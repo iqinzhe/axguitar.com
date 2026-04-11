@@ -94,3 +94,4 @@ const APP = {
         app.innerHTML = UI.dashboard();
     }
 };
+window.APP = APP;
