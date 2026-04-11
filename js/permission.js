@@ -2,7 +2,7 @@ const PERMISSION = {
 
     ROLE: {
         admin: ["ALL"],
-        staff: ["CREATE", "VIEW_OWN", "PAY"]
+        staff: ["CREATE", "PAY", "VIEW_OWN"]
     },
 
     has(action) {
@@ -14,14 +14,10 @@ const PERMISSION = {
         return this.ROLE[AUTH.user.role].includes(action);
     },
 
-    canViewLoan(loan) {
+    canViewLoan(l) {
 
         if (AUTH.user.role === "admin") return true;
 
-        if (AUTH.user.role === "staff") {
-            return loan.staff === AUTH.user.username;
-        }
-
-        return false;
+        return l.staff === AUTH.user.username;
     }
 };
