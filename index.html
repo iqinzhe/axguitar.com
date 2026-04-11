@@ -3,84 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>JF GADAI 典当贷款管理系统 | Sistem Gadai & Pinjaman</title>
+    <title>JF GADAI 智能典当系统 | 动态利息 · 自动延期</title>
     <link rel="stylesheet" href="/cc/main.css">
     <style>
-        /* 补充样式 - 适配记账系统特有模块 */
+        /* 确保双列布局 (桌面/平板) 与手机单列 */
+        .balanced-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--spacing-md);
+            justify-content: center;
+            align-items: stretch;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .balanced-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1rem;
+            }
+            :root {
+                --fs-hero-title: 1.5rem;
+                --fs-section-title: 1.4rem;
+                --fs-card-title: 1.2rem;
+                --fs-subtitle: 1.1rem;
+                --fs-body: 1.0rem;
+                --fs-small: 0.75rem;
+                --icon-size-large: 1.5rem;
+            }
+            .container {
+                padding: 0 var(--spacing-md);
+            }
+            .full-banner {
+                height: 75px;
+            }
+            .quick-actions {
+                flex-direction: column;
+            }
+        }
+
+        /* 自定义徽章与细节 */
         .badge {
             display: inline-block;
-            padding: 0.25rem 0.75rem;
+            padding: 0.2rem 0.6rem;
             border-radius: 20px;
             font-size: var(--fs-small);
             font-weight: 600;
-            text-align: center;
             background: rgba(255,255,255,0.15);
-            color: var(--secondary-color);
         }
-        .badge-success {
-            background: #28a74520;
-            color: #8bc34a;
-            border-left: 3px solid #8bc34a;
-        }
-        .badge-warning {
-            background: #ffc10720;
-            color: #ffc107;
-            border-left: 3px solid #ffc107;
-        }
-        .badge-danger {
-            background: #dc354520;
-            color: #ff8a7a;
-            border-left: 3px solid #dc3545;
+        .badge-success { background: #28a74530; color: #9bff9e; border-left: 3px solid #28a745; }
+        .badge-warning { background: #ffc10730; color: #ffda7c; border-left: 3px solid #ffc107; }
+        .badge-info { background: #17a2b830; color: #9de0ff; }
+        .stat-card {
+            background: rgba(0,0,0,0.25);
+            backdrop-filter: blur(4px);
+            border-radius: var(--border-radius);
+            padding: 0.8rem;
+            text-align: center;
+            flex: 1;
         }
         .loan-stats {
             display: flex;
-            justify-content: space-between;
             gap: 1rem;
             margin: 1rem 0;
             flex-wrap: wrap;
         }
-        .stat-card {
-            background: rgba(0,0,0,0.2);
-            border-radius: var(--border-radius);
-            padding: 0.8rem 1rem;
-            flex: 1;
-            text-align: center;
-            backdrop-filter: blur(4px);
-        }
-        .stat-card span:first-child {
-            font-size: var(--fs-small);
-            opacity: 0.8;
-            display: block;
-        }
-        .stat-card strong {
-            font-size: 1.4rem;
-            color: var(--secondary-color);
-        }
         .payment-history {
-            margin-top: 0.8rem;
-            background: rgba(0,0,0,0.2);
+            margin-top: 10px;
+            background: rgba(0,0,0,0.3);
             border-radius: 12px;
-            padding: 0.5rem;
+            padding: 6px;
             font-size: var(--fs-small);
-            max-height: 120px;
+            max-height: 110px;
             overflow-y: auto;
         }
-        .payment-history p {
-            margin: 4px 0;
-            border-bottom: 1px dashed rgba(255,255,255,0.1);
-            padding: 4px 0;
-        }
-        .grid-card button.small {
-            padding: 0.4rem 0.8rem;
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
             font-size: var(--fs-small);
-            min-width: auto;
-            margin-top: 0.3rem;
+            margin: 4px 0;
+        }
+        .interest-tip {
+            font-size: 0.7rem;
+            color: var(--secondary-color);
+            background: rgba(0,0,0,0.3);
+            border-radius: 20px;
+            padding: 2px 6px;
+            display: inline-block;
         }
         .modal-mask {
             position: fixed;
             top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
             z-index: 2000;
             display: flex;
             align-items: center;
@@ -94,10 +110,10 @@
             opacity:1;
         }
         .modal-card {
-            background: linear-gradient(145deg, #0f3a5a, #08263b);
+            background: linear-gradient(145deg, #0e3e5e, #07273e);
             border-radius: var(--border-radius-lg);
-            max-width: 90%;
-            width: 450px;
+            width: 90%;
+            max-width: 500px;
             padding: 1.5rem;
             border: 1px solid var(--secondary-color);
             box-shadow: var(--shadow-lg);
@@ -118,7 +134,6 @@
             border: none;
             background: rgba(255,255,255,0.15);
             color: white;
-            font-size: var(--fs-body);
         }
         .flex-btns {
             display: flex;
@@ -126,18 +141,12 @@
             justify-content: flex-end;
             margin-top: 1rem;
         }
-        .btn-secondary {
-            background: rgba(255,255,255,0.2);
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--secondary-color);
         }
         hr {
             border-color: rgba(245,197,66,0.3);
-            margin: 0.5rem 0;
-        }
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: var(--fs-small);
-            margin: 4px 0;
         }
     </style>
 </head>
@@ -145,444 +154,425 @@
 
 <header class="assessment-header">
     <div class="container">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 1.8rem;">🏦</span>
-            <h2 style="margin:0; font-size:1.4rem;">JF GADAI | 典当分期记账系统</h2>
+        <div style="display: flex; align-items: center; justify-content: space-between; width:100%; flex-wrap:wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size:1.8rem;">🏦</span>
+                <h2 style="margin:0; font-size:1.3rem;">JF GADAI · 动态利息典当系统</h2>
+            </div>
+            <div style="font-size:0.75rem;">✨ 每期付息自动延期 | 本金减少则利息递减 ✨</div>
         </div>
-        <div style="font-size:0.8rem;">Sistem Gadai & Angsuran</div>
     </div>
 </header>
 
 <div class="container">
-    <!-- 统计卡片区块 -->
+    <!-- 统计看板 (印尼盾 IDR) -->
     <div class="loan-stats fade-in">
-        <div class="stat-card"><span>总放款本金</span><strong id="totalPrincipal">0</strong><span> IDR</span></div>
-        <div class="stat-card"><span>未收本金余额</span><strong id="totalRemain">0</strong><span> IDR</span></div>
-        <div class="stat-card"><span>总利息收入</span><strong id="totalInterestCollected">0</strong><span> IDR</span></div>
-        <div class="stat-card"><span>活跃客户数</span><strong id="activeClients">0</strong></div>
+        <div class="stat-card"><span>📌 总放款本金</span><strong id="totalPrincipal">0</strong><span> IDR</span></div>
+        <div class="stat-card"><span>💰 未还本金余额</span><strong id="totalRemain">0</strong><span> IDR</span></div>
+        <div class="stat-card"><span>💸 累计利息收入</span><strong id="totalInterestCollected">0</strong><span> IDR</span></div>
+        <div class="stat-card"><span>👥 活跃合约</span><strong id="activeCount">0</strong></div>
     </div>
 
-    <!-- 搜索与快速新增 -->
+    <!-- 搜索 + 新增 -->
     <div class="unified-card fade-in">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-            <h3 class="card-title" style="margin-bottom:0;">📋 客户检索 | Pencarian Klien</h3>
-            <button onclick="openNewLoanModal()" class="action-btn whatsapp" style="padding:0.5rem 1rem; min-width:auto;">➕ 新增贷款</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+            <h3 class="card-title" style="margin-bottom:0;">🔍 客户检索 | Cari Klien</h3>
+            <button onclick="openLoanModal()" class="action-btn whatsapp" style="padding:0.5rem 1.2rem; min-width:auto;">➕ 合约 Baru</button>
         </div>
-        <input type="text" id="searchInput" placeholder="🔍 输入姓名 / 手机号后4位 | Nama / 4 digit HP" style="width:100%;padding:12px;border-radius:40px;margin-top:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(245,197,66,0.5);color:white;">
+        <input type="text" id="searchInput" placeholder="📱 输入姓名 / 手机号后4位 | Nama / 4 digit HP" style="width:100%; padding:12px; margin-top:12px; border-radius:40px; background:rgba(255,255,255,0.1); border:1px solid rgba(245,197,66,0.5); color:white;">
     </div>
 
-    <!-- 客户贷款列表 (grid-card 网格) -->
-    <div id="clientLoanList" class="balanced-grid" style="margin-top:1rem;"></div>
+    <!-- 双列网格 (电脑/平板双列, 手机自动单列) -->
+    <div id="loanCardList" class="balanced-grid" style="margin-top:1.5rem;"></div>
 </div>
 
-<!-- 新增/编辑贷款 Modal -->
+<!-- 新增/编辑合约模态框 -->
 <div id="loanModal" class="modal-mask">
     <div class="modal-card">
-        <h3 style="color:var(--secondary-color); margin-bottom:1rem;" id="modalTitle">➕ 新增贷款合约</h3>
-        <div class="input-group">
-            <label>👤 客户姓名 Nama</label>
-            <input type="text" id="modalName" placeholder="例: SUPAINI / 张三">
-        </div>
-        <div class="input-group">
-            <label>📞 手机号 No. HP</label>
-            <input type="text" id="modalPhone" placeholder="08123456789">
-        </div>
-        <div class="input-group">
-            <label>💰 借款本金 (IDR) Jumlah pinjaman</label>
-            <input type="number" id="modalAmount" placeholder="本金 Modal">
-        </div>
-        <div class="input-group">
-            <label>📆 利率 (%) per periode</label>
-            <input type="number" id="modalRate" step="0.01" placeholder="例: 3  (3% per minggu/bulan)">
-        </div>
-        <div class="input-group">
-            <label>⏱️ 周期类型 Tenor</label>
-            <select id="modalPeriodType">
-                <option value="week">每周 (Per Week)</option>
-                <option value="month" selected>每月 (Per Bulan)</option>
-            </select>
-        </div>
-        <div class="input-group">
-            <label>🗓️ 总期数 Total Tenor</label>
-            <input type="number" id="modalTenor" value="10" placeholder="期数">
-        </div>
-        <div class="input-group">
-            <label>📦 抵押品 Jaminan</label>
-            <input type="text" id="modalJaminan" placeholder="BPKB / 电子设备 /  Emas">
-        </div>
-        <div class="flex-btns">
-            <button onclick="closeModal()" class="action-btn location" style="min-width:auto;">取消</button>
-            <button onclick="saveLoanFromModal()" class="action-btn whatsapp" style="min-width:auto;">✅ 保存合约</button>
-        </div>
+        <h3 style="color:var(--secondary-color);" id="modalTitle">➕ 新贷款合约</h3>
+        <div class="input-group"><label>👤 客户姓名 Nama</label><input type="text" id="modalName" placeholder="contoh: SUPAINI"></div>
+        <div class="input-group"><label>📞 手机号 No. HP</label><input type="text" id="modalPhone" placeholder="08123456789"></div>
+        <div class="input-group"><label>💰 贷款本金 (IDR) Jumlah Pinjaman</label><input type="number" id="modalAmount" placeholder="Rp 1.500.000"></div>
+        <div class="input-group"><label>📈 月利率 (%)  / per Bulan</label><input type="number" id="modalRate" step="0.1" placeholder="10 = 10% per bulan" value="10"></div>
+        <div class="input-group"><label>📦 抵押品 Jaminan</label><input type="text" id="modalJaminan" placeholder="BPKB / Emas / Elektronik"></div>
+        <div class="input-group"><label>📅 初始放款日期 Tanggal Mulai</label><input type="date" id="modalStartDate"></div>
+        <div class="flex-btns"><button onclick="closeLoanModal()" class="action-btn location">Batal 取消</button><button onclick="saveLoanContract()" class="action-btn whatsapp">Simpan 保存</button></div>
     </div>
 </div>
 
 <script>
-    // ======================== 数据模型 ========================
-    // clients 结构: 
+    // ---------- 核心数据模型 ----------
+    // Loan 对象结构:
     // {
-    //   id, name, phone, amount (本金), rate (利率小数), periodType ('week'/'month'), tenor (总期数),
-    //   jaminan, startDate (YYYY-MM-DD),
-    //   payments: [{ periodIndex, dueDate, totalDue, principalPaid, interestPaid, status, paidAt }],
-    //   paidPrincipal, paidInterest, status (active/completed)
+    //   id, name, phone, jaminan,
+    //   principal: 原始本金,
+    //   ratePerMonth: 月利率 (小数),
+    //   startDate: YYYY-MM-DD,
+    //   history: [ { date, type, amount, newRemainingPrincipal, interestPaidForMonth, monthIndex, description } ],
+    //   currentPrincipal: 当前剩余本金,
+    //   lastInterestDate: 最后结息日期 (用于延期逻辑),
+    //   status: active / closed
     // }
-    let clients = [];
+    let loans = [];
 
     // 辅助函数
     function loadData() {
-        const stored = localStorage.getItem("jf_gadai_clients_v2");
+        const stored = localStorage.getItem("jf_dynamic_loan_v2");
         if(stored) {
-            clients = JSON.parse(stored);
+            loans = JSON.parse(stored);
+            // 兼容旧数据，确保每个loan拥有必要字段
+            loans.forEach(l => {
+                if(!l.history) l.history = [];
+                if(!l.currentPrincipal) l.currentPrincipal = l.principal;
+                if(!l.lastInterestDate) l.lastInterestDate = l.startDate;
+                if(!l.ratePerMonth) l.ratePerMonth = 0.10;
+            });
         } else {
-            // 基于xlsx风格初始化示例数据 (类似C01 / 张三 以及 C03模板)
-            clients = [
+            // 初始化基于XLSX模板的示例：SUPAINI & 年轻客户
+            loans = [
                 {
-                    id: 1700001,
-                    name: "Pria muda gemuk (Tempeh)",
-                    phone: "08123456789",
-                    amount: 1500000,
-                    rate: 0.03,
-                    periodType: "week",
-                    tenor: 10,
-                    jaminan: "BPKB Motor",
-                    startDate: "2025-12-07",
-                    payments: [],
-                    paidPrincipal: 0,
-                    paidInterest: 0,
+                    id: 1001,
+                    name: "SUPAINI (Cakra Residence)",
+                    phone: "08113690404",
+                    jaminan: "BPKB Mobil",
+                    principal: 1500000,
+                    ratePerMonth: 0.10,   // 10% per bulan
+                    startDate: "2026-01-18",
+                    history: [],
+                    currentPrincipal: 1500000,
+                    lastInterestDate: "2026-01-18",
                     status: "active"
                 },
                 {
-                    id: 1700002,
-                    name: "SUPAINI (Cakra Residence)",
-                    phone: "08113690404",
-                    amount: 1500000,
-                    rate: 0.10,
-                    periodType: "month",
-                    tenor: 10,
-                    jaminan: "BPKB Mobil",
-                    startDate: "2026-01-18",
-                    payments: [],
-                    paidPrincipal: 0,
-                    paidInterest: 0,
+                    id: 1002,
+                    name: "Pria muda gemuk (Tempeh)",
+                    phone: "08123456789",
+                    jaminan: "BPKB Motor",
+                    principal: 1500000,
+                    ratePerMonth: 0.03,
+                    startDate: "2025-12-07",
+                    history: [],
+                    currentPrincipal: 1500000,
+                    lastInterestDate: "2025-12-07",
                     status: "active"
                 }
             ];
-            // 为示例客户生成还款计划
-            clients.forEach(c => generatePaymentSchedule(c));
+            // 为演示模拟一笔历史: SUPAINI 已经付过一期利息 (自动延期案例)
+            const supa = loans[0];
+            const firstInterest = supa.principal * supa.ratePerMonth; // 150000
+            addHistoryRecord(supa, new Date("2026-02-18"), "BUNGA", firstInterest, 0, "Pembayaran Bunga Bulan ke-1 (lunas bunga, perpanjang otomatis)");
+            // 更新剩余本金不变，但 lastInterestDate 推进
+            supa.lastInterestDate = "2026-02-18";
+            supa.currentPrincipal = supa.principal;
             saveToLocal();
         }
-        renderStatsAndList();
+        renderAll();
     }
 
-    function saveToLocal() {
-        localStorage.setItem("jf_gadai_clients_v2", JSON.stringify(clients));
-    }
-
-    // 生成还款计划表 (基于本金,利率,期数,周期)
-    function generatePaymentSchedule(client) {
-        if(client.payments && client.payments.length === client.tenor) return; // 已生成完整
-        const schedule = [];
-        const principal = client.amount;
-        const rate = client.rate;
-        const tenor = client.tenor;
-        const periodType = client.periodType;
-        let currentDate = new Date(client.startDate);
-        
-        // 每期应付总额 (利息部分 = 剩余本金 * 利率，但简化: 经典典当为每期固定利息 = 本金*利率，本金最后一期或每期均摊？根据excel模板看: 每期还固定数额 包含利息+部分本金？ 但excel C01表格: 每期195000 = 1500000*0.03=45000利息 + 150000本金? 150000*10=1.5jt。标准：每期还本金1/10 + 利息 45000 => 195000。我们实现灵活: 每期应还利息 = 本金 * rate; 每期应还本金 = 本金/tenor; 最后调整尾差)
-        const installmentPrincipal = principal / tenor;
-        let remainingPrincipal = principal;
-        
-        for(let i=1; i<=tenor; i++) {
-            let dueDate = new Date(currentDate);
-            if(periodType === 'week') dueDate.setDate(dueDate.getDate() + 7*i);
-            else dueDate.setMonth(dueDate.getMonth() + i);
-            
-            let interestDue = principal * rate;  // 每期利息固定 (依据剩余本金？但简易小贷通常固定)
-            // 最后一期本金调整
-            let principalDue = (i === tenor) ? remainingPrincipal : installmentPrincipal;
-            if(i===tenor) principalDue = remainingPrincipal;
-            else remainingPrincipal -= installmentPrincipal;
-            
-            const totalDue = Math.round(principalDue + interestDue);
-            
-            schedule.push({
-                periodIndex: i,
-                dueDate: dueDate.toISOString().split('T')[0],
-                totalDue: totalDue,
-                principalDue: Math.round(principalDue),
-                interestDue: Math.round(interestDue),
-                principalPaid: 0,
-                interestPaid: 0,
-                status: 'pending', // pending, partial, paid
-                paidAt: null
-            });
-        }
-        client.payments = schedule;
-        // 同步已还数据
-        let totalPaidPrincipal = 0, totalPaidInterest = 0;
-        schedule.forEach(p => {
-            totalPaidPrincipal += p.principalPaid;
-            totalPaidInterest += p.interestPaid;
+    function addHistoryRecord(loan, dateObj, type, amount, principalPaidPart, desc) {
+        if(!loan.history) loan.history = [];
+        loan.history.push({
+            date: dateObj.toISOString().split('T')[0],
+            type: type, // "BUNGA" 或 "POKOK" 或 "MIX"
+            amount: amount,
+            principalPaid: principalPaidPart,
+            newRemainingPrincipal: loan.currentPrincipal - principalPaidPart,
+            description: desc
         });
-        client.paidPrincipal = totalPaidPrincipal;
-        client.paidInterest = totalPaidInterest;
-        client.status = (client.paidPrincipal >= client.amount) ? "completed" : "active";
-        if(client.paidPrincipal >= client.amount) client.status = "completed";
     }
 
-    // 更新单个客户的状态 (根据payment记录)
-    function updateClientStatus(client) {
-        let totalPaidPrincipal = 0, totalPaidInterest = 0;
-        client.payments.forEach(p => {
-            totalPaidPrincipal += p.principalPaid;
-            totalPaidInterest += p.interestPaid;
-        });
-        client.paidPrincipal = totalPaidPrincipal;
-        client.paidInterest = totalPaidInterest;
-        client.status = (client.paidPrincipal >= client.amount) ? "completed" : "active";
-        if(client.paidPrincipal >= client.amount) client.status = "completed";
-        saveToLocal();
+    // 核心：计算某贷款当前截至某日期应该产生的利息（基于剩余本金 & 未付利息周期）
+    // 业务逻辑：客户只需每月付清当月利息即可自动延期，本金不变则下月利息相同；若还了部分本金，则下月起利息 = 剩余本金 * 月利率
+    // 我们以“上次结息日 lastInterestDate” 到 “今天(或操作日)” 计算逾期利息，但系统约定收款时自动结算当月利息+可选本金。
+    // UI上展示每月应付利息 = 当前剩余本金 * 月利率。用户付款时可以选择“仅付利息”自动延期，或“付息+部分本金”。
+    function getCurrentMonthlyInterest(loan) {
+        return loan.currentPrincipal * loan.ratePerMonth;
     }
 
-    // 收款: 选择客户和期数 (支持部分还款)
-    function openPaymentModal(clientId) {
-        const client = clients.find(c => c.id === clientId);
-        if(!client) return;
-        // 展示未还期数列表 (简单用prompt风格，为了体验做内嵌dialog？简便但用模态框二次，为了快速使用使用自定义dialog)
-        let unpaidPeriods = client.payments.filter(p => p.principalPaid < p.principalDue || p.interestPaid < p.interestDue);
-        if(unpaidPeriods.length === 0) {
-            alert("✅ 此贷款已结清！ Lunas");
-            return;
+    // 处理付款 (核心闭环)
+    // paymentAmount: 用户本次支付总额(IDR)
+    // 规则: 优先支付截至当期的所有未付利息 (从上一次结息日到现在的利息)，超出部分冲抵本金。
+    // 但为简化直观，我们按照“每次付款时默认结清从上次利息支付日到现在的利息，余款还本金”，实现自动延期+利息递减。
+    function processPayment(loan, paymentAmount, paymentDate = new Date()) {
+        if(loan.status === 'closed') {
+            alert("合约已结清 | Kontrak sudah lunas");
+            return false;
         }
-        let periodOptions = unpaidPeriods.map(p => `期次 ${p.periodIndex} (应还: ${formatRupiah(p.totalDue)} 截止${p.dueDate})`).join('\n');
-        let periodIndex = prompt(`🔔 选择收款期次 (输入期数) \n${periodOptions}\n\n客户: ${client.name} | 剩余本金: ${formatRupiah(client.amount - client.paidPrincipal)}`);
-        if(!periodIndex) return;
-        const targetPeriod = client.payments.find(p => p.periodIndex == periodIndex);
-        if(!targetPeriod) {
-            alert("期次无效");
-            return;
-        }
-        const remainingPrincipalDue = targetPeriod.principalDue - targetPeriod.principalPaid;
-        const remainingInterestDue = targetPeriod.interestDue - targetPeriod.interestPaid;
-        const remainTotal = remainingPrincipalDue + remainingInterestDue;
-        let payAmount = prompt(`💰 本期剩余应还: ${formatRupiah(remainTotal)}\n输入还款金额 (IDR) :`, remainTotal);
-        if(!payAmount) return;
-        let amountNum = parseInt(payAmount);
-        if(isNaN(amountNum) || amountNum <= 0) return alert("金额无效");
+        let remainingAmount = paymentAmount;
+        let lastDate = loan.lastInterestDate ? new Date(loan.lastInterestDate) : new Date(loan.startDate);
+        let currentDate = paymentDate;
         
-        // 先还利息后本金 (业务规则)
-        let payInterest = Math.min(remainingInterestDue, amountNum);
-        let payPrincipal = Math.min(remainingPrincipalDue, amountNum - payInterest);
-        targetPeriod.interestPaid += payInterest;
-        targetPeriod.principalPaid += payPrincipal;
-        if(targetPeriod.interestPaid >= targetPeriod.interestDue && targetPeriod.principalPaid >= targetPeriod.principalDue) {
-            targetPeriod.status = 'paid';
-            targetPeriod.paidAt = new Date().toISOString();
+        // 计算从上一次结息到本次付款之间应产生的利息 (按月计，不足一个月按比例精确到天)
+        let monthsDiff = (currentDate.getFullYear() - lastDate.getFullYear()) * 12 + (currentDate.getMonth() - lastDate.getMonth());
+        let daysDiff = currentDate.getDate() - lastDate.getDate();
+        let totalMonths = monthsDiff + (daysDiff / 30);
+        if(totalMonths < 0) totalMonths = 0;
+        let accruedInterest = loan.currentPrincipal * loan.ratePerMonth * totalMonths;
+        accruedInterest = Math.round(accruedInterest);
+        
+        let interestToPay = Math.min(accruedInterest, remainingAmount);
+        let paidInterest = interestToPay;
+        remainingAmount -= paidInterest;
+        
+        // 本金偿还部分
+        let paidPrincipal = 0;
+        if(remainingAmount > 0 && loan.currentPrincipal > 0) {
+            paidPrincipal = Math.min(remainingAmount, loan.currentPrincipal);
+            loan.currentPrincipal -= paidPrincipal;
+            remainingAmount -= paidPrincipal;
+        }
+        
+        if(paidInterest === 0 && paidPrincipal === 0) {
+            alert("⛔ 付款金额不足以支付任何利息，请至少支付当期利息");
+            return false;
+        }
+        
+        // 记录历史
+        let description = `Pembayaran: Bunga ${formatRupiah(paidInterest)}`;
+        if(paidPrincipal > 0) description += ` + Pokok ${formatRupiah(paidPrincipal)}`;
+        addHistoryRecord(loan, currentDate, (paidPrincipal>0 ? "MIX" : "BUNGA"), paidInterest, paidPrincipal, description);
+        
+        // 更新最后结息日: 如果本次支付完全覆盖了截至今天的利息，则更新 lastInterestDate 为当前日期 (自动延期)
+        if(paidInterest >= accruedInterest) {
+            loan.lastInterestDate = currentDate.toISOString().split('T')[0];
         } else {
-            targetPeriod.status = 'partial';
+            // 部分支付利息的情况下，保持原有的lastInterestDate不变，留待下次
+            // 但为了体验，允许部分还息；但是我们提醒用户
+            alert(`⚠️ 本次支付利息仅覆盖部分欠息，剩余利息 ${formatRupiah(accruedInterest - paidInterest)} 需尽快补足，否则无法延期。`);
         }
-        updateClientStatus(client);
-        generatePaymentSchedule(client); // 刷新总额同步
-        renderStatsAndList();
+        
+        // 更新状态
+        if(loan.currentPrincipal <= 0) {
+            loan.status = "closed";
+            loan.currentPrincipal = 0;
+            addHistoryRecord(loan, currentDate, "POKOK", 0, 0, "✅ 贷款结清 LUNAS TOTAL");
+        }
+        
         saveToLocal();
-        alert(`✅ 收款成功！ 利息: ${formatRupiah(payInterest)} , 本金: ${formatRupiah(payPrincipal)}`);
+        renderAll();
+        return true;
     }
-
-    // 查看还款历史明细
-    function viewPaymentHistory(clientId) {
-        const client = clients.find(c => c.id === clientId);
-        if(!client) return;
-        let historyHtml = client.payments.map(p => {
-            let statusEmoji = p.status === 'paid' ? '✅' : (p.status === 'partial' ? '⚠️部分' : '⏳未付');
-            return `期次 ${p.periodIndex} (${p.dueDate}): 应收 ${formatRupiah(p.totalDue)} | 已还本:${formatRupiah(p.principalPaid)} 息:${formatRupiah(p.interestPaid)} ${statusEmoji}`;
-        }).join('\n');
-        alert(`📋 还款明细 - ${client.name}\n\n${historyHtml}\n\n剩余应还本金: ${formatRupiah(client.amount - client.paidPrincipal)}`);
-    }
-
-    // 删除客户
-    function deleteClient(clientId) {
-        if(confirm("⚠️ 删除所有贷款记录？不可恢复。 Hapus data?")) {
-            clients = clients.filter(c => c.id !== clientId);
-            saveToLocal();
-            renderStatsAndList();
+    
+    // 快速付息（自动延期一个月）—— 便捷按钮: 支付当前月利息，剩余本金不变，自动延期
+    function quickPayInterest(loanId) {
+        const loan = loans.find(l => l.id === loanId);
+        if(!loan || loan.status === 'closed') {
+            alert("贷款已结清或不存在");
+            return;
+        }
+        const monthlyInterest = getCurrentMonthlyInterest(loan);
+        if(monthlyInterest <= 0) {
+            alert("当前无需付息 | Tidak perlu bayar bunga");
+            return;
+        }
+        let confirmMsg = `💡 支付本月利息 ${formatRupiah(monthlyInterest)} IDR，本金不变，合约自动延期一个月。\nLanjutkan?`;
+        if(confirm(confirmMsg)) {
+            // 构造付款金额正好等于利息
+            const success = processPayment(loan, monthlyInterest, new Date());
+            if(success) alert(`✅ 利息已收，贷款自动延期至下月。Sisa Pokok: ${formatRupiah(loan.currentPrincipal)}`);
         }
     }
-
-    // 新增贷款 (从modal)
-    let editingId = null;
-    function openNewLoanModal(loanId = null) {
-        editingId = loanId;
+    
+    // 自定义还款: 可以还利息+本金
+    function customPayment(loanId) {
+        const loan = loans.find(l => l.id === loanId);
+        if(!loan) return;
+        const monthlyInterest = getCurrentMonthlyInterest(loan);
+        let msg = `💰 当前剩余本金: ${formatRupiah(loan.currentPrincipal)}\n📆 本月应付利息: ${formatRupiah(monthlyInterest)}\n\n输入还款金额 (IDR):`;
+        let amount = prompt(msg, monthlyInterest);
+        if(!amount) return;
+        let payNum = parseInt(amount);
+        if(isNaN(payNum) || payNum <= 0) return alert("无效金额");
+        processPayment(loan, payNum, new Date());
+    }
+    
+    // 合约详情/历史记录
+    function showHistory(loanId) {
+        const loan = loans.find(l => l.id === loanId);
+        if(!loan) return;
+        let historyText = `📜 还款记录 - ${loan.name}\n剩余本金: ${formatRupiah(loan.currentPrincipal)}\n月利率: ${(loan.ratePerMonth*100).toFixed(1)}%\n\n`;
+        if(!loan.history.length) historyText += "暂无还款记录";
+        loan.history.slice().reverse().forEach(h => {
+            historyText += `📅 ${h.date} | ${h.description} | 剩余本金: ${formatRupiah(h.newRemainingPrincipal)}\n`;
+        });
+        alert(historyText);
+    }
+    
+    // 删除合约
+    function deleteLoan(loanId) {
+        if(confirm("⚠️ 永久删除合约及所有记录？Yakin hapus?")) {
+            loans = loans.filter(l => l.id !== loanId);
+            saveToLocal();
+            renderAll();
+        }
+    }
+    
+    // 新增/编辑模态框
+    let currentEditId = null;
+    function openLoanModal(editId = null) {
+        currentEditId = editId;
         const modal = document.getElementById('loanModal');
-        if(loanId) {
-            const client = clients.find(c => c.id === loanId);
-            if(client) {
-                document.getElementById('modalTitle').innerText = '✏️ 编辑贷款合约';
-                document.getElementById('modalName').value = client.name;
-                document.getElementById('modalPhone').value = client.phone;
-                document.getElementById('modalAmount').value = client.amount;
-                document.getElementById('modalRate').value = client.rate * 100;
-                document.getElementById('modalPeriodType').value = client.periodType;
-                document.getElementById('modalTenor').value = client.tenor;
-                document.getElementById('modalJaminan').value = client.jaminan || '';
+        if(editId) {
+            const loan = loans.find(l => l.id === editId);
+            if(loan) {
+                document.getElementById('modalTitle').innerText = "✏️ 编辑合约 Edit";
+                document.getElementById('modalName').value = loan.name;
+                document.getElementById('modalPhone').value = loan.phone;
+                document.getElementById('modalAmount').value = loan.principal;
+                document.getElementById('modalRate').value = loan.ratePerMonth * 100;
+                document.getElementById('modalJaminan').value = loan.jaminan || '';
+                document.getElementById('modalStartDate').value = loan.startDate;
             }
         } else {
-            document.getElementById('modalTitle').innerText = '➕ 新增贷款合约';
+            document.getElementById('modalTitle').innerText = "➕ 合约 Baru";
             document.getElementById('modalName').value = '';
             document.getElementById('modalPhone').value = '';
             document.getElementById('modalAmount').value = '';
-            document.getElementById('modalRate').value = '';
-            document.getElementById('modalPeriodType').value = 'month';
-            document.getElementById('modalTenor').value = '10';
+            document.getElementById('modalRate').value = '10';
             document.getElementById('modalJaminan').value = '';
+            document.getElementById('modalStartDate').value = new Date().toISOString().split('T')[0];
         }
         modal.classList.add('active');
     }
-    function closeModal() {
+    function closeLoanModal() {
         document.getElementById('loanModal').classList.remove('active');
-        editingId = null;
+        currentEditId = null;
     }
-    function saveLoanFromModal() {
+    function saveLoanContract() {
         const name = document.getElementById('modalName').value.trim();
         const phone = document.getElementById('modalPhone').value.trim();
         let amount = parseFloat(document.getElementById('modalAmount').value);
         let ratePercent = parseFloat(document.getElementById('modalRate').value);
-        const periodType = document.getElementById('modalPeriodType').value;
-        let tenor = parseInt(document.getElementById('modalTenor').value);
         const jaminan = document.getElementById('modalJaminan').value.trim();
-        if(!name || !phone || isNaN(amount) || amount<=0 || isNaN(ratePercent) || ratePercent<=0 || isNaN(tenor) || tenor<=0) {
-            alert("请完整填写有效数据！ Nama, HP, jumlah pinjaman, suku bunga harus diisi.");
+        let startDate = document.getElementById('modalStartDate').value;
+        if(!name || !phone || isNaN(amount) || amount<=0 || isNaN(ratePercent) || ratePercent<=0) {
+            alert("Harap isi data lengkap (Nama, HP, Jumlah, Suku Bunga)");
             return;
         }
         const rateDecimal = ratePercent / 100;
-        if(editingId) {
-            // 编辑现有客户 (注意: 编辑会重置还款计划)
-            const index = clients.findIndex(c => c.id === editingId);
-            if(index !== -1) {
-                clients[index] = {
-                    ...clients[index],
-                    name, phone, amount, rate: rateDecimal, periodType, tenor, jaminan,
-                    startDate: clients[index].startDate,
-                    payments: [],
-                    paidPrincipal: 0,
-                    paidInterest: 0,
-                    status: 'active'
+        if(currentEditId) {
+            const idx = loans.findIndex(l => l.id === currentEditId);
+            if(idx !== -1) {
+                const old = loans[idx];
+                loans[idx] = {
+                    ...old,
+                    name, phone, jaminan,
+                    principal: amount,
+                    ratePerMonth: rateDecimal,
+                    startDate: startDate,
+                    currentPrincipal: amount,
+                    lastInterestDate: startDate,
+                    history: old.history || [],
+                    status: "active"
                 };
-                generatePaymentSchedule(clients[index]);
-                saveToLocal();
             }
         } else {
             const newId = Date.now();
-            const newClient = {
+            loans.push({
                 id: newId,
-                name, phone, amount, rate: rateDecimal, periodType, tenor, jaminan,
-                startDate: new Date().toISOString().split('T')[0],
-                payments: [],
-                paidPrincipal: 0,
-                paidInterest: 0,
-                status: 'active'
-            };
-            generatePaymentSchedule(newClient);
-            clients.push(newClient);
-            saveToLocal();
+                name, phone, jaminan,
+                principal: amount,
+                ratePerMonth: rateDecimal,
+                startDate: startDate,
+                history: [],
+                currentPrincipal: amount,
+                lastInterestDate: startDate,
+                status: "active"
+            });
         }
-        closeModal();
-        renderStatsAndList();
+        saveToLocal();
+        closeLoanModal();
+        renderAll();
     }
-
-    // 渲染统计和列表
-    function renderStatsAndList() {
-        // 统计数据
-        let totalLoanPrincipal = 0;
-        let totalRemainPrincipal = 0;
-        let totalInterestCollected = 0;
-        let activeCount = 0;
-        clients.forEach(c => {
-            totalLoanPrincipal += c.amount;
-            const remain = c.amount - c.paidPrincipal;
-            totalRemainPrincipal += remain > 0 ? remain : 0;
-            totalInterestCollected += c.paidInterest;
-            if(c.status === 'active') activeCount++;
+    
+    function saveToLocal() {
+        localStorage.setItem("jf_dynamic_loan_v2", JSON.stringify(loans));
+    }
+    
+    // 渲染双列网格 + 统计
+    function renderAll() {
+        // 统计
+        let totalPrincipal = 0, totalRemain = 0, totalInterestCollected = 0, activeLoans = 0;
+        loans.forEach(l => {
+            totalPrincipal += l.principal;
+            totalRemain += l.currentPrincipal;
+            if(l.history) {
+                const interestSum = l.history.filter(h => h.type !== "POKOK").reduce((sum, h) => sum + (h.amount || 0), 0);
+                totalInterestCollected += interestSum;
+            }
+            if(l.status === 'active') activeLoans++;
         });
-        document.getElementById('totalPrincipal').innerText = formatRupiah(totalLoanPrincipal);
-        document.getElementById('totalRemain').innerText = formatRupiah(totalRemainPrincipal);
-        document.getElementById('totalInterestCollected').innerText = formatRupiah(totalInterestCollected);
-        document.getElementById('activeClients').innerText = activeCount;
+        document.getElementById('totalPrincipal').innerHTML = formatRupiah(totalPrincipal);
+        document.getElementById('totalRemain').innerHTML = formatRupiah(totalRemain);
+        document.getElementById('totalInterestCollected').innerHTML = formatRupiah(totalInterestCollected);
+        document.getElementById('activeCount').innerText = activeLoans;
         
-        // 搜索过滤
         const keyword = document.getElementById('searchInput').value.toLowerCase();
-        const filtered = clients.filter(c => c.name.toLowerCase().includes(keyword) || c.phone.slice(-4).includes(keyword));
-        const container = document.getElementById('clientLoanList');
+        const filtered = loans.filter(l => l.name.toLowerCase().includes(keyword) || l.phone.slice(-4).includes(keyword));
+        const container = document.getElementById('loanCardList');
         container.innerHTML = '';
         if(filtered.length === 0) {
-            container.innerHTML = '<div class="unified-card" style="grid-column:1/-1; text-align:center;">📭 暂无客户数据 / Tidak ada klien</div>';
+            container.innerHTML = '<div class="unified-card" style="grid-column:1/-1;">📭 Tidak ada data klien</div>';
             return;
         }
-        filtered.forEach(client => {
-            const remainPrincipal = client.amount - client.paidPrincipal;
-            const progressPercent = (client.paidPrincipal / client.amount) * 100;
+        filtered.forEach(loan => {
+            const monthlyInterest = getCurrentMonthlyInterest(loan);
+            const progress = ((loan.principal - loan.currentPrincipal) / loan.principal) * 100;
             const card = document.createElement('div');
-            card.className = 'grid-card fade-in';
-            // 显示最近未还期次提醒
-            let nextDue = client.payments.find(p => p.status !== 'paid');
-            let dueInfo = nextDue ? `⏰ 下期: 期${nextDue.periodIndex} 应还 ${formatRupiah(nextDue.totalDue)} (${nextDue.dueDate})` : '✅ 已结清 Lunas';
+            card.className = "grid-card fade-in";
+            card.style.display = "flex";
+            card.style.flexDirection = "column";
             card.innerHTML = `
                 <div style="display:flex; justify-content:space-between; width:100%;">
-                    <h3 style="font-size:1.2rem;">${escapeHtml(client.name)}</h3>
-                    <span class="badge ${client.status==='completed'?'badge-success':'badge-warning'}">${client.status==='completed'?'已结清 Lunas':'正常 Active'}</span>
+                    <h3 style="font-size:1.2rem;">${escapeHtml(loan.name)}</h3>
+                    <span class="badge ${loan.status==='active'?'badge-warning':'badge-success'}">${loan.status==='active'?'Berjalan 进行中':'Lunas 结清'}</span>
                 </div>
-                <div class="detail-row"><span>📞 ${client.phone}</span><span>🏷️ ${client.jaminan || 'BPKB'}</span></div>
-                <div class="detail-row"><span>💰 本金: ${formatRupiah(client.amount)}</span><span>💸 利率: ${(client.rate*100).toFixed(1)}% / ${client.periodType==='week'?'Minggu':'Bulan'}</span></div>
-                <div class="detail-row"><span>📉 剩余本金: ${formatRupiah(remainPrincipal)}</span><span>📈 已还利息: ${formatRupiah(client.paidInterest)}</span></div>
-                <div style="background:rgba(0,0,0,0.3); border-radius:8px; margin:6px 0; height:8px;"><div style="width:${progressPercent}%; background:var(--secondary-color); height:8px; border-radius:8px;"></div></div>
-                <div style="font-size:var(--fs-small); margin-bottom:4px;">${dueInfo}</div>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
-                    <button onclick="openPaymentModal(${client.id})" class="action-btn whatsapp" style="padding:0.3rem 0.8rem; min-width:auto; font-size:0.75rem;">💰 收款 Bayar</button>
-                    <button onclick="viewPaymentHistory(${client.id})" class="action-btn location" style="padding:0.3rem 0.8rem; min-width:auto; font-size:0.75rem;">📜 明细 Riwayat</button>
-                    <button onclick="openNewLoanModal(${client.id})" class="action-btn location" style="padding:0.3rem 0.8rem; min-width:auto; font-size:0.75rem;">✏️ 编辑 Edit</button>
-                    <button onclick="deleteClient(${client.id})" class="action-btn location" style="padding:0.3rem 0.8rem; min-width:auto; background:rgba(220,53,69,0.3);">🗑️ 删除 Hapus</button>
+                <div class="detail-row"><span>📞 ${loan.phone}</span><span>🏷️ ${loan.jaminan || '-'}</span></div>
+                <div class="detail-row"><span>💰 Pokok Awal: ${formatRupiah(loan.principal)}</span><span>💎 Sisa: ${formatRupiah(loan.currentPrincipal)}</span></div>
+                <div class="detail-row"><span>📈 Bunga/bln: ${(loan.ratePerMonth*100).toFixed(1)}%</span><span>💵 Bunga bln ini: ${formatRupiah(monthlyInterest)}</span></div>
+                <div style="background:rgba(0,0,0,0.4); border-radius:8px; margin:8px 0; height:8px;"><div style="width:${progress}%; background:var(--secondary-color); height:8px; border-radius:8px;"></div></div>
+                <div class="interest-tip" style="margin-bottom:6px;">✨ 每付清当月利息 → 自动延期一个月 ✨</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px;">
+                    <button onclick="quickPayInterest(${loan.id})" class="action-btn whatsapp" style="padding:0.4rem 0.8rem; min-width:auto; font-size:0.75rem;">💸 付息延期</button>
+                    <button onclick="customPayment(${loan.id})" class="action-btn location" style="padding:0.4rem 0.8rem; min-width:auto; font-size:0.75rem;">💵 还款 + 还本</button>
+                    <button onclick="showHistory(${loan.id})" class="action-btn location" style="padding:0.4rem 0.8rem; min-width:auto; font-size:0.75rem;">📜 明细</button>
+                    <button onclick="openLoanModal(${loan.id})" class="action-btn location" style="padding:0.4rem 0.8rem;">✏️</button>
+                    <button onclick="deleteLoan(${loan.id})" class="action-btn location" style="background:#dc354530; padding:0.4rem 0.8rem;">🗑️</button>
                 </div>
-                <div class="payment-history" id="historyShort_${client.id}" style="max-height:80px; overflow-y:auto; margin-top:6px;">
-                    ${generateShortHistory(client)}
+                <div class="payment-history" style="margin-top:10px;">
+                    ${generateShortHistory(loan)}
                 </div>
+                <div style="font-size:0.65rem; margin-top:5px; opacity:0.7;">📌 上次结息: ${loan.lastInterestDate} | 剩余本金决定下期利息</div>
             `;
             container.appendChild(card);
         });
     }
     
-    function generateShortHistory(client) {
-        let lastPaid = client.payments.filter(p => p.principalPaid>0 || p.interestPaid>0).slice(-3);
-        if(lastPaid.length === 0) return '<div style="font-size:0.7rem; opacity:0.7;">暂无还款记录</div>';
-        return lastPaid.map(p => `<div style="font-size:0.65rem;">✅ 期${p.periodIndex}: 还本 ${formatRupiah(p.principalPaid)} + 息 ${formatRupiah(p.interestPaid)}</div>`).join('');
+    function generateShortHistory(loan) {
+        if(!loan.history || loan.history.length === 0) return "<div>📭 无交易记录</div>";
+        let lastThree = loan.history.slice(-3).reverse();
+        return lastThree.map(h => `<div>✅ ${h.date} | ${h.description} | Sisa: ${formatRupiah(h.newRemainingPrincipal)}</div>`).join('');
     }
     
     function formatRupiah(num) {
-        if(isNaN(num)) num=0;
+        if(isNaN(num)) num = 0;
         return new Intl.NumberFormat('id-ID').format(Math.floor(num));
     }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
     
-    function escapeHtml(str) {
-        if(!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if(m === '&') return '&amp;';
-            if(m === '<') return '&lt;';
-            if(m === '>') return '&gt;';
-            return m;
-        });
-    }
+    // 搜索监听
+    document.getElementById('searchInput')?.addEventListener('input', renderAll);
+    // 全局挂载函数
+    window.openLoanModal = openLoanModal;
+    window.closeLoanModal = closeLoanModal;
+    window.saveLoanContract = saveLoanContract;
+    window.quickPayInterest = quickPayInterest;
+    window.customPayment = customPayment;
+    window.showHistory = showHistory;
+    window.deleteLoan = deleteLoan;
     
-    // 监听搜索
-    document.getElementById('searchInput')?.addEventListener('input', renderStatsAndList);
-    // 初始化
     loadData();
-    window.openNewLoanModal = openNewLoanModal;
-    window.closeModal = closeModal;
-    window.saveLoanFromModal = saveLoanFromModal;
-    window.openPaymentModal = openPaymentModal;
-    window.viewPaymentHistory = viewPaymentHistory;
-    window.deleteClient = deleteClient;
 </script>
-
-<!-- 确保现有js全局 -->
 <script src="/ccc/main.js"></script>
 </body>
 </html>
