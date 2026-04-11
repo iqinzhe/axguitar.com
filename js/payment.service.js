@@ -2,8 +2,6 @@ const PaymentService = {
 
     payInterest(id) {
 
-        if (!PERMISSION.has("PAY")) return;
-
         const loan = DB.loans.find(l => l.id === id);
 
         const amount = LoanService.interest(loan);
@@ -17,11 +15,11 @@ const PaymentService = {
         loan.lastInterest = Utils.today();
     },
 
-    payPrincipal(id, amount) {
-
-        if (!PERMISSION.has("PAY")) return;
+    payPrincipal(id) {
 
         const loan = DB.loans.find(l => l.id === id);
+
+        const amount = parseFloat(prompt("Amount"));
 
         loan.remaining -= amount;
 
