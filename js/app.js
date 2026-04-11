@@ -1,3 +1,4 @@
+console.log("APP FILE LOADED");
 const APP = {
 
     page: "dashboard",
