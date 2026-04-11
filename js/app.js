@@ -1,17 +1,14 @@
 const APP = {
 
-    page: "dashboard",
+    db: null,
 
     init() {
 
+        this.db = Storage.load();
+
+        AUTH.init(this.db);
         AUTH.load();
 
-        if (!PERMISSION.requireLogin()) {
-            this.renderLogin();
-            return;
-        }
-
-        this.bind();
         this.render();
     },
 
@@ -25,64 +22,29 @@ const APP = {
             return;
         }
 
-        this.init();
+        this.render();
     },
 
     logout() {
         AUTH.logout();
     },
 
-    bind() {
-
-        document.getElementById("btnDashboard")?.addEventListener("click", () => {
-            this.page = "dashboard";
-            this.render();
-        });
-
-        document.getElementById("btnOrders")?.addEventListener("click", () => {
-            this.page = "orders";
-            this.render();
-        });
-    },
-
-    renderLogin() {
-        document.getElementById("app").innerHTML = `
-            <div style="padding:20px">
-                <h2>LOGIN</h2>
-                <input id="u" placeholder="username"><br><br>
-                <input id="p" placeholder="password"><br><br>
-                <button onclick="APP.login()">Login</button>
-            </div>
-        `;
-    },
-
     render() {
 
-        if (!PERMISSION.canAccess(this.page)) {
-            document.getElementById("app").innerHTML = "NO PERMISSION";
+        const app = document.getElementById("app");
+
+        Storage.save(this.db);
+
+        if (!AUTH.user) {
+            app.innerHTML = UI.login();
             return;
         }
 
-        if (this.page === "dashboard") {
-            document.getElementById("app").innerHTML = `
-                <h2>Dashboard</h2>
-                <button id="btnOrders">Orders</button>
-                <button onclick="APP.logout()">Logout</button>
-            `;
-        }
-
-        if (this.page === "orders") {
-            document.getElementById("app").innerHTML = `
-                <h2>Orders</h2>
-                <button id="btnDashboard">Dashboard</button>
-                <button onclick="APP.logout()">Logout</button>
-            `;
-        }
+        const stats = Dashboard.getStats(this.db);
+        app.innerHTML = UI.dashboard(stats);
     }
 };
 
 window.APP = APP;
 
-document.addEventListener("DOMContentLoaded", () => {
-    APP.init();
-});
+document.addEventListener("DOMContentLoaded", () => APP.init());
