@@ -1,4 +1,4 @@
-/* ==================== 现代化典当系统主样式 - 毛玻璃+高级质感（优化版） ==================== */
+/* ==================== 现代化典当系统主样式 - 毛玻璃+高级质感（修复版） ==================== */
 * {
     margin: 0;
     padding: 0;
@@ -51,6 +51,7 @@ body {
     position: relative;
 }
 
+/* ========== 修复背景图案 - 使用纯CSS渐变，更稳定 ========== */
 body::before {
     content: '';
     position: fixed;
@@ -58,8 +59,11 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" opacity="0.08"><path fill="none" stroke="%23f5b642" stroke-width="1.2" d="M0,600 L1200,600 M600,0 L600,1200 M300,150 L900,750 M300,750 L900,150"/><circle cx="600" cy="600" r="250" stroke="%23f5b642" stroke-width="0.8"/><circle cx="600" cy="600" r="400" stroke="%23f5b642" stroke-width="0.5"/></svg>');
-    background-repeat: repeat;
+    background-image: 
+        radial-gradient(circle at 20% 30%, rgba(245, 182, 66, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, rgba(245, 182, 66, 0.08) 0%, transparent 40%),
+        repeating-linear-gradient(45deg, rgba(245, 182, 66, 0.04) 0px, rgba(245, 182, 66, 0.04) 2px, transparent 2px, transparent 12px),
+        repeating-linear-gradient(135deg, rgba(245, 182, 66, 0.03) 0px, rgba(245, 182, 66, 0.03) 1px, transparent 1px, transparent 8px);
     pointer-events: none;
     z-index: 0;
 }
@@ -72,14 +76,91 @@ body::before {
     z-index: 2;
 }
 
-/* 卡片毛玻璃效果 */
+/* ========== 头部样式 ========== */
+.assessment-header {
+    background: rgba(4, 25, 40, 0.85);
+    backdrop-filter: blur(16px);
+    border-bottom: 3px solid var(--secondary-gold);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* ========== 可折叠面板样式 ========== */
+.collapse-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(14px);
+    border: 2px solid var(--secondary-gold);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: var(--spacing-lg);
+    overflow: hidden;
+    transition: var(--transition-smooth);
+}
+
+.collapse-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, rgba(245, 182, 66, 0.15), rgba(245, 182, 66, 0.05));
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--secondary-gold);
+    transition: var(--transition-smooth);
+}
+
+.collapse-header:hover {
+    background: linear-gradient(135deg, rgba(245, 182, 66, 0.25), rgba(245, 182, 66, 0.1));
+}
+
+.collapse-icon {
+    font-size: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.collapse-panel.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.collapse-panel.collapsed .collapse-content {
+    display: none;
+}
+
+.collapse-content {
+    padding: var(--spacing-lg);
+    border-top: 1px solid rgba(245, 182, 66, 0.3);
+}
+
+/* 卡片毛玻璃效果 - 金色边框增强版 */
 .unified-card, .grid-card {
     background: var(--glass-bg);
     backdrop-filter: blur(14px);
-    border: 1px solid var(--glass-border);
+    border: 2px solid var(--secondary-gold);
     border-radius: var(--border-radius-lg);
     transition: var(--transition-smooth);
     box-shadow: var(--glass-shadow);
+    position: relative;
+}
+
+/* 金色边框发光效果 */
+.unified-card::before, .grid-card::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, var(--secondary-gold), transparent, var(--secondary-gold-light));
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+}
+
+.unified-card:hover::before, .grid-card:hover::before {
+    opacity: 0.5;
 }
 
 .unified-card {
@@ -101,7 +182,7 @@ body::before {
 
 .unified-card:hover, .grid-card:hover {
     transform: translateY(-6px);
-    border-color: var(--secondary-gold);
+    border-color: var(--secondary-gold-light);
     box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(245, 182, 66, 0.3);
 }
 
@@ -134,7 +215,7 @@ body::before {
     padding-left: 12px;
 }
 
-/* 统计卡片区 */
+/* 统计卡片区 - 金色边框增强 */
 .loan-stats {
     display: flex;
     gap: var(--spacing-md);
@@ -149,13 +230,14 @@ body::before {
     padding: 1rem 0.8rem;
     text-align: center;
     flex: 1;
-    border: 1px solid rgba(245, 182, 66, 0.35);
+    border: 1.5px solid var(--secondary-gold);
     transition: var(--transition-smooth);
 }
 
 .stat-card:hover {
     background: rgba(0, 0, 0, 0.6);
-    border-color: var(--secondary-gold);
+    border-width: 2px;
+    box-shadow: 0 0 15px rgba(245, 182, 66, 0.4);
     transform: translateY(-3px);
 }
 
@@ -199,11 +281,12 @@ body::before {
     background: linear-gradient(135deg, var(--secondary-gold), #e0a030);
     color: #1e2a3a;
     font-weight: bold;
+    box-shadow: 0 2px 8px rgba(245, 182, 66, 0.3);
 }
 
 .action-btn.location {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1.5px solid var(--secondary-gold);
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid var(--secondary-gold);
     color: var(--secondary-gold);
 }
 
@@ -217,7 +300,7 @@ button:active {
     transform: scale(0.97);
 }
 
-/* 模态框 */
+/* 模态框 - 金色边框增强 */
 .modal-mask {
     position: fixed;
     top: 0;
@@ -244,13 +327,28 @@ button:active {
 
 .modal-card {
     background: linear-gradient(145deg, #0f3a5a, #05243b);
-    border: 2px solid var(--secondary-gold);
+    border: 3px solid var(--secondary-gold);
     border-radius: var(--border-radius-xl);
-    box-shadow: 0 25px 45px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 25px 45px rgba(0, 0, 0, 0.6), 0 0 30px rgba(245, 182, 66, 0.3);
     animation: modalPop 0.25s ease-out;
     max-width: 500px;
     width: 100%;
     padding: 1.8rem;
+    position: relative;
+}
+
+.modal-card::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    background: linear-gradient(135deg, var(--secondary-gold), transparent, var(--secondary-gold-light));
+    border-radius: inherit;
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+    z-index: -1;
 }
 
 @keyframes modalPop {
@@ -258,7 +356,7 @@ button:active {
     to { opacity: 1; transform: scale(1); }
 }
 
-/* 表单输入 */
+/* 表单输入 - 金色聚焦效果 */
 .input-group {
     margin-bottom: 1rem;
 }
@@ -283,7 +381,7 @@ button:active {
 .input-group input:focus, .input-group select:focus {
     outline: none;
     border-color: var(--secondary-gold);
-    box-shadow: 0 0 0 3px rgba(245, 182, 66, 0.3);
+    box-shadow: 0 0 0 3px rgba(245, 182, 66, 0.4), 0 0 0 1px var(--secondary-gold);
 }
 
 /* 徽章 */
