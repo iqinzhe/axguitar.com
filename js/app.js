@@ -1,15 +1,48 @@
-const APP = {
-
-    db: null,
+window.APP = {
 
     init() {
 
-        this.db = Storage.load();
+        console.log("APP init start");
 
-        AUTH.init(this.db);
-        AUTH.load();
+        try {
 
-        this.render();
+            // 1. 初始化数据
+            if (typeof Storage !== "undefined") {
+                this.db = Storage.load() || { users: [], orders: [] };
+            } else {
+                this.db = { users: [], orders: [] };
+            }
+
+            // 2. 初始化 auth
+            if (typeof AUTH !== "undefined") {
+                AUTH.init(this.db);
+            }
+
+            // 3. 判断登录状态
+            if (AUTH.user) {
+                this.renderDashboard();
+            } else {
+                this.renderLogin();
+            }
+
+            console.log("APP init done");
+
+        } catch (e) {
+            console.error("APP init error:", e);
+            document.getElementById("app").innerHTML =
+                "❌ Init error: " + e.message;
+        }
+    },
+
+    renderLogin() {
+        document.getElementById("app").innerHTML = `
+            <h2>Login</h2>
+
+            <input id="u" placeholder="username"><br><br>
+            <input id="p" type="password" placeholder="password"><br><br>
+
+            <button onclick="APP.login()">Login</button>
+        `;
     },
 
     login() {
@@ -17,105 +50,49 @@ const APP = {
         const u = document.getElementById("u").value;
         const p = document.getElementById("p").value;
 
-        if (!AUTH.login(u, p)) {
+        const user = AUTH.login(u, p);
+
+        if (!user) {
             alert("Login failed");
             return;
         }
 
-        this.render();
+        this.renderDashboard();
+    },
+
+    renderDashboard() {
+
+        const role = AUTH.user.role;
+
+        document.getElementById("app").innerHTML = `
+            <h2>Dashboard</h2>
+
+            <div>Role: ${role}</div>
+
+            <div>Total Orders: ${(this.db.orders || []).length}</div>
+
+            <button onclick="APP.createOrder()">New Order</button>
+            <button onclick="APP.logout()">Logout</button>
+        `;
+    },
+
+    createOrder() {
+
+        const id = Date.now();
+
+        this.db.orders.push({
+            id,
+            amount: 1000,
+            time: new Date().toISOString()
+        });
+
+        Storage.save(this.db);
+
+        this.renderDashboard();
     },
 
     logout() {
         AUTH.logout();
-    },
-
-    render() {
-
-        const app = document.getElementById("app");
-
-        Storage.save(this.db);
-
-        if (!AUTH.user) {
-            app.innerHTML = UI.login();
-            return;
-        }
-
-        const stats = Dashboard.getStats(this.db);
-        app.innerHTML = UI.dashboard(stats);
+        this.renderLogin();
     }
 };
-
-window.APP = APP;
-
-document.addEventListener("DOMContentLoaded", () => APP.init());
-
-openOrderForm() {
-
-    const app = document.getElementById("app");
-
-    app.innerHTML = `
-        <h2>New Order</h2>
-
-        <table border="1" cellpadding="6">
-            <tr>
-                <td>Customer Name</td>
-                <td><input id="cname"></td>
-            </tr>
-
-            <tr>
-                <td>Phone</td>
-                <td><input id="cphone"></td>
-            </tr>
-
-            <tr>
-                <td>Amount</td>
-                <td><input id="amount"></td>
-            </tr>
-
-            <tr>
-                <td>Interest %</td>
-                <td><input id="interest"></td>
-            </tr>
-        </table>
-
-        <button onclick="APP.saveOrder()">Save</button>
-        <button onclick="APP.render()">Back</button>
-    `;
-}
-saveOrder() {
-
-    const name = document.getElementById("cname").value;
-    const phone = document.getElementById("cphone").value;
-    const amount = Number(document.getElementById("amount").value);
-    const interest = Number(document.getElementById("interest").value);
-
-    if (!name || !phone || !amount) {
-        alert("Fill all fields");
-        return;
-    }
-
-    // 找或创建客户
-    let customer = this.db.customers.find(c => c.phone === phone);
-
-    if (!customer) {
-        customer = {
-            id: Date.now(),
-            name,
-            phone
-        };
-        this.db.customers.push(customer);
-    }
-
-    // 创建订单
-    Order.create(this.db, {
-        customerId: customer.id,
-        amount,
-        interest
-    });
-
-    Storage.save(this.db);
-
-    alert("Order created");
-
-    this.render();
-}
