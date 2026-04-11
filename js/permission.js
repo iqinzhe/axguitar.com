@@ -1,27 +1,19 @@
 const PERMISSION = {
 
-    role() {
-        return AUTH.user?.role || null;
-    },
-
-    canAccess(page) {
-
-        const role = this.role();
-        if (!role) return false;
-
-        return DB.roles[role]?.pages.includes(page);
-    },
-
     can(action) {
 
-        const role = this.role();
-        if (!role) return false;
+        if (!AUTH.user) return false;
 
-        return DB.roles[role]?.actions.includes(action);
-    },
+        if (AUTH.user.role === "admin") return true;
 
-    requireLogin() {
-        return !!AUTH.user;
+        const staffRules = {
+            order_create: true,
+            order_edit: true,
+            order_delete: false,
+            customer_view: true
+        };
+
+        return !!staffRules[action];
     }
 };
 
