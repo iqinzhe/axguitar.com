@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>借贷管理系统 | Loan System</title>
+    <link rel="stylesheet" href="main.css">
+</head>
+
+<body>
+
+<header class="assessment-header">
+    <div class="container">
+        <h2>借贷系统 | Sistem Pinjaman</h2>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- 搜索 -->
+    <div class="unified-card fade-in">
+        <h3 class="card-title">客户检索 | Pencarian</h3>
+        <input type="text" id="search" placeholder="输入姓名或手机后4位 | Nama / 4 digit HP" style="width:100%;padding:10px;border-radius:8px;">
+    </div>
+
+    <!-- 新增客户 -->
+    <div class="unified-card fade-in">
+        <h3 class="card-title">新增客户 | Tambah Klien</h3>
+        <input id="name" placeholder="姓名 Nama"><br><br>
+        <input id="phone" placeholder="电话 HP"><br><br>
+        <input id="amount" placeholder="本金 Modal"><br><br>
+        <input id="rate" placeholder="利率 Bunga"><br><br>
+        <button onclick="addClient()" class="card-cta-btn">创建 Create</button>
+    </div>
+
+    <!-- 客户列表 -->
+    <div id="clientList" class="balanced-grid"></div>
+
+</div>
+
+<script src="main.js"></script>
+
+<script>
+let clients = JSON.parse(localStorage.getItem("clients") || "[]");
+
+function save(){
+    localStorage.setItem("clients", JSON.stringify(clients));
+}
+
+function addClient(){
+    const name = document.getElementById("name").value;
+    const phone = document.getElementById("phone").value;
+    const amount = Number(document.getElementById("amount").value);
+    const rate = Number(document.getElementById("rate").value);
+
+    if(!name || !phone || !amount) return alert("请填写完整 | Lengkapi data");
+
+    clients.push({
+        id: Date.now(),
+        name,
+        phone,
+        amount,
+        rate,
+        paid: 0,
+        interestPaid: 0,
+        startDate: new Date().toISOString().split("T")[0],
+        status: "正常"
+    });
+
+    save();
+    render();
+}
+
+function render(){
+    const list = document.getElementById("clientList");
+    list.innerHTML = "";
+
+    const keyword = document.getElementById("search").value || "";
+
+    clients
+    .filter(c => c.name.includes(keyword) || c.phone.slice(-4).includes(keyword))
+    .forEach(c => {
+
+        const div = document.createElement("div");
+        div.className = "grid-card fade-in";
+
+        const remain = c.amount - c.paid;
+
+        div.innerHTML = `
+            <h3>${c.name}</h3>
+            <p>📞 ${c.phone}</p>
+            <p>本金 Sisa: ${remain}</p>
+            <p>利率 Bunga: ${c.rate}</p>
+            <p>状态 Status: ${remain<=0 ? "已结清 Lunas" : "正常"}</p>
+            <button onclick="pay(${c.id})" class="action-btn whatsapp">收款 Bayar</button>
+        `;
+
+        list.appendChild(div);
+    });
+}
+
+function pay(id){
+    const amount = prompt("输入收款金额 | Input pembayaran");
+    if(!amount) return;
+
+    const c = clients.find(x=>x.id===id);
+
+    let pay = Number(amount);
+
+    // 利息优先
+    let interest = c.amount * c.rate;
+
+    if(pay >= interest){
+        c.interestPaid += interest;
+        pay -= interest;
+        c.paid += pay;
+    }else{
+        c.interestPaid += pay;
+    }
+
+    save();
+    render();
+}
+
+document.getElementById("search").addEventListener("input", render);
+
+render();
+</script>
+
+</body>
+</html>
