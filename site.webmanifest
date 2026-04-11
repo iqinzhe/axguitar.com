@@ -1,1 +1,122 @@
-{"name":"","short_name":"","icons":[{"src":"/android-chrome-192x192.png","sizes":"192x192","type":"image/png"},{"src":"/android-chrome-512x512.png","sizes":"512x512","type":"image/png"}],"theme_color":"#ffffff","background_color":"#ffffff","display":"standalone"}
+{
+  "name": "JF Gadai | Layanan Gadai Terpercaya",
+  "short_name": "JF Gadai",
+  "description": "Layanan gadai terpercaya untuk emas, elektronik, kendaraan dan barang berharga lainnya.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b2c4a",
+  "theme_color": "#0f4c81",
+  "orientation": "portrait",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": ["finance", "business"],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "icons": [
+    {
+      "src": "/icons/android-chrome-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/android-chrome-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pinjaman Baru",
+      "short_name": "Pinjaman Baru",
+      "description": "Buat kontrak pinjaman baru",
+      "url": "/?action=new",
+      "icons": [
+        {
+          "src": "/icons/shortcut-new-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Bayar Angsuran",
+      "short_name": "Bayar",
+      "description": "Lakukan pembayaran angsuran",
+      "url": "/?action=payment",
+      "icons": [
+        {
+          "src": "/icons/shortcut-payment-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Daftar Klien",
+      "short_name": "Klien",
+      "description": "Lihat daftar semua klien aktif",
+      "url": "/?action=clients",
+      "icons": [
+        {
+          "src": "/icons/shortcut-clients-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    },
+    {
+      "name": "Laporan Keuangan",
+      "short_name": "Laporan",
+      "description": "Ringkasan pendapatan bunga dan pokok",
+      "url": "/?action=report",
+      "icons": [
+        {
+          "src": "/icons/shortcut-report-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png",
+          "purpose": "any"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Tampilan dashboard desktop"
+    },
+    {
+      "src": "/screenshots/mobile-list.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Daftar pinjaman di ponsel"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "iarc_rating_id": "",
+  "note": "Konfigurasi untuk sistem pencatatan gadai - JF Gadai"
+}
