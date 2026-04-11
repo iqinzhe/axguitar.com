@@ -3,8 +3,11 @@ const APP = {
     page: "login",
 
     init() {
+        console.log("APP INIT OK");
+
         AUTH.load();
-        this.render();
+
+        this.render();   // 🔥 强制渲染（关键）
     },
 
     login() {
@@ -12,11 +15,13 @@ const APP = {
         const u = document.getElementById("u").value;
         const p = document.getElementById("p").value;
 
-        if (AUTH.login(u, p)) {
+        const ok = AUTH.login(u, p);
+
+        if (ok) {
             this.page = "dashboard";
         }
 
-        this.render();
+        this.render();   // 🔥 必须重新渲染
     },
 
     openOrders() {
@@ -63,6 +68,13 @@ const APP = {
 
         const app = document.getElementById("app");
 
+        if (!app) {
+            console.log("NO APP ELEMENT");
+            return;
+        }
+
+        console.log("RENDER PAGE:", this.page);
+
         if (!AUTH.user) {
             app.innerHTML = UI.login();
             return;
@@ -70,10 +82,15 @@ const APP = {
 
         if (this.page === "dashboard") {
             app.innerHTML = UI.dashboard();
+            return;
         }
 
         if (this.page === "orders") {
             app.innerHTML = UI.orders();
+            return;
         }
+
+        // 🔥 fallback（防空白）
+        app.innerHTML = UI.dashboard();
     }
 };
