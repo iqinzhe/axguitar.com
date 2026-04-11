@@ -1,17 +1,20 @@
-}
 const APP = {
 
     page: "login",
+    user: null,
 
     // ========================
     // 初始化
     // ========================
     init() {
-        console.log("APP INIT OK");
 
-        AUTH.load();
+        console.log("🚀 APP INIT");
 
-        // 🔥 强制首次渲染
+        if (window.AUTH) {
+            AUTH.load();
+            this.user = AUTH.user;
+        }
+
         this.render();
     },
 
@@ -28,6 +31,11 @@ const APP = {
             return;
         }
 
+        if (!AUTH) {
+            alert("AUTH 未加载");
+            return;
+        }
+
         const ok = AUTH.login(u, p);
 
         if (!ok) {
@@ -35,23 +43,25 @@ const APP = {
             return;
         }
 
+        this.user = AUTH.user;
         this.page = "dashboard";
+
         this.render();
     },
 
     // ========================
-    // 页面切换：订单
+    // 打开订单
     // ========================
     openOrders() {
 
-        console.log("OPEN ORDERS CLICKED");
+        console.log("OPEN ORDERS");
 
         this.page = "orders";
         this.render();
     },
 
     // ========================
-    // 返回首页
+    // 回首页
     // ========================
     openDashboard() {
 
@@ -64,11 +74,15 @@ const APP = {
     // ========================
     createOrder() {
 
-        const name = prompt("Name");
-        const phone = prompt("Phone");
-        const amount = parseFloat(prompt("Principal"));
-        const rate = parseFloat(prompt("Rate (%)"));
-        const collateral = prompt("Collateral");
+        if (!this.user) {
+            alert("未登录");
+            return;
+        }
+
+        const name = prompt("客户姓名");
+        const phone = prompt("手机号");
+        const amount = prompt("本金");
+        const rate = prompt("利率");
 
         if (!name || !phone || !amount) {
             alert("数据不完整");
@@ -79,13 +93,11 @@ const APP = {
             id: Date.now(),
             name,
             phone,
-            principal: amount,
-            remaining: amount,
-            rate: rate || 10,
-            collateral: collateral || "-",
-            start: Utils.today(),
-            lastInterest: Utils.today(),
-            staff: AUTH.user?.username || "system",
+            principal: Number(amount),
+            remaining: Number(amount),
+            rate: Number(rate || 10),
+            start: new Date().toISOString().slice(0, 10),
+            lastInterest: new Date().toISOString().slice(0, 10),
             history: []
         });
 
@@ -93,68 +105,47 @@ const APP = {
     },
 
     // ========================
-    // 付利息
-    // ========================
-    payInterest(id) {
-
-        PaymentService.payInterest(id);
-        this.render();
-    },
-
-    // ========================
-    // 还本金
-    // ========================
-    payPrincipal(id) {
-
-        PaymentService.payPrincipal(id);
-        this.render();
-    },
-
-    // ========================
-    // 核心渲染器
+    // 渲染核心
     // ========================
     render() {
 
         const app = document.getElementById("app");
 
         if (!app) {
-            console.error("NO #app ELEMENT FOUND");
+            console.error("NO APP ROOT");
             return;
         }
 
-        console.log("RENDER PAGE =>", this.page);
-
-        // ========================
-        // 未登录
-        // ========================
-        if (!AUTH.user) {
+        // 🔐 未登录强制回登录页
+        if (!AUTH?.user) {
             app.innerHTML = UI.login();
             return;
         }
 
-        // ========================
-        // dashboard
-        // ========================
         if (this.page === "dashboard") {
             app.innerHTML = UI.dashboard();
             return;
         }
 
-        // ========================
-        // orders
-        // ========================
         if (this.page === "orders") {
             app.innerHTML = UI.orders();
             return;
         }
 
-        // ========================
-        // fallback（防白屏）
-        // ========================
-        console.warn("UNKNOWN PAGE, fallback dashboard");
+        // fallback
+        this.page = "dashboard";
         app.innerHTML = UI.dashboard();
     }
 };
 
-// 🔥 关键：挂到 window（解决 onclick 失效）
+// ========================
+// 🔥 全局挂载（关键）
+// ========================
 window.APP = APP;
+
+// ========================
+// 自动启动
+// ========================
+document.addEventListener("DOMContentLoaded", () => {
+    APP.init();
+});
