@@ -1,24 +1,20 @@
-const UI = {
+dashboard(stats) {
 
-    login() {
-        return `
-            <h2>Login</h2>
-            <input id="u" placeholder="username">
-            <input id="p" placeholder="password">
-            <button onclick="APP.login()">Login</button>
-        `;
-    },
+    const role = AUTH.user?.role;
 
-    dashboard(stats) {
-        return `
-            <h2>Dashboard</h2>
-            <div>Total Orders: ${stats.totalOrders}</div>
-            <div>Total Amount: ${stats.totalAmount}</div>
-            <div>Active: ${stats.active}</div>
+    return `
+        <h2>Dashboard (${role})</h2>
 
-            <button onclick="APP.logout()">Logout</button>
-        `;
-    }
-};
+        <div>Total Orders: ${stats.totalOrders}</div>
+        <div>Total Amount: ${stats.totalAmount}</div>
+        <div>Active: ${stats.active}</div>
 
-window.UI = UI;
+        <hr>
+
+        ${PERMISSION.can("order_create") ? `
+            <button onclick="APP.openOrderForm()">➕ New Order</button>
+        ` : ""}
+
+        <button onclick="APP.logout()">Logout</button>
+    `;
+}
