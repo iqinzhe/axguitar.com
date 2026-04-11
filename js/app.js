@@ -82,3 +82,40 @@ openOrderForm() {
         <button onclick="APP.render()">Back</button>
     `;
 }
+saveOrder() {
+
+    const name = document.getElementById("cname").value;
+    const phone = document.getElementById("cphone").value;
+    const amount = Number(document.getElementById("amount").value);
+    const interest = Number(document.getElementById("interest").value);
+
+    if (!name || !phone || !amount) {
+        alert("Fill all fields");
+        return;
+    }
+
+    // 找或创建客户
+    let customer = this.db.customers.find(c => c.phone === phone);
+
+    if (!customer) {
+        customer = {
+            id: Date.now(),
+            name,
+            phone
+        };
+        this.db.customers.push(customer);
+    }
+
+    // 创建订单
+    Order.create(this.db, {
+        customerId: customer.id,
+        amount,
+        interest
+    });
+
+    Storage.save(this.db);
+
+    alert("Order created");
+
+    this.render();
+}
