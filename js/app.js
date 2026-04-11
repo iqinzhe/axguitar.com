@@ -48,3 +48,37 @@ const APP = {
 window.APP = APP;
 
 document.addEventListener("DOMContentLoaded", () => APP.init());
+
+openOrderForm() {
+
+    const app = document.getElementById("app");
+
+    app.innerHTML = `
+        <h2>New Order</h2>
+
+        <table border="1" cellpadding="6">
+            <tr>
+                <td>Customer Name</td>
+                <td><input id="cname"></td>
+            </tr>
+
+            <tr>
+                <td>Phone</td>
+                <td><input id="cphone"></td>
+            </tr>
+
+            <tr>
+                <td>Amount</td>
+                <td><input id="amount"></td>
+            </tr>
+
+            <tr>
+                <td>Interest %</td>
+                <td><input id="interest"></td>
+            </tr>
+        </table>
+
+        <button onclick="APP.saveOrder()">Save</button>
+        <button onclick="APP.render()">Back</button>
+    `;
+}
