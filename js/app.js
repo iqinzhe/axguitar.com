@@ -1,3 +1,8 @@
+if (!AUTH.guard()) {
+    this.page = "login";
+    this.render();
+    return;
+}
 const APP = {
 
     page: "login",
