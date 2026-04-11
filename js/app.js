@@ -65,3 +65,4 @@ window.APP = APP;
 document.addEventListener("DOMContentLoaded", () => {
     APP.init();
 });
+window.APP = APP;
