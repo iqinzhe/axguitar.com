@@ -1,23 +1,28 @@
 const PERMISSION = {
 
-    ROLE: {
-        admin: ["ALL"],
-        staff: ["CREATE", "PAY", "VIEW_OWN"]
+    role() {
+        return AUTH.user?.role || null;
     },
 
-    has(action) {
+    canAccess(page) {
 
-        if (!AUTH.user) return false;
+        const role = this.role();
+        if (!role) return false;
 
-        if (AUTH.user.role === "admin") return true;
-
-        return this.ROLE[AUTH.user.role].includes(action);
+        return DB.roles[role]?.pages.includes(page);
     },
 
-    canViewLoan(l) {
+    can(action) {
 
-        if (AUTH.user.role === "admin") return true;
+        const role = this.role();
+        if (!role) return false;
 
-        return l.staff === AUTH.user.username;
+        return DB.roles[role]?.actions.includes(action);
+    },
+
+    requireLogin() {
+        return !!AUTH.user;
     }
 };
+
+window.PERMISSION = PERMISSION;
