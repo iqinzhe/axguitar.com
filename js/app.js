@@ -1,62 +1,82 @@
-console.log("APP FILE LOADED");
 const APP = {
 
     page: "dashboard",
 
     init() {
 
-        console.log("🚀 APP START");
-
         AUTH.load();
 
-        this.bindEvents();   // 🔥 关键
-
-        this.render();
-    },
-
-    bindEvents() {
-
-        const btnOrders = document.getElementById("btnOrders");
-        const btnDashboard = document.getElementById("btnDashboard");
-
-        if (btnOrders) {
-            btnOrders.addEventListener("click", () => {
-                this.openOrders();
-            });
+        if (!PERMISSION.requireLogin()) {
+            this.renderLogin();
+            return;
         }
 
-        if (btnDashboard) {
-            btnDashboard.addEventListener("click", () => {
-                this.openDashboard();
-            });
+        this.bind();
+        this.render();
+    },
+
+    login() {
+
+        const u = document.getElementById("u").value;
+        const p = document.getElementById("p").value;
+
+        if (!AUTH.login(u, p)) {
+            alert("Login failed");
+            return;
         }
+
+        this.init();
     },
 
-    openOrders() {
-        this.page = "orders";
-        this.render();
+    logout() {
+        AUTH.logout();
     },
 
-    openDashboard() {
-        this.page = "dashboard";
-        this.render();
+    bind() {
+
+        document.getElementById("btnDashboard")?.addEventListener("click", () => {
+            this.page = "dashboard";
+            this.render();
+        });
+
+        document.getElementById("btnOrders")?.addEventListener("click", () => {
+            this.page = "orders";
+            this.render();
+        });
+    },
+
+    renderLogin() {
+        document.getElementById("app").innerHTML = `
+            <div style="padding:20px">
+                <h2>LOGIN</h2>
+                <input id="u" placeholder="username"><br><br>
+                <input id="p" placeholder="password"><br><br>
+                <button onclick="APP.login()">Login</button>
+            </div>
+        `;
     },
 
     render() {
 
-        const app = document.getElementById("app");
-
-        if (!AUTH?.user) {
-            app.innerHTML = UI.login();
+        if (!PERMISSION.canAccess(this.page)) {
+            document.getElementById("app").innerHTML = "NO PERMISSION";
             return;
         }
 
         if (this.page === "dashboard") {
-            app.innerHTML = UI.dashboard();
+            document.getElementById("app").innerHTML = `
+                <h2>Dashboard</h2>
+                <button id="btnOrders">Orders</button>
+                <button onclick="APP.logout()">Logout</button>
+            `;
         }
 
         if (this.page === "orders") {
-            app.innerHTML = UI.orders();
+            document.getElementById("app").innerHTML = `
+                <h2>Orders</h2>
+                <button id="btnDashboard">Dashboard</button>
+                <button onclick="APP.logout()">Logout</button>
+            `;
         }
     }
 };
@@ -66,4 +86,3 @@ window.APP = APP;
 document.addEventListener("DOMContentLoaded", () => {
     APP.init();
 });
-window.APP = APP;
