@@ -1,33 +1,35 @@
 const AUTH = {
 
     user: null,
+    db: null,
 
-    load() {
-        const raw = localStorage.getItem("user");
-        if (raw) this.user = JSON.parse(raw);
+    init(db) {
+        this.db = db;
     },
 
     login(username, password) {
 
-        const found = DB.users.find(u =>
-            u.username === username &&
-            u.password === password
+        const user = this.db.users.find(u =>
+            u.username === username && u.password === password
         );
 
-        if (!found) return false;
+        if (!user) return false;
 
         this.user = {
-            username: found.username,
-            role: found.role
+            username: user.username,
+            role: user.role
         };
 
         localStorage.setItem("user", JSON.stringify(this.user));
-
         return true;
     },
 
+    load() {
+        const u = localStorage.getItem("user");
+        if (u) this.user = JSON.parse(u);
+    },
+
     logout() {
-        this.user = null;
         localStorage.removeItem("user");
         location.reload();
     }
