@@ -1,69 +1,23 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JF GADAI V3 FINAL</title>
-
+    <title>JF GADAI V3</title>
     <link rel="stylesheet" href="assets/main.css">
 </head>
-
 <body>
 
-<!-- 🔥 关键：必须存在渲染容器 -->
-<div id="app">Loading system...</div>
-
-<!-- 🔥 加载提示（防白屏） -->
-<div id="debug" style="padding:10px;color:yellow;font-size:12px;"></div>
-
-<!-- ================= JS 加载区 ================= -->
+<div id="app">Loading...</div>
 
 <script src="js/utils.js"></script>
-<script src="js/data.store.js"></script>
+<script src="js/storage.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/permission.js"></script>
-<script src="js/loan.service.js"></script>
-<script src="js/payment.service.js"></script>
-<script src="js/ui.render.js"></script>
+<script src="js/customer.js"></script>
+<script src="js/order.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/export.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/app.js"></script>
-
-<!-- ================= 启动器（关键修复） ================= -->
-
-<script>
-(function () {
-
-    function log(msg) {
-        const el = document.getElementById("debug");
-        if (el) el.innerHTML += "<div>" + msg + "</div>";
-        console.log(msg);
-    }
-
-    window.addEventListener("DOMContentLoaded", function () {
-
-        log("Page Loaded");
-
-        if (typeof AUTH === "undefined") {
-            log("❌ AUTH not loaded");
-            return;
-        }
-
-        if (typeof APP === "undefined") {
-            log("❌ APP not loaded");
-            return;
-        }
-
-        log("✅ All modules loaded");
-
-        try {
-            APP.init();
-            log("🚀 APP init executed");
-        } catch (e) {
-            log("❌ APP init error: " + e.message);
-        }
-    };
-
-})();
-</script>
 
 </body>
 </html>
