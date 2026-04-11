@@ -11,30 +11,33 @@ const UI = {
 
     dashboard() {
 
-        const total = DB.loans.reduce((a, b) => a + b.principal, 0);
-
         return `
             <h2>Dashboard</h2>
-            <div>Total Loan: ${Utils.formatIDR(total)}</div>
-
-            <button onclick="APP.viewLoans()">Loans</button>
+            <button onclick="APP.openOrders()">Orders</button>
             <button onclick="AUTH.logout()">Logout</button>
         `;
     },
 
-    loans() {
+    orders() {
 
-        return DB.loans
-            .filter(PERMISSION.canViewLoan)
-            .map(l => `
+        let html = `<h2>Orders</h2>
+        <button onclick="APP.createOrder()">New Order</button>`;
+
+        DB.loans
+        .filter(PERMISSION.canViewLoan)
+        .forEach(l => {
+
+            html += `
                 <div class="card">
                     <b>${l.name}</b><br>
                     Remaining: ${Utils.formatIDR(l.remaining)}<br>
 
-                    <button onclick="APP.pay(${l.id})">
-                        Pay Interest
-                    </button>
+                    <button onclick="APP.payInterest(${l.id})">Interest</button>
+                    <button onclick="APP.payPrincipal(${l.id})">Principal</button>
                 </div>
-            `).join("");
+            `;
+        });
+
+        return html;
     }
 };
