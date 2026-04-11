@@ -1,8 +1,8 @@
 body {
     margin: 0;
     font-family: Arial;
-    background: #081826;
-    color: #fff;
+    background: #0b1b2b;
+    color: white;
 }
 
 #app {
@@ -11,20 +11,21 @@ body {
 
 input {
     display: block;
-    margin: 8px 0;
+    margin: 6px 0;
     padding: 8px;
+    width: 200px;
 }
 
 button {
-    padding: 8px 12px;
+    padding: 6px 10px;
+    margin: 4px;
     background: #f5b642;
     border: none;
     cursor: pointer;
-    margin: 5px;
 }
 
 .card {
-    background: #102a43;
+    background: #12324a;
     padding: 10px;
     margin: 10px 0;
     border-radius: 6px;
