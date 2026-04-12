@@ -115,6 +115,8 @@ window.APP = {
             this.renderDashboard();
         }
     },
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     // ========== 登录相关 ==========
     renderLogin: function() {
