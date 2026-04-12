@@ -31,6 +31,7 @@ window.APP = {
             dashboard: () => this.renderDashboard(),
             orderTable: () => this.showOrderTable(),
             createOrder: () => this.showCreateOrder(),
+            case 'paymentHistory': this.showPaymentHistory(); break;
             viewOrder: () => this.currentOrderId && this.viewOrder(this.currentOrderId),
             payment: () => this.currentOrderId && this.showPayment(this.currentOrderId),
             editOrder: () => this.currentOrderId && this.editOrder(this.currentOrderId),
@@ -53,19 +54,18 @@ window.APP = {
         this.currentPage = page;
         if (params.orderId) this.currentOrderId = params.orderId;
         
-        const navHandlers = {
-            orderTable: () => this.showOrderTable(),
-            createOrder: () => this.showCreateOrder(),
-            dashboard: () => this.renderDashboard(),
-            report: () => this.showReport(),
-            userManagement: () => this.showUserManagement(),
-            backupRestore: () => this.showBackupRestore(),
-            viewOrder: () => params.orderId && this.viewOrder(params.orderId),
-            payment: () => params.orderId && this.showPayment(params.orderId),
-            editOrder: () => params.orderId && this.editOrder(params.orderId)
-        };
-        (navHandlers[page] || navHandlers.dashboard)();
-    },
+const navHandlers = {
+    orderTable: () => this.showOrderTable(),
+    createOrder: () => this.showCreateOrder(),
+    dashboard: () => this.renderDashboard(),
+    report: () => this.showReport(),
+    userManagement: () => this.showUserManagement(),
+    backupRestore: () => this.showBackupRestore(),
+    paymentHistory: () => this.showPaymentHistory(),  // 新增
+    viewOrder: () => params.orderId && this.viewOrder(params.orderId),
+    payment: () => params.orderId && this.showPayment(params.orderId),
+    editOrder: () => params.orderId && this.editOrder(params.orderId)
+};
     
     goBack() {
         if (this.historyStack.length > 0) {
