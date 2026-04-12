@@ -906,91 +906,163 @@ payInterest(orderId) {
         }
     },
     
-    // ==================== 用户管理（修复顺序混乱） ====================
-    showUserManagement() {
-        this.currentPage = 'userManagement';
-        let users = [...(this.db.users || [])];
-        const lang = Utils.lang;
-        const t = (key) => Utils.t(key);
-        
-        // 按用户名排序，解决顺序混乱问题
-        users.sort((a, b) => a.username.localeCompare(b.username));
-        
-        let userRows = '';
-        if (users.length === 0) {
-            userRows = '<tr><td colspan="4" style="text-align: center;">' + t('no_data') + '</td></tr>';
-        } else {
-            userRows = users.map(u => `
+// ==================== 用户管理 ====================
+showUserManagement() {
+    this.currentPage = 'userManagement';
+    let users = [...(this.db.users || [])];
+    const lang = Utils.lang;
+    const t = (key) => Utils.t(key);
+    
+    // 按用户名排序，解决顺序混乱问题
+    users.sort((a, b) => a.username.localeCompare(b.username));
+    
+    let userRows = '';
+    if (users.length === 0) {
+        userRows = '<tr><td colspan="4" style="text-align: center;">' + t('no_data') + '</td></tr>';
+    } else {
+        userRows = users.map(u => {
+            // 判断是否为当前登录用户
+            const isCurrentUser = (u.username === AUTH.user.username);
+            return `
                 <tr>
-                    <td>${Utils.escapeHtml(u.username)}</td
-                    <td>${Utils.escapeHtml(u.name)}</td
-                    <td>${u.role}</td
-                    <td>${u.username !== AUTH.user.username ? '<button class="danger" onclick="APP.deleteUser(\'' + u.username + '\')">' + t('delete') + '</button>' : '<span style="color: #94a3b8;">' + (lang === 'id' ? 'Pengguna Saat Ini' : '当前用户') + '</span>'}
-                </td
-            </tr>`).join('');
-        }
-        
-        document.getElementById("app").innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>👥 ${t('user_management')}</h2>
-                <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                </div>
-            </div>
-            <div class="card">
-                <h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
-                <div class="form-group"><label>${t('username')}</label><input id="newUsername" placeholder="${t('username')}"></div>
-                <div class="form-group"><label>${t('password')}</label><input id="newPassword" type="password" placeholder="${t('password')}"></div>
-                <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'}</label><input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}"></div>
-                <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="newRole"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
-                <button onclick="APP.addUser()">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button>
-            </div>
-            <div class="card">
-                <h3>${lang === 'id' ? 'Pengguna yang Ada' : '现有用户'}</h3>
-                <div class="table-container">
-                    <table>
-                        <thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${t('save')}</th></tr></thead>
-                        <tbody>${userRows}</tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-    },
-    
-    addUser() {
-        const username = document.getElementById("newUsername").value.trim();
-        const password = document.getElementById("newPassword").value;
-        const name = document.getElementById("newName").value.trim();
-        const role = document.getElementById("newRole").value;
-        const lang = Utils.lang;
-        
-        if (!username || !password || !name) {
-            alert(Utils.t('fill_all_fields'));
-            return;
-        }
-        if (AUTH.addUser(username, password, role, name)) {
-            alert(lang === 'id' ? 'Pengguna berhasil ditambahkan' : '用户添加成功');
-            this.showUserManagement();
-        } else {
-            alert(lang === 'id' ? 'Nama pengguna sudah ada' : '用户名已存在');
-        }
-    },
-    
-    deleteUser(username) {
-        const lang = Utils.lang;
-        if (confirm((lang === 'id' ? 'Hapus pengguna' : '删除用户') + ' "' + username + '"?')) {
-            this.db.users = this.db.users.filter(u => u.username !== username);
-            Storage.save(this.db);
-            alert(lang === 'id' ? 'Pengguna dihapus' : '用户已删除');
-            this.showUserManagement();
-        }
-    },
-    
-    logout() {
-        AUTH.logout();
-        this.router();
+                    <td>${Utils.escapeHtml(u.username)}</td>
+                    <td>${Utils.escapeHtml(u.name || '-')}</td>
+                    <td>${u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Staf' : '员工')}</td>
+                    <td>
+                        ${!isCurrentUser ? '<button class="danger" onclick="APP.deleteUser(\'' + Utils.escapeHtml(u.username) + '\')">' + t('delete') + '</button>' : '<span style="color: #10b981;">✅ ' + (lang === 'id' ? 'Login Saat Ini' : '当前登录') + '</span>'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
-};
+    
+    document.getElementById("app").innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>👥 ${t('user_management')}</h2>
+            <div>
+                <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
+            <div class="form-group">
+                <label>${t('username')} *</label>
+                <input id="newUsername" placeholder="${t('username')}" style="width: 250px;">
+            </div>
+            <div class="form-group">
+                <label>${t('password')} *</label>
+                <input id="newPassword" type="password" placeholder="${t('password')}" style="width: 250px;">
+            </div>
+            <div class="form-group">
+                <label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label>
+                <input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}" style="width: 250px;">
+            </div>
+            <div class="form-group">
+                <label>${lang === 'id' ? 'Peran' : '角色'} *</label>
+                <select id="newRole" style="width: 250px;">
+                    <option value="staff">${lang === 'id' ? 'Staf' : '员工'} (Staff)</option>
+                    <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'} (Admin)</option>
+                </select>
+            </div>
+            <button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button>
+        </div>
+        
+        <div class="card">
+            <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
+            <p style="color: #94a3b8; font-size: 12px; margin-bottom: 10px;">
+                💡 ${lang === 'id' ? 'Total pengguna: ' + users.length + ' | Anda dapat menambahkan pengguna sebanyak yang diperlukan.' : '用户总数: ' + users.length + ' | 您可以根据需要添加任意数量的用户。'}
+            </p>
+            <div class="table-container">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>${t('username')}</th>
+                            <th>${lang === 'id' ? 'Nama' : '姓名'}</th>
+                            <th>${lang === 'id' ? 'Peran' : '角色'}</th>
+                            <th>${t('save')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>${userRows}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+},
+
+addUser() {
+    const username = document.getElementById("newUsername").value.trim();
+    const password = document.getElementById("newPassword").value;
+    const name = document.getElementById("newName").value.trim();
+    const role = document.getElementById("newRole").value;
+    const lang = Utils.lang;
+    
+    // 验证输入
+    if (!username) {
+        alert(lang === 'id' ? 'Nama pengguna tidak boleh kosong' : '用户名不能为空');
+        return;
+    }
+    if (!password) {
+        alert(lang === 'id' ? 'Kata sandi tidak boleh kosong' : '密码不能为空');
+        return;
+    }
+    if (!name) {
+        alert(lang === 'id' ? 'Nama lengkap tidak boleh kosong' : '姓名不能为空');
+        return;
+    }
+    
+    // 检查用户名是否已存在
+    const existingUser = this.db.users.find(u => u.username === username);
+    if (existingUser) {
+        alert(lang === 'id' ? 'Nama pengguna "' + username + '" sudah ada!' : '用户名 "' + username + '" 已存在！');
+        return;
+    }
+    
+    // 添加用户（密码使用 base64 编码存储）
+    const newUser = {
+        username: username,
+        password: btoa(password),
+        role: role,
+        name: name
+    };
+    
+    this.db.users.push(newUser);
+    Storage.save(this.db);
+    
+    alert(lang === 'id' ? 'Pengguna "' + username + '" berhasil ditambahkan!' : '用户 "' + username + '" 添加成功！');
+    
+    // 清空表单
+    document.getElementById("newUsername").value = '';
+    document.getElementById("newPassword").value = '';
+    document.getElementById("newName").value = '';
+    document.getElementById("newRole").value = 'staff';
+    
+    // 刷新用户列表
+    this.showUserManagement();
+},
+
+deleteUser(username) {
+    const lang = Utils.lang;
+    
+    // 防止删除当前登录用户
+    if (username === AUTH.user.username) {
+        alert(lang === 'id' ? 'Tidak dapat menghapus pengguna yang sedang login!' : '不能删除当前登录的用户！');
+        return;
+    }
+    
+    // 防止删除默认管理员（可选）
+    if (username === 'admin') {
+        alert(lang === 'id' ? 'Tidak dapat menghapus pengguna admin default!' : '不能删除默认管理员账户！');
+        return;
+    }
+    
+    if (confirm((lang === 'id' ? 'Hapus pengguna "' : '删除用户 "') + username + '" ?')) {
+        this.db.users = this.db.users.filter(u => u.username !== username);
+        Storage.save(this.db);
+        alert(lang === 'id' ? 'Pengguna "' + username + '" telah dihapus' : '用户 "' + username + '" 已删除');
+        this.showUserManagement();
+    }
+},
 
 window.APP = APP;
