@@ -157,14 +157,26 @@ window.APP = {
         `;
     },
     
-    login: async function() {
-        var username = document.getElementById("username").value;
-        var password = document.getElementById("password").value;
-        
-        if (!username || !password) {
-            alert(Utils.t('fill_all_fields'));
-            return;
-        }
+login: async function() {
+    var username = document.getElementById("username").value;
+    var password = document.getElementById("password").value;
+    
+    if (!username || !password) {
+        alert(Utils.t('fill_all_fields'));
+        return;
+    }
+    
+    // 直接使用真实邮箱，忽略用户名输入
+    var email = 'iqinzhe@gmail.com';
+    
+    var user = await AUTH.login(email, password);
+    if (!user) {
+        alert(Utils.t('login_failed'));
+        return;
+    }
+    
+    await this.router();
+},
         
         // 构造邮箱格式
        var email = 'iqinzhe@gmail.com';
