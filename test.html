@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Supabase 登录测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h2>Supabase 登录测试</h2>
+    <input type="text" id="email" placeholder="邮箱" value="iqinzhe@gmail.com" style="width: 300px; padding: 10px;">
+    <br>
+    <input type="password" id="password" placeholder="密码" value="admin123" style="width: 300px; padding: 10px; margin-top: 10px;">
+    <br>
+    <button onclick="testLogin()" style="margin-top: 10px; padding: 10px 20px;">登录测试</button>
+    <pre id="result" style="margin-top: 20px; background: #f0f0f0; padding: 10px;"></pre>
+
+    <script>
+        const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.textContent = '登录中...';
+            
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+            
+            if (error) {
+                resultDiv.textContent = '❌ 失败: ' + error.message;
+            } else {
+                resultDiv.textContent = '✅ 成功！\n用户ID: ' + data.user.id + '\n邮箱: ' + data.user.email;
+            }
+        }
+    </script>
+</body>
+</html>
