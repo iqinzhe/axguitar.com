@@ -25,7 +25,7 @@ const Order = {
             admin_fee_paid: false,               // 管理费是否已支付
             admin_fee_paid_date: null,           // 管理费支付日期
             
-            monthly_interest: Number(data.loan_amount) * 0.10,  // 月利息 10%
+            monthly_interest: Number(data.loan_amount) * 0.10,  // 初始月利息 10%（用于显示）
             interest_paid_months: 0,             // 已支付利息月数
             interest_paid_total: 0,              // 累计支付利息总额
             next_interest_due_date: Utils.calculateNextInterestDueDate(createdDate, 0),  // 下次利息到期日
@@ -70,24 +70,56 @@ const Order = {
         return true;
     },
     
-    // 记录利息支付
+    // 记录利息支付（按剩余本金计算）
     recordInterestPayment(db, orderId, monthsPaid) {
         const order = db.orders.find(o => o.order_id === orderId);
         if (!order) return false;
         
-        const totalInterest = order.monthly_interest * monthsPaid;
+        // 获取当前剩余本金
+        let currentRemainingPrincipal = order.loan_amount - order.principal_paid;
         
-        order.interest_paid_months += monthsPaid;
+        if (currentRemainingPrincipal <= 0) {
+            // 本金已结清，无需支付利息
+            return false;
+        }
+        
+        let totalInterest = 0;
+        let monthsActuallyPaid = 0;
+        
+        // 按剩余本金逐月计算利息
+        for (let i = 0; i < monthsPaid; i++) {
+            if (currentRemainingPrincipal <= 0) break;
+            
+            const monthlyInterest = currentRemainingPrincipal * 0.10;
+            totalInterest += monthlyInterest;
+            monthsActuallyPaid++;
+            
+            // 注意：利息支付不改变本金，所以 currentRemainingPrincipal 保持不变
+            // 这里的循环只是为了计算多个月的利息总额
+        }
+        
+        if (monthsActuallyPaid === 0) {
+            return false;
+        }
+        
+        // 更新订单
+        order.interest_paid_months += monthsActuallyPaid;
         order.interest_paid_total += totalInterest;
-        order.next_interest_due_date = Utils.calculateNextInterestDueDate(order.created_at, order.interest_paid_months);
+        order.next_interest_due_date = Utils.calculateNextInterestDueDate(
+            order.created_at, 
+            order.interest_paid_months
+        );
+        
+        // 更新 monthly_interest 用于显示（基于当前剩余本金）
+        order.monthly_interest = currentRemainingPrincipal * 0.10;
         
         // 添加支付记录
         order.payment_history.push({
             date: new Date().toISOString().split('T')[0],
             type: "interest",
-            months: monthsPaid,
+            months: monthsActuallyPaid,
             amount: totalInterest,
-            description: `Bunga ${monthsPaid} bulan / ${monthsPaid}个月利息`
+            description: `Bunga ${monthsActuallyPaid} bulan (sisa pokok: ${Utils.formatCurrency(currentRemainingPrincipal)}) / ${monthsActuallyPaid}个月利息 (剩余本金: ${Utils.formatCurrency(currentRemainingPrincipal)})`
         });
         
         Storage.save(db);
@@ -104,6 +136,11 @@ const Order = {
         order.principal_paid += paidAmount;
         order.principal_remaining -= paidAmount;
         
+        // 更新月利息（基于新的剩余本金）
+        if (order.principal_remaining > 0) {
+            order.monthly_interest = order.principal_remaining * 0.10;
+        }
+        
         // 添加支付记录
         order.payment_history.push({
             date: new Date().toISOString().split('T')[0],
@@ -116,10 +153,18 @@ const Order = {
         if (order.principal_remaining <= 0) {
             order.status = "completed";
             order.completed_at = new Date().toISOString().split('T')[0];
+            order.monthly_interest = 0; // 本金结清后利息为0
         }
         
         Storage.save(db);
         return true;
+    },
+    
+    // 获取当前月利息（基于剩余本金）
+    getCurrentMonthlyInterest(order) {
+        if (!order) return 0;
+        const remainingPrincipal = order.loan_amount - order.principal_paid;
+        return remainingPrincipal * 0.10;
     },
     
     // 获取支付历史
@@ -163,6 +208,13 @@ const Order = {
         const totalInterestCollected = orders.reduce((sum, o) => sum + o.interest_paid_total, 0);
         const totalPrincipalCollected = orders.reduce((sum, o) => sum + o.principal_paid, 0);
         
+        // 计算预期月利息（基于当前剩余本金）
+        let expectedMonthlyInterest = 0;
+        activeOrders.forEach(o => {
+            const remainingPrincipal = o.loan_amount - o.principal_paid;
+            expectedMonthlyInterest += remainingPrincipal * 0.10;
+        });
+        
         return {
             total_orders: orders.length,
             active_orders: activeOrders.length,
@@ -170,7 +222,8 @@ const Order = {
             total_loan_amount: totalLoanAmount,
             total_admin_fees: totalAdminFeesCollected,
             total_interest: totalInterestCollected,
-            total_principal: totalPrincipalCollected
+            total_principal: totalPrincipalCollected,
+            expected_monthly_interest: expectedMonthlyInterest
         };
     }
 };
