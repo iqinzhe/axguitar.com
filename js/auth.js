@@ -1,7 +1,3 @@
-// ============================================
-// 认证模块 - Supabase Auth 版
-// ============================================
-
 const AUTH = {
     user: null,
     profile: null,
@@ -29,18 +25,13 @@ const AUTH = {
         return this.user;
     },
     
-    // 登录 - 直接使用真实邮箱
-    async login(username, password) {
+    async login(email, password) {
         try {
-            // 直接使用你的真实邮箱，忽略用户输入的用户名
-            const realEmail = 'iqinzhe@gmail.com';
-            
-            const result = await SUPABASE.login(realEmail, password);
+            const result = await SUPABASE.login(email, password);
             await this.loadCurrentUser();
             return this.user;
         } catch (error) {
             console.error('Login error:', error);
-            alert('登录失败: ' + error.message);
             return null;
         }
     },
@@ -51,41 +42,16 @@ const AUTH = {
         this.profile = null;
     },
     
-    isLoggedIn() {
-        return this.user !== null;
-    },
-    
-    isAdmin() {
-        return this.user?.role === 'admin';
-    },
-    
-    isStoreManager() {
-        return this.user?.role === 'store_manager';
-    },
-    
-    getCurrentStoreId() {
-        return this.user?.store_id;
-    },
-    
-    getCurrentStoreName() {
-        return this.user?.store_name || '未知门店';
-    },
-    
-    async addUser(username, password, name, role, storeId) {
-        const email = `${username}@jfgadai.local`;
-        return await SUPABASE.createUser(email, password, username, name, role, storeId);
-    },
+    isLoggedIn() { return this.user !== null; },
+    isAdmin() { return this.user?.role === 'admin'; },
+    isStoreManager() { return this.user?.role === 'store_manager'; },
+    getCurrentStoreId() { return this.user?.store_id; },
+    getCurrentStoreName() { return this.user?.store_name || '未知门店'; },
     
     async getAllUsers() {
-        return await SUPABASE.getAllUsers();
-    },
-    
-    async deleteUser(userId) {
-        return await SUPABASE.deleteUser(userId);
-    },
-    
-    async updateUser(userId, updates) {
-        return await SUPABASE.updateUser(userId, updates);
+        const { data, error } = await SUPABASE.getClient().from('user_profiles').select('*, stores(name)').order('created_at');
+        if (error) throw error;
+        return data;
     }
 };
 
