@@ -6,7 +6,6 @@ window.APP = {
     currentPage: "dashboard",
     currentOrderId: null,
     
-    // ==================== 初始化 ====================
     init() {
         this.db = Storage.load();
         Utils.setDb(this.db);
@@ -19,14 +18,10 @@ window.APP = {
         else this.renderDashboard();
     },
     
-    // ==================== 语言切换 ====================
     toggleLanguage() {
         const newLang = Utils.lang === 'id' ? 'zh' : 'id';
         Utils.setLanguage(newLang);
-        // 刷新当前页面
-        if (this.currentPage === 'dashboard') {
-            this.renderDashboard();
-        } else if (this.currentPage === 'login' || !AUTH.user) {
+        if (this.currentPage === 'login' || !AUTH.user) {
             this.renderLogin();
         } else {
             this.refreshCurrentPage();
@@ -49,7 +44,6 @@ window.APP = {
         (handlers[this.currentPage] || handlers.dashboard)();
     },
     
-    // ==================== 页面导航 ====================
     navigateTo(page, params = {}) {
         this.historyStack.push({
             page: this.currentPage,
@@ -99,7 +93,6 @@ window.APP = {
         }
     },
     
-    // ==================== 登录页面 ====================
     renderLogin() {
         this.currentPage = 'login';
         const lang = Utils.lang;
@@ -146,7 +139,6 @@ window.APP = {
         this.router();
     },
     
-    // ==================== 仪表板 ====================
     renderDashboard() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -188,24 +180,20 @@ window.APP = {
         `;
     },
     
-    // ==================== 订单列表 ====================
     showOrderTable() {
         this.currentPage = 'orderTable';
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
         
-        // 获取所有订单
         let filteredOrders = [];
         if (this.db.orders && this.db.orders.length > 0) {
             filteredOrders = [...this.db.orders];
         }
         
-        // 状态筛选
         if (this.currentFilter !== "all") {
             filteredOrders = filteredOrders.filter(o => o.status === this.currentFilter);
         }
         
-        // 搜索筛选
         if (this.searchKeyword) {
             const keyword = this.searchKeyword.toLowerCase();
             filteredOrders = filteredOrders.filter(o => 
@@ -215,7 +203,6 @@ window.APP = {
             );
         }
         
-        // 按创建时间倒序
         filteredOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         
         const statusMap = {
@@ -224,7 +211,6 @@ window.APP = {
             liquidated: t('status_liquidated')
         };
         
-        // 生成表格行
         let rows = '';
         if (filteredOrders.length === 0) {
             rows = '<tr><td colspan="9" style="text-align: center;">' + t('no_data') + '</td></tr>';
@@ -295,9 +281,7 @@ window.APP = {
                             <th>${t('save')}</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${rows}
-                    </tbody>
+                    <tbody>${rows}</tbody>
                 </table>
             </div>
         `;
@@ -319,7 +303,6 @@ window.APP = {
         this.showOrderTable();
     },
     
-    // ==================== 创建订单 ====================
     showCreateOrder() {
         this.currentPage = 'createOrder';
         const lang = Utils.lang;
@@ -394,7 +377,6 @@ window.APP = {
         this.goBack();
     },
     
-    // ==================== 查看订单详情 ====================
     viewOrder(orderId) {
         this.currentPage = 'viewOrder';
         this.currentOrderId = orderId;
@@ -414,7 +396,6 @@ window.APP = {
             liquidated: t('status_liquidated')
         };
         
-        // 生成支付历史表格
         let paymentHistoryRows = '';
         if (order.payment_history && order.payment_history.length > 0) {
             paymentHistoryRows = order.payment_history.map(p => {
@@ -492,13 +473,11 @@ window.APP = {
                 <div class="toolbar">
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     ${order.status === 'active' ? '<button onclick="APP.navigateTo(\'payment\', {orderId: \'' + order.order_id + '\'})">💰 ' + t('save') + '</button>' : ''}
-                    ${PERMISSION.can("order_edit") && order.status === 'active' ? '<button onclick="APP.navigateTo(\'editOrder\', {orderId: \'' + order.order_id + '\'})">✏️ ' + t('edit') + '</button>' : ''}
                 </div>
             </div>
         `;
     },
     
-    // ==================== 支付页面 ====================
     showPayment(orderId) {
         this.currentPage = 'payment';
         this.currentOrderId = orderId;
@@ -509,7 +488,6 @@ window.APP = {
         const t = (key) => Utils.t(key);
         const remainingPrincipal = order.loan_amount - order.principal_paid;
         
-        // 利息选项 (1-12个月)
         let interestOptions = '';
         for (let i = 1; i <= 12; i++) {
             const amount = order.monthly_interest * i;
@@ -539,7 +517,6 @@ window.APP = {
             <div class="card">
                 <h3>💰 ${lang === 'id' ? 'Pilih Jenis Pembayaran' : '选择支付类型'}</h3>
                 
-                <!-- 管理费支付 -->
                 ${!order.admin_fee_paid ? `
                 <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <h4>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'} - ${Utils.formatCurrency(order.admin_fee)}</h4>
@@ -548,7 +525,6 @@ window.APP = {
                 </div>
                 ` : '<div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;"><h4>📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</h4><p>✅ ' + (lang === 'id' ? 'Sudah dibayar' : '已支付') + '</p></div>'}
                 
-                <!-- 利息支付 -->
                 <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <h4>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '支付利息'}</h4>
                     <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Bunga 10% per bulan dari jumlah pinjaman' : '利息为贷款金额的10%/月'}</p>
@@ -561,7 +537,6 @@ window.APP = {
                     <button onclick="APP.payInterest('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息支付'}</button>
                 </div>
                 
-                <!-- 本金支付 -->
                 <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <h4>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金支付'}</h4>
                     <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Bayar sebagian atau lunasi seluruh pokok' : '支付部分或全部本金'}</p>
@@ -582,7 +557,6 @@ window.APP = {
         `;
     },
     
-    // 支付管理费
     payAdminFee(orderId) {
         const lang = Utils.lang;
         if (confirm(lang === 'id' ? 'Konfirmasi penerimaan Admin Fee 30,000 IDR?' : '确认已收取管理费 30,000 IDR？')) {
@@ -592,7 +566,6 @@ window.APP = {
         }
     },
     
-    // 支付利息
     payInterest(orderId) {
         const months = parseInt(document.getElementById("interestMonths").value);
         const order = this.db.orders.find(o => o.order_id === orderId);
@@ -606,7 +579,6 @@ window.APP = {
         }
     },
     
-    // 支付本金
     payPrincipal(orderId) {
         const amountInput = document.getElementById("principalAmount");
         let amount = parseFloat(amountInput.value);
@@ -634,7 +606,6 @@ window.APP = {
         }
     },
     
-    // ==================== 编辑订单 ====================
     editOrder(orderId) {
         this.currentPage = 'editOrder';
         this.currentOrderId = orderId;
@@ -684,7 +655,6 @@ window.APP = {
         this.goBack();
     },
     
-    // ==================== 删除订单 ====================
     deleteOrder(orderId) {
         if (confirm(Utils.t('confirm_delete'))) {
             Order.delete(this.db, orderId);
@@ -693,7 +663,6 @@ window.APP = {
         }
     },
     
-    // ==================== 财务报表 ====================
     showReport() {
         this.currentPage = 'report';
         const report = Order.getReport(this.db);
@@ -726,7 +695,6 @@ window.APP = {
         alert(Utils.t('export_success'));
     },
     
-    // ==================== 付款记录 ====================
     showPaymentHistory() {
         this.currentPage = 'paymentHistory';
         const lang = Utils.lang;
@@ -760,7 +728,7 @@ window.APP = {
         
         let rows = '';
         if (allPayments.length === 0) {
-            rows = '<tr><td colspan="8" style="text-align: center;">' + Utils.t('no_data') + '</td></tr>';
+            rows = '<tr><td colspan="8" style="text-align: center;">' + Utils.t('no_data') + '</td><td style="text-align: center;">📌 ' + (lang === 'id' ? 'Belum ada pembayaran. Silakan buat pesanan dan lakukan pembayaran.' : '暂无付款记录。请先创建订单并进行付款。') + '</td></tr>';
         } else {
             rows = allPayments.map(p => `
                 <tr>
@@ -790,6 +758,13 @@ window.APP = {
                 <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Total Bunga' : '利息总额'}</div></div>
                 <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Total Pokok' : '本金总额'}</div></div>
                 <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
+            </div>
+            
+            <div class="toolbar" style="background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                <span>💡 ${lang === 'id' ? 'Cara melakukan pembayaran:' : '如何进行付款：'}</span>
+                <span>1️⃣ ${lang === 'id' ? 'Buka "📋 Daftar Pesanan"' : '打开"📋 订单列表"'}</span>
+                <span>2️⃣ ${lang === 'id' ? 'Klik tombol "💰 Simpan" pada pesanan yang ingin dibayar' : '点击要付款订单的"💰 保存"按钮'}</span>
+                <span>3️⃣ ${lang === 'id' ? 'Pilih jenis pembayaran (Admin Fee / Bunga / Pokok)' : '选择付款类型（管理费/利息/本金）'}</span>
             </div>
             
             <div class="table-container">
@@ -867,7 +842,6 @@ window.APP = {
         alert(Utils.t('export_success'));
     },
     
-    // ==================== 备份恢复 ====================
     showBackupRestore() {
         this.currentPage = 'backupRestore';
         const lang = Utils.lang;
@@ -917,12 +891,15 @@ window.APP = {
         }
     },
     
-    // ==================== 用户管理 ====================
+    // ==================== 用户管理（修复顺序混乱） ====================
     showUserManagement() {
         this.currentPage = 'userManagement';
-        const users = this.db.users || [];
+        let users = [...(this.db.users || [])];
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
+        
+        // 按用户名排序，解决顺序混乱问题
+        users.sort((a, b) => a.username.localeCompare(b.username));
         
         let userRows = '';
         if (users.length === 0) {
@@ -995,7 +972,6 @@ window.APP = {
         }
     },
     
-    // ==================== 退出登录 ====================
     logout() {
         AUTH.logout();
         this.router();
