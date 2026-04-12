@@ -118,7 +118,7 @@ window.APP = {
         var username = document.getElementById("username").value;
         var password = document.getElementById("password").value;
         if (!username || !password) { alert(Utils.t('fill_all_fields')); return; }
-        var email = 'iqinzhe@gmail.com';
+        const realEmail = username;
         var user = await AUTH.login(email, password);
         if (!user) { alert(Utils.t('login_failed')); return; }
         await this.router();
