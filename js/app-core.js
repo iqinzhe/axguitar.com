@@ -167,7 +167,7 @@ window.APP = {
         }
         
         // 构造邮箱格式
-        var email = username.includes('@') ? username : `${username}@jfgadai.local`;
+       var email = 'iqinzhe@gmail.com';
         
         var user = await AUTH.login(email, password);
         if (!user) {
