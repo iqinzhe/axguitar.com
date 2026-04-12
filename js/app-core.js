@@ -9,6 +9,7 @@ window.APP = {
     // ==================== 初始化 ====================
     init() {
         this.db = Storage.load();
+        Utils.setDb(this.db);
         AUTH.init(this.db);
         this.router();
     },
@@ -26,18 +27,18 @@ window.APP = {
     },
     
     refreshCurrentPage() {
-        switch (this.currentPage) {
-            case 'dashboard': this.renderDashboard(); break;
-            case 'orderTable': this.showOrderTable(); break;
-            case 'createOrder': this.showCreateOrder(); break;
-            case 'viewOrder': if (this.currentOrderId) this.viewOrder(this.currentOrderId); break;
-            case 'payment': if (this.currentOrderId) this.showPayment(this.currentOrderId); break;
-            case 'editOrder': if (this.currentOrderId) this.editOrder(this.currentOrderId); break;
-            case 'report': this.showReport(); break;
-            case 'userManagement': this.showUserManagement(); break;
-            case 'backupRestore': this.showBackupRestore(); break;
-            default: this.renderDashboard();
-        }
+        const handlers = {
+            dashboard: () => this.renderDashboard(),
+            orderTable: () => this.showOrderTable(),
+            createOrder: () => this.showCreateOrder(),
+            viewOrder: () => this.currentOrderId && this.viewOrder(this.currentOrderId),
+            payment: () => this.currentOrderId && this.showPayment(this.currentOrderId),
+            editOrder: () => this.currentOrderId && this.editOrder(this.currentOrderId),
+            report: () => this.showReport(),
+            userManagement: () => this.showUserManagement(),
+            backupRestore: () => this.showBackupRestore()
+        };
+        (handlers[this.currentPage] || handlers.dashboard)();
     },
     
     // ==================== 页面导航 ====================
@@ -52,15 +53,18 @@ window.APP = {
         this.currentPage = page;
         if (params.orderId) this.currentOrderId = params.orderId;
         
-        if (page === 'orderTable') this.showOrderTable();
-        else if (page === 'createOrder') this.showCreateOrder();
-        else if (page === 'dashboard') this.renderDashboard();
-        else if (page === 'report') this.showReport();
-        else if (page === 'userManagement') this.showUserManagement();
-        else if (page === 'backupRestore') this.showBackupRestore();
-        else if (page === 'viewOrder' && params.orderId) this.viewOrder(params.orderId);
-        else if (page === 'payment' && params.orderId) this.showPayment(params.orderId);
-        else if (page === 'editOrder' && params.orderId) this.editOrder(params.orderId);
+        const navHandlers = {
+            orderTable: () => this.showOrderTable(),
+            createOrder: () => this.showCreateOrder(),
+            dashboard: () => this.renderDashboard(),
+            report: () => this.showReport(),
+            userManagement: () => this.showUserManagement(),
+            backupRestore: () => this.showBackupRestore(),
+            viewOrder: () => params.orderId && this.viewOrder(params.orderId),
+            payment: () => params.orderId && this.showPayment(params.orderId),
+            editOrder: () => params.orderId && this.editOrder(params.orderId)
+        };
+        (navHandlers[page] || navHandlers.dashboard)();
     },
     
     goBack() {
@@ -71,13 +75,15 @@ window.APP = {
             this.currentFilter = prev.filter || "all";
             this.searchKeyword = prev.keyword || "";
             
-            if (prev.page === 'orderTable') this.showOrderTable();
-            else if (prev.page === 'dashboard') this.renderDashboard();
-            else if (prev.page === 'viewOrder' && prev.orderId) this.viewOrder(prev.orderId);
-            else if (prev.page === 'report') this.showReport();
-            else if (prev.page === 'userManagement') this.showUserManagement();
-            else if (prev.page === 'backupRestore') this.showBackupRestore();
-            else this.renderDashboard();
+            const backHandlers = {
+                orderTable: () => this.showOrderTable(),
+                dashboard: () => this.renderDashboard(),
+                viewOrder: () => prev.orderId && this.viewOrder(prev.orderId),
+                report: () => this.showReport(),
+                userManagement: () => this.showUserManagement(),
+                backupRestore: () => this.showBackupRestore()
+            };
+            (backHandlers[prev.page] || backHandlers.dashboard)();
         } else {
             this.renderDashboard();
         }
@@ -145,7 +151,8 @@ window.APP = {
                 <div class="stat-card"><div class="stat-value">${report.active_orders}</div><div>${Utils.t('active')}</div></div>
                 <div class="stat-card"><div class="stat-value">${report.completed_orders}</div><div>${Utils.t('completed')}</div></div>
                 <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_loan_amount)}</div><div>${Utils.t('total_loan')}</div></div>
-                <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_fees_collected)}</div><div>${Utils.t('total_fees')}</div></div>
+                <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div><div>${Utils.lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
+                <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${Utils.lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
             </div>
             
             <div class="toolbar">
@@ -159,107 +166,93 @@ window.APP = {
             
             <div class="card">
                 <h3>${Utils.t('current_user')}: ${AUTH.user.name} (${AUTH.user.role})</h3>
-                <p>📌 ${Utils.t('business_rule')}</p>
+                <p>📌 ${Utils.lang === 'id' ? 'Biaya Admin: 30,000 IDR (dibayar saat kontrak) | Bunga: 10% per bulan (dibayar bulanan)' : '管理费: 30,000 IDR (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
             </div>
         `;
     },
     
-// ==================== 订单列表 ====================
-showOrderTable() {
-    this.currentPage = 'orderTable';
-    
-    let filteredOrders = [...this.db.orders];
-    if (this.currentFilter !== "all") {
-        filteredOrders = filteredOrders.filter(o => o.status === this.currentFilter);
-    }
-    if (this.searchKeyword) {
-        const keyword = this.searchKeyword.toLowerCase();
-        filteredOrders = filteredOrders.filter(o => 
-            o.customer.name.toLowerCase().includes(keyword) ||
-            o.customer.phone.includes(keyword) ||
-            o.order_id.includes(keyword)
-        );
-    }
-    filteredOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    
-    const statusMap = {
-        active: Utils.t('status_active'),
-        completed: Utils.t('status_completed'),
-        liquidated: Utils.t('status_liquidated'),
-        overdue: Utils.t('status_overdue')
-    };
-    
-    const rows = filteredOrders.map(o => {
-        const status = Utils.checkOrderStatus(o);
-        const statusClass = status === 'active' ? 'status-active' : 
-                           (status === 'completed' ? 'status-completed' : 'status-danger');
-        const monthlyPayment = Utils.calculateMonthlyPayment(o.loan_amount);
+    // ==================== 订单列表 ====================
+    showOrderTable() {
+        this.currentPage = 'orderTable';
         
-        return `
-            <tr>
-                <td>${Utils.escapeHtml(o.order_id)}</td>
-                <td>${Utils.escapeHtml(o.customer.name)}</td>
-                <td>${Utils.escapeHtml(o.collateral_name)}</td>
-                <td>${Utils.formatCurrency(o.loan_amount)}</td>
-                <td>${Utils.formatCurrency(monthlyPayment)}</td>
-                <td>${o.paid_months}/10</td>
-                <td><span class="status-badge ${statusClass}">${statusMap[status] || status}</span></td>
-                <td>${Utils.formatDate(o.next_due_date)}</td>
-                <td>
-                    <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})">${Utils.t('view')}</button>
-                    ${PERMISSION.can("order_payment") && o.status === 'active' ? 
-                        `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})">${Utils.t('save')}</button>` : ''}
-                    ${PERMISSION.can("order_edit") && o.status === 'active' ? 
-                        `<button onclick="APP.navigateTo('editOrder', {orderId: '${o.order_id}'})">${Utils.t('edit')}</button>` : ''}
-                    ${PERMISSION.can("order_delete") ? 
-                        `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">${Utils.t('delete')}</button>` : ''}
-                </td>
-            </tr>
-        `;
-    }).join("");
-    
-    document.getElementById("app").innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2>📋 ${Utils.t('order_list')}</h2>
-            <div>
-                <button onclick="APP.toggleLanguage()">🌐 ${Utils.lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
+        let filteredOrders = [...this.db.orders];
+        if (this.currentFilter !== "all") {
+            filteredOrders = filteredOrders.filter(o => o.status === this.currentFilter);
+        }
+        if (this.searchKeyword) {
+            const keyword = this.searchKeyword.toLowerCase();
+            filteredOrders = filteredOrders.filter(o => 
+                o.customer.name.toLowerCase().includes(keyword) ||
+                o.customer.phone.includes(keyword) ||
+                o.order_id.toLowerCase().includes(keyword)
+            );
+        }
+        filteredOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        
+        const statusMap = {
+            active: Utils.t('status_active'),
+            completed: Utils.t('status_completed'),
+            liquidated: Utils.t('status_liquidated')
+        };
+        
+        const rows = filteredOrders.map(o => {
+            const statusClass = o.status === 'active' ? 'status-active' : 
+                               (o.status === 'completed' ? 'status-completed' : 'status-danger');
+            
+            return `
+                <tr>
+                    <td>${Utils.escapeHtml(o.order_id)}</td>
+                    <td>${Utils.escapeHtml(o.customer.name)}</td>
+                    <td>${Utils.escapeHtml(o.collateral_name)}</td>
+                    <td>${Utils.formatCurrency(o.loan_amount)}</td>
+                    <td>${Utils.formatCurrency(o.admin_fee)}</td>
+                    <td>${Utils.formatCurrency(o.monthly_interest)}</td>
+                    <td>${o.interest_paid_months} ${Utils.lang === 'id' ? 'bulan' : '个月'}</td>
+                    <td><span class="status-badge ${statusClass}">${statusMap[o.status] || o.status}</span></td>
+                    <td>
+                        <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})">${Utils.t('view')}</button>
+                        ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})">💰 ${Utils.t('save')}</button>` : ''}
+                        ${PERMISSION.can("order_delete") ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">${Utils.t('delete')}</button>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join("");
+        
+        document.getElementById("app").innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📋 ${Utils.t('order_list')}</h2>
+                <div>
+                    <button onclick="APP.toggleLanguage()">🌐 ${Utils.lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                    <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
+                </div>
             </div>
-        </div>
-        <div class="toolbar">
-            <input type="text" id="searchInput" placeholder="🔍 ${Utils.t('search')}..." style="max-width: 300px;" value="${Utils.escapeHtml(this.searchKeyword)}">
-            <button onclick="APP.searchOrders()">${Utils.t('search')}</button>
-            <button onclick="APP.resetSearch()">${Utils.t('reset')}</button>
-            <select id="statusFilter" onchange="APP.filterOrders(this.value)">
-                <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${Utils.t('total_orders')}</option>
-                <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${Utils.t('active')}</option>
-                <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${Utils.t('completed')}</option>
-                <option value="liquidated" ${this.currentFilter === 'liquidated' ? 'selected' : ''}>${Utils.t('liquidated')}</option>
-            </select>
-            <button onclick="APP.navigateTo('createOrder')">➕ ${Utils.t('create_order')}</button>
-        </div>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>${Utils.t('customer_name')}</th>
-                        <th>${Utils.t('collateral_name')}</th>
-                        <th>${Utils.t('loan_amount')}</th>
-                        <th>${Utils.t('monthly_payment')}</th>
-                        <th>${Utils.t('active')}</th>
-                        <th>${Utils.t('status_active')}</th>
-                        <th>${Utils.lang === 'id' ? 'Jatuh Tempo' : '下次缴费'}</th>
-                        <th>${Utils.t('save')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows || `<tr><td colspan="9">${Utils.t('no_data')}</td></tr>`}
-                </tbody>
-            </table>
-        </div>
-    `;
-},
+            <div class="toolbar">
+                <input type="text" id="searchInput" placeholder="🔍 ${Utils.t('search')}..." style="max-width: 300px;" value="${Utils.escapeHtml(this.searchKeyword)}">
+                <button onclick="APP.searchOrders()">${Utils.t('search')}</button>
+                <button onclick="APP.resetSearch()">${Utils.t('reset')}</button>
+                <select id="statusFilter" onchange="APP.filterOrders(this.value)">
+                    <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${Utils.t('total_orders')}</option>
+                    <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${Utils.t('active')}</option>
+                    <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${Utils.t('completed')}</option>
+                </select>
+                <button onclick="APP.navigateTo('createOrder')">➕ ${Utils.t('create_order')}</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>${Utils.t('customer_name')}</th><th>${Utils.t('collateral_name')}</th>
+                            <th>${Utils.t('loan_amount')}</th><th>${Utils.lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                            <th>${Utils.lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
+                            <th>${Utils.lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                            <th>${Utils.t('status_active')}</th><th>${Utils.t('save')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows || `<tr><td colspan="9">${Utils.t('no_data')}</td></tr>`}</tbody>
+                </table>
+            </div>
+        `;
+    },
     
     searchOrders() {
         this.searchKeyword = document.getElementById("searchInput").value;
@@ -301,7 +294,11 @@ showOrderTable() {
                 <div class="form-group"><label>${Utils.t('loan_amount')} *</label><input id="amount" type="number" placeholder="${Utils.t('loan_amount')}"></div>
                 <div class="form-group"><label>${Utils.t('notes')}</label><textarea id="notes" rows="2" placeholder="${Utils.t('notes')}"></textarea></div>
                 
-                <div class="form-group"><p style="background: #0f172a; padding: 10px; border-radius: 6px;">📌 ${Utils.t('monthly_fee_calc')}</p></div>
+                <div class="form-group">
+                    <p style="background: #0f172a; padding: 10px; border-radius: 6px;">
+                        📌 ${Utils.lang === 'id' ? 'Admin Fee: 30,000 IDR (dibayar saat kontrak) | Bunga: 10% per bulan' : '管理费: 30,000 IDR (签合同支付) | 利息: 10%/月'}
+                    </p>
+                </div>
                 
                 <div class="toolbar">
                     <button onclick="APP.saveOrder()">💾 ${Utils.t('save')}</button>
@@ -334,8 +331,15 @@ showOrderTable() {
             notes: document.getElementById("notes").value
         };
         
-        Order.create(this.db, orderData);
-        alert(Utils.t('order_created'));
+        const newOrder = Order.create(this.db, orderData);
+        alert(`${Utils.t('order_created')}\nID: ${newOrder.order_id}\n${Utils.lang === 'id' ? 'Admin Fee 30,000 IDR harus dibayar sekarang!' : '管理费 30,000 IDR 请立即收取现金！'}`);
+        
+        // 询问是否立即收取管理费
+        if (confirm(Utils.lang === 'id' ? 'Apakah admin fee sudah dibayar?' : '管理费是否已收取？')) {
+            Order.recordAdminFee(this.db, newOrder.order_id);
+            alert(Utils.lang === 'id' ? 'Admin fee dicatat!' : '管理费已记录！');
+        }
+        
         this.goBack();
     },
     
@@ -346,14 +350,22 @@ showOrderTable() {
         const order = this.db.orders.find(o => o.order_id === orderId);
         if (!order) return;
         
-        const status = Utils.checkOrderStatus(order);
-        const monthlyPayment = Utils.calculateMonthlyPayment(order.loan_amount);
         const statusMap = {
             active: Utils.t('status_active'),
             completed: Utils.t('status_completed'),
-            liquidated: Utils.t('status_liquidated'),
-            overdue: Utils.t('status_overdue')
+            liquidated: Utils.t('status_liquidated')
         };
+        
+        // 生成支付历史表格
+        const paymentHistoryRows = order.payment_history.map(p => `
+            <tr>
+                <td>${Utils.formatDate(p.date)}</td>
+                <td>${p.type === 'admin_fee' ? (Utils.lang === 'id' ? 'Admin Fee' : '管理费') : (p.type === 'interest' ? (Utils.lang === 'id' ? 'Bunga' : '利息') : (Utils.lang === 'id' ? 'Pokok' : '本金'))}</td>
+                <td>${p.months ? p.months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') : '-'}</td>
+                <td>${Utils.formatCurrency(p.amount)}</td>
+                <td>${p.description || '-'}</td>
+            </tr>
+        `).join('');
         
         document.getElementById("app").innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -366,7 +378,7 @@ showOrderTable() {
             <div class="card">
                 <h3>${Utils.lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
                 <p><strong>ID:</strong> ${Utils.escapeHtml(order.order_id)}</p>
-                <p><strong>${Utils.t('status_active')}:</strong> <span class="status-badge status-${status}">${statusMap[status] || status}</span></p>
+                <p><strong>${Utils.t('status_active')}:</strong> <span class="status-badge status-${order.status}">${statusMap[order.status] || order.status}</span></p>
                 <p><strong>${Utils.lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
                 <p><strong>${Utils.lang === 'id' ? 'Petugas' : '经办人'}:</strong> ${Utils.escapeHtml(order.created_by)}</p>
                 
@@ -379,40 +391,45 @@ showOrderTable() {
                 <h3>${Utils.t('collateral_info')}</h3>
                 <p><strong>${Utils.t('collateral_name')}:</strong> ${Utils.escapeHtml(order.collateral_name)}</p>
                 <p><strong>${Utils.t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
-                <p><strong>${Utils.t('monthly_payment')}:</strong> ${Utils.formatCurrency(monthlyPayment)} (10% + 30,000)</p>
-                <p><strong>${Utils.lang === 'id' ? 'Bulan Dibayar' : '已缴月数'}:</strong> ${order.paid_months} / 10 (${Utils.lang === 'id' ? 'Siklus' : '周期'} ${order.current_cycle})</p>
-                <p><strong>${Utils.lang === 'id' ? 'Total Biaya Dibayar' : '累计缴费'}:</strong> ${Utils.formatCurrency(order.total_paid_fees)}</p>
-                <p><strong>${Utils.lang === 'id' ? 'Jatuh Tempo Berikutnya' : '下次缴费日'}:</strong> ${Utils.formatDate(order.next_due_date)}</p>
-                <p><strong>${Utils.lang === 'id' ? 'Pembayaran Terakhir' : '最后缴费'}:</strong> ${order.last_payment_date ? Utils.formatDate(order.last_payment_date) : '-'}</p>
+                
+                <h3>💰 ${Utils.lang === 'id' ? 'Rincian Biaya' : '费用明细'}</h3>
+                <p><strong>${Utils.lang === 'id' ? 'Admin Fee' : '管理费'}:</strong> ${Utils.formatCurrency(order.admin_fee)} 
+                    ${order.admin_fee_paid ? '✅ ' + (Utils.lang === 'id' ? 'Lunas' : '已付') : '❌ ' + (Utils.lang === 'id' ? 'Belum dibayar' : '未付')}
+                </p>
+                <p><strong>${Utils.lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</strong> ${Utils.formatCurrency(order.monthly_interest)} (10%)</p>
+                <p><strong>${Utils.lang === 'id' ? 'Bunga Telah Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
+                <p><strong>${Utils.lang === 'id' ? 'Jatuh Tempo Bunga Berikutnya' : '下次利息到期日'}:</strong> ${Utils.formatDate(order.next_interest_due_date)}</p>
+                <p><strong>${Utils.lang === 'id' ? 'Pokok Dibayar' : '已还本金'}:</strong> ${Utils.formatCurrency(order.principal_paid)}</p>
+                <p><strong>${Utils.lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(order.principal_remaining)}</p>
                 <p><strong>${Utils.t('notes')}:</strong> ${Utils.escapeHtml(order.notes) || '-'}</p>
                 
-                ${order.completed_at ? `<p><strong>${Utils.lang === 'id' ? 'Tanggal Lunas' : '结清日期'}:</strong> ${Utils.formatDate(order.completed_at)}</p>` : ''}
-                ${order.liquidated_at ? `<p><strong>${Utils.lang === 'id' ? 'Tanggal Likuidasi' : '变卖日期'}:</strong> ${Utils.formatDate(order.liquidated_at)}</p>` : ''}
+                <h3>📋 ${Utils.lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>${Utils.lang === 'id' ? 'Tanggal' : '日期'}</th><th>${Utils.lang === 'id' ? 'Jenis' : '类型'}</th><th>${Utils.lang === 'id' ? 'Bulan' : '月数'}</th><th>${Utils.lang === 'id' ? 'Jumlah' : '金额'}</th><th>${Utils.lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead>
+                        <tbody>${paymentHistoryRows || `<tr><td colspan="5">${Utils.t('no_data')}</td></tr>`}</tbody>
+                    </table>
+                </div>
                 
                 <div class="toolbar">
                     <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
-                    ${PERMISSION.can("order_payment") && order.status === 'active' ? 
-                        `<button onclick="APP.navigateTo('payment', {orderId: '${order.order_id}'})">💰 ${Utils.t('save')}</button>` : ''}
-                    ${PERMISSION.can("order_edit") && order.status === 'active' ? 
-                        `<button onclick="APP.navigateTo('editOrder', {orderId: '${order.order_id}'})">✏️ ${Utils.t('edit')}</button>` : ''}
+                    ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${order.order_id}'})">💰 ${Utils.t('save')}</button>` : ''}
+                    ${PERMISSION.can("order_edit") && order.status === 'active' ? `<button onclick="APP.navigateTo('editOrder', {orderId: '${order.order_id}'})">✏️ ${Utils.t('edit')}</button>` : ''}
                 </div>
             </div>
         `;
     },
     
-    // ==================== 缴费 ====================
+    // ==================== 支付页面 ====================
     showPayment(orderId) {
         this.currentPage = 'payment';
         this.currentOrderId = orderId;
         const order = this.db.orders.find(o => o.order_id === orderId);
         if (!order) return;
         
-        const monthlyPayment = Utils.calculateMonthlyPayment(order.loan_amount);
-        const remainingMonths = 10 - order.paid_months;
-        
         document.getElementById("app").innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>💰 ${Utils.t('save')} ${Utils.t('monthly_payment')}</h2>
+                <h2>💰 ${Utils.t('save')}</h2>
                 <div>
                     <button onclick="APP.toggleLanguage()">🌐 ${Utils.lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
                     <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
@@ -420,57 +437,77 @@ showOrderTable() {
             </div>
             <div class="card">
                 <p><strong>${Utils.t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer.name)}</p>
+                <p><strong>ID:</strong> ${Utils.escapeHtml(order.order_id)}</p>
                 <p><strong>${Utils.t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
-                <p><strong>${Utils.t('monthly_payment')}:</strong> ${Utils.formatCurrency(monthlyPayment)}</p>
-                <p><strong>${Utils.lang === 'id' ? 'Bulan Dibayar' : '已缴月数'}:</strong> ${order.paid_months} / 10</p>
-                <p><strong>${Utils.lang === 'id' ? 'Sisa Bulan Ini' : '本周期剩余'}:</strong> ${remainingMonths} ${Utils.lang === 'id' ? 'bulan' : '个月'}</p>
+                <p><strong>${Utils.lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(order.principal_remaining)}</p>
+                <p><strong>${Utils.lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</strong> ${Utils.formatCurrency(order.monthly_interest)}</p>
                 
-                <div class="form-group">
-                    <label>${Utils.lang === 'id' ? 'Jumlah Bulan Dibayar' : '缴费月数'} *</label>
-                    <select id="monthsToPay">
-                        <option value="1">1 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment)})</option>
-                        <option value="2">2 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 2)})</option>
-                        <option value="3">3 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 3)})</option>
-                        <option value="4">4 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 4)})</option>
-                        <option value="5">5 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 5)})</option>
-                        ${remainingMonths >= 6 ? `<option value="6">6 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 6)})</option>` : ''}
-                        ${remainingMonths >= 7 ? `<option value="7">7 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 7)})</option>` : ''}
-                        ${remainingMonths >= 8 ? `<option value="8">8 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 8)})</option>` : ''}
-                        ${remainingMonths >= 9 ? `<option value="9">9 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(monthlyPayment * 9)})</option>` : ''}
-                        <option value="${remainingMonths}">${Utils.lang === 'id' ? 'Semua' : '全部'} ${remainingMonths} ${Utils.lang === 'id' ? 'bulan (Lunasi Siklus)' : '个月 (结清周期)'}</option>
-                    </select>
+                <hr>
+                
+                <h3>${Utils.lang === 'id' ? 'Pilih Jenis Pembayaran' : '选择支付类型'}</h3>
+                
+                ${!order.admin_fee_paid ? `
+                <div class="card" style="margin-bottom: 15px;">
+                    <h4>📋 ${Utils.lang === 'id' ? 'Admin Fee' : '管理费'} - ${Utils.formatCurrency(order.admin_fee)}</h4>
+                    <button onclick="APP.payAdminFee('${order.order_id}')">✅ ${Utils.lang === 'id' ? 'Catat Admin Fee' : '记录管理费'}</button>
+                </div>
+                ` : ''}
+                
+                <div class="card" style="margin-bottom: 15px;">
+                    <h4>💰 ${Utils.lang === 'id' ? 'Pembayaran Bunga' : '支付利息'}</h4>
+                    <div class="form-group">
+                        <label>${Utils.lang === 'id' ? 'Jumlah Bulan' : '月数'}:</label>
+                        <select id="interestMonths">
+                            <option value="1">1 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest)})</option>
+                            <option value="2">2 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 2)})</option>
+                            <option value="3">3 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 3)})</option>
+                            <option value="4">4 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 4)})</option>
+                            <option value="5">5 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 5)})</option>
+                            <option value="6">6 ${Utils.lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 6)})</option>
+                        </select>
+                    </div>
+                    <button onclick="APP.payInterest('${order.order_id}')">✅ ${Utils.lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息支付'}</button>
+                </div>
+                
+                <div class="card" style="margin-bottom: 15px;">
+                    <h4>🏦 ${Utils.lang === 'id' ? 'Pembayaran Pokok (Lunasi)' : '本金支付 (结清)'}</h4>
+                    <p>${Utils.lang === 'id' ? 'Sisa Pokok:' : '剩余本金:'} ${Utils.formatCurrency(order.principal_remaining)}</p>
+                    <button onclick="APP.payPrincipal('${order.order_id}')" class="success">✅ ${Utils.lang === 'id' ? 'Lunasi Hutang' : '结清贷款'}</button>
                 </div>
                 
                 <div class="toolbar">
-                    <button onclick="APP.recordPayment('${order.order_id}')">✅ ${Utils.t('confirm')}</button>
                     <button onclick="APP.goBack()">↩️ ${Utils.t('cancel')}</button>
                 </div>
             </div>
         `;
     },
     
-    recordPayment(orderId) {
-        const monthsToPay = parseInt(document.getElementById("monthsToPay").value);
+    payAdminFee(orderId) {
+        if (confirm(Utils.lang === 'id' ? 'Konfirmasi penerimaan Admin Fee 30,000 IDR?' : '确认已收取管理费 30,000 IDR？')) {
+            Order.recordAdminFee(this.db, orderId);
+            alert(Utils.lang === 'id' ? 'Admin Fee dicatat!' : '管理费已记录！');
+            this.viewOrder(orderId);
+        }
+    },
+    
+    payInterest(orderId) {
+        const months = parseInt(document.getElementById("interestMonths").value);
         const order = this.db.orders.find(o => o.order_id === orderId);
-        if (!order) return;
+        const amount = order.monthly_interest * months;
         
-        const monthlyPayment = Utils.calculateMonthlyPayment(order.loan_amount);
-        const totalAmount = monthlyPayment * monthsToPay;
-        
-        if (confirm(`${Utils.t('confirm')} ${Utils.formatCurrency(totalAmount)}?`)) {
-            Order.recordPayment(this.db, orderId, monthsToPay);
-            
-            const updatedOrder = this.db.orders.find(o => o.order_id === orderId);
-            if (updatedOrder.paid_months === 0 && updatedOrder.current_cycle > 1) {
-                if (confirm(`${Utils.lang === 'id' ? 'Siklus selesai! Lunasi pokok?' : '周期完成！是否结清本金？'}\n${Utils.formatCurrency(updatedOrder.loan_amount)}`)) {
-                    Order.settleOrder(this.db, orderId);
-                    alert(Utils.t('completed'));
-                } else {
-                    alert(`${Utils.lang === 'id' ? 'Memasuki siklus' : '进入第'} ${updatedOrder.current_cycle} ${Utils.lang === 'id' ? 'siklus' : '周期'}`);
-                }
-            }
-            alert(Utils.t('payment_recorded'));
-            this.goBack();
+        if (confirm(`${Utils.lang === 'id' ? 'Konfirmasi pembayaran bunga' : '确认支付利息'} ${Utils.formatCurrency(amount)} (${months} ${Utils.lang === 'id' ? 'bulan' : '个月'})?`)) {
+            Order.recordInterestPayment(this.db, orderId, months);
+            alert(Utils.lang === 'id' ? 'Pembayaran bunga dicatat!' : '利息支付已记录！');
+            this.viewOrder(orderId);
+        }
+    },
+    
+    payPrincipal(orderId) {
+        const order = this.db.orders.find(o => o.order_id === orderId);
+        if (confirm(`${Utils.lang === 'id' ? 'Lunasi hutang?' : '结清贷款？'}\n${Utils.formatCurrency(order.principal_remaining)}`)) {
+            Order.recordPrincipalPayment(this.db, orderId, order.principal_remaining);
+            alert(Utils.lang === 'id' ? 'Hutang lunas! Pesanan selesai.' : '贷款已结清！订单完成。');
+            this.viewOrder(orderId);
         }
     },
     
@@ -495,7 +532,6 @@ showOrderTable() {
                 <div class="form-group"><label>${Utils.t('phone')}</label><input id="phone" value="${Utils.escapeHtml(order.customer.phone)}"></div>
                 <div class="form-group"><label>${Utils.t('address')}</label><textarea id="address">${Utils.escapeHtml(order.customer.address)}</textarea></div>
                 <div class="form-group"><label>${Utils.t('collateral_name')}</label><input id="collateral" value="${Utils.escapeHtml(order.collateral_name)}"></div>
-                <div class="form-group"><label>${Utils.t('loan_amount')}</label><input id="amount" type="number" value="${order.loan_amount}"></div>
                 <div class="form-group"><label>${Utils.t('notes')}</label><textarea id="notes">${Utils.escapeHtml(order.notes)}</textarea></div>
                 
                 <div class="toolbar">
@@ -515,7 +551,6 @@ showOrderTable() {
                 address: document.getElementById("address").value
             },
             collateral_name: document.getElementById("collateral").value,
-            loan_amount: document.getElementById("amount").value,
             notes: document.getElementById("notes").value
         };
         Order.update(this.db, orderId, updates);
@@ -536,7 +571,6 @@ showOrderTable() {
     showReport() {
         this.currentPage = 'report';
         const report = Order.getReport(this.db);
-        const activeOrders = this.db.orders.filter(o => o.status === 'active');
         
         document.getElementById("app").innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -549,18 +583,13 @@ showOrderTable() {
             <div class="stats-grid">
                 <div class="stat-card"><div class="stat-value">${report.total_orders}</div><div>${Utils.t('total_orders')}</div></div>
                 <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_loan_amount)}</div><div>${Utils.t('total_loan')}</div></div>
-                <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_fees_collected)}</div><div>${Utils.t('total_fees')}</div></div>
+                <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div><div>${Utils.lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
+                <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${Utils.lang === 'id' ? 'Bunga' : '利息收入'}</div></div>
+                <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_principal)}</div><div>${Utils.lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
             </div>
-            <div class="card">
-                <h3>📈 ${Utils.lang === 'id' ? 'Pendapatan Bulanan yang Diharapkan' : '预期月收入'}</h3>
-                <div class="table-container">
-                    <table>
-                        <thead><tr><th>${Utils.t('customer_name')}</th><th>${Utils.t('loan_amount')}</th><th>${Utils.t('monthly_payment')}</th><th>${Utils.lang === 'id' ? 'Jatuh Tempo' : '下次缴费日'}</th></tr></thead>
-                        <tbody>${activeOrders.map(o => `<tr><td>${Utils.escapeHtml(o.customer.name)}</td><td>${Utils.formatCurrency(o.loan_amount)}</td><td>${Utils.formatCurrency(Utils.calculateMonthlyPayment(o.loan_amount))}</td><td>${Utils.formatDate(o.next_due_date)}</td></tr>`).join('') || `<tr><td colspan="4">${Utils.t('no_data')}</td></tr>`}</tbody>
-                    </table>
-                </div>
+            <div class="toolbar">
+                <button onclick="APP.exportToCSV()">📎 ${Utils.lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
             </div>
-            <div class="toolbar"><button onclick="APP.exportToCSV()">📎 ${Utils.lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button></div>
         `;
     },
     
