@@ -114,15 +114,32 @@ window.APP = {
         `;
     },
     
-    login: async function() {
-        var username = document.getElementById("username").value;
-        var password = document.getElementById("password").value;
-        if (!username || !password) { alert(Utils.t('fill_all_fields')); return; }
-        const realEmail = username;
-        var user = await AUTH.login(email, password);
-        if (!user) { alert(Utils.t('login_failed')); return; }
-        await this.router();
-    },
+login: async function() {
+    var username = document.getElementById("username").value;
+    var password = document.getElementById("password").value;
+
+    if (!username || !password) {
+        alert(Utils.t('fill_all_fields'));
+        return;
+    }
+
+    const realEmail = username;
+
+    // 🔥 加调试（关键）
+    console.log("LOGIN INPUT:", realEmail, password);
+
+    var user = await AUTH.login(realEmail, password);
+
+    console.log("LOGIN RESULT:", user);
+
+    if (!user) {
+        alert("登录失败（检查账号/密码）");
+        return;
+    }
+
+    alert("登录成功");
+    await this.router();
+},
     
     logout: async function() { await AUTH.logout(); await this.router(); },
     
