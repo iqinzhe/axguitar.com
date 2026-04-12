@@ -849,7 +849,156 @@ exportPaymentHistoryToCSV() {
     
     alert(Utils.t('export_success'));
 },
+
+// ==================== 付款记录 ====================
+showPaymentHistory() {
+    this.currentPage = 'paymentHistory';
     
+    // 收集所有付款记录
+    let allPayments = [];
+    this.db.orders.forEach(order => {
+        if (order.payment_history && order.payment_history.length > 0) {
+            order.payment_history.forEach(payment => {
+                allPayments.push({
+                    order_id: order.order_id,
+                    customer_name: order.customer.name,
+                    ...payment
+                });
+            });
+        }
+    });
+    
+    // 按日期倒序排序
+    allPayments.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // 计算汇总统计
+    const totalAdminFee = allPayments.filter(p => p.type === 'admin_fee').reduce((sum, p) => sum + p.amount, 0);
+    const totalInterest = allPayments.filter(p => p.type === 'interest').reduce((sum, p) => sum + p.amount, 0);
+    const totalPrincipal = allPayments.filter(p => p.type === 'principal').reduce((sum, p) => sum + p.amount, 0);
+    
+    const typeMap = {
+        admin_fee: this.lang === 'id' ? 'Admin Fee' : '管理费',
+        interest: this.lang === 'id' ? 'Bunga' : '利息',
+        principal: this.lang === 'id' ? 'Pokok' : '本金'
+    };
+    
+    const rows = allPayments.map(p => `
+        <tr>
+            <td>${Utils.escapeHtml(p.order_id)}</td
+            <td>${Utils.escapeHtml(p.customer_name)}</td
+            <td>${Utils.formatDate(p.date)}</td
+            <td>${typeMap[p.type] || p.type}</td
+            <td>${p.months ? p.months + ' ' + (this.lang === 'id' ? 'bln' : '个月') : '-'}</td
+            <td>${Utils.formatCurrency(p.amount)}</td
+            <td>${Utils.escapeHtml(p.description || '-')}</td
+            <td><button onclick="APP.navigateTo('viewOrder', {orderId: '${p.order_id}'})">${Utils.t('view')}</button></td
+        </tr>
+    `).join('');
+    
+    document.getElementById("app").innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>💰 ${this.lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h2>
+            <div>
+                <button onclick="APP.toggleLanguage()">🌐 ${Utils.lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div>
+                <div>${this.lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${Utils.formatCurrency(totalInterest)}</div>
+                <div>${this.lang === 'id' ? 'Total Bunga' : '利息总额'}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div>
+                <div>${this.lang === 'id' ? 'Total Pokok' : '本金总额'}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div>
+                <div>${this.lang === 'id' ? 'Total Semua' : '全部总计'}</div>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>${this.lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                        <th>${Utils.t('customer_name')}</th>
+                        <th>${this.lang === 'id' ? 'Tanggal' : '日期'}</th>
+                        <th>${this.lang === 'id' ? 'Jenis' : '类型'}</th>
+                        <th>${this.lang === 'id' ? 'Bulan' : '月数'}</th>
+                        <th>${this.lang === 'id' ? 'Jumlah' : '金额'}</th>
+                        <th>${this.lang === 'id' ? 'Keterangan' : '说明'}</th>
+                        <th>${Utils.t('save')}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows || `<tr><td colspan="8">${Utils.t('no_data')}</td></tr>`}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="toolbar">
+            <button onclick="APP.exportPaymentHistoryToCSV()">📎 ${this.lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+        </div>
+    `;
+},
+
+// 导出付款记录为CSV
+exportPaymentHistoryToCSV() {
+    // 收集所有付款记录
+    let allPayments = [];
+    this.db.orders.forEach(order => {
+        if (order.payment_history && order.payment_history.length > 0) {
+            order.payment_history.forEach(payment => {
+                allPayments.push({
+                    order_id: order.order_id,
+                    customer_name: order.customer.name,
+                    ...payment
+                });
+            });
+        }
+    });
+    
+    allPayments.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    const headers = this.lang === 'id' ? 
+        ['ID Pesanan', 'Pelanggan', 'Tanggal', 'Jenis', 'Bulan', 'Jumlah', 'Keterangan'] :
+        ['订单ID', '客户', '日期', '类型', '月数', '金额', '说明'];
+    
+    const typeMap = {
+        admin_fee: this.lang === 'id' ? 'Admin Fee' : '管理费',
+        interest: this.lang === 'id' ? 'Bunga' : '利息',
+        principal: this.lang === 'id' ? 'Pokok' : '本金'
+    };
+    
+    const rows = allPayments.map(p => [
+        p.order_id,
+        p.customer_name,
+        p.date,
+        typeMap[p.type] || p.type,
+        p.months || '',
+        p.amount,
+        p.description || ''
+    ]);
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `payment_history_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    alert(Utils.t('export_success'));
+},
+        
     // ==================== 退出登录 ====================
     logout() {
         AUTH.logout();
