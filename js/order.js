@@ -2,26 +2,37 @@ const Order = {
 
     create(db, data) {
 
-        const id = Date.now();
+        const order = {
+            order_id: Date.now(),
 
-        db.orders.push({
-            id,
-            customerId: data.customerId,
-            amount: data.amount,
-            interest: data.interest,
+            customer: {
+                name: data.customer.name,
+                ktp: data.customer.ktp,
+                phone: data.customer.phone,
+                address: data.customer.address
+            },
+
+            collateral_name: data.collateral_name,
+
+            loan_amount: Number(data.loan_amount),
+            interest_rate: Number(data.interest_rate),
+
             status: "active",
-            createdAt: new Date().toISOString()
-        });
+            due_date: data.due_date,
 
-        return id;
+            officer: AUTH.user.username,
+            created_at: new Date().toLocaleString(),
+
+            notes: data.notes || ""
+        };
+
+        db.orders.push(order);
+
+        return order;
     },
 
     delete(db, id) {
-        db.orders = db.orders.filter(o => o.id !== id);
-    },
-
-    list(db) {
-        return db.orders;
+        db.orders = db.orders.filter(o => o.order_id !== id);
     }
 };
 
