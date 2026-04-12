@@ -478,84 +478,89 @@ window.APP = {
         `;
     },
     
-    showPayment(orderId) {
-        this.currentPage = 'payment';
-        this.currentOrderId = orderId;
-        const order = this.db.orders.find(o => o.order_id === orderId);
-        if (!order) return;
+showPayment(orderId) {
+    this.currentPage = 'payment';
+    this.currentOrderId = orderId;
+    const order = this.db.orders.find(o => o.order_id === orderId);
+    if (!order) return;
+    
+    const lang = Utils.lang;
+    const t = (key) => Utils.t(key);
+    const remainingPrincipal = order.loan_amount - order.principal_paid;
+    const currentMonthlyInterest = remainingPrincipal * 0.10;
+    
+    // 生成利息选项（基于当前剩余本金计算）
+    let interestOptions = '';
+    for (let i = 1; i <= 12; i++) {
+        const amount = currentMonthlyInterest * i;
+        interestOptions += `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(amount)})</option>`;
+    }
+    
+    document.getElementById("app").innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>💰 ${lang === 'id' ? 'Pembayaran' : '缴费'}</h2>
+            <div>
+                <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+            </div>
+        </div>
         
-        const lang = Utils.lang;
-        const t = (key) => Utils.t(key);
-        const remainingPrincipal = order.loan_amount - order.principal_paid;
+        <div class="card">
+            <h3>📋 ${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
+            <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer.name)}</p>
+            <p><strong>ID Pesanan:</strong> ${Utils.escapeHtml(order.order_id)}</p>
+            <p><strong>${t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
+            <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
+            <p><strong>${lang === 'id' ? 'Bunga Bulanan Saat Ini' : '当前月利息'}:</strong> ${Utils.formatCurrency(currentMonthlyInterest)} (10% × ${Utils.formatCurrency(remainingPrincipal)})</p>
+            <p><strong>${lang === 'id' ? 'Bunga Telah Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</p>
+        </div>
         
-        let interestOptions = '';
-        for (let i = 1; i <= 12; i++) {
-            const amount = order.monthly_interest * i;
-            interestOptions += `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(amount)})</option>`;
-        }
-        
-        document.getElementById("app").innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>💰 ${lang === 'id' ? 'Pembayaran' : '缴费'}</h2>
-                <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                </div>
+        <div class="card">
+            <div style="background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                <p style="color: #f59e0b; margin: 0;">📌 ${lang === 'id' ? 'Perhitungan Bunga:' : '利息计算规则：'}</p>
+                <p style="font-size: 12px; margin: 5px 0 0 0;">${lang === 'id' ? 'Bunga dihitung berdasarkan SISA POKOK setiap bulan. Jika Anda membayar sebagian pokok, bunga bulan berikutnya akan berkurang.' : '利息按每月剩余本金计算。如果您偿还了部分本金，下个月的利息将相应减少。'}</p>
             </div>
             
-            <div class="card">
-                <h3>📋 ${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
-                <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer.name)}</p>
-                <p><strong>ID Pesanan:</strong> ${Utils.escapeHtml(order.order_id)}</p>
-                <p><strong>${t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
+            <h3>💰 ${lang === 'id' ? 'Pilih Jenis Pembayaran' : '选择支付类型'}</h3>
+            
+            ${!order.admin_fee_paid ? `
+            <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h4>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'} - ${Utils.formatCurrency(order.admin_fee)}</h4>
+                <button onclick="APP.payAdminFee('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Admin Fee' : '记录管理费支付'}</button>
+            </div>
+            ` : '<div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;"><h4>📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</h4><p>✅ ' + (lang === 'id' ? 'Sudah dibayar' : '已支付') + '</p></div>'}
+            
+            <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h4>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '支付利息'}</h4>
+                <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Bunga dihitung dari SISA POKOK saat ini' : '利息按当前剩余本金计算'}</p>
+                <div class="form-group">
+                    <label>${lang === 'id' ? 'Jumlah Bulan' : '月数'}:</label>
+                    <select id="interestMonths" style="width: 200px;">
+                        ${interestOptions}
+                    </select>
+                </div>
+                <button onclick="APP.payInterest('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息支付'}</button>
+            </div>
+            
+            <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h4>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金支付'}</h4>
+                <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Bayar sebagian atau lunasi seluruh pokok. Membayar pokok akan mengurangi bunga bulan berikutnya.' : '支付部分或全部本金。偿还本金会减少下个月的利息。'}</p>
                 <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
-                <p><strong>${lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</strong> ${Utils.formatCurrency(order.monthly_interest)} (10%)</p>
-                <p><strong>${lang === 'id' ? 'Bunga Telah Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</p>
-                <p><strong>${lang === 'id' ? 'Status Admin Fee' : '管理费状态'}:</strong> ${order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已付') : '❌ ' + (lang === 'id' ? 'Belum dibayar' : '未付')}</p>
-            </div>
-            
-            <div class="card">
-                <h3>💰 ${lang === 'id' ? 'Pilih Jenis Pembayaran' : '选择支付类型'}</h3>
-                
-                ${!order.admin_fee_paid ? `
-                <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <h4>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'} - ${Utils.formatCurrency(order.admin_fee)}</h4>
-                    <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Biaya administrasi dibayar saat kontrak ditandatangani' : '管理费在签合同时支付'}</p>
-                    <button onclick="APP.payAdminFee('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Admin Fee' : '记录管理费支付'}</button>
+                ${remainingPrincipal > 0 ? `
+                <div class="form-group">
+                    <label>${lang === 'id' ? 'Jumlah Pembayaran Pokok' : '本金支付金额'}:</label>
+                    <input type="number" id="principalAmount" value="${remainingPrincipal}" style="width: 200px;">
                 </div>
-                ` : '<div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;"><h4>📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</h4><p>✅ ' + (lang === 'id' ? 'Sudah dibayar' : '已支付') + '</p></div>'}
-                
-                <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <h4>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '支付利息'}</h4>
-                    <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Bunga 10% per bulan dari jumlah pinjaman' : '利息为贷款金额的10%/月'}</p>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Jumlah Bulan' : '月数'}:</label>
-                        <select id="interestMonths" style="width: 200px;">
-                            ${interestOptions}
-                        </select>
-                    </div>
-                    <button onclick="APP.payInterest('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息支付'}</button>
-                </div>
-                
-                <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <h4>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金支付'}</h4>
-                    <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Bayar sebagian atau lunasi seluruh pokok' : '支付部分或全部本金'}</p>
-                    <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
-                    ${remainingPrincipal > 0 ? `
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Jumlah Pembayaran Pokok' : '本金支付金额'}:</label>
-                        <input type="number" id="principalAmount" value="${remainingPrincipal}" style="width: 200px;">
-                    </div>
-                    <button onclick="APP.payPrincipal('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Bayar Pokok' : '支付本金'}</button>
-                    ` : '<p>✅ ' + (lang === 'id' ? 'Pokok sudah lunas' : '本金已结清') + '</p>'}
-                </div>
+                <button onclick="APP.payPrincipal('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Bayar Pokok' : '支付本金'}</button>
+                ` : '<p>✅ ' + (lang === 'id' ? 'Pokok sudah lunas' : '本金已结清') + '</p>'}
             </div>
-            
-            <div class="toolbar">
-                <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
-            </div>
-        `;
-    },
+        </div>
+        
+        <div class="toolbar">
+            <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
+        </div>
+    `;
+},
     
     payAdminFee(orderId) {
         const lang = Utils.lang;
@@ -566,18 +571,28 @@ window.APP = {
         }
     },
     
-    payInterest(orderId) {
-        const months = parseInt(document.getElementById("interestMonths").value);
-        const order = this.db.orders.find(o => o.order_id === orderId);
-        const amount = order.monthly_interest * months;
-        const lang = Utils.lang;
-        
-        if (confirm((lang === 'id' ? 'Konfirmasi pembayaran bunga' : '确认支付利息') + ' ' + Utils.formatCurrency(amount) + ' (' + months + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')?')) {
-            Order.recordInterestPayment(this.db, orderId, months);
-            alert(lang === 'id' ? 'Pembayaran bunga dicatat!' : '利息支付已记录！');
-            this.viewOrder(orderId);
-        }
-    },
+payInterest(orderId) {
+    const months = parseInt(document.getElementById("interestMonths").value);
+    const order = this.db.orders.find(o => o.order_id === orderId);
+    const lang = Utils.lang;
+    const remainingPrincipal = order.loan_amount - order.principal_paid;
+    const monthlyInterest = remainingPrincipal * 0.10;
+    const amount = monthlyInterest * months;
+    
+    if (remainingPrincipal <= 0) {
+        alert(lang === 'id' ? 'Pokok sudah lunas, tidak perlu membayar bunga' : '本金已结清，无需支付利息');
+        return;
+    }
+    
+    if (confirm((lang === 'id' ? 'Konfirmasi pembayaran bunga' : '确认支付利息') + '\n' +
+        (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ': ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
+        (lang === 'id' ? 'Bunga per bulan' : '月利息') + ': ' + Utils.formatCurrency(monthlyInterest) + '\n' +
+        (lang === 'id' ? 'Total' : '总计') + ': ' + Utils.formatCurrency(amount) + ' (' + months + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')')) {
+        Order.recordInterestPayment(this.db, orderId, months);
+        alert(lang === 'id' ? 'Pembayaran bunga dicatat!' : '利息支付已记录！');
+        this.viewOrder(orderId);
+    }
+},
     
     payPrincipal(orderId) {
         const amountInput = document.getElementById("principalAmount");
