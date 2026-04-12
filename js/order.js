@@ -1,163 +1,38 @@
+// ============================================
+// 订单模块 - Supabase 版
+// 保留原有接口，内部调用 SupabaseAPI
+// ============================================
+
 const Order = {
     // 创建订单
-    create(db, data) {
-        const now = new Date();
-        const createdDate = now.toISOString().split('T')[0];
-        
-        // 设置数据库引用供Utils使用
-        Utils.setDb(db);
-        
-        const order = {
-            order_id: Utils.generateOrderId(AUTH.user.role),
-            
-            customer: {
-                name: Utils.escapeHtml(data.customer.name),
-                ktp: Utils.escapeHtml(data.customer.ktp),
-                phone: Utils.escapeHtml(data.customer.phone),
-                address: Utils.escapeHtml(data.customer.address)
-            },
-            
-            collateral_name: Utils.escapeHtml(data.collateral_name),
-            loan_amount: Number(data.loan_amount),
-            
-            // 费用结构
-            admin_fee: 30000,                    // 管理费 (固定30,000)
-            admin_fee_paid: false,               // 管理费是否已支付
-            admin_fee_paid_date: null,           // 管理费支付日期
-            
-            monthly_interest: Number(data.loan_amount) * 0.10,  // 初始月利息 10%（用于显示）
-            interest_paid_months: 0,             // 已支付利息月数
-            interest_paid_total: 0,              // 累计支付利息总额
-            next_interest_due_date: Utils.calculateNextInterestDueDate(createdDate, 0),  // 下次利息到期日
-            
-            // 本金相关
-            principal_paid: 0,                   // 已还本金
-            principal_remaining: Number(data.loan_amount),  // 剩余本金
-            
-            // 状态: active(进行中), completed(已结清), liquidated(已变卖)
-            status: "active",
-            
-            // 支付记录
-            payment_history: [],                  // 每笔支付明细
-            
-            created_at: createdDate,
-            created_by: AUTH.user.username,
-            notes: Utils.escapeHtml(data.notes || "")
+    async create(data) {
+        const orderData = {
+            customer_name: data.customer.name,
+            customer_ktp: data.customer.ktp,
+            customer_phone: data.customer.phone,
+            customer_address: data.customer.address,
+            collateral_name: data.collateral_name,
+            loan_amount: data.loan_amount,
+            notes: data.notes
         };
         
-        db.orders.push(order);
-        Storage.save(db);
-        return order;
+        const newOrder = await SUPABASE.createOrder(orderData);
+        return newOrder;
     },
     
-    // 记录管理费支付 (现金收取)
-    recordAdminFee(db, orderId) {
-        const order = db.orders.find(o => o.order_id === orderId);
-        if (!order || order.admin_fee_paid) return false;
-        
-        order.admin_fee_paid = true;
-        order.admin_fee_paid_date = new Date().toISOString().split('T')[0];
-        
-        // 添加支付记录
-        order.payment_history.push({
-            date: new Date().toISOString().split('T')[0],
-            type: "admin_fee",
-            amount: order.admin_fee,
-            description: "Administrasi Fee / 管理费"
-        });
-        
-        Storage.save(db);
-        return true;
+    // 记录管理费支付
+    async recordAdminFee(orderId) {
+        return await SUPABASE.recordAdminFee(orderId);
     },
     
-    // 记录利息支付（按剩余本金计算）
-    recordInterestPayment(db, orderId, monthsPaid) {
-        const order = db.orders.find(o => o.order_id === orderId);
-        if (!order) return false;
-        
-        // 获取当前剩余本金
-        let currentRemainingPrincipal = order.loan_amount - order.principal_paid;
-        
-        if (currentRemainingPrincipal <= 0) {
-            // 本金已结清，无需支付利息
-            return false;
-        }
-        
-        let totalInterest = 0;
-        let monthsActuallyPaid = 0;
-        
-        // 按剩余本金逐月计算利息
-        for (let i = 0; i < monthsPaid; i++) {
-            if (currentRemainingPrincipal <= 0) break;
-            
-            const monthlyInterest = currentRemainingPrincipal * 0.10;
-            totalInterest += monthlyInterest;
-            monthsActuallyPaid++;
-            
-            // 注意：利息支付不改变本金，所以 currentRemainingPrincipal 保持不变
-            // 这里的循环只是为了计算多个月的利息总额
-        }
-        
-        if (monthsActuallyPaid === 0) {
-            return false;
-        }
-        
-        // 更新订单
-        order.interest_paid_months += monthsActuallyPaid;
-        order.interest_paid_total += totalInterest;
-        order.next_interest_due_date = Utils.calculateNextInterestDueDate(
-            order.created_at, 
-            order.interest_paid_months
-        );
-        
-        // 更新 monthly_interest 用于显示（基于当前剩余本金）
-        order.monthly_interest = currentRemainingPrincipal * 0.10;
-        
-        // 添加支付记录
-        order.payment_history.push({
-            date: new Date().toISOString().split('T')[0],
-            type: "interest",
-            months: monthsActuallyPaid,
-            amount: totalInterest,
-            description: `Bunga ${monthsActuallyPaid} bulan (sisa pokok: ${Utils.formatCurrency(currentRemainingPrincipal)}) / ${monthsActuallyPaid}个月利息 (剩余本金: ${Utils.formatCurrency(currentRemainingPrincipal)})`
-        });
-        
-        Storage.save(db);
-        return true;
+    // 记录利息支付
+    async recordInterestPayment(orderId, monthsPaid) {
+        return await SUPABASE.recordInterestPayment(orderId, monthsPaid);
     },
     
-    // 记录本金支付 (结清)
-    recordPrincipalPayment(db, orderId, amount) {
-        const order = db.orders.find(o => o.order_id === orderId);
-        if (!order) return false;
-        
-        const paidAmount = Math.min(amount, order.principal_remaining);
-        
-        order.principal_paid += paidAmount;
-        order.principal_remaining -= paidAmount;
-        
-        // 更新月利息（基于新的剩余本金）
-        if (order.principal_remaining > 0) {
-            order.monthly_interest = order.principal_remaining * 0.10;
-        }
-        
-        // 添加支付记录
-        order.payment_history.push({
-            date: new Date().toISOString().split('T')[0],
-            type: "principal",
-            amount: paidAmount,
-            description: paidAmount >= order.loan_amount ? "Pelunasan Pokok / 本金结清" : "Pembayaran Pokok / 本金支付"
-        });
-        
-        // 如果本金全部还清，订单完成
-        if (order.principal_remaining <= 0) {
-            order.status = "completed";
-            order.completed_at = new Date().toISOString().split('T')[0];
-            order.monthly_interest = 0; // 本金结清后利息为0
-        }
-        
-        Storage.save(db);
-        return true;
+    // 记录本金支付
+    async recordPrincipalPayment(orderId, amount) {
+        return await SUPABASE.recordPrincipalPayment(orderId, amount);
     },
     
     // 获取当前月利息（基于剩余本金）
@@ -168,63 +43,46 @@ const Order = {
     },
     
     // 获取支付历史
-    getPaymentHistory(db, orderId) {
-        const order = db.orders.find(o => o.order_id === orderId);
-        return order ? order.payment_history : [];
+    async getPaymentHistory(orderId) {
+        const { order, payments } = await SUPABASE.getPaymentHistory(orderId);
+        return payments;
     },
     
     // 删除订单
-    delete(db, orderId) {
-        db.orders = db.orders.filter(o => o.order_id !== orderId);
-        Storage.save(db);
+    async delete(orderId) {
+        return await SUPABASE.deleteOrder(orderId);
     },
     
     // 编辑订单基本信息
-    update(db, orderId, updates) {
-        const order = db.orders.find(o => o.order_id === orderId);
-        if (!order) return false;
+    async update(orderId, updates) {
+        const order = await SUPABASE.getOrder(orderId);
         
+        const updateData = {};
         if (updates.customer) {
-            order.customer = {...order.customer, ...updates.customer};
-            for (let key in order.customer) {
-                order.customer[key] = Utils.escapeHtml(order.customer[key]);
-            }
+            updateData.customer_name = updates.customer.name;
+            updateData.customer_ktp = updates.customer.ktp;
+            updateData.customer_phone = updates.customer.phone;
+            updateData.customer_address = updates.customer.address;
         }
-        if (updates.collateral_name) order.collateral_name = Utils.escapeHtml(updates.collateral_name);
-        if (updates.notes) order.notes = Utils.escapeHtml(updates.notes);
+        if (updates.collateral_name) updateData.collateral_name = updates.collateral_name;
+        if (updates.notes) updateData.notes = updates.notes;
         
-        Storage.save(db);
-        return true;
+        return await SUPABASE.updateOrder(orderId, updateData);
     },
     
     // 获取财务报表
-    getReport(db) {
-        const orders = db.orders;
-        const activeOrders = orders.filter(o => o.status === 'active');
-        const completedOrders = orders.filter(o => o.status === 'completed');
-        
-        const totalLoanAmount = orders.reduce((sum, o) => sum + o.loan_amount, 0);
-        const totalAdminFeesCollected = orders.reduce((sum, o) => sum + (o.admin_fee_paid ? o.admin_fee : 0), 0);
-        const totalInterestCollected = orders.reduce((sum, o) => sum + o.interest_paid_total, 0);
-        const totalPrincipalCollected = orders.reduce((sum, o) => sum + o.principal_paid, 0);
-        
-        // 计算预期月利息（基于当前剩余本金）
-        let expectedMonthlyInterest = 0;
-        activeOrders.forEach(o => {
-            const remainingPrincipal = o.loan_amount - o.principal_paid;
-            expectedMonthlyInterest += remainingPrincipal * 0.10;
-        });
-        
-        return {
-            total_orders: orders.length,
-            active_orders: activeOrders.length,
-            completed_orders: completedOrders.length,
-            total_loan_amount: totalLoanAmount,
-            total_admin_fees: totalAdminFeesCollected,
-            total_interest: totalInterestCollected,
-            total_principal: totalPrincipalCollected,
-            expected_monthly_interest: expectedMonthlyInterest
-        };
+    async getReport() {
+        return await SUPABASE.getReport();
+    },
+    
+    // 解锁订单（管理员）
+    async unlockOrder(orderId) {
+        return await SUPABASE.unlockOrder(orderId);
+    },
+    
+    // 重新锁定订单
+    async relockOrder(orderId) {
+        return await SUPABASE.relockOrder(orderId);
     }
 };
 
