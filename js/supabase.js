@@ -584,3 +584,4 @@ const SupabaseAPI = {
 };
 
 window.SUPABASE = SupabaseAPI;
+window.supabaseClient = supabaseClient;   // 添加这一行
