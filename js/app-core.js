@@ -691,5 +691,3 @@ window.APP = {
         }
     }
 };
-
-window.APP = APP;
