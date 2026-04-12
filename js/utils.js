@@ -13,9 +13,9 @@ const Utils = {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const datePrefix = yy + mm;
         
-        const monthOrders = this.db.orders.filter(o => 
+        const monthOrders = this.db.orders ? this.db.orders.filter(o => 
             o.order_id && o.order_id.startsWith(`${prefix}-${datePrefix}`)
-        );
+        ) : [];
         const seq = String(monthOrders.length + 1).padStart(2, '0');
         
         return `${prefix}-${datePrefix}-${seq}`;
