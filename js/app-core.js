@@ -164,93 +164,102 @@ window.APP = {
         `;
     },
     
-    // ==================== 订单列表 ====================
-    showOrderTable() {
-        this.currentPage = 'orderTable';
+// ==================== 订单列表 ====================
+showOrderTable() {
+    this.currentPage = 'orderTable';
+    
+    let filteredOrders = [...this.db.orders];
+    if (this.currentFilter !== "all") {
+        filteredOrders = filteredOrders.filter(o => o.status === this.currentFilter);
+    }
+    if (this.searchKeyword) {
+        const keyword = this.searchKeyword.toLowerCase();
+        filteredOrders = filteredOrders.filter(o => 
+            o.customer.name.toLowerCase().includes(keyword) ||
+            o.customer.phone.includes(keyword) ||
+            o.order_id.includes(keyword)
+        );
+    }
+    filteredOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    const statusMap = {
+        active: Utils.t('status_active'),
+        completed: Utils.t('status_completed'),
+        liquidated: Utils.t('status_liquidated'),
+        overdue: Utils.t('status_overdue')
+    };
+    
+    const rows = filteredOrders.map(o => {
+        const status = Utils.checkOrderStatus(o);
+        const statusClass = status === 'active' ? 'status-active' : 
+                           (status === 'completed' ? 'status-completed' : 'status-danger');
+        const monthlyPayment = Utils.calculateMonthlyPayment(o.loan_amount);
         
-        let filteredOrders = [...this.db.orders];
-        if (this.currentFilter !== "all") {
-            filteredOrders = filteredOrders.filter(o => o.status === this.currentFilter);
-        }
-        if (this.searchKeyword) {
-            const keyword = this.searchKeyword.toLowerCase();
-            filteredOrders = filteredOrders.filter(o => 
-                o.customer.name.toLowerCase().includes(keyword) ||
-                o.customer.phone.includes(keyword) ||
-                o.order_id.includes(keyword)
-            );
-        }
-        filteredOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        
-        const statusMap = {
-            active: Utils.t('status_active'),
-            completed: Utils.t('status_completed'),
-            liquidated: Utils.t('status_liquidated'),
-            overdue: Utils.t('status_overdue')
-        };
-        
-        const rows = filteredOrders.map(o => {
-            const status = Utils.checkOrderStatus(o);
-            const statusClass = status === 'active' ? 'status-active' : 
-                               (status === 'completed' ? 'status-completed' : 'status-danger');
-            const monthlyPayment = Utils.calculateMonthlyPayment(o.loan_amount);
-            
-            return `
-                <tr>
-                    <td>${Utils.escapeHtml(o.order_id)}</td
-                    <td>${Utils.escapeHtml(o.customer.name)}</td
-                    <td>${Utils.escapeHtml(o.collateral_name)}</td
-                    <td>${Utils.formatCurrency(o.loan_amount)}</td
-                    <td>${Utils.formatCurrency(monthlyPayment)}</td
-                    <td>${o.paid_months}/10</td
-                    <td><span class="status-badge ${statusClass}">${statusMap[status] || status}</span></td
-                    <td>${Utils.formatDate(o.next_due_date)}</td
-                    <td>
-                        <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})">${Utils.t('view')}</button>
-                        ${PERMISSION.can("order_payment") && o.status === 'active' ? 
-                            `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})">${Utils.t('save')}</button>` : ''}
-                        ${PERMISSION.can("order_edit") && o.status === 'active' ? 
-                            `<button onclick="APP.navigateTo('editOrder', {orderId: '${o.order_id}'})">${Utils.t('edit')}</button>` : ''}
-                        ${PERMISSION.can("order_delete") ? 
-                            `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">${Utils.t('delete')}</button>` : ''}
-                    </td
-                </tr>
-            `;
-        }).join("");
-        
-        document.getElementById("app").innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>📋 ${Utils.t('order_list')}</h2>
-                <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${Utils.lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                    <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
-                </div>
-            </div>
-            <div class="toolbar">
-                <input type="text" id="searchInput" placeholder="🔍 ${Utils.t('search')}..." style="max-width: 300px;" value="${Utils.escapeHtml(this.searchKeyword)}">
-                <button onclick="APP.searchOrders()">${Utils.t('search')}</button>
-                <button onclick="APP.resetSearch()">${Utils.t('reset')}</button>
-                <select id="statusFilter" onchange="APP.filterOrders(this.value)">
-                    <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${Utils.t('total_orders')}</option>
-                    <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${Utils.t('active')}</option>
-                    <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${Utils.t('completed')}</option>
-                    <option value="liquidated" ${this.currentFilter === 'liquidated' ? 'selected' : ''}>${Utils.t('liquidated')}</option>
-                </select>
-                <button onclick="APP.navigateTo('createOrder')">➕ ${Utils.t('create_order')}</button>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead><tr>
-                        <th>ID</th><th>${Utils.t('customer_name')}</th><th>${Utils.t('collateral_name')}</th>
-                        <th>${Utils.t('loan_amount')}</th><th>${Utils.t('monthly_payment')}</th>
-                        <th>${Utils.t('active')}</th><th>${Utils.t('status_active')}</th>
-                        <th>${Utils.lang === 'id' ? 'Jatuh Tempo' : '下次缴费'}</th><th>${Utils.t('save')}</th>
-                    </tr></thead>
-                    <tbody>${rows || `<tr><td colspan="9">${Utils.t('no_data')}</td></tr>`}</tbody>
-                </table>
-            </div>
+        return `
+            <tr>
+                <td>${Utils.escapeHtml(o.order_id)}</td>
+                <td>${Utils.escapeHtml(o.customer.name)}</td>
+                <td>${Utils.escapeHtml(o.collateral_name)}</td>
+                <td>${Utils.formatCurrency(o.loan_amount)}</td>
+                <td>${Utils.formatCurrency(monthlyPayment)}</td>
+                <td>${o.paid_months}/10</td>
+                <td><span class="status-badge ${statusClass}">${statusMap[status] || status}</span></td>
+                <td>${Utils.formatDate(o.next_due_date)}</td>
+                <td>
+                    <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})">${Utils.t('view')}</button>
+                    ${PERMISSION.can("order_payment") && o.status === 'active' ? 
+                        `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})">${Utils.t('save')}</button>` : ''}
+                    ${PERMISSION.can("order_edit") && o.status === 'active' ? 
+                        `<button onclick="APP.navigateTo('editOrder', {orderId: '${o.order_id}'})">${Utils.t('edit')}</button>` : ''}
+                    ${PERMISSION.can("order_delete") ? 
+                        `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">${Utils.t('delete')}</button>` : ''}
+                </td>
+            </tr>
         `;
-    },
+    }).join("");
+    
+    document.getElementById("app").innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>📋 ${Utils.t('order_list')}</h2>
+            <div>
+                <button onclick="APP.toggleLanguage()">🌐 ${Utils.lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
+            </div>
+        </div>
+        <div class="toolbar">
+            <input type="text" id="searchInput" placeholder="🔍 ${Utils.t('search')}..." style="max-width: 300px;" value="${Utils.escapeHtml(this.searchKeyword)}">
+            <button onclick="APP.searchOrders()">${Utils.t('search')}</button>
+            <button onclick="APP.resetSearch()">${Utils.t('reset')}</button>
+            <select id="statusFilter" onchange="APP.filterOrders(this.value)">
+                <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${Utils.t('total_orders')}</option>
+                <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${Utils.t('active')}</option>
+                <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${Utils.t('completed')}</option>
+                <option value="liquidated" ${this.currentFilter === 'liquidated' ? 'selected' : ''}>${Utils.t('liquidated')}</option>
+            </select>
+            <button onclick="APP.navigateTo('createOrder')">➕ ${Utils.t('create_order')}</button>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>${Utils.t('customer_name')}</th>
+                        <th>${Utils.t('collateral_name')}</th>
+                        <th>${Utils.t('loan_amount')}</th>
+                        <th>${Utils.t('monthly_payment')}</th>
+                        <th>${Utils.t('active')}</th>
+                        <th>${Utils.t('status_active')}</th>
+                        <th>${Utils.lang === 'id' ? 'Jatuh Tempo' : '下次缴费'}</th>
+                        <th>${Utils.t('save')}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows || `<tr><td colspan="9">${Utils.t('no_data')}</td></tr>`}
+                </tbody>
+            </table>
+        </div>
+    `;
+},
     
     searchOrders() {
         this.searchKeyword = document.getElementById("searchInput").value;
