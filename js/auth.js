@@ -1,84 +1,108 @@
+// ============================================
+// 认证模块 - Supabase Auth 版
+// ============================================
+
 const AUTH = {
     user: null,
-    db: null,
+    profile: null,
     
-    init(db) {
-        this.db = db;
-        const savedUser = sessionStorage.getItem('jf_current_user');
-        if (savedUser) {
-            try {
-                this.user = JSON.parse(savedUser);
-            } catch(e) {}
+    // 初始化（在 APP.init 中调用）
+    async init() {
+        // 检查是否有已登录会话
+        const session = await SUPABASE.getSession();
+        if (session) {
+            await this.loadCurrentUser();
         }
-    },
-    
-    login(username, password) {
-        const user = this.db.users.find(u => u.username === username);
-        
-        if (!user) {
-            console.log('User not found:', username);
-            return null;
-        }
-        
-        // 解码密码并比对
-        let storedPassword;
-        try {
-            storedPassword = atob(user.password);
-        } catch(e) {
-            // 如果密码不是 base64 编码的（旧数据），直接比对
-            storedPassword = user.password;
-        }
-        
-        if (storedPassword !== password) {
-            console.log('Password incorrect for:', username);
-            return null;
-        }
-        
-        this.user = {
-            username: user.username,
-            role: user.role,
-            name: user.name
-        };
-        
-        sessionStorage.setItem('jf_current_user', JSON.stringify(this.user));
         return this.user;
     },
     
-    logout() {
-        this.user = null;
-        sessionStorage.removeItem('jf_current_user');
+    // 加载当前用户信息
+    async loadCurrentUser() {
+        this.profile = await SUPABASE.getCurrentProfile();
+        if (this.profile) {
+            this.user = {
+                id: this.profile.id,
+                username: this.profile.username,
+                name: this.profile.name,
+                role: this.profile.role,
+                store_id: this.profile.store_id,
+                store_name: this.profile.stores?.name
+            };
+        }
+        return this.user;
     },
     
-    changePassword(username, oldPassword, newPassword) {
-        const user = this.db.users.find(u => u.username === username);
-        if (!user) return false;
-        
-        let storedPassword;
+    // 登录
+    async login(email, password) {
         try {
-            storedPassword = atob(user.password);
-        } catch(e) {
-            storedPassword = user.password;
+            // Supabase Auth 使用邮箱登录，但系统使用 username
+            // 需要先通过 username 查找邮箱，或直接使用 email 字段
+            // 简化：登录时使用 username@system.local 格式
+            let loginEmail = email;
+            if (!loginEmail.includes('@')) {
+                loginEmail = `${email}@jfgadai.local`;
+            }
+            
+            const result = await SUPABASE.login(loginEmail, password);
+            await this.loadCurrentUser();
+            return this.user;
+        } catch (error) {
+            console.error('Login error:', error);
+            return null;
         }
-        
-        if (storedPassword !== oldPassword) return false;
-        
-        user.password = btoa(newPassword);
-        Storage.save(this.db);
-        return true;
     },
     
-    addUser(username, password, role, name) {
-        if (this.db.users.find(u => u.username === username)) {
-            return false;
-        }
-        this.db.users.push({
-            username: username,
-            password: btoa(password),
-            role: role,
-            name: name
-        });
-        Storage.save(this.db);
-        return true;
+    // 登出
+    async logout() {
+        await SUPABASE.logout();
+        this.user = null;
+        this.profile = null;
+    },
+    
+    // 检查是否已登录
+    isLoggedIn() {
+        return this.user !== null;
+    },
+    
+    // 检查是否为管理员
+    isAdmin() {
+        return this.user?.role === 'admin';
+    },
+    
+    // 检查是否为店长
+    isStoreManager() {
+        return this.user?.role === 'store_manager';
+    },
+    
+    // 获取当前门店ID
+    getCurrentStoreId() {
+        return this.user?.store_id;
+    },
+    
+    // 获取当前门店名称
+    getCurrentStoreName() {
+        return this.user?.store_name || '未知门店';
+    },
+    
+    // 添加新用户（仅管理员）
+    async addUser(username, password, name, role, storeId) {
+        const email = `${username}@jfgadai.local`;
+        return await SUPABASE.createUser(email, password, username, name, role, storeId);
+    },
+    
+    // 获取所有用户（仅管理员）
+    async getAllUsers() {
+        return await SUPABASE.getAllUsers();
+    },
+    
+    // 删除用户（仅管理员）
+    async deleteUser(userId) {
+        return await SUPABASE.deleteUser(userId);
+    },
+    
+    // 更新用户（仅管理员）
+    async updateUser(userId, updates) {
+        return await SUPABASE.updateUser(userId, updates);
     }
 };
 
