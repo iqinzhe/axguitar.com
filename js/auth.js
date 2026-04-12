@@ -32,25 +32,50 @@ const AUTH = {
         return this.user;
     },
     
-    // 登录
-    async login(email, password) {
-        try {
-            // Supabase Auth 使用邮箱登录，但系统使用 username
-            // 需要先通过 username 查找邮箱，或直接使用 email 字段
-            // 简化：登录时使用 username@system.local 格式
-            let loginEmail = email;
-            if (!loginEmail.includes('@')) {
-                loginEmail = `${email}@jfgadai.local`;
-            }
-            
-            const result = await SUPABASE.login(loginEmail, password);
-            await this.loadCurrentUser();
-            return this.user;
-        } catch (error) {
+// 登录
+async login(username, password) {
+    try {
+        // 如果输入的是 'admin'，自动映射到真实邮箱
+        let loginEmail = username;
+        if (username === 'admin') {
+            loginEmail = 'iqinzhe@gmail.com';
+        } else if (!loginEmail.includes('@')) {
+            loginEmail = `${username}@jfgadai.local`;
+        }
+        
+        // 直接使用 supabaseClient 测试
+        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+            email: loginEmail,
+            password: password
+        });
+        
+        if (error) {
             console.error('Login error:', error);
+            alert('登录失败: ' + error.message);
             return null;
         }
-    },
+        
+        // 手动设置用户信息
+        this.user = {
+            id: data.user.id,
+            username: 'admin',
+            name: 'Administrator',
+            role: 'admin',
+            store_id: null,
+            store_name: '总部'
+        };
+        
+        // 保存到 sessionStorage
+        sessionStorage.setItem('jf_current_user', JSON.stringify(this.user));
+        
+        return this.user;
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('登录失败: ' + error.message);
+        return null;
+    }
+},
     
     // 登出
     async logout() {
