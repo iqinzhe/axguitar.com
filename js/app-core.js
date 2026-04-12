@@ -1,3 +1,27 @@
+/**
+ * ============================================
+ * JF GADAI ENTERPRISE - 主应用文件
+ * ============================================
+ * 
+ * 函数目录：
+ * 1. 初始化与路由 (init, router, navigateTo, goBack)
+ * 2. 登录相关 (renderLogin, login, logout)
+ * 3. 仪表板 (renderDashboard)
+ * 4. 订单列表 (showOrderTable, searchOrders, resetSearch, filterOrders)
+ * 5. 创建订单 (showCreateOrder, saveOrder)
+ * 6. 订单详情 (viewOrder)
+ * 7. 支付功能 (showPayment, payAdminFee, payInterest, payPrincipal)
+ * 8. 编辑订单 (editOrder, updateOrder)
+ * 9. 删除订单 (deleteOrder)
+ * 10. 财务报表 (showReport, exportToCSV)
+ * 11. 付款记录 (showPaymentHistory, exportPaymentHistoryToCSV)
+ * 12. 备份恢复 (showBackupRestore, backupData, restoreData)
+ * 13. 用户管理 (showUserManagement, addUser, deleteUser)
+ * 
+ * 最后更新: 2026-04-12
+ * ============================================
+ */
+
 window.APP = {
     db: null,
     currentFilter: "all",
