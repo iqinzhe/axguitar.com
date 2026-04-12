@@ -212,19 +212,19 @@ window.APP = {
             
             return `
                 <tr>
-                    <td>${Utils.escapeHtml(o.order_id)}</td>
-                    <td>${Utils.escapeHtml(o.customer.name)}</td>
-                    <td>${Utils.escapeHtml(o.collateral_name)}</td>
-                    <td>${Utils.formatCurrency(o.loan_amount)}</td>
-                    <td>${Utils.formatCurrency(o.admin_fee)}</td>
-                    <td>${Utils.formatCurrency(o.monthly_interest)}</td>
-                    <td>${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
-                    <td><span class="status-badge ${statusClass}">${statusMap[o.status] || o.status}</span></td>
+                    <td>${Utils.escapeHtml(o.order_id)}</td
+                    <td>${Utils.escapeHtml(o.customer.name)}</td
+                    <td>${Utils.escapeHtml(o.collateral_name)}</td
+                    <td>${Utils.formatCurrency(o.loan_amount)}</td
+                    <td>${Utils.formatCurrency(o.admin_fee)}</td
+                    <td>${Utils.formatCurrency(o.monthly_interest)}</td
+                    <td>${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td
+                    <td><span class="status-badge ${statusClass}">${statusMap[o.status] || o.status}</span></td
                     <td>
                         <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})">${t('view')}</button>
                         ${o.status === 'active' ? '<button onclick="APP.navigateTo(\'payment\', {orderId: \'' + o.order_id + '\'})">💰 ' + t('save') + '</button>' : ''}
                         ${PERMISSION.can("order_delete") ? '<button class="danger" onclick="APP.deleteOrder(\'' + o.order_id + '\')">' + t('delete') + '</button>' : ''}
-                    </td>
+                    </td
                 </tr>
             `;
         }).join("");
@@ -374,11 +374,11 @@ window.APP = {
         
         const paymentHistoryRows = (order.payment_history || []).map(p => `
             <tr>
-                <td>${Utils.formatDate(p.date)}</td>
-                <td>${p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : (p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金'))}</td>
-                <td>${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
-                <td>${Utils.formatCurrency(p.amount)}</td>
-                <td>${Utils.escapeHtml(p.description || '-')}</td>
+                <td>${Utils.formatDate(p.date)}</td
+                <td>${p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : (p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金'))}</td
+                <td>${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td
+                <td>${Utils.formatCurrency(p.amount)}</td
+                <td>${Utils.escapeHtml(p.description || '-')}</td
             </tr>
         `).join('');
         
@@ -415,7 +415,7 @@ window.APP = {
                 <p><strong>${lang === 'id' ? 'Bunga Telah Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
                 <p><strong>${lang === 'id' ? 'Jatuh Tempo Bunga Berikutnya' : '下次利息到期日'}:</strong> ${Utils.formatDate(order.next_interest_due_date)}</p>
                 <p><strong>${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}:</strong> ${Utils.formatCurrency(order.principal_paid)}</p>
-                <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(order.principal_remaining)}</p>
+                <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</p>
                 <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes) || '-'}</p>
                 
                 <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
@@ -444,58 +444,73 @@ window.APP = {
         
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
+        const remainingPrincipal = order.loan_amount - order.principal_paid;
+        
+        let interestOptions = '';
+        for (let i = 1; i <= 12; i++) {
+            const amount = order.monthly_interest * i;
+            interestOptions += `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(amount)})</option>`;
+        }
         
         document.getElementById("app").innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>💰 ${t('save')}</h2>
+                <h2>💰 ${lang === 'id' ? 'Pembayaran' : '缴费'}</h2>
                 <div>
                     <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
             </div>
+            
             <div class="card">
+                <h3>📋 ${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
                 <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer.name)}</p>
-                <p><strong>ID:</strong> ${Utils.escapeHtml(order.order_id)}</p>
+                <p><strong>ID Pesanan:</strong> ${Utils.escapeHtml(order.order_id)}</p>
                 <p><strong>${t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
-                <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(order.principal_remaining)}</p>
-                <p><strong>${lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</strong> ${Utils.formatCurrency(order.monthly_interest)}</p>
-                
-                <hr>
-                
-                <h3>${lang === 'id' ? 'Pilih Jenis Pembayaran' : '选择支付类型'}</h3>
+                <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
+                <p><strong>${lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</strong> ${Utils.formatCurrency(order.monthly_interest)} (10%)</p>
+                <p><strong>${lang === 'id' ? 'Bunga Telah Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</p>
+            </div>
+            
+            <div class="card">
+                <h3>💰 ${lang === 'id' ? 'Pilih Jenis Pembayaran' : '选择支付类型'}</h3>
                 
                 ${!order.admin_fee_paid ? `
-                <div class="card" style="margin-bottom: 15px;">
+                <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <h4>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'} - ${Utils.formatCurrency(order.admin_fee)}</h4>
-                    <button onclick="APP.payAdminFee('${order.order_id}')">✅ ${lang === 'id' ? 'Catat Admin Fee' : '记录管理费'}</button>
+                    <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Biaya administrasi dibayar saat kontrak ditandatangani' : '管理费在签合同时支付'}</p>
+                    <button onclick="APP.payAdminFee('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Admin Fee' : '记录管理费支付'}</button>
                 </div>
                 ` : ''}
                 
-                <div class="card" style="margin-bottom: 15px;">
+                <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <h4>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '支付利息'}</h4>
+                    <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Bunga 10% per bulan dari jumlah pinjaman' : '利息为贷款金额的10%/月'}</p>
                     <div class="form-group">
                         <label>${lang === 'id' ? 'Jumlah Bulan' : '月数'}:</label>
-                        <select id="interestMonths">
-                            <option value="1">1 ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest)})</option>
-                            <option value="2">2 ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 2)})</option>
-                            <option value="3">3 ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 3)})</option>
-                            <option value="4">4 ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 4)})</option>
-                            <option value="5">5 ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 5)})</option>
-                            <option value="6">6 ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.monthly_interest * 6)})</option>
+                        <select id="interestMonths" style="width: 200px;">
+                            ${interestOptions}
                         </select>
                     </div>
-                    <button onclick="APP.payInterest('${order.order_id}')">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息支付'}</button>
+                    <button onclick="APP.payInterest('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息支付'}</button>
                 </div>
                 
-                <div class="card" style="margin-bottom: 15px;">
-                    <h4>🏦 ${lang === 'id' ? 'Pembayaran Pokok (Lunasi)' : '本金支付 (结清)'}</h4>
-                    <p>${lang === 'id' ? 'Sisa Pokok:' : '剩余本金:'} ${Utils.formatCurrency(order.principal_remaining)}</p>
-                    <button onclick="APP.payPrincipal('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Lunasi Hutang' : '结清贷款'}</button>
+                <div style="background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <h4>🏦 ${lang === 'id' ? 'Pelunasan Pokok' : '本金结清'}</h4>
+                    <p style="color: #94a3b8; font-size: 12px;">${lang === 'id' ? 'Lunasi seluruh sisa pokok pinjaman' : '支付全部剩余本金，结清贷款'}</p>
+                    <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
+                    ${remainingPrincipal > 0 ? `
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Jumlah Pembayaran Pokok' : '本金支付金额'}:</label>
+                        <input type="number" id="principalAmount" value="${remainingPrincipal}" style="width: 200px;">
+                    </div>
+                    <button onclick="APP.payPrincipalPartial('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Bayar Pokok' : '支付本金'}</button>
+                    <button onclick="APP.payPrincipalFull('${order.order_id}')" class="warning" style="margin-top: 10px;">🏦 ${lang === 'id' ? 'Lunasi Semua (Pokok + Bunga)' : '全额结清（本金+利息）'}</button>
+                    ` : '<p>✅ ' + (lang === 'id' ? 'Pokok sudah lunas' : '本金已结清') + '</p>'}
                 </div>
-                
-                <div class="toolbar">
-                    <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
-                </div>
+            </div>
+            
+            <div class="toolbar">
+                <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
             </div>
         `;
     },
@@ -522,11 +537,45 @@ window.APP = {
         }
     },
     
-    payPrincipal(orderId) {
+    payPrincipalPartial(orderId) {
+        const amountInput = document.getElementById("principalAmount");
+        let amount = parseFloat(amountInput.value);
         const order = this.db.orders.find(o => o.order_id === orderId);
         const lang = Utils.lang;
-        if (confirm((lang === 'id' ? 'Lunasi hutang?' : '结清贷款？') + '\n' + Utils.formatCurrency(order.principal_remaining))) {
-            Order.recordPrincipalPayment(this.db, orderId, order.principal_remaining);
+        const remainingPrincipal = order.loan_amount - order.principal_paid;
+        
+        if (isNaN(amount) || amount <= 0) {
+            alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
+            return;
+        }
+        if (amount > remainingPrincipal) {
+            alert(lang === 'id' ? 'Jumlah melebihi sisa pokok' : '金额超过剩余本金');
+            return;
+        }
+        
+        if (confirm((lang === 'id' ? 'Konfirmasi pembayaran pokok' : '确认支付本金') + ' ' + Utils.formatCurrency(amount) + '?')) {
+            Order.recordPrincipalPayment(this.db, orderId, amount);
+            if (amount >= remainingPrincipal) {
+                alert(lang === 'id' ? 'Pokok lunas! Pesanan selesai.' : '本金已结清！订单完成。');
+            } else {
+                alert(lang === 'id' ? 'Pembayaran pokok dicatat!' : '本金支付已记录！');
+            }
+            this.viewOrder(orderId);
+        }
+    },
+    
+    payPrincipalFull(orderId) {
+        const order = this.db.orders.find(o => o.order_id === orderId);
+        const lang = Utils.lang;
+        const remainingPrincipal = order.loan_amount - order.principal_paid;
+        
+        const totalAmount = remainingPrincipal;
+        
+        if (confirm((lang === 'id' ? 'Lunasi semua hutang?' : '全额结清？') + '\n' +
+            (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ': ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
+            (lang === 'id' ? 'Total' : '总计') + ': ' + Utils.formatCurrency(totalAmount))) {
+            
+            Order.recordPrincipalPayment(this.db, orderId, remainingPrincipal);
             alert(lang === 'id' ? 'Hutang lunas! Pesanan selesai.' : '贷款已结清！订单完成。');
             this.viewOrder(orderId);
         }
@@ -663,7 +712,7 @@ window.APP = {
                 <td>${p.months ? p.months + ' ' + (lang === 'id' ? 'bln' : '个月') : '-'}</td
                 <td>${Utils.formatCurrency(p.amount)}</td
                 <td>${Utils.escapeHtml(p.description || '-')}</td
-                <td><button onclick="APP.navigateTo(\'viewOrder\', {orderId: \'' + p.order_id + '\'})">${Utils.t('view')}</button></td
+                <td><button onclick="APP.navigateTo('viewOrder', {orderId: '${p.order_id}'})">${Utils.t('view')}</button></td
             </tr>
         `).join('');
         
