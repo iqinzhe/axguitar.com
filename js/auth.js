@@ -1,7 +1,6 @@
 const AUTH = {
 
     user: null,
-    db: null,
 
     init(db) {
         this.db = db;
@@ -13,25 +12,14 @@ const AUTH = {
             u.username === username && u.password === password
         );
 
-        if (!user) return false;
+        if (!user) return null;
 
-        this.user = {
-            username: user.username,
-            role: user.role
-        };
-
-        localStorage.setItem("user", JSON.stringify(this.user));
-        return true;
-    },
-
-    load() {
-        const u = localStorage.getItem("user");
-        if (u) this.user = JSON.parse(u);
+        this.user = user;
+        return user;
     },
 
     logout() {
-        localStorage.removeItem("user");
-        location.reload();
+        this.user = null;
     }
 };
 
