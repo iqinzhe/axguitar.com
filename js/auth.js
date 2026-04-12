@@ -4,7 +4,6 @@ const AUTH = {
     
     init(db) {
         this.db = db;
-        // 检查是否有已登录用户
         const savedUser = sessionStorage.getItem('jf_current_user');
         if (savedUser) {
             try {
@@ -16,11 +15,25 @@ const AUTH = {
     login(username, password) {
         const user = this.db.users.find(u => u.username === username);
         
-        if (!user || atob(user.password) !== password) {
+        if (!user) {
+            console.log('User not found:', username);
             return null;
         }
         
-        // 不保存密码到session
+        // 解码密码并比对
+        let storedPassword;
+        try {
+            storedPassword = atob(user.password);
+        } catch(e) {
+            // 如果密码不是 base64 编码的（旧数据），直接比对
+            storedPassword = user.password;
+        }
+        
+        if (storedPassword !== password) {
+            console.log('Password incorrect for:', username);
+            return null;
+        }
+        
         this.user = {
             username: user.username,
             role: user.role,
@@ -38,9 +51,17 @@ const AUTH = {
     
     changePassword(username, oldPassword, newPassword) {
         const user = this.db.users.find(u => u.username === username);
-        if (!user || atob(user.password) !== oldPassword) {
-            return false;
+        if (!user) return false;
+        
+        let storedPassword;
+        try {
+            storedPassword = atob(user.password);
+        } catch(e) {
+            storedPassword = user.password;
         }
+        
+        if (storedPassword !== oldPassword) return false;
+        
         user.password = btoa(newPassword);
         Storage.save(this.db);
         return true;
@@ -51,10 +72,10 @@ const AUTH = {
             return false;
         }
         this.db.users.push({
-            username,
+            username: username,
             password: btoa(password),
-            role,
-            name
+            role: role,
+            name: name
         });
         Storage.save(this.db);
         return true;
