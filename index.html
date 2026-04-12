@@ -3,13 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com;
-    connect-src 'self' https://hiupsvsbcdsgoyiieqiv.supabase.co;
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' data:;
-">
 <title>JF GADAI SISTEM - 典当记账系统</title>
 <link rel="stylesheet" href="main.css">
 </head>
@@ -19,7 +12,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/utils.js"></script>
-<script src="js/subabase.js"></script>
+<script src="js/supabase.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/order.js"></script>
@@ -28,13 +21,12 @@
 <script src="js/app-core.js"></script>
 
 <script>
-window.onload = function () {
-    if (!window.APP) {
-        document.getElementById("app").innerHTML = "APP NOT LOADED";
-        return;
-    }
-    APP.init();
-};
+// 直接调用，不依赖 window.onload
+if (window.APP) {
+    window.APP.init();
+} else {
+    document.getElementById("app").innerHTML = "Loading error: APP not defined";
+}
 </script>
 
 </body>
