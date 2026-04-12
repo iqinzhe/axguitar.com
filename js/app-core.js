@@ -155,14 +155,15 @@ window.APP = {
                 <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${Utils.lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
             </div>
             
-            <div class="toolbar">
-                <button onclick="APP.navigateTo('createOrder')">➕ ${Utils.t('create_order')}</button>
-                <button onclick="APP.navigateTo('orderTable')">📋 ${Utils.t('order_list')}</button>
-                ${PERMISSION.can("report_view") ? `<button onclick="APP.navigateTo('report')">📊 ${Utils.t('financial_report')}</button>` : ''}
-                ${PERMISSION.can("user_manage") ? `<button onclick="APP.navigateTo('userManagement')">👥 ${Utils.t('user_management')}</button>` : ''}
-                ${PERMISSION.can("backup_restore") ? `<button onclick="APP.navigateTo('backupRestore')">💾 ${Utils.t('backup_restore')}</button>` : ''}
-                <button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button>
-            </div>
+<div class="toolbar">
+    <button onclick="APP.navigateTo('createOrder')">➕ ${Utils.t('create_order')}</button>
+    <button onclick="APP.navigateTo('orderTable')">📋 ${Utils.t('order_list')}</button>
+    <button onclick="APP.navigateTo('paymentHistory')">💰 ${Utils.lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</button>
+    ${PERMISSION.can("report_view") ? `<button onclick="APP.navigateTo('report')">📊 ${Utils.t('financial_report')}</button>` : ''}
+    ${PERMISSION.can("user_manage") ? `<button onclick="APP.navigateTo('userManagement')">👥 ${Utils.t('user_management')}</button>` : ''}
+    ${PERMISSION.can("backup_restore") ? `<button onclick="APP.navigateTo('backupRestore')">💾 ${Utils.t('backup_restore')}</button>` : ''}
+    <button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button>
+</div>
             
             <div class="card">
                 <h3>${Utils.t('current_user')}: ${AUTH.user.name} (${AUTH.user.role})</h3>
