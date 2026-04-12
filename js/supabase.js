@@ -43,12 +43,21 @@ const SupabaseAPI = {
         return profile?.stores?.name || '未知门店';
     },
     
-    async login(email, password) {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        await this.getCurrentProfile();
-        return data;
-    },
+async login(email, password) {
+    const { data, error } = await this.client.auth.signInWithPassword({
+        email: email,
+        password: password
+    });
+
+    console.log("SUPABASE RAW DATA:", data);
+    console.log("SUPABASE RAW ERROR:", error);
+
+    if (error) {
+        return { error };
+    }
+
+    return data;
+}
     
     async logout() {
         this.clearCache();
