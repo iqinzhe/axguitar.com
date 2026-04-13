@@ -1,15 +1,15 @@
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
-const SUPABASE_KEY = "sb_publishable_ghhdmrulAv5Dt5Rcz9fFyQ_P98L1I5f";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ✅ 修复：Profile 缓存，避免同一请求链中多次重复查询 Supabase
+// Profile 缓存，避免同一请求链中多次重复查询 Supabase
 let _profileCache = null;
 
 const SupabaseAPI = {
     getClient() { return supabaseClient; },
 
-    // ✅ 修复：统一错误处理 - 所有方法均 throw error，不再静默返回 null
+    // 统一错误处理 - 所有方法均 throw error，不再静默返回 null
     async getSession() {
         const { data, error } = await supabaseClient.auth.getSession();
         if (error) throw error;
@@ -22,22 +22,41 @@ const SupabaseAPI = {
         return data.user;
     },
 
-    // ✅ 修复：加入内存缓存，同一会话内只查询一次 Supabase
+    // ✅ 修复：stores(*) 关联查询改为分步查询，避免 store_id 为 NULL 时报错
     async getCurrentProfile() {
         if (_profileCache) return _profileCache;
         const user = await this.getCurrentUser();
         if (!user) return null;
+        
+        // 先查询用户资料
         const { data, error } = await supabaseClient
             .from('user_profiles')
-            .select('*, stores(*)')
+            .select('*')
             .eq('id', user.id)
             .single();
-        if (error) return null;
+        
+        if (error) {
+            console.error("getCurrentProfile error:", error);
+            return null;
+        }
+        
+        // 如果有门店ID，单独查询门店信息
+        if (data.store_id) {
+            const { data: storeData, error: storeError } = await supabaseClient
+                .from('stores')
+                .select('*')
+                .eq('id', data.store_id)
+                .single();
+            if (!storeError && storeData) {
+                data.stores = storeData;
+            }
+        }
+        
         _profileCache = data;
         return data;
     },
 
-    // ✅ 修复：clearCache 现在真正清除缓存变量
+    // 清除缓存
     clearCache() {
         _profileCache = null;
     },
@@ -57,7 +76,6 @@ const SupabaseAPI = {
         return profile?.stores?.name || '未知门店';
     },
 
-    // ✅ 修复：this.client → supabaseClient（致命 Bug，登录必报错）
     async login(email, password) {
         const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: email,
@@ -79,18 +97,26 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ✅ 修复：利用已缓存的 profile，getOrders 只发 1 次网络请求而不是 3 次
+    // ✅ 修复：非管理员且没有门店ID时，不过滤（避免查询失败）
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*');
-        if (profile?.role !== 'admin') {
-            query = query.eq('store_id', profile?.store_id);
+        
+        // 非管理员且有门店ID时才按门店过滤
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
         }
-        if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
-        if (filters.search) query = query.or(
-            `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_id.ilike.%${filters.search}%`
-        );
+        
+        if (filters.status && filters.status !== 'all') {
+            query = query.eq('status', filters.status);
+        }
+        if (filters.search) {
+            query = query.or(
+                `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_id.ilike.%${filters.search}%`
+            );
+        }
         query = query.order('created_at', { ascending: false });
+        
         const { data, error } = await query;
         if (error) throw error;
         return data;
@@ -113,15 +139,14 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
-    // ✅ 修复：订单 ID 碰撞风险 - 改用时间戳毫秒+随机，碰撞概率极低
-    // 格式: AD-2504-1745123456-42（年月-毫秒时间戳后6位-随机2位）
+    // 生成订单ID: 格式 AD-2504-1745123456-42 或 ST-2504-1745123456-42
     _generateOrderId(role) {
         const prefix = role === 'admin' ? 'AD' : 'ST';
         const now = new Date();
         const yy = now.getFullYear().toString().slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const msStr = String(now.getTime()).slice(-6); // 毫秒时间戳后6位
-        const rand = String(Math.floor(Math.random() * 90) + 10); // 10-99 两位随机
+        const msStr = String(now.getTime()).slice(-6);
+        const rand = String(Math.floor(Math.random() * 90) + 10);
         return `${prefix}-${yy}${mm}-${msStr}${rand}`;
     },
 
@@ -221,8 +246,11 @@ const SupabaseAPI = {
         const newPrincipalPaid = order.principal_paid + paidAmount;
         const newPrincipalRemaining = order.loan_amount - newPrincipalPaid;
         let updates = { principal_paid: newPrincipalPaid, principal_remaining: newPrincipalRemaining };
-        if (newPrincipalRemaining <= 0) updates = { ...updates, status: 'completed', monthly_interest: 0 };
-        else updates.monthly_interest = newPrincipalRemaining * 0.10;
+        if (newPrincipalRemaining <= 0) {
+            updates = { ...updates, status: 'completed', monthly_interest: 0 };
+        } else {
+            updates.monthly_interest = newPrincipalRemaining * 0.10;
+        }
         const { error: e1 } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
         if (e1) throw e1;
         const { error: e2 } = await supabaseClient.from('payment_history').insert({
@@ -293,8 +321,8 @@ const SupabaseAPI = {
             .from('payment_history')
             .select('*, orders!inner (order_id, customer_name, store_id)')
             .order('date', { ascending: false });
-        if (profile?.role !== 'admin') {
-            query = query.eq('orders.store_id', profile?.store_id);
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('orders.store_id', profile.store_id);
         }
         const { data, error } = await query;
         if (error) throw error;
