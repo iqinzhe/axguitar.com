@@ -44,7 +44,6 @@ const StoreManager = {
 
     // 获取门店的收入（管理费 + 利息）
     async getStoreIncome(storeId) {
-        // 获取该门店的所有订单
         const { data: orders, error } = await supabaseClient
             .from('orders')
             .select('admin_fee_paid, admin_fee, interest_paid_total')
@@ -60,13 +59,12 @@ const StoreManager = {
     },
 
     async renderStoreManagement() {
-        // 首次进入强制拉取，后续复用缓存
         await this.loadStores();
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
         
         // 收集每个门店的支出和收入数据
-        let storeStatsHtml = '';
+        let storeStatsRows = '';
         let grandTotalIncome = 0;
         let grandTotalExpenses = 0;
         let grandTotalGrossProfit = 0;
@@ -80,16 +78,12 @@ const StoreManager = {
             grandTotalExpenses += expenses;
             grandTotalGrossProfit += grossProfit;
             
-            storeStatsHtml += `
-                <div class="stat-card" style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                        <div><strong>🏪 ${Utils.escapeHtml(store.name)}</strong></div>
-                        <div style="color: #10b981;">💰 ${lang === 'id' ? 'Pendapatan' : '收入'}: ${Utils.formatCurrency(income)}</div>
-                        <div style="color: #ef4444;">📝 ${lang === 'id' ? 'Pengeluaran' : '支出'}: ${Utils.formatCurrency(expenses)}</div>
-                        <div style="color: #3b82f6;">📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}: ${Utils.formatCurrency(grossProfit)}</div>
-                    </div>
-                </div>
-            `;
+            storeStatsRows += `<tr>
+                <td><strong>${Utils.escapeHtml(store.name)}</strong></td>
+                <td style="color: #10b981;">${Utils.formatCurrency(income)}</td>
+                <td style="color: #ef4444;">${Utils.formatCurrency(expenses)}</td>
+                <td style="color: ${grossProfit >= 0 ? '#10b981' : '#ef4444'};">${Utils.formatCurrency(grossProfit)}</td>
+            </tr>`;
         }
 
         let storeRows = '';
@@ -132,9 +126,22 @@ const StoreManager = {
                         <div>${lang === 'id' ? 'Total Laba Kotor' : '总毛利'}</div>
                     </div>
                 </div>
-                <div style="margin-top: 15px;">
-                    <h4>${lang === 'id' ? 'Detail per Toko' : '各门店明细'}</h4>
-                    ${storeStatsHtml || `<p style="color: #94a3b8;">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</p>`}
+                
+                <h4>${lang === 'id' ? 'Detail per Toko' : '各门店明细'}</h4>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                <th>${lang === 'id' ? 'Pendapatan' : '收入'}</th>
+                                <th>${lang === 'id' ? 'Pengeluaran' : '支出'}</th>
+                                <th>${lang === 'id' ? 'Laba Kotor' : '毛利'}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${storeStatsRows || `<tr><td colspan="4" style="text-align: center;">${t('no_data')}</td>`}
+                        </tbody>
+                    </table>
                 </div>
             </div>
             
@@ -162,7 +169,7 @@ const StoreManager = {
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
-                    <table>
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>${lang === 'id' ? 'Kode' : '编码'}</th>
