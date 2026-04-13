@@ -300,20 +300,46 @@ const SupabaseAPI = {
         return true;
     },
 
-    async getReport() {
-        const orders = await this.getOrders();
-        const activeOrders = orders.filter(o => o.status === 'active');
-        return {
-            total_orders: orders.length,
-            active_orders: activeOrders.length,
-            completed_orders: orders.filter(o => o.status === 'completed').length,
-            total_loan_amount: orders.reduce((s, o) => s + o.loan_amount, 0),
-            total_admin_fees: orders.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0),
-            total_interest: orders.reduce((s, o) => s + o.interest_paid_total, 0),
-            total_principal: orders.reduce((s, o) => s + o.principal_paid, 0),
-            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * 0.10), 0)
-        };
-    },
+async getReport() {
+    const orders = await this.getOrders();
+    const activeOrders = orders.filter(o => o.status === 'active');
+    
+    // 获取当前用户的 profile（用于判断角色和门店）
+    const profile = await this.getCurrentProfile();
+    
+    // 获取支出总额
+    let expenseQuery = supabaseClient.from('expenses').select('amount');
+    if (profile?.role !== 'admin' && profile?.store_id) {
+        expenseQuery = expenseQuery.eq('store_id', profile.store_id);
+    }
+    const { data: expenses, error: expenseError } = await expenseQuery;
+    if (expenseError) {
+        console.error("获取支出失败:", expenseError);
+    }
+    const totalExpenses = expenses?.reduce((s, e) => s + e.amount, 0) || 0;
+    
+    // 计算总收入（管理费 + 利息）
+    const totalAdminFees = orders.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0);
+    const totalInterest = orders.reduce((s, o) => s + o.interest_paid_total, 0);
+    const totalIncome = totalAdminFees + totalInterest;
+    
+    // 计算支出占比（支出总额 ÷ 总收入 × 100%）
+    const expenseRatio = totalIncome > 0 ? ((totalExpenses / totalIncome) * 100).toFixed(1) : 0;
+    
+    return {
+        total_orders: orders.length,
+        active_orders: activeOrders.length,
+        completed_orders: orders.filter(o => o.status === 'completed').length,
+        total_loan_amount: orders.reduce((s, o) => s + o.loan_amount, 0),
+        total_admin_fees: totalAdminFees,
+        total_interest: totalInterest,
+        total_principal: orders.reduce((s, o) => s + o.principal_paid, 0),
+        expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * 0.10), 0),
+        // 新增字段
+        total_expenses: totalExpenses,
+        expense_ratio: expenseRatio
+    };
+}
 
     async getAllPayments() {
         const profile = await this.getCurrentProfile();
