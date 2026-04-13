@@ -34,7 +34,6 @@ window.APP = {
             editOrder: async () => { if (self.currentOrderId) await self.editOrder(self.currentOrderId); },
             report: async () => await self.showReport(),
             userManagement: async () => await self.showUserManagement(),
-            backupRestore: () => self.showBackupRestore(),
             paymentHistory: async () => await self.showPaymentHistory(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
             migration: () => Migration.renderMigrationUI()
@@ -61,7 +60,6 @@ window.APP = {
             dashboard: async () => await self.renderDashboard(),
             report: async () => await self.showReport(),
             userManagement: async () => await self.showUserManagement(),
-            backupRestore: () => self.showBackupRestore(),
             paymentHistory: async () => await self.showPaymentHistory(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
             migration: () => Migration.renderMigrationUI(),
@@ -88,7 +86,6 @@ window.APP = {
                 viewOrder: async () => { if (prev.orderId) await self.viewOrder(prev.orderId); },
                 report: async () => await self.showReport(),
                 userManagement: async () => await self.showUserManagement(),
-                backupRestore: () => self.showBackupRestore(),
                 paymentHistory: async () => await self.showPaymentHistory(),
                 storeManagement: async () => await StoreManager.renderStoreManagement()
             };
@@ -182,7 +179,6 @@ window.APP = {
                     ${isAdmin ? `<button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>` : ''}
                     ${isAdmin ? `<button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</button>` : ''}
                     ${isAdmin ? `<button onclick="APP.navigateTo('migration')">📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</button>` : ''}
-                    <button onclick="APP.navigateTo('backupRestore')">💾 ${t('backup_restore')}</button>
                     <button onclick="APP.logout()">🚪 ${t('logout')}</button>
                 </div>
                 <div class="card">
@@ -356,7 +352,7 @@ window.APP = {
                     </tr>`;
                 }
             } else {
-                paymentHistoryRows = `<tr><td colspan="5" style="text-align: center;">${t('no_data')}</td></tr>`;
+                paymentHistoryRows = `<tr><td colspan="5" style="text-align: center;">${t('no_data')}<tr></tr>`;
             }
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
@@ -389,7 +385,7 @@ window.APP = {
                     <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes)}</p>
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
                     <div class="table-container">
-                        <tr>
+                        <table>
                             <thead><tr>
                                 <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                 <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
@@ -654,38 +650,6 @@ window.APP = {
                     <button onclick="Storage.exportPaymentsToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                 </div>`;
         } catch (error) { alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载付款记录失败'); }
-    },
-
-    showBackupRestore: function() {
-        this.currentPage = 'backupRestore';
-        var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
-        document.getElementById("app").innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>💾 ${t('backup_restore')}</h2>
-                <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                </div>
-            </div>
-            <div class="card">
-                <h3>${lang === 'id' ? 'Cadangan Data' : '备份数据'}</h3>
-                <button onclick="Storage.backup()">📥 ${lang === 'id' ? 'Ekspor File Cadangan' : '导出备份文件'}</button>
-                <h3 style="margin-top: 30px;">${lang === 'id' ? 'Pemulihan Data' : '恢复数据'}</h3>
-                <input type="file" id="restoreFile" accept=".json">
-                <button onclick="APP.restoreData()">📤 ${lang === 'id' ? 'Impor Pemulihan' : '导入恢复'}</button>
-                <p style="margin-top: 10px; color: #f59e0b;">⚠️ ${lang === 'id' ? 'Perhatian: Memulihkan data akan menimpa semua data yang ada!' : '注意：恢复数据将覆盖当前所有数据，请谨慎操作！'}</p>
-            </div>`;
-    },
-
-    restoreData: async function() {
-        var file = document.getElementById("restoreFile").files[0];
-        if (!file) { alert(Utils.lang === 'id' ? 'Pilih file cadangan' : '请选择备份文件'); return; }
-        if (confirm(Utils.lang === 'id' ? '⚠️ Lanjutkan pemulihan data?' : '⚠️ 确定继续恢复数据吗？')) {
-            var success = await Storage.restore(file);
-            if (success) { alert(Utils.lang === 'id' ? 'Pemulihan berhasil! Sistem akan dimuat ulang.' : '恢复成功！系统将重新加载。'); location.reload(); }
-            else { alert(Utils.lang === 'id' ? 'Pemulihan gagal: Format file salah' : '恢复失败：文件格式错误'); }
-        }
     },
 
     showUserManagement: async function() {
