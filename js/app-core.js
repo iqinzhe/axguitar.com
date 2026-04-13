@@ -289,7 +289,7 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
                     <div class="table-container">
-                        <table>
+                        </table>
                             <thead>
                                 <tr>
                                     <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
@@ -516,11 +516,11 @@ window.APP = {
                         <td><span class="status-badge ${statusClass}">${statusMap[o.status] || o.status}</span></td>
                         ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
                         <td>
-                            <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})" title="${t('view')}">👁️</button>
-                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})" title="${lang === 'id' ? 'Bayar' : '付款'}">💰</button>` : ''}
-                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" title="${t('delete')}">🗑️</button>` : ''}
-                            <button onclick="APP.printOrder('${o.order_id}')" class="success" title="${lang === 'id' ? 'Cetak' : '打印'}">🖨️</button>
-                            ${o.is_locked ? `<span title="${lang === 'id' ? 'Terkunci' : '已锁定'}">🔒</span>` : ''}
+                            <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})" style="padding: 4px 8px; font-size: 12px;">👁️ ${t('view')}</button>
+                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})" style="padding: 4px 8px; font-size: 12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>` : ''}
+                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" style="padding: 4px 8px; font-size: 12px;">🗑️ ${t('delete')}</button>` : ''}
+                            <button onclick="APP.printOrder('${o.order_id}')" class="success" style="padding: 4px 8px; font-size: 12px;">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            ${o.is_locked ? `<span style="margin-left: 5px;">🔒</span>` : ''}
                         </td>
                     </tr>`;
                 }
@@ -683,7 +683,7 @@ window.APP = {
                     <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes)}</p>
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
                     <div class="table-container">
-                        <tr>
+                        <table>
                             <thead><tr>
                                 <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                 <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
@@ -877,7 +877,7 @@ window.APP = {
             
             // 计算总收入
             var totalIncome = report.total_admin_fees + report.total_interest;
-            var netIncome = totalIncome - totalExpenses;
+            var grossProfit = totalIncome - totalExpenses;
             
             document.getElementById("app").innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -897,7 +897,7 @@ window.APP = {
                 <div class="stats-grid">
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(netIncome)}</div><div>${lang === 'id' ? 'Laba Bersih' : '净利润'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
                 </div>
                 <div class="toolbar">
                     <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
@@ -934,8 +934,8 @@ window.APP = {
                     <td>${Utils.escapeHtml(storeName)}</td>
                     <td>
                         ${isCurrent ? `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>` : ''}
-                        ${!isCurrent ? `<button onclick="APP.editUser('${u.id}')" title="${t('edit')}">✏️</button>` : ''}
-                        ${!isCurrent ? `<button class="danger" onclick="APP.deleteUser('${u.id}')" title="${t('delete')}">🗑️</button>` : ''}
+                        ${!isCurrent ? `<button onclick="APP.editUser('${u.id}')" style="padding: 4px 8px; font-size: 12px;">✏️ ${t('edit')}</button>` : ''}
+                        ${!isCurrent ? `<button class="danger" onclick="APP.deleteUser('${u.id}')" style="padding: 4px 8px; font-size: 12px;">🗑️ ${t('delete')}</button>` : ''}
                     </td>
                 </tr>`;
             }
