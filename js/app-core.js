@@ -34,7 +34,6 @@ window.APP = {
             editOrder: async () => { if (self.currentOrderId) await self.editOrder(self.currentOrderId); },
             report: async () => await self.showReport(),
             userManagement: async () => await self.showUserManagement(),
-            paymentHistory: async () => await self.showPaymentHistory(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
             migration: () => Migration.renderMigrationUI(),
             expenses: async () => await self.showExpenses()
@@ -61,7 +60,6 @@ window.APP = {
             dashboard: async () => await self.renderDashboard(),
             report: async () => await self.showReport(),
             userManagement: async () => await self.showUserManagement(),
-            paymentHistory: async () => await self.showPaymentHistory(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
             migration: () => Migration.renderMigrationUI(),
             expenses: async () => await self.showExpenses(),
@@ -88,7 +86,6 @@ window.APP = {
                 viewOrder: async () => { if (prev.orderId) await self.viewOrder(prev.orderId); },
                 report: async () => await self.showReport(),
                 userManagement: async () => await self.showUserManagement(),
-                paymentHistory: async () => await self.showPaymentHistory(),
                 storeManagement: async () => await StoreManager.renderStoreManagement(),
                 expenses: async () => await self.showExpenses()
             };
@@ -185,7 +182,6 @@ window.APP = {
                 <div class="toolbar">
                     <button onclick="APP.navigateTo('createOrder')">➕ ${t('create_order')}</button>
                     <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</button>
                     <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '支出明细'}</button>
                     ${isAdmin ? `<button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>` : ''}
                     ${isAdmin ? `<button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>` : ''}
@@ -489,14 +485,22 @@ window.APP = {
         var self = this;
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
+        var isAdmin = AUTH.isAdmin();
+        
         try {
             var filters = { status: this.currentFilter, search: this.searchKeyword };
             var orders = await SUPABASE.getOrders(filters);
-            var isAdmin = AUTH.isAdmin();
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            
+            // 获取门店名称映射（用于显示）
+            var stores = await SUPABASE.getAllStores();
+            var storeMap = {};
+            for (var s of stores) storeMap[s.id] = s.name;
+            
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="10" style="text-align: center;">${t('no_data')}</td></tr>`;
+                var colCount = isAdmin ? 11 : 10;
+                rows = `<tr><td colspan="${colCount}" style="text-align: center;">${t('no_data')}</td></tr>`;
             } else {
                 for (var i = 0; i < orders.length; i++) {
                     var o = orders[i];
@@ -510,16 +514,31 @@ window.APP = {
                         <td>${Utils.formatCurrency(o.monthly_interest || 0)}</td>
                         <td>${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
                         <td><span class="status-badge ${statusClass}">${statusMap[o.status] || o.status}</span></td>
+                        ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
                         <td>
-                            <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})">${t('view')}</button>
-                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})">💰</button>` : ''}
-                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️</button>` : ''}
-                            <button onclick="APP.printOrder('${o.order_id}')" class="success">🖨️</button>
+                            <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})" title="${t('view')}">👁️</button>
+                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})" title="${lang === 'id' ? 'Bayar' : '付款'}">💰</button>` : ''}
+                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" title="${t('delete')}">🗑️</button>` : ''}
+                            <button onclick="APP.printOrder('${o.order_id}')" class="success" title="${lang === 'id' ? 'Cetak' : '打印'}">🖨️</button>
                             ${o.is_locked ? `<span title="${lang === 'id' ? 'Terkunci' : '已锁定'}">🔒</span>` : ''}
                         </td>
                     </tr>`;
                 }
             }
+            
+            // 构建表头
+            var headers = `
+                <th>ID</th><th>${t('customer_name')}</th><th>${t('collateral_name')}</th>
+                <th>${t('loan_amount')}</th><th>${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                <th>${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
+                <th>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                <th>${lang === 'id' ? 'Status' : '状态'}</th>
+            `;
+            if (isAdmin) {
+                headers += `<th>${lang === 'id' ? 'Toko' : '门店'}</th>`;
+            }
+            headers += `<th>${lang === 'id' ? 'Aksi' : '操作'}</th>`;
+            
             var html = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📋 ${t('order_list')}</h2>
@@ -541,16 +560,7 @@ window.APP = {
                 </div>
                 <div class="table-container">
                     <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th><th>${t('customer_name')}</th><th>${t('collateral_name')}</th>
-                                <th>${t('loan_amount')}</th><th>${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                                <th>${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
-                                <th>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                <th>${lang === 'id' ? 'Status' : '状态'}</th>
-                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                            </tr>
-                        </thead>
+                        <thead><tr>${headers}</thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
@@ -673,7 +683,7 @@ window.APP = {
                     <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes)}</p>
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
                     <div class="table-container">
-                        <table>
+                        <tr>
                             <thead><tr>
                                 <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                 <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
@@ -857,6 +867,18 @@ window.APP = {
             var report = await Order.getReport();
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
+            
+            // 获取支出总额
+            var totalExpenses = 0;
+            try {
+                var expensesData = await this.getExpensesTotal();
+                totalExpenses = expensesData.total;
+            } catch(e) { console.error("获取支出失败:", e); }
+            
+            // 计算总收入
+            var totalIncome = report.total_admin_fees + report.total_interest;
+            var netIncome = totalIncome - totalExpenses;
+            
             document.getElementById("app").innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📊 ${t('financial_report')}</h2>
@@ -872,73 +894,15 @@ window.APP = {
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga' : '利息收入'}</div></div>
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_principal)}</div><div>${lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
                 </div>
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(netIncome)}</div><div>${lang === 'id' ? 'Laba Bersih' : '净利润'}</div></div>
+                </div>
                 <div class="toolbar">
                     <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                 </div>`;
         } catch (err) { alert(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报告失败'); }
-    },
-
-    showPaymentHistory: async function() {
-        this.currentPage = 'paymentHistory';
-        var lang = Utils.lang;
-        try {
-            var allPayments = await SUPABASE.getAllPayments();
-            var totalAdminFee = 0, totalInterest = 0, totalPrincipal = 0;
-            for (var p of allPayments) {
-                if (p.type === 'admin_fee') totalAdminFee += p.amount;
-                else if (p.type === 'interest') totalInterest += p.amount;
-                else if (p.type === 'principal') totalPrincipal += p.amount;
-            }
-            var typeMap = {
-                admin_fee: lang === 'id' ? 'Admin Fee' : '管理费',
-                interest: lang === 'id' ? 'Bunga' : '利息',
-                principal: lang === 'id' ? 'Pokok' : '本金'
-            };
-            var rows = allPayments.length === 0
-                ? `<tr><td colspan="8" style="text-align: center;">${Utils.t('no_data')}</td></tr>`
-                : allPayments.map(p => `<tr>
-                    <td>${Utils.escapeHtml(p.orders.order_id)}</td>
-                    <td>${Utils.escapeHtml(p.orders.customer_name)}</td>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${typeMap[p.type] || p.type}</td>
-                    <td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td>${Utils.formatCurrency(p.amount)}</td>
-                    <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    <td><button onclick="APP.navigateTo('viewOrder', {orderId: '${p.orders.order_id}'})">${Utils.t('view')}</button></td>
-                </tr>`).join('');
-            document.getElementById("app").innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h2>
-                    <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                        <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
-                    </div>
-                </div>
-                <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Total Bunga' : '利息总额'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Total Pokok' : '本金总额'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead><tr>
-                            <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                            <th>${Utils.t('customer_name')}</th>
-                            <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                            <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
-                            <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                            <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                            <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                            <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                        </tr></thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                </div>
-                <div class="toolbar">
-                    <button onclick="Storage.exportPaymentsToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
-                </div>`;
-        } catch (error) { alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载付款记录失败'); }
     },
 
     showUserManagement: async function() {
@@ -948,10 +912,21 @@ window.APP = {
         try {
             var users = await AUTH.getAllUsers();
             var stores = await SUPABASE.getAllStores();
+            
+            // 按门店名称排序
+            var storeMap = {};
+            for (var s of stores) storeMap[s.id] = s.name;
+            
+            users.sort(function(a, b) {
+                var nameA = storeMap[a.store_id] || '';
+                var nameB = storeMap[b.store_id] || '';
+                return nameA.localeCompare(nameB);
+            });
+            
             var userRows = '';
             for (var u of users) {
                 var isCurrent = (u.id === AUTH.user.id);
-                var storeName = u.stores?.name || '-';
+                var storeName = storeMap[u.store_id] || '-';
                 userRows += `<tr>
                     <td>${Utils.escapeHtml(u.username || u.email || '-')}</td>
                     <td>${Utils.escapeHtml(u.name)}</td>
@@ -959,8 +934,8 @@ window.APP = {
                     <td>${Utils.escapeHtml(storeName)}</td>
                     <td>
                         ${isCurrent ? `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>` : ''}
-                        ${!isCurrent ? `<button onclick="APP.editUser('${u.id}')">✏️ ${t('edit')}</button>` : ''}
-                        ${!isCurrent ? `<button class="danger" onclick="APP.deleteUser('${u.id}')">🗑️ ${t('delete')}</button>` : ''}
+                        ${!isCurrent ? `<button onclick="APP.editUser('${u.id}')" title="${t('edit')}">✏️</button>` : ''}
+                        ${!isCurrent ? `<button class="danger" onclick="APP.deleteUser('${u.id}')" title="${t('delete')}">🗑️</button>` : ''}
                     </td>
                 </tr>`;
             }
@@ -991,7 +966,7 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
                     <div class="table-container">
-                        <td><thead><tr>
+                        <table><thead><tr>
                             <th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th>
                             <th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th>
                             <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
