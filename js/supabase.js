@@ -196,6 +196,7 @@ const SupabaseAPI = {
             store_id: profile.store_id,
             created_by: profile.id,
             notes: orderData.notes || '',
+            customer_id: orderData.customer_id || null,  // ✅ 新增：关联客户ID
             is_locked: true,
             locked_at: new Date().toISOString(),
             locked_by: profile.id
