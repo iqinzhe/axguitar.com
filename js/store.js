@@ -1,5 +1,5 @@
 const StoreManager = {
-    // ✅ 修复：门店列表本地缓存，增删改后局部更新，不再每次全量重拉
+    // 门店列表本地缓存，增删改后局部更新，不再每次全量重拉
     stores: [],
     _loaded: false,
 
@@ -10,7 +10,6 @@ const StoreManager = {
         return this.stores;
     },
 
-    // ✅ 修复：createStore 后局部追加到缓存，不重新拉取全量
     async createStore(code, name, address, phone) {
         const newStore = await SUPABASE.createStore(code, name, address, phone);
         this.stores.push(newStore);
@@ -18,7 +17,6 @@ const StoreManager = {
         return newStore;
     },
 
-    // ✅ 修复：updateStore 后直接在缓存中替换对应记录
     async updateStore(id, updates) {
         const updated = await SUPABASE.updateStore(id, updates);
         const idx = this.stores.findIndex(s => s.id === id);
@@ -26,7 +24,6 @@ const StoreManager = {
         return updated;
     },
 
-    // ✅ 修复：deleteStore 后直接从缓存中移除
     async deleteStore(id) {
         await SUPABASE.deleteStore(id);
         this.stores = this.stores.filter(s => s.id !== id);
