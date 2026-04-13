@@ -1,31 +1,24 @@
 const Utils = {
     lang: localStorage.getItem('jf_language') || 'id',
     db: null,
-    
+
     setDb(db) {
         this.db = db;
     },
-    
-    generateOrderId(role) {
-        const prefix = role === 'admin' ? 'AD' : 'ST';
-        const now = new Date();
-        const yy = now.getFullYear().toString().slice(-2);
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const datePrefix = yy + mm;
-        const random = String(Math.floor(Math.random() * 100)).padStart(2, '0');
-        return `${prefix}-${datePrefix}-${random}`;
-    },
-    
+
+    // ✅ 修复：删除此处重复的 generateOrderId，统一由 supabase.js 的 _generateOrderId 生成
+    // 原来两处逻辑不一致，现在只保留一个权威来源
+
     calculateMonthlyInterest(loanAmount) {
         return loanAmount * 0.10;
     },
-    
+
     calculateNextInterestDueDate(startDate, paidMonths) {
         const date = new Date(startDate);
         date.setMonth(date.getMonth() + paidMonths + 1);
         return date.toISOString().split('T')[0];
     },
-    
+
     translations: {
         id: {
             login: "Masuk", logout: "Keluar", username: "Nama Pengguna", password: "Kata Sandi",
@@ -63,40 +56,47 @@ const Utils = {
             no_data: "暂无数据", current_user: "当前用户"
         }
     },
-    
+
     t(key) {
         return this.translations[this.lang][key] || key;
     },
-    
+
     setLanguage(lang) {
         if (lang === 'id' || lang === 'zh') {
             this.lang = lang;
             localStorage.setItem('jf_language', lang);
         }
     },
-    
+
     getLanguage() {
         return this.lang;
     },
-    
+
     escapeHtml(str) {
         if (!str) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     },
-    
+
     formatCurrency(amount) {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
+        }).format(amount);
     },
-    
+
     formatDate(dateStr) {
         if (!dateStr) return '-';
         const date = new Date(dateStr);
         return date.toLocaleDateString(this.lang === 'id' ? 'id-ID' : 'zh-CN');
     },
-    
+
     exportToJSON(data, filename) {
         const jsonStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonStr], {type: 'application/json'});
+        const blob = new Blob([jsonStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -104,18 +104,20 @@ const Utils = {
         a.click();
         URL.revokeObjectURL(url);
     },
-    
+
     exportToCSV(orders, filename) {
-        const headers = this.lang === 'id' ? 
-            ['ID Pesanan', 'Pelanggan', 'Pinjaman', 'Admin Fee', 'Bunga Bulanan', 'Status', 'Tanggal Dibuat'] :
-            ['订单ID', '客户', '贷款金额', '管理费', '月利息', '状态', '创建日期'];
+        const headers = this.lang === 'id'
+            ? ['ID Pesanan', 'Pelanggan', 'Pinjaman', 'Admin Fee', 'Bunga Bulanan', 'Status', 'Tanggal Dibuat']
+            : ['订单ID', '客户', '贷款金额', '管理费', '月利息', '状态', '创建日期'];
         const rows = orders.map(o => [
-            o.order_id, o.customer_name, this.formatCurrency(o.loan_amount),
-            this.formatCurrency(o.admin_fee), this.formatCurrency(o.monthly_interest),
+            o.order_id, o.customer_name,
+            this.formatCurrency(o.loan_amount),
+            this.formatCurrency(o.admin_fee),
+            this.formatCurrency(o.monthly_interest),
             o.status, this.formatDate(o.created_at)
         ]);
         const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-        const blob = new Blob(['\uFEFF' + csvContent], {type: 'text/csv;charset=utf-8;'});
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -123,14 +125,14 @@ const Utils = {
         a.click();
         URL.revokeObjectURL(url);
     },
-    
+
     importFromJSON(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     resolve(JSON.parse(e.target.result));
-                } catch(err) {
+                } catch (err) {
                     reject('Invalid JSON file');
                 }
             };

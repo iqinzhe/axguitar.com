@@ -1,54 +1,88 @@
 const Migration = {
     isMigrating: false,
-    progress: { total: 0, current: 0, success: 0, failed: 0 },
-    
+    progress: { total: 0, current: 0, success: 0, failed: 0, skipped: 0 },
+    failedOrders: [],
+
     async startMigration() {
+        if (this.isMigrating) return;
         this.isMigrating = true;
+        this.failedOrders = [];
         this.resetProgress();
+
         const oldDb = this.loadLocalStorage();
-        if (!oldDb || !oldDb.orders) {
+        if (!oldDb || !oldDb.orders || oldDb.orders.length === 0) {
             alert(Utils.lang === 'id' ? 'Tidak ada data untuk dimigrasi' : '没有需要迁移的数据');
             this.isMigrating = false;
             return;
         }
+
         const orders = oldDb.orders;
         this.progress.total = orders.length;
-        const stores = await SUPABASE.getAllStores();
-        const storeMap = {};
-        for (const store of stores) storeMap[store.name] = store.id;
-        const adminUser = (await SUPABASE.getAllUsers()).find(u => u.role === 'admin');
+
+        // 预加载门店列表（避免 N 次重复查询）
+        let stores, adminUser;
+        try {
+            stores = await SUPABASE.getAllStores();
+            const allUsers = await SUPABASE.getAllUsers();
+            adminUser = allUsers.find(u => u.role === 'admin');
+        } catch (err) {
+            alert(Utils.lang === 'id' ? 'Gagal memuat data awal: ' + err.message : '加载初始数据失败：' + err.message);
+            this.isMigrating = false;
+            return;
+        }
+
         if (!adminUser) {
             alert(Utils.lang === 'id' ? 'Admin user tidak ditemukan' : '未找到管理员用户');
             this.isMigrating = false;
             return;
         }
-        for (const order of orders) {
-            try {
-                await this.migrateOrder(order, storeMap, adminUser.id);
-                this.progress.success++;
-            } catch (error) {
-                this.progress.failed++;
+
+        const storeMap = {};
+        for (const store of stores) storeMap[store.name] = store.id;
+        const defaultStoreId = stores.length > 0 ? stores[0].id : null;
+
+        // ✅ 修复：检查已存在订单，防止重复迁移
+        let existingIds = new Set();
+        try {
+            const existing = await SUPABASE.getOrders();
+            existingIds = new Set(existing.map(o => o.order_id));
+        } catch (e) { /* 忽略，继续迁移 */ }
+
+        // ✅ 修复：分批并发（每批 10 条），大幅提升速度，不再串行等待
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < orders.length; i += BATCH_SIZE) {
+            const batch = orders.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(order =>
+                this._migrateSingleOrder(order, storeMap, defaultStoreId, adminUser.id, existingIds)
+            );
+            const results = await Promise.allSettled(batchPromises);
+            for (const result of results) {
+                if (result.status === 'fulfilled') {
+                    if (result.value === 'skipped') this.progress.skipped++;
+                    else this.progress.success++;
+                } else {
+                    this.progress.failed++;
+                    this.failedOrders.push(result.reason?.orderId || '未知');
+                }
+                this.progress.current++;
+                this.updateProgressDisplay();
             }
-            this.progress.current++;
-            this.updateProgressDisplay();
         }
+
         this.isMigrating = false;
         this.showMigrationResult();
     },
-    
-    loadLocalStorage() {
-        const data = localStorage.getItem("jf_enterprise_db");
-        return data ? JSON.parse(data) : null;
-    },
-    
-    async migrateOrder(oldOrder, storeMap, adminUserId) {
-        let storeId = null;
-        if (oldOrder.branch && storeMap[oldOrder.branch]) storeId = storeMap[oldOrder.branch];
-        else {
-            const stores = await SUPABASE.getAllStores();
-            if (stores.length > 0) storeId = stores[0].id;
-        }
-        if (!storeId) throw new Error('No store available');
+
+    // ✅ 修复：每笔订单独立处理，不影响其他订单；已存在则跳过
+    async _migrateSingleOrder(oldOrder, storeMap, defaultStoreId, adminUserId, existingIds) {
+        if (existingIds.has(oldOrder.order_id)) return 'skipped';
+
+        let storeId = (oldOrder.branch && storeMap[oldOrder.branch])
+            ? storeMap[oldOrder.branch]
+            : defaultStoreId;
+
+        if (!storeId) throw Object.assign(new Error('No store available'), { orderId: oldOrder.order_id });
+
         const orderData = {
             order_id: oldOrder.order_id,
             customer_name: oldOrder.customer?.name || 'Unknown',
@@ -60,12 +94,12 @@ const Migration = {
             admin_fee: oldOrder.admin_fee || 30000,
             admin_fee_paid: oldOrder.admin_fee_paid || false,
             admin_fee_paid_date: oldOrder.admin_fee_paid_date || null,
-            monthly_interest: oldOrder.monthly_interest || (oldOrder.loan_amount * 0.10),
+            monthly_interest: oldOrder.monthly_interest || ((oldOrder.loan_amount || 0) * 0.10),
             interest_paid_months: oldOrder.interest_paid_months || 0,
             interest_paid_total: oldOrder.interest_paid_total || 0,
             next_interest_due_date: oldOrder.next_interest_due_date || null,
             principal_paid: oldOrder.principal_paid || 0,
-            principal_remaining: oldOrder.principal_remaining || oldOrder.loan_amount,
+            principal_remaining: oldOrder.principal_remaining || oldOrder.loan_amount || 0,
             status: oldOrder.status || 'active',
             store_id: storeId,
             created_by: adminUserId,
@@ -76,38 +110,103 @@ const Migration = {
             locked_by: adminUserId,
             notes: oldOrder.notes || ''
         };
-        const { data: newOrder, error: orderError } = await SUPABASE.getClient().from('orders').insert(orderData).select().single();
-        if (orderError) throw orderError;
+
+        const { data: newOrder, error: orderError } = await SUPABASE.getClient()
+            .from('orders').insert(orderData).select().single();
+        if (orderError) throw Object.assign(orderError, { orderId: oldOrder.order_id });
+
+        // 迁移付款记录（如有）
         if (oldOrder.payment_history && oldOrder.payment_history.length > 0) {
-            for (const payment of oldOrder.payment_history) {
-                await SUPABASE.getClient().from('payment_history').insert({
-                    order_id: newOrder.id, date: payment.date || new Date().toISOString().split('T')[0],
-                    type: payment.type, months: payment.months || null, amount: payment.amount,
-                    description: payment.description || '', recorded_by: adminUserId
-                });
-            }
+            // ✅ 修复：批量插入付款记录，不再逐条串行
+            const paymentRows = oldOrder.payment_history.map(payment => ({
+                order_id: newOrder.id,
+                date: payment.date || new Date().toISOString().split('T')[0],
+                type: payment.type,
+                months: payment.months || null,
+                amount: payment.amount,
+                description: payment.description || '',
+                recorded_by: adminUserId
+            }));
+            const { error: paymentError } = await SUPABASE.getClient()
+                .from('payment_history').insert(paymentRows);
+            if (paymentError) console.warn('付款记录迁移失败:', oldOrder.order_id, paymentError);
         }
+
         return newOrder;
     },
-    
-    resetProgress() { this.progress = { total: 0, current: 0, success: 0, failed: 0 }; },
-    
-    updateProgressDisplay() {
-        const progressDiv = document.getElementById('migrationProgress');
-        if (progressDiv) {
-            const percent = (this.progress.current / this.progress.total * 100).toFixed(1);
-            progressDiv.innerHTML = `<div style="background:#1e293b;padding:15px;border-radius:8px;margin-top:15px;"><p>📊 ${Utils.lang === 'id' ? 'Migrasi Berjalan' : '迁移中'}... ${this.progress.current}/${this.progress.total}</p><div style="background:#334155;border-radius:10px;height:20px;overflow:hidden;"><div style="background:#10b981;width:${percent}%;height:100%;border-radius:10px;"></div></div><p>✅ ${Utils.lang === 'id' ? 'Berhasil' : '成功'}: ${this.progress.success} | ❌ ${Utils.lang === 'id' ? 'Gagal' : '失败'}: ${this.progress.failed}</p></div>`;
+
+    loadLocalStorage() {
+        const data = localStorage.getItem("jf_enterprise_db");
+        try {
+            return data ? JSON.parse(data) : null;
+        } catch (e) {
+            return null;
         }
     },
-    
+
+    resetProgress() {
+        this.progress = { total: 0, current: 0, success: 0, failed: 0, skipped: 0 };
+    },
+
+    updateProgressDisplay() {
+        const progressDiv = document.getElementById('migrationProgress');
+        if (!progressDiv) return;
+        const percent = this.progress.total > 0
+            ? ((this.progress.current / this.progress.total) * 100).toFixed(1)
+            : 0;
+        const lang = Utils.lang;
+        progressDiv.innerHTML = `
+            <div style="background:#1e293b;padding:15px;border-radius:8px;margin-top:15px;">
+                <p>📊 ${lang === 'id' ? 'Migrasi Berjalan' : '迁移中'}... ${this.progress.current}/${this.progress.total}</p>
+                <div style="background:#334155;border-radius:10px;height:20px;overflow:hidden;">
+                    <div style="background:#10b981;width:${percent}%;height:100%;border-radius:10px;transition:width 0.3s;"></div>
+                </div>
+                <p style="margin-top:8px;">
+                    ✅ ${lang === 'id' ? 'Berhasil' : '成功'}: ${this.progress.success} &nbsp;
+                    ⏭️ ${lang === 'id' ? 'Dilewati' : '已跳过'}: ${this.progress.skipped} &nbsp;
+                    ❌ ${lang === 'id' ? 'Gagal' : '失败'}: ${this.progress.failed}
+                </p>
+            </div>`;
+    },
+
     showMigrationResult() {
-        alert(`${Utils.lang === 'id' ? 'Migrasi selesai!\nBerhasil: ' : '迁移完成！\n成功: '}${this.progress.success}\n${Utils.lang === 'id' ? 'Gagal: ' : '失败: '}${this.progress.failed}`);
+        const lang = Utils.lang;
+        let msg = lang === 'id'
+            ? `Migrasi selesai!\nBerhasil: ${this.progress.success}\nDilewati (sudah ada): ${this.progress.skipped}\nGagal: ${this.progress.failed}`
+            : `迁移完成！\n成功: ${this.progress.success}\n已跳过（已存在）: ${this.progress.skipped}\n失败: ${this.progress.failed}`;
+        if (this.failedOrders.length > 0) {
+            msg += '\n' + (lang === 'id' ? 'ID gagal: ' : '失败ID: ') + this.failedOrders.slice(0, 5).join(', ');
+            if (this.failedOrders.length > 5) msg += '...';
+        }
+        alert(msg);
         if (this.progress.success > 0) location.reload();
     },
-    
+
     renderMigrationUI() {
         const lang = Utils.lang;
-        const html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><h2>📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</h2><div><button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button><button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button></div></div><div class="card"><h3>${lang === 'id' ? 'Migrasi dari localStorage ke Supabase' : '从 localStorage 迁移到 Supabase'}</h3><p style="color:#f59e0b;margin-bottom:15px;">⚠️ ${lang === 'id' ? 'Pastikan Anda sudah login sebagai admin sebelum migrasi.' : '请确保在迁移前已以管理员身份登录。'}</p><div id="migrationProgress"></div><button onclick="Migration.startMigration()" class="success">🚀 ${lang === 'id' ? 'Mulai Migrasi' : '开始迁移'}</button></div>`;
+        const html = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2>📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</h2>
+                <div>
+                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                    <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>${lang === 'id' ? 'Migrasi dari localStorage ke Supabase' : '从 localStorage 迁移到 Supabase'}</h3>
+                <p style="color:#94a3b8;margin-bottom:8px;">
+                    ${lang === 'id'
+                        ? '• Data yang sudah ada di Supabase akan dilewati otomatis<br>• Migrasi berjalan paralel (lebih cepat)<br>• Jika gagal sebagian, data yang sudah berhasil tetap tersimpan'
+                        : '• 已存在于 Supabase 的数据将自动跳过<br>• 并行迁移（速度更快）<br>• 部分失败不影响已成功的记录'}
+                </p>
+                <p style="color:#f59e0b;margin-bottom:15px;">
+                    ⚠️ ${lang === 'id' ? 'Pastikan Anda sudah login sebagai admin sebelum migrasi.' : '请确保在迁移前已以管理员身份登录。'}
+                </p>
+                <div id="migrationProgress"></div>
+                <button onclick="Migration.startMigration()" class="success" id="migrateBtn">
+                    🚀 ${lang === 'id' ? 'Mulai Migrasi' : '开始迁移'}
+                </button>
+            </div>`;
         document.getElementById("app").innerHTML = html;
     }
 };

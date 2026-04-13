@@ -1,32 +1,93 @@
-async login(email, password) {
-    console.log("AUTH LOGIN INPUT:", email, password);
+const AUTH = {
+    user: null,
 
-    try {
-        const result = await SUPABASE.login(email, password);
+    async init() {
+        try {
+            await this.loadCurrentUser();
+        } catch (e) {
+            this.user = null;
+        }
+    },
 
-        console.log("SUPABASE LOGIN RESULT:", result);
+    isLoggedIn() {
+        return !!this.user;
+    },
 
-        // 🔴 如果 Supabase 返回错误
-        if (!result || result.error) {
-            alert(result?.error?.message || "登录失败");
+    isAdmin() {
+        return this.user?.role === 'admin';
+    },
+
+    getCurrentStoreName() {
+        return this.user?.stores?.name || this.user?.store_name || '未知门店';
+    },
+
+    // ✅ 修复：login 是 AUTH 对象的方法（原文件 login 是孤立函数，不属于任何对象）
+    async login(email, password) {
+        try {
+            const result = await SUPABASE.login(email, password);
+            if (!result || result.error) {
+                return null;
+            }
+            await this.loadCurrentUser();
+            if (!this.user) {
+                return null;
+            }
+            return this.user;
+        } catch (error) {
+            console.error("LOGIN ERROR:", error);
             return null;
         }
+    },
 
-        // ✅ 加载用户资料
-        await this.loadCurrentUser();
-
-        console.log("CURRENT USER:", this.user);
-
-        if (!this.user) {
-            alert("登录成功但未获取用户资料（user_profiles问题）");
-            return null;
+    async loadCurrentUser() {
+        const profile = await SUPABASE.getCurrentProfile();
+        if (profile) {
+            this.user = profile;
+        } else {
+            this.user = null;
         }
+    },
 
-        return this.user;
+    async logout() {
+        this.user = null;
+        SUPABASE.clearCache();
+        await SUPABASE.logout();
+    },
 
-    } catch (error) {
-        console.error("LOGIN ERROR:", error);
-        alert(error.message || "系统错误");
-        return null;
+    async getAllUsers() {
+        return await SUPABASE.getAllUsers();
+    },
+
+    async addUser(username, password, name, role, storeId) {
+        // 通过 Supabase Auth 创建用户，再写入 user_profiles
+        const { data, error } = await supabaseClient.auth.admin.createUser({
+            email: username,
+            password: password,
+            email_confirm: true
+        });
+        if (error) throw error;
+        const { error: profileError } = await supabaseClient.from('user_profiles').insert({
+            id: data.user.id,
+            username: username,
+            name: name,
+            role: role,
+            store_id: storeId || null
+        });
+        if (profileError) throw profileError;
+        return data.user;
+    },
+
+    async deleteUser(userId) {
+        const { error } = await supabaseClient.from('user_profiles').delete().eq('id', userId);
+        if (error) throw error;
+        return true;
+    },
+
+    async updateUser(userId, updates) {
+        const { error } = await supabaseClient.from('user_profiles').update(updates).eq('id', userId);
+        if (error) throw error;
+        return true;
     }
-}
+};
+
+window.AUTH = AUTH;
