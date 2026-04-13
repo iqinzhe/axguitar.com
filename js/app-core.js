@@ -195,6 +195,127 @@ window.APP = {
         }
     },
 
+    // 打印订单函数
+    printOrder: async function(orderId) {
+        try {
+            var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
+            if (!order) {
+                alert(Utils.lang === 'id' ? 'Order tidak ditemukan' : '订单不存在');
+                return;
+            }
+            
+            var lang = Utils.lang;
+            var totalPayments = payments.length;
+            var totalPrincipalPaid = payments.filter(p => p.type === 'principal').reduce((s, p) => s + p.amount, 0);
+            var totalInterestPaid = payments.filter(p => p.type === 'interest').reduce((s, p) => s + p.amount, 0);
+            var totalAdminFeePaid = payments.filter(p => p.type === 'admin_fee').reduce((s, p) => s + p.amount, 0);
+            
+            var printContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Print Order - ${order.order_id}</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .header h1 { margin: 0; color: #1e293b; }
+                        .header p { margin: 5px 0; color: #64748b; }
+                        .section { margin-bottom: 20px; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; }
+                        .section h3 { margin: 0 0 10px 0; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+                        .info-row { display: flex; margin-bottom: 8px; }
+                        .info-label { width: 120px; font-weight: bold; color: #475569; }
+                        .info-value { flex: 1; color: #1e293b; }
+                        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        .table th, .table td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+                        .table th { background: #f1f5f9; font-weight: bold; }
+                        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #94a3b8; }
+                        @media print {
+                            body { margin: 0; padding: 10px; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+                        <button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                    </div>
+                    <div class="header">
+                        <h1>🏦 JF GADAI ENTERPRISE</h1>
+                        <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'}</p>
+                        <p><strong>${lang === 'id' ? 'Nomor Order' : '订单号'}:</strong> ${order.order_id}</p>
+                        <p><strong>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
+                    </div>
+                    
+                    <div class="section">
+                        <h3>📋 ${lang === 'id' ? 'Informasi Pelanggan' : '客户信息'}</h3>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama Lengkap' : '客户姓名'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_name)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nomor KTP' : 'KTP号码'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_ktp)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nomor Telepon' : '手机号'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_phone)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Alamat' : '地址'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_address || '-')}</div></div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3>💎 ${lang === 'id' ? 'Informasi Jaminan' : '质押物信息'}</h3>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama Barang' : '质押物名称'}:</div><div class="info-value">${Utils.escapeHtml(order.collateral_name)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Jumlah Pinjaman' : '贷款总额'}:</div><div class="info-value">${Utils.formatCurrency(order.loan_amount)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div class="info-value">${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</div></div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3>💰 ${lang === 'id' ? 'Ringkasan Pembayaran' : '付款汇总'}</h3>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Total Pembayaran' : '总付款次数'}:</div><div class="info-value">${totalPayments} ${lang === 'id' ? 'kali' : '次'}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Admin Fee' : '管理费'}:</div><div class="info-value">${Utils.formatCurrency(totalAdminFeePaid)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Total Bunga' : '利息总额'}:</div><div class="info-value">${Utils.formatCurrency(totalInterestPaid)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Total Pokok' : '本金总额'}:</div><div class="info-value">${Utils.formatCurrency(totalPrincipalPaid)}</div></div>
+                    </div>
+                    
+                    <div class="section">
+                        <h3>📋 ${lang === 'id' ? 'Detail Pembayaran' : '付款明细'}</h3>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${payments.map(p => {
+                                    var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费')
+                                        : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息')
+                                        : (lang === 'id' ? 'Pokok' : '本金');
+                                    return `<tr>
+                                        <td>${Utils.formatDate(p.date)}</td>
+                                        <td>${typeText}</td>
+                                        <td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                                        <td>${Utils.formatCurrency(p.amount)}</td>
+                                        <td>${Utils.escapeHtml(p.description || '-')}</td>
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="footer">
+                        <p>${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()}</p>
+                        <p>© JF GADAI ENTERPRISE - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</p>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            var printWindow = window.open('', '_blank');
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+        } catch (error) {
+            alert(Utils.lang === 'id' ? 'Gagal mencetak order' : '打印订单失败');
+        }
+    },
+
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
         var self = this;
@@ -207,7 +328,7 @@ window.APP = {
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="9" style="text-align: center;">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="10" style="text-align: center;">${t('no_data')}</td></tr>`;
             } else {
                 for (var i = 0; i < orders.length; i++) {
                     var o = orders[i];
@@ -227,6 +348,7 @@ window.APP = {
                             ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})">💰</button>` : ''}
                             ${canEdit ? `<button onclick="APP.navigateTo('editOrder', {orderId: '${o.order_id}'})">✏️</button>` : ''}
                             ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️</button>` : ''}
+                            <button onclick="APP.printOrder('${o.order_id}')" class="success">🖨️</button>
                             ${o.is_locked ? `<span title="${lang === 'id' ? 'Terkunci' : '已锁定'}">🔒</span>` : ''}
                         </td>
                     </tr>`;
@@ -352,7 +474,7 @@ window.APP = {
                     </tr>`;
                 }
             } else {
-                paymentHistoryRows = `<tr><td colspan="5" style="text-align: center;">${t('no_data')}<tr></tr>`;
+                paymentHistoryRows = `<tr><td colspan="5" style="text-align: center;">${t('no_data')}</td></tr>`;
             }
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
@@ -385,7 +507,7 @@ window.APP = {
                     <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes)}</p>
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
                     <div class="table-container">
-                        <table>
+                        <tr>
                             <thead><tr>
                                 <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                 <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
@@ -400,6 +522,7 @@ window.APP = {
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                         ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${order.order_id}'})">💰 ${t('save')}</button>` : ''}
                         ${isAdmin && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
+                        <button onclick="APP.printOrder('${order.order_id}')" class="success">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
                 </div>`;
         } catch (error) {
