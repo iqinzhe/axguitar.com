@@ -216,100 +216,59 @@ window.APP = {
         return { total, items: data };
     },
 
-    // 显示支出明细页面
-    showExpenses: async function() {
-        this.currentPage = 'expenses';
-        var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
-        var isAdmin = AUTH.isAdmin();
-        
-        try {
-            // 获取支出记录
-            const profile = await SUPABASE.getCurrentProfile();
-            let query = supabaseClient.from('expenses').select('*, stores(name)').order('expense_date', { ascending: false });
-            if (!isAdmin && profile?.store_id) {
-                query = query.eq('store_id', profile.store_id);
-            }
-            const { data: expenses, error } = await query;
-            if (error) throw error;
-            
-            // 计算总额
-            var totalAmount = expenses?.reduce((s, e) => s + e.amount, 0) || 0;
-            
-            // 构建表格行
-            var rows = '';
-            if (!expenses || expenses.length === 0) {
-                rows = `<tr><td colspan="7" style="text-align: center;">${t('no_data')}</td></tr>`;
-            } else {
-                for (var i = 0; i < expenses.length; i++) {
-                    var e = expenses[i];
-                    rows += `<tr>
-                        <td>${Utils.formatDate(e.expense_date)}</td>
-                        <td>${Utils.escapeHtml(e.category)}</td>
-                        <td>${Utils.formatCurrency(e.amount)}</td>
-                        <td>${Utils.escapeHtml(e.description || '-')}</td>
-                        <td>${Utils.escapeHtml(e.stores?.name || '-')}</td>
-                        <td>${Utils.formatDate(e.created_at)}</td>
-                        <td>${e.is_locked ? '🔒' : ''}</td>
-                    </tr>`;
-                }
-            }
-            
-            var html = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2>📝 ${lang === 'id' ? 'Pengeluaran' : '支出明细'}</h2>
-                    <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                        <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                    </div>
-                </div>
-                <div class="card">
-                    <h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: ${Utils.formatCurrency(totalAmount)}</h3>
-                </div>
-                <div class="card">
-                    <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增支出'}</h3>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
-                        <input type="date" id="expenseDate" style="width:200px;">
-                    </div>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label>
-                        <input type="text" id="expenseCategory" placeholder="${lang === 'id' ? 'Contoh: Listrik, Air, Gaji' : '例如：电费、水费、工资'}" style="width:300px;">
-                    </div>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
-                        <input type="number" id="expenseAmount" min="1" placeholder="0" style="width:200px;">
-                    </div>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Deskripsi' : '描述'}</label>
-                        <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}" style="width:300px;"></textarea>
-                    </div>
-                    <button onclick="APP.addExpense()" class="success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
-                </div>
-                <div class="card">
-                    <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
-                    <div class="table-container">
-                        </table>
-                            <thead>
-                                <tr>
-                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th>${lang === 'id' ? 'Kategori' : '类别'}</th>
-                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th>${lang === 'id' ? 'Dibuat' : '创建时间'}</th>
-                                    <th>${lang === 'id' ? 'Status' : '状态'}</th>
-                                </tr>
-                            </thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
-                </div>`;
-            document.getElementById("app").innerHTML = html;
-        } catch (error) {
-            alert(lang === 'id' ? 'Gagal memuat pengeluaran' : '加载支出失败');
-        }
-    },
+// 在 showExpenses 方法中，替换表格部分
+var html = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>📝 ${lang === 'id' ? 'Pengeluaran' : '支出明细'}</h2>
+        <div>
+            <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+            <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+        </div>
+    </div>
+    <div class="card">
+        <h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: ${Utils.formatCurrency(totalAmount)}</h3>
+    </div>
+    <div class="card">
+        <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增支出'}</h3>
+        <div class="form-group">
+            <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
+            <input type="date" id="expenseDate" style="width:200px;">
+        </div>
+        <div class="form-group">
+            <label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label>
+            <input type="text" id="expenseCategory" placeholder="${lang === 'id' ? 'Contoh: Listrik, Air, Gaji' : '例如：电费、水费、工资'}" style="width:300px;">
+        </div>
+        <div class="form-group">
+            <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
+            <input type="number" id="expenseAmount" min="1" placeholder="0" style="width:200px;">
+        </div>
+        <div class="form-group">
+            <label>${lang === 'id' ? 'Deskripsi' : '描述'}</label>
+            <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}" style="width:300px;"></textarea>
+        </div>
+        <button onclick="APP.addExpense()" class="success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
+    </div>
+    <div class="card">
+        <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                        <th>${lang === 'id' ? 'Kategori' : '类别'}</th>
+                        <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                        <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                        <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                        <th>${lang === 'id' ? 'Dibuat' : '创建时间'}</th>
+                        <th>${lang === 'id' ? 'Status' : '状态'}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+    </div>`;
     
     // 添加支出记录
     addExpense: async function() {
