@@ -36,7 +36,8 @@ window.APP = {
             userManagement: async () => await self.showUserManagement(),
             paymentHistory: async () => await self.showPaymentHistory(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
-            migration: () => Migration.renderMigrationUI()
+            migration: () => Migration.renderMigrationUI(),
+            expenses: async () => await self.showExpenses()
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -63,6 +64,7 @@ window.APP = {
             paymentHistory: async () => await self.showPaymentHistory(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
             migration: () => Migration.renderMigrationUI(),
+            expenses: async () => await self.showExpenses(),
             viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
             payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
             editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); }
@@ -87,7 +89,8 @@ window.APP = {
                 report: async () => await self.showReport(),
                 userManagement: async () => await self.showUserManagement(),
                 paymentHistory: async () => await self.showPaymentHistory(),
-                storeManagement: async () => await StoreManager.renderStoreManagement()
+                storeManagement: async () => await StoreManager.renderStoreManagement(),
+                expenses: async () => await self.showExpenses()
             };
             var handler = backHandlers[prev.page];
             if (handler) handler();
@@ -155,6 +158,14 @@ window.APP = {
             var t = (key) => Utils.t(key);
             var isAdmin = AUTH.isAdmin();
             var storeName = AUTH.getCurrentStoreName();
+            
+            // 获取支出总额
+            var totalExpenses = 0;
+            try {
+                var expensesData = await this.getExpensesTotal();
+                totalExpenses = expensesData.total;
+            } catch(e) { console.error("获取支出失败:", e); }
+            
             var html = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
                     <h1>🏦 JF GADAI ENTERPRISE</h1>
@@ -175,6 +186,7 @@ window.APP = {
                     <button onclick="APP.navigateTo('createOrder')">➕ ${t('create_order')}</button>
                     <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                     <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</button>
+                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '支出明细'}</button>
                     ${isAdmin ? `<button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>` : ''}
                     ${isAdmin ? `<button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>` : ''}
                     ${isAdmin ? `<button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</button>` : ''}
@@ -195,7 +207,163 @@ window.APP = {
         }
     },
 
-    // 打印订单函数
+    // 获取支出总额
+    getExpensesTotal: async function() {
+        const profile = await SUPABASE.getCurrentProfile();
+        let query = supabaseClient.from('expenses').select('amount');
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        const total = data?.reduce((s, e) => s + e.amount, 0) || 0;
+        return { total, items: data };
+    },
+
+    // 显示支出明细页面
+    showExpenses: async function() {
+        this.currentPage = 'expenses';
+        var lang = Utils.lang;
+        var t = (key) => Utils.t(key);
+        var isAdmin = AUTH.isAdmin();
+        
+        try {
+            // 获取支出记录
+            const profile = await SUPABASE.getCurrentProfile();
+            let query = supabaseClient.from('expenses').select('*, stores(name)').order('expense_date', { ascending: false });
+            if (!isAdmin && profile?.store_id) {
+                query = query.eq('store_id', profile.store_id);
+            }
+            const { data: expenses, error } = await query;
+            if (error) throw error;
+            
+            // 计算总额
+            var totalAmount = expenses?.reduce((s, e) => s + e.amount, 0) || 0;
+            
+            // 构建表格行
+            var rows = '';
+            if (!expenses || expenses.length === 0) {
+                rows = `<tr><td colspan="7" style="text-align: center;">${t('no_data')}</td></tr>`;
+            } else {
+                for (var i = 0; i < expenses.length; i++) {
+                    var e = expenses[i];
+                    rows += `<tr>
+                        <td>${Utils.formatDate(e.expense_date)}</td>
+                        <td>${Utils.escapeHtml(e.category)}</td>
+                        <td>${Utils.formatCurrency(e.amount)}</td>
+                        <td>${Utils.escapeHtml(e.description || '-')}</td>
+                        <td>${Utils.escapeHtml(e.stores?.name || '-')}</td>
+                        <td>${Utils.formatDate(e.created_at)}</td>
+                        <td>${e.is_locked ? '🔒' : ''}</td>
+                    </tr>`;
+                }
+            }
+            
+            var html = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>📝 ${lang === 'id' ? 'Pengeluaran' : '支出明细'}</h2>
+                    <div>
+                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                        <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: ${Utils.formatCurrency(totalAmount)}</h3>
+                </div>
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增支出'}</h3>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
+                        <input type="date" id="expenseDate" style="width:200px;">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label>
+                        <input type="text" id="expenseCategory" placeholder="${lang === 'id' ? 'Contoh: Listrik, Air, Gaji' : '例如：电费、水费、工资'}" style="width:300px;">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
+                        <input type="number" id="expenseAmount" min="1" placeholder="0" style="width:200px;">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Deskripsi' : '描述'}</label>
+                        <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}" style="width:300px;"></textarea>
+                    </div>
+                    <button onclick="APP.addExpense()" class="success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
+                </div>
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th>${lang === 'id' ? 'Kategori' : '类别'}</th>
+                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th>${lang === 'id' ? 'Dibuat' : '创建时间'}</th>
+                                    <th>${lang === 'id' ? 'Status' : '状态'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            document.getElementById("app").innerHTML = html;
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal memuat pengeluaran' : '加载支出失败');
+        }
+    },
+    
+    // 添加支出记录
+    addExpense: async function() {
+        var lang = Utils.lang;
+        var expenseDate = document.getElementById("expenseDate").value;
+        var category = document.getElementById("expenseCategory").value.trim();
+        var amount = parseFloat(document.getElementById("expenseAmount").value);
+        var description = document.getElementById("expenseDescription").value;
+        
+        if (!expenseDate) {
+            alert(lang === 'id' ? 'Pilih tanggal pengeluaran' : '请选择支出日期');
+            return;
+        }
+        if (!category) {
+            alert(lang === 'id' ? 'Masukkan kategori pengeluaran' : '请输入支出类别');
+            return;
+        }
+        if (isNaN(amount) || amount <= 0) {
+            alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
+            return;
+        }
+        
+        try {
+            const profile = await SUPABASE.getCurrentProfile();
+            const { error } = await supabaseClient.from('expenses').insert({
+                store_id: profile.store_id,
+                expense_date: expenseDate,
+                category: category,
+                amount: amount,
+                description: description || null,
+                created_by: profile.id,
+                is_locked: true
+            });
+            if (error) throw error;
+            
+            alert(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
+            
+            // 清空表单
+            document.getElementById("expenseDate").value = '';
+            document.getElementById("expenseCategory").value = '';
+            document.getElementById("expenseAmount").value = '';
+            document.getElementById("expenseDescription").value = '';
+            
+            // 刷新页面
+            await this.showExpenses();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+        }
+    },
+
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -333,7 +501,6 @@ window.APP = {
                 for (var i = 0; i < orders.length; i++) {
                     var o = orders[i];
                     var statusClass = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
-                    var canEdit = isAdmin || (!o.is_locked && AUTH.user.role === 'store_manager');
                     rows += `<tr>
                         <td>${Utils.escapeHtml(o.order_id)}</td>
                         <td>${Utils.escapeHtml(o.customer_name)}</td>
@@ -346,7 +513,6 @@ window.APP = {
                         <td>
                             <button onclick="APP.navigateTo('viewOrder', {orderId: '${o.order_id}'})">${t('view')}</button>
                             ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment', {orderId: '${o.order_id}'})">💰</button>` : ''}
-                            ${canEdit ? `<button onclick="APP.navigateTo('editOrder', {orderId: '${o.order_id}'})">✏️</button>` : ''}
                             ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️</button>` : ''}
                             <button onclick="APP.printOrder('${o.order_id}')" class="success">🖨️</button>
                             ${o.is_locked ? `<span title="${lang === 'id' ? 'Terkunci' : '已锁定'}">🔒</span>` : ''}
@@ -507,7 +673,7 @@ window.APP = {
                     <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes)}</p>
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
                     <div class="table-container">
-                        <tr>
+                        <table>
                             <thead><tr>
                                 <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                 <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
@@ -825,7 +991,7 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
                     <div class="table-container">
-                        <table><thead><tr>
+                        <td><thead><tr>
                             <th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th>
                             <th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th>
                             <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
