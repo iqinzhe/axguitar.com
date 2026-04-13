@@ -8,7 +8,6 @@ window.APP = {
     init: async function() {
         document.getElementById("app").innerHTML = '<div style="text-align: center; padding: 50px;">🔄 Loading system...</div>';
         await AUTH.init();
-        // ✅ 修复：删除 Utils.setDb({}) 废弃调用，数据已全部在 Supabase
         await this.router();
     },
 
@@ -127,7 +126,6 @@ window.APP = {
             </div>`;
     },
 
-    // ✅ 修复：删除所有调试 console.log，错误提示改为语言感知
     login: async function() {
         var username = document.getElementById("username").value.trim();
         var password = document.getElementById("password").value;
@@ -160,6 +158,32 @@ window.APP = {
             var t = (key) => Utils.t(key);
             var isAdmin = AUTH.isAdmin();
             var storeName = AUTH.getCurrentStoreName();
+            
+            var statsHtml = `
+                <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="stat-card">
+                        <div class="stat-value">${report.total_orders}</div>
+                        <div>${t('total_orders')}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${Utils.formatCurrency(report.total_loan_amount)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${report.active_orders}</div>
+                        <div>${t('active')}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${t('completed')}: ${report.completed_orders}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div>
+                        <div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${lang === 'id' ? 'Bunga' : '利息'}: ${Utils.formatCurrency(report.total_interest)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Utils.formatCurrency(report.total_expenses)}</div>
+                        <div>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${lang === 'id' ? 'Rasio' : '占比'}: ${report.expense_ratio}%</div>
+                    </div>
+                </div>
+            `;
+            
             var html = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
                     <h1>🏦 JF GADAI ENTERPRISE</h1>
@@ -168,76 +192,31 @@ window.APP = {
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}
                     </div>
                 </div>
-
-renderDashboard: async function() {
-    this.currentPage = 'dashboard';
-    this.currentOrderId = null;
-    try {
-        var report = await Order.getReport();
-        var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
-        var isAdmin = AUTH.isAdmin();
-        var storeName = AUTH.getCurrentStoreName();
-        
-        // 新的统计卡片 HTML（2列 x 2行布局）
-        var statsHtml = `
-            <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
-                <div class="stat-card">
-                    <div class="stat-value">${report.total_orders}</div>
-                    <div>${t('total_orders')}</div>
-                    <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${Utils.formatCurrency(report.total_loan_amount)}</div>
+                ${statsHtml}
+                <div class="toolbar">
+                    <button onclick="APP.navigateTo('createOrder')">➕ ${t('create_order')}</button>
+                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
+                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</button>
+                    ${isAdmin ? `<button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>` : ''}
+                    ${isAdmin ? `<button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>` : ''}
+                    ${isAdmin ? `<button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</button>` : ''}
+                    ${isAdmin ? `<button onclick="APP.navigateTo('migration')">📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</button>` : ''}
+                    <button onclick="APP.navigateTo('backupRestore')">💾 ${t('backup_restore')}</button>
+                    <button onclick="APP.logout()">🚪 ${t('logout')}</button>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value">${report.active_orders}</div>
-                    <div>${t('active')}</div>
-                    <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${t('completed')}: ${report.completed_orders}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div>
-                    <div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div>
-                    <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${lang === 'id' ? 'Bunga' : '利息'}: ${Utils.formatCurrency(report.total_interest)}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${Utils.formatCurrency(report.total_expenses)}</div>
-                    <div>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}</div>
-                    <div class="stat-sub" style="font-size: 14px; color: #94a3b8;">${lang === 'id' ? 'Rasio' : '占比'}: ${report.expense_ratio}%</div>
-                </div>
-            </div>
-        `;
-        
-        var html = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
-                <h1>🏦 JF GADAI ENTERPRISE</h1>
-                <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                    ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}
-                </div>
-            </div>
-            ${statsHtml}
-            <div class="toolbar">
-                <button onclick="APP.navigateTo('createOrder')">➕ ${t('create_order')}</button>
-                <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</button>
-                ${isAdmin ? `<button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>` : ''}
-                ${isAdmin ? `<button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>` : ''}
-                ${isAdmin ? `<button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</button>` : ''}
-                ${isAdmin ? `<button onclick="APP.navigateTo('migration')">📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</button>` : ''}
-                <button onclick="APP.navigateTo('backupRestore')">💾 ${t('backup_restore')}</button>
-                <button onclick="APP.logout()">🚪 ${t('logout')}</button>
-            </div>
-            <div class="card">
-                <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role})</h3>
-                <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
-                <p>📌 ${lang === 'id'
-                    ? 'Admin Fee: 30,000 IDR (dibayar saat kontrak) | Bunga: 10% per bulan'
-                    : '管理费: 30,000 IDR (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
-                ${!isAdmin ? `<p style="color: #f59e0b;">🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
-            </div>`;
-        document.getElementById("app").innerHTML = html;
-    } catch (err) {
-        document.getElementById("app").innerHTML = `<div class="card"><p style="color:#ef4444;">⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
-    }
-},
+                <div class="card">
+                    <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role})</h3>
+                    <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
+                    <p>📌 ${lang === 'id'
+                        ? 'Admin Fee: 30,000 IDR (dibayar saat kontrak) | Bunga: 10% per bulan'
+                        : '管理费: 30,000 IDR (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
+                    ${!isAdmin ? `<p style="color: #f59e0b;">🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
+                </div>`;
+            document.getElementById("app").innerHTML = html;
+        } catch (err) {
+            document.getElementById("app").innerHTML = `<div class="card"><p style="color:#ef4444;">⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
+        }
+    },
 
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
