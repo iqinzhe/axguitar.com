@@ -73,7 +73,7 @@ const SupabaseAPI = {
 
     async getCurrentStoreName() {
         const profile = await this.getCurrentProfile();
-        return profile?.stores?.name || '未知门店';
+        return profile?.stores?.name || '总部';
     },
 
     async login(email, password) {
