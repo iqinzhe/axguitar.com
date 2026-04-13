@@ -239,7 +239,7 @@ td:last-child button {
 
     /* 卡片内边距减小 */
     .card {
-        padding: 15px;
+        padding: 10px;
     }
 
     /* 表单控件宽度自适应 */
@@ -259,22 +259,5 @@ td:last-child button {
 
     h3 {
         font-size: 14px;
-    }
-}
-
-/* 超小屏幕（<480px）进一步优化 */
-@media (max-width: 480px) {
-    .stats-grid {
-        grid-template-columns: 1fr; /* 单列布局 */
-    }
-
-    .toolbar button {
-        flex: 1 0 auto;
-        text-align: center;
-    }
-
-    td:last-child button {
-        display: inline-block;
-        width: auto;
     }
 }
