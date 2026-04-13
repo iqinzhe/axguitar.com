@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Reset Password</title>
+</head>
+<body>
+
+<h2>Reset Password</h2>
+
+<input type="password" id="pw" placeholder="New password">
+<button onclick="update()">Update</button>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js"
+
+const supabase = createClient(
+  "https://hiupsvsbcdsgoyiieqiv.supabase.co",
+  "你的anon key"
+)
+
+async function update() {
+  const pw = document.getElementById("pw").value
+
+  const { error } = await supabase.auth.updateUser({
+    password: pw
+  })
+
+  alert(error ? error.message : "Password updated")
+}
+</script>
+
+</body>
+</html>
