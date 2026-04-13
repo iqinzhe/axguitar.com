@@ -57,6 +57,7 @@ button {
     border-radius: 6px;
     font-size: 14px;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 button:hover {
@@ -83,6 +84,7 @@ button.warning {
 .table-container {
     overflow-x: auto;
     margin-top: 20px;
+    -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -91,12 +93,14 @@ table {
     background: #1e293b;
     border-radius: 8px;
     overflow: hidden;
+    min-width: 600px;
 }
 
 th, td {
     border: 1px solid #334155;
     padding: 12px;
     text-align: left;
+    vertical-align: middle;
 }
 
 th {
@@ -107,6 +111,17 @@ th {
 
 tr:hover {
     background: #334155;
+}
+
+/* 操作按钮组样式 */
+td:last-child {
+    white-space: nowrap;
+}
+
+td:last-child button {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin: 2px;
 }
 
 .status-badge {
@@ -166,18 +181,100 @@ tr:hover {
     margin-bottom: 20px;
 }
 
+/* ========== 手机端优化 ========== */
 @media (max-width: 768px) {
     body {
         padding: 10px;
     }
-    
-    th, td {
-        padding: 8px;
+
+    /* 表格容器强制横向滚动 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        min-width: 700px; /* 保证表格不压缩，允许横向滚动 */
         font-size: 12px;
     }
-    
-    button {
+
+    th, td {
+        padding: 8px 6px;
+    }
+
+    /* 按钮组在手机上允许换行，但保持按钮紧凑 */
+    td:last-child {
+        white-space: normal;
+    }
+
+    td:last-child button {
+        padding: 4px 6px;
+        font-size: 11px;
+        margin: 2px;
+    }
+
+    /* 工具栏按钮换行 */
+    .toolbar {
+        gap: 8px;
+    }
+
+    .toolbar button {
         padding: 6px 12px;
         font-size: 12px;
+    }
+
+    /* 统计卡片网格改为1列或2列 */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .stat-card {
+        padding: 12px;
+    }
+
+    .stat-value {
+        font-size: 24px;
+    }
+
+    /* 卡片内边距减小 */
+    .card {
+        padding: 15px;
+    }
+
+    /* 表单控件宽度自适应 */
+    input, select, textarea {
+        max-width: 100%;
+        font-size: 16px; /* 防止iOS自动缩放 */
+    }
+
+    /* 标题字号调整 */
+    h1 {
+        font-size: 22px;
+    }
+
+    h2 {
+        font-size: 18px;
+    }
+
+    h3 {
+        font-size: 16px;
+    }
+}
+
+/* 超小屏幕（<480px）进一步优化 */
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr; /* 单列布局 */
+    }
+
+    .toolbar button {
+        flex: 1 0 auto;
+        text-align: center;
+    }
+
+    td:last-child button {
+        display: inline-block;
+        width: auto;
     }
 }
