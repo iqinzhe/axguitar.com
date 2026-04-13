@@ -139,9 +139,30 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
-    // 生成订单ID: 格式 AD-2504-1745123456-42 或 ST-2504-1745123456-42
-    _generateOrderId(role) {
-        const prefix = role === 'admin' ? 'AD' : 'ST';
+    // 根据门店ID获取订单前缀
+    // BL = Bangil, GP = Gempol, SO = Sidoarjo, AD = Admin, ST = 默认店长
+    async _getStorePrefix(storeId) {
+        if (!storeId) return 'ST';
+        const { data, error } = await supabaseClient
+            .from('stores')
+            .select('name')
+            .eq('id', storeId)
+            .single();
+        if (error || !data) return 'ST';
+        const name = data.name.toLowerCase();
+        if (name.includes('bangil')) return 'BL';
+        if (name.includes('gempol')) return 'GP';
+        if (name.includes('sidoarjo')) return 'SO';
+        return 'ST';
+    },
+
+    // 生成订单ID: 格式 门店前缀-年月-序号
+    // BL = Bangil, GP = Gempol, SO = Sidoarjo, AD = Admin
+    async _generateOrderId(role, storeId) {
+        let prefix = 'AD'; // 默认管理员
+        if (role === 'store_manager') {
+            prefix = await this._getStorePrefix(storeId);
+        }
         const now = new Date();
         const yy = now.getFullYear().toString().slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -152,7 +173,7 @@ const SupabaseAPI = {
 
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
-        const orderId = this._generateOrderId(profile.role);
+        const orderId = await this._generateOrderId(profile.role, profile.store_id);
         const nowDate = new Date().toISOString().split('T')[0];
 
         const newOrder = {
