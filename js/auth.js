@@ -21,15 +21,16 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || '未知门店';
     },
 
-    // ✅ 修复：login 是 AUTH 对象的方法（原文件 login 是孤立函数，不属于任何对象）
     async login(email, password) {
         try {
             const result = await SUPABASE.login(email, password);
             if (!result || result.error) {
+                console.error("Login error:", result?.error);
                 return null;
             }
             await this.loadCurrentUser();
             if (!this.user) {
+                console.error("Failed to load user profile after login");
                 return null;
             }
             return this.user;
@@ -58,6 +59,8 @@ const AUTH = {
         return await SUPABASE.getAllUsers();
     },
 
+    // ⚠️ 注意：此方法需要 Service Role Key 才能正常工作
+    // 当前使用 anon key 会失败，建议改用 Edge Function 或添加 SERVICE_ROLE_KEY
     async addUser(username, password, name, role, storeId) {
         // 通过 Supabase Auth 创建用户，再写入 user_profiles
         const { data, error } = await supabaseClient.auth.admin.createUser({
