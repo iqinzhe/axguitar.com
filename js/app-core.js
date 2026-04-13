@@ -174,7 +174,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
                     <h1>🏦 SIPEG JF</h1>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+            
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}
                     </div>
                 </div>
@@ -266,7 +266,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -386,7 +386,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📝 ${t('create_order')}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -504,7 +504,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📋 ${lang === 'id' ? 'Order Nasabah' : '客户订单'} - ${Utils.escapeHtml(customer.name)}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -600,7 +600,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'} - ${Utils.escapeHtml(customer.name)}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                       
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -687,7 +687,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran' : '支出明细'}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                       
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -825,7 +825,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款明细'}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
                     </div>
                 </div>
@@ -1048,7 +1048,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📋 ${t('order_list')}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -1086,7 +1086,7 @@ window.APP = {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>📝 ${t('create_order')}</h2>
                 <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                    
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
             </div>
@@ -1171,7 +1171,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📄 ${t('view')} ${t('order_list')}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                       
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -1261,7 +1261,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>💰 ${lang === 'id' ? 'Pembayaran' : '缴费'}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -1336,7 +1336,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>✏️ ${t('edit')} ${t('order_list')}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -1401,7 +1401,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>📊 ${t('financial_report')}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -1462,7 +1462,7 @@ window.APP = {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>👥 ${t('user_management')}</h2>
                     <div>
-                        <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                     </div>
                 </div>
