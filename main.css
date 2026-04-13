@@ -250,15 +250,15 @@ td:last-child button {
 
     /* 标题字号调整 */
     h1 {
-        font-size: 22px;
-    }
-
-    h2 {
         font-size: 18px;
     }
 
-    h3 {
+    h2 {
         font-size: 16px;
+    }
+
+    h3 {
+        font-size: 14px;
     }
 }
 
