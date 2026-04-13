@@ -194,7 +194,19 @@ td:last-child button {
     }
 
     table {
-        min-width: 700px; /* 保证表格不压缩，允许横向滚动 */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    /* 表格容器强制横向滚动 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        min-width: 700px;
         font-size: 12px;
     }
 
@@ -202,7 +214,6 @@ td:last-child button {
         padding: 8px 6px;
     }
 
-    /* 按钮组在手机上允许换行，但保持按钮紧凑 */
     td:last-child {
         white-space: normal;
     }
@@ -213,7 +224,6 @@ td:last-child button {
         margin: 2px;
     }
 
-    /* 工具栏按钮换行 */
     .toolbar {
         gap: 8px;
     }
@@ -223,7 +233,6 @@ td:last-child button {
         font-size: 12px;
     }
 
-    /* 统计卡片网格改为1列或2列 */
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
@@ -237,18 +246,15 @@ td:last-child button {
         font-size: 24px;
     }
 
-    /* 卡片内边距减小 */
     .card {
-        padding: 10px;
+        padding: 15px;
     }
 
-    /* 表单控件宽度自适应 */
     input, select, textarea {
         max-width: 100%;
-        font-size: 16px; /* 防止iOS自动缩放 */
+        font-size: 16px;
     }
 
-    /* 标题字号调整 */
     h1 {
         font-size: 18px;
     }
@@ -259,5 +265,20 @@ td:last-child button {
 
     h3 {
         font-size: 14px;
+    }
+
+    /* ===== 新增：头部居中 ===== */
+    #app > div:first-child {
+        flex-direction: column;
+        text-align: center;
+    }
+    #app > div:first-child h1 {
+        margin-bottom: 10px;
+    }
+    #app > div:first-child div {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
     }
 }
