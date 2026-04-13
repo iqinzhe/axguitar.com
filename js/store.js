@@ -29,11 +29,68 @@ const StoreManager = {
         this.stores = this.stores.filter(s => s.id !== id);
     },
 
+    // 获取门店的支出总额
+    async getStoreExpenses(storeId) {
+        const { data, error } = await supabaseClient
+            .from('expenses')
+            .select('amount')
+            .eq('store_id', storeId);
+        if (error) {
+            console.error("获取支出失败:", error);
+            return 0;
+        }
+        return data?.reduce((s, e) => s + e.amount, 0) || 0;
+    },
+
+    // 获取门店的收入（管理费 + 利息）
+    async getStoreIncome(storeId) {
+        // 获取该门店的所有订单
+        const { data: orders, error } = await supabaseClient
+            .from('orders')
+            .select('admin_fee_paid, admin_fee, interest_paid_total')
+            .eq('store_id', storeId);
+        if (error) {
+            console.error("获取收入失败:", error);
+            return 0;
+        }
+        
+        const totalAdminFees = orders?.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0) || 0;
+        const totalInterest = orders?.reduce((s, o) => s + (o.interest_paid_total || 0), 0) || 0;
+        return totalAdminFees + totalInterest;
+    },
+
     async renderStoreManagement() {
         // 首次进入强制拉取，后续复用缓存
         await this.loadStores();
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
+        
+        // 收集每个门店的支出和收入数据
+        let storeStatsHtml = '';
+        let grandTotalIncome = 0;
+        let grandTotalExpenses = 0;
+        let grandTotalGrossProfit = 0;
+        
+        for (const store of this.stores) {
+            const expenses = await this.getStoreExpenses(store.id);
+            const income = await this.getStoreIncome(store.id);
+            const grossProfit = income - expenses;
+            
+            grandTotalIncome += income;
+            grandTotalExpenses += expenses;
+            grandTotalGrossProfit += grossProfit;
+            
+            storeStatsHtml += `
+                <div class="stat-card" style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div><strong>🏪 ${Utils.escapeHtml(store.name)}</strong></div>
+                        <div style="color: #10b981;">💰 ${lang === 'id' ? 'Pendapatan' : '收入'}: ${Utils.formatCurrency(income)}</div>
+                        <div style="color: #ef4444;">📝 ${lang === 'id' ? 'Pengeluaran' : '支出'}: ${Utils.formatCurrency(expenses)}</div>
+                        <div style="color: #3b82f6;">📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}: ${Utils.formatCurrency(grossProfit)}</div>
+                    </div>
+                </div>
+            `;
+        }
 
         let storeRows = '';
         for (const store of this.stores) {
@@ -43,8 +100,8 @@ const StoreManager = {
                 <td>${Utils.escapeHtml(store.address || '-')}</td>
                 <td>${Utils.escapeHtml(store.phone || '-')}</td>
                 <td>
-                    <button onclick="APP.editStore('${store.id}')">✏️ ${t('edit')}</button>
-                    <button class="danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>
+                    <button onclick="APP.editStore('${store.id}')" style="padding: 4px 8px; font-size: 12px;">✏️ ${t('edit')}</button>
+                    <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding: 4px 8px; font-size: 12px;">🗑️ ${t('delete')}</button>
                 </td>
             </tr>`;
         }
@@ -57,6 +114,30 @@ const StoreManager = {
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
             </div>
+            
+            <!-- 门店统计卡片 -->
+            <div class="card">
+                <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
+                <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
+                    <div class="stat-card">
+                        <div class="stat-value">${Utils.formatCurrency(grandTotalIncome)}</div>
+                        <div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Utils.formatCurrency(grandTotalExpenses)}</div>
+                        <div>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Utils.formatCurrency(grandTotalGrossProfit)}</div>
+                        <div>${lang === 'id' ? 'Total Laba Kotor' : '总毛利'}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <h4>${lang === 'id' ? 'Detail per Toko' : '各门店明细'}</h4>
+                    ${storeStatsHtml || `<p style="color: #94a3b8;">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</p>`}
+                </div>
+            </div>
+            
             <div class="card">
                 <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                 <div class="form-group">
@@ -77,6 +158,7 @@ const StoreManager = {
                 </div>
                 <button onclick="APP.addStore()" class="success">➕ ${lang === 'id' ? 'Tambah Toko' : '添加门店'}</button>
             </div>
+            
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
