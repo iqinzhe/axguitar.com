@@ -156,6 +156,18 @@ window.APP = {
             var isAdmin = AUTH.isAdmin();
             var storeName = AUTH.getCurrentStoreName();
             
+            // 获取支出总额
+            var totalExpenses = 0;
+            try {
+                var expensesData = await this.getExpensesTotal();
+                totalExpenses = expensesData.total;
+            } catch(e) { console.error("获取支出失败:", e); }
+            
+            // 计算支出占比（支出总额 / 总收入 * 100）
+            var totalIncome = report.total_admin_fees + report.total_interest;
+            var expenseRatio = totalIncome > 0 ? ((totalExpenses / totalIncome) * 100).toFixed(1) : 0;
+            
+            // 新布局：2x2 网格
             var html = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
                     <h1>🏦 JF GADAI ENTERPRISE</h1>
@@ -164,13 +176,27 @@ window.APP = {
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}
                     </div>
                 </div>
-                <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-value">${report.total_orders}</div><div>${t('total_orders')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${report.active_orders}</div><div>${t('active')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${report.completed_orders}</div><div>${t('completed')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_loan_amount)}</div><div>${t('total_loan')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
+                <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="stat-card">
+                        <div class="stat-value">${report.total_orders}</div>
+                        <div>${t('total_orders')}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8; margin-top: 5px;">${Utils.formatCurrency(report.total_loan_amount)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${report.active_orders}</div>
+                        <div>${t('active')}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8; margin-top: 5px;">${t('completed')}: ${report.completed_orders}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div>
+                        <div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8; margin-top: 5px;">${lang === 'id' ? 'Bunga' : '利息'}: ${Utils.formatCurrency(report.total_interest)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Utils.formatCurrency(totalExpenses)}</div>
+                        <div>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}</div>
+                        <div class="stat-sub" style="font-size: 14px; color: #94a3b8; margin-top: 5px;">${lang === 'id' ? 'Rasio' : '占比'}: ${expenseRatio}%</div>
+                    </div>
                 </div>
                 <div class="toolbar">
                     <button onclick="APP.navigateTo('createOrder')">➕ ${t('create_order')}</button>
@@ -543,7 +569,8 @@ window.APP = {
                 </div>
                 <div class="table-container">
                     <table class="table">
-                        <thead><tr>${headers}</thead>
+                        <thead><tr>${headers}</tr>
+                        </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
