@@ -3,13 +3,11 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Profile 缓存，避免同一请求链中多次重复查询 Supabase
 let _profileCache = null;
 
 const SupabaseAPI = {
     getClient() { return supabaseClient; },
 
-    // 统一错误处理 - 所有方法均 throw error，不再静默返回 null
     async getSession() {
         const { data, error } = await supabaseClient.auth.getSession();
         if (error) throw error;
@@ -22,13 +20,11 @@ const SupabaseAPI = {
         return data.user;
     },
 
-    // ✅ 修复：stores(*) 关联查询改为分步查询，避免 store_id 为 NULL 时报错
     async getCurrentProfile() {
         if (_profileCache) return _profileCache;
         const user = await this.getCurrentUser();
         if (!user) return null;
         
-        // 先查询用户资料
         const { data, error } = await supabaseClient
             .from('user_profiles')
             .select('*')
@@ -40,7 +36,6 @@ const SupabaseAPI = {
             return null;
         }
         
-        // 如果有门店ID，单独查询门店信息
         if (data.store_id) {
             const { data: storeData, error: storeError } = await supabaseClient
                 .from('stores')
@@ -56,7 +51,6 @@ const SupabaseAPI = {
         return data;
     },
 
-    // 清除缓存
     clearCache() {
         _profileCache = null;
     },
@@ -97,12 +91,10 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ✅ 修复：非管理员且没有门店ID时，不过滤（避免查询失败）
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*');
         
-        // 非管理员且有门店ID时才按门店过滤
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
         }
@@ -139,8 +131,6 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
-    // 根据门店ID获取订单前缀
-    // BL = Bangil, GP = Gempol, SO = Sidoarjo, AD = Admin, ST = 默认店长
     async _getStorePrefix(storeId) {
         if (!storeId) return 'ST';
         const { data, error } = await supabaseClient
@@ -156,19 +146,37 @@ const SupabaseAPI = {
         return 'ST';
     },
 
-    // 生成订单ID: 格式 门店前缀-年月-序号
-    // BL = Bangil, GP = Gempol, SO = Sidoarjo, AD = Admin
+    // 生成订单ID: 格式 门店前缀-年月-3位序号 (如 BL-2604-001)
     async _generateOrderId(role, storeId) {
-        let prefix = 'AD'; // 默认管理员
+        let prefix = 'AD';
         if (role === 'store_manager') {
             prefix = await this._getStorePrefix(storeId);
         }
         const now = new Date();
         const yy = now.getFullYear().toString().slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const msStr = String(now.getTime()).slice(-6);
-        const rand = String(Math.floor(Math.random() * 90) + 10);
-        return `${prefix}-${yy}${mm}-${msStr}${rand}`;
+        const yearMonth = `${yy}${mm}`;
+        
+        // 查询当前月份该前缀的最大序号
+        const { data: orders, error } = await supabaseClient
+            .from('orders')
+            .select('order_id')
+            .like('order_id', `${prefix}-${yearMonth}-%`);
+        
+        let nextNumber = 1;
+        if (orders && orders.length > 0) {
+            const numbers = orders.map(o => {
+                const match = o.order_id.match(new RegExp(`${prefix}-${yearMonth}-(\\d+)$`));
+                return match ? parseInt(match[1], 10) : 0;
+            }).filter(n => n > 0);
+            if (numbers.length > 0) {
+                nextNumber = Math.max(...numbers) + 1;
+            }
+        }
+        
+        if (nextNumber > 999) nextNumber = 999;
+        const serial = String(nextNumber).padStart(3, '0');
+        return `${prefix}-${yearMonth}-${serial}`;
     },
 
     async createOrder(orderData) {
@@ -196,7 +204,7 @@ const SupabaseAPI = {
             store_id: profile.store_id,
             created_by: profile.id,
             notes: orderData.notes || '',
-            customer_id: orderData.customer_id || null,  // ✅ 新增：关联客户ID
+            customer_id: orderData.customer_id || null,
             is_locked: true,
             locked_at: new Date().toISOString(),
             locked_by: profile.id
@@ -330,65 +338,4 @@ const SupabaseAPI = {
             active_orders: activeOrders.length,
             completed_orders: orders.filter(o => o.status === 'completed').length,
             total_loan_amount: orders.reduce((s, o) => s + o.loan_amount, 0),
-            total_admin_fees: orders.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0),
-            total_interest: orders.reduce((s, o) => s + o.interest_paid_total, 0),
-            total_principal: orders.reduce((s, o) => s + o.principal_paid, 0),
-            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * 0.10), 0)
-        };
-    },
-
-    async getAllPayments() {
-        const profile = await this.getCurrentProfile();
-        let query = supabaseClient
-            .from('payment_history')
-            .select('*, orders!inner (order_id, customer_name, store_id)')
-            .order('date', { ascending: false });
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('orders.store_id', profile.store_id);
-        }
-        const { data, error } = await query;
-        if (error) throw error;
-        return data;
-    },
-
-    async getAllUsers() {
-        const { data, error } = await supabaseClient
-            .from('user_profiles').select('*, stores(*)').order('name');
-        if (error) throw error;
-        return data;
-    },
-
-    async createStore(code, name, address, phone) {
-        const { data, error } = await supabaseClient
-            .from('stores').insert({ code, name, address, phone }).select().single();
-        if (error) throw error;
-        return data;
-    },
-
-    async updateStore(id, updates) {
-        const { data, error } = await supabaseClient
-            .from('stores').update(updates).eq('id', id).select().single();
-        if (error) throw error;
-        return data;
-    },
-
-    async deleteStore(id) {
-        const { error } = await supabaseClient.from('stores').delete().eq('id', id);
-        if (error) throw error;
-        return true;
-    },
-
-    formatCurrency(amount) {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
-        }).format(amount);
-    },
-
-    formatDate(dateStr) {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('id-ID');
-    }
-};
-
-window.SUPABASE = SupabaseAPI;
-window.supabaseClient = supabaseClient;
+            total_admin_f
