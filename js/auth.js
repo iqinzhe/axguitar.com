@@ -18,7 +18,11 @@ const AUTH = {
     },
 
     getCurrentStoreName() {
-        return this.user?.stores?.name || this.user?.store_name || '未知门店';
+        // 如果是 admin 且没有门店关联，返回"总部"
+        if (this.user?.role === 'admin' && !this.user?.stores?.name && !this.user?.store_name) {
+            return Utils.lang === 'id' ? 'Kantor Pusat' : '总部';
+        }
+        return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
     async login(email, password) {
@@ -59,10 +63,7 @@ const AUTH = {
         return await SUPABASE.getAllUsers();
     },
 
-    // ⚠️ 注意：此方法需要 Service Role Key 才能正常工作
-    // 当前使用 anon key 会失败，建议改用 Edge Function 或添加 SERVICE_ROLE_KEY
     async addUser(username, password, name, role, storeId) {
-        // 通过 Supabase Auth 创建用户，再写入 user_profiles
         const { data, error } = await supabaseClient.auth.admin.createUser({
             email: username,
             password: password,
