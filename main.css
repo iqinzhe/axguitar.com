@@ -42,6 +42,12 @@ input, select, textarea {
     font-size: 14px;
 }
 
+/* 日期选择器统一背景色 */
+input[type="date"] {
+    background: #ffffff;
+    color: #1e293b;
+}
+
 input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: #3b82f6;
@@ -111,7 +117,7 @@ table {
 }
 
 th, td {
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1 !important;
     padding: 10px 12px;
     text-align: left;
     vertical-align: middle;
@@ -133,13 +139,23 @@ td:last-child button {
     margin: 2px;
 }
 
-/* 确保 tbody 中的每一行都有边框 */
 tbody tr {
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid #cbd5e1;
 }
 
 tbody tr:last-child {
     border-bottom: none;
+}
+
+/* 用户表格专用样式 */
+.user-table {
+    min-width: 500px;
+}
+
+.user-table th,
+.user-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 10px 12px;
 }
 
 /* ========== 付款明细表格 ========== */
@@ -304,7 +320,7 @@ tbody tr:last-child {
         box-shadow: none;
     }
     th, td {
-        border: 1px solid #ccc;
+        border: 1px solid #ccc !important;
     }
     .stat-value {
         color: #333;
@@ -315,13 +331,11 @@ tbody tr:last-child {
 @media (max-width: 768px) {
     body { padding: 10px; background: #f8fafc; }
 
-    /* 仪表盘统计卡片改为2列 */
     .stats-grid {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 10px;
     }
 
-    /* 金额字体缩小，防止换行 */
     .stat-value {
         font-size: 16px !important;
         word-break: keep-all;
@@ -329,7 +343,6 @@ tbody tr:last-child {
         overflow-x: auto;
     }
     
-    /* 统计卡片内边距减小 */
     .stat-card {
         padding: 10px;
     }
@@ -391,6 +404,10 @@ tbody tr:last-child {
 
     input, select, textarea {
         max-width: 100%;
+        font-size: 14px;
+    }
+
+    input[type="date"] {
         font-size: 14px;
     }
 
