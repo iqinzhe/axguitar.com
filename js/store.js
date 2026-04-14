@@ -82,7 +82,6 @@ const StoreManager = {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                 <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
             </div>
