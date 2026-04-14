@@ -1111,10 +1111,10 @@ window.APP = {
                         ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
                         <td>
                             <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})">👁️ ${t('view')}</button>
-                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})">💰</button>` : ''}
-                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️</button>` : ''}
-                            <button onclick="APP.printOrder('${o.order_id}')" class="success">🖨️</button>
-                            ${o.is_locked ? '<span>🔒</span>' : ''}
+                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️ ${t('delete')}</button>` : ''}
+                            <button onclick="APP.printOrder('${o.order_id}')" class="success">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            ${o.is_locked ? `<span style="font-size:12px;color:#94a3b8;">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>` : ''}
                         </td>
                     </tr>`;
                 }).join('');
@@ -1237,56 +1237,151 @@ window.APP = {
         try {
             var order = await SUPABASE.getOrder(orderId);
             if (!order) return;
+
+            // 同时拉取付款历史，用于展示利息和本金的历史记录
+            var { payments } = await SUPABASE.getPaymentHistory(orderId);
+
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             var currentMonthlyInterest = remainingPrincipal * 0.10;
-            var interestOptions = '';
-            for (var i = 1; i <= 12; i++) {
-                interestOptions += `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(currentMonthlyInterest * i)})</option>`;
-            }
+
+            // 拆分付款类型
+            var interestPayments = payments.filter(p => p.type === 'interest');
+            var principalPayments = payments.filter(p => p.type === 'principal');
+            var adminFeePayments = payments.filter(p => p.type === 'admin_fee');
+
+            // 利息历史表格
+            var interestRows = interestPayments.length === 0
+                ? `<tr><td colspan="4" style="text-align:center;color:#94a3b8;font-size:12px;">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`
+                : interestPayments.map(p => `<tr>
+                    <td>${Utils.formatDate(p.date)}</td>
+                    <td>${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
+                    <td>${Utils.formatCurrency(p.amount)}</td>
+                    <td style="font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                  </tr>`).join('');
+
+            // 本金历史表格
+            var principalRows = principalPayments.length === 0
+                ? `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`
+                : principalPayments.map(p => `<tr>
+                    <td>${Utils.formatDate(p.date)}</td>
+                    <td>${Utils.formatCurrency(p.amount)}</td>
+                    <td style="font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                  </tr>`).join('');
+
+            // 管理费区块
             var adminFeeSection = !order.admin_fee_paid
-                ? `<div style="background:#0f172a;padding:15px;border-radius:8px;margin-bottom:15px;">
-                    <h4>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'} - ${Utils.formatCurrency(order.admin_fee)}</h4>
-                    <button onclick="APP.payAdminFee('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Admin Fee' : '记录管理费'}</button>
+                ? `<div style="background:#0f172a;padding:12px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #f59e0b;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                        <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ❌ ${lang === 'id' ? 'Belum dibayar' : '未支付'}</span>
+                        <button onclick="APP.payAdminFee('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
+                    </div>
                    </div>`
-                : `<div style="background:#0f172a;padding:15px;border-radius:8px;margin-bottom:15px;">
-                    <p>✅ ${lang === 'id' ? 'Admin Fee sudah dibayar' : '管理费已支付'}</p>
+                : `<div style="background:#0f172a;padding:10px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #10b981;">
+                    <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ✅ ${lang === 'id' ? 'Sudah dibayar' : '已支付'} (${Utils.formatDate(order.admin_fee_paid_date)})</span>
                    </div>`;
-            var principalSection = remainingPrincipal > 0
-                ? `<div class="form-group"><label>${lang === 'id' ? 'Jumlah Pembayaran Pokok' : '本金支付金额'}:</label>
-                   <input type="text" id="principalAmount" value="${remainingPrincipal}" style="width:200px;text-align:right;"></div>
-                   <button onclick="APP.payPrincipal('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Bayar Pokok' : '支付本金'}</button>`
-                : `<p>✅ ${lang === 'id' ? 'Pokok sudah lunas' : '本金已结清'}</p>`;
+
+            // 利息月数：只显示"本月（1个月）"，规则：付完当期自动续1个月
+            // 同时提供 2、3 个月选项（提前多付）
+            var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
+            var interestOptions = [1, 2, 3].map(i =>
+                `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(currentMonthlyInterest * i)}</option>`
+            ).join('');
+
+            // 本金：输入框默认为空（不预填贷款总额），防止误操作
+            var principalInputSection = remainingPrincipal > 0
+                ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                    <label style="color:#cbd5e1;white-space:nowrap;">${lang === 'id' ? 'Jumlah bayar pokok' : '本次还款金额'} (IDR):</label>
+                    <input type="text" id="principalAmount" placeholder="${lang === 'id' ? 'Masukkan jumlah' : '输入金额'}" style="width:180px;text-align:right;margin:0;">
+                    <button onclick="APP.payPrincipal('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Bayar Pokok' : '支付本金'}</button>
+                   </div>
+                   <p style="font-size:12px;color:#94a3b8;">${lang === 'id' ? 'Sisa pokok' : '剩余本金'}: <strong style="color:#f1f5f9;">${Utils.formatCurrency(remainingPrincipal)}</strong></p>`
+                : `<p style="color:#10b981;">✅ ${lang === 'id' ? 'Pokok sudah LUNAS' : '本金已全部结清'}</p>`;
 
             document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                     <h2>💰 ${lang === 'id' ? 'Pembayaran' : '缴费'}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
-                <div class="card">
-                    <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer_name)}</p>
-                    <p><strong>ID:</strong> ${Utils.escapeHtml(order.order_id)}</p>
-                    <p><strong>${t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
-                    <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
-                    <p><strong>${lang === 'id' ? 'Bunga Bulanan' : '月利息'}:</strong> ${Utils.formatCurrency(currentMonthlyInterest)}</p>
-                </div>
-                <div class="card">
-                    ${adminFeeSection}
-                    <div style="background:#0f172a;padding:15px;border-radius:8px;margin-bottom:15px;">
-                        <h4>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '支付利息'}</h4>
-                        <div class="form-group"><label>${lang === 'id' ? 'Jumlah Bulan' : '月数'}:</label>
-                        <select id="interestMonths" style="width:200px;">${interestOptions}</select></div>
-                        <button onclick="APP.payInterest('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Bunga' : '记录利息'}</button>
-                    </div>
-                    <div style="background:#0f172a;padding:15px;border-radius:8px;margin-bottom:15px;">
-                        <h4>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金支付'}</h4>
-                        ${principalSection}
+
+                <!-- 订单概览 -->
+                <div class="card" style="padding:14px 18px;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
+                        <div><div style="font-size:11px;color:#94a3b8;">${t('customer_name')}</div><div style="font-weight:600;">${Utils.escapeHtml(order.customer_name)}</div></div>
+                        <div><div style="font-size:11px;color:#94a3b8;">ID</div><div style="font-weight:600;">${Utils.escapeHtml(order.order_id)}</div></div>
+                        <div><div style="font-size:11px;color:#94a3b8;">${t('loan_amount')}</div><div style="font-weight:600;">${Utils.formatCurrency(order.loan_amount)}</div></div>
+                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</div><div style="font-weight:600;color:${remainingPrincipal > 0 ? '#f59e0b' : '#10b981'};">${Utils.formatCurrency(remainingPrincipal)}</div></div>
+                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</div><div style="font-weight:600;color:#3b82f6;">${Utils.formatCurrency(currentMonthlyInterest)}</div></div>
+                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Jatuh Tempo Bunga' : '下次利息到期'}</div><div style="font-weight:600;">${nextDueDate}</div></div>
+                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息期数'}</div><div style="font-weight:600;">${order.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</div></div>
                     </div>
                 </div>
-                <div class="toolbar"><button onclick="APP.goBack()">↩️ ${t('cancel')}</button></div>`;
+
+                <!-- 管理费 -->
+                ${adminFeeSection}
+
+                <!-- 利息缴费 + 历史 -->
+                <div class="card">
+                    <h3 style="margin-bottom:12px;">💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3>
+                    <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
+                        ${lang === 'id'
+                            ? '📌 Setiap pembayaran memperpanjang pinjaman 1 bulan secara otomatis'
+                            : '📌 每次付息后自动延续1个月，到期日同步更新'}
+                    </p>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+                        <label style="color:#cbd5e1;white-space:nowrap;">${lang === 'id' ? 'Bayar untuk' : '支付'}:</label>
+                        <select id="interestMonths" style="width:auto;min-width:200px;margin:0;">${interestOptions}</select>
+                        <button onclick="APP.payInterest('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息付款'}</button>
+                    </div>
+
+                    <!-- 利息历史 -->
+                    <h4 style="font-size:13px;margin-bottom:6px;color:#94a3b8;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息付款历史'}</h4>
+                    <div class="table-container" style="margin-top:0;">
+                        <table class="table" style="min-width:400px;">
+                            <thead><tr>
+                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                            </tr></thead>
+                            <tbody>${interestRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 本金缴费 + 历史 -->
+                <div class="card">
+                    <h3 style="margin-bottom:12px;">🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金还款'}</h3>
+                    <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
+                        ${lang === 'id'
+                            ? `📌 Total pinjaman: ${Utils.formatCurrency(order.loan_amount)} | Sudah dibayar: ${Utils.formatCurrency(order.principal_paid)} | Sisa: ${Utils.formatCurrency(remainingPrincipal)}`
+                            : `📌 贷款总额: ${Utils.formatCurrency(order.loan_amount)} | 已还: ${Utils.formatCurrency(order.principal_paid)} | 剩余: ${Utils.formatCurrency(remainingPrincipal)}`}
+                    </p>
+                    ${principalInputSection}
+
+                    <!-- 本金历史 -->
+                    <h4 style="font-size:13px;margin-top:14px;margin-bottom:6px;color:#94a3b8;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</h4>
+                    <div class="table-container" style="margin-top:0;">
+                        <table class="table" style="min-width:360px;">
+                            <thead><tr>
+                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                            </tr></thead>
+                            <tbody>${principalRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <button onclick="APP.viewOrder('${order.order_id}')">📄 ${lang === 'id' ? 'Lihat Detail Order' : '查看订单详情'}</button>
+                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                </div>`;
+
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
+
         } catch (error) {
             alert(Utils.lang === 'id' ? 'Gagal memuat halaman pembayaran' : '加载支付页面失败');
             this.goBack();
@@ -1295,15 +1390,19 @@ window.APP = {
 
     payAdminFee: async function(orderId) {
         if (confirm(Utils.lang === 'id' ? 'Konfirmasi penerimaan Admin Fee 30,000 IDR?' : '确认已收取管理费 30,000 IDR？')) {
-            try { await Order.recordAdminFee(orderId); await this.viewOrder(orderId); }
+            try { await Order.recordAdminFee(orderId); await this.showPayment(orderId); }
             catch (error) { alert('Error: ' + error.message); }
         }
     },
 
     payInterest: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
-        if (confirm((Utils.lang === 'id' ? 'Konfirmasi pembayaran bunga ' : '确认支付利息 ') + months + (Utils.lang === 'id' ? ' bulan?' : ' 个月？'))) {
-            try { await Order.recordInterestPayment(orderId, months); await this.viewOrder(orderId); }
+        var lang = Utils.lang;
+        if (confirm((lang === 'id' ? 'Konfirmasi pembayaran bunga ' : '确认支付利息 ') + months + (lang === 'id' ? ' bulan?' : ' 个月？'))) {
+            try {
+                await Order.recordInterestPayment(orderId, months);
+                await this.showPayment(orderId); // 刷新缴费页，立即显示新历史和新到期日
+            }
             catch (error) { alert('Error: ' + error.message); }
         }
     },
@@ -1311,9 +1410,13 @@ window.APP = {
     payPrincipal: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
-        if (isNaN(amount) || amount <= 0) { alert(Utils.lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
-        if (confirm((Utils.lang === 'id' ? 'Konfirmasi pembayaran pokok ' : '确认支付本金 ') + Utils.formatCurrency(amount) + '?')) {
-            try { await Order.recordPrincipalPayment(orderId, amount); await this.viewOrder(orderId); }
+        var lang = Utils.lang;
+        if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
+        if (confirm((lang === 'id' ? 'Konfirmasi pembayaran pokok ' : '确认支付本金 ') + Utils.formatCurrency(amount) + '?')) {
+            try {
+                await Order.recordPrincipalPayment(orderId, amount);
+                await this.showPayment(orderId); // 刷新缴费页，显示更新后的剩余本金和历史
+            }
             catch (error) { alert('Error: ' + error.message); }
         }
     },
@@ -1380,38 +1483,86 @@ window.APP = {
             var totalInterestPaid = payments.filter(p => p.type === 'interest').reduce((s, p) => s + p.amount, 0);
             var totalAdminFeePaid = payments.filter(p => p.type === 'admin_fee').reduce((s, p) => s + p.amount, 0);
             var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Print - ${order.order_id}</title>
-            <style>body{font-family:'Segoe UI',sans-serif;margin:20px;}.header{text-align:center;margin-bottom:30px;}.section{margin-bottom:20px;border:1px solid #e2e8f0;padding:15px;border-radius:8px;}.section h3{margin:0 0 10px;border-bottom:1px solid #e2e8f0;padding-bottom:5px;}.info-row{display:flex;margin-bottom:8px;}.info-label{width:140px;font-weight:bold;color:#475569;}.info-value{flex:1;}.table{width:100%;border-collapse:collapse;margin-top:10px;}.table th,.table td{border:1px solid #e2e8f0;padding:8px;text-align:left;}.table th{background:#f1f5f9;}.remarks{margin-top:20px;padding:15px;background:#fef3c7;border-left:4px solid #f59e0b;font-size:12px;}.no-print{text-align:center;margin-bottom:20px;}@media print{.no-print{display:none;}}</style>
+            <style>
+                * { box-sizing: border-box; margin: 0; padding: 0; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #1e293b; padding: 12mm 14mm; }
+                .header { text-align: center; margin-bottom: 8px; border-bottom: 2px solid #1e293b; padding-bottom: 6px; }
+                .header h1 { font-size: 16px; margin-bottom: 2px; }
+                .header p { font-size: 11px; color: #475569; margin: 1px 0; }
+                .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+                .section { border: 1px solid #cbd5e1; border-radius: 4px; padding: 7px 10px; }
+                .section h3 { font-size: 11px; font-weight: 700; margin-bottom: 5px; padding-bottom: 3px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+                .info-row { display: flex; margin-bottom: 3px; }
+                .info-label { width: 90px; font-weight: 600; color: #475569; flex-shrink: 0; }
+                .info-value { flex: 1; }
+                .table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+                .table th, .table td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; font-size: 10px; }
+                .table th { background: #f1f5f9; font-weight: 700; }
+                .table tr:nth-child(even) { background: #f8fafc; }
+                .remarks { margin-top: 8px; padding: 6px 10px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 0 4px 4px 0; font-size: 10px; line-height: 1.5; }
+                .remarks h4 { font-size: 10px; font-weight: 700; margin-bottom: 3px; color: #92400e; }
+                .remarks p { margin: 1px 0; color: #78350f; }
+                .footer { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 5px; }
+                .no-print { text-align: center; padding: 10px; background: #f1f5f9; margin-bottom: 10px; border-radius: 6px; }
+                .no-print button { margin: 0 5px; padding: 6px 14px; cursor: pointer; border: none; border-radius: 4px; font-size: 13px; }
+                .btn-print { background: #3b82f6; color: white; }
+                .btn-close { background: #64748b; color: white; }
+                @media print {
+                    .no-print { display: none; }
+                    body { padding: 8mm 10mm; }
+                }
+            </style>
             </head><body>
-            <div class="no-print"><button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button><button onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button></div>
-            <div class="header"><h1>🏦 JF! by Gadai</h1><p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'}</p><p><strong>${order.order_id}</strong></p><p>${Utils.formatDate(order.created_at)}</p></div>
-            <div class="section"><h3>📋 ${lang === 'id' ? 'Informasi Pelanggan' : '客户信息'}</h3>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama' : '姓名'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_name)}</div></div>
-                <div class="info-row"><div class="info-label">KTP:</div><div class="info-value">${Utils.escapeHtml(order.customer_ktp)}</div></div>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Telepon' : '电话'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_phone)}</div></div>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Alamat' : '地址'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_address || '-')}</div></div>
+            <div class="no-print">
+                <button class="btn-print" onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                <button class="btn-close" onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
             </div>
-            <div class="section"><h3>💎 ${lang === 'id' ? 'Jaminan' : '质押物'}</h3>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Barang' : '物品'}:</div><div class="info-value">${Utils.escapeHtml(order.collateral_name)}</div></div>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Pinjaman' : '贷款'}:</div><div class="info-value">${Utils.formatCurrency(order.loan_amount)}</div></div>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div class="info-value">${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</div></div>
+            <div class="header">
+                <h1>🏦 JF! by Gadai</h1>
+                <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} &nbsp;|&nbsp; <strong>${order.order_id}</strong> &nbsp;|&nbsp; ${Utils.formatDate(order.created_at)}</p>
             </div>
-            <div class="section"><h3>💰 ${lang === 'id' ? 'Ringkasan Pembayaran' : '付款汇总'}</h3>
-                <div class="info-row"><div class="info-label">Admin Fee:</div><div class="info-value">${Utils.formatCurrency(totalAdminFeePaid)}</div></div>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Total Bunga' : '利息总额'}:</div><div class="info-value">${Utils.formatCurrency(totalInterestPaid)}</div></div>
-                <div class="info-row"><div class="info-label">${lang === 'id' ? 'Total Pokok' : '本金总额'}:</div><div class="info-value">${Utils.formatCurrency(totalPrincipalPaid)}</div></div>
+            <div class="two-col">
+                <div class="section">
+                    <h3>📋 ${lang === 'id' ? 'Informasi Pelanggan' : '客户信息'}</h3>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama' : '姓名'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_name)}</div></div>
+                    <div class="info-row"><div class="info-label">KTP:</div><div class="info-value">${Utils.escapeHtml(order.customer_ktp || '-')}</div></div>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Telepon' : '电话'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_phone || '-')}</div></div>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Alamat' : '地址'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_address || '-')}</div></div>
+                </div>
+                <div class="section">
+                    <h3>💎 ${lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款'}</h3>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Barang' : '物品'}:</div><div class="info-value">${Utils.escapeHtml(order.collateral_name)}</div></div>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Pinjaman' : '贷款'}:</div><div class="info-value"><strong>${Utils.formatCurrency(order.loan_amount)}</strong></div></div>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div class="info-value"><strong>${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</strong></div></div>
+                    <div class="info-row"><div class="info-label">Admin Fee:</div><div class="info-value">${Utils.formatCurrency(totalAdminFeePaid)} ${order.admin_fee_paid ? '✅' : '❌'}</div></div>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Bunga/Bln' : '月利息'}:</div><div class="info-value">${Utils.formatCurrency(order.monthly_interest || 0)}</div></div>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Bunga Lunas' : '已付利息'}:</div><div class="info-value">${Utils.formatCurrency(totalInterestPaid)}</div></div>
+                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Pokok Lunas' : '已还本金'}:</div><div class="info-value">${Utils.formatCurrency(totalPrincipalPaid)}</div></div>
+                </div>
             </div>
-            <div class="section"><h3>📋 ${lang === 'id' ? 'Detail Pembayaran' : '付款明细'}</h3>
-            <table class="table"><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th>${lang === 'id' ? 'Bulan' : '月数'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>
-            ${payments.map(p => {
-                var tt = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
-                return `<tr><td>${Utils.formatDate(p.date)}</td><td>${tt}</td><td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td><td>${Utils.formatCurrency(p.amount)}</td><td>${Utils.escapeHtml(p.description || '-')}</td></tr>`;
-            }).join('')}
-            </tbody></table></div>
-            <div class="remarks"><h4>📌 ${lang === 'id' ? 'Penting' : '重要提示'}:</h4>
-            <p>1. Peminjam wajib membayar sewa modal setiap bulan tepat waktu.</p>
-            <p>2. Jika tidak membayar, Pemberi Pinjaman berhak menjual barang jaminan.</p>
-            <p>3. Keterlambatan lebih dari 7 hari dikenakan denda 5% per bulan.</p></div>
-            <p style="text-align:center;font-size:12px;margin-top:20px;">${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()} | © JF! by Gadai</p>
+            <div class="section">
+                <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款明细'}</h3>
+                <table class="table"><thead><tr>
+                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                    <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
+                    <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
+                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                    <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                </tr></thead><tbody>
+                ${payments.length === 0 ? `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">${lang === 'id' ? 'Belum ada pembayaran' : '暂无付款记录'}</td></tr>` :
+                payments.map(p => {
+                    var tt = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
+                    return `<tr><td>${Utils.formatDate(p.date)}</td><td>${tt}</td><td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 月') : '-'}</td><td>${Utils.formatCurrency(p.amount)}</td><td>${Utils.escapeHtml(p.description || '-')}</td></tr>`;
+                }).join('')}
+                </tbody></table>
+            </div>
+            <div class="remarks">
+                <h4>📌 ${lang === 'id' ? 'Penting' : '重要提示'}:</h4>
+                <p>1. Peminjam wajib membayar sewa modal setiap bulan tepat waktu. Pembayaran memperpanjang pinjaman 1 bulan.</p>
+                <p>2. Jika tidak membayar dan pinjaman belum lunas, Pemberi Pinjaman berhak menjual barang jaminan.</p>
+                <p>3. Keterlambatan lebih dari 7 hari dikenakan denda 5% per bulan. Lebih dari 30 hari, barang langsung dijual.</p>
+            </div>
+            <div class="footer">${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()} &nbsp;|&nbsp; © JF! by Gadai</div>
             </body></html>`;
             var pw = window.open('', '_blank');
             pw.document.write(printContent);
