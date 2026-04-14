@@ -354,7 +354,6 @@ td:last-child button {
 
     .report-store-stat { border-right: none; }
     
-    /* 用户管理表格手机端优化 */
     .user-table {
         min-width: 550px;
     }
