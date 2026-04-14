@@ -95,7 +95,6 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*');
         
-        // FIX: admin 看全部，其他角色只看本门店
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
         }
@@ -120,7 +119,6 @@ const SupabaseAPI = {
             .from('orders').select('*').eq('order_id', orderId).single();
         if (error) throw error;
 
-        // FIX: 验证非 admin 用户只能访问本门店订单
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin' && profile?.store_id && data.store_id !== profile.store_id) {
             throw new Error(Utils.lang === 'id' ? 'Tidak ada akses ke order ini' : '无权访问此订单');
@@ -139,7 +137,6 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
-    // FIX: 门店前缀从数据库 code 字段读取，不再硬编码
     async _getStorePrefix(storeId) {
         if (!storeId) return 'AD';
         const { data, error } = await supabaseClient
@@ -148,9 +145,7 @@ const SupabaseAPI = {
             .eq('id', storeId)
             .single();
         if (error || !data) return 'ST';
-        // 优先用 code 字段的前2位作为前缀
         if (data.code) return data.code.substring(0, 2).toUpperCase();
-        // 降级：从名称推断
         const name = data.name.toLowerCase();
         if (name.includes('bangil')) return 'BL';
         if (name.includes('gempol')) return 'GP';
@@ -158,7 +153,6 @@ const SupabaseAPI = {
         return 'ST';
     },
 
-    // 生成订单ID: 格式 门店前缀-年月-3位序号 (如 BL-2604-001)
     async _generateOrderId(role, storeId) {
         let prefix = 'AD';
         if (role !== 'admin') {
@@ -306,7 +300,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // FIX: deleteOrder 增加服务端角色验证
     async deleteOrder(orderId) {
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin') {
@@ -320,13 +313,11 @@ const SupabaseAPI = {
         return true;
     },
 
-    // FIX: updateOrder 同步更新 customers 表
     async updateOrder(orderId, updateData, customerId) {
         const { data, error } = await supabaseClient
             .from('orders').update(updateData).eq('order_id', orderId).select().single();
         if (error) throw error;
 
-        // 同步更新 customers 表（如果提供了 customerId 和客户字段）
         if (customerId && (updateData.customer_name || updateData.customer_phone || updateData.customer_ktp)) {
             const customerUpdate = {};
             if (updateData.customer_name) customerUpdate.name = updateData.customer_name;
@@ -386,13 +377,32 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient
             .from('payment_history')
-            .select('*, orders!inner (order_id, customer_name, store_id)')
+            .select('*, orders!left(order_id, customer_name, store_id)')
             .order('date', { ascending: false });
+        
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('orders.store_id', profile.store_id);
         }
+        
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+            console.warn("Payment query with join failed, falling back:", error);
+            const { data: payments, error: payError } = await supabaseClient
+                .from('payment_history')
+                .select('*')
+                .order('date', { ascending: false });
+            if (payError) throw payError;
+            
+            for (var p of payments) {
+                const { data: order } = await supabaseClient
+                    .from('orders')
+                    .select('order_id, customer_name, store_id')
+                    .eq('id', p.order_id)
+                    .single();
+                p.orders = order;
+            }
+            return payments;
+        }
         return data;
     },
 
@@ -418,6 +428,30 @@ const SupabaseAPI = {
     },
 
     async deleteStore(id) {
+        const { data: orders, error: ordersError } = await supabaseClient
+            .from('orders')
+            .select('id', { count: 'exact', head: true })
+            .eq('store_id', id);
+        
+        if (ordersError) throw ordersError;
+        if (orders && orders.length > 0) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Toko ini masih memiliki order, tidak dapat dihapus' 
+                : '该门店还有订单，无法删除');
+        }
+        
+        const { data: users, error: usersError } = await supabaseClient
+            .from('user_profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('store_id', id);
+        
+        if (usersError) throw usersError;
+        if (users && users.length > 0) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Toko ini masih memiliki pengguna, tidak dapat dihapus' 
+                : '该门店还有用户，无法删除');
+        }
+        
         const { error } = await supabaseClient.from('stores').delete().eq('id', id);
         if (error) throw error;
         return true;
