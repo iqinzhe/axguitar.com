@@ -338,4 +338,65 @@ const SupabaseAPI = {
             active_orders: activeOrders.length,
             completed_orders: orders.filter(o => o.status === 'completed').length,
             total_loan_amount: orders.reduce((s, o) => s + o.loan_amount, 0),
-            total_admin_f
+            total_admin_fees: orders.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0),
+            total_interest: orders.reduce((s, o) => s + o.interest_paid_total, 0),
+            total_principal: orders.reduce((s, o) => s + o.principal_paid, 0),
+            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * 0.10), 0)
+        };
+    },
+
+    async getAllPayments() {
+        const profile = await this.getCurrentProfile();
+        let query = supabaseClient
+            .from('payment_history')
+            .select('*, orders!inner (order_id, customer_name, store_id)')
+            .order('date', { ascending: false });
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('orders.store_id', profile.store_id);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    async getAllUsers() {
+        const { data, error } = await supabaseClient
+            .from('user_profiles').select('*, stores(*)').order('name');
+        if (error) throw error;
+        return data;
+    },
+
+    async createStore(code, name, address, phone) {
+        const { data, error } = await supabaseClient
+            .from('stores').insert({ code, name, address, phone }).select().single();
+        if (error) throw error;
+        return data;
+    },
+
+    async updateStore(id, updates) {
+        const { data, error } = await supabaseClient
+            .from('stores').update(updates).eq('id', id).select().single();
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteStore(id) {
+        const { error } = await supabaseClient.from('stores').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+    },
+
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
+        }).format(amount);
+    },
+
+    formatDate(dateStr) {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleDateString('id-ID');
+    }
+};
+
+window.SUPABASE = SupabaseAPI;
+window.supabaseClient = supabaseClient;
