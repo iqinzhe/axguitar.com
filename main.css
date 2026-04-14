@@ -129,6 +129,15 @@ td:last-child button {
     margin: 2px;
 }
 
+/* 确保 tbody 中的每一行都有边框 */
+tbody tr {
+    border-bottom: 1px solid #334155;
+}
+
+tbody tr:last-child {
+    border-bottom: none;
+}
+
 /* ========== 付款明细表格 ========== */
 .payment-table {
     min-width: 700px;
@@ -296,6 +305,33 @@ td:last-child button {
 @media (max-width: 768px) {
     body { padding: 10px; }
 
+    /* 仪表盘统计卡片改为2列 */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px;
+    }
+
+    /* 金额字体缩小，防止换行 */
+    .stat-value {
+        font-size: 16px !important;
+        word-break: keep-all;
+        white-space: nowrap;
+        overflow-x: auto;
+    }
+    
+    /* 统计卡片内边距减小 */
+    .stat-card {
+        padding: 10px;
+    }
+    
+    .stat-card div:first-child {
+        font-size: 14px;
+    }
+    
+    .stat-card div:last-child {
+        font-size: 11px;
+    }
+
     .form-grid {
         grid-template-columns: 1fr;
     }
@@ -314,58 +350,73 @@ td:last-child button {
     }
 
     table {
-        min-width: 700px;
-        font-size: 12px;
-    }
-
-    th, td { padding: 8px 6px; }
-
-    td:last-child { white-space: normal; }
-    td:last-child button {
-        padding: 4px 6px;
+        min-width: 650px;
         font-size: 11px;
-        margin: 2px;
     }
 
-    .toolbar { gap: 8px; }
-    .toolbar button { padding: 6px 12px; font-size: 12px; }
-
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
+    th, td { 
+        padding: 6px 4px; 
     }
 
-    .stat-card { padding: 12px; }
-    .stat-value { font-size: 20px; }
-    .card { padding: 10px; }
+    td:last-child { 
+        white-space: normal; 
+    }
+    td:last-child button {
+        padding: 3px 5px;
+        font-size: 10px;
+        margin: 1px;
+    }
+
+    .toolbar { 
+        gap: 6px; 
+    }
+    .toolbar button { 
+        padding: 5px 10px; 
+        font-size: 11px; 
+    }
+
+    .card { 
+        padding: 10px; 
+    }
 
     input, select, textarea {
         max-width: 100%;
-        font-size: 16px;
+        font-size: 14px;
     }
 
-    h1 { font-size: 18px; }
-    h2 { font-size: 16px; }
-    h3 { font-size: 14px; }
+    h1 { font-size: 16px; }
+    h2 { font-size: 15px; }
+    h3 { font-size: 13px; }
 
     .report-store-stats {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .report-store-stat { border-right: none; }
+    .report-store-stat { 
+        border-right: none; 
+        padding: 8px 10px;
+    }
+    
+    .report-store-stat .value {
+        font-size: 13px;
+    }
+    
+    .report-store-stat .label {
+        font-size: 9px;
+    }
     
     .user-table {
-        min-width: 550px;
+        min-width: 500px;
     }
     
     .user-table th, .user-table td {
-        padding: 6px 8px;
-        font-size: 11px;
+        padding: 5px 6px;
+        font-size: 10px;
     }
     
     .user-table td button {
-        padding: 3px 6px;
-        font-size: 10px;
+        padding: 2px 5px;
+        font-size: 9px;
         margin: 1px;
     }
 }
