@@ -1027,122 +1027,114 @@ window.APP = {
     },
 
     // ==================== 用户管理 ====================
+showUserManagement: async function() {
+    this.currentPage = 'userManagement';
+    var lang = Utils.lang;
+    var t = (key) => Utils.t(key);
+    try {
+        var users = await AUTH.getAllUsers();
+        var stores = await SUPABASE.getAllStores();
+        var storeMap = {};
+        for (var s of stores) storeMap[s.id] = s.name;
+        users.sort((a, b) => (storeMap[a.store_id] || '').localeCompare(storeMap[b.store_id] || ''));
 
-    showUserManagement: async function() {
-        this.currentPage = 'userManagement';
-        var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
-        try {
-            var users = await AUTH.getAllUsers();
-            var stores = await SUPABASE.getAllStores();
-            var storeMap = {};
-            for (var s of stores) storeMap[s.id] = s.name;
-            users.sort((a, b) => (storeMap[a.store_id] || '').localeCompare(storeMap[b.store_id] || ''));
+        // 修复：正确构建表格行，确保列数匹配
+        var userRows = '';
+        for (var u of users) {
+            var isCurrent = u.id === AUTH.user.id;
+            var storeName = storeMap[u.store_id] || '-';
+            var roleText = u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长');
+            var actionHtml = '';
+            if (isCurrent) {
+                actionHtml = `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>`;
+            } else {
+                actionHtml = `
+                    <button onclick="APP.editUser('${u.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
+                    <button class="danger" onclick="APP.deleteUser('${u.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+                `;
+            }
+            userRows += `<tr>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(u.username || u.email || '-')}</td>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(u.name)}</td>
+                <td style="border:1px solid #334155;padding:8px;">${roleText}</td>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(storeName)}</td>
+                <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionHtml}</td>
+            </tr>`;
+        }
 
-            var userRows = users.map(u => {
-                var isCurrent = u.id === AUTH.user.id;
-                var storeName = storeMap[u.store_id] || '-';
-                return `<tr>
-                    <td>${Utils.escapeHtml(u.username || u.email || '-')}</td>
-                    <td>${Utils.escapeHtml(u.name)}</td>
-                    <td>${u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')}</td>
-                    <td>${Utils.escapeHtml(storeName)}</td>
-                    <td>
-                        ${isCurrent ? `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>` : ''}
-                        ${!isCurrent ? `<button onclick="APP.editUser('${u.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>` : ''}
-                        ${!isCurrent ? `<button class="danger" onclick="APP.deleteUser('${u.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>` : ''}
-                     </td>
-                 </tr>`;
-            }).join('');
+        if (users.length === 0) {
+            userRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+        }
 
-            var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
-            for (var s of stores) storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
+        var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
+        for (var s of stores) {
+            storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
+        }
 
-            document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                    <h2>👥 ${t('user_management')}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+        document.getElementById("app").innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2>👥 ${t('user_management')}</h2>
+                <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+            </div>
+
+            <div class="card">
+                <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
+                <div class="table-container">
+                    <table class="table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#0f172a;">
+                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${t('username')}</th>
+                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Nama' : '姓名'}</th>
+                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Peran' : '角色'}</th>
+                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                            </tr>
+                        </thead>
+                        <tbody>${userRows}</tbody>
+                    </table>
                 </div>
+            </div>
 
-                <div class="card">
-                    <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
-                    <div class="table-container">
-                        <table class="table"><thead><tr>
-                            <th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th>
-                            <th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                            <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                         </table></thead><tbody>${userRows}</tbody></table>
+            <div class="card">
+                <h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>${t('username')} *</label>
+                        <input id="newUsername" placeholder="${t('username')}">
+                    </div>
+                    <div class="form-group">
+                        <label>${t('password')} *</label>
+                        <input id="newPassword" type="password" placeholder="${t('password')}">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label>
+                        <input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Peran' : '角色'} *</label>
+                        <select id="newRole">
+                            <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
+                            <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Toko' : '门店'}</label>
+                        <select id="newStoreId">${storeOptions}</select>
+                    </div>
+                    <div class="form-group"></div>
+                    <div class="form-actions">
+                        <button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button>
                     </div>
                 </div>
-
-                <div class="card">
-                    <h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>${t('username')} *</label>
-                            <input id="newUsername" placeholder="${t('username')}">
-                        </div>
-                        <div class="form-group">
-                            <label>${t('password')} *</label>
-                            <input id="newPassword" type="password" placeholder="${t('password')}">
-                        </div>
-                        <div class="form-group">
-                            <label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label>
-                            <input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}">
-                        </div>
-                        <div class="form-group">
-                            <label>${lang === 'id' ? 'Peran' : '角色'} *</label>
-                            <select id="newRole">
-                                <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
-                                <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>${lang === 'id' ? 'Toko' : '门店'}</label>
-                            <select id="newStoreId">${storeOptions}</select>
-                        </div>
-                        <div class="form-group"></div>
-                        <div class="form-actions">
-                            <button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="toolbar">
-                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                </div>`;
-        } catch (error) {
-            alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna' : '加载用户管理失败');
-        }
-    },
-
-    addUser: async function() {
-        var username = document.getElementById("newUsername").value.trim();
-        var password = document.getElementById("newPassword").value;
-        var name = document.getElementById("newName").value.trim();
-        var role = document.getElementById("newRole").value;
-        var storeId = document.getElementById("newStoreId").value;
-        if (!username || !password || !name) { alert(Utils.lang === 'id' ? 'Harap isi semua field' : '请填写所有字段'); return; }
-        try {
-            await AUTH.addUser(username, password, name, role, storeId || null);
-            alert((Utils.lang === 'id' ? 'Pengguna "' : '用户 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！'));
-            await this.showUserManagement();
-        } catch (error) { alert('Error: ' + error.message); }
-    },
-
-    deleteUser: async function(userId) {
-        if (confirm(Utils.lang === 'id' ? 'Hapus pengguna ini?' : '删除此用户？')) {
-            try { await AUTH.deleteUser(userId); await this.showUserManagement(); }
-            catch (error) { alert('Error: ' + error.message); }
-        }
-    },
-
-    editUser: async function(userId) {
-        var newRole = prompt(Utils.lang === 'id' ? 'Masukkan peran baru (admin/store_manager):' : '输入新角色 (admin/store_manager):');
-        if (newRole && (newRole === 'admin' || newRole === 'store_manager')) {
-            try { await AUTH.updateUser(userId, { role: newRole }); await this.showUserManagement(); }
-            catch (error) { alert('Error: ' + error.message); }
-        }
-    },
+            </div>
+            <div class="toolbar">
+                <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+            </div>`;
+    } catch (error) {
+        console.error("showUserManagement error:", error);
+        alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna: ' + error.message : '加载用户管理失败：' + error.message);
+    }
+},
 
     // ==================== 订单相关 ====================
 
