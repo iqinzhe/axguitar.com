@@ -118,7 +118,7 @@ window.APP = {
         document.getElementById("app").innerHTML = `
             <div class="card" style="max-width: 400px; margin: 50px auto;">
                 <div style="text-align: right; margin-bottom: 10px;">
-                    
+                <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>   
                 </div>
                 <h2>🏦 SIPEG JF</h2>
                 <h3>${t('login')}</h3>
