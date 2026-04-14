@@ -19,7 +19,6 @@ window.APP = {
         document.getElementById("app").innerHTML = '<div style="text-align: center; padding: 50px;">🔄 Loading system...</div>';
         await AUTH.init();
         
-        // 恢复之前保存的页面状态
         var savedPage = sessionStorage.getItem('jf_current_page');
         var savedOrderId = sessionStorage.getItem('jf_current_orderId');
         var savedCustomerId = sessionStorage.getItem('jf_current_customerId');
@@ -291,6 +290,8 @@ window.APP = {
         }
     },
 
+    // ==================== 客户信息模块 ====================
+
     showCustomers: async function() {
         this.currentPage = 'customers';
         this.saveCurrentPageState();
@@ -316,7 +317,7 @@ window.APP = {
 
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="7" style="text-align: center;">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="7" style="text-align: center; padding:20px;">${t('no_data')}</td></tr>`;
             } else {
                 for (var c of customers) {
                     var hasActive = customerHasActiveOrder[c.id];
@@ -358,7 +359,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                 </tr>
+                                  </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -545,22 +546,46 @@ window.APP = {
         }
     },
 
+    // 修复删除客户方法
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
         if (!confirm(lang === 'id' ? 'Hapus nasabah ini? Semua order terkait juga akan terhapus.' : '删除此客户？相关订单也将被删除。')) return;
+        
         try {
-            const { data: orders } = await supabaseClient.from('orders').select('id').eq('customer_id', customerId);
+            const { data: orders, error: ordersError } = await supabaseClient
+                .from('orders')
+                .select('id')
+                .eq('customer_id', customerId);
+            
+            if (ordersError) throw ordersError;
+            
             if (orders && orders.length > 0) {
                 for (var o of orders) {
-                    await supabaseClient.from('payment_history').delete().eq('order_id', o.id);
+                    await supabaseClient
+                        .from('payment_history')
+                        .delete()
+                        .eq('order_id', o.id);
                 }
-                await supabaseClient.from('orders').delete().eq('customer_id', customerId);
+                
+                const { error: orderDeleteError } = await supabaseClient
+                    .from('orders')
+                    .delete()
+                    .eq('customer_id', customerId);
+                if (orderDeleteError) throw orderDeleteError;
             }
-            const { error } = await supabaseClient.from('customers').delete().eq('id', customerId);
-            if (error) throw error;
-            alert(lang === 'id' ? 'Nasabah dihapus' : '客户已删除');
+            
+            const { error: customerError } = await supabaseClient
+                .from('customers')
+                .delete()
+                .eq('id', customerId);
+            
+            if (customerError) throw customerError;
+            
+            alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
             await this.showCustomers();
+            
         } catch (e) {
+            console.error('删除客户错误:', e);
             alert(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
         }
     },
@@ -663,8 +688,8 @@ window.APP = {
                     <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
                         ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>` : ''}
-                    </td>
-                </tr>`;
+                     </td>
+                </table>`;
             }).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             document.getElementById("app").innerHTML = `
@@ -690,7 +715,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                 </tr>
+                                  </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -748,7 +773,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                 </tr>
+                                  </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -758,6 +783,8 @@ window.APP = {
             alert(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
         }
     },
+
+    // ==================== 运营支出模块 ====================
 
     getExpensesTotal: async function() {
         const profile = await SUPABASE.getCurrentProfile();
@@ -781,15 +808,32 @@ window.APP = {
             const { data: expenses, error } = await query;
             if (error) throw error;
             var totalAmount = expenses?.reduce((s, e) => s + e.amount, 0) || 0;
+            
+            // 系统当前日期
+            var todayDate = new Date().toISOString().split('T')[0];
 
-            var rows = expenses && expenses.length > 0 ? expenses.map(e => `<tr>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.category)}</td>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.created_at)}</td>
-            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            var rows = expenses && expenses.length > 0 ? expenses.map(e => {
+                var canEdit = isAdmin && !e.is_reconciled;
+                var actionBtns = '';
+                if (canEdit) {
+                    actionBtns = `
+                        <button onclick="APP.editExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
+                        <button class="danger" onclick="APP.deleteExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+                    `;
+                } else if (e.is_reconciled) {
+                    actionBtns = `<span style="color:#10b981;font-size:11px;">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
+                } else if (!isAdmin) {
+                    actionBtns = `<span style="color:#94a3b8;font-size:11px;">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
+                }
+                return `<tr>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.category)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
+                    <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionBtns}</td>
+                </table>`;
+            }).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -811,8 +855,8 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Dibuat' : '创建时间'}</th>
-                                 </tr>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                  </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -824,7 +868,7 @@ window.APP = {
                     <div class="form-grid">
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
-                            <input type="date" id="expenseDate">
+                            <input type="date" id="expenseDate" value="${todayDate}" readonly style="background:#334155;">
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
@@ -845,6 +889,7 @@ window.APP = {
                 </div>
                 <div class="toolbar">
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    ${isAdmin ? `<button onclick="APP.balanceExpenses()" class="warning" style="background:#8b5cf6;">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
                 </div>`;
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
@@ -855,19 +900,27 @@ window.APP = {
 
     addExpense: async function() {
         var lang = Utils.lang;
-        var expenseDate = document.getElementById("expenseDate").value;
+        // 直接使用系统当前日期，不从输入框读取
+        var expenseDate = new Date().toISOString().split('T')[0];
         var category = document.getElementById("expenseCategory").value.trim();
         var amountStr = document.getElementById("expenseAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var description = document.getElementById("expenseDescription").value;
-        if (!expenseDate) { alert(lang === 'id' ? 'Pilih tanggal pengeluaran' : '请选择日期'); return; }
+        
         if (!category) { alert(lang === 'id' ? 'Masukkan kategori' : '请输入类别'); return; }
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
+        
         try {
             const profile = await SUPABASE.getCurrentProfile();
             const { error } = await supabaseClient.from('expenses').insert({
-                store_id: profile.store_id, expense_date: expenseDate, category, amount,
-                description: description || null, created_by: profile.id, is_locked: true
+                store_id: profile.store_id, 
+                expense_date: expenseDate,
+                category, 
+                amount,
+                description: description || null, 
+                created_by: profile.id, 
+                is_locked: true,
+                is_reconciled: false
             });
             if (error) throw error;
             alert(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
@@ -876,6 +929,134 @@ window.APP = {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
+
+    // 平账功能
+    balanceExpenses: async function() {
+        var lang = Utils.lang;
+        var isAdmin = AUTH.isAdmin();
+        
+        if (!isAdmin) {
+            alert(lang === 'id' ? 'Hanya admin yang dapat melakukan rekonsiliasi' : '只有管理员可以执行平账操作');
+            return;
+        }
+        
+        var period = prompt(
+            lang === 'id' 
+                ? 'Pilih periode rekonsiliasi:\n1 = Bulan ini\n2 = 6 bulan terakhir\n3 = 12 bulan terakhir\n4 = Tahun ini\n5 = Kustom (input manual)'
+                : '选择平账周期：\n1 = 本月\n2 = 最近6个月\n3 = 最近12个月\n4 = 本年\n5 = 自定义（手动输入）'
+        );
+        
+        if (!period) return;
+        
+        var startDate, endDate;
+        var today = new Date();
+        var currentYear = today.getFullYear();
+        var currentMonth = today.getMonth();
+        
+        switch(period) {
+            case '1':
+                startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+                break;
+            case '2':
+                startDate = new Date(currentYear, currentMonth - 5, 1).toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+                break;
+            case '3':
+                startDate = new Date(currentYear - 1, currentMonth, 1).toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+                break;
+            case '4':
+                startDate = new Date(currentYear, 0, 1).toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+                break;
+            case '5':
+                startDate = prompt(lang === 'id' ? 'Masukkan tanggal mulai (YYYY-MM-DD):' : '请输入开始日期 (YYYY-MM-DD):');
+                endDate = prompt(lang === 'id' ? 'Masukkan tanggal akhir (YYYY-MM-DD):' : '请输入结束日期 (YYYY-MM-DD):');
+                if (!startDate || !endDate) return;
+                break;
+            default:
+                return;
+        }
+        
+        if (!confirm(lang === 'id' 
+            ? `Rekonsiliasi pengeluaran dari ${startDate} sampai ${endDate}? Tindakan ini tidak dapat dibatalkan.`
+            : `确认平账 ${startDate} 至 ${endDate} 期间的支出？此操作不可撤销。`)) {
+            return;
+        }
+        
+        try {
+            const { data, error } = await supabaseClient
+                .from('expenses')
+                .update({ 
+                    is_reconciled: true, 
+                    reconciled_at: new Date().toISOString(),
+                    reconciled_by: AUTH.user.id 
+                })
+                .gte('expense_date', startDate)
+                .lte('expense_date', endDate)
+                .eq('is_reconciled', false);
+            
+            if (error) throw error;
+            
+            var count = data?.length || 0;
+            alert(lang === 'id' 
+                ? `Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.`
+                : `平账完成！已平账 ${count} 条支出记录。`);
+            
+            await this.showExpenses();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
+        }
+    },
+
+    editExpense: async function(expenseId) {
+        var lang = Utils.lang;
+        try {
+            const { data: expense, error } = await supabaseClient
+                .from('expenses')
+                .select('*')
+                .eq('id', expenseId)
+                .single();
+            if (error) throw error;
+            
+            if (expense.is_reconciled) {
+                alert(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
+                return;
+            }
+            
+            var newAmount = prompt(lang === 'id' ? 'Masukkan jumlah baru:' : '请输入新金额:', expense.amount);
+            if (newAmount && !isNaN(parseFloat(newAmount))) {
+                const { error: updateError } = await supabaseClient
+                    .from('expenses')
+                    .update({ amount: parseFloat(newAmount) })
+                    .eq('id', expenseId);
+                if (updateError) throw updateError;
+                alert(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
+                await this.showExpenses();
+            }
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
+        }
+    },
+
+    deleteExpense: async function(expenseId) {
+        var lang = Utils.lang;
+        if (!confirm(lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？')) return;
+        try {
+            const { error } = await supabaseClient
+                .from('expenses')
+                .delete()
+                .eq('id', expenseId);
+            if (error) throw error;
+            alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
+            await this.showExpenses();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
+        }
+    },
+
+    // ==================== 付款明细 ====================
 
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
@@ -906,7 +1087,7 @@ window.APP = {
                     <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
                     <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
                     <td style="border:1px solid #334155;padding:8px;"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${Utils.t('view')}</button></td>
-                </tr>`).join('');
+                </table>`).join('');
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -931,7 +1112,7 @@ window.APP = {
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                             </tr>
+                              </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -944,6 +1125,8 @@ window.APP = {
             alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载付款记录失败');
         }
     },
+
+    // ==================== 财务报表 ====================
 
     showReport: async function() {
         this.currentPage = 'report';
@@ -1080,6 +1263,8 @@ window.APP = {
         }
     },
 
+    // ==================== 用户管理 ====================
+
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -1142,7 +1327,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Peran' : '角色'}</th>
                                     <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Toko' : '门店'}</th>
                                     <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                 </tr>
+                                  </tr>
                             </thead>
                             <tbody>${userRows}</tbody>
                         </table>
@@ -1219,6 +1404,8 @@ window.APP = {
         }
     },
 
+    // ==================== 订单相关 ====================
+
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
         this.saveCurrentPageState();
@@ -1288,7 +1475,7 @@ window.APP = {
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
                                 ${isAdmin ? `<th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                             </tr>
+                              </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -1360,7 +1547,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                 </tr>
+                                  </tr>
                             </thead>
                             <tbody>${payRows}</tbody>
                         </table>
@@ -1488,7 +1675,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                 </tr>
+                                  </table>
                             </thead>
                             <tbody>${interestRows}</tbody>
                         </table>
@@ -1512,7 +1699,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                 </tr>
+                                  </tr>
                             </thead>
                             <tbody>${principalRows}</tbody>
                         </table>
@@ -1694,7 +1881,7 @@ window.APP = {
                     <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
                     <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
                     <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                </tr></thead><tbody>
+                </table></thead><tbody>
                 ${payments.length === 0 ? `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">${lang === 'id' ? 'Belum ada pembayaran' : '暂无付款记录'}</td></tr>` :
                 payments.map(p => {
                     var tt = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
@@ -1718,6 +1905,8 @@ window.APP = {
         }
     },
 
+    // ==================== 门店管理（调用 StoreManager） ====================
+
     addStore: async function() {
         var code = document.getElementById("newStoreCode").value.trim();
         var name = document.getElementById("newStoreName").value.trim();
@@ -1729,11 +1918,7 @@ window.APP = {
     },
 
     editStore: async function(storeId) {
-        var newName = prompt(Utils.lang === 'id' ? 'Masukkan nama toko baru:' : '输入新门店名称:');
-        if (newName) {
-            try { await StoreManager.updateStore(storeId, { name: newName }); await StoreManager.renderStoreManagement(); }
-            catch (error) { alert('Error: ' + error.message); }
-        }
+        await StoreManager.editStore(storeId);
     },
 
     deleteStore: async function(storeId) {
