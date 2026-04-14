@@ -34,7 +34,8 @@ const Utils = {
             order_created: "Pesanan berhasil dibuat!", order_updated: "Pesanan diperbarui",
             order_deleted: "Pesanan dihapus", confirm_delete: "Yakin ingin menghapus?",
             backup_downloaded: "Cadangan diunduh!", export_success: "Ekspor berhasil!",
-            no_data: "Tidak ada data", current_user: "Pengguna saat ini"
+            no_data: "Tidak ada data", current_user: "Pengguna saat ini",
+            print: "Cetak", export_csv: "Ekspor CSV"
         },
         zh: {
             login: "登录", logout: "退出", username: "用户名", password: "密码",
@@ -50,7 +51,8 @@ const Utils = {
             fill_all_fields: "请填写所有字段！", login_failed: "登录失败！",
             order_created: "订单创建成功！", order_updated: "订单已更新", order_deleted: "订单已删除",
             confirm_delete: "确定删除？", backup_downloaded: "备份已下载！", export_success: "导出成功！",
-            no_data: "暂无数据", current_user: "当前用户"
+            no_data: "暂无数据", current_user: "当前用户",
+            print: "打印", export_csv: "导出CSV"
         }
     },
 
@@ -138,7 +140,6 @@ const Utils = {
         });
     },
 
-    // ========== 新增：金额千位分隔符函数 ==========
     formatNumberWithCommas: function(x) {
         if (x === null || x === undefined || x === '') return '';
         var num = String(x).replace(/[,\s]/g, '');
