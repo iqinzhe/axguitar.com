@@ -70,7 +70,7 @@ button.danger:hover { background: #dc2626; }
 button.success { background: #10b981; }
 button.warning { background: #f59e0b; }
 
-/* ========== 双列表单网格 (问题3) ========== */
+/* ========== 双列表单网格 ========== */
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -81,12 +81,10 @@ button.warning { background: #f59e0b; }
     margin-bottom: 15px;
 }
 
-/* 跨两列的字段（如备注、地址长文本） */
 .form-grid .form-group.full-width {
     grid-column: 1 / -1;
 }
 
-/* 表单底部按钮行跨两列 */
 .form-grid .form-actions {
     grid-column: 1 / -1;
     padding-top: 4px;
@@ -131,8 +129,7 @@ td:last-child button {
     margin: 2px;
 }
 
-/* ========== 付款明细表格 (问题5修复) ========== */
-/* 付款记录：每行一条记录，纵向延展 */
+/* ========== 付款明细表格 ========== */
 .payment-table {
     min-width: 700px;
 }
@@ -186,7 +183,7 @@ td:last-child button {
     word-break: break-all;
 }
 
-/* ========== 财务报表分门店统计 (问题4) ========== */
+/* ========== 财务报表分门店统计 ========== */
 .report-store-section {
     border: 1px solid #334155;
     border-radius: 8px;
@@ -222,7 +219,6 @@ td:last-child button {
 .report-store-stat .value.expense { color: #ef4444; }
 .report-store-stat .value.profit { color: #3b82f6; }
 
-/* 最后一行去掉下边框 */
 .report-store-stats:last-child .report-store-stat {
     border-bottom: none;
 }
@@ -241,7 +237,7 @@ td:last-child button {
     align-items: center;
 }
 
-/* ========== 地址选项 (问题1) ========== */
+/* ========== 地址选项 ========== */
 .address-option {
     display: flex;
     gap: 12px;
@@ -300,7 +296,6 @@ td:last-child button {
 @media (max-width: 768px) {
     body { padding: 10px; }
 
-    /* 双列表单改为单列 */
     .form-grid {
         grid-template-columns: 1fr;
     }
@@ -313,7 +308,6 @@ td:last-child button {
         grid-column: 1;
     }
 
-    /* 表格横向滚动 */
     .table-container {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -347,7 +341,7 @@ td:last-child button {
 
     input, select, textarea {
         max-width: 100%;
-        font-size: 16px; /* 防止iOS自动缩放 */
+        font-size: 16px;
     }
 
     h1 { font-size: 18px; }
@@ -359,34 +353,20 @@ td:last-child button {
     }
 
     .report-store-stat { border-right: none; }
-}
-/* ========== 手机端表格优化 ========== */
-@media (max-width: 768px) {
-    /* 用户管理表格 - 手机端允许横向滚动 */
-    .table-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
     
-    .table {
+    /* 用户管理表格手机端优化 */
+    .user-table {
         min-width: 550px;
     }
     
-    /* 表格单元格内边距减小 */
-    .table th, .table td {
+    .user-table th, .user-table td {
         padding: 6px 8px;
         font-size: 11px;
     }
     
-    /* 按钮缩小 */
-    .table td button {
+    .user-table td button {
         padding: 3px 6px;
         font-size: 10px;
         margin: 1px;
-    }
-    
-    /* 当前用户标识缩小 */
-    .table td span {
-        font-size: 10px;
     }
 }
