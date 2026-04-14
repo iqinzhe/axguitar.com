@@ -29,13 +29,13 @@
 <script src="js/app-customers.js"></script>
 <script src="js/app-orders.js"></script>
 <script>
-// FIX #2: 使用 DOMContentLoaded 防止 APP not defined 错误
 document.addEventListener('DOMContentLoaded', function() {
-    if (window.APP) {
+    if (window.APP && typeof window.APP.init === 'function') {
         window.APP.init();
     } else {
-        document.getElementById("app").innerHTML =
-            '<div style="text-align:center;padding:50px;color:#ef4444;">Loading error: APP not defined. Please refresh.</div>';
+        console.error("APP not properly loaded");
+        document.getElementById("app").innerHTML = 
+            '<div style="text-align:center;padding:50px;color:#ef4444;">Loading error: System not ready. Please refresh.</div>';
     }
 });
 </script>
