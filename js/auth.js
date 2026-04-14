@@ -7,6 +7,15 @@ const AUTH = {
         } catch (e) {
             this.user = null;
         }
+        // FIX: 监听 auth 状态变化，自动清除 profileCache（防止多标签页缓存不同步）
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_OUT') {
+                this.user = null;
+                SUPABASE.clearCache();
+            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+                SUPABASE.clearCache();
+            }
+        });
     },
 
     isLoggedIn() {
@@ -17,6 +26,19 @@ const AUTH = {
         return this.user?.role === 'admin';
     },
 
+    isStoreManager() {
+        return this.user?.role === 'store_manager';
+    },
+
+    isStaff() {
+        return this.user?.role === 'staff';
+    },
+
+    // 能操作订单的角色 (admin / store_manager / staff)
+    canManageOrders() {
+        return ['admin', 'store_manager', 'staff'].includes(this.user?.role);
+    },
+
     getCurrentStoreName() {
         if (this.user?.role === 'admin' && !this.user?.stores?.name && !this.user?.store_name) {
             return Utils.lang === 'id' ? 'Kantor Pusat' : '总部';
@@ -24,9 +46,27 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
-    async login(email, password) {
+    // FIX #1: 登录时支持邮箱或用户名，修复 "用户名 vs email" 登录失败问题
+    async login(usernameOrEmail, password) {
         try {
-            const result = await SUPABASE.login(email, password);
+            let emailToUse = usernameOrEmail;
+
+            // 如果输入的不是邮箱格式，先在 user_profiles 表中查找对应邮箱
+            if (!usernameOrEmail.includes('@')) {
+                const { data: profileData, error: profileError } = await supabaseClient
+                    .from('user_profiles')
+                    .select('username')
+                    .eq('username', usernameOrEmail)
+                    .single();
+
+                if (profileError || !profileData) {
+                    console.error("找不到该用户名:", usernameOrEmail);
+                    return null;
+                }
+                emailToUse = profileData.username; // username 字段存储的是邮箱
+            }
+
+            const result = await SUPABASE.login(emailToUse, password);
             if (!result || result.error) {
                 console.error("Login error:", result?.error);
                 return null;
@@ -62,22 +102,35 @@ const AUTH = {
         return await SUPABASE.getAllUsers();
     },
 
+    // FIX: addUser 改为调用 Supabase Edge Function（避免前端使用 admin API）
+    // 如果尚未部署 Edge Function，回退到直接调用（仅在配置了 service_role 时有效）
     async addUser(username, password, name, role, storeId) {
-        const { data, error } = await supabaseClient.auth.admin.createUser({
-            email: username,
-            password: password,
-            email_confirm: true
-        });
-        if (error) throw error;
-        const { error: profileError } = await supabaseClient.from('user_profiles').insert({
-            id: data.user.id,
-            username: username,
-            name: name,
-            role: role,
-            store_id: storeId || null
-        });
-        if (profileError) throw profileError;
-        return data.user;
+        try {
+            // 尝试调用 Edge Function（推荐方式）
+            const { data, error } = await supabaseClient.functions.invoke('create-user', {
+                body: { email: username, password, name, role, store_id: storeId || null }
+            });
+            if (error) throw error;
+            return data;
+        } catch (fnError) {
+            // 回退：直接调用 admin API（仅在本地开发 / service_role 配置时有效）
+            console.warn("Edge Function 不可用，尝试直接调用 admin API:", fnError.message);
+            const { data, error } = await supabaseClient.auth.admin.createUser({
+                email: username,
+                password: password,
+                email_confirm: true
+            });
+            if (error) throw error;
+            const { error: profileError } = await supabaseClient.from('user_profiles').insert({
+                id: data.user.id,
+                username: username,
+                name: name,
+                role: role,
+                store_id: storeId || null
+            });
+            if (profileError) throw profileError;
+            return data.user;
+        }
     },
 
     async deleteUser(userId) {

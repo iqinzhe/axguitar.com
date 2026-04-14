@@ -95,6 +95,7 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*');
         
+        // FIX: admin 看全部，其他角色只看本门店
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
         }
@@ -118,6 +119,13 @@ const SupabaseAPI = {
         const { data, error } = await supabaseClient
             .from('orders').select('*').eq('order_id', orderId).single();
         if (error) throw error;
+
+        // FIX: 验证非 admin 用户只能访问本门店订单
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin' && profile?.store_id && data.store_id !== profile.store_id) {
+            throw new Error(Utils.lang === 'id' ? 'Tidak ada akses ke order ini' : '无权访问此订单');
+        }
+
         return data;
     },
 
@@ -131,14 +139,18 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
+    // FIX: 门店前缀从数据库 code 字段读取，不再硬编码
     async _getStorePrefix(storeId) {
-        if (!storeId) return 'ST';
+        if (!storeId) return 'AD';
         const { data, error } = await supabaseClient
             .from('stores')
-            .select('name')
+            .select('code, name')
             .eq('id', storeId)
             .single();
         if (error || !data) return 'ST';
+        // 优先用 code 字段的前2位作为前缀
+        if (data.code) return data.code.substring(0, 2).toUpperCase();
+        // 降级：从名称推断
         const name = data.name.toLowerCase();
         if (name.includes('bangil')) return 'BL';
         if (name.includes('gempol')) return 'GP';
@@ -149,7 +161,7 @@ const SupabaseAPI = {
     // 生成订单ID: 格式 门店前缀-年月-3位序号 (如 BL-2604-001)
     async _generateOrderId(role, storeId) {
         let prefix = 'AD';
-        if (role === 'store_manager') {
+        if (role !== 'admin') {
             prefix = await this._getStorePrefix(storeId);
         }
         const now = new Date();
@@ -157,7 +169,6 @@ const SupabaseAPI = {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const yearMonth = `${yy}${mm}`;
         
-        // 查询当前月份该前缀的最大序号
         const { data: orders, error } = await supabaseClient
             .from('orders')
             .select('order_id')
@@ -295,7 +306,12 @@ const SupabaseAPI = {
         return true;
     },
 
+    // FIX: deleteOrder 增加服务端角色验证
     async deleteOrder(orderId) {
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus order' : '只有管理员可以删除订单');
+        }
         const order = await this.getOrder(orderId);
         const { error: e1 } = await supabaseClient.from('payment_history').delete().eq('order_id', order.id);
         if (e1) throw e1;
@@ -304,14 +320,35 @@ const SupabaseAPI = {
         return true;
     },
 
-    async updateOrder(orderId, updateData) {
+    // FIX: updateOrder 同步更新 customers 表
+    async updateOrder(orderId, updateData, customerId) {
         const { data, error } = await supabaseClient
             .from('orders').update(updateData).eq('order_id', orderId).select().single();
         if (error) throw error;
+
+        // 同步更新 customers 表（如果提供了 customerId 和客户字段）
+        if (customerId && (updateData.customer_name || updateData.customer_phone || updateData.customer_ktp)) {
+            const customerUpdate = {};
+            if (updateData.customer_name) customerUpdate.name = updateData.customer_name;
+            if (updateData.customer_phone) customerUpdate.phone = updateData.customer_phone;
+            if (updateData.customer_ktp) customerUpdate.ktp_number = updateData.customer_ktp;
+            if (updateData.customer_address) {
+                customerUpdate.ktp_address = updateData.customer_address;
+                customerUpdate.address = updateData.customer_address;
+            }
+            if (Object.keys(customerUpdate).length > 0) {
+                await supabaseClient.from('customers').update(customerUpdate).eq('id', customerId);
+            }
+        }
+
         return data;
     },
 
     async unlockOrder(orderId) {
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat membuka kunci order' : '只有管理员可以解锁订单');
+        }
         const { error } = await supabaseClient.from('orders').update({
             is_locked: false, locked_at: null, locked_by: null
         }).eq('order_id', orderId);

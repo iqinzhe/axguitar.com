@@ -202,8 +202,8 @@ window.APP = {
                 <h2><img src="/icons/system-jf.png" alt="JF!" style="height: 32px; vertical-align: middle;"> JF! by Gadai</h2>
                 <h3>${t('login')}</h3>
                 <div class="form-group">
-                    <label>${t('username')}</label>
-                    <input id="username" placeholder="${t('username')}">
+                    <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
+                    <input id="username" placeholder="email@domain.com">
                 </div>
                 <div class="form-group">
                     <label>${t('password')}</label>
@@ -280,7 +280,7 @@ window.APP = {
                     <button onclick="APP.logout()">🚪 ${t('logout')}</button>
                 </div>
                 <div class="card">
-                    <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
+                    <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.user.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工')})</h3>
                     <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
                     <p>📌 ${lang === 'id' ? 'Admin Fee: 30,000 IDR (dibayar saat kontrak) | Bunga: 10% per bulan' : '管理费: 30,000 IDR (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
                     ${!isAdmin ? `<p style="color: #f59e0b;">🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
@@ -334,7 +334,7 @@ window.APP = {
                                 ? `<button onclick="APP.navigateTo('customerPaymentHistory',{customerId:'${c.id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>`
                                 : `<button onclick="APP.createOrderForCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;" class="success">➕ ${lang === 'id' ? 'Buat Order' : '新开订单'}</button>`
                             }
-                            ${isAdmin ? `<button onclick="APP.deleteCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;" class="danger">🗑️ ${t('delete')}</button>` : ''}
+                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;" class="danger">🗑️ ${t('delete')}</button>` : ''}
                         </td>
                     </tr>`;
                 }
@@ -921,7 +921,7 @@ window.APP = {
                 </div>
                 <div class="toolbar">
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                    ${isAdmin ? `<button onclick="APP.balanceExpenses()" class="warning" style="background:#8b5cf6;">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
+                    ${PERMISSION.canReconcile() ? `<button onclick="APP.balanceExpenses()" class="warning" style="background:#8b5cf6;">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
                 </div>`;
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
@@ -1332,7 +1332,7 @@ window.APP = {
             for (var u of users) {
                 var isCurrent = u.id === AUTH.user.id;
                 var storeName = storeMap[u.store_id] || '-';
-                var roleText = u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长');
+                var roleText = u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : u.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工');
                 var usernameDisplay = u.username || u.email || '-';
                 var actionHtml = '';
                 if (isCurrent) {
@@ -1390,7 +1390,7 @@ window.APP = {
                     <div class="form-grid">
                         <div class="form-group">
                             <label>${t('username')} *</label>
-                            <input id="newUsername" placeholder="${t('username')}">
+                            <input id="newUsername" placeholder="email@domain.com">
                         </div>
                         <div class="form-group">
                             <label>${t('password')} *</label>
@@ -1456,8 +1456,8 @@ window.APP = {
     },
 
     editUser: async function(userId) {
-        var newRole = prompt(Utils.lang === 'id' ? 'Masukkan peran baru (admin/store_manager):' : '输入新角色 (admin/store_manager):');
-        if (newRole && (newRole === 'admin' || newRole === 'store_manager')) {
+        var newRole = prompt(Utils.lang === 'id' ? 'Masukkan peran baru (admin/store_manager/staff):' : '输入新角色 (admin/store_manager/staff):');
+        if (newRole && (newRole === 'admin' || newRole === 'store_manager' || newRole === 'staff')) {
             try { 
                 await AUTH.updateUser(userId, { role: newRole }); 
                 await this.showUserManagement(); 
@@ -1503,7 +1503,7 @@ window.APP = {
                         <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
                             <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
                             ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>` : ''}
                             <button onclick="APP.printOrder('${o.order_id}')" class="success" style="padding:4px 8px;font-size:12px;">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                             ${o.is_locked ? `<span style="font-size:12px;color:#94a3b8;margin-left:4px;">🔒</span>` : ''}
                         </td>
@@ -1641,7 +1641,7 @@ window.APP = {
                     <div class="toolbar">
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                         ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})">💰 ${t('save')}</button>` : ''}
-                        ${isAdmin && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
+                        ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
                         <button onclick="APP.printOrder('${order.order_id}')" class="success">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
                 </div>`;
@@ -1870,7 +1870,7 @@ window.APP = {
             if (!order) return;
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
-            var canEdit = AUTH.isAdmin() || (!order.is_locked && AUTH.user.role === 'store_manager');
+            var canEdit = PERMISSION.canEditOrder(order);
             if (!canEdit) { alert(lang === 'id' ? 'Order ini sudah terkunci' : '此订单已锁定'); this.goBack(); return; }
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -1899,6 +1899,7 @@ window.APP = {
     },
 
     updateOrder: async function(orderId) {
+        var order = await SUPABASE.getOrder(orderId);
         var updates = {
             customer: { 
                 name: document.getElementById("name").value, 
@@ -1910,7 +1911,8 @@ window.APP = {
             notes: document.getElementById("notes").value
         };
         try {
-            await Order.update(orderId, updates);
+            // FIX: 传递 customerId 以同步 customers 表数据
+            await Order.update(orderId, updates, order.customer_id);
             if (AUTH.isAdmin()) await Order.relockOrder(orderId);
             alert(Utils.t('order_updated'));
             this.goBack();
