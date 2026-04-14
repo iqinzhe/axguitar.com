@@ -2023,22 +2023,27 @@ window.APP = {
         }
     },
 
-    addStore: async function() {
-        var code = document.getElementById("newStoreCode").value.trim();
-        var name = document.getElementById("newStoreName").value.trim();
-        var address = document.getElementById("newStoreAddress").value;
-        var phone = document.getElementById("newStorePhone").value;
-        if (!code || !name) { 
-            alert(Utils.lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); 
-            return; 
-        }
-        try { 
-            await StoreManager.createStore(code, name, address, phone); 
-            await StoreManager.renderStoreManagement(); 
-        } catch (error) { 
-            alert('Error: ' + error.message); 
-        }
-    },
+// 在 app-core.js 中找到 addStore 函数，确保代码如下：
+addStore: async function() {
+    var code = document.getElementById("newStoreCode").value.trim();
+    var name = document.getElementById("newStoreName").value.trim();
+    var address = document.getElementById("newStoreAddress").value;
+    var phone = document.getElementById("newStorePhone").value;
+    var lang = Utils.lang;
+    
+    if (!code || !name) { 
+        alert(lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); 
+        return; 
+    }
+    try { 
+        await StoreManager.createStore(code, name, address, phone); 
+        alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+        await StoreManager.renderStoreManagement(); 
+    } catch (error) { 
+        console.error("addStore error:", error);
+        alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message); 
+    }
+},
 
     addStoreWithManager: async function() {
         var code = document.getElementById("newStoreCode").value.trim();
