@@ -47,7 +47,6 @@ const StoreManager = {
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
 
-        // 门店财务汇总
         let storeStatsRows = '';
         let grandTotalIncome = 0, grandTotalExpenses = 0, grandTotalGrossProfit = 0;
         for (const store of this.stores) {
@@ -65,7 +64,6 @@ const StoreManager = {
             </tr>`;
         }
 
-        // 门店列表
         let storeRows = this.stores.map(store => `<tr>
             <td>${Utils.escapeHtml(store.code)}</td>
             <td>${Utils.escapeHtml(store.name)}</td>
@@ -74,10 +72,9 @@ const StoreManager = {
             <td>
                 <button onclick="APP.editStore('${store.id}')">✏️ ${t('edit')}</button>
                 <button class="danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>
-            </td>
+             </td>
         </tr>`).join('');
 
-        // 问题3：列表在上，新增表单在下，双列布局
         document.getElementById("app").innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
@@ -86,13 +83,21 @@ const StoreManager = {
                 </div>
             </div>
 
-            <!-- 财务汇总 -->
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
-                <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:15px;">
-                    <div class="stat-card"><div class="stat-value" style="color:#10b981;">${Utils.formatCurrency(grandTotalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
-                    <div class="stat-card"><div class="stat-value" style="color:#ef4444;">${Utils.formatCurrency(grandTotalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</div></div>
-                    <div class="stat-card"><div class="stat-value" style="color:#3b82f6;">${Utils.formatCurrency(grandTotalGrossProfit)}</div><div>${lang === 'id' ? 'Total Laba Kotor' : '总毛利'}</div></div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #334155; border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
+                    <div class="stat-card" style="border-right: 1px solid #334155; margin:0; border-radius:0;">
+                        <div class="stat-value" style="color:#10b981;">${Utils.formatCurrency(grandTotalIncome)}</div>
+                        <div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div>
+                    </div>
+                    <div class="stat-card" style="border-right: 1px solid #334155; margin:0; border-radius:0;">
+                        <div class="stat-value" style="color:#ef4444;">${Utils.formatCurrency(grandTotalExpenses)}</div>
+                        <div>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</div>
+                    </div>
+                    <div class="stat-card" style="margin:0; border-radius:0;">
+                        <div class="stat-value" style="color:#3b82f6;">${Utils.formatCurrency(grandTotalGrossProfit)}</div>
+                        <div>${lang === 'id' ? 'Total Laba Kotor' : '总毛利'}</div>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table class="table"><thead><tr>
@@ -106,7 +111,6 @@ const StoreManager = {
                 </div>
             </div>
 
-            <!-- 门店列表放上方 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
@@ -122,7 +126,6 @@ const StoreManager = {
                 </div>
             </div>
 
-            <!-- 新增门店表单放下方，双列布局 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                 <div class="form-grid">
@@ -146,6 +149,9 @@ const StoreManager = {
                         <button onclick="APP.addStore()" class="success">➕ ${lang === 'id' ? 'Tambah Toko' : '添加门店'}</button>
                     </div>
                 </div>
+            </div>
+            <div class="toolbar">
+                <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
             </div>`;
     }
 };
