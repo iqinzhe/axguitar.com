@@ -1,33 +1,144 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Reset Password</title>
+  <meta charset="UTF-8">
+  <title>Reset Password - JF! by Gadai</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    h2 {
+      color: #f1f5f9;
+      margin-top: 0;
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #cbd5e1;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #f1f5f9;
+      border-radius: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #3b82f6;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .message {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 14px;
+    }
+    .success {
+      background: #10b981;
+      color: white;
+    }
+    .error {
+      background: #ef4444;
+      color: white;
+    }
+  </style>
 </head>
 <body>
-
-<h2>Reset Password</h2>
-
-<input type="password" id="pw" placeholder="New password">
-<button onclick="update()">Update</button>
+<div class="card">
+  <h2>🔐 Reset Password</h2>
+  <div class="form-group">
+    <label>New Password</label>
+    <input type="password" id="pw" placeholder="Enter new password">
+  </div>
+  <div class="form-group">
+    <label>Confirm Password</label>
+    <input type="password" id="confirmPw" placeholder="Confirm new password">
+  </div>
+  <button onclick="update()">Update Password</button>
+  <div id="message"></div>
+</div>
 
 <script type="module">
-import { createClient } from "https://esm.sh/@supabase/supabase-js"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const supabase = createClient(
   "https://hiupsvsbcdsgoyiieqiv.supabase.co",
-  "你的anon key"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU"
 )
 
 async function update() {
   const pw = document.getElementById("pw").value
-
+  const confirmPw = document.getElementById("confirmPw").value
+  const messageDiv = document.getElementById("message")
+  
+  if (!pw) {
+    messageDiv.innerHTML = '<div class="message error">Please enter a password</div>'
+    return
+  }
+  
+  if (pw !== confirmPw) {
+    messageDiv.innerHTML = '<div class="message error">Passwords do not match</div>'
+    return
+  }
+  
+  if (pw.length < 6) {
+    messageDiv.innerHTML = '<div class="message error">Password must be at least 6 characters</div>'
+    return
+  }
+  
+  messageDiv.innerHTML = '<div class="message">Updating password...</div>'
+  
   const { error } = await supabase.auth.updateUser({
     password: pw
   })
 
-  alert(error ? error.message : "Password updated")
+  if (error) {
+    messageDiv.innerHTML = `<div class="message error">Error: ${error.message}</div>`
+  } else {
+    messageDiv.innerHTML = '<div class="message success">✅ Password updated successfully! You can now close this window.</div>'
+    document.getElementById("pw").value = ""
+    document.getElementById("confirmPw").value = ""
+  }
 }
 </script>
-
 </body>
 </html>
