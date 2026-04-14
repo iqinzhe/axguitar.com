@@ -1,5 +1,3 @@
-// ✅ 修复：清除废弃的 load() / save() 空壳方法
-// 系统已全面迁移至 Supabase，本地存储只用于迁移来源读取（由 migration.js 负责）
 const Storage = {
 
     async backup() {
