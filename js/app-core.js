@@ -6,10 +6,36 @@ window.APP = {
     currentOrderId: null,
     currentCustomerId: null,
 
+    // 保存当前页面状态到 sessionStorage
+    saveCurrentPageState: function() {
+        sessionStorage.setItem('jf_current_page', this.currentPage);
+        sessionStorage.setItem('jf_current_orderId', this.currentOrderId || '');
+        sessionStorage.setItem('jf_current_customerId', this.currentCustomerId || '');
+        sessionStorage.setItem('jf_current_filter', this.currentFilter);
+        sessionStorage.setItem('jf_current_keyword', this.searchKeyword);
+    },
+
     init: async function() {
         document.getElementById("app").innerHTML = '<div style="text-align: center; padding: 50px;">🔄 Loading system...</div>';
         await AUTH.init();
-        await this.router();
+        
+        // 恢复之前保存的页面状态
+        var savedPage = sessionStorage.getItem('jf_current_page');
+        var savedOrderId = sessionStorage.getItem('jf_current_orderId');
+        var savedCustomerId = sessionStorage.getItem('jf_current_customerId');
+        var savedFilter = sessionStorage.getItem('jf_current_filter');
+        var savedKeyword = sessionStorage.getItem('jf_current_keyword');
+        
+        if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
+            this.currentPage = savedPage;
+            this.currentOrderId = savedOrderId || null;
+            this.currentCustomerId = savedCustomerId || null;
+            this.currentFilter = savedFilter || "all";
+            this.searchKeyword = savedKeyword || "";
+            await this.refreshCurrentPage();
+        } else {
+            await this.router();
+        }
     },
 
     router: async function() {
@@ -24,7 +50,6 @@ window.APP = {
         else this.refreshCurrentPage();
     },
 
-    // 登录页面专用语言切换
     toggleLanguageOnLogin: function() {
         var newLang = Utils.lang === 'id' ? 'zh' : 'id';
         Utils.setLanguage(newLang);
@@ -66,6 +91,9 @@ window.APP = {
         this.currentPage = page;
         if (params.orderId) this.currentOrderId = params.orderId;
         if (params.customerId) this.currentCustomerId = params.customerId;
+        
+        this.saveCurrentPageState();
+        
         var self = this;
         var navHandlers = {
             orderTable: async () => await self.showOrderTable(),
@@ -97,6 +125,9 @@ window.APP = {
             this.currentCustomerId = prev.customerId;
             this.currentFilter = prev.filter || "all";
             this.searchKeyword = prev.keyword || "";
+            
+            this.saveCurrentPageState();
+            
             var backHandlers = {
                 orderTable: async () => await self.showOrderTable(),
                 dashboard: async () => await self.renderDashboard(),
@@ -118,7 +149,6 @@ window.APP = {
         }
     },
 
-    // 通用打印方法
     printCurrentPage: function() {
         var printContent = document.getElementById("app").cloneNode(true);
         var printWindow = window.open('', '_blank');
@@ -159,7 +189,6 @@ window.APP = {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         
-        // 确保语言已正确加载
         var storedLang = localStorage.getItem('jf_language');
         if (storedLang && (storedLang === 'id' || storedLang === 'zh')) {
             Utils.lang = storedLang;
@@ -200,7 +229,6 @@ window.APP = {
             if (btnEl) { btnEl.disabled = false; btnEl.textContent = Utils.t('login'); }
             return;
         }
-        // 确保登录后使用已保存的语言
         var savedLang = localStorage.getItem('jf_language');
         if (savedLang && (savedLang === 'id' || savedLang === 'zh')) {
             Utils.lang = savedLang;
@@ -209,6 +237,12 @@ window.APP = {
     },
 
     logout: async function() {
+        sessionStorage.removeItem('jf_current_page');
+        sessionStorage.removeItem('jf_current_orderId');
+        sessionStorage.removeItem('jf_current_customerId');
+        sessionStorage.removeItem('jf_current_filter');
+        sessionStorage.removeItem('jf_current_keyword');
+        
         await AUTH.logout();
         await this.router();
     },
@@ -216,6 +250,7 @@ window.APP = {
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
+        this.saveCurrentPageState();
         try {
             var report = await Order.getReport();
             var lang = Utils.lang;
@@ -256,10 +291,9 @@ window.APP = {
         }
     },
 
-    // ==================== 客户信息模块 ====================
-
     showCustomers: async function() {
         this.currentPage = 'customers';
+        this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         var isAdmin = AUTH.isAdmin();
@@ -287,13 +321,13 @@ window.APP = {
                 for (var c of customers) {
                     var hasActive = customerHasActiveOrder[c.id];
                     rows += `<tr>
-                        <td>${Utils.formatDate(c.registered_date)}</td>
-                        <td>${Utils.escapeHtml(c.name)}</td>
-                        <td>${Utils.escapeHtml(c.ktp_number || '-')}</td>
-                        <td>${Utils.escapeHtml(c.phone || '-')}</td>
-                        <td>${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
-                        <td>${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
-                        <td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(c.registered_date)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.name)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.ktp_number || '-')}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.phone || '-')}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
+                        <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
                             <button onclick="APP.editCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>
                             ${hasActive
                                 ? `<button onclick="APP.navigateTo('customerPaymentHistory',{customerId:'${c.id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>`
@@ -314,17 +348,17 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
                     <div class="table-container">
-                        <table class="table">
+                        <table class="table" style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr>
-                                    <th>${lang === 'id' ? 'Tanggal Daftar' : '录入日期'}</th>
-                                    <th>${t('customer_name')}</th>
-                                    <th>${t('ktp_number')}</th>
-                                    <th>${t('phone')}</th>
-                                    <th>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
-                                    <th>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
-                                    <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                </tr>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal Daftar' : '录入日期'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${t('customer_name')}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${t('ktp_number')}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${t('phone')}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -609,6 +643,7 @@ window.APP = {
     showCustomerOrders: async function(customerId) {
         this.currentPage = 'customerOrders';
         this.currentCustomerId = customerId;
+        this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         try {
@@ -619,18 +654,18 @@ window.APP = {
             var rows = orders && orders.length > 0 ? orders.map(o => {
                 var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                 return `<tr>
-                    <td>${Utils.escapeHtml(o.order_id)}</td>
-                    <td>${Utils.formatDate(o.created_at)}</td>
-                    <td>${Utils.formatCurrency(o.loan_amount)}</td>
-                    <td>${Utils.formatCurrency(o.principal_paid)}</td>
-                    <td>${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
-                    <td><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                    <td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(o.created_at)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.loan_amount)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.principal_paid)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
+                    <td style="border:1px solid #334155;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
+                    <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
                         ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>` : ''}
-                     </td>
-                 </tr>`;
-            }).join('') : `<tr><td colspan="7" style="text-align:center;">${t('no_data')}</td></tr>`;
+                    </td>
+                </tr>`;
+            }).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -645,11 +680,20 @@ window.APP = {
                 <div class="card">
                     <h3>📋 ${t('order_list')}</h3>
                     <div class="table-container">
-                        <table class="table"><thead><tr>
-                            <th>ID</th><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${t('loan_amount')}</th>
-                            <th>${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th><th>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                            <th>${lang === 'id' ? 'Status' : '状态'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                         </tr></thead><tbody>${rows}</tbody></table>
+                        <table class="table" style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:10px;">ID</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${t('loan_amount')}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                 </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
                     </div>
                 </div>`;
         } catch (error) {
@@ -660,6 +704,7 @@ window.APP = {
     showCustomerPaymentHistory: async function(customerId) {
         this.currentPage = 'customerPaymentHistory';
         this.currentCustomerId = customerId;
+        this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         try {
@@ -673,15 +718,15 @@ window.APP = {
             }
             var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="6" style="text-align:center;">${t('no_data')}</td></tr>`
+                ? `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td>${typeMap[p.type] || p.type}</td>
-                    <td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td>${Utils.formatCurrency(p.amount)}</td>
-                    <td>${Utils.escapeHtml(p.description || '-')}</td>
-                 </tr>`).join('');
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${typeMap[p.type] || p.type}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
+                </tr>`).join('');
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'} - ${Utils.escapeHtml(customer.name)}</h2>
@@ -694,22 +739,25 @@ window.APP = {
                 <div class="card">
                     <h3>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h3>
                     <div class="table-container">
-                        <table class="table payment-table"><thead><tr>
-                            <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                            <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                            <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
-                            <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                            <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                            <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                         </tr></thead><tbody>${rows}</tbody></table>
+                        <table class="table payment-table" style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                 </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
                     </div>
                 </div>`;
         } catch (error) {
             alert(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
         }
     },
-
-    // ==================== 运营支出 ====================
 
     getExpensesTotal: async function() {
         const profile = await SUPABASE.getCurrentProfile();
@@ -722,6 +770,7 @@ window.APP = {
 
     showExpenses: async function() {
         this.currentPage = 'expenses';
+        this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         var isAdmin = AUTH.isAdmin();
@@ -734,13 +783,13 @@ window.APP = {
             var totalAmount = expenses?.reduce((s, e) => s + e.amount, 0) || 0;
 
             var rows = expenses && expenses.length > 0 ? expenses.map(e => `<tr>
-                <td>${Utils.formatDate(e.expense_date)}</td>
-                <td>${Utils.escapeHtml(e.category)}</td>
-                <td>${Utils.formatCurrency(e.amount)}</td>
-                <td>${Utils.escapeHtml(e.description || '-')}</td>
-                <td>${Utils.escapeHtml(e.stores?.name || '-')}</td>
-                <td>${Utils.formatDate(e.created_at)}</td>
-             </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;">${t('no_data')}</td></tr>`;
+                <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.category)}</td>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
+                <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.created_at)}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -754,14 +803,19 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
                     <div class="table-container">
-                        <table class="table"><thead><tr>
-                            <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                            <th>${lang === 'id' ? 'Kategori' : '类别'}</th>
-                            <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                            <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                            <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                            <th>${lang === 'id' ? 'Dibuat' : '创建时间'}</th>
-                         </tr></thead><tbody>${rows}</tbody></table>
+                        <table class="table" style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Kategori' : '类别'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Dibuat' : '创建时间'}</th>
+                                 </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -823,10 +877,9 @@ window.APP = {
         }
     },
 
-    // ==================== 付款明细 ====================
-
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
+        this.saveCurrentPageState();
         var lang = Utils.lang;
         try {
             var allPayments = await SUPABASE.getAllPayments();
@@ -843,17 +896,17 @@ window.APP = {
             };
 
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="8" style="text-align:center;">${Utils.t('no_data')}</td></tr>`
+                ? `<tr><td colspan="8" style="text-align:center;padding:20px;">${Utils.t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
-                    <td>${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${typeMap[p.type] || p.type}</td>
-                    <td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td>${Utils.formatCurrency(p.amount)}</td>
-                    <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    <td><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${Utils.t('view')}</button></td>
-                 </tr>`).join('');
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${typeMap[p.type] || p.type}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
+                    <td style="border:1px solid #334155;padding:8px;"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${Utils.t('view')}</button></td>
+                </tr>`).join('');
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -867,17 +920,19 @@ window.APP = {
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
                 </div>
                 <div class="table-container">
-                    <table class="table payment-table">
-                        <thead><tr>
-                            <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                            <th>${Utils.t('customer_name')}</th>
-                            <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                            <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
-                            <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                            <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                            <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                            <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                         </tr></thead>
+                    <table class="table payment-table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#0f172a;">
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${Utils.t('customer_name')}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                             </tr>
+                        </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>
@@ -890,10 +945,9 @@ window.APP = {
         }
     },
 
-    // ==================== 财务报表 ====================
-
     showReport: async function() {
         this.currentPage = 'report';
+        this.saveCurrentPageState();
         try {
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
@@ -1026,120 +1080,148 @@ window.APP = {
         }
     },
 
-    // ==================== 用户管理 ====================
-showUserManagement: async function() {
-    this.currentPage = 'userManagement';
-    var lang = Utils.lang;
-    var t = (key) => Utils.t(key);
-    try {
-        var users = await AUTH.getAllUsers();
-        var stores = await SUPABASE.getAllStores();
-        var storeMap = {};
-        for (var s of stores) storeMap[s.id] = s.name;
-        users.sort((a, b) => (storeMap[a.store_id] || '').localeCompare(storeMap[b.store_id] || ''));
+    showUserManagement: async function() {
+        this.currentPage = 'userManagement';
+        this.saveCurrentPageState();
+        var lang = Utils.lang;
+        var t = (key) => Utils.t(key);
+        try {
+            var users = await AUTH.getAllUsers();
+            var stores = await SUPABASE.getAllStores();
+            var storeMap = {};
+            for (var s of stores) storeMap[s.id] = s.name;
+            users.sort((a, b) => (storeMap[a.store_id] || '').localeCompare(storeMap[b.store_id] || ''));
 
-        // 修复：正确构建表格行，确保列数匹配
-        var userRows = '';
-        for (var u of users) {
-            var isCurrent = u.id === AUTH.user.id;
-            var storeName = storeMap[u.store_id] || '-';
-            var roleText = u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长');
-            var actionHtml = '';
-            if (isCurrent) {
-                actionHtml = `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>`;
-            } else {
-                actionHtml = `
-                    <button onclick="APP.editUser('${u.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
-                    <button class="danger" onclick="APP.deleteUser('${u.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
-                `;
+            var userRows = '';
+            for (var u of users) {
+                var isCurrent = u.id === AUTH.user.id;
+                var storeName = storeMap[u.store_id] || '-';
+                var roleText = u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长');
+                var usernameDisplay = u.username || u.email || '-';
+                var actionHtml = '';
+                if (isCurrent) {
+                    actionHtml = `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>`;
+                } else {
+                    actionHtml = `
+                        <button onclick="APP.editUser('${u.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
+                        <button class="danger" onclick="APP.deleteUser('${u.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+                    `;
+                }
+                userRows += `<tr>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(usernameDisplay)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(u.name)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${roleText}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(storeName)}</td>
+                    <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionHtml}</td>
+                </tr>`;
             }
-            userRows += `<tr>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(u.username || u.email || '-')}</td>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(u.name)}</td>
-                <td style="border:1px solid #334155;padding:8px;">${roleText}</td>
-                <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(storeName)}</td>
-                <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionHtml}</td>
-            </tr>`;
-        }
 
-        if (users.length === 0) {
-            userRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
-        }
+            if (users.length === 0) {
+                userRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            }
 
-        var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
-        for (var s of stores) {
-            storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
-        }
+            var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
+            for (var s of stores) {
+                storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
+            }
 
-        document.getElementById("app").innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <h2>👥 ${t('user_management')}</h2>
-                <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
-            </div>
-
-            <div class="card">
-                <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
-                <div class="table-container">
-                    <table class="table" style="width:100%;border-collapse:collapse;">
-                        <thead>
-                            <tr style="background:#0f172a;">
-                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${t('username')}</th>
-                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Nama' : '姓名'}</th>
-                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Peran' : '角色'}</th>
-                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                            </tr>
-                        </thead>
-                        <tbody>${userRows}</tbody>
-                    </table>
+            document.getElementById("app").innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <h2>👥 ${t('user_management')}</h2>
+                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
                 </div>
-            </div>
 
-            <div class="card">
-                <h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>${t('username')} *</label>
-                        <input id="newUsername" placeholder="${t('username')}">
-                    </div>
-                    <div class="form-group">
-                        <label>${t('password')} *</label>
-                        <input id="newPassword" type="password" placeholder="${t('password')}">
-                    </div>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label>
-                        <input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}">
-                    </div>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Peran' : '角色'} *</label>
-                        <select id="newRole">
-                            <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
-                            <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Toko' : '门店'}</label>
-                        <select id="newStoreId">${storeOptions}</select>
-                    </div>
-                    <div class="form-group"></div>
-                    <div class="form-actions">
-                        <button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button>
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
+                    <div class="table-container">
+                        <table class="table user-table" style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${t('username')}</th>
+                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Nama' : '姓名'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Peran' : '角色'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                 </tr>
+                            </thead>
+                            <tbody>${userRows}</tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
-            <div class="toolbar">
-                <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-            </div>`;
-    } catch (error) {
-        console.error("showUserManagement error:", error);
-        alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna: ' + error.message : '加载用户管理失败：' + error.message);
-    }
-},
 
-    // ==================== 订单相关 ====================
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>${t('username')} *</label>
+                            <input id="newUsername" placeholder="${t('username')}">
+                        </div>
+                        <div class="form-group">
+                            <label>${t('password')} *</label>
+                            <input id="newPassword" type="password" placeholder="${t('password')}">
+                        </div>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label>
+                            <input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}">
+                        </div>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Peran' : '角色'} *</label>
+                            <select id="newRole">
+                                <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
+                                <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Toko' : '门店'}</label>
+                            <select id="newStoreId">${storeOptions}</select>
+                        </div>
+                        <div class="form-group"></div>
+                        <div class="form-actions">
+                            <button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="toolbar">
+                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                </div>`;
+        } catch (error) {
+            console.error("showUserManagement error:", error);
+            alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna: ' + error.message : '加载用户管理失败：' + error.message);
+        }
+    },
+
+    addUser: async function() {
+        var username = document.getElementById("newUsername").value.trim();
+        var password = document.getElementById("newPassword").value;
+        var name = document.getElementById("newName").value.trim();
+        var role = document.getElementById("newRole").value;
+        var storeId = document.getElementById("newStoreId").value;
+        if (!username || !password || !name) { alert(Utils.lang === 'id' ? 'Harap isi semua field' : '请填写所有字段'); return; }
+        try {
+            await AUTH.addUser(username, password, name, role, storeId || null);
+            alert((Utils.lang === 'id' ? 'Pengguna "' : '用户 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！'));
+            await this.showUserManagement();
+        } catch (error) { alert('Error: ' + error.message); }
+    },
+
+    deleteUser: async function(userId) {
+        if (confirm(Utils.lang === 'id' ? 'Hapus pengguna ini?' : '删除此用户？')) {
+            try { await AUTH.deleteUser(userId); await this.showUserManagement(); }
+            catch (error) { alert('Error: ' + error.message); }
+        }
+    },
+
+    editUser: async function(userId) {
+        var newRole = prompt(Utils.lang === 'id' ? 'Masukkan peran baru (admin/store_manager):' : '输入新角色 (admin/store_manager):');
+        if (newRole && (newRole === 'admin' || newRole === 'store_manager')) {
+            try { await AUTH.updateUser(userId, { role: newRole }); await this.showUserManagement(); }
+            catch (error) { alert('Error: ' + error.message); }
+        }
+    },
 
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
+        this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         var isAdmin = AUTH.isAdmin();
@@ -1152,25 +1234,25 @@ showUserManagement: async function() {
             for (var s of stores) storeMap[s.id] = s.name;
 
             var rows = orders.length === 0
-                ? `<td><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;">${t('no_data')}</td></tr>`
+                ? `<tr><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`
                 : orders.map(o => {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                     return `<tr>
-                        <td>${Utils.escapeHtml(o.order_id)}</td>
-                        <td>${Utils.escapeHtml(o.customer_name)}</td>
-                        <td>${Utils.escapeHtml(o.collateral_name)}</td>
-                        <td>${Utils.formatCurrency(o.loan_amount)}</td>
-                        <td>${Utils.formatCurrency(o.admin_fee)}</td>
-                        <td>${Utils.formatCurrency(o.monthly_interest || 0)}</td>
-                        <td>${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
-                        <td><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
-                        <td>
-                            <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})">👁️ ${t('view')}</button>
-                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️ ${t('delete')}</button>` : ''}
-                            <button onclick="APP.printOrder('${o.order_id}')" class="success">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                            ${o.is_locked ? `<span style="font-size:12px;color:#94a3b8;">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>` : ''}
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.customer_name)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.collateral_name)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.loan_amount)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.admin_fee)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.monthly_interest || 0)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
+                        <td style="border:1px solid #334155;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
+                        ${isAdmin ? `<td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
+                        <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
+                            <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
+                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${isAdmin ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>` : ''}
+                            <button onclick="APP.printOrder('${o.order_id}')" class="success" style="padding:4px 8px;font-size:12px;">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            ${o.is_locked ? `<span style="font-size:12px;color:#94a3b8;margin-left:4px;">🔒</span>` : ''}
                         </td>
                     </tr>`;
                 }).join('');
@@ -1193,15 +1275,23 @@ showUserManagement: async function() {
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>
                 <div class="table-container">
-                    <table class="table"><thead><tr>
-                        <th>ID</th><th>${t('customer_name')}</th><th>${t('collateral_name')}</th>
-                        <th>${t('loan_amount')}</th><th>${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                        <th>${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
-                        <th>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                        <th>${lang === 'id' ? 'Status' : '状态'}</th>
-                        ${isAdmin ? `<th>${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                        <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                    </tr></thead><tbody>${rows}</tbody></table>
+                    <table class="table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#0f172a;">
+                                <th style="border:1px solid #334155;padding:10px;">ID</th>
+                                <th style="border:1px solid #334155;padding:10px;">${t('customer_name')}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${t('collateral_name')}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${t('loan_amount')}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
+                                ${isAdmin ? `<th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                             </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
                 </div>`;
         } catch (err) {
             alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
@@ -1215,6 +1305,7 @@ showUserManagement: async function() {
     viewOrder: async function(orderId) {
         this.currentPage = 'viewOrder';
         this.currentOrderId = orderId;
+        this.saveCurrentPageState();
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
             if (!order) { alert('Order not found'); this.goBack(); return; }
@@ -1225,13 +1316,13 @@ showUserManagement: async function() {
             var payRows = payments && payments.length > 0 ? payments.map(p => {
                 var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
                 return `<tr>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${typeText}</td>
-                    <td>${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
-                    <td>${Utils.formatCurrency(p.amount)}</td>
-                    <td>${Utils.escapeHtml(p.description || '-')}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${typeText}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
                 </tr>`;
-            }).join('') : `<tr><td colspan="5" style="text-align:center;">${t('no_data')}</td></tr>`;
+            }).join('') : `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
@@ -1261,13 +1352,18 @@ showUserManagement: async function() {
                     <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes || '-')}</p>
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
                     <div class="table-container">
-                        <table class="table payment-table"><thead><tr>
-                            <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                            <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
-                            <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                            <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                            <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                         </tr></thead><tbody>${payRows}</tbody></table>
+                        <table class="table payment-table" style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                 </tr>
+                            </thead>
+                            <tbody>${payRows}</tbody>
+                        </table>
                     </div>
                     <div class="toolbar">
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
@@ -1292,6 +1388,7 @@ showUserManagement: async function() {
     showPayment: async function(orderId) {
         this.currentPage = 'payment';
         this.currentOrderId = orderId;
+        this.saveCurrentPageState();
         try {
             var order = await SUPABASE.getOrder(orderId);
             if (!order) return;
@@ -1308,21 +1405,21 @@ showUserManagement: async function() {
             var adminFeePayments = payments.filter(p => p.type === 'admin_fee');
 
             var interestRows = interestPayments.length === 0
-                ? `<tr><td colspan="4" style="text-align:center;color:#94a3b8;font-size:12px;">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`
+                ? `<tr><td colspan="4" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`
                 : interestPayments.map(p => `<tr>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
-                    <td>${Utils.formatCurrency(p.amount)}</td>
-                    <td style="font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
-                  </tr>`).join('');
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                    <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                </tr>`).join('');
 
             var principalRows = principalPayments.length === 0
-                ? `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`
+                ? `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`
                 : principalPayments.map(p => `<tr>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${Utils.formatCurrency(p.amount)}</td>
-                    <td style="font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
-                  </tr>`).join('');
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                    <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                </tr>`).join('');
 
             var adminFeeSection = !order.admin_fee_paid
                 ? `<div style="background:#0f172a;padding:12px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #f59e0b;">
@@ -1384,13 +1481,15 @@ showUserManagement: async function() {
 
                     <h4 style="font-size:13px;margin-bottom:6px;color:#94a3b8;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息付款历史'}</h4>
                     <div class="table-container" style="margin-top:0;">
-                        <table class="table" style="min-width:400px;">
-                            <thead><tr>
-                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                            </tr></thead>
+                        <table class="table" style="min-width:400px;width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                 </tr>
+                            </thead>
                             <tbody>${interestRows}</tbody>
                         </table>
                     </div>
@@ -1407,12 +1506,14 @@ showUserManagement: async function() {
 
                     <h4 style="font-size:13px;margin-top:14px;margin-bottom:6px;color:#94a3b8;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</h4>
                     <div class="table-container" style="margin-top:0;">
-                        <table class="table" style="min-width:360px;">
-                            <thead><tr>
-                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                            </tr></thead>
+                        <table class="table" style="min-width:360px;width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#0f172a;">
+                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                 </tr>
+                            </thead>
                             <tbody>${principalRows}</tbody>
                         </table>
                     </div>
@@ -1468,6 +1569,7 @@ showUserManagement: async function() {
     editOrder: async function(orderId) {
         this.currentPage = 'editOrder';
         this.currentOrderId = orderId;
+        this.saveCurrentPageState();
         try {
             var order = await SUPABASE.getOrder(orderId);
             if (!order) return;
@@ -1596,7 +1698,7 @@ showUserManagement: async function() {
                 ${payments.length === 0 ? `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">${lang === 'id' ? 'Belum ada pembayaran' : '暂无付款记录'}</td></tr>` :
                 payments.map(p => {
                     var tt = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
-                    return `<tr><td>${Utils.formatDate(p.date)}</td><td>${tt}</td><td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 月') : '-'}</td><td>${Utils.formatCurrency(p.amount)}</td><td>${Utils.escapeHtml(p.description || '-')}</td></tr>`;
+                    return `<tr><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.formatDate(p.date)}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${tt}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 月') : '-'}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.formatCurrency(p.amount)}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
                 }).join('')}
                 </tbody></table>
             </div>
