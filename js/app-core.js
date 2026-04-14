@@ -210,7 +210,7 @@ window.APP = {
                     <input id="password" type="password" placeholder="${t('password')}">
                 </div>
                 <button onclick="APP.login()">${t('login')}</button>
-                <p style="margin-top: 15px; font-size: 12px; color: #94a3b8;">
+                <p style="margin-top: 15px; font-size: 12px; color: #64748b;">
                     ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}
                 </p>
             </div>`;
@@ -290,6 +290,8 @@ window.APP = {
         }
     },
 
+    // ==================== 客户信息模块 ====================
+
     showCustomers: async function() {
         this.currentPage = 'customers';
         this.saveCurrentPageState();
@@ -320,13 +322,13 @@ window.APP = {
                 for (var c of customers) {
                     var hasActive = customerHasActiveOrder[c.id];
                     rows += `<tr>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(c.registered_date)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.name)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.ktp_number || '-')}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.phone || '-')}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
-                        <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(c.registered_date)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(c.name)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(c.ktp_number || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(c.phone || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
                             <button onclick="APP.editCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>
                             ${hasActive
                                 ? `<button onclick="APP.navigateTo('customerPaymentHistory',{customerId:'${c.id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>`
@@ -347,17 +349,17 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
                     <div class="table-container">
-                        <table class="table" style="width:100%;border-collapse:collapse;">
+                        <table style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal Daftar' : '录入日期'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${t('customer_name')}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${t('ktp_number')}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${t('phone')}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                   </tr>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal Daftar' : '录入日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${t('customer_name')}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${t('ktp_number')}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${t('phone')}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -432,7 +434,6 @@ window.APP = {
 
         try {
             const profile = await SUPABASE.getCurrentProfile();
-            console.log("当前用户资料:", profile);
             
             const { data, error } = await supabaseClient.from('customers').insert({
                 store_id: profile.store_id,
@@ -471,8 +472,8 @@ window.APP = {
             modal.id = 'editCustomerModal';
             modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
             modal.innerHTML = `
-                <div style="background:#1e293b;border-radius:12px;padding:24px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;">
-                    <h3 style="margin-top:0;">✏️ ${lang === 'id' ? 'Ubah Data Nasabah' : '修改客户信息'}</h3>
+                <div style="background:#ffffff;border-radius:12px;padding:24px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;">
+                    <h3 style="margin-top:0;color:#1e293b;">✏️ ${lang === 'id' ? 'Ubah Data Nasabah' : '修改客户信息'}</h3>
                     <div class="form-grid">
                         <div class="form-group">
                             <label>${t('customer_name')} *</label>
@@ -556,8 +557,6 @@ window.APP = {
         var lang = Utils.lang;
         if (!confirm(lang === 'id' ? 'Hapus nasabah ini? Semua order terkait juga akan terhapus.' : '删除此客户？相关订单也将被删除。')) return;
         
-        console.log("开始删除客户:", customerId);
-        
         try {
             const { data: orders, error: ordersError } = await supabaseClient
                 .from('orders')
@@ -568,8 +567,6 @@ window.APP = {
                 console.error("查询订单错误:", ordersError);
                 throw ordersError;
             }
-            
-            console.log("找到订单数量:", orders?.length || 0);
             
             if (orders && orders.length > 0) {
                 for (var o of orders) {
@@ -601,9 +598,7 @@ window.APP = {
             }
             
             alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
-            
             await this.showCustomers();
-            
         } catch (e) {
             console.error('删除客户异常:', e);
             alert(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
@@ -699,13 +694,12 @@ window.APP = {
             var rows = orders && orders.length > 0 ? orders.map(o => {
                 var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                 return `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(o.created_at)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.loan_amount)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.principal_paid)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
-                    <td style="border:1px solid #334155;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                    <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
+                                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.loan_amount)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.principal_paid)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
                         ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>` : ''}
                       </td>
@@ -725,17 +719,17 @@ window.APP = {
                 <div class="card">
                     <h3>📋 ${t('order_list')}</h3>
                     <div class="table-container">
-                        <table class="table" style="width:100%;border-collapse:collapse;">
+                        <table style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:10px;">ID</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${t('loan_amount')}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                  </table>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">ID</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${t('loan_amount')}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -765,12 +759,12 @@ window.APP = {
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${typeMap[p.type] || p.type}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(p.date)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${typeMap[p.type] || p.type}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
                 </tr>`).join('');
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -784,16 +778,16 @@ window.APP = {
                 <div class="card">
                     <h3>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h3>
                     <div class="table-container">
-                        <table class="table payment-table" style="width:100%;border-collapse:collapse;">
+                        <table class="payment-table" style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                  </tr>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -803,6 +797,8 @@ window.APP = {
             alert(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
         }
     },
+
+    // ==================== 运营支出模块 ====================
 
     getExpensesTotal: async function() {
         const profile = await SUPABASE.getCurrentProfile();
@@ -845,12 +841,12 @@ window.APP = {
                         actionBtns = `<span style="color:#94a3b8;font-size:11px;">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
                     }
                     rows += `<tr>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.category)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
-                        <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionBtns}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(e.category)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">${actionBtns}</td>
                     </tr>`;
                 }
             } else {
@@ -869,16 +865,16 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
                     <div class="table-container">
-                        <table class="table" style="width:100%;border-collapse:collapse;">
+                        <table style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Kategori' : '类别'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                  </tr>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Kategori' : '类别'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -890,7 +886,7 @@ window.APP = {
                     <div class="form-grid">
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
-                            <input type="date" id="expenseDate" value="${todayDate}" style="background:#1e293b;">
+                            <input type="date" id="expenseDate" value="${todayDate}" style="background:#ffffff;color:#1e293b;">
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
@@ -937,7 +933,6 @@ window.APP = {
         
         try {
             const profile = await SUPABASE.getCurrentProfile();
-            console.log("添加支出，用户资料:", profile);
             
             const { data, error } = await supabaseClient.from('expenses').insert({
                 store_id: profile.store_id, 
@@ -998,8 +993,6 @@ window.APP = {
         if (!confirm(lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？')) return;
         
         try {
-            console.log("删除支出记录:", expenseId);
-            
             const { error } = await supabaseClient
                 .from('expenses')
                 .delete()
@@ -1098,6 +1091,8 @@ window.APP = {
         }
     },
 
+    // ==================== 付款明细 ====================
+
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
@@ -1119,14 +1114,14 @@ window.APP = {
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="8" style="text-align:center;padding:20px;">${Utils.t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${typeMap[p.type] || p.type}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
-                    <td style="border:1px solid #334155;padding:8px;"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${Utils.t('view')}</button></td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(p.date)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${typeMap[p.type] || p.type}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${Utils.t('view')}</button></td>
                 </tr>`).join('');
 
             document.getElementById("app").innerHTML = `
@@ -1141,18 +1136,18 @@ window.APP = {
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
                 </div>
                 <div class="table-container">
-                    <table class="table payment-table" style="width:100%;border-collapse:collapse;">
+                    <table class="payment-table" style="width:100%;border-collapse:collapse;">
                         <thead>
-                            <tr style="background:#0f172a;">
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${Utils.t('customer_name')}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                              </tr>
+                            <tr style="background:#f8fafc;">
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${Utils.t('customer_name')}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                            </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -1166,6 +1161,8 @@ window.APP = {
             alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载付款记录失败');
         }
     },
+
+    // ==================== 财务报表 ====================
 
     showReport: async function() {
         this.currentPage = 'report';
@@ -1233,28 +1230,28 @@ window.APP = {
 
                     <div class="card" style="border:2px solid #3b82f6;">
                         <h3 style="color:#3b82f6;">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</h3>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #334155; border-radius: 8px; overflow: hidden;">
-                            <div class="stat-card" style="border-right: 1px solid #334155; border-bottom: 1px solid #334155; margin:0; border-radius:0;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                            <div class="stat-card" style="border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; margin:0; border-radius:0; box-shadow:none;">
                                 <div class="stat-value">${grandTotal.orders}</div>
                                 <div>${t('total_orders')}</div>
                             </div>
-                            <div class="stat-card" style="border-right: 1px solid #334155; border-bottom: 1px solid #334155; margin:0; border-radius:0;">
+                            <div class="stat-card" style="border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; margin:0; border-radius:0; box-shadow:none;">
                                 <div class="stat-value">${grandTotal.active}</div>
                                 <div>${t('active')}</div>
                             </div>
-                            <div class="stat-card" style="border-bottom: 1px solid #334155; margin:0; border-radius:0;">
+                            <div class="stat-card" style="border-bottom: 1px solid #e2e8f0; margin:0; border-radius:0; box-shadow:none;">
                                 <div class="stat-value">${Utils.formatCurrency(grandTotal.loan)}</div>
                                 <div>${t('total_loan')}</div>
                             </div>
-                            <div class="stat-card" style="border-right: 1px solid #334155; margin:0; border-radius:0;">
+                            <div class="stat-card" style="border-right: 1px solid #e2e8f0; margin:0; border-radius:0; box-shadow:none;">
                                 <div class="stat-value" style="color:#10b981;">${Utils.formatCurrency(grandTotal.income)}</div>
                                 <div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div>
                             </div>
-                            <div class="stat-card" style="border-right: 1px solid #334155; margin:0; border-radius:0;">
+                            <div class="stat-card" style="border-right: 1px solid #e2e8f0; margin:0; border-radius:0; box-shadow:none;">
                                 <div class="stat-value" style="color:#ef4444;">${Utils.formatCurrency(grandTotal.expenses)}</div>
                                 <div>${lang === 'id' ? 'Total Pengeluaran' : '总运营支出'}</div>
                             </div>
-                            <div class="stat-card" style="margin:0; border-radius:0;">
+                            <div class="stat-card" style="margin:0; border-radius:0; box-shadow:none;">
                                 <div class="stat-value" style="color:#3b82f6;">${Utils.formatCurrency(grandTotal.profit)}</div>
                                 <div>${lang === 'id' ? 'Total Laba Kotor' : '总毛利'}</div>
                             </div>
@@ -1303,6 +1300,8 @@ window.APP = {
         }
     },
 
+    // ==================== 用户管理 ====================
+
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -1331,11 +1330,11 @@ window.APP = {
                     `;
                 }
                 userRows += `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(usernameDisplay)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(u.name)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${roleText}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(storeName)}</td>
-                    <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionHtml}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(usernameDisplay)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(u.name)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${roleText}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(storeName)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">${actionHtml}</td>
                 </tr>`;
             }
 
@@ -1357,15 +1356,15 @@ window.APP = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
                     <div class="table-container">
-                        <table class="table user-table" style="width:100%;border-collapse:collapse;">
+                        <table class="user-table" style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${t('username')}</th>
-                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Nama' : '姓名'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Peran' : '角色'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                  </table>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${t('username')}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Nama' : '姓名'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Peran' : '角色'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                </tr>
                             </thead>
                             <tbody>${userRows}</tbody>
                         </table>
@@ -1455,6 +1454,8 @@ window.APP = {
         }
     },
 
+    // ==================== 订单相关 ====================
+
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
         this.saveCurrentPageState();
@@ -1471,21 +1472,21 @@ window.APP = {
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<td><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                     rows += `<tr>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.customer_name)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.collateral_name)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.loan_amount)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.admin_fee)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(o.monthly_interest || 0)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
-                        <td style="border:1px solid #334155;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                        ${isAdmin ? `<td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
-                        <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(o.customer_name)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(o.collateral_name)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.loan_amount)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.admin_fee)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.monthly_interest || 0)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
+                        ${isAdmin ? `<td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
+                        <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
                             <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
                             ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                             ${PERMISSION.canDeleteOrder() ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>` : ''}
@@ -1514,20 +1515,20 @@ window.APP = {
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>
                 <div class="table-container">
-                    <table class="table" style="width:100%;border-collapse:collapse;">
+                    <table style="width:100%;border-collapse:collapse;">
                         <thead>
-                            <tr style="background:#0f172a;">
-                                <th style="border:1px solid #334155;padding:10px;">ID</th>
-                                <th style="border:1px solid #334155;padding:10px;">${t('customer_name')}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${t('collateral_name')}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${t('loan_amount')}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
-                                ${isAdmin ? `<th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                              </tr>
+                            <tr style="background:#f8fafc;">
+                                <th style="border:1px solid #cbd5e1;padding:10px;">ID</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${t('customer_name')}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${t('collateral_name')}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${t('loan_amount')}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
+                                ${isAdmin ? `<th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                            </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -1571,11 +1572,11 @@ window.APP = {
                 for (var p of payments) {
                     var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
                     payRows += `<tr>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${typeText}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(p.date)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${typeText}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
                     </tr>`;
                 }
             } else {
@@ -1610,15 +1611,15 @@ window.APP = {
                     <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes || '-')}</p>
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '支付记录'}</h3>
                     <div class="table-container">
-                        <table class="table payment-table" style="width:100%;border-collapse:collapse;">
+                        <table class="payment-table" style="width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                  </tr>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                </tr>
                             </thead>
                             <tbody>${payRows}</tbody>
                         </table>
@@ -1668,39 +1669,39 @@ window.APP = {
 
             var interestRows = '';
             if (interestPayments.length === 0) {
-                interestRows = `<tr><td colspan="4" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
+                interestRows = `<tr><td colspan="4" style="text-align:center;color:#64748b;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
             } else {
                 for (var p of interestPayments) {
                     interestRows += `<tr>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                        <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(p.date)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;font-size:11px;color:#64748b;">${Utils.escapeHtml(p.description || '-')}</td>
                     </tr>`;
                 }
             }
 
             var principalRows = '';
             if (principalPayments.length === 0) {
-                principalRows = `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
+                principalRows = `<tr><td colspan="3" style="text-align:center;color:#64748b;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
             } else {
                 for (var p of principalPayments) {
                     principalRows += `<tr>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                        <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(p.date)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                        <td style="border:1px solid #cbd5e1;padding:8px;font-size:11px;color:#64748b;">${Utils.escapeHtml(p.description || '-')}</td>
                     </tr>`;
                 }
             }
 
             var adminFeeSection = !order.admin_fee_paid
-                ? `<div style="background:#0f172a;padding:12px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #f59e0b;">
+                ? `<div style="background:#f8fafc;padding:12px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #f59e0b;">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                         <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ❌ ${lang === 'id' ? 'Belum dibayar' : '未支付'}</span>
                         <button onclick="APP.payAdminFee('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
                     </div>
                    </div>`
-                : `<div style="background:#0f172a;padding:10px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #10b981;">
+                : `<div style="background:#f8fafc;padding:10px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #10b981;">
                     <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ✅ ${lang === 'id' ? 'Sudah dibayar' : '已支付'} (${Utils.formatDate(order.admin_fee_paid_date)})</span>
                    </div>`;
 
@@ -1711,11 +1712,11 @@ window.APP = {
 
             var principalInputSection = remainingPrincipal > 0
                 ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-                    <label style="color:#cbd5e1;white-space:nowrap;">${lang === 'id' ? 'Jumlah bayar pokok' : '本次还款金额'} (IDR):</label>
+                    <label style="color:#334155;white-space:nowrap;">${lang === 'id' ? 'Jumlah bayar pokok' : '本次还款金额'} (IDR):</label>
                     <input type="text" id="principalAmount" placeholder="${lang === 'id' ? 'Masukkan jumlah' : '输入金额'}" style="width:180px;text-align:right;margin:0;">
                     <button onclick="APP.payPrincipal('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Bayar Pokok' : '支付本金'}</button>
                    </div>
-                   <p style="font-size:12px;color:#94a3b8;">${lang === 'id' ? 'Sisa pokok' : '剩余本金'}: <strong style="color:#f1f5f9;">${Utils.formatCurrency(remainingPrincipal)}</strong></p>`
+                   <p style="font-size:12px;color:#64748b;">${lang === 'id' ? 'Sisa pokok' : '剩余本金'}: <strong style="color:#1e293b;">${Utils.formatCurrency(remainingPrincipal)}</strong></p>`
                 : `<p style="color:#10b981;">✅ ${lang === 'id' ? 'Pokok sudah LUNAS' : '本金已全部结清'}</p>`;
 
             document.getElementById("app").innerHTML = `
@@ -1726,13 +1727,13 @@ window.APP = {
 
                 <div class="card" style="padding:14px 18px;">
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
-                        <div><div style="font-size:11px;color:#94a3b8;">${t('customer_name')}</div><div style="font-weight:600;">${Utils.escapeHtml(order.customer_name)}</div></div>
-                        <div><div style="font-size:11px;color:#94a3b8;">ID</div><div style="font-weight:600;">${Utils.escapeHtml(order.order_id)}</div></div>
-                        <div><div style="font-size:11px;color:#94a3b8;">${t('loan_amount')}</div><div style="font-weight:600;">${Utils.formatCurrency(order.loan_amount)}</div></div>
-                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</div><div style="font-weight:600;color:${remainingPrincipal > 0 ? '#f59e0b' : '#10b981'};">${Utils.formatCurrency(remainingPrincipal)}</div></div>
-                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</div><div style="font-weight:600;color:#3b82f6;">${Utils.formatCurrency(currentMonthlyInterest)}</div></div>
-                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Jatuh Tempo Bunga' : '下次利息到期'}</div><div style="font-weight:600;">${nextDueDate}</div></div>
-                        <div><div style="font-size:11px;color:#94a3b8;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息期数'}</div><div style="font-weight:600;">${order.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</div></div>
+                        <div><div style="font-size:11px;color:#64748b;">${t('customer_name')}</div><div style="font-weight:600;">${Utils.escapeHtml(order.customer_name)}</div></div>
+                        <div><div style="font-size:11px;color:#64748b;">ID</div><div style="font-weight:600;">${Utils.escapeHtml(order.order_id)}</div></div>
+                        <div><div style="font-size:11px;color:#64748b;">${t('loan_amount')}</div><div style="font-weight:600;">${Utils.formatCurrency(order.loan_amount)}</div></div>
+                        <div><div style="font-size:11px;color:#64748b;">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</div><div style="font-weight:600;color:${remainingPrincipal > 0 ? '#f59e0b' : '#10b981'};">${Utils.formatCurrency(remainingPrincipal)}</div></div>
+                        <div><div style="font-size:11px;color:#64748b;">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</div><div style="font-weight:600;color:#3b82f6;">${Utils.formatCurrency(currentMonthlyInterest)}</div></div>
+                        <div><div style="font-size:11px;color:#64748b;">${lang === 'id' ? 'Jatuh Tempo Bunga' : '下次利息到期'}</div><div style="font-weight:600;">${nextDueDate}</div></div>
+                        <div><div style="font-size:11px;color:#64748b;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息期数'}</div><div style="font-weight:600;">${order.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</div></div>
                     </div>
                 </div>
 
@@ -1740,27 +1741,27 @@ window.APP = {
 
                 <div class="card">
                     <h3 style="margin-bottom:12px;">💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3>
-                    <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
+                    <p style="font-size:12px;color:#64748b;margin-bottom:10px;">
                         ${lang === 'id'
                             ? '📌 Setiap pembayaran memperpanjang pinjaman 1 bulan secara otomatis'
                             : '📌 每次付息后自动延续1个月，到期日同步更新'}
                     </p>
                     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-                        <label style="color:#cbd5e1;white-space:nowrap;">${lang === 'id' ? 'Bayar untuk' : '支付'}:</label>
+                        <label style="color:#334155;white-space:nowrap;">${lang === 'id' ? 'Bayar untuk' : '支付'}:</label>
                         <select id="interestMonths" style="width:auto;min-width:200px;margin:0;">${interestOptions}</select>
                         <button onclick="APP.payInterest('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息付款'}</button>
                     </div>
 
-                    <h4 style="font-size:13px;margin-bottom:6px;color:#94a3b8;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息付款历史'}</h4>
+                    <h4 style="font-size:13px;margin-bottom:6px;color:#64748b;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息付款历史'}</h4>
                     <div class="table-container" style="margin-top:0;">
-                        <table class="table" style="min-width:400px;width:100%;border-collapse:collapse;">
+                        <table style="min-width:400px;width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                  </tr>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                </tr>
                             </thead>
                             <tbody>${interestRows}</tbody>
                         </table>
@@ -1769,22 +1770,22 @@ window.APP = {
 
                 <div class="card">
                     <h3 style="margin-bottom:12px;">🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金还款'}</h3>
-                    <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
+                    <p style="font-size:12px;color:#64748b;margin-bottom:10px;">
                         ${lang === 'id'
                             ? `📌 Total pinjaman: ${Utils.formatCurrency(order.loan_amount)} | Sudah dibayar: ${Utils.formatCurrency(order.principal_paid)} | Sisa: ${Utils.formatCurrency(remainingPrincipal)}`
                             : `📌 贷款总额: ${Utils.formatCurrency(order.loan_amount)} | 已还: ${Utils.formatCurrency(order.principal_paid)} | 剩余: ${Utils.formatCurrency(remainingPrincipal)}`}
                     </p>
                     ${principalInputSection}
 
-                    <h4 style="font-size:13px;margin-top:14px;margin-bottom:6px;color:#94a3b8;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</h4>
+                    <h4 style="font-size:13px;margin-top:14px;margin-bottom:6px;color:#64748b;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</h4>
                     <div class="table-container" style="margin-top:0;">
-                        <table class="table" style="min-width:360px;width:100%;border-collapse:collapse;">
+                        <table style="min-width:360px;width:100%;border-collapse:collapse;">
                             <thead>
-                                <tr style="background:#0f172a;">
-                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                  </tr>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                </tr>
                             </thead>
                             <tbody>${principalRows}</tbody>
                         </table>
@@ -2023,79 +2024,28 @@ window.APP = {
         }
     },
 
-// 在 app-core.js 中找到 addStore 函数，确保代码如下：
-addStore: async function() {
-    var code = document.getElementById("newStoreCode").value.trim();
-    var name = document.getElementById("newStoreName").value.trim();
-    var address = document.getElementById("newStoreAddress").value;
-    var phone = document.getElementById("newStorePhone").value;
-    var lang = Utils.lang;
-    
-    if (!code || !name) { 
-        alert(lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); 
-        return; 
-    }
-    try { 
-        await StoreManager.createStore(code, name, address, phone); 
-        alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
-        await StoreManager.renderStoreManagement(); 
-    } catch (error) { 
-        console.error("addStore error:", error);
-        alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message); 
-    }
-},
-
-    addStoreWithManager: async function() {
+    addStore: async function() {
         var code = document.getElementById("newStoreCode").value.trim();
         var name = document.getElementById("newStoreName").value.trim();
         var address = document.getElementById("newStoreAddress").value;
         var phone = document.getElementById("newStorePhone").value;
-        var managerName = document.getElementById("newManagerName").value.trim();
-        var managerEmail = document.getElementById("newManagerEmail").value.trim();
-        var managerPassword = document.getElementById("newManagerPassword").value;
-        
         var lang = Utils.lang;
         
         if (!code || !name) { 
             alert(lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); 
             return; 
         }
-        if (!managerName || !managerEmail || !managerPassword) {
-            alert(lang === 'id' ? 'Data manajer harus diisi lengkap' : '店长信息必须完整填写');
-            return;
-        }
-        if (managerPassword.length < 6) {
-            alert(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6位');
-            return;
-        }
-        
         try { 
-            await StoreManager.createStoreWithManager(code, name, address, phone, managerName, managerEmail, managerPassword);
-            await StoreManager.renderStoreManagement();
-            if (this.currentPage === 'userManagement') {
-                await this.showUserManagement();
-            }
+            await StoreManager.createStore(code, name, address, phone); 
+            alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+            await StoreManager.renderStoreManagement(); 
         } catch (error) { 
-            console.error("addStoreWithManager error:", error);
-            alert('Error: ' + error.message); 
+            console.error("addStore error:", error);
+            alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message); 
         }
     },
 
-    editStore: async function(storeId) {
-        await StoreManager.editStore(storeId);
-    },
-
-    deleteStore: async function(storeId) {
-        if (confirm(Utils.lang === 'id' ? 'Hapus toko ini?' : '删除此门店？')) {
-            try { 
-                await StoreManager.deleteStore(storeId); 
-                await StoreManager.renderStoreManagement(); 
-            } catch (error) { 
-                alert('Error: ' + error.message); 
-            }
-        }
-    },
-
+    // 保留原有的 showCreateOrder 方法
     showCreateOrder: function() {
         alert('Please select a customer first');
         this.navigateTo('customers');
