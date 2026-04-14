@@ -42,12 +42,87 @@ const StoreManager = {
         return totalAdminFees + totalInterest;
     },
 
+    // 编辑门店 - 完整表单（编码不可修改）
+    editStore: async function(storeId) {
+        var lang = Utils.lang;
+        var t = (key) => Utils.t(key);
+        
+        try {
+            const { data: store, error } = await supabaseClient
+                .from('stores')
+                .select('*')
+                .eq('id', storeId)
+                .single();
+            
+            if (error) throw error;
+            
+            var modal = document.createElement('div');
+            modal.id = 'editStoreModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.innerHTML = `
+                <div style="background:#1e293b;border-radius:12px;padding:24px;width:100%;max-width:500px;">
+                    <h3 style="margin-top:0;">✏️ ${lang === 'id' ? 'Edit Toko' : '编辑门店'}</h3>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Kode Toko' : '门店编码'} *</label>
+                        <input id="editStoreCode" value="${Utils.escapeHtml(store.code)}" readonly style="background:#334155;cursor:not-allowed;">
+                        <small style="color:#94a3b8;">⚠️ ${lang === 'id' ? 'Kode tidak dapat diubah' : '编码不可修改'}</small>
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Nama Toko' : '门店名称'} *</label>
+                        <input id="editStoreName" value="${Utils.escapeHtml(store.name)}">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Alamat' : '地址'}</label>
+                        <input id="editStoreAddress" value="${Utils.escapeHtml(store.address || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Telepon' : '电话'}</label>
+                        <input id="editStorePhone" value="${Utils.escapeHtml(store.phone || '')}">
+                    </div>
+                    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+                        <button onclick="StoreManager._saveEditStore('${storeId}')" class="success">💾 ${t('save')}</button>
+                        <button onclick="document.getElementById('editStoreModal').remove()">✖ ${t('cancel')}</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal memuat data toko' : '加载门店数据失败');
+        }
+    },
+
+    _saveEditStore: async function(storeId) {
+        var lang = Utils.lang;
+        var name = document.getElementById('editStoreName').value.trim();
+        var address = document.getElementById('editStoreAddress').value.trim();
+        var phone = document.getElementById('editStorePhone').value.trim();
+        
+        if (!name) {
+            alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            return;
+        }
+        
+        try {
+            const { error } = await supabaseClient
+                .from('stores')
+                .update({ name: name, address: address || null, phone: phone || null })
+                .eq('id', storeId);
+            
+            if (error) throw error;
+            
+            document.getElementById('editStoreModal')?.remove();
+            alert(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
+            await this.renderStoreManagement();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+        }
+    },
+
     async renderStoreManagement() {
         await this.loadStores();
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
 
-        // 门店财务汇总
         let storeStatsRows = '';
         let grandTotalIncome = 0, grandTotalExpenses = 0, grandTotalGrossProfit = 0;
         for (const store of this.stores) {
@@ -65,14 +140,13 @@ const StoreManager = {
             </tr>`;
         }
 
-        // 门店列表
         let storeRows = this.stores.map(store => `<tr>
             <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.code)}</td>
             <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.name)}</td>
             <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.address || '-')}</td>
             <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.phone || '-')}</td>
             <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
-                <button onclick="APP.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
+                <button onclick="StoreManager.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
                 <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
             </td>
         </tr>`).join('');
@@ -82,7 +156,6 @@ const StoreManager = {
             storeStatsRows = `<tr><td colspan="4" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
         }
 
-        // 问题3：列表在上，新增表单在下，双列布局 + 3宫格线框
         document.getElementById("app").innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
@@ -91,7 +164,6 @@ const StoreManager = {
                 </div>
             </div>
 
-            <!-- 财务汇总 - 3宫格带线框 -->
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #334155; border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
@@ -119,11 +191,10 @@ const StoreManager = {
                               </tr>
                         </thead>
                         <tbody>${storeStatsRows}</tbody>
-                     </table>
+                      </table>
                 </div>
             </div>
 
-            <!-- 门店列表放上方 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
@@ -138,11 +209,10 @@ const StoreManager = {
                               </tr>
                         </thead>
                         <tbody>${storeRows}</tbody>
-                     </table>
+                      </table>
                 </div>
             </div>
 
-            <!-- 新增门店表单放下方，双列布局 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                 <div class="form-grid">
@@ -168,7 +238,6 @@ const StoreManager = {
                 </div>
             </div>
             
-            <!-- 打印按钮 -->
             <div class="toolbar">
                 <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
             </div>`;
