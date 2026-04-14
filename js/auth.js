@@ -18,7 +18,6 @@ const AUTH = {
     },
 
     getCurrentStoreName() {
-        // 如果是 admin 且没有门店关联，返回"总部"
         if (this.user?.role === 'admin' && !this.user?.stores?.name && !this.user?.store_name) {
             return Utils.lang === 'id' ? 'Kantor Pusat' : '总部';
         }
