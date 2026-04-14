@@ -156,4 +156,53 @@ const Migration = {
                     <div style="background:#10b981;width:${percent}%;height:100%;border-radius:10px;transition:width 0.3s;"></div>
                 </div>
                 <p style="margin-top:8px;">
-                    ✅ ${lang === 'id' ? 'Berhasil' : '成功'
+                    ✅ ${lang === 'id' ? 'Berhasil' : '成功'}: ${this.progress.success} &nbsp;
+                    ⏭️ ${lang === 'id' ? 'Dilewati' : '已跳过'}: ${this.progress.skipped} &nbsp;
+                    ❌ ${lang === 'id' ? 'Gagal' : '失败'}: ${this.progress.failed}
+                </p>
+            </div>`;
+    },
+
+    showMigrationResult() {
+        const lang = Utils.lang;
+        let msg = lang === 'id'
+            ? `Migrasi selesai!\nBerhasil: ${this.progress.success}\nDilewati (sudah ada): ${this.progress.skipped}\nGagal: ${this.progress.failed}`
+            : `迁移完成！\n成功: ${this.progress.success}\n已跳过（已存在）: ${this.progress.skipped}\n失败: ${this.progress.failed}`;
+        if (this.failedOrders.length > 0) {
+            msg += '\n' + (lang === 'id' ? 'ID gagal: ' : '失败ID: ') + this.failedOrders.slice(0, 5).join(', ');
+            if (this.failedOrders.length > 5) msg += '...';
+        }
+        alert(msg);
+        if (this.progress.success > 0) location.reload();
+    },
+
+    renderMigrationUI() {
+        const lang = Utils.lang;
+        const html = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h2>📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</h2>
+                <div>
+                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                    <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>${lang === 'id' ? 'Migrasi dari localStorage ke Supabase' : '从 localStorage 迁移到 Supabase'}</h3>
+                <p style="color:#94a3b8;margin-bottom:8px;">
+                    ${lang === 'id'
+                        ? '• Data yang sudah ada di Supabase akan dilewati otomatis<br>• Migrasi berjalan paralel (lebih cepat)<br>• Jika gagal sebagian, data yang sudah berhasil tetap tersimpan'
+                        : '• 已存在于 Supabase 的数据将自动跳过<br>• 并行迁移（速度更快）<br>• 部分失败不影响已成功的记录'}
+                </p>
+                <p style="color:#f59e0b;margin-bottom:15px;">
+                    ⚠️ ${lang === 'id' ? 'Pastikan Anda sudah login sebagai admin sebelum migrasi.' : '请确保在迁移前已以管理员身份登录。'}
+                </p>
+                <div id="migrationProgress"></div>
+                <button onclick="Migration.startMigration()" class="success" id="migrateBtn">
+                    🚀 ${lang === 'id' ? 'Mulai Migrasi' : '开始迁移'}
+                </button>
+            </div>`;
+        document.getElementById("app").innerHTML = html;
+    }
+};
+
+window.Migration = Migration;
