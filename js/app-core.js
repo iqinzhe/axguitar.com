@@ -290,8 +290,6 @@ window.APP = {
         }
     },
 
-    // ==================== 客户信息模块 ====================
-
     showCustomers: async function() {
         this.currentPage = 'customers';
         this.saveCurrentPageState();
@@ -359,7 +357,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                  </tr>
+                                   </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -561,7 +559,6 @@ window.APP = {
         console.log("开始删除客户:", customerId);
         
         try {
-            // 1. 先查询该客户是否有订单
             const { data: orders, error: ordersError } = await supabaseClient
                 .from('orders')
                 .select('id')
@@ -574,10 +571,8 @@ window.APP = {
             
             console.log("找到订单数量:", orders?.length || 0);
             
-            // 2. 如果有订单，先删除订单的付款记录，再删除订单
             if (orders && orders.length > 0) {
                 for (var o of orders) {
-                    // 删除付款记录
                     const { error: payError } = await supabaseClient
                         .from('payment_history')
                         .delete()
@@ -585,7 +580,6 @@ window.APP = {
                     if (payError) console.warn('删除付款记录失败:', payError);
                 }
                 
-                // 删除订单
                 const { error: orderDeleteError } = await supabaseClient
                     .from('orders')
                     .delete()
@@ -596,7 +590,6 @@ window.APP = {
                 }
             }
             
-            // 3. 删除客户
             const { error: customerError } = await supabaseClient
                 .from('customers')
                 .delete()
@@ -609,7 +602,6 @@ window.APP = {
             
             alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
             
-            // 4. 强制刷新页面数据
             await this.showCustomers();
             
         } catch (e) {
@@ -716,8 +708,8 @@ window.APP = {
                     <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
                         ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>` : ''}
-                     </td>
-                </tr>`;
+                      </td>
+                 </tr>`;
             }).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             document.getElementById("app").innerHTML = `
@@ -743,7 +735,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
                                     <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                  </tr>
+                                  </table>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -811,8 +803,6 @@ window.APP = {
             alert(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
         }
     },
-
-    // ==================== 运营支出模块 ====================
 
     getExpensesTotal: async function() {
         const profile = await SUPABASE.getCurrentProfile();
@@ -900,7 +890,7 @@ window.APP = {
                     <div class="form-grid">
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
-                            <input type="date" id="expenseDate" value="${todayDate}" readonly style="background:#334155;">
+                            <input type="date" id="expenseDate" value="${todayDate}" style="background:#1e293b;">
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
@@ -933,7 +923,10 @@ window.APP = {
 
     addExpense: async function() {
         var lang = Utils.lang;
-        var expenseDate = new Date().toISOString().split('T')[0];
+        var expenseDate = document.getElementById("expenseDate").value;
+        if (!expenseDate) {
+            expenseDate = new Date().toISOString().split('T')[0];
+        }
         var category = document.getElementById("expenseCategory").value.trim();
         var amountStr = document.getElementById("expenseAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -1105,8 +1098,6 @@ window.APP = {
         }
     },
 
-    // ==================== 付款明细 ====================
-
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
@@ -1136,7 +1127,7 @@ window.APP = {
                     <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
                     <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
                     <td style="border:1px solid #334155;padding:8px;"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${Utils.t('view')}</button></td>
-                </table>`).join('');
+                </tr>`).join('');
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -1161,7 +1152,7 @@ window.APP = {
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                              <tr>
+                              </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -1175,8 +1166,6 @@ window.APP = {
             alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载付款记录失败');
         }
     },
-
-    // ==================== 财务报表 ====================
 
     showReport: async function() {
         this.currentPage = 'report';
@@ -1314,8 +1303,6 @@ window.APP = {
         }
     },
 
-    // ==================== 用户管理 ====================
-
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -1378,7 +1365,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Peran' : '角色'}</th>
                                     <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Toko' : '门店'}</th>
                                     <th style="border:1px solid #334155;padding:10px;text-align:left;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                  </tr>
+                                  </table>
                             </thead>
                             <tbody>${userRows}</tbody>
                         </table>
@@ -1467,8 +1454,6 @@ window.APP = {
             }
         }
     },
-
-    // ==================== 订单相关 ====================
 
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
@@ -1697,9 +1682,8 @@ window.APP = {
 
             var principalRows = '';
             if (principalPayments.length === 0) {
-                principalRows = `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}
-
-                            } else {
+                principalRows = `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
+            } else {
                 for (var p of principalPayments) {
                     principalRows += `<tr>
                         <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
@@ -1911,7 +1895,6 @@ window.APP = {
             notes: document.getElementById("notes").value
         };
         try {
-            // FIX: 传递 customerId 以同步 customers 表数据
             await Order.update(orderId, updates, order.customer_id);
             if (AUTH.isAdmin()) await Order.relockOrder(orderId);
             alert(Utils.t('order_updated'));
@@ -2008,7 +1991,7 @@ window.APP = {
                     <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
                     <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
                     <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                <tr></thead><tbody>`;
+                </tr></thead><tbody>`;
             
             if (payments.length === 0) {
                 printContent += `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">${lang === 'id' ? 'Belum ada pembayaran' : '暂无付款记录'}</td></tr>`;
@@ -2040,8 +2023,6 @@ window.APP = {
         }
     },
 
-    // ==================== 门店管理（调用 StoreManager） ====================
-
     addStore: async function() {
         var code = document.getElementById("newStoreCode").value.trim();
         var name = document.getElementById("newStoreName").value.trim();
@@ -2059,7 +2040,6 @@ window.APP = {
         }
     },
 
-    // 新增门店并同时创建店长用户
     addStoreWithManager: async function() {
         var code = document.getElementById("newStoreCode").value.trim();
         var name = document.getElementById("newStoreName").value.trim();
@@ -2087,7 +2067,6 @@ window.APP = {
         try { 
             await StoreManager.createStoreWithManager(code, name, address, phone, managerName, managerEmail, managerPassword);
             await StoreManager.renderStoreManagement();
-            // 刷新用户管理页面
             if (this.currentPage === 'userManagement') {
                 await this.showUserManagement();
             }
@@ -2112,13 +2091,10 @@ window.APP = {
         }
     },
 
-    // 保留原有的 showCreateOrder 方法（如果不存在则添加）
     showCreateOrder: function() {
-        // 如果有需要可以添加，目前使用 createOrderForCustomer 替代
         alert('Please select a customer first');
         this.navigateTo('customers');
     }
 };
 
-// 确保 APP 对象全局可用
 window.APP = APP;
