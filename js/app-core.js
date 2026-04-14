@@ -409,7 +409,8 @@ window.APP = {
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>`;
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
+            console.error("showCustomers error:", error);
+            alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
         }
     },
 
@@ -433,7 +434,9 @@ window.APP = {
 
         try {
             const profile = await SUPABASE.getCurrentProfile();
-            const { error } = await supabaseClient.from('customers').insert({
+            console.log("当前用户资料:", profile);
+            
+            const { data, error } = await supabaseClient.from('customers').insert({
                 store_id: profile.store_id,
                 name: name,
                 ktp_number: ktp || null,
@@ -444,11 +447,16 @@ window.APP = {
                 living_address: livingAddress || null,
                 registered_date: new Date().toISOString().split('T')[0],
                 created_by: profile.id
-            });
-            if (error) throw error;
+            }).select();
+            
+            if (error) {
+                console.error("插入客户错误:", error);
+                throw error;
+            }
             alert(lang === 'id' ? 'Nasabah berhasil ditambahkan' : '客户添加成功');
             await this.showCustomers();
         } catch (error) {
+            console.error("addCustomer error:", error);
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
@@ -546,46 +554,66 @@ window.APP = {
         }
     },
 
-    // 修复删除客户方法
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
         if (!confirm(lang === 'id' ? 'Hapus nasabah ini? Semua order terkait juga akan terhapus.' : '删除此客户？相关订单也将被删除。')) return;
         
+        console.log("开始删除客户:", customerId);
+        
         try {
+            // 1. 先查询该客户是否有订单
             const { data: orders, error: ordersError } = await supabaseClient
                 .from('orders')
                 .select('id')
                 .eq('customer_id', customerId);
             
-            if (ordersError) throw ordersError;
+            if (ordersError) {
+                console.error("查询订单错误:", ordersError);
+                throw ordersError;
+            }
             
+            console.log("找到订单数量:", orders?.length || 0);
+            
+            // 2. 如果有订单，先删除订单的付款记录，再删除订单
             if (orders && orders.length > 0) {
                 for (var o of orders) {
-                    await supabaseClient
+                    // 删除付款记录
+                    const { error: payError } = await supabaseClient
                         .from('payment_history')
                         .delete()
                         .eq('order_id', o.id);
+                    if (payError) console.warn('删除付款记录失败:', payError);
                 }
                 
+                // 删除订单
                 const { error: orderDeleteError } = await supabaseClient
                     .from('orders')
                     .delete()
                     .eq('customer_id', customerId);
-                if (orderDeleteError) throw orderDeleteError;
+                if (orderDeleteError) {
+                    console.error("删除订单错误:", orderDeleteError);
+                    throw orderDeleteError;
+                }
             }
             
+            // 3. 删除客户
             const { error: customerError } = await supabaseClient
                 .from('customers')
                 .delete()
                 .eq('id', customerId);
             
-            if (customerError) throw customerError;
+            if (customerError) {
+                console.error("删除客户错误:", customerError);
+                throw customerError;
+            }
             
             alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
+            
+            // 4. 强制刷新页面数据
             await this.showCustomers();
             
         } catch (e) {
-            console.error('删除客户错误:', e);
+            console.error('删除客户异常:', e);
             alert(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
         }
     },
@@ -689,7 +717,7 @@ window.APP = {
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
                         ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>` : ''}
                      </td>
-                </table>`;
+                </tr>`;
             }).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             document.getElementById("app").innerHTML = `
@@ -809,31 +837,35 @@ window.APP = {
             if (error) throw error;
             var totalAmount = expenses?.reduce((s, e) => s + e.amount, 0) || 0;
             
-            // 系统当前日期
             var todayDate = new Date().toISOString().split('T')[0];
 
-            var rows = expenses && expenses.length > 0 ? expenses.map(e => {
-                var canEdit = isAdmin && !e.is_reconciled;
-                var actionBtns = '';
-                if (canEdit) {
-                    actionBtns = `
-                        <button onclick="APP.editExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
-                        <button class="danger" onclick="APP.deleteExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
-                    `;
-                } else if (e.is_reconciled) {
-                    actionBtns = `<span style="color:#10b981;font-size:11px;">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
-                } else if (!isAdmin) {
-                    actionBtns = `<span style="color:#94a3b8;font-size:11px;">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
+            var rows = '';
+            if (expenses && expenses.length > 0) {
+                for (var e of expenses) {
+                    var canEdit = isAdmin && !e.is_reconciled;
+                    var actionBtns = '';
+                    if (canEdit) {
+                        actionBtns = `
+                            <button onclick="APP.editExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
+                            <button class="danger" onclick="APP.deleteExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+                        `;
+                    } else if (e.is_reconciled) {
+                        actionBtns = `<span style="color:#10b981;font-size:11px;">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
+                    } else if (!isAdmin) {
+                        actionBtns = `<span style="color:#94a3b8;font-size:11px;">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
+                    }
+                    rows += `<tr>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.category)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
+                        <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionBtns}</td>
+                    </tr>`;
                 }
-                return `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.category)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
-                    <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">${actionBtns}</td>
-                </table>`;
-            }).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            } else {
+                rows = `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            }
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -894,13 +926,13 @@ window.APP = {
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
+            console.error("showExpenses error:", error);
             alert(lang === 'id' ? 'Gagal memuat pengeluaran' : '加载支出失败');
         }
     },
 
     addExpense: async function() {
         var lang = Utils.lang;
-        // 直接使用系统当前日期，不从输入框读取
         var expenseDate = new Date().toISOString().split('T')[0];
         var category = document.getElementById("expenseCategory").value.trim();
         var amountStr = document.getElementById("expenseAmount").value;
@@ -912,25 +944,87 @@ window.APP = {
         
         try {
             const profile = await SUPABASE.getCurrentProfile();
-            const { error } = await supabaseClient.from('expenses').insert({
+            console.log("添加支出，用户资料:", profile);
+            
+            const { data, error } = await supabaseClient.from('expenses').insert({
                 store_id: profile.store_id, 
                 expense_date: expenseDate,
-                category, 
-                amount,
+                category: category, 
+                amount: amount,
                 description: description || null, 
                 created_by: profile.id, 
                 is_locked: true,
                 is_reconciled: false
-            });
-            if (error) throw error;
+            }).select();
+            
+            if (error) {
+                console.error("添加支出错误:", error);
+                throw error;
+            }
             alert(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
             await this.showExpenses();
         } catch (error) {
+            console.error("addExpense error:", error);
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
 
-    // 平账功能
+    editExpense: async function(expenseId) {
+        var lang = Utils.lang;
+        try {
+            const { data: expense, error } = await supabaseClient
+                .from('expenses')
+                .select('*')
+                .eq('id', expenseId)
+                .single();
+            if (error) throw error;
+            
+            if (expense.is_reconciled) {
+                alert(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
+                return;
+            }
+            
+            var newAmount = prompt(lang === 'id' ? 'Masukkan jumlah baru:' : '请输入新金额:', expense.amount);
+            if (newAmount && !isNaN(parseFloat(newAmount))) {
+                const { error: updateError } = await supabaseClient
+                    .from('expenses')
+                    .update({ amount: parseFloat(newAmount) })
+                    .eq('id', expenseId);
+                if (updateError) throw updateError;
+                alert(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
+                await this.showExpenses();
+            }
+        } catch (error) {
+            console.error("editExpense error:", error);
+            alert(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
+        }
+    },
+
+    deleteExpense: async function(expenseId) {
+        var lang = Utils.lang;
+        if (!confirm(lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？')) return;
+        
+        try {
+            console.log("删除支出记录:", expenseId);
+            
+            const { error } = await supabaseClient
+                .from('expenses')
+                .delete()
+                .eq('id', expenseId);
+            
+            if (error) {
+                console.error("删除支出错误:", error);
+                throw error;
+            }
+            
+            alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
+            await this.showExpenses();
+        } catch (error) {
+            console.error("deleteExpense error:", error);
+            alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
+        }
+    },
+
     balanceExpenses: async function() {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -1006,53 +1100,8 @@ window.APP = {
             
             await this.showExpenses();
         } catch (error) {
+            console.error("balanceExpenses error:", error);
             alert(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
-        }
-    },
-
-    editExpense: async function(expenseId) {
-        var lang = Utils.lang;
-        try {
-            const { data: expense, error } = await supabaseClient
-                .from('expenses')
-                .select('*')
-                .eq('id', expenseId)
-                .single();
-            if (error) throw error;
-            
-            if (expense.is_reconciled) {
-                alert(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
-                return;
-            }
-            
-            var newAmount = prompt(lang === 'id' ? 'Masukkan jumlah baru:' : '请输入新金额:', expense.amount);
-            if (newAmount && !isNaN(parseFloat(newAmount))) {
-                const { error: updateError } = await supabaseClient
-                    .from('expenses')
-                    .update({ amount: parseFloat(newAmount) })
-                    .eq('id', expenseId);
-                if (updateError) throw updateError;
-                alert(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
-                await this.showExpenses();
-            }
-        } catch (error) {
-            alert(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
-        }
-    },
-
-    deleteExpense: async function(expenseId) {
-        var lang = Utils.lang;
-        if (!confirm(lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？')) return;
-        try {
-            const { error } = await supabaseClient
-                .from('expenses')
-                .delete()
-                .eq('id', expenseId);
-            if (error) throw error;
-            alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
-            await this.showExpenses();
-        } catch (error) {
-            alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
         }
     },
 
@@ -1112,7 +1161,7 @@ window.APP = {
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
                                 <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                              </tr>
+                              <tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -1122,6 +1171,7 @@ window.APP = {
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>`;
         } catch (error) {
+            console.error("showPaymentHistory error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载付款记录失败');
         }
     },
@@ -1259,6 +1309,7 @@ window.APP = {
                     </div>`;
             }
         } catch (err) {
+            console.error("showReport error:", err);
             alert(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报告失败');
         }
     },
@@ -1386,21 +1437,34 @@ window.APP = {
             await AUTH.addUser(username, password, name, role, storeId || null);
             alert((Utils.lang === 'id' ? 'Pengguna "' : '用户 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！'));
             await this.showUserManagement();
-        } catch (error) { alert('Error: ' + error.message); }
+        } catch (error) { 
+            console.error("addUser error:", error);
+            alert('Error: ' + error.message); 
+        }
     },
 
     deleteUser: async function(userId) {
         if (confirm(Utils.lang === 'id' ? 'Hapus pengguna ini?' : '删除此用户？')) {
-            try { await AUTH.deleteUser(userId); await this.showUserManagement(); }
-            catch (error) { alert('Error: ' + error.message); }
+            try { 
+                await AUTH.deleteUser(userId); 
+                await this.showUserManagement(); 
+            } catch (error) { 
+                console.error("deleteUser error:", error);
+                alert('Error: ' + error.message); 
+            }
         }
     },
 
     editUser: async function(userId) {
         var newRole = prompt(Utils.lang === 'id' ? 'Masukkan peran baru (admin/store_manager):' : '输入新角色 (admin/store_manager):');
         if (newRole && (newRole === 'admin' || newRole === 'store_manager')) {
-            try { await AUTH.updateUser(userId, { role: newRole }); await this.showUserManagement(); }
-            catch (error) { alert('Error: ' + error.message); }
+            try { 
+                await AUTH.updateUser(userId, { role: newRole }); 
+                await this.showUserManagement(); 
+            } catch (error) { 
+                console.error("editUser error:", error);
+                alert('Error: ' + error.message); 
+            }
         }
     },
 
@@ -1420,11 +1484,13 @@ window.APP = {
             var storeMap = {};
             for (var s of stores) storeMap[s.id] = s.name;
 
-            var rows = orders.length === 0
-                ? `<tr><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`
-                : orders.map(o => {
+            var rows = '';
+            if (orders.length === 0) {
+                rows = `<td><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            } else {
+                for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
-                    return `<tr>
+                    rows += `<tr>
                         <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
                         <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.customer_name)}</td>
                         <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(o.collateral_name)}</td>
@@ -1442,7 +1508,8 @@ window.APP = {
                             ${o.is_locked ? `<span style="font-size:12px;color:#94a3b8;margin-left:4px;">🔒</span>` : ''}
                         </td>
                     </tr>`;
-                }).join('');
+                }
+            }
 
             document.getElementById("app").innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -1481,13 +1548,26 @@ window.APP = {
                     </table>
                 </div>`;
         } catch (err) {
+            console.error("showOrderTable error:", err);
             alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
         }
     },
 
-    searchOrders: function() { this.searchKeyword = document.getElementById("searchInput").value; this.showOrderTable(); },
-    resetSearch: function() { this.searchKeyword = ""; this.currentFilter = "all"; this.showOrderTable(); },
-    filterOrders: function(status) { this.currentFilter = status; this.showOrderTable(); },
+    searchOrders: function() { 
+        this.searchKeyword = document.getElementById("searchInput").value; 
+        this.showOrderTable(); 
+    },
+    
+    resetSearch: function() { 
+        this.searchKeyword = ""; 
+        this.currentFilter = "all"; 
+        this.showOrderTable(); 
+    },
+    
+    filterOrders: function(status) { 
+        this.currentFilter = status; 
+        this.showOrderTable(); 
+    },
 
     viewOrder: async function(orderId) {
         this.currentPage = 'viewOrder';
@@ -1500,16 +1580,22 @@ window.APP = {
             var t = (key) => Utils.t(key);
             var isAdmin = AUTH.isAdmin();
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
-            var payRows = payments && payments.length > 0 ? payments.map(p => {
-                var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
-                return `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${typeText}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
-                </tr>`;
-            }).join('') : `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            
+            var payRows = '';
+            if (payments && payments.length > 0) {
+                for (var p of payments) {
+                    var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
+                    payRows += `<tr>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${typeText}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
+                    </tr>`;
+                }
+            } else {
+                payRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            }
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
@@ -1560,6 +1646,7 @@ window.APP = {
                     </div>
                 </div>`;
         } catch (error) {
+            console.error("viewOrder error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
             this.goBack();
         }
@@ -1567,8 +1654,12 @@ window.APP = {
 
     unlockOrder: async function(orderId) {
         if (confirm(Utils.lang === 'id' ? 'Buka kunci order ini?' : '解锁此订单？')) {
-            try { await Order.unlockOrder(orderId); await this.viewOrder(orderId); }
-            catch (error) { alert('Error: ' + error.message); }
+            try { 
+                await Order.unlockOrder(orderId); 
+                await this.viewOrder(orderId); 
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
         }
     },
 
@@ -1589,24 +1680,34 @@ window.APP = {
 
             var interestPayments = payments.filter(p => p.type === 'interest');
             var principalPayments = payments.filter(p => p.type === 'principal');
-            var adminFeePayments = payments.filter(p => p.type === 'admin_fee');
 
-            var interestRows = interestPayments.length === 0
-                ? `<tr><td colspan="4" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`
-                : interestPayments.map(p => `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                    <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
-                </tr>`).join('');
+            var interestRows = '';
+            if (interestPayments.length === 0) {
+                interestRows = `<tr><td colspan="4" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
+            } else {
+                for (var p of interestPayments) {
+                    interestRows += `<tr>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                        <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                    </tr>`;
+                }
+            }
 
-            var principalRows = principalPayments.length === 0
-                ? `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`
-                : principalPayments.map(p => `<tr>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
-                    <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                    <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
-                </tr>`).join('');
+            var principalRows = '';
+            if (principalPayments.length === 0) {
+                principalRows = `<tr><td colspan="3" style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}
+
+                            } else {
+                for (var p of principalPayments) {
+                    principalRows += `<tr>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatDate(p.date)}</td>
+                        <td style="border:1px solid #334155;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
+                        <td style="border:1px solid #334155;padding:8px;font-size:11px;color:#94a3b8;">${Utils.escapeHtml(p.description || '-')}</td>
+                    </tr>`;
+                }
+            }
 
             var adminFeeSection = !order.admin_fee_paid
                 ? `<div style="background:#0f172a;padding:12px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #f59e0b;">
@@ -1675,7 +1776,7 @@ window.APP = {
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th style="border:1px solid #334155;padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                  </table>
+                                  </tr>
                             </thead>
                             <tbody>${interestRows}</tbody>
                         </table>
@@ -1715,6 +1816,7 @@ window.APP = {
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
 
         } catch (error) {
+            console.error("showPayment error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat halaman pembayaran' : '加载支付页面失败');
             this.goBack();
         }
@@ -1722,8 +1824,12 @@ window.APP = {
 
     payAdminFee: async function(orderId) {
         if (confirm(Utils.lang === 'id' ? 'Konfirmasi penerimaan Admin Fee 30,000 IDR?' : '确认已收取管理费 30,000 IDR？')) {
-            try { await Order.recordAdminFee(orderId); await this.showPayment(orderId); }
-            catch (error) { alert('Error: ' + error.message); }
+            try { 
+                await Order.recordAdminFee(orderId); 
+                await this.showPayment(orderId); 
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
         }
     },
 
@@ -1734,8 +1840,9 @@ window.APP = {
             try {
                 await Order.recordInterestPayment(orderId, months);
                 await this.showPayment(orderId);
+            } catch (error) { 
+                alert('Error: ' + error.message); 
             }
-            catch (error) { alert('Error: ' + error.message); }
         }
     },
 
@@ -1748,8 +1855,9 @@ window.APP = {
             try {
                 await Order.recordPrincipalPayment(orderId, amount);
                 await this.showPayment(orderId);
+            } catch (error) { 
+                alert('Error: ' + error.message); 
             }
-            catch (error) { alert('Error: ' + error.message); }
         }
     },
 
@@ -1783,12 +1891,21 @@ window.APP = {
                         </div>
                     </div>
                 </div>`;
-        } catch (error) { alert('Error loading order'); this.goBack(); }
+        } catch (error) { 
+            console.error("editOrder error:", error);
+            alert('Error loading order'); 
+            this.goBack(); 
+        }
     },
 
     updateOrder: async function(orderId) {
         var updates = {
-            customer: { name: document.getElementById("name").value, ktp: document.getElementById("ktp").value, phone: document.getElementById("phone").value, address: document.getElementById("address").value },
+            customer: { 
+                name: document.getElementById("name").value, 
+                ktp: document.getElementById("ktp").value, 
+                phone: document.getElementById("phone").value, 
+                address: document.getElementById("address").value 
+            },
             collateral_name: document.getElementById("collateral").value,
             notes: document.getElementById("notes").value
         };
@@ -1797,13 +1914,20 @@ window.APP = {
             if (AUTH.isAdmin()) await Order.relockOrder(orderId);
             alert(Utils.t('order_updated'));
             this.goBack();
-        } catch (error) { alert('Error: ' + error.message); }
+        } catch (error) { 
+            alert('Error: ' + error.message); 
+        }
     },
 
     deleteOrder: async function(orderId) {
         if (confirm(Utils.t('confirm_delete'))) {
-            try { await Order.delete(orderId); alert(Utils.t('order_deleted')); await this.showOrderTable(); }
-            catch (error) { alert('Error: ' + error.message); }
+            try { 
+                await Order.delete(orderId); 
+                alert(Utils.t('order_deleted')); 
+                await this.showOrderTable(); 
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
         }
     },
 
@@ -1815,6 +1939,7 @@ window.APP = {
             var totalPrincipalPaid = payments.filter(p => p.type === 'principal').reduce((s, p) => s + p.amount, 0);
             var totalInterestPaid = payments.filter(p => p.type === 'interest').reduce((s, p) => s + p.amount, 0);
             var totalAdminFeePaid = payments.filter(p => p.type === 'admin_fee').reduce((s, p) => s + p.amount, 0);
+            
             var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Print - ${order.order_id}</title>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1881,12 +2006,18 @@ window.APP = {
                     <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
                     <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
                     <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                </table></thead><tbody>
-                ${payments.length === 0 ? `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">${lang === 'id' ? 'Belum ada pembayaran' : '暂无付款记录'}</td></tr>` :
-                payments.map(p => {
+                <tr></thead><tbody>`;
+            
+            if (payments.length === 0) {
+                printContent += `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">${lang === 'id' ? 'Belum ada pembayaran' : '暂无付款记录'}</td></tr>`;
+            } else {
+                for (var p of payments) {
                     var tt = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
-                    return `<tr><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.formatDate(p.date)}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${tt}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 月') : '-'}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.formatCurrency(p.amount)}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
-                }).join('')}
+                    printContent += `<tr><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.formatDate(p.date)}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${tt}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 月') : '-'}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.formatCurrency(p.amount)}</td><td style="border:1px solid #cbd5e1;padding:4px 6px;">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
+                }
+            }
+            
+            printContent += `
                 </tbody></table>
             </div>
             <div class="remarks">
@@ -1897,10 +2028,12 @@ window.APP = {
             </div>
             <div class="footer">${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()} &nbsp;|&nbsp; © JF! by Gadai</div>
             </body></html>`;
+            
             var pw = window.open('', '_blank');
             pw.document.write(printContent);
             pw.document.close();
         } catch (error) {
+            console.error("printOrder error:", error);
             alert(Utils.lang === 'id' ? 'Gagal mencetak order' : '打印订单失败');
         }
     },
@@ -1912,9 +2045,54 @@ window.APP = {
         var name = document.getElementById("newStoreName").value.trim();
         var address = document.getElementById("newStoreAddress").value;
         var phone = document.getElementById("newStorePhone").value;
-        if (!code || !name) { alert(Utils.lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); return; }
-        try { await StoreManager.createStore(code, name, address, phone); await StoreManager.renderStoreManagement(); }
-        catch (error) { alert('Error: ' + error.message); }
+        if (!code || !name) { 
+            alert(Utils.lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); 
+            return; 
+        }
+        try { 
+            await StoreManager.createStore(code, name, address, phone); 
+            await StoreManager.renderStoreManagement(); 
+        } catch (error) { 
+            alert('Error: ' + error.message); 
+        }
+    },
+
+    // 新增门店并同时创建店长用户
+    addStoreWithManager: async function() {
+        var code = document.getElementById("newStoreCode").value.trim();
+        var name = document.getElementById("newStoreName").value.trim();
+        var address = document.getElementById("newStoreAddress").value;
+        var phone = document.getElementById("newStorePhone").value;
+        var managerName = document.getElementById("newManagerName").value.trim();
+        var managerEmail = document.getElementById("newManagerEmail").value.trim();
+        var managerPassword = document.getElementById("newManagerPassword").value;
+        
+        var lang = Utils.lang;
+        
+        if (!code || !name) { 
+            alert(lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); 
+            return; 
+        }
+        if (!managerName || !managerEmail || !managerPassword) {
+            alert(lang === 'id' ? 'Data manajer harus diisi lengkap' : '店长信息必须完整填写');
+            return;
+        }
+        if (managerPassword.length < 6) {
+            alert(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6位');
+            return;
+        }
+        
+        try { 
+            await StoreManager.createStoreWithManager(code, name, address, phone, managerName, managerEmail, managerPassword);
+            await StoreManager.renderStoreManagement();
+            // 刷新用户管理页面
+            if (this.currentPage === 'userManagement') {
+                await this.showUserManagement();
+            }
+        } catch (error) { 
+            console.error("addStoreWithManager error:", error);
+            alert('Error: ' + error.message); 
+        }
     },
 
     editStore: async function(storeId) {
@@ -1923,8 +2101,22 @@ window.APP = {
 
     deleteStore: async function(storeId) {
         if (confirm(Utils.lang === 'id' ? 'Hapus toko ini?' : '删除此门店？')) {
-            try { await StoreManager.deleteStore(storeId); await StoreManager.renderStoreManagement(); }
-            catch (error) { alert('Error: ' + error.message); }
+            try { 
+                await StoreManager.deleteStore(storeId); 
+                await StoreManager.renderStoreManagement(); 
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
         }
+    },
+
+    // 保留原有的 showCreateOrder 方法（如果不存在则添加）
+    showCreateOrder: function() {
+        // 如果有需要可以添加，目前使用 createOrderForCustomer 替代
+        alert('Please select a customer first');
+        this.navigateTo('customers');
     }
 };
+
+// 确保 APP 对象全局可用
+window.APP = APP;
