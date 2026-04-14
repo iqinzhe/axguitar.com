@@ -360,3 +360,33 @@ td:last-child button {
 
     .report-store-stat { border-right: none; }
 }
+/* ========== 手机端表格优化 ========== */
+@media (max-width: 768px) {
+    /* 用户管理表格 - 手机端允许横向滚动 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .table {
+        min-width: 550px;
+    }
+    
+    /* 表格单元格内边距减小 */
+    .table th, .table td {
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+    
+    /* 按钮缩小 */
+    .table td button {
+        padding: 3px 6px;
+        font-size: 10px;
+        margin: 1px;
+    }
+    
+    /* 当前用户标识缩小 */
+    .table td span {
+        font-size: 10px;
+    }
+}
