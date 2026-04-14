@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JF! by Gadai</title>
-
-<!-- Favicon & Web App Manifest -->
 <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
@@ -14,31 +12,30 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#ffffff">
-    
 <link rel="stylesheet" href="main.css">
 </head>
 <body>
-
 <div id="app">Loading system...</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/utils.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/permission.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/order.js"></script>
 <script src="js/store.js"></script>
 <script src="js/migration.js"></script>
 <script src="js/app-core.js"></script>
-
 <script>
-// 直接调用，不依赖 window.onload
-if (window.APP) {
-    window.APP.init();
-} else {
-    document.getElementById("app").innerHTML = "Loading error: APP not defined";
-}
+// FIX #2: 使用 DOMContentLoaded 防止 APP not defined 错误
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.APP) {
+        window.APP.init();
+    } else {
+        document.getElementById("app").innerHTML =
+            '<div style="text-align:center;padding:50px;color:#ef4444;">Loading error: APP not defined. Please refresh.</div>';
+    }
+});
 </script>
-
 </body>
 </html>
