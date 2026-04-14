@@ -16,6 +16,49 @@ const StoreManager = {
         return newStore;
     },
 
+    // 创建门店并同时创建店长用户
+    async createStoreWithManager(code, name, address, phone, managerName, managerEmail, managerPassword) {
+        const lang = Utils.lang;
+        
+        try {
+            // 1. 创建门店
+            const newStore = await SUPABASE.createStore(code, name, address, phone);
+            this.stores.push(newStore);
+            this.stores.sort((a, b) => a.name.localeCompare(b.name));
+            
+            // 2. 创建店长用户（需要 admin 权限，使用 supabase admin API）
+            const { data: userData, error: userError } = await supabaseClient.auth.admin.createUser({
+                email: managerEmail,
+                password: managerPassword,
+                email_confirm: true,
+                user_metadata: { name: managerName, role: 'store_manager', store_id: newStore.id }
+            });
+            
+            if (userError) throw userError;
+            
+            // 3. 创建用户资料
+            const { error: profileError } = await supabaseClient.from('user_profiles').insert({
+                id: userData.user.id,
+                username: managerEmail,
+                name: managerName,
+                role: 'store_manager',
+                store_id: newStore.id
+            });
+            
+            if (profileError) throw profileError;
+            
+            alert(lang === 'id' 
+                ? `Toko dan manajer berhasil dibuat!\nEmail: ${managerEmail}\nPassword: ${managerPassword}`
+                : `门店和店长创建成功！\n邮箱: ${managerEmail}\n密码: ${managerPassword}`);
+            
+            return newStore;
+        } catch (error) {
+            console.error("Create store with manager error:", error);
+            alert(lang === 'id' ? 'Gagal membuat toko: ' + error.message : '创建门店失败：' + error.message);
+            throw error;
+        }
+    },
+
     async updateStore(id, updates) {
         const updated = await SUPABASE.updateStore(id, updates);
         const idx = this.stores.findIndex(s => s.id === id);
@@ -152,9 +195,12 @@ const StoreManager = {
         </tr>`).join('');
 
         if (this.stores.length === 0) {
-            storeRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            storeRows = `<td><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
             storeStatsRows = `<tr><td colspan="4" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
         }
+
+        // 获取当前日期用于门店新增表单的店长信息
+        var todayDate = new Date().toISOString().split('T')[0];
 
         document.getElementById("app").innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -214,7 +260,7 @@ const StoreManager = {
             </div>
 
             <div class="card">
-                <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
+                <h3>${lang === 'id' ? 'Tambah Toko Baru + Manajer' : '新增门店 + 店长'}</h3>
                 <div class="form-grid">
                     <div class="form-group">
                         <label>${lang === 'id' ? 'Kode Toko' : '门店编码'} *</label>
@@ -232,8 +278,21 @@ const StoreManager = {
                         <label>${lang === 'id' ? 'Telepon' : '电话'}</label>
                         <input id="newStorePhone" placeholder="${lang === 'id' ? 'Telepon' : '电话'}">
                     </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Nama Manajer' : '店长姓名'} *</label>
+                        <input id="newManagerName" placeholder="${lang === 'id' ? 'Nama Manajer' : '店长姓名'}">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Email Manajer' : '店长邮箱'} *</label>
+                        <input id="newManagerEmail" placeholder="manager@toko.com">
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Password Manajer' : '店长密码'} *</label>
+                        <input type="password" id="newManagerPassword" placeholder="${lang === 'id' ? 'Password' : '密码'}">
+                    </div>
+                    <div class="form-group"></div>
                     <div class="form-actions">
-                        <button onclick="APP.addStore()" class="success">➕ ${lang === 'id' ? 'Tambah Toko' : '添加门店'}</button>
+                        <button onclick="APP.addStoreWithManager()" class="success">➕ ${lang === 'id' ? 'Tambah Toko + Manajer' : '添加门店 + 店长'}</button>
                     </div>
                 </div>
             </div>
