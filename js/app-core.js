@@ -120,7 +120,7 @@ window.APP = {
                 <div style="text-align: right; margin-bottom: 10px;">
                 <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>   
                 </div>
-                <h2>🏦 SIPEG JF</h2>
+                <h2>🏦 JF! by Gadai</h2>
                 <h3>${t('login')}</h3>
                 <div class="form-group">
                     <label>${t('username')}</label>
@@ -172,7 +172,7 @@ window.APP = {
             
             var html = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
-                    <h1>🏦 SIPEG JF</h1>
+                    <h1>🏦 JF! by Gadai</h1>
                     <div>
             
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}
@@ -906,7 +906,7 @@ window.APP = {
                         <button onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
                     </div>
                     <div class="header">
-                        <h1>🏦 SIPEG JF</h1>
+                        <h1>🏦 JF! by Gadai</h1>
                         <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'}</p>
                         <p><strong>${lang === 'id' ? 'Nomor Order' : '订单号'}:</strong> ${order.order_id}</p>
                         <p><strong>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
@@ -973,7 +973,7 @@ window.APP = {
                     
                     <div class="footer">
                         <p>${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()}</p>
-                        <p>© SIPEG JF - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</p>
+                        <p>© JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</p>
                     </div>
                 </body>
                 </html>
