@@ -1,12 +1,12 @@
 {
-  "name": "JF Gadai | Layanan Gadai Terpercaya",
-  "short_name": "JF Gadai",
-  "description": "Layanan gadai terpercaya untuk emas, elektronik, kendaraan dan barang berharga lainnya.",
+  "name": "JF! Gadai | Sistem Pencatatan Gadai",
+  "short_name": "JF! Gadai",
+  "description": "Sistem manajemen pinjaman gadai untuk admin dan manajer toko. Kelola nasabah, kontrak, pembayaran bunga & pokok, laporan keuangan, dan multi-cabang.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0b2c4a",
-  "theme_color": "#0f4c81",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
   "orientation": "portrait",
   "lang": "id",
   "dir": "ltr",
@@ -17,36 +17,30 @@
   },
   "icons": [
     {
-      "src": "/icons/android-chrome-96x96.png",
+      "src": "/icons/system-jf.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/favicon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/android-chrome-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/android-chrome-192x192.png",
+      "src": "/icons/favicon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/android-chrome-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [
     {
-      "name": "Pinjaman Baru",
-      "short_name": "Pinjaman Baru",
-      "description": "Buat kontrak pinjaman baru",
-      "url": "/?action=new",
+      "name": "Buat Kontrak Baru",
+      "short_name": "Kontrak Baru",
+      "description": "Buat perjanjian pinjaman baru untuk nasabah",
+      "url": "/?action=newOrder",
       "icons": [
         {
           "src": "/icons/shortcut-new-96x96.png",
@@ -59,7 +53,7 @@
     {
       "name": "Bayar Angsuran",
       "short_name": "Bayar",
-      "description": "Lakukan pembayaran angsuran",
+      "description": "Catat pembayaran bunga atau pokok",
       "url": "/?action=payment",
       "icons": [
         {
@@ -71,10 +65,10 @@
       ]
     },
     {
-      "name": "Daftar Klien",
-      "short_name": "Klien",
-      "description": "Lihat daftar semua klien aktif",
-      "url": "/?action=clients",
+      "name": "Data Nasabah",
+      "short_name": "Nasabah",
+      "description": "Lihat dan kelola daftar nasabah",
+      "url": "/?action=customers",
       "icons": [
         {
           "src": "/icons/shortcut-clients-96x96.png",
@@ -87,7 +81,7 @@
     {
       "name": "Laporan Keuangan",
       "short_name": "Laporan",
-      "description": "Ringkasan pendapatan bunga dan pokok",
+      "description": "Ringkasan pendapatan per cabang",
       "url": "/?action=report",
       "icons": [
         {
@@ -101,22 +95,21 @@
   ],
   "screenshots": [
     {
-      "src": "/screenshots/desktop-dashboard.png",
+      "src": "/screenshots/dashboard-desktop.png",
       "sizes": "1280x720",
       "type": "image/png",
       "platform": "wide",
-      "label": "Tampilan dashboard desktop"
+      "label": "Dashboard admin di desktop"
     },
     {
-      "src": "/screenshots/mobile-list.png",
+      "src": "/screenshots/orders-mobile.png",
       "sizes": "750x1334",
       "type": "image/png",
       "platform": "narrow",
-      "label": "Daftar pinjaman di ponsel"
+      "label": "Daftar kontrak di ponsel"
     }
   ],
   "prefer_related_applications": false,
   "related_applications": [],
-  "iarc_rating_id": "",
-  "note": "Konfigurasi untuk sistem pencatatan gadai - JF Gadai"
+  "note": "Manifest untuk sistem pencatatan gadai JF! Gadai - terintegrasi dengan Supabase"
 }
