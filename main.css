@@ -200,6 +200,7 @@ td:last-child button {
     font-weight: bold;
     color: #f1f5f9;
     font-size: 15px;
+    border-bottom: 1px solid #334155;
 }
 
 .report-store-stats {
@@ -211,7 +212,7 @@ td:last-child button {
 .report-store-stat {
     padding: 12px 16px;
     border-right: 1px solid #334155;
-    border-top: 1px solid #334155;
+    border-bottom: 1px solid #334155;
 }
 
 .report-store-stat:last-child { border-right: none; }
@@ -220,6 +221,11 @@ td:last-child button {
 .report-store-stat .value.income { color: #10b981; }
 .report-store-stat .value.expense { color: #ef4444; }
 .report-store-stat .value.profit { color: #3b82f6; }
+
+/* 最后一行去掉下边框 */
+.report-store-stats:last-child .report-store-stat {
+    border-bottom: none;
+}
 
 .report-total-row {
     background: #0f172a;
@@ -259,6 +265,35 @@ td:last-child button {
     padding: 0;
     margin: 0;
     cursor: pointer;
+}
+
+/* ========== 打印样式 ========== */
+@media print {
+    .no-print, .toolbar button:not(.print-btn) {
+        display: none !important;
+    }
+    .toolbar {
+        display: block !important;
+    }
+    .print-btn {
+        display: inline-block !important;
+    }
+    body {
+        background: white;
+        color: black;
+        padding: 10mm;
+    }
+    .card, .stat-card, .report-store-section {
+        background: white;
+        border: 1px solid #ccc;
+        color: black;
+    }
+    th, td {
+        border: 1px solid #ccc;
+    }
+    .stat-value {
+        color: #333;
+    }
 }
 
 /* ========== 手机端优化 ========== */
