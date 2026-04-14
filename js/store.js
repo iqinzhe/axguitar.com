@@ -47,6 +47,7 @@ const StoreManager = {
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
 
+        // 门店财务汇总
         let storeStatsRows = '';
         let grandTotalIncome = 0, grandTotalExpenses = 0, grandTotalGrossProfit = 0;
         for (const store of this.stores) {
@@ -57,24 +58,31 @@ const StoreManager = {
             grandTotalExpenses += expenses;
             grandTotalGrossProfit += grossProfit;
             storeStatsRows += `<tr>
-                <td><strong>${Utils.escapeHtml(store.name)}</strong></td>
-                <td style="color:#10b981;">${Utils.formatCurrency(income)}</td>
-                <td style="color:#ef4444;">${Utils.formatCurrency(expenses)}</td>
-                <td style="color:${grossProfit >= 0 ? '#10b981' : '#ef4444'};">${Utils.formatCurrency(grossProfit)}</td>
+                <td style="border:1px solid #334155;padding:8px;"><strong>${Utils.escapeHtml(store.name)}</strong></td>
+                <td style="border:1px solid #334155;padding:8px;color:#10b981;">${Utils.formatCurrency(income)}</td>
+                <td style="border:1px solid #334155;padding:8px;color:#ef4444;">${Utils.formatCurrency(expenses)}</td>
+                <td style="border:1px solid #334155;padding:8px;color:${grossProfit >= 0 ? '#10b981' : '#ef4444'};">${Utils.formatCurrency(grossProfit)}</td>
             </tr>`;
         }
 
+        // 门店列表
         let storeRows = this.stores.map(store => `<tr>
-            <td>${Utils.escapeHtml(store.code)}</td>
-            <td>${Utils.escapeHtml(store.name)}</td>
-            <td>${Utils.escapeHtml(store.address || '-')}</td>
-            <td>${Utils.escapeHtml(store.phone || '-')}</td>
-            <td>
-                <button onclick="APP.editStore('${store.id}')">✏️ ${t('edit')}</button>
-                <button class="danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>
-             </td>
+            <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.code)}</td>
+            <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.name)}</td>
+            <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.address || '-')}</td>
+            <td style="border:1px solid #334155;padding:8px;">${Utils.escapeHtml(store.phone || '-')}</td>
+            <td style="border:1px solid #334155;padding:8px;white-space:nowrap;">
+                <button onclick="APP.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
+                <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+            </td>
         </tr>`).join('');
 
+        if (this.stores.length === 0) {
+            storeRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            storeStatsRows = `<tr><td colspan="4" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+        }
+
+        // 问题3：列表在上，新增表单在下，双列布局 + 3宫格线框
         document.getElementById("app").innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
@@ -83,6 +91,7 @@ const StoreManager = {
                 </div>
             </div>
 
+            <!-- 财务汇总 - 3宫格带线框 -->
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #334155; border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
@@ -100,32 +109,40 @@ const StoreManager = {
                     </div>
                 </div>
                 <div class="table-container">
-                    <table class="table"><thead><tr>
-                        <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                        <th>${lang === 'id' ? 'Pendapatan' : '收入'}</th>
-                        <th>${lang === 'id' ? 'Pengeluaran' : '支出'}</th>
-                        <th>${lang === 'id' ? 'Laba Kotor' : '毛利'}</th>
-                    </tr></thead>
-                    <tbody>${storeStatsRows || `<tr><td colspan="4" style="text-align:center;">${t('no_data')}</td></tr>`}</tbody>
-                    </table>
+                    <table class="table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#0f172a;">
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Pendapatan' : '收入'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Pengeluaran' : '支出'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Laba Kotor' : '毛利'}</th>
+                              </tr>
+                        </thead>
+                        <tbody>${storeStatsRows}</tbody>
+                     </table>
                 </div>
             </div>
 
+            <!-- 门店列表放上方 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
-                    <table class="table"><thead><tr>
-                        <th>${lang === 'id' ? 'Kode' : '编码'}</th>
-                        <th>${lang === 'id' ? 'Nama' : '名称'}</th>
-                        <th>${lang === 'id' ? 'Alamat' : '地址'}</th>
-                        <th>${lang === 'id' ? 'Telepon' : '电话'}</th>
-                        <th>${t('save')}</th>
-                    </tr></thead>
-                    <tbody>${storeRows || `<tr><td colspan="5" style="text-align:center;">${t('no_data')}</td></tr>`}</tbody>
-                    </table>
+                    <table class="table" style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#0f172a;">
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Kode' : '编码'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Nama' : '名称'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Alamat' : '地址'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${lang === 'id' ? 'Telepon' : '电话'}</th>
+                                <th style="border:1px solid #334155;padding:10px;">${t('save')}</th>
+                              </tr>
+                        </thead>
+                        <tbody>${storeRows}</tbody>
+                     </table>
                 </div>
             </div>
 
+            <!-- 新增门店表单放下方，双列布局 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                 <div class="form-grid">
@@ -150,6 +167,8 @@ const StoreManager = {
                     </div>
                 </div>
             </div>
+            
+            <!-- 打印按钮 -->
             <div class="toolbar">
                 <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
             </div>`;
