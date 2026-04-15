@@ -154,76 +154,106 @@ const SupabaseAPI = {
     },
 
     async _generateOrderId(role, storeId) {
-        // 获取门店前缀
+        // 1. 获取门店前缀
         let prefix = 'AD';
         if (role !== 'admin') {
             prefix = await this._getStorePrefix(storeId);
         }
         
-        // 生成年月日：YYMMDD
+        // 2. 生成年月日：YYMMDD (例如：260415)
         const now = new Date();
         const yy = now.getFullYear().toString().slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const dd = String(now.getDate()).padStart(2, '0');
         const dateCode = `${yy}${mm}${dd}`;
         
-        // 查询今天同一门店的订单数量
+        // 3. 查询今天该门店的最大序号
         const { data: orders, error } = await supabaseClient
             .from('orders')
             .select('order_id')
             .like('order_id', `${prefix}-${dateCode}-%`);
         
-        let nextNumber = 1;
+        let maxNumber = 0;
         if (orders && orders.length > 0) {
-            const numbers = orders.map(o => {
-                const match = o.order_id.match(new RegExp(`${prefix}-${dateCode}-(\\d+)$`));
-                return match ? parseInt(match[1], 10) : 0;
-            }).filter(n => n > 0);
-            if (numbers.length > 0) {
-                nextNumber = Math.max(...numbers) + 1;
+            for (const order of orders) {
+                const match = order.order_id.match(new RegExp(`${prefix}-${dateCode}-(\\d+)$`));
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    if (num > maxNumber) maxNumber = num;
+                }
             }
         }
         
+        // 4. 序号 = 最大序号 + 1，范围 01-99
+        let nextNumber = maxNumber + 1;
         if (nextNumber > 99) nextNumber = 99;
         const serial = String(nextNumber).padStart(2, '0');
+        
+        // 5. 返回完整订单ID
         return `${prefix}-${dateCode}-${serial}`;
     },
 
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
-        const orderId = await this._generateOrderId(profile.role, profile.store_id);
         const nowDate = new Date().toISOString().split('T')[0];
         const adminFee = orderData.admin_fee || 30000;
+        
+        // 最多重试3次（防止并发冲突）
+        let retryCount = 0;
+        let lastError = null;
+        
+        while (retryCount < 3) {
+            try {
+                const orderId = await this._generateOrderId(profile.role, profile.store_id);
+                
+                const newOrder = {
+                    order_id: orderId,
+                    customer_name: orderData.customer_name,
+                    customer_ktp: orderData.customer_ktp,
+                    customer_phone: orderData.customer_phone,
+                    customer_address: orderData.customer_address || '',
+                    collateral_name: orderData.collateral_name,
+                    loan_amount: orderData.loan_amount,
+                    admin_fee: adminFee,
+                    admin_fee_paid: false,
+                    monthly_interest: orderData.loan_amount * 0.10,
+                    interest_paid_months: 0,
+                    interest_paid_total: 0,
+                    next_interest_due_date: this.calculateNextDueDate(nowDate, 0),
+                    principal_paid: 0,
+                    principal_remaining: orderData.loan_amount,
+                    status: 'active',
+                    store_id: profile.store_id,
+                    created_by: profile.id,
+                    notes: orderData.notes || '',
+                    customer_id: orderData.customer_id || null,
+                    is_locked: true,
+                    locked_at: new Date().toISOString(),
+                    locked_by: profile.id
+                };
 
-        const newOrder = {
-            order_id: orderId,
-            customer_name: orderData.customer_name,
-            customer_ktp: orderData.customer_ktp,
-            customer_phone: orderData.customer_phone,
-            customer_address: orderData.customer_address || '',
-            collateral_name: orderData.collateral_name,
-            loan_amount: orderData.loan_amount,
-            admin_fee: adminFee,
-            admin_fee_paid: false,
-            monthly_interest: orderData.loan_amount * 0.10,
-            interest_paid_months: 0,
-            interest_paid_total: 0,
-            next_interest_due_date: this.calculateNextDueDate(nowDate, 0),
-            principal_paid: 0,
-            principal_remaining: orderData.loan_amount,
-            status: 'active',
-            store_id: profile.store_id,
-            created_by: profile.id,
-            notes: orderData.notes || '',
-            customer_id: orderData.customer_id || null,
-            is_locked: true,
-            locked_at: new Date().toISOString(),
-            locked_by: profile.id
-        };
-
-        const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
-        if (error) throw error;
-        return data;
+                const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
+                
+                if (error) {
+                    // 唯一约束冲突，重试
+                    if (error.code === '23505') {
+                        console.warn(`订单ID冲突: ${orderId}, 重试第 ${retryCount + 1} 次`);
+                        retryCount++;
+                        continue;
+                    }
+                    throw error;
+                }
+                
+                console.log(`✅ 订单创建成功: ${orderId}`);
+                return data;
+                
+            } catch (err) {
+                if (retryCount >= 2) throw err;
+                retryCount++;
+                lastError = err;
+            }
+        }
+        throw lastError || new Error('创建订单失败，请重试');
     },
 
     calculateNextDueDate(startDate, paidMonths) {
