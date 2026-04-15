@@ -1,5 +1,6 @@
 /* ===============================
-   JF! by Gadai - 统一样式表（类名优化版）
+   JF! by Gadai - 统一样式表（完整优化版）
+   包含：手机端响应式、负余额样式、资金管理样式
    更新: 2026-01-15
    =============================== */
 
@@ -167,6 +168,21 @@ h3 { font-size: 15px; }
 }
 .cashflow-item .label { font-size: 13px; opacity: 0.9; margin-bottom: 8px; }
 .cashflow-item .value { font-size: 22px; font-weight: 700; }
+.cashflow-item .value.negative { color: #fca5a5; }
+
+/* 资金管理按钮 */
+.capital-summary { flex-wrap: wrap; gap: 10px; }
+.capital-btn {
+    background: rgba(255,255,255,0.2) !important;
+    border: none !important;
+    padding: 4px 12px !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+}
+.capital-btn:hover {
+    background: rgba(255,255,255,0.3) !important;
+    transform: none !important;
+}
 
 /* ===== 统计卡片 ===== */
 .stats-grid {
@@ -447,25 +463,6 @@ input:focus, select:focus, textarea:focus {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ===== 响应式布局 ===== */
-@media (max-width: 1024px) and (min-width: 769px) {
-    #app { max-width: 95%; padding: 16px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .report-grid-5x2 { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 768px) {
-    #app { width: 100%; padding: 12px; }
-    .form-grid { grid-template-columns: 1fr; }
-    .cashflow-stats { grid-template-columns: 1fr; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .toolbar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .toolbar button { width: 100%; margin: 0; }
-    .toolbar input { grid-column: 1 / -1; max-width: 100% !important; }
-    .report-grid-5x2 { grid-template-columns: repeat(2, 1fr); }
-    .data-table th, .data-table td, .user-table th, .user-table td, .payment-table th, .payment-table td { font-size: 12px; padding: 6px 8px; }
-    .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .payment-method-options, .address-option { flex-direction: column; gap: 8px; }
-}
 /* ==================== 手机端优化（宽度 ≤ 640px，覆盖所有手机）==================== */
 
 @media (max-width: 640px) {
@@ -501,7 +498,7 @@ input:focus, select:focus, textarea:focus {
         margin-bottom: 16px;
     }
     
-    /* 工具栏中的输入框和下拉框占满整行（搜索框等） */
+    /* 工具栏中的输入框和下拉框占满整行 */
     .toolbar input,
     .toolbar select {
         grid-column: span 3;
@@ -679,6 +676,17 @@ input:focus, select:focus, textarea:focus {
         font-size: 16px;
         margin: 0;
     }
+    
+    /* 现金流汇总手机适配 */
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .capital-summary {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 
 /* ==================== 小屏手机微调（宽度 ≤ 400px，如 iPhone SE）==================== */
@@ -725,4 +733,36 @@ input:focus, select:focus, textarea:focus {
     .customer-table {
         min-width: 520px;
     }
+}
+
+/* ==================== 模态框通用样式 ==================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-content {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 550px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
 }
