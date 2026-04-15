@@ -154,20 +154,17 @@ const SupabaseAPI = {
     },
 
     async _generateOrderId(role, storeId) {
-        // 1. 获取门店前缀
         let prefix = 'AD';
         if (role !== 'admin') {
             prefix = await this._getStorePrefix(storeId);
         }
         
-        // 2. 生成年月日：YYMMDD (例如：260415)
         const now = new Date();
         const yy = now.getFullYear().toString().slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const dd = String(now.getDate()).padStart(2, '0');
         const dateCode = `${yy}${mm}${dd}`;
         
-        // 3. 查询今天该门店的最大序号
         const { data: orders, error } = await supabaseClient
             .from('orders')
             .select('order_id')
@@ -184,12 +181,10 @@ const SupabaseAPI = {
             }
         }
         
-        // 4. 序号 = 最大序号 + 1，范围 01-99
         let nextNumber = maxNumber + 1;
         if (nextNumber > 99) nextNumber = 99;
         const serial = String(nextNumber).padStart(2, '0');
         
-        // 5. 返回完整订单ID
         return `${prefix}-${dateCode}-${serial}`;
     },
 
@@ -198,7 +193,6 @@ const SupabaseAPI = {
         const nowDate = new Date().toISOString().split('T')[0];
         const adminFee = orderData.admin_fee || 30000;
         
-        // 最多重试3次（防止并发冲突）
         let retryCount = 0;
         let lastError = null;
         
@@ -235,7 +229,6 @@ const SupabaseAPI = {
                 const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
                 
                 if (error) {
-                    // 唯一约束冲突，重试
                     if (error.code === '23505') {
                         console.warn(`订单ID冲突: ${orderId}, 重试第 ${retryCount + 1} 次`);
                         retryCount++;
