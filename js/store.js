@@ -211,9 +211,10 @@ const StoreManager = {
             　　　`;
         }
 
+        // 生成门店列表行（包含 WA 号码输入框）
         let storeRows = '';
         if (this.stores.length === 0) {
-            storeRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            storeRows = `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
             storeStatsRows = `<tr><td colspan="11" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
         } else {
             for (const store of this.stores) {
@@ -222,6 +223,11 @@ const StoreManager = {
                     <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.name)}</td>
                     <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.address || '-')}</td>
                     <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.phone || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">
+                        <input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" 
+                               placeholder="628xxxxxxxxxx" style="width:140px; font-size:12px; padding:6px;" 
+                               onchange="APP.updateStoreWANumber('${store.id}', this.value)">
+                    </td>
                     <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
                         <button onclick="StoreManager.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
                         <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
@@ -290,12 +296,16 @@ const StoreManager = {
                                 <th>${lang === 'id' ? 'Nama' : '名称'}</th>
                                 <th>${lang === 'id' ? 'Alamat' : '地址'}</th>
                                 <th>${lang === 'id' ? 'Telepon' : '电话'}</th>
+                                <th>📱 WA</th>
                                 <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                             </tr>
                         </thead>
                         <tbody>${storeRows}</tbody>
                     </table>
                 </div>
+                <p style="font-size:12px; color:#64748b; margin-top:8px;">
+                    💡 ${lang === 'id' ? 'Klik pada kolom WA untuk mengedit nomor. Contoh: 6281234567890' : '点击 WA 列编辑号码。示例: 6281234567890'}
+                </p>
             </div>
 
             <div class="card">
@@ -326,7 +336,12 @@ const StoreManager = {
             
             <div class="toolbar">
                 <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-            </div>`;
+            </div>
+            <style>
+                .data-table td input { width: 140px; font-size: 12px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; }
+                .data-table td input:focus { outline: none; border-color: #2563eb; }
+            </style>
+        `;
     }
 };
 
