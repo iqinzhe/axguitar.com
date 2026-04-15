@@ -466,14 +466,263 @@ input:focus, select:focus, textarea:focus {
     .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .payment-method-options, .address-option { flex-direction: column; gap: 8px; }
 }
-@media (max-width: 480px) {
-    .stats-grid, .toolbar, .report-grid-5x2 { grid-template-columns: 1fr; }
+/* ==================== 手机端优化（宽度 ≤ 640px，覆盖所有手机）==================== */
+
+@media (max-width: 640px) {
+    /* 容器内边距 */
+    #app {
+        padding: 12px;
+    }
+    
+    /* ===== 统计卡片：双列显示 ===== */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        padding: 12px 8px;
+    }
+    
+    .stat-card .stat-value {
+        font-size: 18px;
+        white-space: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* ===== 工具栏按钮：三列显示 ===== */
+    .toolbar {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    
+    /* 工具栏中的输入框和下拉框占满整行（搜索框等） */
+    .toolbar input,
+    .toolbar select {
+        grid-column: span 3;
+        width: 100%;
+    }
+    
+    /* 按钮样式适配 */
+    .toolbar button {
+        width: 100%;
+        padding: 8px 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* ===== 表格优化：横向滚动 ===== */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -4px;
+        padding: 0 4px;
+    }
+    
+    .data-table,
+    .user-table,
+    .payment-table,
+    .order-table,
+    .customer-table {
+        min-width: 600px;
+        font-size: 12px;
+    }
+    
+    .data-table td,
+    .user-table td,
+    .payment-table td,
+    .order-table td,
+    .customer-table td {
+        padding: 8px 6px;
+        white-space: nowrap;
+    }
+    
+    /* 金额列字体缩小 */
+    .data-table td.text-right,
+    .payment-table td.text-right,
+    .order-table td.text-right {
+        font-size: 11px;
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    
+    /* 订单ID列 */
+    .order-id {
+        font-family: monospace;
+        font-size: 11px;
+    }
+    
+    /* 状态标签 */
+    .status-badge {
+        font-size: 10px;
+        padding: 2px 8px;
+        white-space: nowrap;
+    }
+    
+    /* 操作按钮 */
+    .action-cell {
+        white-space: nowrap;
+    }
+    
+    .btn-small {
+        padding: 4px 6px;
+        font-size: 11px;
+        margin: 0 1px;
+    }
+    
+    /* ===== 卡片 ===== */
+    .card {
+        padding: 14px;
+        margin-bottom: 16px;
+    }
+    
+    /* ===== 现金流卡片 ===== */
+    .cashflow-item .value {
+        font-size: 18px;
+    }
+    
+    .cashflow-item .label {
+        font-size: 11px;
+    }
+    
+    /* ===== 报表页面：5列改为2列 ===== */
+    .report-grid-5x2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .report-store-stat .value {
+        font-size: 13px;
+    }
+    
+    .report-store-stat .label {
+        font-size: 10px;
+    }
+    
+    /* ===== 表单 ===== */
+    .form-group label {
+        font-size: 12px;
+    }
+    
+    input, select, textarea {
+        font-size: 12px;
+        padding: 8px;
+    }
+    
+    /* ===== 缴费页面 ===== */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .summary-value {
+        font-size: 12px;
+    }
+    
+    .summary-label {
+        font-size: 10px;
+    }
+    
+    .interest-input-group,
+    .principal-input-group,
+    .admin-fee-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .interest-months,
+    .principal-amount,
+    .admin-fee-select,
+    .admin-fee-custom {
+        width: 100%;
+    }
+    
+    /* 支付方式选项 */
+    .payment-method-options {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .payment-method-options label {
+        font-size: 12px;
+    }
+    
+    /* 模态框 */
+    .modal-content {
+        padding: 16px;
+        max-height: 85vh;
+    }
+    
+    .modal-content h3 {
+        font-size: 16px;
+    }
+    
+    /* 页面标题 */
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    
+    .page-header h2 {
+        font-size: 16px;
+        margin: 0;
+    }
+}
+
+/* ==================== 小屏手机微调（宽度 ≤ 400px，如 iPhone SE）==================== */
+
+@media (max-width: 400px) {
+    /* 工具栏按钮字体进一步缩小 */
+    .toolbar button {
+        font-size: 10px;
+        padding: 6px 2px;
+    }
+    
+    /* 统计卡片数值 */
+    .stat-card .stat-value {
+        font-size: 16px;
+    }
+    
+    /* 标题 */
     h1 { font-size: 18px; }
     h2 { font-size: 16px; }
     h3 { font-size: 14px; }
-    .stat-card .stat-value { font-size: 22px; }
-}
-
-@media print {
-    .payment-method-group { background: white; border: 1px solid #ccc; }
+    
+    /* 现金流 */
+    .cashflow-item .value {
+        font-size: 16px;
+    }
+    
+    /* 操作按钮 */
+    .btn-small {
+        padding: 3px 5px;
+        font-size: 10px;
+    }
+    
+    /* 状态标签 */
+    .status-badge {
+        font-size: 9px;
+        padding: 2px 6px;
+    }
+    
+    /* 表格最小宽度适当减小 */
+    .data-table,
+    .user-table,
+    .payment-table,
+    .order-table,
+    .customer-table {
+        min-width: 520px;
+    }
 }
