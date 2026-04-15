@@ -161,6 +161,27 @@ const Utils = {
                 e.target.value = Utils.formatNumberWithCommas(num);
             }
         });
+    },
+
+    // 页面头部包装函数 - 统一页面布局
+    renderPageHeader: function(title, showBackBtn = true) {
+        var lang = this.lang;
+        var t = (key) => this.t(key);
+        var backBtnHtml = showBackBtn && window.APP && typeof window.APP.goBack === 'function' 
+            ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` 
+            : '';
+        return `
+            <div class="page-header">
+                <h2>${title}</h2>
+                <div>${backBtnHtml}</div>
+            </div>
+        `;
+    },
+
+    // 表格行包装函数
+    wrapTableRow: function(cells, isHeader = false) {
+        var tag = isHeader ? 'th' : 'td';
+        return '<tr>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '</tr>';
     }
 };
 
