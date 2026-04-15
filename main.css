@@ -38,6 +38,46 @@ body {
     background: var(--bg);
 }
 
+/* ===== 错误页面样式 ===== */
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: var(--bg);
+    padding: 20px;
+}
+.error-card {
+    max-width: 400px;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border);
+}
+.error-icon { font-size: 48px; margin-bottom: 16px; }
+.error-title { color: var(--danger); margin: 0 0 8px 0; }
+.error-message { color: var(--text-secondary); margin: 0 0 20px 0; font-size: 14px; }
+.error-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: var(--bg);
+}
+.loading-text { color: var(--text-secondary); margin-top: 16px; }
+
 /* ===== 打印样式 ===== */
 @media print {
     @page { size: A4; margin: 15mm 12mm; }
@@ -363,6 +403,26 @@ input:focus, select:focus, textarea:focus {
     margin-bottom: 20px;
     text-align: center;
 }
+.login-logo {
+    height: 32px;
+    vertical-align: middle;
+}
+.lang-toggle {
+    text-align: right;
+    margin-bottom: 10px;
+}
+.lang-btn {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+}
+.lang-btn:hover { background: var(--primary-soft); transform: none; }
+.login-note {
+    margin-top: 15px;
+    font-size: 12px;
+    color: #94a3b8;
+}
 
 /* ===== 辅助类 ===== */
 .text-center { text-align: center; }
@@ -415,7 +475,5 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media print {
-    .user-table td:last-child, .user-table th:last-child,
-    .payment-table td:last-child, .payment-table th:last-child { display: none; }
     .payment-method-group { background: white; border: 1px solid #ccc; }
 }
