@@ -545,7 +545,7 @@ input:focus, select:focus, textarea:focus {
     .data-table td.text-right,
     .payment-table td.text-right,
     .order-table td.text-right {
-        font-size: 11px;
+        font-size: 12px;
         padding-left: 4px;
         padding-right: 4px;
     }
@@ -553,7 +553,7 @@ input:focus, select:focus, textarea:focus {
     /* 订单ID列 */
     .order-id {
         font-family: monospace;
-        font-size: 11px;
+        font-size: 12px;
     }
     
     /* 状态标签 */
@@ -570,7 +570,7 @@ input:focus, select:focus, textarea:focus {
     
     .btn-small {
         padding: 4px 6px;
-        font-size: 11px;
+        font-size: 12px;
         margin: 0 1px;
     }
     
@@ -586,7 +586,7 @@ input:focus, select:focus, textarea:focus {
     }
     
     .cashflow-item .label {
-        font-size: 11px;
+        font-size: 15px;
     }
     
     /* ===== 报表页面：5列改为2列 ===== */
