@@ -1,5 +1,5 @@
-// app-dashboard.js - 仪表板、登录、路由、报表模块（完整版）
-// 包含：注资/提现功能、WA提醒功能、手机端响应式优化
+// app-dashboard.js - 完整版（包含所有功能）
+// 包含：仪表盘、登录、路由、报表、注资/提现、WA提醒（按钮闪烁/禁用逻辑）
 
 window.APP = window.APP || {};
 
@@ -252,7 +252,7 @@ const DashboardModule = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（包含注资功能和WA提醒按钮）====================
+    // ==================== 仪表盘（核心）====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -264,6 +264,15 @@ const DashboardModule = {
             var t = (key) => Utils.t(key);
             var isAdmin = AUTH.isAdmin();
             var storeName = AUTH.getCurrentStoreName();
+            
+            // 检查今日是否有需要提醒的客户（用于按钮状态）
+            var needRemindOrders = await SUPABASE.getOrdersNeedReminder();
+            var hasReminders = needRemindOrders.length > 0;
+            var hasSentToday = await this.hasSentRemindersToday();
+            
+            // 按钮状态：如果今日已发送，则禁用；如果今日有提醒但未发送，则高亮
+            var btnDisabled = hasSentToday;
+            var btnHighlight = hasReminders && !hasSentToday;
             
             var cashInvestment = cashFlow.capital?.cash?.investment || 0;
             var cashWithdrawal = cashFlow.capital?.cash?.withdrawal || 0;
@@ -334,11 +343,12 @@ const DashboardModule = {
                     <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                     <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</button>
                     <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                    <button onclick="APP.sendDailyReminders()" class="warning" style="background:#25D366;">📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'}</button>
+                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning" style="background:${btnHighlight ? '#25D366' : '#94a3b8'}; opacity:${btnDisabled ? '0.5' : '1'}; ${btnDisabled ? 'cursor: not-allowed;' : ''}" ${btnDisabled ? 'disabled' : ''}>
+                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                    </button>
                     ${isAdmin ? `<button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>` : ''}
                     ${isAdmin ? `<button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>` : ''}
                     ${isAdmin ? `<button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</button>` : ''}
-                    ${isAdmin ? `<button onclick="APP.showSystemConfig()">⚙️ ${lang === 'id' ? 'Konfigurasi' : '系统配置'}</button>` : ''}
                     <button onclick="APP.logout()">🚪 ${t('logout')}</button>
                 </div>
                 
@@ -503,21 +513,10 @@ const DashboardModule = {
     // ==================== WA 提醒功能 ====================
 
     getSenderWANumber: async function(storeId) {
-        var lang = Utils.lang;
-        
         var storeWANumber = await SUPABASE.getStoreWANumber(storeId);
         if (storeWANumber) {
             return storeWANumber;
         }
-        
-        var defaultWANumber = await SUPABASE.getDefaultWANumber();
-        if (defaultWANumber) {
-            return defaultWANumber;
-        }
-        
-        alert(lang === 'id' 
-            ? '⚠️ Belum ada nomor WA yang dikonfigurasi. Silakan hubungi administrator.'
-            : '⚠️ 未配置 WA 号码，请联系管理员。');
         return null;
     },
 
@@ -526,12 +525,11 @@ const DashboardModule = {
         var remainingPrincipal = order.loan_amount - order.principal_paid;
         var monthlyInterest = remainingPrincipal * 0.10;
         var dueDate = Utils.formatDate(order.next_interest_due_date);
-        var reminderDays = 2;
         
         return lang === 'id' 
             ? `Halo *${Utils.escapeHtml(order.customer_name)}*,
 
-Kami ingin mengingatkan bahwa pembayaran bunga pinjaman Anda akan jatuh tempo *dalam ${reminderDays} hari*.
+Kami ingin mengingatkan bahwa pembayaran bunga pinjaman Anda akan jatuh tempo *dalam 2 hari*.
 
 📋 *ID Pesanan:* ${order.order_id}
 💰 *Sisa Pokok:* ${Utils.formatCurrency(remainingPrincipal)}
@@ -546,7 +544,7 @@ Terima kasih,
 
             : `您好 *${Utils.escapeHtml(order.customer_name)}*，
 
-温馨提醒，您的贷款利息将在 *${reminderDays}天后* 到期。
+温馨提醒，您的贷款利息将在 *2天后* 到期。
 
 📋 *订单号:* ${order.order_id}
 💰 *剩余本金:* ${Utils.formatCurrency(remainingPrincipal)}
@@ -576,6 +574,33 @@ Terima kasih,
         }
     },
 
+    hasSentRemindersToday: async function() {
+        var profile = await SUPABASE.getCurrentProfile();
+        var today = new Date().toISOString().split('T')[0];
+        
+        let query = supabaseClient
+            .from('reminder_logs')
+            .select('id', { count: 'exact', head: true })
+            .eq('reminder_date', today);
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            const { data: orders } = await supabaseClient
+                .from('orders')
+                .select('id')
+                .eq('store_id', profile.store_id);
+            const orderIds = orders?.map(o => o.id) || [];
+            if (orderIds.length > 0) {
+                query = query.in('order_id', orderIds);
+            } else {
+                return false;
+            }
+        }
+        
+        const { count, error } = await query;
+        if (error) return false;
+        return count > 0;
+    },
+
     sendWAReminder: async function(orderId) {
         var lang = Utils.lang;
         try {
@@ -586,14 +611,11 @@ Terima kasih,
             }
             
             var senderNumber = await this.getSenderWANumber(order.store_id);
-            if (!senderNumber) return;
-            
-            var alreadySent = await SUPABASE.hasReminderSentToday(order.id);
-            if (alreadySent) {
-                var confirmMsg = lang === 'id' 
-                    ? '⚠️ Pengingat sudah dikirim hari ini. Kirim ulang?'
-                    : '⚠️ 今天已发送过提醒，是否重新发送？';
-                if (!confirm(confirmMsg)) return;
+            if (!senderNumber) {
+                alert(lang === 'id' 
+                    ? '⚠️ Toko ini belum memiliki nomor WA. Silakan isi nomor WA di halaman Manajemen Toko.'
+                    : '⚠️ 该门店未配置 WA 号码，请在门店管理中填写。');
+                return;
             }
             
             var waText = this.generateWAText(order, senderNumber);
@@ -616,6 +638,13 @@ Terima kasih,
 
     sendDailyReminders: async function() {
         var lang = Utils.lang;
+        var button = document.getElementById('reminderBtn');
+        
+        // 检查按钮是否禁用
+        if (button && button.disabled) {
+            alert(lang === 'id' ? 'Pengingat sudah dikirim hari ini.' : '今日已发送过提醒。');
+            return;
+        }
         
         try {
             var orders = await SUPABASE.getOrdersNeedReminder();
@@ -625,40 +654,91 @@ Terima kasih,
                 return;
             }
             
-            var message = lang === 'id'
-                ? `📱 Ada ${orders.length} pelanggan yang perlu diingatkan (jatuh tempo 2 hari lagi).\n\nKirim pengingat sekarang?`
-                : `📱 有 ${orders.length} 位客户需要提醒（2天后到期）。\n\n立即发送提醒？`;
+            // 过滤没有 WA 号码的门店
+            var validOrders = [];
+            var skippedStores = [];
             
-            if (!confirm(message)) return;
-            
-            var successCount = 0;
-            for (var i = 0; i < orders.length; i++) {
-                var order = orders[i];
+            for (var order of orders) {
                 var senderNumber = await this.getSenderWANumber(order.store_id);
-                if (!senderNumber) continue;
-                
-                var waText = this.generateWAText(order, senderNumber);
-                var phone = order.customer_phone?.replace(/[^0-9]/g, '') || '';
-                if (!phone.startsWith('62')) {
-                    phone = '62' + phone.replace(/^0+/, '');
+                if (senderNumber) {
+                    validOrders.push({ order, senderNumber });
+                } else {
+                    var storeName = await SUPABASE.getStoreName(order.store_id);
+                    if (!skippedStores.includes(storeName)) {
+                        skippedStores.push(storeName);
+                    }
                 }
-                
-                var waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`;
-                window.open(waUrl, '_blank');
-                
-                await SUPABASE.logReminder(order.id);
-                successCount++;
-                
-                await new Promise(r => setTimeout(r, 1000));
             }
             
-            alert(lang === 'id' 
-                ? `✅ ${successCount} pengingat telah disiapkan. WhatsApp akan terbuka secara bertahap.`
-                : `✅ 已准备 ${successCount} 条提醒，WhatsApp 将逐步打开。`);
+            if (validOrders.length === 0) {
+                var msg = lang === 'id'
+                    ? `⚠️ Tidak dapat mengirim pengingat. ${skippedStores.length > 0 ? `Toko ${skippedStores.join(', ')} belum memiliki nomor WA.` : ''}`
+                    : `⚠️ 无法发送提醒。${skippedStores.length > 0 ? `门店 ${skippedStores.join(', ')} 未配置 WA 号码。` : ''}`;
+                alert(msg);
+                return;
+            }
+            
+            var confirmMsg = lang === 'id'
+                ? `📱 Akan mengirim ${validOrders.length} pengingat.${skippedStores.length > 0 ? `\n\n⚠️ Melewatkan ${skippedStores.length} order dari toko tanpa WA.` : ''}\n\nLanjutkan?`
+                : `📱 将发送 ${validOrders.length} 条提醒。${skippedStores.length > 0 ? `\n\n⚠️ 跳过 ${skippedStores.length} 条来自未配置 WA 门店的订单。` : ''}\n\n继续？`;
+            
+            if (!confirm(confirmMsg)) return;
+            
+            // 禁用按钮
+            if (button) {
+                button.disabled = true;
+                button.style.opacity = '0.5';
+                button.style.backgroundColor = '#94a3b8';
+                button.innerText = lang === 'id' ? '⏳ Mengirim...' : '⏳ 发送中...';
+            }
+            
+            try {
+                for (var i = 0; i < validOrders.length; i++) {
+                    var item = validOrders[i];
+                    var waText = this.generateWAText(item.order, item.senderNumber);
+                    var phone = item.order.customer_phone?.replace(/[^0-9]/g, '') || '';
+                    if (!phone.startsWith('62')) {
+                        phone = '62' + phone.replace(/^0+/, '');
+                    }
+                    
+                    var waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`;
+                    window.open(waUrl, '_blank');
+                    
+                    await SUPABASE.logReminder(item.order.id);
+                    
+                    if (i < validOrders.length - 1) {
+                        await new Promise(r => setTimeout(r, 1500));
+                    }
+                }
+                
+                alert(lang === 'id' 
+                    ? `✅ ${validOrders.length} pengingat telah disiapkan.`
+                    : `✅ 已准备 ${validOrders.length} 条提醒。`);
+                
+                if (button) {
+                    button.innerText = lang === 'id' ? '✅ Terkirim' : '✅ 已发送';
+                }
+                
+            } catch (err) {
+                if (button) {
+                    button.disabled = false;
+                    button.style.opacity = '1';
+                    button.style.backgroundColor = '#25D366';
+                    button.innerText = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
+                }
+                throw err;
+            }
             
         } catch (error) {
             console.error("sendDailyReminders error:", error);
             alert(lang === 'id' ? 'Gagal mengirim pengingat massal' : '批量发送提醒失败');
+            
+            if (button) {
+                button.disabled = false;
+                button.style.opacity = '1';
+                button.style.backgroundColor = '#25D366';
+                button.innerText = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
+            }
         }
     },
 
@@ -674,62 +754,6 @@ Terima kasih,
             msg.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#10b981; color:white; padding:8px 16px; border-radius:8px; z-index:9999;';
             document.body.appendChild(msg);
             setTimeout(() => msg.remove(), 1500);
-            
-        } catch (error) {
-            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
-        }
-    },
-
-    showSystemConfig: async function() {
-        var lang = Utils.lang;
-        
-        var defaultWANumber = await SUPABASE.getDefaultWANumber();
-        var reminderDays = await SUPABASE.getReminderDays();
-        
-        var modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 450px;">
-                <h3>⚙️ ${lang === 'id' ? 'Konfigurasi Sistem' : '系统配置'}</h3>
-                
-                <div class="form-group">
-                    <label>📱 ${lang === 'id' ? 'Nomor WA Kantor Pusat' : '总部 WA 号码'}</label>
-                    <input type="text" id="defaultWANumber" placeholder="628xxxxxxxxxx" value="${defaultWANumber || ''}">
-                    <small>${lang === 'id' ? 'Digunakan jika toko belum memiliki nomor WA sendiri' : '当门店未配置自己的 WA 号码时使用'}</small>
-                </div>
-                
-                <div class="form-group">
-                    <label>⏰ ${lang === 'id' ? 'Pengingat (hari sebelum jatuh tempo)' : '提醒（到期前天数）'}</label>
-                    <select id="reminderDays" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
-                        <option value="1" ${reminderDays === 1 ? 'selected' : ''}>1 ${lang === 'id' ? 'hari sebelumnya' : '天前'}</option>
-                        <option value="2" ${reminderDays === 2 ? 'selected' : ''}>2 ${lang === 'id' ? 'hari sebelumnya' : '天前'}</option>
-                        <option value="3" ${reminderDays === 3 ? 'selected' : ''}>3 ${lang === 'id' ? 'hari sebelumnya' : '天前'}</option>
-                        <option value="5" ${reminderDays === 5 ? 'selected' : ''}>5 ${lang === 'id' ? 'hari sebelumnya' : '天前'}</option>
-                        <option value="7" ${reminderDays === 7 ? 'selected' : ''}>7 ${lang === 'id' ? 'hari sebelumnya' : '天前'}</option>
-                    </select>
-                    <small>${lang === 'id' ? 'Kapan pengingat akan dikirim sebelum jatuh tempo' : '在到期前多少天发送提醒'}</small>
-                </div>
-                
-                <div class="form-actions">
-                    <button onclick="APP.saveSystemConfig()" class="success">💾 ${Utils.t('save')}</button>
-                    <button onclick="this.closest('.modal-overlay').remove()">✖ ${Utils.t('cancel')}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    },
-
-    saveSystemConfig: async function() {
-        var lang = Utils.lang;
-        var defaultWANumber = document.getElementById('defaultWANumber').value.trim().replace(/[^0-9]/g, '');
-        var reminderDays = document.getElementById('reminderDays').value;
-        
-        try {
-            await SUPABASE.updateSystemConfig('default_wa_number', defaultWANumber);
-            await SUPABASE.updateSystemConfig('reminder_days_before', reminderDays);
-            
-            alert(lang === 'id' ? '✅ Konfigurasi sistem disimpan' : '✅ 系统配置已保存');
-            document.querySelector('.modal-overlay')?.remove();
             
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
@@ -1105,7 +1129,7 @@ Terima kasih,
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
                 <div class="card"><h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
-                    <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody><tr></div>
+                    <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
                 </div>
                 <div class="card"><h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
                     <div class="form-grid">
@@ -1694,5 +1718,4 @@ window.APP.copyToClipboard = DashboardModule.copyToClipboard;
 window.APP.sendWAReminder = DashboardModule.sendWAReminder;
 window.APP.sendDailyReminders = DashboardModule.sendDailyReminders;
 window.APP.updateStoreWANumber = DashboardModule.updateStoreWANumber;
-window.APP.showSystemConfig = DashboardModule.showSystemConfig;
-window.APP.saveSystemConfig = DashboardModule.saveSystemConfig;
+window.APP.hasSentRemindersToday = DashboardModule.hasSentRemindersToday;
