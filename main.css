@@ -1,82 +1,419 @@
-<div id="app">
-    <!-- 工具栏 -->
-    <div class="toolbar">
-        <h1>现金流管理仪表盘</h1>
-        <button>+ 新增记录</button>
-    </div>
+/* ===============================
+   Premium CSS (适配实际HTML结构)
+   =============================== */
 
-    <!-- 统计卡片（可选） -->
-    <div class="stats">
-        <div class="stat"><div class="label">总客户</div><div class="value">128</div></div>
-        <div class="stat"><div class="label">总交易额</div><div class="value">¥45,200</div></div>
-        <div class="stat"><div class="label">活跃合同</div><div class="value">24</div></div>
-    </div>
+:root {
+    --primary: #2563eb;
+    --primary-light: #60a5fa;
+    --primary-soft: #dbeafe;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #d97706;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text-main: #0f172a;
+    --text-secondary: #64748b;
+    --radius: 12px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 6px 18px rgba(0,0,0,0.08);
+}
 
-    <!-- 仪表盘主容器 -->
-    <div class="dashboard">
-        <!-- 双栏布局：现金流汇总 + 其他指标 -->
-        <div class="dashboard-two-col">
-            
-            <!-- 左侧：现金流汇总 -->
-            <div class="dashboard-left">
-                <div class="cashflow">
-                    <h3>💰 现金流汇总</h3>
-                    <div class="cashflow-grid">
-                        <div class="cashflow-item">
-                            <div class="label">本月收入</div>
-                            <div class="value">¥38,500</div>
-                            <div class="trend">↑ +12%</div>
-                        </div>
-                        <div class="cashflow-item">
-                            <div class="label">本月支出</div>
-                            <div class="value">¥21,200</div>
-                            <div class="trend">↓ -5%</div>
-                        </div>
-                        <div class="cashflow-item">
-                            <div class="label">净现金流</div>
-                            <div class="value">¥17,300</div>
-                            <div class="trend">↑ +28%</div>
-                        </div>
-                        <div class="cashflow-item">
-                            <div class="label">应收账款</div>
-                            <div class="value">¥12,800</div>
-                            <div class="trend">需关注</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+* { box-sizing: border-box; }
 
-            <!-- 右侧：仪表盘指标卡片组 -->
-            <div class="dashboard-right">
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-label">总资产</div>
-                        <div class="metric-value">¥286,500</div>
-                        <div class="metric-change change-up">↑ 8.2%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">总负债</div>
-                        <div class="metric-value">¥94,200</div>
-                        <div class="metric-change change-down">↓ 3.1%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">资产负债率</div>
-                        <div class="metric-value">32.9%</div>
-                        <div class="metric-change">健康</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">流动比率</div>
-                        <div class="metric-value">2.4</div>
-                        <div class="metric-change">优秀</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+body {
+    margin: 0;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text-main);
+}
 
-        <!-- 下方可以放表格等其他内容 -->
-        <div class="card">
-            <h2>📋 交易明细</h2>
-            <!-- 表格内容 -->
-        </div>
-    </div>
-</div>
+#app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* ===== 标题 ===== */
+h1, h2, h3 {
+    margin: 0 0 12px 0;
+}
+h1 { font-size: 22px; }
+h2 { font-size: 18px; }
+h3 { font-size: 15px; }
+
+/* ===== 卡片 ===== */
+.card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    padding: 18px;
+    transition: 0.2s;
+    margin-bottom: 20px;
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* ===== 现金流汇总区域 (匹配JS生成的类名) ===== */
+.cashflow-summary {
+    background: linear-gradient(135deg, #2563eb, #60a5fa);
+    border-radius: var(--radius);
+    padding: 20px;
+    color: white;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 24px;
+}
+
+.cashflow-summary h3 {
+    color: rgba(255,255,255,0.95);
+    margin: 0 0 16px 0;
+    font-size: 18px;
+}
+
+.cashflow-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+}
+
+.cashflow-item {
+    background: rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 14px;
+    backdrop-filter: blur(6px);
+}
+
+.cashflow-item .label {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+}
+
+.cashflow-item .value {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+/* ===== 统计卡片网格 (stats-grid) ===== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 16px;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: 0.2s;
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.stat-card .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 8px;
+}
+
+/* ===== 工具栏 ===== */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* ===== 按钮 ===== */
+button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: 0.15s;
+}
+
+button:hover {
+    background: #1e40af;
+    transform: translateY(-1px);
+}
+
+button.success {
+    background: var(--success);
+}
+button.success:hover {
+    background: #15803d;
+}
+
+button.danger {
+    background: var(--danger);
+}
+button.danger:hover {
+    background: #b91c1c;
+}
+
+button.warning {
+    background: var(--warning);
+}
+button.warning:hover {
+    background: #b45309;
+}
+
+/* ===== 表单 ===== */
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+    outline: none;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-grid .full-width,
+.form-actions.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+/* ===== 表格 ===== */
+.table-container {
+    overflow-x: auto;
+    margin-top: 16px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    font-size: 13px;
+}
+
+th {
+    background: #f1f5f9;
+    text-align: left;
+    padding: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+td {
+    padding: 10px;
+    border-top: 1px solid var(--border);
+}
+
+tr:hover {
+    background: #f9fbff;
+}
+
+/* 状态标签 */
+.status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-active {
+    background: rgba(22,163,74,0.1);
+    color: var(--success);
+}
+
+.status-completed {
+    background: rgba(37,99,235,0.1);
+    color: var(--primary);
+}
+
+.status-liquidated {
+    background: rgba(220,38,38,0.1);
+    color: var(--danger);
+}
+
+/* 支付方式标签 */
+.payment-method-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.method-cash {
+    background: rgba(16,185,129,0.1);
+    color: #10b981;
+}
+
+.method-bank {
+    background: rgba(37,99,235,0.1);
+    color: #2563eb;
+}
+
+/* ===== 财务报表页面样式 ===== */
+.report-store-section {
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.report-store-header {
+    background: #f1f5f9;
+    padding: 12px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.report-store-stats {
+    padding: 16px;
+}
+
+.report-grid-5x2 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+.report-store-stat {
+    text-align: center;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.report-store-stat .label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.report-store-stat .value {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.report-store-stat .value.income {
+    color: var(--success);
+}
+
+.report-store-stat .value.expense {
+    color: var(--danger);
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 768px) {
+    #app {
+        padding: 12px;
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .report-grid-5x2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .toolbar button {
+        width: 100%;
+    }
+    
+    .toolbar input {
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .report-grid-5x2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== 登录页面 ===== */
+.login-container {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #dbeafe, #f8fafc);
+}
+
+.login-box {
+    width: 360px;
+    max-width: 90%;
+    background: white;
+    padding: 24px;
+    border-radius: 14px;
+    box-shadow: var(--shadow-md);
+}
+
+.login-title {
+    font-size: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
