@@ -14,22 +14,23 @@ const SupabaseAPI = {
         return data.session;
     },
 
-    async getCurrentUser() {
-        try {
-            const { data, error } = await supabaseClient.auth.getUser();
-            if (error) {
-                // 静默处理未登录状态
-                if (error.message !== 'Auth session missing!') {
-                    console.warn("getCurrentUser error:", error.message);
-                }
+async getCurrentUser() {
+    try {
+        const { data, error } = await supabaseClient.auth.getUser();
+        if (error) {
+            // 静默处理未登录状态
+            if (error.status === 403 || error.message === 'Auth session missing!' || error.message.includes('JWT')) {
                 return null;
             }
-            return data?.user || null;
-        } catch (err) {
-            console.warn("getCurrentUser exception:", err.message);
+            console.warn("getCurrentUser error:", error.message);
             return null;
         }
-    },
+        return data?.user || null;
+    } catch (err) {
+        console.warn("getCurrentUser exception:", err.message);
+        return null;
+    }
+},
 
     async getCurrentProfile() {
         if (_profileCache) return _profileCache;
