@@ -99,7 +99,6 @@ const AUTH = {
     },
 
     async addUser(username, password, name, role, storeId) {
-        // 检查是否已存在
         const { data: existing } = await supabaseClient
             .from('user_profiles')
             .select('username')
@@ -112,7 +111,6 @@ const AUTH = {
                 : '用户名已存在');
         }
         
-        // 使用 Supabase Auth 创建用户
         const { data: authUser, error: signUpError } = await supabaseClient.auth.signUp({
             email: username,
             password: password,
@@ -133,7 +131,6 @@ const AUTH = {
                 : '创建用户失败');
         }
         
-        // 创建用户资料
         const { error: profileError } = await supabaseClient.from('user_profiles').insert({
             id: authUser.user.id,
             username: username,
@@ -148,7 +145,6 @@ const AUTH = {
     },
 
     async deleteUser(userId) {
-        // 不能删除自己
         if (userId === this.user?.id) {
             throw new Error(Utils.lang === 'id' 
                 ? 'Tidak dapat menghapus akun sendiri' 
