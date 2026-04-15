@@ -612,3 +612,141 @@ tr:hover {
         content: " (" attr(href) ")";
     }
 }
+
+/* ===== 用户管理表格 ===== */
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.user-table th,
+.user-table td {
+    border: 1px solid var(--border);
+    padding: 8px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.user-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.user-table tbody tr:hover {
+    background: #f9fbff;
+}
+
+/* ===== 缴费记录表格 ===== */
+.payment-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.payment-table th,
+.payment-table td {
+    border: 1px solid var(--border);
+    padding: 8px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.payment-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.payment-table tbody tr:hover {
+    background: #f9fbff;
+}
+
+/* ===== 内联样式辅助类（兼容现有代码）===== */
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+
+/* ===== 按钮禁用状态 ===== */
+button:disabled,
+button.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+button:disabled:hover,
+button.disabled:hover {
+    transform: none;
+    background: inherit;
+}
+
+/* ===== 加载动画（与 index.html 中的 loading 样式配合）===== */
+.loader {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ===== 响应式表格优化 ===== */
+@media (max-width: 768px) {
+    .user-table th,
+    .user-table td,
+    .payment-table th,
+    .payment-table td {
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    
+    /* 手机端表格可滚动 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* ===== 打印样式增强 ===== */
+@media print {
+    /* 确保用户表格和支付表格在打印时边框可见 */
+    .user-table,
+    .payment-table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+    
+    .user-table th,
+    .user-table td,
+    .payment-table th,
+    .payment-table td {
+        border: 1px solid #ccc !important;
+        padding: 6px;
+    }
+    
+    /* 打印时隐藏操作按钮列 */
+    .user-table td:last-child,
+    .user-table th:last-child,
+    .payment-table td:last-child,
+    .payment-table th:last-child {
+        display: none;
+    }
+}
