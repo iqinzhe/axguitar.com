@@ -108,10 +108,8 @@ const StoreManager = {
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
         
-        // ========== 优化：一次查询所有数据 ==========
         console.log('开始加载门店管理数据...');
         
-        // 并行查询所有需要的数据
         const [allOrdersResult, allExpensesResult, allPaymentsResult, cashFlow] = await Promise.all([
             supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid'),
             supabaseClient.from('expenses').select('id, store_id, amount, payment_method'),
@@ -125,49 +123,31 @@ const StoreManager = {
         
         console.log(`数据加载完成: 订单 ${allOrders.length} 条, 支出 ${allExpenses.length} 条, 付款 ${allPayments.length} 条`);
         
-        // 构建 order_id 到 store_id 的映射（用于付款记录归属门店）
         const orderStoreMap = {};
         for (const order of allOrders) {
             orderStoreMap[order.id] = order.store_id;
         }
         
-        // 按门店分组计算各项指标
         const storeStats = {};
-        
-        // 初始化每个门店的统计对象
         for (const store of this.stores) {
-            storeStats[store.id] = {
-                orders: [],
-                expenses: [],
-                payments: []
-            };
+            storeStats[store.id] = { orders: [], expenses: [], payments: [] };
         }
         
-        // 分组订单
         for (const order of allOrders) {
             const storeId = order.store_id;
-            if (storeStats[storeId]) {
-                storeStats[storeId].orders.push(order);
-            }
+            if (storeStats[storeId]) storeStats[storeId].orders.push(order);
         }
         
-        // 分组支出
         for (const expense of allExpenses) {
             const storeId = expense.store_id;
-            if (storeStats[storeId]) {
-                storeStats[storeId].expenses.push(expense);
-            }
+            if (storeStats[storeId]) storeStats[storeId].expenses.push(expense);
         }
         
-        // 分组付款记录（通过 order 找到所属门店）
         for (const payment of allPayments) {
             const storeId = orderStoreMap[payment.order_id];
-            if (storeId && storeStats[storeId]) {
-                storeStats[storeId].payments.push(payment);
-            }
+            if (storeId && storeStats[storeId]) storeStats[storeId].payments.push(payment);
         }
         
-        // 计算汇总数据
         let grandTotal = { 
             orders: 0, active: 0, loan: 0, adminFee: 0, interest: 0, 
             principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
@@ -181,7 +161,6 @@ const StoreManager = {
             const expenses = stats.expenses;
             const payments = stats.payments;
             
-            // 计算订单指标
             const ordsCount = orders.length;
             const activeCount = orders.filter(o => o.status === 'active').length;
             const totalLoan = orders.reduce((s, o) => s + (o.loan_amount || 0), 0);
@@ -189,11 +168,8 @@ const StoreManager = {
             const totalInterest = orders.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
             const totalPrincipal = orders.reduce((s, o) => s + (o.principal_paid || 0), 0);
             const totalIncome = totalAdminFee + totalInterest;
-            
-            // 计算支出
             const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
             
-            // 计算现金流（按支付方式分类）
             let cashIncome = 0, bankIncome = 0;
             for (const p of payments) {
                 if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
@@ -209,7 +185,6 @@ const StoreManager = {
             const cashBalance = cashIncome - cashExpense;
             const bankBalance = bankIncome - bankExpense;
             
-            // 累加总计
             grandTotal.orders += ordsCount;
             grandTotal.active += activeCount;
             grandTotal.loan += totalLoan;
@@ -251,12 +226,12 @@ const StoreManager = {
                         <button onclick="StoreManager.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
                         <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
                     </td>
-                　　`;
+                　　　`;
             }
         }
 
         document.getElementById("app").innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                 <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
             </div>
@@ -284,20 +259,20 @@ const StoreManager = {
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                 <div class="table-container" style="overflow-x: auto;">
-                    <table style="min-width:1000px; width:100%; border-collapse:collapse;">
+                    <table class="data-table" style="min-width:1000px;">
                         <thead>
-                            <tr style="background:#f8fafc;">
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${t('total_orders')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${t('active')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${t('total_loan')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Bunga' : '利息'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Pokok' : '本金'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Pendapatan' : '管理费+利息'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:8px;">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
+                            <tr>
+                                <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                <th>${t('total_orders')}</th>
+                                <th>${t('active')}</th>
+                                <th>${t('total_loan')}</th>
+                                <th>${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                                <th>${lang === 'id' ? 'Bunga' : '利息'}</th>
+                                <th>${lang === 'id' ? 'Pokok' : '本金'}</th>
+                                <th>${lang === 'id' ? 'Pendapatan' : '管理费+利息'}</th>
+                                <th>${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
+                                <th>🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
+                                <th>🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
                             </tr>
                         </thead>
                         <tbody>${storeStatsRows}</tbody>
@@ -308,14 +283,14 @@ const StoreManager = {
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
-                    <table style="width:100%;border-collapse:collapse;">
+                    <table class="data-table">
                         <thead>
-                            <tr style="background:#f8fafc;">
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Kode' : '编码'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Nama' : '名称'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Alamat' : '地址'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Telepon' : '电话'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                            <tr>
+                                <th>${lang === 'id' ? 'Kode' : '编码'}</th>
+                                <th>${lang === 'id' ? 'Nama' : '名称'}</th>
+                                <th>${lang === 'id' ? 'Alamat' : '地址'}</th>
+                                <th>${lang === 'id' ? 'Telepon' : '电话'}</th>
+                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                             </tr>
                         </thead>
                         <tbody>${storeRows}</tbody>
