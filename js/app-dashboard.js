@@ -650,7 +650,7 @@ showReport: async function() {
                         <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password" placeholder="${t('password')}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'} *</label>
-// 添加新用户时的角色下拉框 - 完整3个选项
+
 <select id="newRole">
     <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
     <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
