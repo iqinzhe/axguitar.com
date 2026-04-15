@@ -150,12 +150,12 @@ const Migration = {
             : 0;
         const lang = Utils.lang;
         progressDiv.innerHTML = `
-            <div style="background:#1e293b;padding:15px;border-radius:8px;margin-top:15px;">
+            <div class="migration-progress">
                 <p>📊 ${lang === 'id' ? 'Migrasi Berjalan' : '迁移中'}... ${this.progress.current}/${this.progress.total}</p>
-                <div style="background:#334155;border-radius:10px;height:20px;overflow:hidden;">
-                    <div style="background:#10b981;width:${percent}%;height:100%;border-radius:10px;transition:width 0.3s;"></div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width:${percent}%;"></div>
                 </div>
-                <p style="margin-top:8px;">
+                <p class="progress-stats">
                     ✅ ${lang === 'id' ? 'Berhasil' : '成功'}: ${this.progress.success} &nbsp;
                     ⏭️ ${lang === 'id' ? 'Dilewati' : '已跳过'}: ${this.progress.skipped} &nbsp;
                     ❌ ${lang === 'id' ? 'Gagal' : '失败'}: ${this.progress.failed}
@@ -179,28 +179,36 @@ const Migration = {
     renderMigrationUI() {
         const lang = Utils.lang;
         const html = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</h2>
                 <div>
-                    <button onclick="APP.toggleLanguage()">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                    <button onclick="APP.toggleLanguage()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
                     <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
                 </div>
             </div>
             <div class="card">
                 <h3>${lang === 'id' ? 'Migrasi dari localStorage ke Supabase' : '从 localStorage 迁移到 Supabase'}</h3>
-                <p style="color:#94a3b8;margin-bottom:8px;">
+                <p class="migration-info">
                     ${lang === 'id'
                         ? '• Data yang sudah ada di Supabase akan dilewati otomatis<br>• Migrasi berjalan paralel (lebih cepat)<br>• Jika gagal sebagian, data yang sudah berhasil tetap tersimpan'
                         : '• 已存在于 Supabase 的数据将自动跳过<br>• 并行迁移（速度更快）<br>• 部分失败不影响已成功的记录'}
                 </p>
-                <p style="color:#f59e0b;margin-bottom:15px;">
+                <p class="migration-warning">
                     ⚠️ ${lang === 'id' ? 'Pastikan Anda sudah login sebagai admin sebelum migrasi.' : '请确保在迁移前已以管理员身份登录。'}
                 </p>
                 <div id="migrationProgress"></div>
                 <button onclick="Migration.startMigration()" class="success" id="migrateBtn">
                     🚀 ${lang === 'id' ? 'Mulai Migrasi' : '开始迁移'}
                 </button>
-            </div>`;
+            </div>
+            <style>
+                .migration-progress { background: #1e293b; padding: 15px; border-radius: 8px; margin-top: 15px; }
+                .progress-bar-container { background: #334155; border-radius: 10px; height: 20px; overflow: hidden; }
+                .progress-bar-fill { background: #10b981; height: 100%; border-radius: 10px; transition: width 0.3s; }
+                .progress-stats { margin-top: 8px; color: #94a3b8; font-size: 13px; }
+                .migration-info { color: #94a3b8; margin-bottom: 8px; line-height: 1.5; }
+                .migration-warning { color: #f59e0b; margin-bottom: 15px; }
+            </style>`;
         document.getElementById("app").innerHTML = html;
     }
 };
