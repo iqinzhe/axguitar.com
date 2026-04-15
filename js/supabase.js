@@ -154,24 +154,29 @@ const SupabaseAPI = {
     },
 
     async _generateOrderId(role, storeId) {
+        // 获取门店前缀
         let prefix = 'AD';
         if (role !== 'admin') {
             prefix = await this._getStorePrefix(storeId);
         }
+        
+        // 生成年月日：YYMMDD
         const now = new Date();
         const yy = now.getFullYear().toString().slice(-2);
         const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const yearMonth = `${yy}${mm}`;
+        const dd = String(now.getDate()).padStart(2, '0');
+        const dateCode = `${yy}${mm}${dd}`;
         
+        // 查询今天同一门店的订单数量
         const { data: orders, error } = await supabaseClient
             .from('orders')
             .select('order_id')
-            .like('order_id', `${prefix}-${yearMonth}-%`);
+            .like('order_id', `${prefix}-${dateCode}-%`);
         
         let nextNumber = 1;
         if (orders && orders.length > 0) {
             const numbers = orders.map(o => {
-                const match = o.order_id.match(new RegExp(`${prefix}-${yearMonth}-(\\d+)$`));
+                const match = o.order_id.match(new RegExp(`${prefix}-${dateCode}-(\\d+)$`));
                 return match ? parseInt(match[1], 10) : 0;
             }).filter(n => n > 0);
             if (numbers.length > 0) {
@@ -179,9 +184,9 @@ const SupabaseAPI = {
             }
         }
         
-        if (nextNumber > 999) nextNumber = 999;
-        const serial = String(nextNumber).padStart(3, '0');
-        return `${prefix}-${yearMonth}-${serial}`;
+        if (nextNumber > 99) nextNumber = 99;
+        const serial = String(nextNumber).padStart(2, '0');
+        return `${prefix}-${dateCode}-${serial}`;
     },
 
     async createOrder(orderData) {
@@ -476,7 +481,6 @@ const SupabaseAPI = {
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
-        // 获取收入（按支付方式分类）
         let incomeQuery = supabaseClient.from('payment_history').select('type, amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
@@ -495,7 +499,6 @@ const SupabaseAPI = {
             }
         }
         
-        // 获取支出（按支付方式分类）
         let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             expenseQuery = expenseQuery.eq('store_id', profile.store_id);
