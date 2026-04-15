@@ -52,15 +52,17 @@ const PaymentsModule = {
                 }
             }
 
-            // 管理费选项
+            // 管理费选项 - 包含手工录入输入框
             var adminFeeOptions = `
-                <select id="adminFeeAmount" style="width:auto;min-width:150px;margin-right:10px;">
-                    <option value="30000">Rp 30.000</option>
-                    <option value="40000">Rp 40.000</option>
-                    <option value="50000">Rp 50.000</option>
-                    <option value="custom">${lang === 'id' ? 'Input Manual' : '手工录入'}</option>
-                </select>
-                <input type="text" id="customAdminFee" placeholder="${lang === 'id' ? 'Masukkan jumlah' : '输入金额'}" style="width:150px;display:none;text-align:right;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <select id="adminFeeAmount" style="width:auto;min-width:150px;">
+                        <option value="30000">Rp 30.000</option>
+                        <option value="40000">Rp 40.000</option>
+                        <option value="50000">Rp 50.000</option>
+                        <option value="custom">${lang === 'id' ? 'Input Manual' : '手工录入'}</option>
+                    </select>
+                    <input type="text" id="customAdminFee" placeholder="${lang === 'id' ? 'Masukkan jumlah' : '输入金额'}" style="width:150px;display:none;text-align:right;">
+                </div>
             `;
 
             var adminFeeSection = !order.admin_fee_paid
@@ -74,10 +76,8 @@ const PaymentsModule = {
                                 <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
                             </div>
                         </div>
-                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                            ${adminFeeOptions}
-                            <button onclick="APP.payAdminFeeWithMethod('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
-                        </div>
+                        ${adminFeeOptions}
+                        <button onclick="APP.payAdminFeeWithMethod('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
                     </div>
                    </div>`
                 : `<div style="background:#f8fafc;padding:10px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #10b981;">
@@ -173,26 +173,27 @@ const PaymentsModule = {
                 <div class="toolbar">
                     <button onclick="APP.viewOrder('${order.order_id}')">📄 ${lang === 'id' ? 'Lihat Detail Order' : '查看订单详情'}</button>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                </div>
-                <script>
-                    var adminFeeSelect = document.getElementById('adminFeeAmount');
-                    var customAdminFee = document.getElementById('customAdminFee');
-                    if (adminFeeSelect) {
-                        adminFeeSelect.addEventListener('change', function() {
-                            if (this.value === 'custom') {
-                                customAdminFee.style.display = 'inline-block';
-                            } else {
-                                customAdminFee.style.display = 'none';
-                            }
-                        });
-                    }
-                    if (customAdminFee && Utils.bindAmountFormat) {
-                        Utils.bindAmountFormat(customAdminFee);
-                    }
-                <\/script>`;
+                </div>`;
 
+            // 初始化管理费手工录入输入框
+            var adminFeeSelect = document.getElementById('adminFeeAmount');
+            var customAdminFee = document.getElementById('customAdminFee');
+            
+            if (adminFeeSelect) {
+                adminFeeSelect.addEventListener('change', function() {
+                    if (customAdminFee) {
+                        customAdminFee.style.display = this.value === 'custom' ? 'inline-block' : 'none';
+                    }
+                });
+            }
+            
+            if (customAdminFee && Utils.bindAmountFormat) {
+                Utils.bindAmountFormat(customAdminFee);
+            }
+            
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
+            
         } catch (error) {
             console.error("showPayment error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat halaman pembayaran' : '加载缴费页面失败');
