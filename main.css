@@ -1,25 +1,38 @@
 /* ===============================
-   Premium CSS (适配实际HTML结构)
+   JF! by Gadai - 完整样式表（A4比例优化版）
+   更新: 2026-01-15
    =============================== */
 
+/* ===== 全局变量 ===== */
 :root {
+    /* 主色调 */
     --primary: #2563eb;
     --primary-light: #60a5fa;
     --primary-soft: #dbeafe;
+    
+    /* 状态颜色 */
     --success: #16a34a;
     --danger: #dc2626;
     --warning: #d97706;
+    
+    /* 背景和边框 */
     --bg: #f8fafc;
     --card: #ffffff;
     --border: #e5e7eb;
+    
+    /* 文字颜色 */
     --text-main: #0f172a;
     --text-secondary: #64748b;
+    
+    /* 视觉效果 */
     --radius: 12px;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
     --shadow-md: 0 6px 18px rgba(0,0,0,0.08);
 }
 
-* { box-sizing: border-box; }
+* { 
+    box-sizing: border-box;
+}
 
 body {
     margin: 0;
@@ -28,10 +41,79 @@ body {
     color: var(--text-main);
 }
 
+/* ===== 主容器 - 模拟A4纸比例 ===== */
 #app {
-    max-width: 1400px;
-    margin: 0 auto;
+    max-width: 1200px;           /* A4纸等效宽度（打印时约210mm） */
+    margin: 0 auto;              /* 水平居中 */
     padding: 20px;
+    background: var(--bg);
+}
+
+/* ===== 打印时自动添加页眉页脚 ===== */
+@media print {
+    @page {
+        size: A4;
+        margin: 15mm 12mm;       /* 上下15mm，左右12mm */
+    }
+    
+    body {
+        background: white;
+        padding: 0;
+        margin: 0;
+    }
+    
+    #app {
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+    
+    /* 自动页眉 */
+    header {
+        position: running(header);
+    }
+    
+    /* 自动页脚 */
+    footer {
+        position: running(footer);
+    }
+    
+    @page {
+        @top-center {
+            content: "JF! by Gadai - Sistem Manajemen Gadai";
+            font-size: 10pt;
+            color: #64748b;
+        }
+        @bottom-center {
+            content: "Halaman " counter(page) " / " counter(pages);
+            font-size: 9pt;
+            color: #94a3b8;
+        }
+        @bottom-right {
+            content: "Dicetak: " date();
+            font-size: 8pt;
+            color: #cbd5e1;
+        }
+    }
+    
+    /* 隐藏不需要打印的元素 */
+    .toolbar button:not(.print-btn),
+    .no-print,
+    button:not(.print-btn) {
+        display: none !important;
+    }
+    
+    /* 确保卡片边框在打印时可见 */
+    .card, .stat-card, .cashflow-summary {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        background: white !important;
+    }
+    
+    /* 表格边框优化 */
+    table, th, td {
+        border: 1px solid #ccc !important;
+    }
 }
 
 /* ===== 标题 ===== */
@@ -57,7 +139,60 @@ h3 { font-size: 15px; }
     box-shadow: var(--shadow-md);
 }
 
-/* ===== 现金流汇总区域 (匹配JS生成的类名) ===== */
+/* ===== 表单布局优化 - 限制最大宽度，避免拉得太宽 ===== */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+/* 桌面端表单最大宽度限制 */
+@media (min-width: 769px) {
+    .form-grid {
+        max-width: 800px;        /* 限制表单最大宽度，避免拉得太宽 */
+    }
+    
+    /* 长表单区域也限制宽度 */
+    .card .form-grid,
+    .card form {
+        max-width: 800px;
+    }
+    
+    /* 输入框舒适宽度 */
+    input, select, textarea {
+        max-width: 380px;
+    }
+    
+    textarea {
+        max-width: 100%;
+    }
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-group.full-width,
+.form-actions {
+    grid-column: 1 / -1;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+/* ===== 现金流汇总区域 ===== */
 .cashflow-summary {
     background: linear-gradient(135deg, #2563eb, #60a5fa);
     border-radius: var(--radius);
@@ -97,7 +232,7 @@ h3 { font-size: 15px; }
     font-weight: 700;
 }
 
-/* ===== 统计卡片网格 (stats-grid) ===== */
+/* ===== 统计卡片网格（仪表盘指标）===== */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -176,7 +311,7 @@ button.warning:hover {
     background: #b45309;
 }
 
-/* ===== 表单 ===== */
+/* ===== 表单元素 ===== */
 input, select, textarea {
     width: 100%;
     padding: 10px;
@@ -190,37 +325,6 @@ input:focus, select:focus, textarea:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
     outline: none;
-}
-
-.form-group {
-    margin-bottom: 12px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-}
-
-.form-grid .full-width,
-.form-actions.full-width {
-    grid-column: 1 / -1;
-}
-
-.form-actions {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    margin-top: 8px;
 }
 
 /* ===== 表格 ===== */
@@ -253,7 +357,7 @@ tr:hover {
     background: #f9fbff;
 }
 
-/* 状态标签 */
+/* ===== 状态标签 ===== */
 .status-badge {
     display: inline-block;
     padding: 3px 10px;
@@ -277,7 +381,7 @@ tr:hover {
     color: var(--danger);
 }
 
-/* 支付方式标签 */
+/* ===== 支付方式标签 ===== */
 .payment-method-badge {
     display: inline-block;
     padding: 3px 8px;
@@ -295,7 +399,7 @@ tr:hover {
     color: #2563eb;
 }
 
-/* ===== 财务报表页面样式 ===== */
+/* ===== 财务报表页面 ===== */
 .report-store-section {
     background: var(--card);
     border-radius: var(--radius);
@@ -348,42 +452,6 @@ tr:hover {
     color: var(--danger);
 }
 
-/* ===== 响应式 ===== */
-@media (max-width: 768px) {
-    #app {
-        padding: 12px;
-    }
-    
-    .form-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .cashflow-stats {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .report-grid-5x2 {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .toolbar button {
-        width: 100%;
-    }
-    
-    .toolbar input {
-        max-width: 100% !important;
-    }
-}
-
 /* ===== 登录页面 ===== */
 .login-container {
     height: 100vh;
@@ -406,4 +474,143 @@ tr:hover {
     font-size: 20px;
     margin-bottom: 20px;
     text-align: center;
+}
+
+/* ============================================
+   响应式布局（核心优化）
+   ============================================ */
+
+/* 桌面端默认样式已在上面定义 */
+
+/* 平板设备 (宽度 769px - 1024px) */
+@media (max-width: 1024px) and (min-width: 769px) {
+    #app {
+        max-width: 95%;
+        padding: 16px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .report-grid-5x2 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* 手机设备 (宽度 ≤ 768px) */
+@media (max-width: 768px) {
+    #app {
+        width: 100%;
+        padding: 12px;
+    }
+    
+    /* 表单改为单列 */
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* 现金流卡片改为单列 */
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    /* ===== 手机端双列显示：统计卡片 ===== */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);  /* 双列 */
+        gap: 12px;
+    }
+    
+    /* ===== 手机端双列显示：功能按钮 ===== */
+    .toolbar {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);  /* 按钮双列 */
+        gap: 10px;
+    }
+    
+    .toolbar button {
+        width: 100%;
+        margin: 0;
+    }
+    
+    /* 工具栏中的输入框占满整行 */
+    .toolbar input {
+        grid-column: 1 / -1;
+        max-width: 100% !important;
+    }
+    
+    /* 报表网格改为2列 */
+    .report-grid-5x2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* 表格字体稍微缩小 */
+    table, th, td {
+        font-size: 12px;
+    }
+    
+    th, td {
+        padding: 6px 8px;
+    }
+}
+
+/* 小手机设备 (宽度 ≤ 480px) */
+@media (max-width: 480px) {
+    /* 统计卡片改为单列（屏幕太小双列显示困难） */
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* 功能按钮改为单列 */
+    .toolbar {
+        grid-template-columns: 1fr;
+    }
+    
+    /* 报表网格改为单列 */
+    .report-grid-5x2 {
+        grid-template-columns: 1fr;
+    }
+    
+    /* 标题字体缩小 */
+    h1 { font-size: 18px; }
+    h2 { font-size: 16px; }
+    h3 { font-size: 14px; }
+    
+    /* 统计卡片数值字体缩小 */
+    .stat-card .stat-value {
+        font-size: 22px;
+    }
+}
+
+/* ============================================
+   打印优化补充
+   ============================================ */
+@media print {
+    /* 确保A4打印时内容不溢出 */
+    #app {
+        width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+    
+    /* 强制分页避免内容被截断 */
+    .card, .cashflow-summary, .stats-grid {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    
+    /* 表格避免跨页断行 */
+    table, tr, td, th {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    
+    thead {
+        display: table-header-group;
+    }
+    
+    /* 打印时显示链接地址 */
+    a[href]:after {
+        content: " (" attr(href) ")";
+    }
 }
