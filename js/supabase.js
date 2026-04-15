@@ -15,40 +15,56 @@ const SupabaseAPI = {
     },
 
     async getCurrentUser() {
-        const { data, error } = await supabaseClient.auth.getUser();
-        if (error) return null;
-        return data.user;
+        try {
+            const { data, error } = await supabaseClient.auth.getUser();
+            if (error) {
+                // 静默处理未登录状态
+                if (error.message !== 'Auth session missing!') {
+                    console.warn("getCurrentUser error:", error.message);
+                }
+                return null;
+            }
+            return data?.user || null;
+        } catch (err) {
+            console.warn("getCurrentUser exception:", err.message);
+            return null;
+        }
     },
 
     async getCurrentProfile() {
         if (_profileCache) return _profileCache;
-        const user = await this.getCurrentUser();
-        if (!user) return null;
-        
-        const { data, error } = await supabaseClient
-            .from('user_profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-        
-        if (error) {
-            console.error("getCurrentProfile error:", error);
+        try {
+            const user = await this.getCurrentUser();
+            if (!user) return null;
+            
+            const { data, error } = await supabaseClient
+                .from('user_profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            
+            if (error) {
+                console.error("getCurrentProfile error:", error.message);
+                return null;
+            }
+            
+            if (data?.store_id) {
+                const { data: storeData, error: storeError } = await supabaseClient
+                    .from('stores')
+                    .select('*')
+                    .eq('id', data.store_id)
+                    .single();
+                if (!storeError && storeData) {
+                    data.stores = storeData;
+                }
+            }
+            
+            _profileCache = data;
+            return data;
+        } catch (err) {
+            console.warn("getCurrentProfile exception:", err.message);
             return null;
         }
-        
-        if (data.store_id) {
-            const { data: storeData, error: storeError } = await supabaseClient
-                .from('stores')
-                .select('*')
-                .eq('id', data.store_id)
-                .single();
-            if (!storeError && storeData) {
-                data.stores = storeData;
-            }
-        }
-        
-        _profileCache = data;
-        return data;
     },
 
     clearCache() {
@@ -501,7 +517,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 资金注资/提现 API（新增）====================
+    // ==================== 资金注资/提现 API ====================
     async getCapitalTransactions() {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('capital_transactions').select('*').order('transaction_date', { ascending: false });
@@ -518,7 +534,6 @@ const SupabaseAPI = {
     async addCapitalTransaction(transaction) {
         const profile = await this.getCurrentProfile();
         
-        // 只有管理员可以注资/提现
         if (profile?.role !== 'admin') {
             throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
         }
@@ -570,7 +585,6 @@ const SupabaseAPI = {
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
-        // 获取收入（付款记录）
         let incomeQuery = supabaseClient.from('payment_history').select('type, amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
@@ -589,7 +603,6 @@ const SupabaseAPI = {
             }
         }
         
-        // 获取支出（运营支出）
         let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             expenseQuery = expenseQuery.eq('store_id', profile.store_id);
@@ -602,10 +615,8 @@ const SupabaseAPI = {
             else if (e.payment_method === 'bank') bankExpense += e.amount;
         }
         
-        // 获取注资/提现
         const capital = await this.getCapitalSummary();
         
-        // 最终余额 = 注资净额 + 收入 - 支出
         const cashBalance = capital.cash.net + cashIncome - cashExpense;
         const bankBalance = capital.bank.net + bankIncome - bankExpense;
         
