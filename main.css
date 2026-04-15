@@ -533,3 +533,57 @@ table td:last-child button {
 .cash-outflow {
     color: #ef4444;
 }
+
+/* ========== 财务报表手机端响应式布局 ========== */
+/* 桌面端：5列2行 */
+.report-grid-5x2 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+}
+
+.report-grid-5x2 .report-store-stat {
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.report-grid-5x2 .report-store-stat:nth-child(5n) {
+    border-right: none;
+}
+
+.report-grid-5x2 .report-store-stat:nth-last-child(-n+5) {
+    border-bottom: none;
+}
+
+/* 手机端：2列5行 */
+@media (max-width: 768px) {
+    .report-grid-5x2 {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    
+    .report-grid-5x2 .report-store-stat {
+        border-right: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .report-grid-5x2 .report-store-stat:nth-child(2n) {
+        border-right: none;
+    }
+    
+    .report-grid-5x2 .report-store-stat:nth-last-child(-n+2) {
+        border-bottom: none;
+    }
+    
+    /* 确保手机端字体大小合适 */
+    .report-grid-5x2 .report-store-stat .value {
+        font-size: 13px !important;
+    }
+    
+    .report-grid-5x2 .report-store-stat .stat-value {
+        font-size: 14px !important;
+    }
+    
+    .report-grid-5x2 .report-store-stat .label {
+        font-size: 10px !important;
+    }
+}
