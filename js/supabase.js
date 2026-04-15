@@ -643,34 +643,6 @@ const SupabaseAPI = {
     },
 
     // ==================== WA 提醒相关 API ====================
-    async getDefaultWANumber() {
-        const { data, error } = await supabaseClient
-            .from('system_config')
-            .select('value')
-            .eq('key', 'default_wa_number')
-            .single();
-        if (error && error.code !== 'PGRST116') throw error;
-        return data?.value || null;
-    },
-
-    async getReminderDays() {
-        const { data, error } = await supabaseClient
-            .from('system_config')
-            .select('value')
-            .eq('key', 'reminder_days_before')
-            .single();
-        if (error && error.code !== 'PGRST116') return 2;
-        return data?.value ? parseInt(data.value) : 2;
-    },
-
-    async updateSystemConfig(key, value) {
-        const { error } = await supabaseClient
-            .from('system_config')
-            .upsert({ key: key, value: String(value), updated_at: new Date().toISOString() });
-        if (error) throw error;
-        return true;
-    },
-
     async getStoreWANumber(storeId) {
         const { data, error } = await supabaseClient
             .from('stores')
@@ -718,7 +690,7 @@ const SupabaseAPI = {
 
     async getOrdersNeedReminder() {
         const profile = await this.getCurrentProfile();
-        const reminderDays = await this.getReminderDays();
+        const reminderDays = 2; // 固定提前2天
         
         let query = supabaseClient
             .from('orders')
@@ -752,6 +724,16 @@ const SupabaseAPI = {
         }
         
         return needRemind;
+    },
+
+    async getStoreName(storeId) {
+        const { data, error } = await supabaseClient
+            .from('stores')
+            .select('name')
+            .eq('id', storeId)
+            .single();
+        if (error) return '-';
+        return data?.name || '-';
     },
 
     formatCurrency(amount) {
