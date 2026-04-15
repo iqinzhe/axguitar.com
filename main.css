@@ -235,7 +235,7 @@ h3 { font-size: 15px; }
 /* ===== 统计卡片网格（仪表盘指标）===== */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 3fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 16px;
     margin-bottom: 24px;
 }
@@ -479,8 +479,6 @@ tr:hover {
 /* ============================================
    响应式布局（核心优化）
    ============================================ */
-
-/* 桌面端默认样式已在上面定义 */
 
 /* 平板设备 (宽度 769px - 1024px) */
 @media (max-width: 1024px) and (min-width: 769px) {
