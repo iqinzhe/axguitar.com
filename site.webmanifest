@@ -1,7 +1,7 @@
 {
   "name": "JF! Gadai | Sistem Pencatatan Gadai",
   "short_name": "JF! Gadai",
-  "description": "Sistem manajemen pinjaman gadai untuk admin dan manajer toko. Kelola nasabah, kontrak, pembayaran bunga & pokok, laporan keuangan, dan multi-cabang.",
+  "description": "Sistem manajemen pinjaman gadai untuk admin dan manajer toko.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
