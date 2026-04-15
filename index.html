@@ -2,22 +2,44 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>JF! by Gadai - Sistem Manajemen Gadai</title>
-<link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
-<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/android-chrome-192x192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="/icons/android-chrome-512x512.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#ffffff">
+<title>JF! by Gadai - Sistem Manajemen Gadai</title>
+
+<!-- Favicon - 使用相对路径 -->
+<link rel="icon" type="image/x-icon" href="icons/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/android-chrome-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/android-chrome-512x512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+
+<!-- 预加载关键资源 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="main.css">
 </head>
 <body>
-<div id="app">Loading system...</div>
+<div id="app">
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;background:#f8fafc;">
+        <div style="text-align:center;">
+            <div style="width:40px;height:40px;border:3px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
+            <p style="color:#64748b;">Memuat sistem...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+<!-- 外部脚本 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- 核心模块 -->
 <script src="js/utils.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/auth.js"></script>
@@ -26,20 +48,59 @@
 <script src="js/order.js"></script>
 <script src="js/store.js"></script>
 <script src="js/migration.js"></script>
-<!-- app-core 已拆分为3个文件 -->
+
+<!-- 应用模块 -->
 <script src="js/app-dashboard.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (window.APP && typeof window.APP.init === 'function') {
-        window.APP.init();
-    } else {
-        console.error("APP not properly loaded");
-        document.getElementById("app").innerHTML = 
-            '<div style="text-align:center;padding:50px;color:#ef4444;">Loading error: System not ready. Please refresh.</div>';
-    }
+// 全局错误捕获
+window.addEventListener('error', function(e) {
+    console.error('Global error:', e.error);
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 等待一小段时间确保所有脚本执行完毕
+    setTimeout(function() {
+        try {
+            if (window.APP && typeof window.APP.init === 'function') {
+                window.APP.init();
+            } else {
+                throw new Error('APP module not available');
+            }
+        } catch (err) {
+            console.error('Init error:', err);
+            showError('Gagal memuat aplikasi: ' + err.message);
+        }
+    }, 100);
+});
+
+function showError(message) {
+    const app = document.getElementById('app');
+    if (app) {
+        app.innerHTML = `
+            <div style="display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f8fafc;padding:20px;">
+                <div style="max-width:400px;background:white;border-radius:16px;padding:32px;text-align:center;box-shadow:0 4px 6px rgba(0,0,0,0.05);border:1px solid #e5e7eb;">
+                    <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+                    <h3 style="color:#dc2626;margin:0 0 8px 0;">Error Sistem</h3>
+                    <p style="color:#64748b;margin:0 0 20px 0;font-size:14px;">${escapeHtml(message)}</p>
+                    <button onclick="location.reload()" style="background:#2563eb;color:white;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:14px;">Muat Ulang</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
 </script>
 </body>
 </html>
