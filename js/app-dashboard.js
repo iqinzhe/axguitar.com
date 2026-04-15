@@ -1,4 +1,4 @@
-// app-dashboard.js - 仪表板、登录、路由、报表模块
+// app-dashboard.js - 仪表板、登录、路由、报表模块（类名优化版）
 
 window.APP = window.APP || {};
 
@@ -19,7 +19,7 @@ const DashboardModule = {
     },
 
     init: async function() {
-        document.getElementById("app").innerHTML = '<div style="text-align: center; padding: 50px;">🔄 Loading system...</div>';
+        document.getElementById("app").innerHTML = '<div class="loading-container"><div class="loader"></div><p class="loading-text">🔄 Loading system...</p></div>';
         await AUTH.init();
         
         var savedPage = sessionStorage.getItem('jf_current_page');
@@ -151,7 +151,7 @@ const DashboardModule = {
                 <link rel="stylesheet" href="${styles}">
                 <style>
                     body { padding: 20px; background: white; color: black; }
-                    .no-print, .toolbar button:not(.print-btn) { display: none !important; }
+                    .no-print, .toolbar button:not(.print-btn), button:not(.print-btn) { display: none !important; }
                     .toolbar { display: block !important; }
                     .print-btn { display: inline-block !important; }
                     table { border-collapse: collapse; width: 100%; }
@@ -185,24 +185,26 @@ const DashboardModule = {
         }
         
         document.getElementById("app").innerHTML = `
-            <div class="card" style="max-width: 400px; margin: 50px auto;">
-                <div style="text-align: right; margin-bottom: 10px;">
-                    <button onclick="APP.toggleLanguageOnLogin()">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+            <div class="login-container">
+                <div class="login-box">
+                    <div class="lang-toggle">
+                        <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                    </div>
+                    <h2 class="login-title"><img src="/icons/system-jf.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>
+                    <h3>${t('login')}</h3>
+                    <div class="form-group">
+                        <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
+                        <input id="username" placeholder="email@domain.com">
+                    </div>
+                    <div class="form-group">
+                        <label>${t('password')}</label>
+                        <input id="password" type="password" placeholder="${t('password')}">
+                    </div>
+                    <button onclick="APP.login()">${t('login')}</button>
+                    <p class="login-note">
+                        ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}
+                    </p>
                 </div>
-                <h2><img src="/icons/system-jf.png" alt="JF!" style="height: 32px; vertical-align: middle;"> JF! by Gadai</h2>
-                <h3>${t('login')}</h3>
-                <div class="form-group">
-                    <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
-                    <input id="username" placeholder="email@domain.com">
-                </div>
-                <div class="form-group">
-                    <label>${t('password')}</label>
-                    <input id="password" type="password" placeholder="${t('password')}">
-                </div>
-                <button onclick="APP.login()">${t('login')}</button>
-                <p style="margin-top: 15px; font-size: 12px; color: #94a3b8;">
-                    ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}
-                </p>
             </div>`;
     },
 
@@ -262,7 +264,7 @@ const DashboardModule = {
             var storeName = AUTH.getCurrentStoreName();
             
             document.getElementById("app").innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+                <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
                     <h1><img src="/icons/system-jf.png" alt="JF!" style="height: 32px; vertical-align: middle;"> JF! by Gadai</h1>
                     <div>${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}</div>
                 </div>
@@ -287,7 +289,7 @@ const DashboardModule = {
                     </div>
                 </div>
                 
-                <div class="stats-grid" 
+                <div class="stats-grid">
                     <div class="stat-card"><div class="stat-value">${report.total_orders}</div><div>${t('total_orders')}</div></div>
                     <div class="stat-card"><div class="stat-value">${report.active_orders}</div><div>${t('active')}</div></div>
                     <div class="stat-card"><div class="stat-value">${report.completed_orders}</div><div>${t('completed')}</div></div>
@@ -316,266 +318,256 @@ const DashboardModule = {
         }
     },
 
-showReport: async function() {
-    this.currentPage = 'report';
-    this.saveCurrentPageState();
-    try {
-        var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
-        var isAdmin = AUTH.isAdmin();
-        
-        // ========== 优化：并行查询所有数据 ==========
-        console.log('开始加载财务报表数据...');
-        
-        const startTime = Date.now();
-        
-        // 并行执行所有查询
-        const [storesResult, allOrdersResult, allExpensesResult, allPaymentsResult, cashFlow] = await Promise.all([
-            supabaseClient.from('stores').select('*').order('name'),
-            supabaseClient.from('orders').select('*'),
-            supabaseClient.from('expenses').select('*'),
-            supabaseClient.from('payment_history').select('*'),
-            SUPABASE.getCashFlowSummary()
-        ]);
-        
-        const stores = storesResult.data || [];
-        const allOrders = allOrdersResult.data || [];
-        const allExpenses = allExpensesResult.data || [];
-        const allPayments = allPaymentsResult.data || [];
-        
-        console.log(`数据加载完成: 门店 ${stores.length} 家, 订单 ${allOrders.length} 条, 支出 ${allExpenses.length} 条, 付款 ${allPayments.length} 条, 耗时 ${Date.now() - startTime}ms`);
-        
-        // 构建 order_id 到 store_id 的映射
-        const orderStoreMap = {};
-        for (const order of allOrders) {
-            orderStoreMap[order.id] = order.store_id;
-        }
-        
-        // 按门店分组付款记录
-        const paymentsByStore = {};
-        for (const payment of allPayments) {
-            const storeId = orderStoreMap[payment.order_id];
-            if (storeId) {
-                if (!paymentsByStore[storeId]) paymentsByStore[storeId] = [];
-                paymentsByStore[storeId].push(payment);
+        // ==================== 财务报表 ====================
+    showReport: async function() {
+        this.currentPage = 'report';
+        this.saveCurrentPageState();
+        try {
+            var lang = Utils.lang;
+            var t = (key) => Utils.t(key);
+            var isAdmin = AUTH.isAdmin();
+            
+            console.log('开始加载财务报表数据...');
+            const startTime = Date.now();
+            
+            const [storesResult, allOrdersResult, allExpensesResult, allPaymentsResult, cashFlow] = await Promise.all([
+                supabaseClient.from('stores').select('*').order('name'),
+                supabaseClient.from('orders').select('*'),
+                supabaseClient.from('expenses').select('*'),
+                supabaseClient.from('payment_history').select('*'),
+                SUPABASE.getCashFlowSummary()
+            ]);
+            
+            const stores = storesResult.data || [];
+            const allOrders = allOrdersResult.data || [];
+            const allExpenses = allExpensesResult.data || [];
+            const allPayments = allPaymentsResult.data || [];
+            
+            console.log(`数据加载完成: 门店 ${stores.length} 家, 订单 ${allOrders.length} 条, 支出 ${allExpenses.length} 条, 付款 ${allPayments.length} 条, 耗时 ${Date.now() - startTime}ms`);
+            
+            const orderStoreMap = {};
+            for (const order of allOrders) {
+                orderStoreMap[order.id] = order.store_id;
             }
-        }
-        
-        // 按门店分组支出
-        const expensesByStore = {};
-        for (const expense of allExpenses) {
-            const storeId = expense.store_id;
-            if (storeId) {
-                if (!expensesByStore[storeId]) expensesByStore[storeId] = [];
-                expensesByStore[storeId].push(expense);
+            
+            const paymentsByStore = {};
+            const expensesByStore = {};
+            const ordersByStore = {};
+            
+            for (const payment of allPayments) {
+                const storeId = orderStoreMap[payment.order_id];
+                if (storeId) {
+                    if (!paymentsByStore[storeId]) paymentsByStore[storeId] = [];
+                    paymentsByStore[storeId].push(payment);
+                }
             }
-        }
-        
-        // 按门店分组订单
-        const ordersByStore = {};
-        for (const order of allOrders) {
-            const storeId = order.store_id;
-            if (storeId) {
-                if (!ordersByStore[storeId]) ordersByStore[storeId] = [];
-                ordersByStore[storeId].push(order);
+            
+            for (const expense of allExpenses) {
+                const storeId = expense.store_id;
+                if (storeId) {
+                    if (!expensesByStore[storeId]) expensesByStore[storeId] = [];
+                    expensesByStore[storeId].push(expense);
+                }
             }
-        }
+            
+            for (const order of allOrders) {
+                const storeId = order.store_id;
+                if (storeId) {
+                    if (!ordersByStore[storeId]) ordersByStore[storeId] = [];
+                    ordersByStore[storeId].push(order);
+                }
+            }
 
-        if (isAdmin) {
-            var storeReports = [];
-            var grandTotal = { 
-                orders: 0, active: 0, loan: 0, adminFee: 0, interest: 0, 
-                principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
-            };
+            if (isAdmin) {
+                var storeReports = [];
+                var grandTotal = { 
+                    orders: 0, active: 0, loan: 0, adminFee: 0, interest: 0, 
+                    principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
+                };
 
-            for (var store of stores) {
-                const orders = ordersByStore[store.id] || [];
-                const expenses = expensesByStore[store.id] || [];
-                const payments = paymentsByStore[store.id] || [];
+                for (var store of stores) {
+                    const orders = ordersByStore[store.id] || [];
+                    const expenses = expensesByStore[store.id] || [];
+                    const payments = paymentsByStore[store.id] || [];
+                    
+                    const ords = orders;
+                    const activeOrds = ords.filter(o => o.status === 'active');
+                    const totalLoan = ords.reduce((s, o) => s + (o.loan_amount || 0), 0);
+                    const totalAdminFee = ords.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
+                    const totalInterest = ords.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
+                    const totalPrincipal = ords.reduce((s, o) => s + (o.principal_paid || 0), 0);
+                    const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+                    const totalIncome = totalAdminFee + totalInterest;
+                    
+                    let cashIncome = 0, bankIncome = 0;
+                    for (const p of payments) {
+                        if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
+                            if (p.payment_method === 'cash') cashIncome += p.amount;
+                            else if (p.payment_method === 'bank') bankIncome += p.amount;
+                        }
+                    }
+                    let cashExpense = 0, bankExpense = 0;
+                    for (const e of expenses) {
+                        if (e.payment_method === 'cash') cashExpense += e.amount;
+                        else if (e.payment_method === 'bank') bankExpense += e.amount;
+                    }
+                    const cashBalance = cashIncome - cashExpense;
+                    const bankBalance = bankIncome - bankExpense;
+
+                    storeReports.push({ 
+                        store, 
+                        ords: ords.length, 
+                        active: activeOrds.length, 
+                        totalLoan, 
+                        totalAdminFee, 
+                        totalInterest, 
+                        totalPrincipal, 
+                        totalExpenses, 
+                        totalIncome,
+                        cashBalance,
+                        bankBalance
+                    });
+
+                    grandTotal.orders += ords.length;
+                    grandTotal.active += activeOrds.length;
+                    grandTotal.loan += totalLoan;
+                    grandTotal.adminFee += totalAdminFee;
+                    grandTotal.interest += totalInterest;
+                    grandTotal.principal += totalPrincipal;
+                    grandTotal.expenses += totalExpenses;
+                    grandTotal.income += totalIncome;
+                    grandTotal.cashBalance += cashBalance;
+                    grandTotal.bankBalance += bankBalance;
+                }
+
+                var storeHtml = storeReports.length === 0 
+                    ? `<div class="report-store-section"><div class="report-store-header">${lang === 'id' ? 'Tidak ada toko' : '暂无门店'}</div></div>`
+                    : storeReports.map(r => `
+                    <div class="report-store-section">
+                        <div class="report-store-header">🏪 ${Utils.escapeHtml(r.store.name)}</div>
+                        <div class="report-store-stats report-grid-5x2">
+                            <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="value">${r.ords}</div></div>
+                            <div class="report-store-stat"><div class="label">${t('active')}</div><div class="value">${r.active}</div></div>
+                            <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="value">${Utils.formatCurrency(r.totalLoan)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div><div class="value income">${Utils.formatCurrency(r.totalAdminFee)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Bunga' : '利息收入总额'}</div><div class="value income">${Utils.formatCurrency(r.totalInterest)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="value">${Utils.formatCurrency(r.totalPrincipal)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+利息合计'}</div><div class="value income">${Utils.formatCurrency(r.totalIncome)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="value expense">${Utils.formatCurrency(r.totalExpenses)}</div></div>
+                            <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="value">${Utils.formatCurrency(r.cashBalance)}</div></div>
+                            <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="value">${Utils.formatCurrency(r.bankBalance)}</div></div>
+                        </div>
+                    </div>`).join('');
+
+                document.getElementById("app").innerHTML = `
+                    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                        <h2>📊 ${t('financial_report')}</h2>
+                        <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    </div>
+                    
+                    <div class="cashflow-summary" style="margin-bottom:20px;">
+                        <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
+                        <div class="cashflow-stats">
+                            <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div></div>
+                            <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(cashFlow.bank.balance)}</div></div>
+                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div></div>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="border:2px solid #3b82f6;">
+                        <h3 style="color:#3b82f6;">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</h3>
+                        <div class="report-store-stats report-grid-5x2" style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
+                            <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="stat-value" style="font-size:20px;">${grandTotal.orders}</div></div>
+                            <div class="report-store-stat"><div class="label">${t('active')}</div><div class="stat-value" style="font-size:20px;">${grandTotal.active}</div></div>
+                            <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.loan)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.adminFee)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Bunga' : '利息收入总额'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.interest)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.principal)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+利息合计'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.income)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="stat-value expense" style="font-size:16px;">${Utils.formatCurrency(grandTotal.expenses)}</div></div>
+                            <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.cashBalance)}</div></div>
+                            <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.bankBalance)}</div></div>
+                        </div>
+                    </div>
+                    
+                    <h3>${lang === 'id' ? 'Detail per Toko' : '各门店明细'}</h3>
+                    ${storeHtml}
+                    
+                    <div class="toolbar">
+                        <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                        <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    </div>`;
+            } else {
+                const profile = await SUPABASE.getCurrentProfile();
+                const storeId = profile?.store_id;
                 
-                const ords = orders;
-                const activeOrds = ords.filter(o => o.status === 'active');
-                const totalLoan = ords.reduce((s, o) => s + (o.loan_amount || 0), 0);
-                const totalAdminFee = ords.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
-                const totalInterest = ords.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
-                const totalPrincipal = ords.reduce((s, o) => s + (o.principal_paid || 0), 0);
-                const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
-                const totalIncome = totalAdminFee + totalInterest;
+                const storeOrders = allOrders.filter(o => o.store_id === storeId);
+                const storeExpenses = allExpenses.filter(e => e.store_id === storeId);
+                const storeOrderIds = storeOrders.map(o => o.id);
+                const storePayments = allPayments.filter(p => storeOrderIds.includes(p.order_id));
                 
-                // 计算该门店现金流
                 let cashIncome = 0, bankIncome = 0;
-                for (const p of payments) {
+                for (const p of storePayments) {
                     if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
                         if (p.payment_method === 'cash') cashIncome += p.amount;
                         else if (p.payment_method === 'bank') bankIncome += p.amount;
                     }
                 }
                 let cashExpense = 0, bankExpense = 0;
-                for (const e of expenses) {
+                for (const e of storeExpenses) {
                     if (e.payment_method === 'cash') cashExpense += e.amount;
                     else if (e.payment_method === 'bank') bankExpense += e.amount;
                 }
                 const cashBalance = cashIncome - cashExpense;
                 const bankBalance = bankIncome - bankExpense;
+                
+                const totalLoan = storeOrders.reduce((s, o) => s + (o.loan_amount || 0), 0);
+                const totalAdminFee = storeOrders.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
+                const totalInterest = storeOrders.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
+                const totalPrincipal = storeOrders.reduce((s, o) => s + (o.principal_paid || 0), 0);
+                const totalExpenses = storeExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+                const totalIncome = totalAdminFee + totalInterest;
+                const grossProfit = totalIncome - totalExpenses;
 
-                storeReports.push({ 
-                    store, 
-                    ords: ords.length, 
-                    active: activeOrds.length, 
-                    totalLoan, 
-                    totalAdminFee, 
-                    totalInterest, 
-                    totalPrincipal, 
-                    totalExpenses, 
-                    totalIncome,
-                    cashBalance,
-                    bankBalance
-                });
-
-                grandTotal.orders += ords.length;
-                grandTotal.active += activeOrds.length;
-                grandTotal.loan += totalLoan;
-                grandTotal.adminFee += totalAdminFee;
-                grandTotal.interest += totalInterest;
-                grandTotal.principal += totalPrincipal;
-                grandTotal.expenses += totalExpenses;
-                grandTotal.income += totalIncome;
-                grandTotal.cashBalance += cashBalance;
-                grandTotal.bankBalance += bankBalance;
+                document.getElementById("app").innerHTML = `
+                    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                        <h2>📊 ${t('financial_report')}</h2>
+                        <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    </div>
+                    
+                    <div class="cashflow-summary" style="margin-bottom:20px;">
+                        <h3>💰 ${lang === 'id' ? 'ARUS KAS' : '现金流'}</h3>
+                        <div class="cashflow-stats">
+                            <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashBalance)}</div></div>
+                            <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(bankBalance)}</div></div>
+                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashBalance + bankBalance)}</div></div>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-value">${storeOrders.length}</div><div>${t('total_orders')}</div></div>
+                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalLoan)}</div><div>${t('total_loan')}</div></div>
+                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
+                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Bunga' : '利息收入'}</div></div>
+                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-value" style="color:#10b981;">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
+                        <div class="stat-card"><div class="stat-value" style="color:#ef4444;">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
+                        <div class="stat-card"><div class="stat-value" style="color:#3b82f6;">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
+                    </div>
+                    <div class="toolbar">
+                        <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                        <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    </div>`;
             }
-
-            var storeHtml = storeReports.length === 0 
-                ? `<div class="report-store-section"><div class="report-store-header">${lang === 'id' ? 'Tidak ada toko' : '暂无门店'}</div></div>`
-                : storeReports.map(r => `
-                <div class="report-store-section">
-                    <div class="report-store-header">🏪 ${Utils.escapeHtml(r.store.name)}</div>
-                    <div class="report-store-stats report-grid-5x2">
-                        <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="value">${r.ords}</div></div>
-                        <div class="report-store-stat"><div class="label">${t('active')}</div><div class="value">${r.active}</div></div>
-                        <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="value">${Utils.formatCurrency(r.totalLoan)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div><div class="value income">${Utils.formatCurrency(r.totalAdminFee)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Bunga' : '利息收入总额'}</div><div class="value income">${Utils.formatCurrency(r.totalInterest)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="value">${Utils.formatCurrency(r.totalPrincipal)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+利息合计'}</div><div class="value income">${Utils.formatCurrency(r.totalIncome)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="value expense">${Utils.formatCurrency(r.totalExpenses)}</div></div>
-                        <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="value">${Utils.formatCurrency(r.cashBalance)}</div></div>
-                        <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="value">${Utils.formatCurrency(r.bankBalance)}</div></div>
-                    </div>
-                </div>`).join('');
-
-            document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                    <h2>📊 ${t('financial_report')}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
-                </div>
-                
-                <div class="cashflow-summary" style="margin-bottom:20px;">
-                    <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
-                    <div class="cashflow-stats">
-                        <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div></div>
-                        <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(cashFlow.bank.balance)}</div></div>
-                        <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div></div>
-                    </div>
-                </div>
-                
-                <div class="card" style="border:2px solid #3b82f6;">
-                    <h3 style="color:#3b82f6;">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</h3>
-                    <div class="report-store-stats report-grid-5x2" style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
-                        <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="stat-value" style="font-size:20px;">${grandTotal.orders}</div></div>
-                        <div class="report-store-stat"><div class="label">${t('active')}</div><div class="stat-value" style="font-size:20px;">${grandTotal.active}</div></div>
-                        <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.loan)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.adminFee)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Bunga' : '利息收入总额'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.interest)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.principal)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+利息合计'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.income)}</div></div>
-                        <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="stat-value expense" style="font-size:16px;">${Utils.formatCurrency(grandTotal.expenses)}</div></div>
-                        <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.cashBalance)}</div></div>
-                        <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.bankBalance)}</div></div>
-                    </div>
-                </div>
-                
-                <h3>${lang === 'id' ? 'Detail per Toko' : '各门店明细'}</h3>
-                ${storeHtml}
-                
-                <div class="toolbar">
-                    <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
-                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                </div>`;
-        } else {
-            // 非管理员视图
-            const profile = await SUPABASE.getCurrentProfile();
-            const storeId = profile?.store_id;
-            
-            // 过滤当前门店的数据
-            const storeOrders = allOrders.filter(o => o.store_id === storeId);
-            const storeExpenses = allExpenses.filter(e => e.store_id === storeId);
-            
-            // 获取当前门店的付款记录
-            const storeOrderIds = storeOrders.map(o => o.id);
-            const storePayments = allPayments.filter(p => storeOrderIds.includes(p.order_id));
-            
-            // 计算现金流
-            let cashIncome = 0, bankIncome = 0;
-            for (const p of storePayments) {
-                if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
-                    if (p.payment_method === 'cash') cashIncome += p.amount;
-                    else if (p.payment_method === 'bank') bankIncome += p.amount;
-                }
-            }
-            let cashExpense = 0, bankExpense = 0;
-            for (const e of storeExpenses) {
-                if (e.payment_method === 'cash') cashExpense += e.amount;
-                else if (e.payment_method === 'bank') bankExpense += e.amount;
-            }
-            const cashBalance = cashIncome - cashExpense;
-            const bankBalance = bankIncome - bankExpense;
-            
-            const totalLoan = storeOrders.reduce((s, o) => s + (o.loan_amount || 0), 0);
-            const totalAdminFee = storeOrders.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
-            const totalInterest = storeOrders.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
-            const totalPrincipal = storeOrders.reduce((s, o) => s + (o.principal_paid || 0), 0);
-            const totalExpenses = storeExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-            const totalIncome = totalAdminFee + totalInterest;
-            const grossProfit = totalIncome - totalExpenses;
-
-            document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                    <h2>📊 ${t('financial_report')}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
-                </div>
-                
-                <div class="cashflow-summary" style="margin-bottom:20px;">
-                    <h3>💰 ${lang === 'id' ? 'ARUS KAS' : '现金流'}</h3>
-                    <div class="cashflow-stats">
-                        <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashBalance)}</div></div>
-                        <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(bankBalance)}</div></div>
-                        <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashBalance + bankBalance)}</div></div>
-                    </div>
-                </div>
-                
-                <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-value">${storeOrders.length}</div><div>${t('total_orders')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalLoan)}</div><div>${t('total_loan')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Bunga' : '利息收入'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
-                </div>
-                <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-value" style="color:#10b981;">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
-                    <div class="stat-card"><div class="stat-value" style="color:#ef4444;">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
-                    <div class="stat-card"><div class="stat-value" style="color:#3b82f6;">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
-                </div>
-                <div class="toolbar">
-                    <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
-                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                </div>`;
+        } catch (err) {
+            console.error("showReport error:", err);
+            alert(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报告失败');
         }
-    } catch (err) {
-        console.error("showReport error:", err);
-        alert(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报告失败');
-    }
-},
+    },
 
+    // ==================== 用户管理 ====================
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -599,21 +591,21 @@ showReport: async function() {
                     actionHtml = `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>`;
                 } else {
                     actionHtml = `
-                        <button onclick="APP.editUser('${u.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
-                        <button class="danger" onclick="APP.deleteUser('${u.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+                        <button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button>
+                        <button class="danger btn-small" onclick="APP.deleteUser('${u.id}')">🗑️ ${t('delete')}</button>
                     `;
                 }
                 userRows += `<tr>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(usernameDisplay)}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(u.name)}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${roleText}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(storeName)}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">${actionHtml}</td>
+                    <td>${Utils.escapeHtml(usernameDisplay)}</td>
+                    <td>${Utils.escapeHtml(u.name)}</td>
+                    <td>${roleText}</td>
+                    <td>${Utils.escapeHtml(storeName)}</td>
+                    <td class="action-cell">${actionHtml}</td>
                 　　`;
             }
 
             if (users.length === 0) {
-                userRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+                userRows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
             }
 
             var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
@@ -622,21 +614,21 @@ showReport: async function() {
             }
 
             document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div class="page-header">
                     <h2>👥 ${t('user_management')}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
                     <div class="table-container">
-                        <table class="user-table" style="width:100%;border-collapse:collapse;">
+                        <table class="user-table">
                             <thead>
-                                <tr style="background:#f8fafc;">
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${t('username')}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Nama' : '姓名'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Peran' : '角色'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                <tr>
+                                    <th>${t('username')}</th>
+                                    <th>${lang === 'id' ? 'Nama' : '姓名'}</th>
+                                    <th>${lang === 'id' ? 'Peran' : '角色'}</th>
+                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
                             <tbody>${userRows}</tbody>
@@ -650,18 +642,23 @@ showReport: async function() {
                         <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password" placeholder="${t('password')}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'} *</label>
-
-<select id="newRole">
-    <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
-    <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
-    <option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option>
-</select>
+                            <select id="newRole">
+                                <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
+                                <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
+                                <option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option>
+                            </select>
                         </div>
                         <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label><select id="newStoreId">${storeOptions}</select></div>
                         <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button></div>
                     </div>
                 </div>
-                <div class="toolbar"><button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button></div>`;
+                <div class="toolbar"><button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button></div>
+                <style>
+                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+                    .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
+                    .action-cell { white-space: nowrap; }
+                    .text-center { text-align: center; }
+                </style>`;
         } catch (error) {
             console.error("showUserManagement error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna: ' + error.message : '加载用户管理失败：' + error.message);
@@ -713,25 +710,38 @@ showReport: async function() {
             
             var modal = document.createElement('div');
             modal.id = 'editUserModal';
-            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.className = 'modal-overlay';
             modal.innerHTML = `
-                <div style="background:#ffffff;border-radius:12px;padding:24px;width:100%;max-width:400px;">
-                    <h3 style="margin-top:0;color:#1e293b;">✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3>
+                <div class="modal-content">
+                    <h3>✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3>
                     <div class="form-group">
                         <label>${lang === 'id' ? 'Peran' : '角色'}</label>
-                        <select id="editRoleSelect" style="width:100%;padding:10px;border-radius:6px;border:1px solid #cbd5e1;">
+                        <select id="editRoleSelect" class="form-select">
                             <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option>
                             <option value="store_manager" ${currentRole === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
                             <option value="staff" ${currentRole === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option>
                         </select>
                     </div>
-                    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+                    <div class="modal-actions">
                         <button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button>
                         <button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
+            
+            // 添加模态框样式
+            if (!document.getElementById('modal-styles')) {
+                var style = document.createElement('style');
+                style.id = 'modal-styles';
+                style.textContent = `
+                    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+                    .modal-content { background: #ffffff; border-radius: 12px; padding: 24px; width: 100%; max-width: 400px; }
+                    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+                    .form-select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; }
+                `;
+                document.head.appendChild(style);
+            }
         } catch (error) {
             console.error("editUser error:", error);
             alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败');
@@ -753,6 +763,7 @@ showReport: async function() {
         }
     },
 
+        // ==================== 运营支出管理 ====================
     showExpenses: async function() {
         this.currentPage = 'expenses';
         this.saveCurrentPageState();
@@ -774,47 +785,49 @@ showReport: async function() {
                     var canEdit = isAdmin && !e.is_reconciled;
                     var actionBtns = '';
                     if (canEdit) {
-                        actionBtns = `<button onclick="APP.editExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
-                                     <button class="danger" onclick="APP.deleteExpense('${e.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>`;
+                        actionBtns = `<button onclick="APP.editExpense('${e.id}')" class="btn-small">✏️ ${t('edit')}</button>
+                                     <button class="danger btn-small" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button>`;
                     } else if (e.is_reconciled) {
-                        actionBtns = `<span style="color:#10b981;font-size:11px;">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
+                        actionBtns = `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
                     } else if (!isAdmin) {
-                        actionBtns = `<span style="color:#94a3b8;font-size:11px;">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
+                        actionBtns = `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
                     }
                     var methodText = e.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     rows += `<tr>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(e.expense_date)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(e.category)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(e.amount)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${methodText}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(e.description || '-')}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(e.stores?.name || '-')}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">${actionBtns}</td>
+                        <td>${Utils.formatDate(e.expense_date)}</td>
+                        <td>${Utils.escapeHtml(e.category)}</td>
+                        <td class="text-right">${Utils.formatCurrency(e.amount)}</td>
+                        <td>${methodText}</td>
+                        <td>${Utils.escapeHtml(e.description || '-')}</td>
+                        <td>${Utils.escapeHtml(e.stores?.name || '-')}</td>
+                        <td class="action-cell">${actionBtns}</td>
                     　　　`;
                 }
             } else {
-                rows = `<tr><td colspan="7" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
             }
 
             document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
-                <div class="card"><h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: <span style="color:#ef4444;">${Utils.formatCurrency(totalAmount)}</span></h3></div>
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: <span class="total-expense">${Utils.formatCurrency(totalAmount)}</span></h3>
+                </div>
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
                     <div class="table-container">
-                        <table style="width:100%;border-collapse:collapse;">
+                        <table class="data-table">
                             <thead>
-                                <tr style="background:#f8fafc;">
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Kategori' : '类别'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                <tr>
+                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th>${lang === 'id' ? 'Kategori' : '类别'}</th>
+                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                    <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -825,7 +838,7 @@ showReport: async function() {
                     <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增运营支出'}</h3>
                     <div class="form-grid">
                         <div class="form-group"><label>${lang === 'id' ? 'Tanggal' : '日期'} *</label><input type="date" id="expenseDate" value="${todayDate}"></div>
-                        <div class="form-group"><label>${lang === 'id' ? 'Jumlah' : '金额'} *</label><input type="text" id="expenseAmount" placeholder="0" style="text-align:right;"></div>
+                        <div class="form-group"><label>${lang === 'id' ? 'Jumlah' : '金额'} *</label><input type="text" id="expenseAmount" placeholder="0" class="amount-input"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label><input type="text" id="expenseCategory" placeholder="${lang === 'id' ? 'Contoh: Listrik, Gaji' : '例如：电费、工资'}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Metode Pembayaran' : '支付方式'} *</label>
                             <select id="expenseMethod">
@@ -839,8 +852,18 @@ showReport: async function() {
                 </div>
                 <div class="toolbar">
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                    ${PERMISSION.canReconcile() ? `<button onclick="APP.balanceExpenses()" class="warning" style="background:#8b5cf6;">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
-                </div>`;
+                    ${PERMISSION.canReconcile() ? `<button onclick="APP.balanceExpenses()" class="warning">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
+                </div>
+                <style>
+                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+                    .total-expense { color: #ef4444; font-size: 18px; }
+                    .text-right { text-align: right; }
+                    .action-cell { white-space: nowrap; }
+                    .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
+                    .reconciled-badge { color: #10b981; font-size: 11px; }
+                    .locked-badge { color: #94a3b8; font-size: 11px; }
+                    .amount-input { text-align: right; }
+                </style>`;
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
@@ -945,6 +968,7 @@ showReport: async function() {
         }
     },
 
+    // ==================== 缴费明细 ====================
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
@@ -961,23 +985,23 @@ showReport: async function() {
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
 
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="9" style="text-align:center;padding:20px;">${Utils.t('no_data')}</td></tr>`
+                ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(p.date)}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${typeMap[p.type] || p.type}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;"><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${Utils.t('view')}</button></td>
+                    <td>${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                    <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
+                    <td>${Utils.formatDate(p.date)}</td>
+                    <td>${typeMap[p.type] || p.type}</td>
+                    <td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                    <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
+                    <td>${Utils.escapeHtml(p.description || '-')}</td>
+                    <td class="action-cell"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" class="btn-small">👁️ ${Utils.t('view')}</button></td>
                 　　`).join('');
 
             document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button></div>
+                    <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
                 </div>
                 <div class="stats-grid">
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div></div>
@@ -986,18 +1010,18 @@ showReport: async function() {
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
                 </div>
                 <div class="table-container">
-                    <table class="payment-table" style="width:100%;border-collapse:collapse;">
+                    <table class="payment-table">
                         <thead>
-                            <tr style="background:#f8fafc;">
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${Utils.t('customer_name')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                            <tr>
+                                <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                                <th>${Utils.t('customer_name')}</th>
+                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
@@ -1006,13 +1030,20 @@ showReport: async function() {
                 <div class="toolbar">
                     <button onclick="Storage.exportPaymentsToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                </div>`;
+                </div>
+                <style>
+                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+                    .text-right { text-align: right; }
+                    .action-cell { white-space: nowrap; }
+                    .btn-small { padding: 4px 8px; font-size: 12px; }
+                </style>`;
         } catch (error) {
             console.error("showPaymentHistory error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
         }
     },
 
+        // ==================== 订单列表 ====================
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
         this.saveCurrentPageState();
@@ -1029,38 +1060,38 @@ showReport: async function() {
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 10 : 9}" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 10 : 9}" class="text-center">${t('no_data')}</td></tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                     rows += `<tr>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(o.order_id)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(o.customer_name)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(o.collateral_name)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.loan_amount)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.admin_fee)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(o.monthly_interest || 0)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                        ${isAdmin ? `<td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
-                        <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
-                            <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
-                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button class="danger" onclick="APP.deleteOrder('${o.order_id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>` : ''}
-                            <button onclick="APP.printOrder('${o.order_id}')" class="success" style="padding:4px 8px;font-size:12px;">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                            ${o.is_locked ? `<span style="font-size:12px;color:#94a3b8;margin-left:4px;">🔒</span>` : ''}
+                        <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
+                        <td>${Utils.escapeHtml(o.customer_name)}</td>
+                        <td>${Utils.escapeHtml(o.collateral_name)}</td>
+                        <td class="text-right">${Utils.formatCurrency(o.loan_amount)}</td>
+                        <td class="text-right">${Utils.formatCurrency(o.admin_fee)}</td>
+                        <td class="text-right">${Utils.formatCurrency(o.monthly_interest || 0)}</td>
+                        <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
+                        <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
+                        ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
+                        <td class="action-cell">
+                            <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}</button>
+                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button class="danger btn-small" onclick="APP.deleteOrder('${o.order_id}')">🗑️ ${t('delete')}</button>` : ''}
+                            <button onclick="APP.printOrder('${o.order_id}')" class="btn-small print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            ${o.is_locked ? `<span class="locked-icon">🔒</span>` : ''}
                         </td>
                     　　　`;
                 }
             }
 
             document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div class="page-header">
                     <h2>📋 ${t('order_list')}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
                 <div class="toolbar">
-                    <input type="text" id="searchInput" placeholder="🔍 ${t('search')}..." style="max-width:300px;" value="${Utils.escapeHtml(this.searchKeyword)}">
+                    <input type="text" id="searchInput" placeholder="🔍 ${t('search')}..." value="${Utils.escapeHtml(this.searchKeyword)}">
                     <button onclick="APP.searchOrders()">${t('search')}</button>
                     <button onclick="APP.resetSearch()">${t('reset')}</button>
                     <select id="statusFilter" onchange="APP.filterOrders(this.value)">
@@ -1072,24 +1103,35 @@ showReport: async function() {
                     <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>
                 <div class="table-container">
-                    <table style="width:100%;border-collapse:collapse;">
+                    <table class="data-table order-table">
                         <thead>
-                            <tr style="background:#f8fafc;">
-                                <th style="border:1px solid #cbd5e1;padding:10px;">ID</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${t('customer_name')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${t('collateral_name')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${t('loan_amount')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
-                                ${isAdmin ? `<th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                            <tr>
+                                <th>ID</th>
+                                <th>${t('customer_name')}</th>
+                                <th>${t('collateral_name')}</th>
+                                <th class="text-right">${t('loan_amount')}</th>
+                                <th class="text-right">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                                <th class="text-right">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
+                                <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                <th class="text-center">${lang === 'id' ? 'Status' : '状态'}</th>
+                                ${isAdmin ? `<th>${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
-                </div>`;
+                </div>
+                <style>
+                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+                    .text-right { text-align: right; }
+                    .text-center { text-align: center; }
+                    .action-cell { white-space: nowrap; }
+                    .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
+                    .order-id { font-family: monospace; font-weight: 600; }
+                    .locked-icon { margin-left: 4px; font-size: 11px; color: #94a3b8; }
+                    .order-table th, .order-table td { border: 1px solid #cbd5e1; padding: 8px; }
+                    .order-table th { background: #f8fafc; font-weight: 600; }
+                </style>`;
         } catch (err) {
             console.error("showOrderTable error:", err);
             alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
@@ -1100,6 +1142,7 @@ showReport: async function() {
     resetSearch: function() { this.searchKeyword = ""; this.currentFilter = "all"; this.showOrderTable(); },
     filterOrders: function(status) { this.currentFilter = status; this.showOrderTable(); },
 
+    // ==================== 查看订单详情 ====================
     viewOrder: async function(orderId) {
         this.currentPage = 'viewOrder';
         this.currentOrderId = orderId;
@@ -1118,67 +1161,91 @@ showReport: async function() {
                 for (var p of payments) {
                     var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
                     payRows += `<tr>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(p.date)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${typeText}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(p.amount)}</td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;"><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
-                        <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(p.description || '-')}</td>
-                    </tr>`;
+                        <td>${Utils.formatDate(p.date)}</td>
+                        <td>${typeText}</td>
+                        <td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
+                        <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
+                        <td>${Utils.escapeHtml(p.description || '-')}</td>
+                    　　`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
             }
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div class="page-header">
                     <h2>📄 ${t('view')} ${t('order_list')}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
-                <div class="card">
+                <div class="card order-detail-card">
                     <h3>${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
-                    <p><strong>ID:</strong> ${Utils.escapeHtml(order.order_id)}</p>
-                    <p><strong>${lang === 'id' ? 'Status' : '状态'}:</strong> <span class="status-badge status-${order.status}">${statusMap[order.status] || order.status}</span></p>
-                    <p><strong>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
-                    ${order.is_locked ? `<p><strong>🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</strong></p>` : ''}
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">ID:</span><span class="info-value">${Utils.escapeHtml(order.order_id)}</span></div>
+                        <div class="info-item"><span class="info-label">${lang === 'id' ? 'Status' : '状态'}:</span><span class="status-badge status-${order.status}">${statusMap[order.status] || order.status}</span></div>
+                        <div class="info-item"><span class="info-label">${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</span><span class="info-value">${Utils.formatDate(order.created_at)}</span></div>
+                        ${order.is_locked ? `<div class="info-item"><span class="info-label">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}:</span><span class="info-value">✅</span></div>` : ''}
+                    </div>
+                    
                     <h3>${t('customer_info')}</h3>
-                    <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer_name)}</p>
-                    <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(order.customer_ktp)}</p>
-                    <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(order.customer_phone)}</p>
-                    <p><strong>${t('address')}:</strong> ${Utils.escapeHtml(order.customer_address)}</p>
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">${t('customer_name')}:</span><span class="info-value">${Utils.escapeHtml(order.customer_name)}</span></div>
+                        <div class="info-item"><span class="info-label">${t('ktp_number')}:</span><span class="info-value">${Utils.escapeHtml(order.customer_ktp)}</span></div>
+                        <div class="info-item"><span class="info-label">${t('phone')}:</span><span class="info-value">${Utils.escapeHtml(order.customer_phone)}</span></div>
+                        <div class="info-item full-width"><span class="info-label">${t('address')}:</span><span class="info-value">${Utils.escapeHtml(order.customer_address)}</span></div>
+                    </div>
+                    
                     <h3>${t('collateral_info')}</h3>
-                    <p><strong>${t('collateral_name')}:</strong> ${Utils.escapeHtml(order.collateral_name)}</p>
-                    <p><strong>${t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">${t('collateral_name')}:</span><span class="info-value">${Utils.escapeHtml(order.collateral_name)}</span></div>
+                        <div class="info-item"><span class="info-label">${t('loan_amount')}:</span><span class="info-value">${Utils.formatCurrency(order.loan_amount)}</span></div>
+                    </div>
+                    
                     <h3>💰 ${lang === 'id' ? 'Rincian Biaya' : '费用明细'}</h3>
-                    <p><strong>${lang === 'id' ? 'Admin Fee' : '管理费'}:</strong> ${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅' : '❌'}</p>
-                    <p><strong>${lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</strong> ${Utils.formatCurrency(order.monthly_interest)}</p>
-                    <p><strong>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
-                    <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
-                    <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes || '-')}</p>
+                    <div class="info-grid">
+                        <div class="info-item"><span class="info-label">${lang === 'id' ? 'Admin Fee' : '管理费'}:</span><span class="info-value">${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅' : '❌'}</span></div>
+                        <div class="info-item"><span class="info-label">${lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</span><span class="info-value">${Utils.formatCurrency(order.monthly_interest)}</span></div>
+                        <div class="info-item"><span class="info-label">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}:</span><span class="info-value">${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</span></div>
+                        <div class="info-item"><span class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</span><span class="info-value">${Utils.formatCurrency(remainingPrincipal)}</span></div>
+                        <div class="info-item full-width"><span class="info-label">${t('notes')}:</span><span class="info-value">${Utils.escapeHtml(order.notes || '-')}</span></div>
+                    </div>
+                    
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
                     <div class="table-container">
-                        <table class="payment-table" style="width:100%;border-collapse:collapse;">
+                        <table class="payment-table">
                             <thead>
-                                <tr style="background:#f8fafc;">
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <tr>
+                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                    <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
                                 </tr>
                             </thead>
                             <tbody>${payRows}</tbody>
                         </table>
                     </div>
+                    
                     <div class="toolbar">
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                        ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})">💰 ${t('save')}</button>` : ''}
-                        ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
-                        <button onclick="APP.printOrder('${order.order_id}')" class="success">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
+                        ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')" class="warning">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
+                        <button onclick="APP.printOrder('${order.order_id}')" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
-                </div>`;
+                </div>
+                <style>
+                    .order-detail-card .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; margin-bottom: 16px; }
+                    .order-detail-card .info-item { display: flex; }
+                    .order-detail-card .info-item.full-width { grid-column: 1 / -1; }
+                    .order-detail-card .info-label { width: 140px; font-weight: 600; color: #64748b; flex-shrink: 0; }
+                    .order-detail-card .info-value { color: #1e293b; }
+                    @media (max-width: 768px) {
+                        .order-detail-card .info-grid { grid-template-columns: 1fr; }
+                        .order-detail-card .info-label { width: 120px; }
+                    }
+                </style>`;
         } catch (error) {
             console.error("viewOrder error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
@@ -1205,9 +1272,9 @@ showReport: async function() {
             var canEdit = PERMISSION.canEditOrder(order);
             if (!canEdit) { alert(lang === 'id' ? 'Order ini sudah terkunci' : '此订单已锁定'); this.goBack(); return; }
             document.getElementById("app").innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div class="page-header">
                     <h2>✏️ ${t('edit')}</h2>
-                    <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
                 <div class="card">
                     <div class="form-grid">
@@ -1218,11 +1285,14 @@ showReport: async function() {
                         <div class="form-group full-width"><label>${t('address')}</label><textarea id="address">${Utils.escapeHtml(order.customer_address)}</textarea></div>
                         <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes">${Utils.escapeHtml(order.notes || '')}</textarea></div>
                         <div class="form-actions">
-                            <button onclick="APP.updateOrder('${order.order_id}')">💾 ${t('save')}</button>
+                            <button onclick="APP.updateOrder('${order.order_id}')" class="success">💾 ${t('save')}</button>
                             <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
                         </div>
                     </div>
-                </div>`;
+                </div>
+                <style>
+                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+                </style>`;
         } catch (error) { console.error("editOrder error:", error); alert('Error loading order'); this.goBack(); }
     },
 
@@ -1248,6 +1318,7 @@ showReport: async function() {
         }
     },
 
+    // ==================== 打印订单 ====================
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -1259,17 +1330,20 @@ showReport: async function() {
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #1e293b; }
+                .print-container { max-width: 210mm; margin: 0 auto; padding: 5mm; }
                 .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #1e293b; padding-bottom: 10px; }
                 .header h1 { font-size: 18px; margin: 5px 0; }
                 .header p { font-size: 11px; color: #475569; margin: 2px 0; }
                 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-                .section { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; }
+                .section { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; }
                 .section h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
                 .info-row { display: flex; margin-bottom: 4px; }
                 .info-label { width: 90px; font-weight: 600; color: #475569; }
-                .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                .table th, .table td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; font-size: 10px; }
-                .table th { background: #f1f5f9; font-weight: 700; }
+                .info-value { flex: 1; }
+                .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                .data-table th, .data-table td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; font-size: 10px; }
+                .data-table th { background: #f1f5f9; font-weight: 700; }
+                .text-right { text-align: right; }
                 .footer { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
                 .no-print { text-align: center; padding: 10px; margin-bottom: 15px; }
                 .no-print button { margin: 0 5px; padding: 6px 14px; cursor: pointer; border: none; border-radius: 4px; }
@@ -1280,53 +1354,57 @@ showReport: async function() {
                     body { margin: 0; padding: 0; }
                     .no-print { display: none; }
                     .page-break { page-break-before: always; }
-                    table { page-break-inside: avoid; }
+                    .data-table { page-break-inside: avoid; }
                     tr { page-break-inside: avoid; page-break-after: auto; }
                     thead { display: table-header-group; }
                 }
             </style>
             </head><body>
-            <div class="no-print">
-                <button class="btn-print" onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                <button class="btn-close" onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
-            </div>
-            <div class="header">
-                <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
-                    <img src="/icons/system-jf.png" alt="JF!" style="height: 32px;">
-                    <h1 style="margin:0;">JF! by Gadai</h1>
+            <div class="print-container">
+                <div class="no-print">
+                    <button class="btn-print" onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    <button class="btn-close" onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
                 </div>
-                <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${order.order_id}</strong> | ${Utils.formatDate(order.created_at)}</p>
-            </div>
-            <div class="two-col">
+                <div class="header">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+                        <img src="/icons/system-jf.png" alt="JF!" style="height: 32px;">
+                        <h1 style="margin:0;">JF! by Gadai</h1>
+                    </div>
+                    <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${order.order_id}</strong> | ${Utils.formatDate(order.created_at)}</p>
+                </div>
+                <div class="two-col">
+                    <div class="section">
+                        <h3>📋 ${lang === 'id' ? 'Informasi Pelanggan' : '客户信息'}</h3>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama' : '姓名'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_name)}</div></div>
+                        <div class="info-row"><div class="info-label">KTP:</div><div class="info-value">${Utils.escapeHtml(order.customer_ktp || '-')}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Telepon' : '电话'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_phone || '-')}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Alamat' : '地址'}:</div><div class="info-value">${Utils.escapeHtml(order.customer_address || '-')}</div></div>
+                    </div>
+                    <div class="section">
+                        <h3>💎 ${lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款'}</h3>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Barang' : '物品'}:</div><div class="info-value">${Utils.escapeHtml(order.collateral_name)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Pinjaman' : '贷款'}:</div><div class="info-value"><strong>${Utils.formatCurrency(order.loan_amount)}</strong></div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div class="info-value"><strong>${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</strong></div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Admin Fee' : '管理费'}:</div><div class="info-value">${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅' : '❌'}</div></div>
+                    </div>
+                </div>
                 <div class="section">
-                    <h3>📋 ${lang === 'id' ? 'Informasi Pelanggan' : '客户信息'}</h3>
-                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama' : '姓名'}:</div><div>${Utils.escapeHtml(order.customer_name)}</div></div>
-                    <div class="info-row"><div class="info-label">KTP:</div><div>${Utils.escapeHtml(order.customer_ktp || '-')}</div></div>
-                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Telepon' : '电话'}:</div><div>${Utils.escapeHtml(order.customer_phone || '-')}</div></div>
-                </div>
-                <div class="section">
-                    <h3>💎 ${lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款'}</h3>
-                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Barang' : '物品'}:</div><div>${Utils.escapeHtml(order.collateral_name)}</div></div>
-                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Pinjaman' : '贷款'}:</div><div><strong>${Utils.formatCurrency(order.loan_amount)}</strong></div></div>
-                    <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div><strong>${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</strong></div></div>
-                </div>
-            </div>
-            <div class="section">
-                <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h3>
-                <table class="table">
-                    <thead>
-                        <tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th></tr>
-                    </thead>
-                    <tbody>`;
+                    <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th></tr>
+                        </thead>
+                        <tbody>`;
             for (var p of payments) {
                 var tt = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
-                printContent += `<tr><td>${Utils.formatDate(p.date)}</td><td>${tt}</td><td>${Utils.formatCurrency(p.amount)}</td><td>${methodMap[p.payment_method] || '-'}</td></tr>`;
+                printContent += `<tr><td>${Utils.formatDate(p.date)}</td><td>${tt}</td><td class="text-right">${Utils.formatCurrency(p.amount)}</td><td>${methodMap[p.payment_method] || '-'}</td></tr>`;
             }
             printContent += `
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="footer">${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()} | © JF! by Gadai</div>
             </div>
-            <div class="footer">${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()} | © JF! by Gadai</div>
             </body></html>`;
             var pw = window.open('', '_blank');
             pw.document.write(printContent);
