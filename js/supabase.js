@@ -188,6 +188,7 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         const orderId = await this._generateOrderId(profile.role, profile.store_id);
         const nowDate = new Date().toISOString().split('T')[0];
+        const adminFee = orderData.admin_fee || 30000;
 
         const newOrder = {
             order_id: orderId,
@@ -197,7 +198,7 @@ const SupabaseAPI = {
             customer_address: orderData.customer_address || '',
             collateral_name: orderData.collateral_name,
             loan_amount: orderData.loan_amount,
-            admin_fee: 30000,
+            admin_fee: adminFee,
             admin_fee_paid: false,
             monthly_interest: orderData.loan_amount * 0.10,
             interest_paid_months: 0,
@@ -226,23 +227,29 @@ const SupabaseAPI = {
         return date.toISOString().split('T')[0];
     },
 
-    async recordAdminFee(orderId, paymentMethod = 'cash') {
+    async recordAdminFee(orderId, paymentMethod = 'cash', adminFeeAmount = null) {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
+        const feeAmount = adminFeeAmount || order.admin_fee;
+        
         const { error: e1 } = await supabaseClient.from('orders').update({
             admin_fee_paid: true,
-            admin_fee_paid_date: new Date().toISOString().split('T')[0]
+            admin_fee_paid_date: new Date().toISOString().split('T')[0],
+            admin_fee: feeAmount
         }).eq('order_id', orderId);
         if (e1) throw e1;
-        const { error: e2 } = await supabaseClient.from('payment_history').insert({
+        
+        const paymentData = {
             order_id: order.id,
             date: new Date().toISOString().split('T')[0],
             type: 'admin_fee',
-            amount: order.admin_fee,
-            description: 'Administrasi Fee / 管理费',
+            amount: feeAmount,
+            description: `Administrasi Fee / 管理费 (${Utils.formatCurrency(feeAmount)})`,
             recorded_by: profile.id,
             payment_method: paymentMethod
-        });
+        };
+        
+        const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
         return true;
     },
@@ -261,7 +268,8 @@ const SupabaseAPI = {
             monthly_interest: monthlyInterest
         }).eq('order_id', orderId);
         if (e1) throw e1;
-        const { error: e2 } = await supabaseClient.from('payment_history').insert({
+        
+        const paymentData = {
             order_id: order.id,
             date: new Date().toISOString().split('T')[0],
             type: 'interest',
@@ -270,7 +278,9 @@ const SupabaseAPI = {
             description: `Bunga ${months} bulan / 利息${months}个月`,
             recorded_by: profile.id,
             payment_method: paymentMethod
-        });
+        };
+        
+        const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
         return true;
     },
@@ -290,7 +300,8 @@ const SupabaseAPI = {
         }
         const { error: e1 } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
         if (e1) throw e1;
-        const { error: e2 } = await supabaseClient.from('payment_history').insert({
+        
+        const paymentData = {
             order_id: order.id,
             date: new Date().toISOString().split('T')[0],
             type: 'principal',
@@ -298,7 +309,9 @@ const SupabaseAPI = {
             description: paidAmount >= order.loan_amount ? 'Pelunasan Pokok / 全额还款' : 'Pembayaran Pokok / 部分还款',
             recorded_by: profile.id,
             payment_method: paymentMethod
-        });
+        };
+        
+        const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
         return true;
     },
@@ -462,28 +475,27 @@ const SupabaseAPI = {
 
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('payment_history').select('type, amount, payment_method');
         
+        // 获取收入（按支付方式分类）
+        let incomeQuery = supabaseClient.from('payment_history').select('type, amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
             const orderIds = orders?.map(o => o.id) || [];
             if (orderIds.length > 0) {
-                query = query.in('order_id', orderIds);
+                incomeQuery = incomeQuery.in('order_id', orderIds);
             }
         }
-        
-        const { data, error } = await query;
-        if (error) throw error;
+        const { data: incomes } = await incomeQuery;
         
         let cashIncome = 0, bankIncome = 0;
-        
-        for (const p of data || []) {
+        for (const p of incomes || []) {
             if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
                 if (p.payment_method === 'cash') cashIncome += p.amount;
                 else if (p.payment_method === 'bank') bankIncome += p.amount;
             }
         }
         
+        // 获取支出（按支付方式分类）
         let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             expenseQuery = expenseQuery.eq('store_id', profile.store_id);
