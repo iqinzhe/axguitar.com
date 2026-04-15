@@ -656,5 +656,118 @@ async getCurrentUser() {
     }
 };
 
+    // ==================== WA 提醒相关 API ====================
+
+    async getDefaultWANumber() {
+        const { data, error } = await supabaseClient
+            .from('system_config')
+            .select('value')
+            .eq('key', 'default_wa_number')
+            .single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return data?.value || null;
+    },
+
+    async getReminderDays() {
+        const { data, error } = await supabaseClient
+            .from('system_config')
+            .select('value')
+            .eq('key', 'reminder_days_before')
+            .single();
+        if (error && error.code !== 'PGRST116') return 2;
+        return data?.value ? parseInt(data.value) : 2;
+    },
+
+    async updateSystemConfig(key, value) {
+        const { error } = await supabaseClient
+            .from('system_config')
+            .upsert({ key: key, value: String(value), updated_at: new Date().toISOString() });
+        if (error) throw error;
+        return true;
+    },
+
+    async getStoreWANumber(storeId) {
+        const { data, error } = await supabaseClient
+            .from('stores')
+            .select('wa_number')
+            .eq('id', storeId)
+            .single();
+        if (error && error.code !== 'PGRST116') return null;
+        return data?.wa_number || null;
+    },
+
+    async updateStoreWANumber(storeId, waNumber) {
+        const { error } = await supabaseClient
+            .from('stores')
+            .update({ wa_number: waNumber || null })
+            .eq('id', storeId);
+        if (error) throw error;
+        return true;
+    },
+
+    async hasReminderSentToday(orderId) {
+        const today = new Date().toISOString().split('T')[0];
+        const { data, error } = await supabaseClient
+            .from('reminder_logs')
+            .select('id')
+            .eq('order_id', orderId)
+            .eq('reminder_date', today)
+            .maybeSingle();
+        if (error) throw error;
+        return !!data;
+    },
+
+    async logReminder(orderId) {
+        const profile = await this.getCurrentProfile();
+        const today = new Date().toISOString().split('T')[0];
+        const { error } = await supabaseClient
+            .from('reminder_logs')
+            .insert({
+                order_id: orderId,
+                reminder_date: today,
+                sent_by: profile?.id || null
+            });
+        if (error) throw error;
+        return true;
+    },
+
+    async getOrdersNeedReminder() {
+        const profile = await this.getCurrentProfile();
+        const reminderDays = await this.getReminderDays();
+        
+        let query = supabaseClient
+            .from('orders')
+            .select('*, customers!left(name, phone)')
+            .eq('status', 'active');
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        const { data: orders, error } = await query;
+        if (error) throw error;
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const needRemind = [];
+        for (const order of orders) {
+            if (!order.next_interest_due_date) continue;
+            
+            const dueDate = new Date(order.next_interest_due_date);
+            dueDate.setHours(0, 0, 0, 0);
+            const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntilDue === reminderDays) {
+                const alreadySent = await this.hasReminderSentToday(order.id);
+                if (!alreadySent) {
+                    needRemind.push(order);
+                }
+            }
+        }
+        
+        return needRemind;
+    }
+
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
