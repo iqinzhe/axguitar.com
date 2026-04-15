@@ -9,22 +9,16 @@ const PERMISSION = {
         if (!AUTH.user) return false;
         const role = AUTH.user.role;
         
-        // 管理员拥有全部权限
         if (role === 'admin') return true;
         
-        // 店长权限
         if (role === 'store_manager') {
             switch (action) {
                 case 'order_create': return true;
                 case 'order_view': return true;
                 case 'order_payment': return true;
-                case 'order_edit':
-                    // 店长可以编辑未锁定的订单
-                    return order && !order.is_locked;
-                case 'order_lock':
-                    // 店长可以锁定订单（审核通过后）
-                    return order && !order.is_locked;
-                case 'order_unlock': return false;  // 只有admin可以解锁
+                case 'order_edit': return order && !order.is_locked;
+                case 'order_lock': return order && !order.is_locked;
+                case 'order_unlock': return false;
                 case 'order_delete': return false;
                 case 'customer_manage': return true;
                 case 'expense_add': return true;
@@ -37,16 +31,13 @@ const PERMISSION = {
             }
         }
         
-        // 员工权限
         if (role === 'staff') {
             switch (action) {
                 case 'order_create': return true;
                 case 'order_view': return true;
                 case 'order_payment': return true;
-                case 'order_edit':
-                    // 员工可以编辑未锁定的订单
-                    return order && !order.is_locked;
-                case 'order_lock': return false;   // 员工不能锁单
+                case 'order_edit': return order && !order.is_locked;
+                case 'order_lock': return false;
                 case 'order_unlock': return false;
                 case 'order_delete': return false;
                 case 'customer_manage': return true;
@@ -63,7 +54,6 @@ const PERMISSION = {
         return false;
     },
 
-    // 便捷方法
     canDeleteOrder() { return this.can('order_delete'); },
     
     canEditOrder(order) {
