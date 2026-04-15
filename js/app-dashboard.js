@@ -565,7 +565,11 @@ const DashboardModule = {
                         <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password" placeholder="${t('password')}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'} *</label>
-                            <select id="newRole"><option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option></select>
+                          <select id="newRole">
+    <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
+    <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
+    <option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option>
+</select> 
                         </div>
                         <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label><select id="newStoreId">${storeOptions}</select></div>
                         <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button></div>
