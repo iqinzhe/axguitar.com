@@ -1,4 +1,4 @@
-// app-payments.js - 付款管理、资金去向模块
+// app-payments.js - 缴费管理、资金去向模块
 
 window.APP = window.APP || {};
 
@@ -52,6 +52,17 @@ const PaymentsModule = {
                 }
             }
 
+            // 管理费选项
+            var adminFeeOptions = `
+                <select id="adminFeeAmount" style="width:auto;min-width:150px;margin-right:10px;">
+                    <option value="30000">Rp 30.000</option>
+                    <option value="40000">Rp 40.000</option>
+                    <option value="50000">Rp 50.000</option>
+                    <option value="custom">${lang === 'id' ? 'Input Manual' : '手工录入'}</option>
+                </select>
+                <input type="text" id="customAdminFee" placeholder="${lang === 'id' ? 'Masukkan jumlah' : '输入金额'}" style="width:150px;display:none;text-align:right;">
+            `;
+
             var adminFeeSection = !order.admin_fee_paid
                 ? `<div style="background:#f8fafc;padding:12px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #f59e0b;">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -63,7 +74,10 @@ const PaymentsModule = {
                                 <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
                             </div>
                         </div>
-                        <button onclick="APP.payAdminFeeWithMethod('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            ${adminFeeOptions}
+                            <button onclick="APP.payAdminFeeWithMethod('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
+                        </div>
                     </div>
                    </div>`
                 : `<div style="background:#f8fafc;padding:10px 15px;border-radius:8px;margin-bottom:12px;border-left:3px solid #10b981;">
@@ -125,7 +139,7 @@ const PaymentsModule = {
                         <select id="interestMonths" style="width:auto;min-width:200px;margin:0;">${interestOptions}</select>
                         <button onclick="APP.payInterestWithMethod('${order.order_id}')" class="success" style="margin:0;">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息付款'}</button>
                     </div>
-                    <h4 style="font-size:13px;margin-bottom:6px;color:#64748b;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息付款历史'}</h4>
+                    <h4 style="font-size:13px;margin-bottom:6px;color:#64748b;">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</h4>
                     <div class="table-container" style="margin-top:0;">
                         <table style="min-width:500px;width:100%;border-collapse:collapse;">
                             <thead><tr style="background:#f8fafc;">
@@ -159,23 +173,55 @@ const PaymentsModule = {
                 <div class="toolbar">
                     <button onclick="APP.viewOrder('${order.order_id}')">📄 ${lang === 'id' ? 'Lihat Detail Order' : '查看订单详情'}</button>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                </div>`;
+                </div>
+                <script>
+                    var adminFeeSelect = document.getElementById('adminFeeAmount');
+                    var customAdminFee = document.getElementById('customAdminFee');
+                    if (adminFeeSelect) {
+                        adminFeeSelect.addEventListener('change', function() {
+                            if (this.value === 'custom') {
+                                customAdminFee.style.display = 'inline-block';
+                            } else {
+                                customAdminFee.style.display = 'none';
+                            }
+                        });
+                    }
+                    if (customAdminFee && Utils.bindAmountFormat) {
+                        Utils.bindAmountFormat(customAdminFee);
+                    }
+                <\/script>`;
 
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
         } catch (error) {
             console.error("showPayment error:", error);
-            alert(Utils.lang === 'id' ? 'Gagal memuat halaman pembayaran' : '加载支付页面失败');
+            alert(Utils.lang === 'id' ? 'Gagal memuat halaman pembayaran' : '加载缴费页面失败');
             this.goBack();
         }
     },
 
     payAdminFeeWithMethod: async function(orderId) {
         var method = document.querySelector('input[name="adminFeeMethod"]:checked')?.value || 'cash';
+        var adminFeeSelect = document.getElementById('adminFeeAmount');
+        var customAdminFeeInput = document.getElementById('customAdminFee');
+        var adminFeeAmount = 30000;
+        
+        if (adminFeeSelect) {
+            if (adminFeeSelect.value === 'custom') {
+                adminFeeAmount = Utils.parseNumberFromCommas(customAdminFeeInput?.value || '0');
+                if (isNaN(adminFeeAmount) || adminFeeAmount <= 0) {
+                    alert(Utils.lang === 'id' ? 'Masukkan jumlah admin fee yang valid' : '请输入有效的管理费金额');
+                    return;
+                }
+            } else {
+                adminFeeAmount = parseInt(adminFeeSelect.value);
+            }
+        }
+        
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
-        if (confirm(Utils.lang === 'id' ? `Konfirmasi penerimaan Admin Fee 30,000 IDR via ${methodName}?` : `确认已收取管理费 30,000 IDR，支付方式：${methodName}？`)) {
+        if (confirm(Utils.lang === 'id' ? `Konfirmasi penerimaan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName}?` : `确认已收取管理费 ${Utils.formatCurrency(adminFeeAmount)}，支付方式：${methodName}？`)) {
             try { 
-                await Order.recordAdminFee(orderId, method); 
+                await Order.recordAdminFee(orderId, method, adminFeeAmount); 
                 await this.showPayment(orderId); 
             } catch (error) { 
                 alert('Error: ' + error.message); 
