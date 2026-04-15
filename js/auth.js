@@ -99,42 +99,62 @@ const AUTH = {
     },
 
     async addUser(username, password, name, role, storeId) {
-        try {
-            const { data, error } = await supabaseClient.functions.invoke('create-user', {
-                body: { email: username, password, name, role, store_id: storeId || null }
-            });
-            if (error) throw error;
-            return data;
-        } catch (fnError) {
-            console.warn("Edge Function 不可用，尝试直接调用 admin API:", fnError.message);
-            
-            if (!SUPABASE_KEY.includes('service_role')) {
-                throw new Error(Utils.lang === 'id' 
-                    ? 'Tidak dapat membuat pengguna. Silakan deploy Edge Function terlebih dahulu.'
-                    : '无法创建用户，请先部署 Edge Function。');
-            }
-            
-            const { data, error } = await supabaseClient.auth.admin.createUser({
-                email: username,
-                password: password,
-                email_confirm: true,
-                user_metadata: { name: name, role: role, store_id: storeId }
-            });
-            if (error) throw error;
-            
-            const { error: profileError } = await supabaseClient.from('user_profiles').insert({
-                id: data.user.id,
-                username: username,
-                name: name,
-                role: role,
-                store_id: storeId || null
-            });
-            if (profileError) throw profileError;
-            return data.user;
+        // 检查是否已存在
+        const { data: existing } = await supabaseClient
+            .from('user_profiles')
+            .select('username')
+            .eq('username', username)
+            .single();
+        
+        if (existing) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Username sudah digunakan' 
+                : '用户名已存在');
         }
+        
+        // 使用 Supabase Auth 创建用户
+        const { data: authUser, error: signUpError } = await supabaseClient.auth.signUp({
+            email: username,
+            password: password,
+            options: {
+                data: {
+                    name: name,
+                    role: role,
+                    store_id: storeId || null
+                }
+            }
+        });
+        
+        if (signUpError) throw signUpError;
+        
+        if (!authUser.user) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Gagal membuat pengguna' 
+                : '创建用户失败');
+        }
+        
+        // 创建用户资料
+        const { error: profileError } = await supabaseClient.from('user_profiles').insert({
+            id: authUser.user.id,
+            username: username,
+            name: name,
+            role: role,
+            store_id: storeId || null
+        });
+        
+        if (profileError) throw profileError;
+        
+        return authUser.user;
     },
 
     async deleteUser(userId) {
+        // 不能删除自己
+        if (userId === this.user?.id) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Tidak dapat menghapus akun sendiri' 
+                : '不能删除自己的账号');
+        }
+        
         const { error } = await supabaseClient.from('user_profiles').delete().eq('id', userId);
         if (error) throw error;
         return true;
