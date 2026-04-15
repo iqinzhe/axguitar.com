@@ -121,9 +121,11 @@ const StoreManager = {
         await this.loadStores();
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
+        const cashFlow = await SUPABASE.getCashFlowSummary();
 
         let storeStatsRows = '';
         let grandTotalIncome = 0, grandTotalExpenses = 0, grandTotalGrossProfit = 0;
+        
         for (const store of this.stores) {
             const expenses = await this.getStoreExpenses(store.id);
             const income = await this.getStoreIncome(store.id);
@@ -136,30 +138,51 @@ const StoreManager = {
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(income)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#ef4444;">${Utils.formatCurrency(expenses)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:${grossProfit >= 0 ? '#10b981' : '#ef4444'};">${Utils.formatCurrency(grossProfit)}</td>
-            </tr>`;
+            　　　`;
         }
 
-        let storeRows = this.stores.map(store => `<tr>
-            <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.code)}</td>
-            <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.name)}</td>
-            <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.address || '-')}</td>
-            <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.phone || '-')}</td>
-            <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
-                <button onclick="StoreManager.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
-                <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
-            </td>
-        </tr>`).join('');
-
+        let storeRows = '';
         if (this.stores.length === 0) {
             storeRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
             storeStatsRows = `<tr><td colspan="4" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+        } else {
+            for (const store of this.stores) {
+                storeRows += `<tr>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.code)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.name)}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.address || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.phone || '-')}</td>
+                    <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
+                        <button onclick="StoreManager.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
+                        <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+                    </td>
+                　　`;
+            }
         }
 
         document.getElementById("app").innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
-                <div>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+            </div>
+
+            <div class="cashflow-summary" style="margin-bottom:20px;">
+                <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
+                <div class="cashflow-stats">
+                    <div class="cashflow-item">
+                        <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
+                        <div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
+                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(cashFlow.cash.income)} / -${Utils.formatCurrency(cashFlow.cash.expense)}</div>
+                    </div>
+                    <div class="cashflow-item">
+                        <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
+                        <div class="value">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
+                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(cashFlow.bank.income)} / -${Utils.formatCurrency(cashFlow.bank.expense)}</div>
+                    </div>
+                    <div class="cashflow-item">
+                        <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
+                        <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
+                    </div>
                 </div>
             </div>
 
@@ -180,14 +203,14 @@ const StoreManager = {
                     </div>
                 </div>
                 <div class="table-container">
-                    <table class="table" style="width:100%;border-collapse:collapse;">
+                    <table style="width:100%;border-collapse:collapse;">
                         <thead>
                             <tr style="background:#f8fafc;">
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Pendapatan' : '收入'}</th>
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Pengeluaran' : '支出'}</th>
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Laba Kotor' : '毛利'}</th>
-                              </tr>
+                            <tr>
                         </thead>
                         <tbody>${storeStatsRows}</tbody>
                     </table>
@@ -197,7 +220,7 @@ const StoreManager = {
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
-                    <table class="table" style="width:100%;border-collapse:collapse;">
+                    <table style="width:100%;border-collapse:collapse;">
                         <thead>
                             <tr style="background:#f8fafc;">
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Kode' : '编码'}</th>
@@ -205,7 +228,7 @@ const StoreManager = {
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Alamat' : '地址'}</th>
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Telepon' : '电话'}</th>
                                 <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                              </table>
+                            </tr>
                         </thead>
                         <tbody>${storeRows}</tbody>
                     </table>
