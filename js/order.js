@@ -7,7 +7,7 @@ const Order = {
             customer_address: data.customer.address,
             collateral_name: data.collateral_name,
             loan_amount: data.loan_amount,
-            admin_fee: data.admin_fee || 30000,  // 支持自定义管理费
+            admin_fee: data.admin_fee || 30000,
             notes: data.notes,
             customer_id: data.customer_id || null
         };
