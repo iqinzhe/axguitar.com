@@ -29,17 +29,52 @@ const StoreManager = {
     },
 
     async getStoreExpenses(storeId) {
-        const { data, error } = await supabaseClient.from('expenses').select('amount').eq('store_id', storeId);
-        if (error) return 0;
-        return data?.reduce((s, e) => s + e.amount, 0) || 0;
+        const { data, error } = await supabaseClient.from('expenses').select('amount, payment_method').eq('store_id', storeId);
+        if (error) return { total: 0, cash: 0, bank: 0 };
+        const total = data?.reduce((s, e) => s + e.amount, 0) || 0;
+        const cash = data?.filter(e => e.payment_method === 'cash').reduce((s, e) => s + e.amount, 0) || 0;
+        const bank = data?.filter(e => e.payment_method === 'bank').reduce((s, e) => s + e.amount, 0) || 0;
+        return { total, cash, bank };
     },
 
     async getStoreIncome(storeId) {
         const { data: orders, error } = await supabaseClient.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total').eq('store_id', storeId);
-        if (error) return 0;
-        const totalAdminFees = orders?.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0) || 0;
-        const totalInterest = orders?.reduce((s, o) => s + (o.interest_paid_total || 0), 0) || 0;
-        return totalAdminFees + totalInterest;
+        if (error) return { total: 0, adminFee: 0, interest: 0 };
+        const adminFee = orders?.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0) || 0;
+        const interest = orders?.reduce((s, o) => s + (o.interest_paid_total || 0), 0) || 0;
+        return { total: adminFee + interest, adminFee, interest };
+    },
+
+    async getStoreCashBalance(storeId) {
+        // 获取该门店的所有订单ID
+        const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', storeId);
+        const orderIds = orders?.map(o => o.id) || [];
+        
+        // 获取收入（按支付方式分类）
+        let cashIncome = 0, bankIncome = 0;
+        if (orderIds.length > 0) {
+            const { data: payments } = await supabaseClient
+                .from('payment_history')
+                .select('type, amount, payment_method')
+                .in('order_id', orderIds);
+            
+            for (var p of payments || []) {
+                if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
+                    if (p.payment_method === 'cash') cashIncome += p.amount;
+                    else if (p.payment_method === 'bank') bankIncome += p.amount;
+                }
+            }
+        }
+        
+        // 获取支出
+        const { data: expenses } = await supabaseClient.from('expenses').select('amount, payment_method').eq('store_id', storeId);
+        let cashExpense = 0, bankExpense = 0;
+        for (var e of expenses || []) {
+            if (e.payment_method === 'cash') cashExpense += e.amount;
+            else if (e.payment_method === 'bank') bankExpense += e.amount;
+        }
+        
+        return { cash: cashIncome - cashExpense, bank: bankIncome - bankExpense };
     },
 
     editStore: async function(storeId) {
@@ -124,27 +159,59 @@ const StoreManager = {
         const cashFlow = await SUPABASE.getCashFlowSummary();
 
         let storeStatsRows = '';
-        let grandTotalIncome = 0, grandTotalExpenses = 0, grandTotalGrossProfit = 0;
+        let grandTotal = { 
+            orders: 0, active: 0, loan: 0, adminFee: 0, interest: 0, 
+            principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
+        };
         
         for (const store of this.stores) {
+            // 获取订单数据
+            const { data: orders } = await supabaseClient.from('orders').select('*').eq('store_id', store.id);
+            const ords = orders || [];
+            const activeOrds = ords.filter(o => o.status === 'active');
+            const totalLoan = ords.reduce((s, o) => s + o.loan_amount, 0);
+            const totalAdminFee = ords.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0);
+            const totalInterest = ords.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
+            const totalPrincipal = ords.reduce((s, o) => s + (o.principal_paid || 0), 0);
+            const totalIncome = totalAdminFee + totalInterest;
+            
+            // 获取支出
             const expenses = await this.getStoreExpenses(store.id);
-            const income = await this.getStoreIncome(store.id);
-            const grossProfit = income - expenses;
-            grandTotalIncome += income;
-            grandTotalExpenses += expenses;
-            grandTotalGrossProfit += grossProfit;
+            const totalExpenses = expenses.total;
+            
+            // 获取现金流余额
+            const balances = await this.getStoreCashBalance(store.id);
+            
+            grandTotal.orders += ords.length;
+            grandTotal.active += activeOrds.length;
+            grandTotal.loan += totalLoan;
+            grandTotal.adminFee += totalAdminFee;
+            grandTotal.interest += totalInterest;
+            grandTotal.principal += totalPrincipal;
+            grandTotal.expenses += totalExpenses;
+            grandTotal.income += totalIncome;
+            grandTotal.cashBalance += balances.cash;
+            grandTotal.bankBalance += balances.bank;
+            
             storeStatsRows += `<tr>
                 <td style="border:1px solid #cbd5e1;padding:8px;"><strong>${Utils.escapeHtml(store.name)}</strong></td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(income)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:#ef4444;">${Utils.formatCurrency(expenses)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:${grossProfit >= 0 ? '#10b981' : '#ef4444'};">${Utils.formatCurrency(grossProfit)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${ords.length}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${activeOrds.length}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalLoan)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalAdminFee)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalInterest)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalPrincipal)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalIncome)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;color:#ef4444;">${Utils.formatCurrency(totalExpenses)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(balances.cash)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(balances.bank)}</td>
             　　　`;
         }
 
         let storeRows = '';
         if (this.stores.length === 0) {
             storeRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
-            storeStatsRows = `<tr><td colspan="4" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            storeStatsRows = `<tr><td colspan="11" style="text-align:center;padding:20px;">${t('no_data')}</td></td>`;
         } else {
             for (const store of this.stores) {
                 storeRows += `<tr>
@@ -188,29 +255,22 @@ const StoreManager = {
 
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
-                    <div class="stat-card" style="border-right: 1px solid #e2e8f0; margin:0; border-radius:0; box-shadow:none;">
-                        <div class="stat-value" style="color:#10b981;">${Utils.formatCurrency(grandTotalIncome)}</div>
-                        <div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div>
-                    </div>
-                    <div class="stat-card" style="border-right: 1px solid #e2e8f0; margin:0; border-radius:0; box-shadow:none;">
-                        <div class="stat-value" style="color:#ef4444;">${Utils.formatCurrency(grandTotalExpenses)}</div>
-                        <div>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</div>
-                    </div>
-                    <div class="stat-card" style="margin:0; border-radius:0; box-shadow:none;">
-                        <div class="stat-value" style="color:#3b82f6;">${Utils.formatCurrency(grandTotalGrossProfit)}</div>
-                        <div>${lang === 'id' ? 'Total Laba Kotor' : '总毛利'}</div>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table style="width:100%;border-collapse:collapse;">
+                <div class="table-container" style="overflow-x: auto;">
+                    <table style="min-width:1000px; width:100%; border-collapse:collapse;">
                         <thead>
                             <tr style="background:#f8fafc;">
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Pendapatan' : '收入'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Pengeluaran' : '支出'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Laba Kotor' : '毛利'}</th>
-                            <tr>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${t('total_orders')}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${t('active')}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${t('total_loan')}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Bunga' : '利息'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Pokok' : '本金'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Pendapatan' : '管理费+利息'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
+                                <th style="border:1px solid #cbd5e1;padding:8px;">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
+                            </tr>
                         </thead>
                         <tbody>${storeStatsRows}</tbody>
                     </table>
