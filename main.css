@@ -235,7 +235,7 @@ h3 { font-size: 15px; }
 /* ===== 统计卡片网格（仪表盘指标）===== */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 3fr));
     gap: 16px;
     margin-bottom: 24px;
 }
@@ -490,11 +490,11 @@ tr:hover {
     }
     
     .stats-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .report-grid-5x2 {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
