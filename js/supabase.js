@@ -14,23 +14,21 @@ const SupabaseAPI = {
         return data.session;
     },
 
-async getCurrentUser() {
-    try {
-        const { data, error } = await supabaseClient.auth.getUser();
-        if (error) {
-            // 静默处理未登录状态
-            if (error.status === 403 || error.message === 'Auth session missing!' || error.message.includes('JWT')) {
+    async getCurrentUser() {
+        try {
+            const { data, error } = await supabaseClient.auth.getUser();
+            if (error) {
+                if (error.message !== 'Auth session missing!') {
+                    console.warn("getCurrentUser error:", error.message);
+                }
                 return null;
             }
-            console.warn("getCurrentUser error:", error.message);
+            return data?.user || null;
+        } catch (err) {
+            console.warn("getCurrentUser exception:", err.message);
             return null;
         }
-        return data?.user || null;
-    } catch (err) {
-        console.warn("getCurrentUser exception:", err.message);
-        return null;
-    }
-},
+    },
 
     async getCurrentProfile() {
         if (_profileCache) return _profileCache;
@@ -644,20 +642,7 @@ async getCurrentUser() {
         };
     },
 
-    formatCurrency(amount) {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
-        }).format(amount);
-    },
-
-    formatDate(dateStr) {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('id-ID');
-    }
-};
-
     // ==================== WA 提醒相关 API ====================
-
     async getDefaultWANumber() {
         const { data, error } = await supabaseClient
             .from('system_config')
@@ -737,7 +722,7 @@ async getCurrentUser() {
         
         let query = supabaseClient
             .from('orders')
-            .select('*, customers!left(name, phone)')
+            .select('*')
             .eq('status', 'active');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
@@ -751,7 +736,7 @@ async getCurrentUser() {
         today.setHours(0, 0, 0, 0);
         
         const needRemind = [];
-        for (const order of orders) {
+        for (const order of orders || []) {
             if (!order.next_interest_due_date) continue;
             
             const dueDate = new Date(order.next_interest_due_date);
@@ -767,7 +752,19 @@ async getCurrentUser() {
         }
         
         return needRemind;
+    },
+
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
+        }).format(amount);
+    },
+
+    formatDate(dateStr) {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleDateString('id-ID');
     }
+};
 
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
