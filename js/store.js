@@ -28,55 +28,6 @@ const StoreManager = {
         this.stores = this.stores.filter(s => s.id !== id);
     },
 
-    async getStoreExpenses(storeId) {
-        const { data, error } = await supabaseClient.from('expenses').select('amount, payment_method').eq('store_id', storeId);
-        if (error) return { total: 0, cash: 0, bank: 0 };
-        const total = data?.reduce((s, e) => s + e.amount, 0) || 0;
-        const cash = data?.filter(e => e.payment_method === 'cash').reduce((s, e) => s + e.amount, 0) || 0;
-        const bank = data?.filter(e => e.payment_method === 'bank').reduce((s, e) => s + e.amount, 0) || 0;
-        return { total, cash, bank };
-    },
-
-    async getStoreIncome(storeId) {
-        const { data: orders, error } = await supabaseClient.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total').eq('store_id', storeId);
-        if (error) return { total: 0, adminFee: 0, interest: 0 };
-        const adminFee = orders?.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0) || 0;
-        const interest = orders?.reduce((s, o) => s + (o.interest_paid_total || 0), 0) || 0;
-        return { total: adminFee + interest, adminFee, interest };
-    },
-
-    async getStoreCashBalance(storeId) {
-        // 获取该门店的所有订单ID
-        const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', storeId);
-        const orderIds = orders?.map(o => o.id) || [];
-        
-        // 获取收入（按支付方式分类）
-        let cashIncome = 0, bankIncome = 0;
-        if (orderIds.length > 0) {
-            const { data: payments } = await supabaseClient
-                .from('payment_history')
-                .select('type, amount, payment_method')
-                .in('order_id', orderIds);
-            
-            for (var p of payments || []) {
-                if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
-                    if (p.payment_method === 'cash') cashIncome += p.amount;
-                    else if (p.payment_method === 'bank') bankIncome += p.amount;
-                }
-            }
-        }
-        
-        // 获取支出
-        const { data: expenses } = await supabaseClient.from('expenses').select('amount, payment_method').eq('store_id', storeId);
-        let cashExpense = 0, bankExpense = 0;
-        for (var e of expenses || []) {
-            if (e.payment_method === 'cash') cashExpense += e.amount;
-            else if (e.payment_method === 'bank') bankExpense += e.amount;
-        }
-        
-        return { cash: cashIncome - cashExpense, bank: bankIncome - bankExpense };
-    },
-
     editStore: async function(storeId) {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
@@ -156,62 +107,139 @@ const StoreManager = {
         await this.loadStores();
         const lang = Utils.lang;
         const t = (key) => Utils.t(key);
-        const cashFlow = await SUPABASE.getCashFlowSummary();
-
-        let storeStatsRows = '';
+        
+        // ========== 优化：一次查询所有数据 ==========
+        console.log('开始加载门店管理数据...');
+        
+        // 并行查询所有需要的数据
+        const [allOrdersResult, allExpensesResult, allPaymentsResult, cashFlow] = await Promise.all([
+            supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid'),
+            supabaseClient.from('expenses').select('id, store_id, amount, payment_method'),
+            supabaseClient.from('payment_history').select('id, order_id, type, amount, payment_method'),
+            SUPABASE.getCashFlowSummary()
+        ]);
+        
+        const allOrders = allOrdersResult.data || [];
+        const allExpenses = allExpensesResult.data || [];
+        const allPayments = allPaymentsResult.data || [];
+        
+        console.log(`数据加载完成: 订单 ${allOrders.length} 条, 支出 ${allExpenses.length} 条, 付款 ${allPayments.length} 条`);
+        
+        // 构建 order_id 到 store_id 的映射（用于付款记录归属门店）
+        const orderStoreMap = {};
+        for (const order of allOrders) {
+            orderStoreMap[order.id] = order.store_id;
+        }
+        
+        // 按门店分组计算各项指标
+        const storeStats = {};
+        
+        // 初始化每个门店的统计对象
+        for (const store of this.stores) {
+            storeStats[store.id] = {
+                orders: [],
+                expenses: [],
+                payments: []
+            };
+        }
+        
+        // 分组订单
+        for (const order of allOrders) {
+            const storeId = order.store_id;
+            if (storeStats[storeId]) {
+                storeStats[storeId].orders.push(order);
+            }
+        }
+        
+        // 分组支出
+        for (const expense of allExpenses) {
+            const storeId = expense.store_id;
+            if (storeStats[storeId]) {
+                storeStats[storeId].expenses.push(expense);
+            }
+        }
+        
+        // 分组付款记录（通过 order 找到所属门店）
+        for (const payment of allPayments) {
+            const storeId = orderStoreMap[payment.order_id];
+            if (storeId && storeStats[storeId]) {
+                storeStats[storeId].payments.push(payment);
+            }
+        }
+        
+        // 计算汇总数据
         let grandTotal = { 
             orders: 0, active: 0, loan: 0, adminFee: 0, interest: 0, 
             principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
         };
         
+        let storeStatsRows = '';
+        
         for (const store of this.stores) {
-            // 获取订单数据
-            const { data: orders } = await supabaseClient.from('orders').select('*').eq('store_id', store.id);
-            const ords = orders || [];
-            const activeOrds = ords.filter(o => o.status === 'active');
-            const totalLoan = ords.reduce((s, o) => s + o.loan_amount, 0);
-            const totalAdminFee = ords.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0);
-            const totalInterest = ords.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
-            const totalPrincipal = ords.reduce((s, o) => s + (o.principal_paid || 0), 0);
+            const stats = storeStats[store.id] || { orders: [], expenses: [], payments: [] };
+            const orders = stats.orders;
+            const expenses = stats.expenses;
+            const payments = stats.payments;
+            
+            // 计算订单指标
+            const ordsCount = orders.length;
+            const activeCount = orders.filter(o => o.status === 'active').length;
+            const totalLoan = orders.reduce((s, o) => s + (o.loan_amount || 0), 0);
+            const totalAdminFee = orders.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
+            const totalInterest = orders.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
+            const totalPrincipal = orders.reduce((s, o) => s + (o.principal_paid || 0), 0);
             const totalIncome = totalAdminFee + totalInterest;
             
-            // 获取支出
-            const expenses = await this.getStoreExpenses(store.id);
-            const totalExpenses = expenses.total;
+            // 计算支出
+            const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
             
-            // 获取现金流余额
-            const balances = await this.getStoreCashBalance(store.id);
+            // 计算现金流（按支付方式分类）
+            let cashIncome = 0, bankIncome = 0;
+            for (const p of payments) {
+                if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
+                    if (p.payment_method === 'cash') cashIncome += p.amount;
+                    else if (p.payment_method === 'bank') bankIncome += p.amount;
+                }
+            }
+            let cashExpense = 0, bankExpense = 0;
+            for (const e of expenses) {
+                if (e.payment_method === 'cash') cashExpense += e.amount;
+                else if (e.payment_method === 'bank') bankExpense += e.amount;
+            }
+            const cashBalance = cashIncome - cashExpense;
+            const bankBalance = bankIncome - bankExpense;
             
-            grandTotal.orders += ords.length;
-            grandTotal.active += activeOrds.length;
+            // 累加总计
+            grandTotal.orders += ordsCount;
+            grandTotal.active += activeCount;
             grandTotal.loan += totalLoan;
             grandTotal.adminFee += totalAdminFee;
             grandTotal.interest += totalInterest;
             grandTotal.principal += totalPrincipal;
             grandTotal.expenses += totalExpenses;
             grandTotal.income += totalIncome;
-            grandTotal.cashBalance += balances.cash;
-            grandTotal.bankBalance += balances.bank;
+            grandTotal.cashBalance += cashBalance;
+            grandTotal.bankBalance += bankBalance;
             
             storeStatsRows += `<tr>
                 <td style="border:1px solid #cbd5e1;padding:8px;"><strong>${Utils.escapeHtml(store.name)}</strong></td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${ords.length}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${activeOrds.length}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${ordsCount}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${activeCount}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalLoan)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalAdminFee)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalInterest)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalPrincipal)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalIncome)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#ef4444;">${Utils.formatCurrency(totalExpenses)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(balances.cash)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(balances.bank)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(cashBalance)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(bankBalance)}</td>
             　　　`;
         }
 
         let storeRows = '';
         if (this.stores.length === 0) {
             storeRows = `<tr><td colspan="5" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
-            storeStatsRows = `<tr><td colspan="11" style="text-align:center;padding:20px;">${t('no_data')}</td></td>`;
+            storeStatsRows = `<tr><td colspan="11" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
         } else {
             for (const store of this.stores) {
                 storeRows += `<tr>
