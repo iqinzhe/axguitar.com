@@ -355,11 +355,11 @@ tr:hover {
     }
     
     .form-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .cashflow-stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .stats-grid {
@@ -381,16 +381,6 @@ tr:hover {
     
     .toolbar input {
         max-width: 100% !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .report-grid-5x2 {
-        grid-template-columns: 1fr;
     }
 }
 
