@@ -1,3 +1,4 @@
+/* main.css */
 * {
     box-sizing: border-box;
 }
@@ -31,7 +32,6 @@ label {
     color: #334155;
 }
 
-/* 所有输入框统一样式 */
 input, select, textarea {
     width: 100%;
     max-width: 100%;
@@ -43,7 +43,6 @@ input, select, textarea {
     font-size: 14px;
 }
 
-/* 日期选择器强制白色背景 */
 input[type="date"],
 input[type="date"]:focus,
 input[type="date"]:hover {
@@ -52,7 +51,6 @@ input[type="date"]:hover {
     border: 1px solid #cbd5e1;
 }
 
-/* 日期选择器在暗色模式下的兼容 */
 input[type="date"]::-webkit-calendar-picker-indicator {
     cursor: pointer;
     filter: invert(0.3);
@@ -88,8 +86,9 @@ button.success { background: #10b981; }
 button.success:hover { background: #059669; }
 button.warning { background: #f59e0b; }
 button.warning:hover { background: #d97706; }
+button.info { background: #8b5cf6; }
+button.info:hover { background: #7c3aed; }
 
-/* ========== 双列表单网格 ========== */
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -109,16 +108,15 @@ button.warning:hover { background: #d97706; }
     padding-top: 4px;
 }
 
-/* ========== 表格容器 ========== */
 .table-container {
     overflow-x: auto;
     margin-top: 20px;
     -webkit-overflow-scrolling: touch;
     border-radius: 8px;
     border: 1px solid #e2e8f0;
+    background: #ffffff;
 }
 
-/* 基础表格样式 */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -126,7 +124,6 @@ table {
     font-size: 14px;
 }
 
-/* 所有表格单元格边框 - 使用更具体的选择器确保生效 */
 table th,
 table td {
     border: 1px solid #cbd5e1;
@@ -135,7 +132,6 @@ table td {
     vertical-align: middle;
 }
 
-/* 表头样式 */
 table th {
     background: #f8fafc;
     font-weight: 600;
@@ -143,12 +139,10 @@ table th {
     white-space: nowrap;
 }
 
-/* 表格行悬停效果 */
 table tbody tr:hover {
     background: #f1f5f9;
 }
 
-/* 操作按钮区域 */
 table td:last-child {
     white-space: nowrap;
 }
@@ -159,27 +153,10 @@ table td:last-child button {
     margin: 2px;
 }
 
-/* 用户管理表格专用样式 - 确保边框可见 */
-.user-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
 .user-table th,
 .user-table td {
     border: 1px solid #cbd5e1 !important;
     padding: 10px 12px;
-}
-
-.user-table th {
-    background: #f8fafc;
-    font-weight: 600;
-}
-
-/* 门店管理表格专用样式 */
-.store-table {
-    width: 100%;
-    border-collapse: collapse;
 }
 
 .store-table th,
@@ -188,12 +165,6 @@ table td:last-child button {
     padding: 10px 12px;
 }
 
-.store-table th {
-    background: #f8fafc;
-    font-weight: 600;
-}
-
-/* ========== 付款明细表格 ========== */
 .payment-table {
     min-width: 700px;
 }
@@ -205,7 +176,6 @@ table td:last-child button {
     border: 1px solid #cbd5e1;
 }
 
-/* ========== 状态徽标 ========== */
 .status-badge {
     display: inline-block;
     padding: 4px 8px;
@@ -218,7 +188,6 @@ table td:last-child button {
 .status-completed { background: #3b82f6; color: white; }
 .status-liquidated { background: #ef4444; color: white; }
 
-/* ========== 卡片 ========== */
 .card {
     background: #ffffff;
     border-radius: 12px;
@@ -228,7 +197,6 @@ table td:last-child button {
     border: 1px solid #e2e8f0;
 }
 
-/* ========== 统计卡片 ========== */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -252,7 +220,6 @@ table td:last-child button {
     word-break: break-all;
 }
 
-/* ========== 财务报表分门店统计 ========== */
 .report-store-section {
     border: 1px solid #e2e8f0;
     border-radius: 12px;
@@ -289,16 +256,6 @@ table td:last-child button {
 .report-store-stat .value.expense { color: #ef4444; }
 .report-store-stat .value.profit { color: #3b82f6; }
 
-.report-store-stats:last-child .report-store-stat {
-    border-bottom: none;
-}
-
-.report-total-row {
-    background: #f8fafc;
-    border-top: 2px solid #3b82f6;
-}
-
-/* ========== 工具栏 ========== */
 .toolbar {
     display: flex;
     gap: 10px;
@@ -307,7 +264,6 @@ table td:last-child button {
     align-items: center;
 }
 
-/* ========== 地址选项 ========== */
 .address-option {
     display: flex;
     gap: 12px;
@@ -333,7 +289,77 @@ table td:last-child button {
     cursor: pointer;
 }
 
-/* ========== 打印样式 ========== */
+/* Payment Method Styles */
+.payment-method-group {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+.payment-method-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #1e293b;
+}
+
+.payment-method-options {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.payment-method-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+.payment-method-options input[type="radio"] {
+    width: auto;
+    margin: 0;
+}
+
+/* Cash Flow Summary */
+.cashflow-summary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+}
+
+.cashflow-summary h3 {
+    color: white;
+    margin-bottom: 10px;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.cashflow-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.cashflow-item {
+    text-align: center;
+}
+
+.cashflow-item .label {
+    font-size: 11px;
+    opacity: 0.8;
+    margin-bottom: 5px;
+}
+
+.cashflow-item .value {
+    font-size: 18px;
+    font-weight: bold;
+}
+
 @media print {
     .no-print, .toolbar button:not(.print-btn) {
         display: none !important;
@@ -364,7 +390,6 @@ table td:last-child button {
     }
 }
 
-/* ========== 手机端优化 ========== */
 @media (max-width: 768px) {
     body { padding: 10px; background: #f8fafc; }
 
@@ -488,7 +513,6 @@ table td:last-child button {
     }
 }
 
-/* ========== 辅助类 ========== */
 .text-muted {
     color: #64748b;
 }
@@ -499,4 +523,13 @@ table td:last-child button {
 
 .border-light {
     border-color: #e2e8f0;
+}
+
+/* Cash flow highlight */
+.cash-inflow {
+    color: #10b981;
+}
+
+.cash-outflow {
+    color: #ef4444;
 }
