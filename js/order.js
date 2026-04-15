@@ -7,14 +7,15 @@ const Order = {
             customer_address: data.customer.address,
             collateral_name: data.collateral_name,
             loan_amount: data.loan_amount,
+            admin_fee: data.admin_fee || 30000,  // 支持自定义管理费
             notes: data.notes,
             customer_id: data.customer_id || null
         };
         return await SUPABASE.createOrder(orderData);
     },
     
-    async recordAdminFee(orderId, paymentMethod) { 
-        return await SUPABASE.recordAdminFee(orderId, paymentMethod); 
+    async recordAdminFee(orderId, paymentMethod, adminFeeAmount) { 
+        return await SUPABASE.recordAdminFee(orderId, paymentMethod, adminFeeAmount); 
     },
     
     async recordInterestPayment(orderId, monthsPaid, paymentMethod) { 
