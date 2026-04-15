@@ -226,7 +226,7 @@ const SupabaseAPI = {
         return date.toISOString().split('T')[0];
     },
 
-    async recordAdminFee(orderId) {
+    async recordAdminFee(orderId, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
         const { error: e1 } = await supabaseClient.from('orders').update({
@@ -240,13 +240,14 @@ const SupabaseAPI = {
             type: 'admin_fee',
             amount: order.admin_fee,
             description: 'Administrasi Fee / 管理费',
-            recorded_by: profile.id
+            recorded_by: profile.id,
+            payment_method: paymentMethod
         });
         if (e2) throw e2;
         return true;
     },
 
-    async recordInterestPayment(orderId, months) {
+    async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
         const remainingPrincipal = order.loan_amount - order.principal_paid;
@@ -267,13 +268,14 @@ const SupabaseAPI = {
             months: months,
             amount: totalInterest,
             description: `Bunga ${months} bulan / 利息${months}个月`,
-            recorded_by: profile.id
+            recorded_by: profile.id,
+            payment_method: paymentMethod
         });
         if (e2) throw e2;
         return true;
     },
 
-    async recordPrincipalPayment(orderId, amount) {
+    async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
         const remainingPrincipal = order.loan_amount - order.principal_paid;
@@ -294,7 +296,8 @@ const SupabaseAPI = {
             type: 'principal',
             amount: paidAmount,
             description: paidAmount >= order.loan_amount ? 'Pelunasan Pokok / 全额还款' : 'Pembayaran Pokok / 部分还款',
-            recorded_by: profile.id
+            recorded_by: profile.id,
+            payment_method: paymentMethod
         });
         if (e2) throw e2;
         return true;
@@ -455,6 +458,49 @@ const SupabaseAPI = {
         const { error } = await supabaseClient.from('stores').delete().eq('id', id);
         if (error) throw error;
         return true;
+    },
+
+    async getCashFlowSummary() {
+        const profile = await this.getCurrentProfile();
+        let query = supabaseClient.from('payment_history').select('type, amount, payment_method');
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
+            const orderIds = orders?.map(o => o.id) || [];
+            if (orderIds.length > 0) {
+                query = query.in('order_id', orderIds);
+            }
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        let cashIncome = 0, bankIncome = 0;
+        
+        for (const p of data || []) {
+            if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
+                if (p.payment_method === 'cash') cashIncome += p.amount;
+                else if (p.payment_method === 'bank') bankIncome += p.amount;
+            }
+        }
+        
+        let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            expenseQuery = expenseQuery.eq('store_id', profile.store_id);
+        }
+        const { data: expenses } = await expenseQuery;
+        
+        let cashExpense = 0, bankExpense = 0;
+        for (const e of expenses || []) {
+            if (e.payment_method === 'cash') cashExpense += e.amount;
+            else if (e.payment_method === 'bank') bankExpense += e.amount;
+        }
+        
+        return {
+            cash: { income: cashIncome, expense: cashExpense, balance: cashIncome - cashExpense },
+            bank: { income: bankIncome, expense: bankExpense, balance: bankIncome - bankExpense },
+            total: { income: cashIncome + bankIncome, expense: cashExpense + bankExpense, balance: (cashIncome + bankIncome) - (cashExpense + bankExpense) }
+        };
     },
 
     formatCurrency(amount) {
