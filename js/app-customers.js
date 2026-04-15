@@ -20,19 +20,11 @@ const CustomersModule = {
             const { data: customers, error } = await query;
             if (error) throw error;
 
-            var customerHasActiveOrder = {};
-            for (var c of customers) {
-                const { data: orders } = await supabaseClient
-                    .from('orders').select('status').eq('customer_id', c.id).eq('status', 'active');
-                customerHasActiveOrder[c.id] = orders && orders.length > 0;
-            }
-
             var rows = '';
             if (!customers || customers.length === 0) {
                 rows = `<tr><td colspan="7" style="text-align: center; padding:20px;">${t('no_data')}</td></tr>`;
             } else {
                 for (var c of customers) {
-                    var hasActive = customerHasActiveOrder[c.id];
                     rows += `<tr>
                         <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatDate(c.registered_date)}</td>
                         <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(c.name)}</td>
@@ -42,13 +34,10 @@ const CustomersModule = {
                         <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
                         <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
                             <button onclick="APP.editCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>
-                            ${hasActive
-                                ? `<button onclick="APP.navigateTo('customerPaymentHistory',{customerId:'${c.id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>`
-                                : `<button onclick="APP.createOrderForCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;" class="success">➕ ${lang === 'id' ? 'Buat Order' : '新开订单'}</button>`
-                            }
+                            <button onclick="APP.createOrderForCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;" class="success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" style="padding:4px 8px;font-size:12px;" class="danger">🗑️ ${t('delete')}</button>` : ''}
                         </td>
-                    </tr>`;
+                    　　　`;
                 }
             }
 
@@ -138,14 +127,11 @@ const CustomersModule = {
         var livingSameAsKtp = livingOpt === 'same';
         var livingAddress = livingSameAsKtp ? null : document.getElementById("customerLivingAddress").value.trim();
 
-        console.log("添加客户数据:", { name, ktp, phone, ktpAddress, livingSameAsKtp, livingAddress });
-
         if (!name) { alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写'); return; }
         if (!phone) { alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写'); return; }
 
         try {
             const profile = await SUPABASE.getCurrentProfile();
-            console.log("当前用户资料:", profile);
             
             if (!profile || !profile.store_id) {
                 throw new Error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
@@ -165,22 +151,15 @@ const CustomersModule = {
                 updated_at: new Date().toISOString()
             };
             
-            console.log("提交数据:", customerData);
-            
             const { data, error } = await supabaseClient
                 .from('customers')
                 .insert(customerData)
                 .select();
             
-            if (error) {
-                console.error("插入客户错误:", error);
-                throw error;
-            }
+            if (error) throw error;
             
-            console.log("插入成功:", data);
             alert(lang === 'id' ? 'Nasabah berhasil ditambahkan' : '客户添加成功');
             await this.showCustomers();
-            
         } catch (error) {
             console.error("addCustomer error:", error);
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
@@ -379,9 +358,9 @@ const CustomersModule = {
                     <td style="border:1px solid #cbd5e1;padding:8px;"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
                     <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">👁️ ${t('view')}</button>
-                        ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '付款'}</button>` : ''}
+                        ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" style="padding:4px 8px;font-size:12px;">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     </td>
-                </tr>`;
+                　　　`;
             }).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
 
             document.getElementById("app").innerHTML = `
@@ -398,15 +377,17 @@ const CustomersModule = {
                     <h3>📋 ${t('order_list')}</h3>
                     <div class="table-container">
                         <table style="width:100%;border-collapse:collapse;">
-                            <thead><tr style="background:#f8fafc;">
-                                <th style="border:1px solid #cbd5e1;padding:10px;">ID</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${t('loan_amount')}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                            </tr></thead>
+                            <thead>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">ID</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${t('loan_amount')}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Status' : '状态'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                </tr>
+                            </thead>
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
@@ -458,15 +439,17 @@ const CustomersModule = {
                     <h3>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h3>
                     <div class="table-container">
                         <table class="payment-table" style="width:100%;border-collapse:collapse;">
-                            <thead><tr style="background:#f8fafc;">
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                            </tr></thead>
+                            <thead>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                    <th style="border:1px solid #cbd5e1;padding:10px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                </tr>
+                            </thead>
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
