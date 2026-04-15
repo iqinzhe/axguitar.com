@@ -501,9 +501,76 @@ const SupabaseAPI = {
         return true;
     },
 
+    // ==================== 资金注资/提现 API（新增）====================
+    async getCapitalTransactions() {
+        const profile = await this.getCurrentProfile();
+        let query = supabaseClient.from('capital_transactions').select('*').order('transaction_date', { ascending: false });
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    async addCapitalTransaction(transaction) {
+        const profile = await this.getCurrentProfile();
+        
+        // 只有管理员可以注资/提现
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
+        }
+        
+        const { data, error } = await supabaseClient.from('capital_transactions').insert({
+            store_id: transaction.store_id || profile.store_id,
+            type: transaction.type,
+            payment_method: transaction.payment_method,
+            amount: transaction.amount,
+            description: transaction.description,
+            transaction_date: transaction.transaction_date || new Date().toISOString().split('T')[0],
+            created_by: profile.id
+        }).select().single();
+        
+        if (error) throw error;
+        return data;
+    },
+
+    async getCapitalSummary() {
+        const profile = await this.getCurrentProfile();
+        let query = supabaseClient.from('capital_transactions').select('type, payment_method, amount');
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        let cashInvestment = 0, bankInvestment = 0;
+        let cashWithdrawal = 0, bankWithdrawal = 0;
+        
+        for (const t of data || []) {
+            if (t.type === 'investment') {
+                if (t.payment_method === 'cash') cashInvestment += t.amount;
+                else if (t.payment_method === 'bank') bankInvestment += t.amount;
+            } else if (t.type === 'withdrawal' || t.type === 'dividend') {
+                if (t.payment_method === 'cash') cashWithdrawal += t.amount;
+                else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
+            }
+        }
+        
+        return {
+            cash: { investment: cashInvestment, withdrawal: cashWithdrawal, net: cashInvestment - cashWithdrawal },
+            bank: { investment: bankInvestment, withdrawal: bankWithdrawal, net: bankInvestment - bankWithdrawal }
+        };
+    },
+
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
+        // 获取收入（付款记录）
         let incomeQuery = supabaseClient.from('payment_history').select('type, amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
@@ -522,6 +589,7 @@ const SupabaseAPI = {
             }
         }
         
+        // 获取支出（运营支出）
         let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             expenseQuery = expenseQuery.eq('store_id', profile.store_id);
@@ -534,10 +602,33 @@ const SupabaseAPI = {
             else if (e.payment_method === 'bank') bankExpense += e.amount;
         }
         
+        // 获取注资/提现
+        const capital = await this.getCapitalSummary();
+        
+        // 最终余额 = 注资净额 + 收入 - 支出
+        const cashBalance = capital.cash.net + cashIncome - cashExpense;
+        const bankBalance = capital.bank.net + bankIncome - bankExpense;
+        
         return {
-            cash: { income: cashIncome, expense: cashExpense, balance: cashIncome - cashExpense },
-            bank: { income: bankIncome, expense: bankExpense, balance: bankIncome - bankExpense },
-            total: { income: cashIncome + bankIncome, expense: cashExpense + bankExpense, balance: (cashIncome + bankIncome) - (cashExpense + bankExpense) }
+            capital: { cash: capital.cash, bank: capital.bank },
+            cash: { 
+                income: cashIncome, 
+                expense: cashExpense, 
+                netIncome: cashIncome - cashExpense,
+                balance: cashBalance 
+            },
+            bank: { 
+                income: bankIncome, 
+                expense: bankExpense, 
+                netIncome: bankIncome - bankExpense,
+                balance: bankBalance 
+            },
+            total: { 
+                income: cashIncome + bankIncome, 
+                expense: cashExpense + bankExpense,
+                netIncome: (cashIncome + bankIncome) - (cashExpense + bankExpense),
+                balance: cashBalance + bankBalance 
+            }
         };
     },
 
@@ -552,138 +643,6 @@ const SupabaseAPI = {
         return new Date(dateStr).toLocaleDateString('id-ID');
     }
 };
-
-// ==================== 资金注资/提现 API ====================
-
-async getCapitalTransactions() {
-    const profile = await this.getCurrentProfile();
-    let query = supabaseClient.from('capital_transactions').select('*').order('transaction_date', { ascending: false });
-    
-    if (profile?.role !== 'admin' && profile?.store_id) {
-        query = query.eq('store_id', profile.store_id);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
-},
-
-async addCapitalTransaction(transaction) {
-    const profile = await this.getCurrentProfile();
-    
-    // 只有管理员可以注资/提现
-    if (profile?.role !== 'admin') {
-        throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
-    }
-    
-    const { data, error } = await supabaseClient.from('capital_transactions').insert({
-        store_id: transaction.store_id || profile.store_id,
-        type: transaction.type,
-        payment_method: transaction.payment_method,
-        amount: transaction.amount,
-        description: transaction.description,
-        transaction_date: transaction.transaction_date || new Date().toISOString().split('T')[0],
-        created_by: profile.id
-    }).select().single();
-    
-    if (error) throw error;
-    return data;
-},
-
-async getCapitalSummary() {
-    const profile = await this.getCurrentProfile();
-    let query = supabaseClient.from('capital_transactions').select('type, payment_method, amount');
-    
-    if (profile?.role !== 'admin' && profile?.store_id) {
-        query = query.eq('store_id', profile.store_id);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    
-    let cashInvestment = 0, bankInvestment = 0;
-    let cashWithdrawal = 0, bankWithdrawal = 0;
-    
-    for (const t of data || []) {
-        if (t.type === 'investment') {
-            if (t.payment_method === 'cash') cashInvestment += t.amount;
-            else if (t.payment_method === 'bank') bankInvestment += t.amount;
-        } else if (t.type === 'withdrawal' || t.type === 'dividend') {
-            if (t.payment_method === 'cash') cashWithdrawal += t.amount;
-            else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
-        }
-    }
-    
-    return {
-        cash: { investment: cashInvestment, withdrawal: cashWithdrawal, net: cashInvestment - cashWithdrawal },
-        bank: { investment: bankInvestment, withdrawal: bankWithdrawal, net: bankInvestment - bankWithdrawal }
-    };
-},
-
-async getCashFlowSummary() {
-    const profile = await this.getCurrentProfile();
-    
-    // 获取收入（付款记录）
-    let incomeQuery = supabaseClient.from('payment_history').select('type, amount, payment_method');
-    if (profile?.role !== 'admin' && profile?.store_id) {
-        const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
-        const orderIds = orders?.map(o => o.id) || [];
-        if (orderIds.length > 0) {
-            incomeQuery = incomeQuery.in('order_id', orderIds);
-        }
-    }
-    const { data: incomes } = await incomeQuery;
-    
-    let cashIncome = 0, bankIncome = 0;
-    for (const p of incomes || []) {
-        if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
-            if (p.payment_method === 'cash') cashIncome += p.amount;
-            else if (p.payment_method === 'bank') bankIncome += p.amount;
-        }
-    }
-    
-    // 获取支出（运营支出）
-    let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
-    if (profile?.role !== 'admin' && profile?.store_id) {
-        expenseQuery = expenseQuery.eq('store_id', profile.store_id);
-    }
-    const { data: expenses } = await expenseQuery;
-    
-    let cashExpense = 0, bankExpense = 0;
-    for (const e of expenses || []) {
-        if (e.payment_method === 'cash') cashExpense += e.amount;
-        else if (e.payment_method === 'bank') bankExpense += e.amount;
-    }
-    
-    // 获取注资/提现
-    const capital = await this.getCapitalSummary();
-    
-    // 最终余额 = 注资净额 + 收入 - 支出
-    const cashBalance = capital.cash.net + cashIncome - cashExpense;
-    const bankBalance = capital.bank.net + bankIncome - bankExpense;
-    
-    return {
-        capital: { cash: capital.cash, bank: capital.bank },
-        cash: { 
-            income: cashIncome, 
-            expense: cashExpense, 
-            netIncome: cashIncome - cashExpense,
-            balance: cashBalance 
-        },
-        bank: { 
-            income: bankIncome, 
-            expense: bankExpense, 
-            netIncome: bankIncome - bankExpense,
-            balance: bankBalance 
-        },
-        total: { 
-            income: cashIncome + bankIncome, 
-            expense: cashExpense + bankExpense,
-            netIncome: (cashIncome + bankIncome) - (cashExpense + bankExpense),
-            balance: cashBalance + bankBalance 
-        }
-    };
-}
 
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
