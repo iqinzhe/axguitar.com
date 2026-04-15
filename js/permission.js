@@ -1,48 +1,96 @@
-// FIX #3: 完整权限系统 - 正确区分 admin / store_manager / staff 三个角色
+// permission.js - 权限系统 v2.0
+// 角色定义：
+// - admin: 全部权限
+// - store_manager: 店长权限（审核订单、锁单）
+// - staff: 员工权限（录入、修改、保存）
+
 const PERMISSION = {
-    can(action) {
+    can(action, order = null) {
         if (!AUTH.user) return false;
         const role = AUTH.user.role;
-        const rules = {
-            admin: [
-                "order_create", "order_view", "order_delete", "order_edit",
-                "order_payment", "order_unlock", "order_liquidate",
-                "user_manage", "store_manage", "report_view",
-                "backup_restore", "expense_edit", "expense_delete",
-                "customer_delete", "expense_reconcile"
-            ],
-            store_manager: [
-                "order_create", "order_view", "order_payment",
-                "order_edit_unlocked", "expense_add",
-                "customer_manage", "report_view"
-            ],
-            staff: [
-                "order_create", "order_view", "order_payment",
-                "expense_add", "customer_manage"
-            ]
-        };
-        return rules[role]?.includes(action) || false;
+        
+        // 管理员拥有全部权限
+        if (role === 'admin') return true;
+        
+        // 店长权限
+        if (role === 'store_manager') {
+            switch (action) {
+                case 'order_create': return true;
+                case 'order_view': return true;
+                case 'order_payment': return true;
+                case 'order_edit':
+                    // 店长可以编辑未锁定的订单
+                    return order && !order.is_locked;
+                case 'order_lock':
+                    // 店长可以锁定订单（审核通过后）
+                    return order && !order.is_locked;
+                case 'order_unlock': return false;  // 只有admin可以解锁
+                case 'order_delete': return false;
+                case 'customer_manage': return true;
+                case 'expense_add': return true;
+                case 'expense_edit': return false;
+                case 'expense_delete': return false;
+                case 'report_view': return true;
+                case 'user_manage': return false;
+                case 'store_manage': return false;
+                default: return false;
+            }
+        }
+        
+        // 员工权限
+        if (role === 'staff') {
+            switch (action) {
+                case 'order_create': return true;
+                case 'order_view': return true;
+                case 'order_payment': return true;
+                case 'order_edit':
+                    // 员工可以编辑未锁定的订单
+                    return order && !order.is_locked;
+                case 'order_lock': return false;   // 员工不能锁单
+                case 'order_unlock': return false;
+                case 'order_delete': return false;
+                case 'customer_manage': return true;
+                case 'expense_add': return true;
+                case 'expense_edit': return false;
+                case 'expense_delete': return false;
+                case 'report_view': return false;
+                case 'user_manage': return false;
+                case 'store_manage': return false;
+                default: return false;
+            }
+        }
+        
+        return false;
     },
 
     // 便捷方法
-    canDeleteOrder()    { return this.can("order_delete"); },
+    canDeleteOrder() { return this.can('order_delete'); },
+    
     canEditOrder(order) {
-        if (!AUTH.user) return false;
-        if (AUTH.user.role === 'admin') return true;
-        // store_manager / staff 只能编辑未锁定的订单
-        return !order.is_locked && (AUTH.user.role === 'store_manager' || AUTH.user.role === 'staff');
+        if (!order) return false;
+        return this.can('order_edit', order);
     },
-    canManageUsers()    { return this.can("user_manage"); },
-    canManageStores()   { return this.can("store_manage"); },
-    canViewReport()     { return this.can("report_view"); },
-    canUnlockOrder()    { return this.can("order_unlock"); },
-    canReconcile()      { return this.can("expense_reconcile"); },
-    canDeleteCustomer() { return this.can("customer_delete"); },
-    canDeleteExpense()  { return this.can("expense_delete"); },
-    canEditExpense()    { return this.can("expense_edit"); },
-    isAdmin()           { return AUTH.user?.role === 'admin'; },
-    isStoreManager()    { return AUTH.user?.role === 'store_manager'; },
-    isStaff()           { return AUTH.user?.role === 'staff'; }
+    
+    canLockOrder(order) {
+        if (!order) return false;
+        return this.can('order_lock', order);
+    },
+    
+    canUnlockOrder() { 
+        return AUTH.user?.role === 'admin'; 
+    },
+    
+    canManageUsers() { return this.can('user_manage'); },
+    canManageStores() { return this.can('store_manage'); },
+    canViewReport() { return this.can('report_view'); },
+    canReconcile() { return AUTH.user?.role === 'admin'; },
+    canDeleteCustomer() { return AUTH.user?.role === 'admin'; },
+    canDeleteExpense() { return AUTH.user?.role === 'admin'; },
+    canEditExpense() { return AUTH.user?.role === 'admin'; },
+    
+    isAdmin() { return AUTH.user?.role === 'admin'; },
+    isStoreManager() { return AUTH.user?.role === 'store_manager'; },
+    isStaff() { return AUTH.user?.role === 'staff'; }
 };
 
 window.PERMISSION = PERMISSION;
