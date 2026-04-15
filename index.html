@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>JF! by Gadai</title>
+<title>JF! by Gadai - Sistem Manajemen Gadai</title>
 <link rel="icon" type="image/x-icon" href="/icons/favicon.ico">
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
@@ -26,77 +26,19 @@
 <script src="js/order.js"></script>
 <script src="js/store.js"></script>
 <script src="js/migration.js"></script>
-<!-- app-core 拆分为3个文件 -->
+<script src="js/app-core.js"></script>
 <script src="js/app-dashboard.js"></script>
-<script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', async function () {
-    const appEl = document.getElementById("app");
-
-    try {
-        // 1️⃣ 检查 Supabase 是否加载
-        if (!window.supabase) {
-            throw new Error("Supabase not loaded");
-        }
-
-        // 2️⃣ 初始化客户端（你已有 supabase.js）
-        const supabase = window.supabaseClient;
-
-        // 3️⃣ 检查是否“已安装”（判断 users 表是否有数据）
-        let { data: users, error: userError } = await supabase
-            .from('users')
-            .select('id')
-            .limit(1);
-
-        if (userError) {
-            console.warn("Users table not ready:", userError);
-            appEl.innerHTML = "System not installed. Please run initialization.";
-            return;
-        }
-
-        if (!users || users.length === 0) {
-            // 👉 未安装
-            appEl.innerHTML = `
-                <div style="text-align:center;padding:50px;">
-                    <h2>System Not Installed</h2>
-                    <p>Please initialize the system first.</p>
-                    <button onclick="initSystem()">Initialize</button>
-                </div>
-            `;
-            return;
-        }
-
-        // 4️⃣ 检查登录状态
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session) {
-            appEl.innerHTML = `
-                <div style="text-align:center;padding:50px;">
-                    <h2>Please Login</h2>
-                    <button onclick="showLogin()">Login</button>
-                </div>
-            `;
-            return;
-        }
-
-        // 5️⃣ 正常启动系统
-        if (window.APP && typeof window.APP.init === 'function') {
-            window.APP.init();
-        } else {
-            throw new Error("APP not loaded");
-        }
-
-    } catch (err) {
-        console.error(err);
-        appEl.innerHTML = `
-            <div style="text-align:center;padding:50px;color:#ef4444;">
-                System error. Please refresh.
-            </div>
-        `;
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.APP && typeof window.APP.init === 'function') {
+        window.APP.init();
+    } else {
+        console.error("APP not properly loaded");
+        document.getElementById("app").innerHTML = 
+            '<div style="text-align:center;padding:50px;color:#ef4444;">Loading error: System not ready. Please refresh.</div>';
     }
 });
-</script>    
+</script>
 </body>
 </html>
