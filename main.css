@@ -68,6 +68,12 @@ body {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    align-items: center;
+}
+
+/* 返回按钮特殊样式：放在最后，增加左边距 */
+.page-header .header-actions .btn-back {
+    margin-left: 20px;
 }
 
 /* 手机端适配 */
@@ -80,6 +86,11 @@ body {
     .page-header .header-actions {
         width: 100%;
         justify-content: flex-end;
+    }
+    
+    /* 手机端返回按钮间距缩小 */
+    .page-header .header-actions .btn-back {
+        margin-left: 12px;
     }
 }
 
