@@ -1,5 +1,6 @@
-// app-dashboard-core.js - 核心功能模块
+// app-dashboard-core.js - 核心功能模块（完整版）
 // 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
+// 门店用户可见：利润再投资、本金循环
 
 window.APP = window.APP || {};
 
@@ -348,6 +349,7 @@ const DashboardCore = {
             transactions = await SUPABASE.getCapitalTransactions();
         } catch(e) { console.error(e); }
         
+        // ========== 关键：门店用户可以看到两个选项 ==========
         var typeOptions = '';
         if (isAdmin) {
             typeOptions = `
@@ -356,6 +358,7 @@ const DashboardCore = {
                 <option value="dividend">📊 ${lang === 'id' ? 'Dividen' : '利润分红'}</option>
             `;
         } else {
+            // 店长/员工：显示利润再投资和本金循环
             typeOptions = `
                 <option value="reinvestment">🔄 ${lang === 'id' ? 'Reinvestasi Laba (Bunga)' : '利润再投资（利息）'}</option>
                 <option value="capital_circulation">🔄 ${lang === 'id' ? 'Sirkulasi Modal (Pokok)' : '本金循环（回收本金）'}</option>
@@ -372,7 +375,7 @@ const DashboardCore = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="6" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金记录'}</td></tr>`;
+            transactionRows = `<tr><td colspan="6" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金记录'} (Rp 0)</td></tr>`;
         } else {
             for (var txn of transactions.slice(0, 10)) {
                 var sourceStoreName = txn.source_store?.name || '-';
@@ -462,7 +465,7 @@ const DashboardCore = {
                                 <th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th>
                                 <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                 <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                            </td>
+                            </tr>
                         </thead>
                         <tbody>${transactionRows}</tbody>
                     </table>
@@ -507,6 +510,7 @@ const DashboardCore = {
             var targetStore = stores.find(s => s.id === targetStoreId);
             targetStoreName = targetStore?.name || '-';
         } else {
+            // 店长/员工：自动使用当前门店
             const profile = await SUPABASE.getCurrentProfile();
             targetStoreId = profile.store_id;
             var currentStore = await SUPABASE.getStoreName(targetStoreId);
@@ -610,7 +614,7 @@ const DashboardCore = {
                 </tr>`;
             }
 
-            if (users.length === 0) userRows = `<tr><td colspan="5" class="text-center">${t('no_data')}<tr></tr>`;
+            if (users.length === 0) userRows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
 
             var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
             for (var s of stores) storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
