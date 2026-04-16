@@ -1,4 +1,5 @@
-// store.js - 修复版（门店编码自动生成）
+// store.js - 完整修复版
+// 门店编码自动生成：STORE_000, STORE_001, STORE_002...
 
 const StoreManager = {
     stores: [],
@@ -14,61 +15,34 @@ const StoreManager = {
     async _generateStoreCode(name) {
         await this.loadStores(true);
         
-        // 门店名称到代码的映射表
-        const nameToCode = {
-            'bangil': 'BL',
-            'gempol': 'GP',
-            'sidoarjo': 'SO',
-            'beji': 'BJ',
-            'kantor pusat': 'HQ',
-            'pusat': 'HQ',
-            'surabaya': 'SBY',
-            'jakarta': 'JKT',
-            'malang': 'MLG',
-            'kediri': 'KDR',
-            'blitar': 'BLT',
-            'probolinggo': 'PBG',
-            'pasuruan': 'PSR',
-            'lumajang': 'LMJ',
-            'jember': 'JMR',
-            'banyuwangi': 'BYW'
-        };
-        
+        // 总部固定为 STORE_000
         const nameLower = name.toLowerCase();
-        let baseCode = 'ST';
+        if (nameLower.includes('kantor') || nameLower.includes('pusat') || nameLower.includes('总部')) {
+            return 'STORE_000';
+        }
         
-        // 1. 根据名称映射
-        for (const [key, val] of Object.entries(nameToCode)) {
-            if (nameLower.includes(key)) {
-                baseCode = val;
-                break;
+        // 获取现有门店的最大序号
+        let maxNumber = 0;
+        for (const store of this.stores) {
+            const match = store.code?.match(/STORE_(\d+)/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > maxNumber) maxNumber = num;
             }
         }
         
-        // 2. 如果没有映射，取前两个字母
-        if (baseCode === 'ST') {
-            const letters = name.replace(/[^A-Za-z]/g, '').toUpperCase();
-            baseCode = letters.substring(0, 2);
-            if (baseCode.length < 2) baseCode = 'ST';
-        }
+        // 下一个序号（从1开始，因为0是总部）
+        const nextNumber = Math.max(1, maxNumber + 1);
+        const serial = String(nextNumber).padStart(3, '0');
         
-        // 3. 检查是否重复，如果重复则添加数字
-        let finalCode = baseCode;
-        let counter = 1;
-        while (this.stores.some(s => s.code === finalCode)) {
-            finalCode = `${baseCode}${counter}`;
-            counter++;
-        }
-        
-        return finalCode;
+        return `STORE_${serial}`;
     },
 
     async createStore(name, address, phone) {
-        // 自动生成门店编码
         const code = await this._generateStoreCode(name);
         const newStore = await SUPABASE.createStore(code, name, address, phone);
         this.stores.push(newStore);
-        this.stores.sort((a, b) => a.name.localeCompare(b.name));
+        this.stores.sort((a, b) => a.code.localeCompare(b.code));
         return newStore;
     },
 
@@ -359,7 +333,7 @@ const StoreManager = {
                     </table>
                 </div>
                 <p style="font-size:12px; color:#64748b; margin-top:8px;">
-                    💡 ${lang === 'id' ? 'Kode toko dibuat otomatis berdasarkan nama. Klik pada kolom WA untuk mengedit nomor. Contoh: 6281234567890' : '门店编码根据名称自动生成。点击 WA 列编辑号码。示例: 6281234567890'}
+                    💡 ${lang === 'id' ? 'Kode toko dibuat otomatis. Klik pada kolom WA untuk mengedit nomor. Contoh: 6281234567890' : '门店编码自动生成。点击 WA 列编辑号码。示例: 6281234567890'}
                 </p>
             </div>
 
@@ -369,7 +343,7 @@ const StoreManager = {
                     <div class="form-group">
                         <label>${lang === 'id' ? 'Nama Toko' : '门店名称'} *</label>
                         <input id="newStoreName" placeholder="${lang === 'id' ? 'Contoh: Bangil, Gempol' : '例如: Bangil, Gempol'}">
-                        <small style="color:#64748b;font-size:11px;">${lang === 'id' ? 'Kode toko akan dibuat otomatis' : '门店编码将自动生成'}</small>
+                        <small style="color:#64748b;font-size:11px;">${lang === 'id' ? 'Kode toko akan dibuat otomatis (STORE_XXX)' : '门店编码将自动生成 (STORE_XXX)'}</small>
                     </div>
                     <div class="form-group">
                         <label>${lang === 'id' ? 'Alamat' : '地址'}</label>
