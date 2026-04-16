@@ -149,7 +149,11 @@ const DashboardReport = {
                 document.getElementById("app").innerHTML = `
                     <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
-                        <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                        <div class="header-actions">
+                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                            <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                            <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        </div>
                     </div>
                     
                     <div class="cashflow-summary">
@@ -178,12 +182,7 @@ const DashboardReport = {
                     </div>
                     
                     <h3>${lang === 'id' ? 'Detail per Toko' : '各门店明细'}</h3>
-                    ${storeHtml}
-                    
-                    <div class="toolbar">
-                        <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
-                        <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                    </div>`;
+                    ${storeHtml}`;
             } else {
                 const profile = await SUPABASE.getCurrentProfile();
                 const storeId = profile?.store_id;
@@ -219,7 +218,11 @@ const DashboardReport = {
                 document.getElementById("app").innerHTML = `
                     <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
-                        <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                        <div class="header-actions">
+                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                            <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                            <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        </div>
                     </div>
                     
                     <div class="cashflow-summary">
@@ -242,10 +245,6 @@ const DashboardReport = {
                         <div class="stat-card"><div class="stat-value income">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
                         <div class="stat-card"><div class="stat-value expense">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
                         <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
-                    </div>
-                    <div class="toolbar">
-                        <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
-                        <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>`;
             }
         } catch (err) {
@@ -255,7 +254,6 @@ const DashboardReport = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardReport) {
     if (typeof DashboardReport[key] === 'function') {
         window.APP[key] = DashboardReport[key];
