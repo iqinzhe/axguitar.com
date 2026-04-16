@@ -1,5 +1,5 @@
 // app-customers.js - 完整修复版
-// 修复内容：客户ID生成显示、Admin可选择门店、Admin创建订单可选门店
+// 修复内容：客户ID生成显示、Admin可选择门店、Admin创建订单可选门店、头部按钮优化
 
 window.APP = window.APP || {};
 
@@ -17,7 +17,7 @@ const CustomersModule = {
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}<tr></tr>`;
             } else {
                 for (var c of customers) {
                     rows += `<tr>
@@ -38,7 +38,6 @@ const CustomersModule = {
                 }
             }
 
-            // 获取门店列表（Admin需要选择门店）
             var stores = await SUPABASE.getAllStores();
             var storeOptions = '<option value="">-- ' + (lang === 'id' ? 'Pilih Toko' : '选择门店') + ' --</option>';
             for (var store of stores) {
@@ -48,8 +47,12 @@ const CustomersModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    </div>
                 </div>
+                
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
                     <div class="table-container">
@@ -71,6 +74,7 @@ const CustomersModule = {
                         </table>
                     </div>
                 </div>
+                
                 <div class="card">
                     <h3>${lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户'}</h3>
                     <div class="form-grid">
@@ -110,9 +114,6 @@ const CustomersModule = {
                             <button onclick="APP.addCustomer()" class="success">💾 ${lang === 'id' ? 'Simpan Nasabah' : '保存客户'}</button>
                         </div>
                     </div>
-                </div>
-                <div class="toolbar">
-                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>
                 <style>
                     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -360,8 +361,11 @@ const CustomersModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${t('create_order')}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    </div>
                 </div>
+                
                 <div class="card">
                     <h3>${t('customer_info')}</h3>
                     <div class="customer-info-display">
@@ -480,8 +484,11 @@ const CustomersModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📋 ${lang === 'id' ? 'Order Nasabah' : '客户订单'} - ${Utils.escapeHtml(customer.name)}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    </div>
                 </div>
+                
                 <div class="card customer-summary">
                     <p><strong>${lang === 'id' ? 'ID Nasabah' : '客户ID'}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p>
                     <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
@@ -489,6 +496,7 @@ const CustomersModule = {
                     <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
                     <p><strong>${lang === 'id' ? 'Toko' : '门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')}</p>
                 </div>
+                
                 <div class="card">
                     <h3>📋 ${t('order_list')}</h3>
                     <div class="table-container">
@@ -556,12 +564,16 @@ const CustomersModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'} - ${Utils.escapeHtml(customer.name)}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    </div>
                 </div>
+                
                 <div class="card customer-summary">
                     <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
                     <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
                 </div>
+                
                 <div class="card">
                     <h3>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h3>
                     <div class="table-container">
