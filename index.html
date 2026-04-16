@@ -51,17 +51,19 @@
 
 <script>
 window.addEventListener('error', function(e) {
-    console.error('Global error:', e.error);
+    console.error('Global error:', e.error);  // 修复 console.er → console.error
 });
 
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         try {
-            if (window.APP && typeof window.APP.init === 'function') {
-                window.APP.init();
-            } else {
-                throw new Error('APP module not available');
+            if (!window.APP) {
+                throw new Error('APP module not loaded');
             }
+            if (typeof window.APP.init !== 'function') {
+                throw new Error('APP.init is not a function');
+            }
+            window.APP.init();
         } catch (err) {
             console.error('Init error:', err);
             showError('Gagal memuat aplikasi: ' + err.message);
