@@ -1,3 +1,5 @@
+// supabase.js - 完整版（包含资金流向 target_store_id 字段）
+
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
@@ -516,10 +518,20 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 资金注资/提现 API ====================
+    // ==================== 资金注资/提现 API（含流向字段）====================
+    
     async getCapitalTransactions() {
         const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('capital_transactions').select('*').order('transaction_date', { ascending: false });
+        
+        // 关联查询来源门店和目标门店的名称
+        let query = supabaseClient
+            .from('capital_transactions')
+            .select(`
+                *,
+                source_store:stores!capital_transactions_store_id_fkey(name, code),
+                target_store:stores!capital_transactions_target_store_id_fkey(name, code)
+            `)
+            .order('transaction_date', { ascending: false });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
@@ -533,16 +545,23 @@ const SupabaseAPI = {
     async addCapitalTransaction(transaction) {
         const profile = await this.getCurrentProfile();
         
+        // 只有管理员可以管理资金
         if (profile?.role !== 'admin') {
             throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
         }
         
+        // 验证 target_store_id 必须存在
+        if (!transaction.target_store_id) {
+            throw new Error(Utils.lang === 'id' ? 'Harap pilih tujuan aliran dana' : '请选择资金流向');
+        }
+        
         const { data, error } = await supabaseClient.from('capital_transactions').insert({
             store_id: transaction.store_id || profile.store_id,
+            target_store_id: transaction.target_store_id,
             type: transaction.type,
             payment_method: transaction.payment_method,
             amount: transaction.amount,
-            description: transaction.description,
+            description: transaction.description || '',
             transaction_date: transaction.transaction_date || new Date().toISOString().split('T')[0],
             created_by: profile.id
         }).select().single();
@@ -551,9 +570,11 @@ const SupabaseAPI = {
         return data;
     },
 
-    async getCapitalSummary() {
+    async getCapitalSummary(byStore = false) {
         const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('capital_transactions').select('type, payment_method, amount');
+        let query = supabaseClient
+            .from('capital_transactions')
+            .select('type, payment_method, amount, target_store_id, store_id');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
@@ -562,6 +583,34 @@ const SupabaseAPI = {
         const { data, error } = await query;
         if (error) throw error;
         
+        if (byStore) {
+            // 按门店汇总（基于 target_store_id 接收方）
+            const storeMap = {};
+            for (const t of data || []) {
+                const targetId = t.target_store_id;
+                if (!storeMap[targetId]) {
+                    storeMap[targetId] = { 
+                        investment: 0,    // 注资（收到钱）
+                        withdrawal: 0,    // 提现（拿出钱）
+                        dividend: 0,      // 分红（拿出钱）
+                        net: 0
+                    };
+                }
+                if (t.type === 'investment') {
+                    storeMap[targetId].investment += t.amount;
+                    storeMap[targetId].net += t.amount;
+                } else if (t.type === 'withdrawal') {
+                    storeMap[targetId].withdrawal += t.amount;
+                    storeMap[targetId].net -= t.amount;
+                } else if (t.type === 'dividend') {
+                    storeMap[targetId].dividend += t.amount;
+                    storeMap[targetId].net -= t.amount;
+                }
+            }
+            return { byStore: storeMap };
+        }
+        
+        // 原有逻辑：按支付方式汇总
         let cashInvestment = 0, bankInvestment = 0;
         let cashWithdrawal = 0, bankWithdrawal = 0;
         
@@ -584,6 +633,7 @@ const SupabaseAPI = {
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
+        // 获取收入（缴费记录）
         let incomeQuery = supabaseClient.from('payment_history').select('type, amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
@@ -602,6 +652,7 @@ const SupabaseAPI = {
             }
         }
         
+        // 获取支出（运营支出）
         let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             expenseQuery = expenseQuery.eq('store_id', profile.store_id);
@@ -614,13 +665,34 @@ const SupabaseAPI = {
             else if (e.payment_method === 'bank') bankExpense += e.amount;
         }
         
-        const capital = await this.getCapitalSummary();
+        // 获取资金（注资/提现/分红）- 基于 target_store_id 统计各门店实际收到的资金
+        let capitalQuery = supabaseClient.from('capital_transactions').select('type, payment_method, amount, target_store_id');
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            capitalQuery = capitalQuery.eq('target_store_id', profile.store_id);
+        }
+        const { data: capitals } = await capitalQuery;
         
-        const cashBalance = capital.cash.net + cashIncome - cashExpense;
-        const bankBalance = capital.bank.net + bankIncome - bankExpense;
+        let cashInvestment = 0, bankInvestment = 0;
+        let cashWithdrawal = 0, bankWithdrawal = 0;
+        
+        for (const t of capitals || []) {
+            if (t.type === 'investment') {
+                if (t.payment_method === 'cash') cashInvestment += t.amount;
+                else if (t.payment_method === 'bank') bankInvestment += t.amount;
+            } else if (t.type === 'withdrawal' || t.type === 'dividend') {
+                if (t.payment_method === 'cash') cashWithdrawal += t.amount;
+                else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
+            }
+        }
+        
+        const cashBalance = (cashInvestment - cashWithdrawal) + cashIncome - cashExpense;
+        const bankBalance = (bankInvestment - bankWithdrawal) + bankIncome - bankExpense;
         
         return {
-            capital: { cash: capital.cash, bank: capital.bank },
+            capital: {
+                cash: { investment: cashInvestment, withdrawal: cashWithdrawal, net: cashInvestment - cashWithdrawal },
+                bank: { investment: bankInvestment, withdrawal: bankWithdrawal, net: bankInvestment - bankWithdrawal }
+            },
             cash: { 
                 income: cashIncome, 
                 expense: cashExpense, 
@@ -643,6 +715,7 @@ const SupabaseAPI = {
     },
 
     // ==================== WA 提醒相关 API ====================
+    
     async getStoreWANumber(storeId) {
         const { data, error } = await supabaseClient
             .from('stores')
