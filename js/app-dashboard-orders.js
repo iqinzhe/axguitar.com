@@ -51,9 +51,9 @@ const DashboardOrders = {
                 <div class="page-header">
                     <h2>📋 ${t('order_list')}</h2>
                     <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                         <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
                 
@@ -143,9 +143,9 @@ const DashboardOrders = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📄 ${t('view')} ${t('order_list')}</h2>
-                    <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    <div class="header-actions">    
                         <button onclick="APP.printOrder('${order.order_id}')" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
                 
@@ -365,9 +365,9 @@ const DashboardOrders = {
                 <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h2>
                     <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button>
                         <button onclick="Storage.exportPaymentsToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button>                  
                     </div>
                 </div>
                 
