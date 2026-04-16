@@ -58,22 +58,19 @@ window.addEventListener('error', function(e) {
 // ==================== Loading 超时机制 ====================
 var initTimeout = setTimeout(function() {
     showError('加载超时，请刷新页面重试');
-}, 10000);  // 10秒超时
+}, 10000);
 
 // ==================== 页面初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         clearTimeout(initTimeout);
         try {
-            // 检查 APP 模块是否存在
             if (!window.APP) {
                 throw new Error('APP module not loaded');
             }
-            // 检查 init 方法是否存在
             if (typeof window.APP.init !== 'function') {
                 throw new Error('APP.init is not a function');
             }
-            // 启动应用
             window.APP.init();
         } catch (err) {
             console.error('Init error:', err);
