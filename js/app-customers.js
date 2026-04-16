@@ -1,7 +1,6 @@
 // app-customers.js - 完整最终版
-// 功能：客户管理
+// 权限：拉黑（店长/员工），解除（仅管理员），查看黑名单（管理员看全部，店长看本店）
 // 布局：客户列表（上方）→ 新增客户（中间）→ 黑名单列表（下方）
-// 权限：Admin 只能查看所有门店客户（不能增/改），店长/员工只能操作本门店客户
 
 window.APP = window.APP || {};
 
@@ -13,6 +12,9 @@ const CustomersModule = {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         var isAdmin = AUTH.isAdmin();
+        var isStoreManager = AUTH.isStoreManager();
+        var isStaff = AUTH.isStaff();
+        var canBlacklist = !isAdmin; // 店长和员工可以拉黑，管理员不能拉黑
 
         try {
             const customers = await SUPABASE.getCustomers();
@@ -21,12 +23,10 @@ const CustomersModule = {
             var blacklistStatus = {};
             var blacklistCustomerIds = [];
             var blacklistData = [];
-            if (isAdmin) {
-                blacklistData = await APP.getBlacklist();
-                for (var b of blacklistData) {
-                    blacklistStatus[b.customer_id] = b.reason;
-                    blacklistCustomerIds.push(b.customer_id);
-                }
+            blacklistData = await APP.getBlacklist();
+            for (var b of blacklistData) {
+                blacklistStatus[b.customer_id] = b.reason;
+                blacklistCustomerIds.push(b.customer_id);
             }
             
             // 生成客户列表行
@@ -56,7 +56,7 @@ const CustomersModule = {
                             ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                            ${isAdmin && !isBlacklisted ? `<button onclick="APP.showBlacklistCustomerModal('${c.id}', '${Utils.escapeHtml(c.name)}')" class="btn-small" style="background:#d97706;color:white;">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+                            ${canBlacklist && !isBlacklisted ? `<button onclick="APP.showBlacklistCustomerModal('${c.id}', '${Utils.escapeHtml(c.name)}')" class="btn-small" style="background:#d97706;color:white;">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
                             ${isAdmin && isBlacklisted ? `<button onclick="APP.removeFromBlacklist('${c.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus Blacklist' : '解除拉黑'}</button>` : ''}
                             <button onclick="APP.showCustomerOrders('${c.id}')" class="btn-small">📋 ${lang === 'id' ? 'Order' : '订单'}</button>
                             <button onclick="APP.showCustomerPaymentHistory('${c.id}')" class="btn-small">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>
@@ -117,7 +117,7 @@ const CustomersModule = {
                         <td style="max-width:250px;">${Utils.escapeHtml(item.reason)}</td>
                         <td class="date-cell">${Utils.formatDate(item.blacklisted_at)}</td>
                         <td class="action-cell">
-                            <button onclick="APP.removeFromBlacklist('${customer.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus' : '解除'}</button>
+                            ${isAdmin ? `<button onclick="APP.removeFromBlacklist('${customer.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus' : '解除'}</button>` : ''}
                             <button onclick="APP.showCustomerOrders('${customer.id}')" class="btn-small">📋 ${lang === 'id' ? 'Order' : '订单'}</button>
                         </td>
                     　　　`;
@@ -159,7 +159,6 @@ const CustomersModule = {
                 ${addCustomerCardHtml}
                 
                 <!-- ===== 黑名单列表（辅助功能，最下方） ===== -->
-                ${blacklistCount > 0 ? `
                 <div class="card" style="margin-top:20px; background:#fef2f2;">
                     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:12px;">
                         <h3 style="margin:0; color:#dc2626;">🚫 ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'} (${blacklistCount})</h3>
@@ -181,11 +180,12 @@ const CustomersModule = {
                                     <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
-                            <tbody>${blacklistRows}</tbody>
+                            <tbody>
+                                ${blacklistCount > 0 ? blacklistRows : `<td><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada nasabah dalam blacklist' : '暂无黑名单客户'}</td></tr>`}
+                            </tbody>
                         </table>
                     </div>
                 </div>
-                ` : ''}
                 
                 <style>
                     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -826,7 +826,7 @@ const CustomersModule = {
             }
             var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`
+                ? `<td><td colspan="7" class="text-center">${t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
                     <td class="date-cell">${Utils.formatDate(p.date)}</td>
                     <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
