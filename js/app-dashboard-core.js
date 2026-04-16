@@ -402,10 +402,7 @@ const DashboardCore = {
             `;
         }
         
-        var modal = document.createElement('div');
-        modal.id = 'capitalModal';
-        modal.className = 'modal-overlay';
-        modal.innerHTML = `
+        var modalHtml = `
             <div class="modal-content" style="max-width:950px;max-height:85vh;overflow-y:auto;">
                 <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                     <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Kelola Modal & Laba' : '资金与利润管理'}</h3>
@@ -482,16 +479,23 @@ const DashboardCore = {
                 </div>
             </div>
         `;
+        
+        var modal = document.createElement('div');
+        modal.id = 'capitalModal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = modalHtml;
         document.body.appendChild(modal);
         
+        // ===== 重要：在模态框添加到DOM之后，再绑定金额输入框 =====
         var amountInput = document.getElementById('capitalAmount');
-        if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+        if (amountInput && Utils.bindAmountFormat) {
+            Utils.bindAmountFormat(amountInput);
+        }
         
         // 根据用户角色禁用某些选项
         if (!isAdmin) {
             var typeSelect = document.getElementById('capitalType');
             if (typeSelect) {
-                // 店长/员工只能进行提现还本和分红（从本店划出资金）
                 typeSelect.innerHTML = `
                     <option value="withdrawal">📤 ${lang === 'id' ? '提现还本 (本店→总部)' : '提现还本 (本店→总部)'}</option>
                     <option value="dividend">📊 ${lang === 'id' ? '分红 (本店→总部)' : '分红 (本店→总部)'}</option>
@@ -532,28 +536,24 @@ const DashboardCore = {
             var result;
             
             if (type === 'investment') {
-                // 注资：总部给分店（仅管理员可操作）
                 result = await SUPABASE.investToShop(targetStoreId, amount, paymentMethod, description, transactionDate);
                 alert(lang === 'id' 
                     ? `✅ Investasi ${Utils.formatCurrency(amount)} berhasil!` 
                     : `✅ 注资 ${Utils.formatCurrency(amount)} 成功！`);
             } 
             else if (type === 'withdrawal') {
-                // 提现还本：分店还本金给总部
                 result = await SUPABASE.withdrawFromShop(targetStoreId, amount, paymentMethod, description, transactionDate);
                 alert(lang === 'id' 
                     ? `✅ Penarikan pokok ${Utils.formatCurrency(amount)} berhasil!` 
                     : `✅ 本金提现 ${Utils.formatCurrency(amount)} 成功！`);
             }
             else if (type === 'dividend') {
-                // 分红：分店分配利润给总部
                 result = await SUPABASE.distributeDividend(targetStoreId, amount, paymentMethod, description, transactionDate);
                 alert(lang === 'id' 
                     ? `✅ Dividen ${Utils.formatCurrency(amount)} berhasil!` 
                     : `✅ 分红 ${Utils.formatCurrency(amount)} 成功！`);
             }
             
-            // 刷新页面数据
             document.getElementById('capitalModal')?.remove();
             await this.renderDashboard();
             
@@ -596,7 +596,6 @@ const DashboardCore = {
                     <td>${Utils.escapeHtml(usernameDisplay)}</td>
                     <td>${Utils.escapeHtml(u.name)}</td>
                     <td>${roleText}</td>
-                    <td>${Utils.escapeHtml(storeName)}</td>
                     <td class="action-cell">${actionHtml}</td>
                 </tr>`;
             }
@@ -615,7 +614,7 @@ const DashboardCore = {
                     </div>
                 </div>
                 <div class="card"><h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
-                    <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
+                    <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
                 </div>
                 <div class="card"><h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
                     <div class="form-grid">
