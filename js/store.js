@@ -1,5 +1,6 @@
 // store.js - 完整修复版
 // 门店编码自动生成：STORE_000, STORE_001, STORE_002...
+// 头部按钮已优化
 
 const StoreManager = {
     stores: [],
@@ -266,9 +267,12 @@ const StoreManager = {
         }
 
         document.getElementById("app").innerHTML = `
-            <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div class="page-header">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
-                <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
+                <div class="header-actions">
+                    <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                </div>
             </div>
 
             <div class="cashflow-summary" style="margin-bottom:20px;">
@@ -359,9 +363,6 @@ const StoreManager = {
                 </div>
             </div>
             
-            <div class="toolbar">
-                <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-            </div>
             <style>
                 .data-table td input { width: 140px; font-size: 12px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; }
                 .data-table td input:focus { outline: none; border-color: #2563eb; }
