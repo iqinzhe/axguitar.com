@@ -320,9 +320,10 @@ const DashboardModule = {
                         <div class="cashflow-item">
                             <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
                             <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
-                            <div class="cashflow-detail">
-                                📈 ${lang === 'id' ? 'Laba/Rugi' : '盈亏'}: ${Utils.formatCurrency(cashFlow.total.netIncome)}
-                            </div>
+<div class="cashflow-detail">
+    📈 ${lang === 'id' ? 'Pendapatan' : '收入'}: +${Utils.formatCurrency(cashFlow.total.income)}<br>
+    📉 ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.total.expense)}
+</div>
                         </div>
                     </div>
                 </div>
