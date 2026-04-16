@@ -1,5 +1,5 @@
 // app-dashboard-core.js - 核心功能模块（完整版）
-// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理、黑名单入口
+// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
 
 window.APP = window.APP || {};
 
@@ -312,7 +312,6 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                     <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</button>
                     <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                    ${isAdmin ? `<button onclick="APP.navigateTo('blacklist')">🚫 ${lang === 'id' ? 'Daftar Hitam' : '黑名单'}</button>` : ''}
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                         📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
