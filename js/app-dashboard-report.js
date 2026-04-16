@@ -150,9 +150,9 @@ const DashboardReport = {
                     <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                             <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                             <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>                      
                         </div>
                     </div>
                     
@@ -218,10 +218,10 @@ const DashboardReport = {
                 document.getElementById("app").innerHTML = `
                     <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
-                        <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <div class="header-actions">                            
                             <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                             <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                         </div>
                     </div>
                     
