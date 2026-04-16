@@ -265,12 +265,10 @@ const DashboardModule = {
             var isAdmin = AUTH.isAdmin();
             var storeName = AUTH.getCurrentStoreName();
             
-            // 检查今日是否有需要提醒的客户（用于按钮状态）
             var needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             var hasReminders = needRemindOrders.length > 0;
             var hasSentToday = await this.hasSentRemindersToday();
             
-            // 按钮状态：如果今日已发送，则禁用；如果今日有提醒但未发送，则高亮
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
@@ -280,8 +278,8 @@ const DashboardModule = {
             var bankWithdrawal = cashFlow.capital?.bank?.withdrawal || 0;
             
             document.getElementById("app").innerHTML = `
-                <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
-                    <h1><img src="/icons/system-jf.png" alt="JF!" style="height: 32px; vertical-align: middle;"> JF! by Gadai</h1>
+                <div class="dashboard-header">
+                    <h1><img src="/icons/system-jf.png" alt="JF!"> JF! by Gadai</h1>
                     <div>${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}</div>
                 </div>
                 
@@ -289,15 +287,15 @@ const DashboardModule = {
                     <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
                     
                     ${isAdmin ? `
-                    <div class="capital-summary" style="display: flex; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.2); flex-wrap: wrap; gap: 10px;">
-                        <div style="font-size: 12px;">
-                            <span style="opacity:0.8;">💰 ${lang === 'id' ? 'Total Investasi' : '总投资'}:</span>
+                    <div class="capital-summary">
+                        <div class="capital-summary-text">
+                            <span>💰 ${lang === 'id' ? 'Total Investasi' : '总投资'}:</span>
                             <strong>${Utils.formatCurrency(cashInvestment + bankInvestment)}</strong>
-                            <span style="opacity:0.8; margin-left: 12px;">📤 ${lang === 'id' ? 'Penarikan' : '提现'}:</span>
+                            <span>📤 ${lang === 'id' ? 'Penarikan' : '提现'}:</span>
                             <strong>${Utils.formatCurrency(cashWithdrawal + bankWithdrawal)}</strong>
                         </div>
                         <div>
-                            <button onclick="APP.showCapitalModal()" class="capital-btn" style="background: rgba(255,255,255,0.2); border: none; padding: 4px 12px; font-size: 12px; border-radius: 6px;">🏦 ${lang === 'id' ? 'Kelola Modal' : '资金管理'}</button>
+                            <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Kelola Modal' : '资金管理'}</button>
                         </div>
                     </div>
                     ` : ''}
@@ -306,7 +304,7 @@ const DashboardModule = {
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
-                            <div style="font-size:10px; opacity:0.7;">
+                            <div class="cashflow-detail">
                                 ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(cashInvestment)} / -${Utils.formatCurrency(cashWithdrawal)}<br>
                                 ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.cash.income)} / -${Utils.formatCurrency(cashFlow.cash.expense)}
                             </div>
@@ -314,7 +312,7 @@ const DashboardModule = {
                         <div class="cashflow-item">
                             <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
-                            <div style="font-size:10px; opacity:0.7;">
+                            <div class="cashflow-detail">
                                 ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(bankInvestment)} / -${Utils.formatCurrency(bankWithdrawal)}<br>
                                 ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.bank.income)} / -${Utils.formatCurrency(cashFlow.bank.expense)}
                             </div>
@@ -322,7 +320,7 @@ const DashboardModule = {
                         <div class="cashflow-item">
                             <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
                             <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
-                            <div style="font-size:10px; opacity:0.7;">
+                            <div class="cashflow-detail">
                                 📈 ${lang === 'id' ? 'Laba/Rugi' : '盈亏'}: ${Utils.formatCurrency(cashFlow.total.netIncome)}
                             </div>
                         </div>
@@ -343,7 +341,7 @@ const DashboardModule = {
                     <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                     <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</button>
                     <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning" style="background:${btnHighlight ? '#25D366' : '#94a3b8'}; opacity:${btnDisabled ? '0.5' : '1'}; ${btnDisabled ? 'cursor: not-allowed;' : ''}" ${btnDisabled ? 'disabled' : ''}>
+                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                         📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
                     ${isAdmin ? `<button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>` : ''}
@@ -356,10 +354,10 @@ const DashboardModule = {
                     <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.user.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工')})</h3>
                     <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
                     <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan' : '管理费: (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
-                    ${!isAdmin ? `<p style="color: #f59e0b;">🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
+                    ${!isAdmin ? `<p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
                 </div>`;
         } catch (err) {
-            document.getElementById("app").innerHTML = `<div class="card"><p style="color:#ef4444;">⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
+            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
         }
     },
 
@@ -375,7 +373,7 @@ const DashboardModule = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="5" class="text-center" style="padding: 20px;">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金记录'}</td></tr>`;
+            transactionRows = `<tr><td colspan="5" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金记录'}</td></tr>`;
         } else {
             var typeMap = {
                 investment: lang === 'id' ? '💰 Investasi' : '💰 注资',
@@ -384,12 +382,12 @@ const DashboardModule = {
             };
             for (var txn of transactions.slice(0, 10)) {
                 transactionRows += `<tr>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1;">${Utils.formatDate(txn.transaction_date)}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1;">${typeMap[txn.type] || txn.type}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${txn.payment_method === 'cash' ? '🏦 ' + (lang === 'id' ? 'Tunai' : '现金') : '🏧 ' + (lang === 'id' ? 'Bank' : '银行')}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; ${txn.type === 'investment' ? 'color: #10b981;' : 'color: #ef4444;'}">${Utils.formatCurrency(txn.amount)}</td>
-                    <td style="padding: 8px; border: 1px solid #cbd5e1; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${Utils.escapeHtml(txn.description || '-')}</td>
-                　　`;
+                    <td>${Utils.formatDate(txn.transaction_date)}</td>
+                    <td>${typeMap[txn.type] || txn.type}</td>
+                    <td class="text-center">${txn.payment_method === 'cash' ? '🏦 ' + (lang === 'id' ? 'Tunai' : '现金') : '🏧 ' + (lang === 'id' ? 'Bank' : '银行')}</td>
+                    <td class="text-right ${txn.type === 'investment' ? 'income' : 'expense'}">${Utils.formatCurrency(txn.amount)}</td>
+                    <td>${Utils.escapeHtml(txn.description || '-')}</td>
+                </tr>`;
             }
         }
         
@@ -397,18 +395,18 @@ const DashboardModule = {
         modal.id = 'capitalModal';
         modal.className = 'modal-overlay';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width: 550px; max-height: 85vh; overflow-y: auto;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Kelola Modal' : '资金管理'}</h3>
-                    <button onclick="document.getElementById('capitalModal').remove()" style="background: none; color: #64748b; font-size: 20px; border: none; cursor: pointer;">✖</button>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🏦 ${lang === 'id' ? 'Kelola Modal' : '资金管理'}</h3>
+                    <button onclick="document.getElementById('capitalModal').remove()" class="modal-close">✖</button>
                 </div>
                 
-                <div style="background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; font-size: 14px;">📝 ${lang === 'id' ? 'Tambah Transaksi Baru' : '新增交易'}</h4>
-                    <div class="form-grid" style="gap: 12px;">
+                <div class="modal-section">
+                    <h4>📝 ${lang === 'id' ? 'Tambah Transaksi Baru' : '新增交易'}</h4>
+                    <div class="form-grid">
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Tipe' : '类型'}</label>
-                            <select id="capitalType" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <select id="capitalType">
                                 <option value="investment">💰 ${lang === 'id' ? 'Investasi (Tambah Modal)' : '注资（增加本金）'}</option>
                                 <option value="withdrawal">📤 ${lang === 'id' ? 'Penarikan (Ambil Modal)' : '提现（取出本金）'}</option>
                                 <option value="dividend">📊 ${lang === 'id' ? 'Dividen (Bagi Hasil)' : '分红（利润分配）'}</option>
@@ -416,47 +414,47 @@ const DashboardModule = {
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Metode' : '方式'}</label>
-                            <select id="capitalMethod" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <select id="capitalMethod">
                                 <option value="cash">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</option>
                                 <option value="bank">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Jumlah (IDR)' : '金额'}</label>
-                            <input type="text" id="capitalAmount" placeholder="0" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; text-align: right;">
+                            <input type="text" id="capitalAmount" placeholder="0" class="amount-input">
                         </div>
                         <div class="form-group full-width">
                             <label>${lang === 'id' ? 'Keterangan' : '说明'}</label>
-                            <input type="text" id="capitalDesc" placeholder="${lang === 'id' ? 'Contoh: Modal awal, Setoran modal, dll' : '例如：初始资金、注资等'}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <input type="text" id="capitalDesc" placeholder="${lang === 'id' ? 'Contoh: Modal awal, Setoran modal, dll' : '例如：初始资金、注资等'}">
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Tanggal' : '日期'}</label>
-                            <input type="date" id="capitalDate" value="${new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                            <input type="date" id="capitalDate" value="${new Date().toISOString().split('T')[0]}">
                         </div>
                     </div>
-                    <div class="form-actions" style="margin-top: 16px; display: flex; justify-content: flex-end;">
-                        <button onclick="APP.saveCapitalTransaction()" class="success" style="padding: 8px 16px;">💾 ${lang === 'id' ? 'Simpan Transaksi' : '保存交易'}</button>
+                    <div class="form-actions">
+                        <button onclick="APP.saveCapitalTransaction()" class="success">💾 ${lang === 'id' ? 'Simpan Transaksi' : '保存交易'}</button>
                     </div>
                 </div>
                 
-                <h4 style="margin: 0 0 12px 0; font-size: 14px;">📋 ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h4>
-                <div class="table-container" style="max-height: 300px; overflow-y: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <h4>📋 ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h4>
+                <div class="table-container">
+                    <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="padding: 8px; border: 1px solid #cbd5e1; background: #f8fafc;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th style="padding: 8px; border: 1px solid #cbd5e1; background: #f8fafc;">${lang === 'id' ? 'Tipe' : '类型'}</th>
-                                <th style="padding: 8px; border: 1px solid #cbd5e1; background: #f8fafc;">${lang === 'id' ? 'Metode' : '方式'}</th>
-                                <th style="padding: 8px; border: 1px solid #cbd5e1; background: #f8fafc;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th style="padding: 8px; border: 1px solid #cbd5e1; background: #f8fafc;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                <th>${lang === 'id' ? 'Metode' : '方式'}</th>
+                                <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
                             </tr>
                         </thead>
                         <tbody>${transactionRows}</tbody>
                     </table>
                 </div>
                 
-                <div class="modal-actions" style="margin-top: 16px; display: flex; justify-content: flex-end;">
-                    <button onclick="document.getElementById('capitalModal').remove()" style="padding: 8px 16px; background: #64748b;">${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                <div class="modal-actions">
+                    <button onclick="document.getElementById('capitalModal').remove()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
                 </div>
             </div>
         `;
@@ -640,7 +638,6 @@ Terima kasih,
         var lang = Utils.lang;
         var button = document.getElementById('reminderBtn');
         
-        // 检查按钮是否禁用
         if (button && button.disabled) {
             alert(lang === 'id' ? 'Pengingat sudah dikirim hari ini.' : '今日已发送过提醒。');
             return;
@@ -654,7 +651,6 @@ Terima kasih,
                 return;
             }
             
-            // 过滤没有 WA 号码的门店
             var validOrders = [];
             var skippedStores = [];
             
@@ -684,12 +680,10 @@ Terima kasih,
             
             if (!confirm(confirmMsg)) return;
             
-            // 禁用按钮
             if (button) {
                 button.disabled = true;
-                button.style.opacity = '0.5';
-                button.style.backgroundColor = '#94a3b8';
-                button.innerText = lang === 'id' ? '⏳ Mengirim...' : '⏳ 发送中...';
+                button.classList.add('disabled');
+                button.textContent = lang === 'id' ? '⏳ Mengirim...' : '⏳ 发送中...';
             }
             
             try {
@@ -716,15 +710,14 @@ Terima kasih,
                     : `✅ 已准备 ${validOrders.length} 条提醒。`);
                 
                 if (button) {
-                    button.innerText = lang === 'id' ? '✅ Terkirim' : '✅ 已发送';
+                    button.textContent = lang === 'id' ? '✅ Terkirim' : '✅ 已发送';
                 }
                 
             } catch (err) {
                 if (button) {
                     button.disabled = false;
-                    button.style.opacity = '1';
-                    button.style.backgroundColor = '#25D366';
-                    button.innerText = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
+                    button.classList.remove('disabled');
+                    button.textContent = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
                 }
                 throw err;
             }
@@ -735,9 +728,8 @@ Terima kasih,
             
             if (button) {
                 button.disabled = false;
-                button.style.opacity = '1';
-                button.style.backgroundColor = '#25D366';
-                button.innerText = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
+                button.classList.remove('disabled');
+                button.textContent = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
             }
         }
     },
@@ -751,7 +743,7 @@ Terima kasih,
             
             var msg = document.createElement('div');
             msg.textContent = lang === 'id' ? '✅ Tersimpan' : '✅ 已保存';
-            msg.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#10b981; color:white; padding:8px 16px; border-radius:8px; z-index:9999;';
+            msg.className = 'toast-message';
             document.body.appendChild(msg);
             setTimeout(() => msg.remove(), 1500);
             
@@ -777,7 +769,7 @@ Terima kasih,
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 10 : 9}" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<td><td colspan="${isAdmin ? 10 : 9}" class="text-center">${t('no_data')}</td></tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
@@ -794,16 +786,16 @@ Terima kasih,
                         <td class="action-cell">
                             <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}</button>
                             ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button class="danger btn-small" onclick="APP.deleteOrder('${o.order_id}')">🗑️ ${t('delete')}</button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️ ${t('delete')}</button>` : ''}
                             <button onclick="APP.printOrder('${o.order_id}')" class="btn-small print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                             ${o.is_locked ? `<span class="locked-icon">🔒</span>` : ''}
                         </td>
-                    　　　`;
+                    </tr>`;
                 }
             }
 
             document.getElementById("app").innerHTML = `
-                <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="page-header">
                     <h2>📋 ${t('order_list')}</h2>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
@@ -872,7 +864,7 @@ Terima kasih,
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                         <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    　　　`;
+                    </tr>`;
                 }
             } else {
                 payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
@@ -880,7 +872,7 @@ Terima kasih,
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
-                <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="page-header">
                     <h2>📄 ${t('view')} ${t('order_list')}</h2>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
@@ -920,7 +912,7 @@ Terima kasih,
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                         ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
                         ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')" class="warning">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
-                        <button onclick="APP.sendWAReminder('${order.order_id}')" class="warning" style="background:#25D366;">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
+                        <button onclick="APP.sendWAReminder('${order.order_id}')" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
                         <button onclick="APP.printOrder('${order.order_id}')" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
                 </div>`;
@@ -950,7 +942,7 @@ Terima kasih,
             var canEdit = PERMISSION.canEditOrder(order);
             if (!canEdit) { alert(lang === 'id' ? 'Order ini sudah terkunci' : '此订单已锁定'); this.goBack(); return; }
             document.getElementById("app").innerHTML = `
-                <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="page-header">
                     <h2>✏️ ${t('edit')}</h2>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
@@ -1105,9 +1097,9 @@ Terima kasih,
                 var usernameDisplay = u.username || u.email || '-';
                 var actionHtml = '';
                 if (isCurrent) {
-                    actionHtml = `<span style="color:#10b981;">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>`;
+                    actionHtml = `<span class="current-user-badge">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>`;
                 } else {
-                    actionHtml = `<button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button><button class="danger btn-small" onclick="APP.deleteUser('${u.id}')">🗑️ ${t('delete')}</button>`;
+                    actionHtml = `<button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button><button class="btn-small danger" onclick="APP.deleteUser('${u.id}')">🗑️ ${t('delete')}</button>`;
                 }
                 userRows += `<tr>
                     <td>${Utils.escapeHtml(usernameDisplay)}</td>
@@ -1115,7 +1107,7 @@ Terima kasih,
                     <td>${roleText}</td>
                     <td>${Utils.escapeHtml(storeName)}</td>
                     <td class="action-cell">${actionHtml}</td>
-                　　`;
+                </tr>`;
             }
 
             if (users.length === 0) userRows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
@@ -1124,7 +1116,7 @@ Terima kasih,
             for (var s of stores) storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
 
             document.getElementById("app").innerHTML = `
-                <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="page-header">
                     <h2>👥 ${t('user_management')}</h2>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
@@ -1326,12 +1318,12 @@ Terima kasih,
                     </div>`).join('');
 
                 document.getElementById("app").innerHTML = `
-                    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
                         <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
                     </div>
                     
-                    <div class="cashflow-summary" style="margin-bottom:20px;">
+                    <div class="cashflow-summary">
                         <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
                         <div class="cashflow-stats">
                             <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div></div>
@@ -1340,19 +1332,19 @@ Terima kasih,
                         </div>
                     </div>
                     
-                    <div class="card" style="border:2px solid #3b82f6;">
-                        <h3 style="color:#3b82f6;">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</h3>
-                        <div class="report-store-stats report-grid-5x2" style="border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
-                            <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="stat-value" style="font-size:20px;">${grandTotal.orders}</div></div>
-                            <div class="report-store-stat"><div class="label">${t('active')}</div><div class="stat-value" style="font-size:20px;">${grandTotal.active}</div></div>
-                            <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.loan)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.adminFee)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Bunga' : '利息收入总额'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.interest)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.principal)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+利息合计'}</div><div class="stat-value income" style="font-size:16px;">${Utils.formatCurrency(grandTotal.income)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="stat-value expense" style="font-size:16px;">${Utils.formatCurrency(grandTotal.expenses)}</div></div>
-                            <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.cashBalance)}</div></div>
-                            <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="stat-value" style="font-size:16px;">${Utils.formatCurrency(grandTotal.bankBalance)}</div></div>
+                    <div class="card grand-total-card">
+                        <h3>📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</h3>
+                        <div class="report-store-stats report-grid-5x2">
+                            <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="stat-value">${grandTotal.orders}</div></div>
+                            <div class="report-store-stat"><div class="label">${t('active')}</div><div class="stat-value">${grandTotal.active}</div></div>
+                            <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.loan)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.adminFee)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Bunga' : '利息收入总额'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.interest)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.principal)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+利息合计'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.income)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="stat-value expense">${Utils.formatCurrency(grandTotal.expenses)}</div></div>
+                            <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.cashBalance)}</div></div>
+                            <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.bankBalance)}</div></div>
                         </div>
                     </div>
                     
@@ -1396,12 +1388,12 @@ Terima kasih,
                 const grossProfit = totalIncome - totalExpenses;
 
                 document.getElementById("app").innerHTML = `
-                    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
                         <div><button onclick="APP.goBack()">↩️ ${t('back')}</button></div>
                     </div>
                     
-                    <div class="cashflow-summary" style="margin-bottom:20px;">
+                    <div class="cashflow-summary">
                         <h3>💰 ${lang === 'id' ? 'ARUS KAS' : '现金流'}</h3>
                         <div class="cashflow-stats">
                             <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashBalance)}</div></div>
@@ -1418,9 +1410,9 @@ Terima kasih,
                         <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
                     </div>
                     <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-value" style="color:#10b981;">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
-                        <div class="stat-card"><div class="stat-value" style="color:#ef4444;">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
-                        <div class="stat-card"><div class="stat-value" style="color:#3b82f6;">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
+                        <div class="stat-card"><div class="stat-value income">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
+                        <div class="stat-card"><div class="stat-value expense">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
+                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
                     </div>
                     <div class="toolbar">
                         <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
@@ -1456,7 +1448,7 @@ Terima kasih,
                     var actionBtns = '';
                     if (canEdit) {
                         actionBtns = `<button onclick="APP.editExpense('${e.id}')" class="btn-small">✏️ ${t('edit')}</button>
-                                     <button class="danger btn-small" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button>`;
+                                     <button class="btn-small danger" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button>`;
                     } else if (e.is_reconciled) {
                         actionBtns = `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
                     } else if (!isAdmin) {
@@ -1471,14 +1463,14 @@ Terima kasih,
                         <td>${Utils.escapeHtml(e.description || '-')}</td>
                         <td>${Utils.escapeHtml(e.stores?.name || '-')}</td>
                         <td class="action-cell">${actionBtns}</td>
-                    　　　`;
+                    </tr>`;
                 }
             } else {
-                rows = `<td><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
             }
 
             document.getElementById("app").innerHTML = `
-                <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
@@ -1659,7 +1651,7 @@ Terima kasih,
                 　　`).join('');
 
             document.getElementById("app").innerHTML = `
-                <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h2>
                     <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
                 </div>
