@@ -15,16 +15,14 @@
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
     --shadow-md: 0 6px 18px rgba(0,0,0,0.08);
     
-    /* 字体阶梯变量（6级精简版，电脑/手机统一使用16px基准） */
-    --font-xxs: 0.85rem;   /* 极小辅助文字、角标、极细说明 */
-    --font-xs: 1.0rem;     /* 辅助文字、状态标签、角标、极小按钮 */
-    --font-sm: 1.15rem;     /* 正文、表单标签、表格内容、卡片描述（默认字体） */
-    --font-md: 1.25rem;     /* 小标题、强调文字、中等按钮 */
-    --font-lg: 1.35rem;     /* 卡片标题、弹窗标题、统计数值 */
-    --font-xl: 1.45rem;     /* 页面大标题、重要汇总数字、突出信息 */
+    --font-xxs: 0.85rem;
+    --font-xs: 1.0rem;
+    --font-sm: 1.15rem;
+    --font-md: 1.25rem;
+    --font-lg: 1.35rem;
+    --font-xl: 1.45rem;
 }
 
-/* 根字号固定为16px，电脑/手机统一基准 */
 html {
     font-size: 16px;
 }
@@ -43,12 +41,101 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ===== 主容器 ===== */
 #app {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
     background: var(--bg);
+}
+
+/* ===== 页面头部统一布局 ===== */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.page-header h1, 
+.page-header h2, 
+.page-header h3 {
+    margin: 0;
+}
+
+.page-header .header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* 手机端适配 */
+@media (max-width: 640px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .page-header .header-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+/* ===== 页面头部按钮样式 ===== */
+.btn-back, .btn-print, .btn-export, .btn-balance, .btn-detail {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: var(--font-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.15s;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-back {
+    background: #64748b;
+    color: white;
+}
+.btn-back:hover {
+    background: #475569;
+    transform: translateY(-1px);
+}
+
+.btn-print {
+    background: #2563eb;
+    color: white;
+}
+.btn-print:hover {
+    background: #1e40af;
+}
+
+.btn-export {
+    background: #10b981;
+    color: white;
+}
+.btn-export:hover {
+    background: #059669;
+}
+
+.btn-balance {
+    background: #d97706;
+    color: white;
+}
+.btn-balance:hover {
+    background: #b45309;
+}
+
+.btn-detail {
+    background: #8b5cf6;
+    color: white;
+}
+.btn-detail:hover {
+    background: #7c3aed;
 }
 
 /* ===== Dashboard 头部 ===== */
@@ -124,7 +211,9 @@ body {
         @bottom-center { content: "Halaman " counter(page) " / " counter(pages); font-size: 9pt; color: #94a3b8; }
         @bottom-right { content: "Dicetak: " date(); font-size: 8pt; color: #cbd5e1; }
     }
-    .no-print, .toolbar button:not(.print-btn), button:not(.print-btn) { display: none !important; }
+    .no-print, .toolbar button:not(.print-btn), button:not(.print-btn), .btn-back, .btn-export, .btn-balance, .btn-detail { display: none !important; }
+    .toolbar { display: block !important; }
+    .print-btn { display: inline-block !important; }
     .card, .stat-card, .cashflow-summary { border: 1px solid #ccc !important; box-shadow: none !important; background: white !important; }
     table, th, td { border: 1px solid #ccc !important; }
     .user-table td:last-child, .user-table th:last-child,
@@ -151,16 +240,14 @@ h3 { font-size: var(--font-md); }
 }
 .card:hover { box-shadow: var(--shadow-md); }
 
-/* ===== 用户信息卡片（仪表盘底部）优化 ===== */
+/* ===== 用户信息卡片 ===== */
 .card:last-of-type {
     padding: 12px 16px;
 }
-
 .card:last-of-type h3 {
     font-size: var(--font-sm);
     margin-bottom: 6px;
 }
-
 .card:last-of-type p {
     font-size: var(--font-xs);
     margin: 4px 0;
@@ -222,7 +309,6 @@ h3 { font-size: var(--font-md); }
 .cashflow-item .value { font-size: var(--font-xl); font-weight: 700; }
 .cashflow-item .value.negative { color: #fca5a5; }
 
-/* 现金流详情文字，与上方总投资文字大小一致 */
 .cashflow-detail {
     font-size: var(--font-xs);
     opacity: 0.8;
@@ -287,7 +373,6 @@ h3 { font-size: var(--font-md); }
 }
 
 /* ===== 工具栏 ===== */
-/* 电脑端（>640px）使用 Grid 布局，等宽左对齐 */
 @media (min-width: 641px) {
     .toolbar {
         display: grid;
@@ -372,7 +457,6 @@ input:focus, select:focus, textarea:focus {
 }
 .data-table tbody tr:hover { background: #f9fbff; }
 
-/* 兼容旧类名 */
 .user-table, .payment-table {
     width: 100%;
     border-collapse: collapse;
@@ -392,14 +476,12 @@ input:focus, select:focus, textarea:focus {
 }
 .user-table tbody tr:hover, .payment-table tbody tr:hover { background: #f9fbff; }
 
-/* 订单ID列样式 */
 .order-id {
     font-family: monospace;
     font-size: var(--font-xs);
     letter-spacing: 0.5px;
 }
 
-/* 操作单元格样式 */
 .action-cell {
     white-space: nowrap;
 }
@@ -407,14 +489,12 @@ input:focus, select:focus, textarea:focus {
     margin: 2px;
 }
 
-/* 锁定图标样式 */
 .locked-icon {
     font-size: var(--font-xs);
     margin-left: 4px;
     opacity: 0.7;
 }
 
-/* 已平账/已锁定标签 */
 .reconciled-badge, .locked-badge {
     font-size: var(--font-xs);
     padding: 2px 6px;
@@ -427,14 +507,12 @@ input:focus, select:focus, textarea:focus {
     color: var(--success);
 }
 
-/* 总计金额样式 */
 .total-expense {
     font-size: var(--font-lg);
     color: var(--danger);
     font-weight: 600;
 }
 
-/* ===== 状态标签 ===== */
 .status-badge {
     display: inline-block;
     padding: 3px 10px;
@@ -446,7 +524,6 @@ input:focus, select:focus, textarea:focus {
 .status-completed { background: rgba(37,99,235,0.1); color: var(--primary); }
 .status-liquidated { background: rgba(220,38,38,0.1); color: var(--danger); }
 
-/* ===== 支付方式标签 ===== */
 .payment-method-badge {
     display: inline-block;
     padding: 3px 8px;
@@ -456,7 +533,6 @@ input:focus, select:focus, textarea:focus {
 .method-cash { background: rgba(16,185,129,0.1); color: #10b981; }
 .method-bank { background: rgba(37,99,235,0.1); color: #2563eb; }
 
-/* ===== 支付方式选择组 ===== */
 .payment-method-group {
     background: #f8fafc;
     border-radius: 8px;
@@ -485,7 +561,6 @@ input:focus, select:focus, textarea:focus {
 }
 .payment-method-options input[type="radio"] { width: auto; margin: 0; cursor: pointer; }
 
-/* ===== 地址选项 ===== */
 .address-option {
     display: flex;
     gap: 20px;
@@ -501,7 +576,6 @@ input:focus, select:focus, textarea:focus {
 }
 .address-option input[type="radio"] { width: auto; margin: 0; }
 
-/* ===== 财务报表页面 ===== */
 .report-store-section {
     background: var(--card);
     border-radius: var(--radius);
@@ -540,7 +614,6 @@ input:focus, select:focus, textarea:focus {
 .report-store-stat .value.income { color: var(--success); }
 .report-store-stat .value.expense { color: var(--danger); }
 
-/* ===== 登录页面 ===== */
 .login-container {
     height: 100vh;
     display: flex;
@@ -583,7 +656,6 @@ input:focus, select:focus, textarea:focus {
     color: #94a3b8;
 }
 
-/* ===== 辅助类 ===== */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .mt-1 { margin-top: 4px; }
@@ -594,7 +666,6 @@ input:focus, select:focus, textarea:focus {
 .mb-3 { margin-bottom: 12px; }
 .full-width { width: 100%; }
 
-/* ===== 加载动画 ===== */
 .loader {
     width: 40px;
     height: 40px;
@@ -607,14 +678,11 @@ input:focus, select:focus, textarea:focus {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==================== 手机端布局 ==================== */
-
 @media (max-width: 640px) {
-    /* 容器内边距 */
     #app {
         padding: 12px;
     }
     
-    /* Dashboard 头部 */
     .dashboard-header {
         margin-bottom: 16px;
     }
@@ -623,7 +691,6 @@ input:focus, select:focus, textarea:focus {
         font-size: var(--font-md);
     }
     
-    /* 统计卡片：3列变2列 */
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 8px;
@@ -634,7 +701,6 @@ input:focus, select:focus, textarea:focus {
         padding: 10px 6px;
     }
     
-    /* 工具栏：等宽按钮，文字左对齐，超长截断 */
     .toolbar {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
@@ -656,13 +722,11 @@ input:focus, select:focus, textarea:focus {
         text-align: left;
     }
     
-    /* 卡片内边距和间距优化 */
     .card {
         padding: 12px;
         margin-bottom: 12px;
     }
     
-    /* 压缩卡片内文字间距 */
     .card p, .card h3 {
         margin: 0 0 6px 0;
         line-height: 1.4;
@@ -672,7 +736,6 @@ input:focus, select:focus, textarea:focus {
         margin-bottom: 8px;
     }
     
-    /* 用户信息卡片（仪表盘底部）手机端优化 */
     .card:last-of-type {
         padding: 10px 12px;
     }
@@ -688,7 +751,6 @@ input:focus, select:focus, textarea:focus {
         line-height: 1.3;
     }
     
-    /* 表格横向滚动 */
     .table-container {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -713,31 +775,26 @@ input:focus, select:focus, textarea:focus {
         white-space: nowrap;
     }
     
-    /* 报表页：5列变2列 */
     .report-grid-5x2 {
         grid-template-columns: repeat(2, 1fr);
         gap: 8px;
     }
     
-    /* 报表统计数值字体调整 */
     .report-store-stat .value {
         font-size: var(--font-sm);
     }
     
-    /* 支付方式选项 */
     .payment-method-options {
         flex-direction: row;
         flex-wrap: wrap;
         gap: 12px;
     }
     
-    /* 模态框 */
     .modal-content {
         padding: 16px;
         max-height: 85vh;
     }
     
-    /* 现金流汇总 */
     .cashflow-stats {
         grid-template-columns: 1fr;
         gap: 10px;
@@ -747,7 +804,6 @@ input:focus, select:focus, textarea:focus {
         font-size: var(--font-lg);
     }
     
-    /* 现金流详情文字间距优化 */
     .cashflow-detail {
         margin-top: 4px;
         line-height: 1.3;
@@ -759,7 +815,6 @@ input:focus, select:focus, textarea:focus {
     }
 }
 
-/* 极小屏微调 */
 @media (max-width: 400px) {
     .toolbar {
         grid-template-columns: repeat(auto-fit, minmax(75px, 1fr));
@@ -780,7 +835,6 @@ input:focus, select:focus, textarea:focus {
     }
 }
 
-/* ==================== 模态框通用样式 ==================== */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -823,7 +877,6 @@ input:focus, select:focus, textarea:focus {
     margin-top: 20px;
 }
 
-/* ===== 小按钮样式 ===== */
 .btn-small {
     padding: 4px 8px;
     font-size: var(--font-xs);
@@ -848,7 +901,6 @@ input:focus, select:focus, textarea:focus {
     color: white;
 }
 
-/* ===== 打印按钮专用 ===== */
 .print-btn {
     background: #64748b;
 }
