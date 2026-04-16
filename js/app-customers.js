@@ -1,11 +1,14 @@
 // app-customers.js - 完整最终版
 // 功能：客户管理
-// 新增：黑名单管理、客户查重（姓名/KTP/电话）
+// 新增：黑名单筛选（嵌入客户信息页面）、客户查重（姓名/KTP/电话）
 // 权限：Admin 只能查看所有门店客户（不能增/改），店长/员工只能操作本门店客户
 
 window.APP = window.APP || {};
 
 const CustomersModule = {
+    
+    // 黑名单筛选状态
+    showBlacklistOnly: false,
 
     showCustomers: async function() {
         this.currentPage = 'customers';
@@ -19,23 +22,40 @@ const CustomersModule = {
             
             // 获取黑名单状态
             var blacklistStatus = {};
+            var blacklistCustomerIds = [];
+            var blacklistData = [];
             if (isAdmin) {
-                const blacklist = await APP.getBlacklist();
-                for (var b of blacklist) {
+                blacklistData = await APP.getBlacklist();
+                for (var b of blacklistData) {
                     blacklistStatus[b.customer_id] = b.reason;
+                    blacklistCustomerIds.push(b.customer_id);
                 }
             }
             
+            // 根据筛选条件过滤客户
+            var filteredCustomers = customers;
+            if (this.showBlacklistOnly) {
+                filteredCustomers = customers.filter(c => blacklistCustomerIds.includes(c.id));
+            }
+            
             var rows = '';
-            if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}</td></td>`;
+            if (!filteredCustomers || filteredCustomers.length === 0) {
+                var noDataMsg = this.showBlacklistOnly 
+                    ? (lang === 'id' ? 'Tidak ada nasabah dalam blacklist' : '黑名单中暂无客户')
+                    : (lang === 'id' ? 'Tidak ada data nasabah' : '暂无客户数据');
+                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${noDataMsg}</td></tr>`;
             } else {
-                for (var c of customers) {
+                for (var c of filteredCustomers) {
                     var isBlacklisted = blacklistStatus[c.id];
-                    var blacklistBadge = isBlacklisted ? '<span class="blacklist-badge" style="background:#dc2626; color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:5px;">🚫 BLACKLIST</span>' : '';
+                    var blacklistBadge = '';
+                    var blacklistReason = '';
+                    if (isBlacklisted) {
+                        blacklistBadge = '<span class="status-badge status-liquidated" style="margin-left:5px;" title="' + Utils.escapeHtml(blacklistStatus[c.id]) + '">🚫 BLACKLIST</span>';
+                        blacklistReason = '<small style="color:#dc2626; display:block; font-size:10px;">原因: ' + Utils.escapeHtml(blacklistStatus[c.id].substring(0, 30)) + '</small>';
+                    }
                     
                     rows += `<tr>
-                        <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}${blacklistBadge}</td>
+                        <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}${blacklistBadge}${blacklistReason}</td>
                         <td class="date-cell">${Utils.formatDate(c.registered_date)}</td>
                         <td class="name-cell">${Utils.escapeHtml(c.name)}</td>
                         <td class="ktp-cell">${Utils.escapeHtml(c.ktp_number || '-')}</td>
@@ -94,13 +114,36 @@ const CustomersModule = {
                 </div>`;
             }
 
+            // 黑名单统计
+            var blacklistCount = blacklistCustomerIds.length;
+            var filterCheckboxChecked = this.showBlacklistOnly ? 'checked' : '';
+            
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
                     <div class="header-actions">
-                        <button onclick="APP.navigateTo('blacklist')" class="btn-danger" style="background:#dc2626;color:white;">🚫 ${lang === 'id' ? 'Daftar Hitam' : '黑名单'}</button>
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    </div>
+                </div>
+                
+                <!-- 黑名单筛选栏（嵌入客户信息页面） -->
+                <div class="card" style="margin-bottom:16px; padding:12px; background:#fef2f2;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="status-badge status-liquidated" style="margin-right:4px;">🚫</span>
+                            <span><strong>${lang === 'id' ? 'Blacklist' : '黑名单'}</strong> (${blacklistCount})</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                            <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="showBlacklistOnly" onchange="APP.toggleBlacklistFilter()" ${filterCheckboxChecked}>
+                                <span>${lang === 'id' ? 'Hanya tampilkan blacklist' : '只显示黑名单'}</span>
+                            </label>
+                            ${blacklistCount > 0 ? `
+                            <button onclick="APP.printBlacklistOnly()" class="btn-small print-btn">🖨️ ${lang === 'id' ? 'Cetak Blacklist' : '打印黑名单'}</button>
+                            <button onclick="APP.exportBlacklistOnlyToCSV()" class="btn-small" style="background:#10b981; color:white;">📎 ${lang === 'id' ? 'Ekspor Blacklist' : '导出黑名单'}</button>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
                 
@@ -131,14 +174,13 @@ const CustomersModule = {
                 <style>
                     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
                     .customer-table { width: 100%; border-collapse: collapse; }
-                    .customer-table th, .customer-table td { border: 1px solid #cbd5e1; padding: 8px; }
+                    .customer-table th, .customer-table td { border: 1px solid #cbd5e1; padding: 8px; vertical-align: top; }
                     .customer-table th { background: #f8fafc; font-weight: 600; }
                     .customer-id-cell, .date-cell, .ktp-cell, .phone-cell, .store-cell { white-space: nowrap; }
                     .address-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                     .action-cell { white-space: nowrap; }
                     .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
                     .text-center { text-align: center; }
-                    .blacklist-badge { display: inline-block; margin-left: 5px; font-size: 10px; }
                     @media (max-width: 768px) {
                         .customer-table th, .customer-table td { font-size: 12px; padding: 6px; }
                         .address-cell { max-width: 120px; }
@@ -148,6 +190,92 @@ const CustomersModule = {
             console.error("showCustomers error:", error);
             alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
         }
+    },
+
+    // 切换黑名单筛选
+    toggleBlacklistFilter: async function() {
+        var checkbox = document.getElementById('showBlacklistOnly');
+        this.showBlacklistOnly = checkbox ? checkbox.checked : false;
+        await this.showCustomers();
+    },
+    
+    // 打印黑名单（仅黑名单客户）
+    printBlacklistOnly: async function() {
+        var lang = Utils.lang;
+        var blacklistData = await APP.getBlacklist();
+        
+        if (blacklistData.length === 0) {
+            alert(lang === 'id' ? 'Tidak ada data blacklist' : '暂无黑名单数据');
+            return;
+        }
+        
+        var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'}</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; font-size: 12px; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .header h1 { margin: 0; font-size: 18px; color: #dc2626; }
+            .header p { margin: 5px 0; color: #666; font-size: 11px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background: #fef3c7; font-weight: 600; }
+            .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
+            @media print { @page { size: A4 landscape; margin: 10mm; } body { margin: 0; } .no-print { display: none; } }
+        </style>
+        </head><body>
+        <div class="header"><h1>🚫 JF! by Gadai - ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'}</h1>
+        <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
+        <table><thead><tr><th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'KTP' : 'KTP'}</th><th>${lang === 'id' ? 'Telepon' : '电话'}</th><th>${lang === 'id' ? 'Alasan' : '拉黑原因'}</th><th>${lang === 'id' ? 'Tanggal' : '拉黑日期'}</th></tr></thead><tbody>`;
+        
+        for (var item of blacklistData) {
+            var customer = item.customers;
+            printContent += `<tr><td>${Utils.escapeHtml(customer?.customer_id || '-')}</td><td>${Utils.escapeHtml(customer?.name || '-')}</td><td>${Utils.escapeHtml(customer?.ktp_number || '-')}</td><td>${Utils.escapeHtml(customer?.phone || '-')}</td><td>${Utils.escapeHtml(item.reason)}</td><td>${Utils.formatDate(item.blacklisted_at)}</td></tr>`;
+        }
+        
+        printContent += `</tbody></table><div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div>
+        <div class="no-print" style="text-align:center; margin-top:20px;"><button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+        <button onclick="window.close()" style="margin-left:10px;">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button></div></body></html>`;
+        
+        var printWindow = window.open('', '_blank');
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+    },
+    
+    // 导出黑名单 CSV
+    exportBlacklistOnlyToCSV: async function() {
+        var lang = Utils.lang;
+        var blacklistData = await APP.getBlacklist();
+        
+        if (blacklistData.length === 0) {
+            alert(lang === 'id' ? 'Tidak ada data untuk diekspor' : '没有数据可导出');
+            return;
+        }
+        
+        var headers = lang === 'id'
+            ? ['ID Nasabah', 'Nama', 'KTP', 'Telepon', 'Alasan', 'Tanggal Diblacklist']
+            : ['客户ID', '姓名', 'KTP号', '电话', '拉黑原因', '拉黑日期'];
+        
+        var rows = [];
+        for (var item of blacklistData) {
+            var customer = item.customers;
+            rows.push([
+                customer?.customer_id || '-',
+                customer?.name || '-',
+                customer?.ktp_number || '-',
+                customer?.phone || '-',
+                item.reason,
+                Utils.formatDate(item.blacklisted_at)
+            ]);
+        }
+        
+        var csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+        var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = `jf_blacklist_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
     toggleLivingAddress: function(value) {
@@ -160,7 +288,6 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能创建客户
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat menambah nasabah. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能添加客户，请使用店长或员工账号登录。');
             return;
@@ -177,7 +304,7 @@ const CustomersModule = {
         if (!name) { alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写'); return; }
         if (!phone) { alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写'); return; }
         
-        // ===== 查重检查 =====
+        // 查重检查
         try {
             const duplicate = await APP.checkDuplicateCustomer(name, ktp, phone);
             if (duplicate && duplicate.isDuplicate) {
@@ -193,7 +320,6 @@ const CustomersModule = {
             }
         } catch (err) {
             console.warn("查重检查失败:", err);
-            // 继续执行，不阻塞添加
         }
 
         try {
@@ -224,7 +350,6 @@ const CustomersModule = {
             await this.showCustomers();
         } catch (error) {
             console.error("addCustomer error:", error);
-            // 处理唯一约束冲突
             if (error.code === '23505') {
                 alert(lang === 'id' 
                     ? '⚠️ Data nasabah sudah terdaftar! (Nama, KTP, atau Telepon sudah digunakan)'
@@ -239,7 +364,6 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能编辑客户
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
             return;
@@ -317,14 +441,6 @@ const CustomersModule = {
         if (!name || !phone) { alert(lang === 'id' ? 'Nama dan telepon wajib diisi' : '姓名和手机号必须填写'); return; }
 
         try {
-            // 获取原客户信息用于查重排除自身
-            const { data: existingCustomer } = await supabaseClient
-                .from('customers')
-                .select('name, ktp_number, phone')
-                .eq('id', customerId)
-                .single();
-            
-            // 检查是否与其他客户重复（排除自身）
             const duplicate = await APP.checkDuplicateCustomer(name, ktp, phone, customerId);
             if (duplicate && duplicate.isDuplicate) {
                 var fieldText = '';
@@ -360,7 +476,6 @@ const CustomersModule = {
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
         
-        // 检查是否在黑名单中
         const blacklistCheck = await APP.isBlacklisted(customerId);
         if (blacklistCheck.isBlacklisted) {
             if (!confirm(lang === 'id' 
@@ -405,7 +520,7 @@ const CustomersModule = {
             return;
         }
         
-        // ===== 黑名单检查 =====
+        // 黑名单检查
         const blacklistCheck = await APP.isBlacklisted(customerId);
         if (blacklistCheck.isBlacklisted) {
             alert(lang === 'id' 
@@ -569,6 +684,21 @@ const CustomersModule = {
             await APP.addToBlacklist(customerId, reason);
             document.getElementById('blacklistModal')?.remove();
             alert(lang === 'id' ? '✅ Nasabah berhasil diblacklist' : '✅ 客户已拉黑');
+            await this.showCustomers();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal: ' + error.message : '失败：' + error.message);
+        }
+    },
+
+    removeFromBlacklist: async function(customerId) {
+        var lang = Utils.lang;
+        if (!confirm(lang === 'id' ? 'Hapus nasabah ini dari daftar hitam?' : '确定将此客户移出黑名单？')) {
+            return;
+        }
+        
+        try {
+            await APP.removeFromBlacklist(customerId);
+            alert(lang === 'id' ? '✅ Nasabah dihapus dari daftar hitam' : '✅ 客户已移出黑名单');
             await this.showCustomers();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal: ' + error.message : '失败：' + error.message);
