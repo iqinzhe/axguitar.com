@@ -1,5 +1,5 @@
-// app-dashboard-core.js - 核心功能模块（简化资金管理版）
-// 资金管理：只显示流水记录，可打印/导出CSV
+// app-dashboard-core.js - 核心功能模块（完整版）
+// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理、黑名单入口
 
 window.APP = window.APP || {};
 
@@ -62,7 +62,8 @@ const DashboardCore = {
             customers: async () => await self.showCustomers(),
             paymentHistory: async () => await self.showPaymentHistory(),
             customerOrders: async () => { if (self.currentCustomerId) await self.showCustomerOrders(self.currentCustomerId); },
-            customerPaymentHistory: async () => { if (self.currentCustomerId) await self.showCustomerPaymentHistory(self.currentCustomerId); }
+            customerPaymentHistory: async () => { if (self.currentCustomerId) await self.showCustomerPaymentHistory(self.currentCustomerId); },
+            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -99,7 +100,8 @@ const DashboardCore = {
             customerPaymentHistory: async () => { if (params.customerId) await self.showCustomerPaymentHistory(params.customerId); },
             viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
             payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
-            editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); }
+            editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); },
+            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
         };
         var handler = navHandlers[page];
         if (handler) handler();
@@ -129,7 +131,8 @@ const DashboardCore = {
                 customers: async () => await self.showCustomers(),
                 paymentHistory: async () => await self.showPaymentHistory(),
                 customerOrders: async () => { if (prev.customerId) await self.showCustomerOrders(prev.customerId); },
-                customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); }
+                customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); },
+                blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
             };
             var handler = backHandlers[prev.page];
             if (handler) handler();
@@ -309,6 +312,7 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                     <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</button>
                     <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+                    ${isAdmin ? `<button onclick="APP.navigateTo('blacklist')">🚫 ${lang === 'id' ? 'Daftar Hitam' : '黑名单'}</button>` : ''}
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                         📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
@@ -338,13 +342,11 @@ const DashboardCore = {
         var isAdmin = AUTH.isAdmin();
         var currentStoreId = AUTH.user?.store_id;
         
-        // 获取资金流水
         var transactions = [];
         try {
             transactions = await SUPABASE.getCapitalTransactions();
         } catch(e) { console.error(e); }
         
-        // 构建流水表格
         var transactionRows = '';
         if (transactions.length === 0) {
             transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
@@ -380,11 +382,10 @@ const DashboardCore = {
                     <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
                     <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                     <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
-                　　　`;
+                </tr>`;
             }
         }
         
-        // 获取门店列表（用于筛选）
         var storeOptions = '<option value="all">' + (lang === 'id' ? 'Semua Toko' : '全部门店') + '</option>';
         for (var store of stores) {
             if (!isAdmin && store.id !== currentStoreId) continue;
@@ -402,7 +403,6 @@ const DashboardCore = {
                     </div>
                 </div>
                 
-                <!-- 筛选栏 -->
                 <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
                     <select id="filterStore" style="width:auto; min-width:150px;">
                         ${storeOptions}
@@ -419,7 +419,6 @@ const DashboardCore = {
                     <button onclick="APP.resetCapitalFilters()" class="btn-small">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                 </div>
                 
-                <!-- 流水表格 -->
                 <div class="table-container" style="max-height:450px; overflow-y:auto;" id="capitalTransactionsTable">
                     <table class="data-table" style="width:100%; font-size:13px; border-collapse:collapse;">
                         <thead style="position:sticky; top:0; background:#f1f5f9;">
@@ -454,7 +453,6 @@ const DashboardCore = {
         modal.innerHTML = modalHtml;
         document.body.appendChild(modal);
         
-        // 保存原始数据用于筛选
         window._capitalTransactionsData = transactions;
     },
 
@@ -539,7 +537,7 @@ const DashboardCore = {
                 <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
                 <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                 <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
-            　　　`;
+            </tr>`;
         }
         
         if (rows === '') {
@@ -554,149 +552,63 @@ const DashboardCore = {
         }
     },
     
-    // ==================== 打印资金流水 ====================
     printCapitalTransactions: function() {
         var lang = Utils.lang;
         var transactions = window._capitalTransactionsData || [];
         
-        var printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</title>
-                <style>
-                    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; font-size: 12px; }
-                    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                    .header h1 { margin: 0; font-size: 18px; }
-                    .header p { margin: 5px 0; color: #666; font-size: 11px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-                    th { background: #f1f5f9; font-weight: 600; }
-                    .text-right { text-align: right; }
-                    .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
-                    @media print { @page { size: A4 landscape; margin: 10mm; } body { margin: 0; } .no-print { display: none; } }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h1>
-                    <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                            <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
-                            <th>${lang === 'id' ? 'Metode' : '方式'}</th>
-                            <th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th>
-                            <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                            <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
+        var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; font-size: 12px; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .header h1 { margin: 0; font-size: 18px; }
+            .header p { margin: 5px 0; color: #666; font-size: 11px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background: #f1f5f9; font-weight: 600; }
+            .text-right { text-align: right; }
+            .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ccc; padding-top: 10px; }
+            @media print { @page { size: A4 landscape; margin: 10mm; } body { margin: 0; } .no-print { display: none; } }
+        </style>
+        </head><body>
+        <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h1>
+        <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
+        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
         
-        var typeMap = {
-            investment: lang === 'id' ? '注资' : '注资',
-            withdrawal: lang === 'id' ? '还本' : '还本',
-            dividend: lang === 'id' ? '分红' : '分红'
-        };
-        
+        var typeMap = { investment: '注资', withdrawal: '还本', dividend: '分红' };
         for (var txn of transactions) {
-            var sourceName = '总部';
-            var targetName = '总部';
-            
-            if (txn.type === 'investment') {
-                sourceName = '总部';
-                targetName = txn.target_store?.name || (txn.target_store_id ? '分店' : '总部');
-            } else if (txn.type === 'withdrawal' || txn.type === 'dividend') {
-                sourceName = txn.source_store?.name || (txn.store_id ? '分店' : '总部');
-                targetName = '总部';
-            }
-            
+            var sourceName = '总部', targetName = '总部';
+            if (txn.type === 'investment') { sourceName = '总部'; targetName = txn.target_store?.name || '分店'; }
+            else if (txn.type === 'withdrawal' || txn.type === 'dividend') { sourceName = txn.source_store?.name || '分店'; targetName = '总部'; }
             var methodText = txn.payment_method === 'cash' ? '现金' : '银行';
-            
-            printContent += `<tr>
-                <td>${Utils.formatDate(txn.transaction_date)}</td>
-                <td>${typeMap[txn.type] || txn.type}</td>
-                <td>${methodText}</td>
-                <td>${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td>
-                <td class="text-right">${Utils.formatCurrency(txn.amount)}</td>
-                <td>${Utils.escapeHtml(txn.description || '-')}</td>
-            　　　`;
+            printContent += `<tr><td>${Utils.formatDate(txn.transaction_date)}</td><td>${typeMap[txn.type] || txn.type}</td><td>${methodText}</td><td>${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td><td class="text-right">${Utils.formatCurrency(txn.amount)}</td><td>${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
         }
         
-        printContent += `
-                    </tbody>
-                </table>
-                <div class="footer">
-                    <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
-                    <div>${lang === 'id' ? 'Dicetak secara elektronik' : '电子打印凭证'}</div>
-                </div>
-                <div class="no-print" style="text-align:center; margin-top:20px;">
-                    <button onclick="window.print()" style="padding:8px 16px;">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                    <button onclick="window.close()" style="padding:8px 16px; margin-left:10px;">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button>
-                </div>
-            </body>
-            </html>
-        `;
+        printContent += `</tbody></table><div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div>
+        <div class="no-print" style="text-align:center; margin-top:20px;"><button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+        <button onclick="window.close()" style="margin-left:10px;">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button></div></body></html>`;
         
         var printWindow = window.open('', '_blank');
         printWindow.document.write(printContent);
         printWindow.document.close();
     },
     
-    // ==================== 导出资金流水为 CSV ====================
     exportCapitalTransactionsToCSV: function() {
         var lang = Utils.lang;
         var transactions = window._capitalTransactionsData || [];
+        if (transactions.length === 0) { alert(lang === 'id' ? 'Tidak ada data untuk diekspor' : '没有数据可导出'); return; }
         
-        if (transactions.length === 0) {
-            alert(lang === 'id' ? 'Tidak ada data untuk diekspor' : '没有数据可导出');
-            return;
-        }
-        
-        var headers = lang === 'id'
-            ? ['Tanggal', 'Tipe', 'Metode', 'Sumber', 'Tujuan', 'Jumlah', 'Keterangan', 'No. Transaksi']
-            : ['日期', '类型', '方式', '来源', '去向', '金额', '说明', '交易号'];
-        
+        var headers = lang === 'id' ? ['Tanggal', 'Tipe', 'Metode', 'Sumber', 'Tujuan', 'Jumlah', 'Keterangan'] : ['日期', '类型', '方式', '来源', '去向', '金额', '说明'];
         var rows = [];
         for (var txn of transactions) {
-            var typeText = '';
-            if (txn.type === 'investment') typeText = lang === 'id' ? '注资' : '注资';
-            else if (txn.type === 'withdrawal') typeText = lang === 'id' ? '还本' : '还本';
-            else if (txn.type === 'dividend') typeText = lang === 'id' ? '分红' : '分红';
-            else typeText = txn.type;
-            
-            var methodText = txn.payment_method === 'cash' ? (lang === 'id' ? '现金' : '现金') : (lang === 'id' ? '银行' : '银行');
-            
-            var sourceName = '总部';
-            var targetName = '总部';
-            
-            if (txn.type === 'investment') {
-                sourceName = '总部';
-                targetName = txn.target_store?.name || (txn.target_store_id ? '分店' : '总部');
-            } else if (txn.type === 'withdrawal' || txn.type === 'dividend') {
-                sourceName = txn.source_store?.name || (txn.store_id ? '分店' : '总部');
-                targetName = '总部';
-            }
-            
-            rows.push([
-                Utils.formatDate(txn.transaction_date),
-                typeText,
-                methodText,
-                sourceName,
-                targetName,
-                txn.amount,
-                txn.description || '',
-                txn.biz_no || ''
-            ]);
+            var typeText = txn.type === 'investment' ? '注资' : (txn.type === 'withdrawal' ? '还本' : '分红');
+            var methodText = txn.payment_method === 'cash' ? '现金' : '银行';
+            var sourceName = '总部', targetName = '总部';
+            if (txn.type === 'investment') { sourceName = '总部'; targetName = txn.target_store?.name || '分店'; }
+            else if (txn.type === 'withdrawal' || txn.type === 'dividend') { sourceName = txn.source_store?.name || '分店'; targetName = '总部'; }
+            rows.push([Utils.formatDate(txn.transaction_date), typeText, methodText, sourceName, targetName, txn.amount, txn.description || '']);
         }
         
-        var csvContent = [headers, ...rows]
-            .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-            .join('\n');
-        
+        var csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
         var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
@@ -704,7 +616,6 @@ const DashboardCore = {
         a.download = `jf_capital_transactions_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
@@ -810,13 +721,10 @@ const DashboardCore = {
         catch (error) { alert('Error: ' + error.message); }
     },
 
-    // ==================== WA 提醒功能 ====================
+    // ==================== WA 提醒功能（简化版） ====================
     getSenderWANumber: async function(storeId) {
         var storeWANumber = await SUPABASE.getStoreWANumber(storeId);
-        if (storeWANumber) {
-            return storeWANumber;
-        }
-        return null;
+        return storeWANumber || null;
     },
 
     generateWAText: function(order, senderNumber) {
@@ -824,77 +732,21 @@ const DashboardCore = {
         var remainingPrincipal = order.loan_amount - order.principal_paid;
         var monthlyInterest = remainingPrincipal * 0.10;
         var dueDate = Utils.formatDate(order.next_interest_due_date);
-        
         return lang === 'id' 
-            ? `Halo *${Utils.escapeHtml(order.customer_name)}*,
-
-Kami ingin mengingatkan bahwa pembayaran bunga pinjaman Anda akan jatuh tempo *dalam 2 hari*.
-
-📋 *ID Pesanan:* ${order.order_id}
-💰 *Sisa Pokok:* ${Utils.formatCurrency(remainingPrincipal)}
-📅 *Bunga per Bulan:* ${Utils.formatCurrency(monthlyInterest)}
-⏰ *Tanggal Jatuh Tempo:* ${dueDate}
-
-Mohon persiapkan pembayaran Anda.
-
-Terima kasih,
-*${AUTH.getCurrentStoreName()}*
-📞 ${senderNumber}`
-
-            : `您好 *${Utils.escapeHtml(order.customer_name)}*，
-
-温馨提醒，您的贷款利息将在 *2天后* 到期。
-
-📋 *订单号:* ${order.order_id}
-💰 *剩余本金:* ${Utils.formatCurrency(remainingPrincipal)}
-📅 *月利息:* ${Utils.formatCurrency(monthlyInterest)}
-⏰ *到期日:* ${dueDate}
-
-请您提前准备。
-
-感谢您，
-*${AUTH.getCurrentStoreName()}*
-📞 ${senderNumber}`;
-    },
-
-    copyToClipboard: async function(text) {
-        var lang = Utils.lang;
-        try {
-            await navigator.clipboard.writeText(text);
-            alert(lang === 'id' ? '✅ Teks berhasil disalin! Buka WhatsApp dan paste.' : '✅ 文本已复制！请打开 WhatsApp 粘贴发送。');
-        } catch (err) {
-            var textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            alert(lang === 'id' ? '✅ Teks berhasil disalin!' : '✅ 文本已复制！');
-        }
+            ? `Halo *${Utils.escapeHtml(order.customer_name)}*,\n\nKami ingin mengingatkan bahwa pembayaran bunga pinjaman Anda akan jatuh tempo *dalam 2 hari*.\n\n📋 *ID Pesanan:* ${order.order_id}\n💰 *Sisa Pokok:* ${Utils.formatCurrency(remainingPrincipal)}\n📅 *Bunga per Bulan:* ${Utils.formatCurrency(monthlyInterest)}\n⏰ *Tanggal Jatuh Tempo:* ${dueDate}\n\nMohon persiapkan pembayaran Anda.\n\nTerima kasih,\n*${AUTH.getCurrentStoreName()}*\n📞 ${senderNumber}`
+            : `您好 *${Utils.escapeHtml(order.customer_name)}*，\n\n温馨提醒，您的贷款利息将在 *2天后* 到期。\n\n📋 *订单号:* ${order.order_id}\n💰 *剩余本金:* ${Utils.formatCurrency(remainingPrincipal)}\n📅 *月利息:* ${Utils.formatCurrency(monthlyInterest)}\n⏰ *到期日:* ${dueDate}\n\n请您提前准备。\n\n感谢您，\n*${AUTH.getCurrentStoreName()}*\n📞 ${senderNumber}`;
     },
 
     hasSentRemindersToday: async function() {
         var profile = await SUPABASE.getCurrentProfile();
         var today = new Date().toISOString().split('T')[0];
-        
-        let query = supabaseClient
-            .from('reminder_logs')
-            .select('id', { count: 'exact', head: true })
-            .eq('reminder_date', today);
-        
+        let query = supabaseClient.from('reminder_logs').select('id', { count: 'exact', head: true }).eq('reminder_date', today);
         if (profile?.role !== 'admin' && profile?.store_id) {
-            const { data: orders } = await supabaseClient
-                .from('orders')
-                .select('id')
-                .eq('store_id', profile.store_id);
+            const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
             const orderIds = orders?.map(o => o.id) || [];
-            if (orderIds.length > 0) {
-                query = query.in('order_id', orderIds);
-            } else {
-                return false;
-            }
+            if (orderIds.length > 0) query = query.in('order_id', orderIds);
+            else return false;
         }
-        
         const { count, error } = await query;
         if (error) return false;
         return count > 0;
@@ -904,153 +756,63 @@ Terima kasih,
         var lang = Utils.lang;
         try {
             var { order } = await SUPABASE.getPaymentHistory(orderId);
-            if (!order) {
-                alert(lang === 'id' ? 'Order tidak ditemukan' : '订单不存在');
-                return;
-            }
-            
+            if (!order) { alert(lang === 'id' ? 'Order tidak ditemukan' : '订单不存在'); return; }
             var senderNumber = await this.getSenderWANumber(order.store_id);
             if (!senderNumber) {
-                alert(lang === 'id' 
-                    ? '⚠️ Toko ini belum memiliki nomor WA. Silakan isi nomor WA di halaman Manajemen Toko.'
-                    : '⚠️ 该门店未配置 WA 号码，请在门店管理中填写。');
+                alert(lang === 'id' ? '⚠️ Toko ini belum memiliki nomor WA.' : '⚠️ 该门店未配置 WA 号码。');
                 return;
             }
-            
             var waText = this.generateWAText(order, senderNumber);
-            
             var phone = order.customer_phone.replace(/[^0-9]/g, '');
-            if (!phone.startsWith('62')) {
-                phone = '62' + phone.replace(/^0+/, '');
-            }
-            
-            var waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`;
-            window.open(waUrl, '_blank');
-            
+            if (!phone.startsWith('62')) phone = '62' + phone.replace(/^0+/, '');
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waText)}`, '_blank');
             await SUPABASE.logReminder(order.id);
-            
-        } catch (error) {
-            console.error("sendWAReminder error:", error);
-            alert(lang === 'id' ? 'Gagal mengirim pengingat: ' + error.message : '发送提醒失败：' + error.message);
-        }
+        } catch (error) { alert(lang === 'id' ? 'Gagal mengirim pengingat' : '发送提醒失败'); }
     },
 
     sendDailyReminders: async function() {
         var lang = Utils.lang;
         var button = document.getElementById('reminderBtn');
-        
-        if (button && button.disabled) {
-            alert(lang === 'id' ? 'Pengingat sudah dikirim hari ini.' : '今日已发送过提醒。');
-            return;
-        }
-        
+        if (button && button.disabled) { alert(lang === 'id' ? 'Pengingat sudah dikirim hari ini.' : '今日已发送过提醒。'); return; }
         try {
             var orders = await SUPABASE.getOrdersNeedReminder();
-            
-            if (orders.length === 0) {
-                alert(lang === 'id' ? '📭 Tidak ada pengingat yang perlu dikirim hari ini.' : '📭 今天没有需要发送的提醒。');
-                return;
-            }
-            
+            if (orders.length === 0) { alert(lang === 'id' ? '📭 Tidak ada pengingat yang perlu dikirim hari ini.' : '📭 今天没有需要发送的提醒。'); return; }
             var validOrders = [];
-            var skippedStores = [];
-            
             for (var order of orders) {
                 var senderNumber = await this.getSenderWANumber(order.store_id);
-                if (senderNumber) {
-                    validOrders.push({ order, senderNumber });
-                } else {
-                    var storeName = await SUPABASE.getStoreName(order.store_id);
-                    if (!skippedStores.includes(storeName)) {
-                        skippedStores.push(storeName);
-                    }
-                }
+                if (senderNumber) validOrders.push({ order, senderNumber });
             }
-            
-            if (validOrders.length === 0) {
-                var msg = lang === 'id'
-                    ? `⚠️ Tidak dapat mengirim pengingat. ${skippedStores.length > 0 ? `Toko ${skippedStores.join(', ')} belum memiliki nomor WA.` : ''}`
-                    : `⚠️ 无法发送提醒。${skippedStores.length > 0 ? `门店 ${skippedStores.join(', ')} 未配置 WA 号码。` : ''}`;
-                alert(msg);
-                return;
+            if (validOrders.length === 0) { alert(lang === 'id' ? '⚠️ Tidak dapat mengirim pengingat.' : '⚠️ 无法发送提醒。'); return; }
+            if (!confirm(lang === 'id' ? `📱 Akan mengirim ${validOrders.length} pengingat. Lanjutkan?` : `📱 将发送 ${validOrders.length} 条提醒。继续？`)) return;
+            if (button) { button.disabled = true; button.textContent = lang === 'id' ? '⏳ Mengirim...' : '⏳ 发送中...'; }
+            for (var i = 0; i < validOrders.length; i++) {
+                var item = validOrders[i];
+                var waText = this.generateWAText(item.order, item.senderNumber);
+                var phone = item.order.customer_phone?.replace(/[^0-9]/g, '') || '';
+                if (!phone.startsWith('62')) phone = '62' + phone.replace(/^0+/, '');
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(waText)}`, '_blank');
+                await SUPABASE.logReminder(item.order.id);
+                if (i < validOrders.length - 1) await new Promise(r => setTimeout(r, 1500));
             }
-            
-            var confirmMsg = lang === 'id'
-                ? `📱 Akan mengirim ${validOrders.length} pengingat.${skippedStores.length > 0 ? `\n\n⚠️ Melewatkan ${skippedStores.length} order dari toko tanpa WA.` : ''}\n\nLanjutkan?`
-                : `📱 将发送 ${validOrders.length} 条提醒。${skippedStores.length > 0 ? `\n\n⚠️ 跳过 ${skippedStores.length} 条来自未配置 WA 门店的订单。` : ''}\n\n继续？`;
-            
-            if (!confirm(confirmMsg)) return;
-            
-            if (button) {
-                button.disabled = true;
-                button.classList.add('disabled');
-                button.textContent = lang === 'id' ? '⏳ Mengirim...' : '⏳ 发送中...';
-            }
-            
-            try {
-                for (var i = 0; i < validOrders.length; i++) {
-                    var item = validOrders[i];
-                    var waText = this.generateWAText(item.order, item.senderNumber);
-                    var phone = item.order.customer_phone?.replace(/[^0-9]/g, '') || '';
-                    if (!phone.startsWith('62')) {
-                        phone = '62' + phone.replace(/^0+/, '');
-                    }
-                    
-                    var waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`;
-                    window.open(waUrl, '_blank');
-                    
-                    await SUPABASE.logReminder(item.order.id);
-                    
-                    if (i < validOrders.length - 1) {
-                        await new Promise(r => setTimeout(r, 1500));
-                    }
-                }
-                
-                alert(lang === 'id' 
-                    ? `✅ ${validOrders.length} pengingat telah disiapkan.`
-                    : `✅ 已准备 ${validOrders.length} 条提醒。`);
-                
-                if (button) {
-                    button.textContent = lang === 'id' ? '✅ Terkirim' : '✅ 已发送';
-                }
-                
-            } catch (err) {
-                if (button) {
-                    button.disabled = false;
-                    button.classList.remove('disabled');
-                    button.textContent = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
-                }
-                throw err;
-            }
-            
+            alert(lang === 'id' ? `✅ ${validOrders.length} pengingat telah disiapkan.` : `✅ 已准备 ${validOrders.length} 条提醒。`);
+            if (button) button.textContent = lang === 'id' ? '✅ Terkirim' : '✅ 已发送';
         } catch (error) {
-            console.error("sendDailyReminders error:", error);
+            if (button) { button.disabled = false; button.textContent = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒'; }
             alert(lang === 'id' ? 'Gagal mengirim pengingat massal' : '批量发送提醒失败');
-            
-            if (button) {
-                button.disabled = false;
-                button.classList.remove('disabled');
-                button.textContent = lang === 'id' ? '📱 Kirim Pengingat' : '📱 发送提醒';
-            }
         }
     },
 
     updateStoreWANumber: async function(storeId, waNumber) {
         var lang = Utils.lang;
         waNumber = waNumber.replace(/[^0-9]/g, '');
-        
         try {
             await SUPABASE.updateStoreWANumber(storeId, waNumber || null);
-            
             var msg = document.createElement('div');
             msg.textContent = lang === 'id' ? '✅ Tersimpan' : '✅ 已保存';
-            msg.className = 'toast-message';
+            msg.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#22c55e; color:white; padding:10px 20px; border-radius:8px; z-index:10000;';
             document.body.appendChild(msg);
             setTimeout(() => msg.remove(), 1500);
-            
-        } catch (error) {
-            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
-        }
+        } catch (error) { alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message); }
     },
 
     showCreateOrder: function() { alert('Please select a customer first'); this.navigateTo('customers'); },
@@ -1080,6 +842,16 @@ Terima kasih,
         if (confirm(Utils.lang === 'id' ? 'Hapus toko ini?' : '删除此门店？')) {
             try { await StoreManager.deleteStore(storeId); await StoreManager.renderStoreManagement(); } 
             catch (error) { alert('Error: ' + error.message); }
+        }
+    },
+
+    // ==================== 黑名单页面入口 ====================
+    showBlacklist: async function() {
+        // 这个函数由 app-blacklist.js 提供
+        if (typeof window.APP.showBlacklist === 'function') {
+            await window.APP.showBlacklist();
+        } else {
+            alert(Utils.lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
         }
     }
 };
