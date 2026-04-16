@@ -1,5 +1,6 @@
 // app-customers.js - 完整最终版
 // 功能：客户管理
+// 新增：黑名单管理、客户查重（姓名/KTP/电话）
 // 权限：Admin 只能查看所有门店客户（不能增/改），店长/员工只能操作本门店客户
 
 window.APP = window.APP || {};
@@ -16,13 +17,25 @@ const CustomersModule = {
         try {
             const customers = await SUPABASE.getCustomers();
             
+            // 获取黑名单状态
+            var blacklistStatus = {};
+            if (isAdmin) {
+                const blacklist = await APP.getBlacklist();
+                for (var b of blacklist) {
+                    blacklistStatus[b.customer_id] = b.reason;
+                }
+            }
+            
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 8 : 7}" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}</td></td>`;
             } else {
                 for (var c of customers) {
+                    var isBlacklisted = blacklistStatus[c.id];
+                    var blacklistBadge = isBlacklisted ? '<span class="blacklist-badge" style="background:#dc2626; color:white; padding:2px 6px; border-radius:4px; font-size:11px; margin-left:5px;">🚫 BLACKLIST</span>' : '';
+                    
                     rows += `<tr>
-                        <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}</td>
+                        <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}${blacklistBadge}</td>
                         <td class="date-cell">${Utils.formatDate(c.registered_date)}</td>
                         <td class="name-cell">${Utils.escapeHtml(c.name)}</td>
                         <td class="ktp-cell">${Utils.escapeHtml(c.ktp_number || '-')}</td>
@@ -34,6 +47,10 @@ const CustomersModule = {
                             ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                            ${isAdmin && !isBlacklisted ? `<button onclick="APP.showBlacklistCustomerModal('${c.id}', '${Utils.escapeHtml(c.name)}')" class="btn-small" style="background:#d97706;color:white;">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+                            ${isAdmin && isBlacklisted ? `<button onclick="APP.removeFromBlacklist('${c.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus Blacklist' : '解除拉黑'}</button>` : ''}
+                            <button onclick="APP.showCustomerOrders('${c.id}')" class="btn-small">📋 ${lang === 'id' ? 'Order' : '订单'}</button>
+                            <button onclick="APP.showCustomerPaymentHistory('${c.id}')" class="btn-small">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>
                         </td>
                     　　　`;
                 }
@@ -80,7 +97,8 @@ const CustomersModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
-                    <div class="header-actions">                        
+                    <div class="header-actions">
+                        <button onclick="APP.navigateTo('blacklist')" class="btn-danger" style="background:#dc2626;color:white;">🚫 ${lang === 'id' ? 'Daftar Hitam' : '黑名单'}</button>
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
@@ -120,6 +138,7 @@ const CustomersModule = {
                     .action-cell { white-space: nowrap; }
                     .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
                     .text-center { text-align: center; }
+                    .blacklist-badge { display: inline-block; margin-left: 5px; font-size: 10px; }
                     @media (max-width: 768px) {
                         .customer-table th, .customer-table td { font-size: 12px; padding: 6px; }
                         .address-cell { max-width: 120px; }
@@ -136,6 +155,7 @@ const CustomersModule = {
         if (el) el.style.display = value === 'different' ? 'block' : 'none';
     },
 
+    // ==================== 添加客户（带查重） ====================
     addCustomer: async function() {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -156,6 +176,25 @@ const CustomersModule = {
 
         if (!name) { alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写'); return; }
         if (!phone) { alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写'); return; }
+        
+        // ===== 查重检查 =====
+        try {
+            const duplicate = await APP.checkDuplicateCustomer(name, ktp, phone);
+            if (duplicate && duplicate.isDuplicate) {
+                var fieldText = '';
+                if (duplicate.duplicateFields.includes('name')) fieldText += lang === 'id' ? 'Nama' : '姓名';
+                if (duplicate.duplicateFields.includes('ktp')) fieldText += fieldText ? ', KTP' : 'KTP';
+                if (duplicate.duplicateFields.includes('phone')) fieldText += fieldText ? ', Telepon' : '电话';
+                
+                alert(lang === 'id' 
+                    ? `⚠️ Data sudah terdaftar! (${fieldText} sudah digunakan)\nID Nasabah: ${duplicate.existingCustomer.customer_id}`
+                    : `⚠️ 信息已存在！(${fieldText} 已被使用)\n客户ID: ${duplicate.existingCustomer.customer_id}`);
+                return;
+            }
+        } catch (err) {
+            console.warn("查重检查失败:", err);
+            // 继续执行，不阻塞添加
+        }
 
         try {
             const profile = await SUPABASE.getCurrentProfile();
@@ -185,7 +224,14 @@ const CustomersModule = {
             await this.showCustomers();
         } catch (error) {
             console.error("addCustomer error:", error);
-            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            // 处理唯一约束冲突
+            if (error.code === '23505') {
+                alert(lang === 'id' 
+                    ? '⚠️ Data nasabah sudah terdaftar! (Nama, KTP, atau Telepon sudah digunakan)'
+                    : '⚠️ 客户信息已存在！（姓名、KTP或电话已被使用）');
+            } else {
+                alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            }
         }
     },
 
@@ -255,7 +301,6 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能编辑客户
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
             return;
@@ -272,6 +317,27 @@ const CustomersModule = {
         if (!name || !phone) { alert(lang === 'id' ? 'Nama dan telepon wajib diisi' : '姓名和手机号必须填写'); return; }
 
         try {
+            // 获取原客户信息用于查重排除自身
+            const { data: existingCustomer } = await supabaseClient
+                .from('customers')
+                .select('name, ktp_number, phone')
+                .eq('id', customerId)
+                .single();
+            
+            // 检查是否与其他客户重复（排除自身）
+            const duplicate = await APP.checkDuplicateCustomer(name, ktp, phone, customerId);
+            if (duplicate && duplicate.isDuplicate) {
+                var fieldText = '';
+                if (duplicate.duplicateFields.includes('name')) fieldText += lang === 'id' ? 'Nama' : '姓名';
+                if (duplicate.duplicateFields.includes('ktp')) fieldText += fieldText ? ', KTP' : 'KTP';
+                if (duplicate.duplicateFields.includes('phone')) fieldText += fieldText ? ', Telepon' : '电话';
+                
+                alert(lang === 'id' 
+                    ? `⚠️ Data sudah terdaftar! (${fieldText} sudah digunakan)\nID Nasabah: ${duplicate.existingCustomer.customer_id}`
+                    : `⚠️ 信息已存在！(${fieldText} 已被使用)\n客户ID: ${duplicate.existingCustomer.customer_id}`);
+                return;
+            }
+            
             const { error } = await supabaseClient.from('customers').update({
                 name: name,
                 phone: phone,
@@ -293,6 +359,18 @@ const CustomersModule = {
 
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
+        
+        // 检查是否在黑名单中
+        const blacklistCheck = await APP.isBlacklisted(customerId);
+        if (blacklistCheck.isBlacklisted) {
+            if (!confirm(lang === 'id' 
+                ? `Nasabah ini dalam BLACKLIST. Hapus dari blacklist terlebih dahulu?`
+                : `该客户在黑名单中，是否先解除拉黑再删除？`)) {
+                return;
+            }
+            await APP.removeFromBlacklist(customerId);
+        }
+        
         if (!confirm(lang === 'id' ? 'Hapus nasabah ini? Semua order terkait juga akan terhapus.' : '删除此客户？相关订单也将被删除。')) return;
         
         try {
@@ -317,13 +395,22 @@ const CustomersModule = {
         }
     },
 
+    // ==================== 创建订单（带黑名单检查） ====================
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能创建订单
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat membuat order. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能创建订单，请使用店长或员工账号登录。');
+            return;
+        }
+        
+        // ===== 黑名单检查 =====
+        const blacklistCheck = await APP.isBlacklisted(customerId);
+        if (blacklistCheck.isBlacklisted) {
+            alert(lang === 'id' 
+                ? `🚫 Nasabah ini dalam BLACKLIST!\nAlasan: ${blacklistCheck.reason}\nTidak dapat membuat order baru.`
+                : `🚫 该客户已被拉黑！\n原因: ${blacklistCheck.reason}\n无法创建新订单。`);
             return;
         }
         
@@ -346,7 +433,6 @@ const CustomersModule = {
             this.currentCustomerId = customerId;
             var t = (key) => Utils.t(key);
             
-            // 获取当前用户的门店信息
             const profile = await SUPABASE.getCurrentProfile();
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             const userStoreCode = profile?.stores?.code || '-';
@@ -427,7 +513,7 @@ const CustomersModule = {
                 loan_amount: amount,
                 notes: notes,
                 customer_id: customerId,
-                store_id: null  // 不传，让后端使用当前用户的门店
+                store_id: null
             };
             
             var newOrder = await Order.create(orderData);
@@ -436,6 +522,56 @@ const CustomersModule = {
         } catch (error) {
             console.error("saveOrderWithCustomer error:", error);
             alert(Utils.lang === 'id' ? 'Gagal menyimpan order: ' + error.message : '保存订单失败：' + error.message);
+        }
+    },
+
+    // ==================== 黑名单相关方法 ====================
+    
+    showBlacklistCustomerModal: async function(customerId, customerName) {
+        var lang = Utils.lang;
+        
+        const { isBlacklisted } = await APP.isBlacklisted(customerId);
+        if (isBlacklisted) {
+            alert(lang === 'id' ? 'Nasabah sudah ada di blacklist' : '客户已在黑名单中');
+            return;
+        }
+        
+        var modal = document.createElement('div');
+        modal.id = 'blacklistModal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:450px;">
+                <h3>🚫 ${lang === 'id' ? 'Blacklist Nasabah' : '拉黑客户'}</h3>
+                <p><strong>${Utils.escapeHtml(customerName)}</strong></p>
+                <div class="form-group">
+                    <label>${lang === 'id' ? 'Alasan Blacklist' : '拉黑原因'} *</label>
+                    <textarea id="blacklistReason" rows="3" style="width:100%;" placeholder="${lang === 'id' ? 'Contoh: Sering telat bayar, Tidak kooperatif, dll' : '例如：经常逾期、不配合等'}"></textarea>
+                </div>
+                <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+                    <button onclick="APP.confirmAddToBlacklist('${customerId}')" class="danger" style="background:#dc2626;color:white;">🚫 ${lang === 'id' ? 'Blacklist' : '确认拉黑'}</button>
+                    <button onclick="document.getElementById('blacklistModal').remove()">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    confirmAddToBlacklist: async function(customerId) {
+        var lang = Utils.lang;
+        var reason = document.getElementById('blacklistReason')?.value.trim();
+        
+        if (!reason) {
+            alert(lang === 'id' ? 'Harap isi alasan blacklist' : '请填写拉黑原因');
+            return;
+        }
+        
+        try {
+            await APP.addToBlacklist(customerId, reason);
+            document.getElementById('blacklistModal')?.remove();
+            alert(lang === 'id' ? '✅ Nasabah berhasil diblacklist' : '✅ 客户已拉黑');
+            await this.showCustomers();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal: ' + error.message : '失败：' + error.message);
         }
     },
 
