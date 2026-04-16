@@ -172,6 +172,7 @@ h3 { font-size: var(--font-md); }
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 16px;
 }
+
 .cashflow-item {
     background: rgba(255,255,255,0.15);
     border-radius: 10px;
@@ -181,6 +182,14 @@ h3 { font-size: var(--font-md); }
 .cashflow-item .label { font-size: var(--font-sm); opacity: 0.9; margin-bottom: 8px; }
 .cashflow-item .value { font-size: var(--font-xl); font-weight: 700; }
 .cashflow-item .value.negative { color: #fca5a5; }
+
+/* 新增：现金流详情文字，与上方总投资文字大小一致 */
+.cashflow-detail {
+    font-size: var(--font-xs);
+    opacity: 0.8;
+    margin-top: 6px;
+    line-height: 1.4;
+}
 
 /* ===== 资金管理区域 ===== */
 .capital-summary {
