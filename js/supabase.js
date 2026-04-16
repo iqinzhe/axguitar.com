@@ -1,6 +1,6 @@
-// supabase.js - 完整修复版
-// 门店编码: STORE_000(Kantor), STORE_001(Bangil), STORE_002(Sidoarjo), STORE_003(Gempol), STORE_004(Beji)
-// 订单/客户前缀: AD, BL, SO, GP, BJ
+// supabase.js - 完整最终版
+// 资金类型：investment(启动资金), withdrawal(本金提取), dividend(利润分红), 
+//          reinvestment(利润再投资), capital_circulation(本金循环)
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -123,21 +123,18 @@ const SupabaseAPI = {
         
         if (error || !data) return 'AD';
         
-        // 门店编码到前缀的映射表
         const codeToPrefix = {
-            'STORE_000': 'AD',  // Kantor (总部)
-            'STORE_001': 'BL',  // Bangil
-            'STORE_002': 'SO',  // Sidoarjo
-            'STORE_003': 'GP',  // Gempol
-            'STORE_004': 'BJ',  // Beji
+            'STORE_000': 'AD',
+            'STORE_001': 'BL',
+            'STORE_002': 'SO',
+            'STORE_003': 'GP',
+            'STORE_004': 'BJ',
         };
         
-        // 1. 优先根据门店编码映射
         if (data.code && codeToPrefix[data.code]) {
             return codeToPrefix[data.code];
         }
         
-        // 2. 其次根据名称映射
         const nameToPrefix = {
             'kantor': 'AD',
             'bangil': 'BL',
@@ -153,7 +150,6 @@ const SupabaseAPI = {
             }
         }
         
-        // 3. 默认返回 AD
         return 'AD';
     },
 
@@ -278,12 +274,22 @@ const SupabaseAPI = {
         const nowDate = new Date().toISOString().split('T')[0];
         const adminFee = orderData.admin_fee || 30000;
         
+        const targetStoreId = orderData.store_id || profile.store_id;
+        
+        if (profile.role === 'admin' && !orderData.store_id) {
+            throw new Error(Utils.lang === 'id' ? 'Administrator tidak dapat membuat order. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能创建订单，请使用店长或员工账号登录。');
+        }
+        
+        if (!targetStoreId) {
+            throw new Error(Utils.lang === 'id' ? 'Toko tidak ditemukan' : '未找到门店信息');
+        }
+        
         let retryCount = 0;
         let lastError = null;
         
         while (retryCount < 3) {
             try {
-                const orderId = await this._generateOrderId(profile.role, orderData.store_id || profile.store_id);
+                const orderId = await this._generateOrderId(profile.role, targetStoreId);
                 
                 const newOrder = {
                     order_id: orderId,
@@ -302,7 +308,7 @@ const SupabaseAPI = {
                     principal_paid: 0,
                     principal_remaining: orderData.loan_amount,
                     status: 'active',
-                    store_id: orderData.store_id || profile.store_id,
+                    store_id: targetStoreId,
                     created_by: profile.id,
                     notes: orderData.notes || '',
                     customer_id: orderData.customer_id || null,
@@ -322,7 +328,7 @@ const SupabaseAPI = {
                     throw error;
                 }
                 
-                console.log(`✅ 订单创建成功: ${orderId}`);
+                console.log(`✅ 订单创建成功: ${orderId} (门店: ${targetStoreId})`);
                 return data;
                 
             } catch (err) {
@@ -611,7 +617,6 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         const storeId = customerData.store_id || profile.store_id;
         
-        // 生成客户ID
         const customerId = await this._generateCustomerId(storeId);
         
         const { data, error } = await supabaseClient
@@ -637,7 +642,7 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 资金注资/提现 API ====================
+    // ==================== 资金注资/提现/分红/再投资 API ====================
     
     async getCapitalTransactions() {
         const profile = await this.getCurrentProfile();
@@ -663,16 +668,31 @@ const SupabaseAPI = {
     async addCapitalTransaction(transaction) {
         const profile = await this.getCurrentProfile();
         
-        if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
+        const validTypes = ['investment', 'withdrawal', 'dividend', 'reinvestment', 'capital_circulation'];
+        if (!validTypes.includes(transaction.type)) {
+            throw new Error(Utils.lang === 'id' ? 'Tipe transaksi tidak valid' : '交易类型无效');
         }
         
-        if (!transaction.target_store_id) {
-            throw new Error(Utils.lang === 'id' ? 'Harap pilih tujuan aliran dana' : '请选择资金流向');
+        // 权限验证
+        if (transaction.type === 'reinvestment' || transaction.type === 'capital_circulation') {
+            // 利润再投资 和 本金循环：门店可以操作
+            if (!profile?.store_id) {
+                throw new Error(Utils.lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
+            }
+            transaction.store_id = profile.store_id;
+            transaction.target_store_id = profile.store_id;
+        } else {
+            // 启动资金/本金提取/利润分红：只有 Admin 可以操作
+            if (profile?.role !== 'admin') {
+                throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
+            }
+            if (!transaction.target_store_id) {
+                throw new Error(Utils.lang === 'id' ? 'Harap pilih tujuan aliran dana' : '请选择资金流向');
+            }
         }
         
         const { data, error } = await supabaseClient.from('capital_transactions').insert({
-            store_id: transaction.store_id || profile.store_id,
+            store_id: transaction.store_id,
             target_store_id: transaction.target_store_id,
             type: transaction.type,
             payment_method: transaction.payment_method,
@@ -705,7 +725,8 @@ const SupabaseAPI = {
                 const targetId = t.target_store_id;
                 if (!storeMap[targetId]) {
                     storeMap[targetId] = { 
-                        investment: 0, withdrawal: 0, dividend: 0, net: 0
+                        investment: 0, withdrawal: 0, dividend: 0, 
+                        reinvestment: 0, capital_circulation: 0, net: 0
                     };
                 }
                 if (t.type === 'investment') {
@@ -717,6 +738,12 @@ const SupabaseAPI = {
                 } else if (t.type === 'dividend') {
                     storeMap[targetId].dividend += t.amount;
                     storeMap[targetId].net -= t.amount;
+                } else if (t.type === 'reinvestment') {
+                    storeMap[targetId].reinvestment += t.amount;
+                    storeMap[targetId].net += t.amount;
+                } else if (t.type === 'capital_circulation') {
+                    storeMap[targetId].capital_circulation += t.amount;
+                    storeMap[targetId].net += t.amount;
                 }
             }
             return { byStore: storeMap };
@@ -726,7 +753,7 @@ const SupabaseAPI = {
         let cashWithdrawal = 0, bankWithdrawal = 0;
         
         for (const t of data || []) {
-            if (t.type === 'investment') {
+            if (t.type === 'investment' || t.type === 'reinvestment' || t.type === 'capital_circulation') {
                 if (t.payment_method === 'cash') cashInvestment += t.amount;
                 else if (t.payment_method === 'bank') bankInvestment += t.amount;
             } else if (t.type === 'withdrawal' || t.type === 'dividend') {
@@ -785,7 +812,7 @@ const SupabaseAPI = {
         
         for (const t of capitals || []) {
             if (profile?.role === 'admin') {
-                if (t.type === 'investment') {
+                if (t.type === 'investment' || t.type === 'reinvestment' || t.type === 'capital_circulation') {
                     if (t.payment_method === 'cash') cashInvestment += t.amount;
                     else if (t.payment_method === 'bank') bankInvestment += t.amount;
                 } else if (t.type === 'withdrawal' || t.type === 'dividend') {
@@ -793,10 +820,11 @@ const SupabaseAPI = {
                     else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
                 }
             } else {
-                if (t.target_store_id === profile.store_id && t.type === 'investment') {
+                if ((t.target_store_id === profile.store_id) && 
+                    (t.type === 'investment' || t.type === 'reinvestment' || t.type === 'capital_circulation')) {
                     if (t.payment_method === 'cash') cashInvestment += t.amount;
                     else if (t.payment_method === 'bank') bankInvestment += t.amount;
-                } else if (t.store_id === profile.store_id && (t.type === 'withdrawal' || t.type === 'dividend')) {
+                } else if ((t.store_id === profile.store_id) && (t.type === 'withdrawal' || t.type === 'dividend')) {
                     if (t.payment_method === 'cash') cashWithdrawal += t.amount;
                     else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
                 }
