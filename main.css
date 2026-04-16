@@ -287,7 +287,7 @@ h3 { font-size: var(--font-md); }
 }
 
 /* ===== 工具栏 ===== */
-/* 电脑端（>640px）使用 Grid 布局 */
+/* 电脑端（>640px）使用 Grid 布局，等宽左对齐 */
 @media (min-width: 641px) {
     .toolbar {
         display: grid;
@@ -304,9 +304,10 @@ h3 { font-size: var(--font-md); }
         font-size: var(--font-sm);
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        gap: 4px;
+        justify-content: flex-start;
+        gap: 6px;
         width: 100%;
+        text-align: left;
     }
 }
 
@@ -633,7 +634,7 @@ input:focus, select:focus, textarea:focus {
         padding: 10px 6px;
     }
     
-    /* 工具栏：等宽按钮，文字超长截断 */
+    /* 工具栏：等宽按钮，文字左对齐，超长截断 */
     .toolbar {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
@@ -642,16 +643,17 @@ input:focus, select:focus, textarea:focus {
     }
     
     .toolbar button {
-        padding: 8px 4px;
+        padding: 8px 6px;
         font-size: var(--font-xxs);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 4px;
         width: 100%;
+        text-align: left;
     }
     
     /* 卡片内边距和间距优化 */
@@ -765,7 +767,7 @@ input:focus, select:focus, textarea:focus {
     }
     
     .toolbar button {
-        padding: 6px 3px;
+        padding: 6px 4px;
         font-size: 0.75rem;
     }
     
