@@ -1,4 +1,5 @@
-// app-customers.js - 客户管理、订单创建模块（类名优化版）
+// app-customers.js - 完整修复版
+// 修复内容：Admin可创建客户（选择门店）、客户ID显示、Admin创建订单（选择门店）
 
 window.APP = window.APP || {};
 
@@ -12,26 +13,22 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
 
         try {
-            const profile = await SUPABASE.getCurrentProfile();
-            let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-            if (!isAdmin && profile?.store_id) {
-                query = query.eq('store_id', profile.store_id);
-            }
-            const { data: customers, error } = await query;
-            if (error) throw error;
-
+            const customers = await SUPABASE.getCustomers();
+            
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}</td></tr>`;
             } else {
                 for (var c of customers) {
                     rows += `<tr>
+                        <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}</td>
                         <td class="date-cell">${Utils.formatDate(c.registered_date)}</td>
                         <td class="name-cell">${Utils.escapeHtml(c.name)}</td>
                         <td class="ktp-cell">${Utils.escapeHtml(c.ktp_number || '-')}</td>
                         <td class="phone-cell">${Utils.escapeHtml(c.phone || '-')}</td>
                         <td class="address-cell">${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
                         <td class="address-cell">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
+                        ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')}</td>` : ''}
                         <td class="action-cell">
                             <button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>
                             <button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>
@@ -39,6 +36,13 @@ const CustomersModule = {
                         </td>
                     　　　`;
                 }
+            }
+
+            // 获取门店列表（Admin需要选择门店）
+            var stores = await SUPABASE.getAllStores();
+            var storeOptions = '<option value="">-- ' + (lang === 'id' ? 'Pilih Toko' : '选择门店') + ' --</option>';
+            for (var store of stores) {
+                storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${Utils.escapeHtml(store.code || '-')})</option>`;
             }
 
             document.getElementById("app").innerHTML = `
@@ -52,12 +56,14 @@ const CustomersModule = {
                         <table class="customer-table">
                             <thead>
                                 <tr>
+                                    <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
                                     <th>${lang === 'id' ? 'Tanggal Daftar' : '录入日期'}</th>
                                     <th>${t('customer_name')}</th>
                                     <th>${t('ktp_number')}</th>
                                     <th>${t('phone')}</th>
                                     <th>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
                                     <th>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
+                                    ${isAdmin ? `<th>${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
                                     <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
@@ -80,6 +86,14 @@ const CustomersModule = {
                             <label>${t('ktp_number')}</label>
                             <input type="text" id="customerKtp" placeholder="${t('ktp_number')}">
                         </div>
+                        ${isAdmin ? `
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Toko' : '门店'} *</label>
+                            <select id="customerStoreId">
+                                ${storeOptions}
+                            </select>
+                        </div>
+                        ` : ''}
                         <div class="form-group full-width">
                             <label>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</label>
                             <textarea id="customerKtpAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址'}"></textarea>
@@ -105,7 +119,7 @@ const CustomersModule = {
                     .customer-table { width: 100%; border-collapse: collapse; }
                     .customer-table th, .customer-table td { border: 1px solid #cbd5e1; padding: 8px; }
                     .customer-table th { background: #f8fafc; font-weight: 600; }
-                    .date-cell, .ktp-cell, .phone-cell { white-space: nowrap; }
+                    .customer-id-cell, .date-cell, .ktp-cell, .phone-cell, .store-cell { white-space: nowrap; }
                     .address-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                     .action-cell { white-space: nowrap; }
                     .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
@@ -135,6 +149,25 @@ const CustomersModule = {
         var livingOpt = document.querySelector('input[name="livingAddrOpt"]:checked')?.value || 'same';
         var livingSameAsKtp = livingOpt === 'same';
         var livingAddress = livingSameAsKtp ? null : document.getElementById("customerLivingAddress").value.trim();
+        
+        // 获取门店ID（Admin 需要选择，非 Admin 使用自己的门店）
+        var isAdmin = AUTH.isAdmin();
+        var storeId;
+        
+        if (isAdmin) {
+            storeId = document.getElementById("customerStoreId")?.value;
+            if (!storeId) {
+                alert(lang === 'id' ? 'Harap pilih toko' : '请选择门店');
+                return;
+            }
+        } else {
+            const profile = await SUPABASE.getCurrentProfile();
+            storeId = profile?.store_id;
+            if (!storeId) {
+                alert(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
+                return;
+            }
+        }
 
         if (!name) { alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写'); return; }
         if (!phone) { alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写'); return; }
@@ -142,12 +175,8 @@ const CustomersModule = {
         try {
             const profile = await SUPABASE.getCurrentProfile();
             
-            if (!profile || !profile.store_id) {
-                throw new Error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
-            }
-            
             const customerData = {
-                store_id: profile.store_id,
+                store_id: storeId,
                 name: name,
                 ktp_number: ktp || null,
                 phone: phone,
@@ -156,18 +185,12 @@ const CustomersModule = {
                 living_same_as_ktp: livingSameAsKtp,
                 living_address: livingAddress || null,
                 registered_date: new Date().toISOString().split('T')[0],
-                created_by: profile.id,
-                updated_at: new Date().toISOString()
+                created_by: profile.id
             };
             
-            const { data, error } = await supabaseClient
-                .from('customers')
-                .insert(customerData)
-                .select();
+            const newCustomer = await SUPABASE.createCustomer(customerData);
             
-            if (error) throw error;
-            
-            alert(lang === 'id' ? 'Nasabah berhasil ditambahkan' : '客户添加成功');
+            alert(lang === 'id' ? `Nasabah berhasil ditambahkan! ID: ${newCustomer.customer_id}` : `客户添加成功！ID: ${newCustomer.customer_id}`);
             await this.showCustomers();
         } catch (error) {
             console.error("addCustomer error:", error);
@@ -289,19 +312,51 @@ const CustomersModule = {
 
     createOrderForCustomer: async function(customerId) {
         try {
+            // 检查是否有活跃订单
             const { data: existingOrders } = await supabaseClient
                 .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
             if (existingOrders && existingOrders.length > 0) {
                 alert(Utils.lang === 'id' ? 'Nasabah ini masih memiliki order aktif.' : '该客户还有未结清的订单。');
                 return;
             }
-            const { data: customer, error } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
+            
+            const { data: customer, error } = await supabaseClient
+                .from('customers')
+                .select('*, stores(name, code)')
+                .eq('id', customerId)
+                .single();
             if (error) throw error;
 
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
+            var isAdmin = AUTH.isAdmin();
+            
+            // 获取门店列表（Admin 需要选择门店）
+            var stores = await SUPABASE.getAllStores();
+            var storeOptions = '';
+            for (var store of stores) {
+                storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${Utils.escapeHtml(store.code || '-')})</option>`;
+            }
+            
+            // 默认选中客户所属门店
+            var defaultStoreId = customer.store_id;
+            
+            var storeSelectionHtml = '';
+            if (isAdmin) {
+                storeSelectionHtml = `
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Pilih Toko' : '选择门店'} *</label>
+                        <select id="orderStoreId">
+                            ${storeOptions}
+                        </select>
+                    </div>
+                    <script>
+                        document.getElementById('orderStoreId').value = '${defaultStoreId}';
+                    </script>
+                `;
+            }
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -311,14 +366,17 @@ const CustomersModule = {
                 <div class="card">
                     <h3>${t('customer_info')}</h3>
                     <div class="customer-info-display">
+                        <p><strong>${lang === 'id' ? 'ID Nasabah' : '客户ID'}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p>
                         <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
                         <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p>
                         <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
                         <p><strong>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}:</strong> ${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</p>
                         <p><strong>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}:</strong> ${customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')}</p>
+                        <p><strong>${lang === 'id' ? 'Toko Asal' : '所属门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')} (${Utils.escapeHtml(customer.stores?.code || '-')})</p>
                     </div>
                     <h3>${t('collateral_info')}</h3>
                     <div class="form-grid">
+                        ${storeSelectionHtml}
                         <div class="form-group full-width"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
                         <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input"></div>
                         <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div>
@@ -347,13 +405,36 @@ const CustomersModule = {
         var amountStr = document.getElementById("amount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var notes = document.getElementById("notes").value;
+        
+        // 获取门店ID（Admin 需要从下拉框获取）
+        var isAdmin = AUTH.isAdmin();
+        var storeId = null;
+        if (isAdmin) {
+            storeId = document.getElementById("orderStoreId")?.value;
+            if (!storeId) {
+                alert(Utils.lang === 'id' ? 'Harap pilih toko' : '请选择门店');
+                return;
+            }
+        }
+        
         if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
+        
         try {
-            const { data: customer } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
+            const { data: customer } = await supabaseClient
+                .from('customers')
+                .select('*')
+                .eq('id', customerId)
+                .single();
+            
             var orderData = {
                 customer: { name: customer.name, ktp: customer.ktp_number || '', phone: customer.phone, address: customer.ktp_address || customer.address || '' },
-                collateral_name: collateral, loan_amount: amount, notes: notes, customer_id: customerId
+                collateral_name: collateral,
+                loan_amount: amount,
+                notes: notes,
+                customer_id: customerId,
+                store_id: storeId  // Admin 指定的门店，非 Admin 时为 null（会使用用户自己的门店）
             };
+            
             var newOrder = await Order.create(orderData);
             alert(Utils.t('order_created') + "\nID: " + newOrder.order_id);
             this.goBack();
@@ -370,8 +451,16 @@ const CustomersModule = {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         try {
-            const { data: customer } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
-            const { data: orders, error } = await supabaseClient.from('orders').select('*').eq('customer_id', customerId).order('created_at', { ascending: false });
+            const { data: customer } = await supabaseClient
+                .from('customers')
+                .select('*, stores(name, code)')
+                .eq('id', customerId)
+                .single();
+            const { data: orders, error } = await supabaseClient
+                .from('orders')
+                .select('*, stores(code, name)')
+                .eq('customer_id', customerId)
+                .order('created_at', { ascending: false });
             if (error) throw error;
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var rows = orders && orders.length > 0 ? orders.map(o => {
@@ -396,9 +485,11 @@ const CustomersModule = {
                     <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
                 <div class="card customer-summary">
+                    <p><strong>${lang === 'id' ? 'ID Nasabah' : '客户ID'}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p>
                     <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
                     <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p>
                     <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
+                    <p><strong>${lang === 'id' ? 'Toko' : '门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')}</p>
                 </div>
                 <div class="card">
                     <h3>📋 ${t('order_list')}</h3>
