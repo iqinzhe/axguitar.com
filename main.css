@@ -48,8 +48,8 @@ body {
 }
 
 /* ===== 2. Logo 图片统一大小 ===== */
-.dashboard-header h1 img,
-.page-header h1 img,
+.dashboard-header h2 img,
+.page-header h2 img,
 h1 img,
 .login-logo {
     height: 1.2em;
