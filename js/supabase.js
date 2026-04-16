@@ -1,5 +1,6 @@
 // supabase.js - 完整修复版
-// 修复内容：订单ID生成、客户ID生成、资金统计、门店代码映射
+// 门店编码: STORE_000(Kantor), STORE_001(Bangil), STORE_002(Sidoarjo), STORE_003(Gempol), STORE_004(Beji)
+// 订单/客户前缀: AD, BL, SO, GP, BJ
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -85,7 +86,7 @@ const SupabaseAPI = {
 
     async getCurrentStoreName() {
         const profile = await this.getCurrentProfile();
-        return profile?.stores?.name || '总部';
+        return profile?.stores?.name || 'Kantor';
     },
 
     async login(email, password) {
@@ -104,15 +105,15 @@ const SupabaseAPI = {
     },
 
     async getAllStores() {
-        const { data, error } = await supabaseClient.from('stores').select('*').order('name');
+        const { data, error } = await supabaseClient.from('stores').select('*').order('code');
         if (error) throw error;
         return data;
     },
 
-    // ==================== 门店代码映射 ====================
+    // ==================== 门店代码到前缀的映射 ====================
     
     async _getStorePrefix(storeId) {
-        if (!storeId) return 'HQ';
+        if (!storeId) return 'AD';
         
         const { data, error } = await supabaseClient
             .from('stores')
@@ -120,48 +121,40 @@ const SupabaseAPI = {
             .eq('id', storeId)
             .single();
         
-        if (error || !data) return 'ST';
+        if (error || !data) return 'AD';
         
-        // 门店名称到代码的映射表
-        const nameToCode = {
+        // 门店编码到前缀的映射表
+        const codeToPrefix = {
+            'STORE_000': 'AD',  // Kantor (总部)
+            'STORE_001': 'BL',  // Bangil
+            'STORE_002': 'SO',  // Sidoarjo
+            'STORE_003': 'GP',  // Gempol
+            'STORE_004': 'BJ',  // Beji
+        };
+        
+        // 1. 优先根据门店编码映射
+        if (data.code && codeToPrefix[data.code]) {
+            return codeToPrefix[data.code];
+        }
+        
+        // 2. 其次根据名称映射
+        const nameToPrefix = {
+            'kantor': 'AD',
             'bangil': 'BL',
             'gempol': 'GP',
             'sidoarjo': 'SO',
-            'beji': 'BJ',
-            'kantor pusat': 'HQ',
-            'pusat': 'HQ',
-            'surabaya': 'SBY',
-            'jakarta': 'JKT'
+            'beji': 'BJ'
         };
         
         const nameLower = data.name.toLowerCase();
-        
-        // 1. 优先根据名称映射
-        for (const [key, val] of Object.entries(nameToCode)) {
+        for (const [key, val] of Object.entries(nameToPrefix)) {
             if (nameLower.includes(key)) {
                 return val;
             }
         }
         
-        // 2. 其次使用门店编码的前两位
-        if (data.code && data.code.trim()) {
-            const codeMatch = data.code.match(/STORE_(\d+)/);
-            if (codeMatch) {
-                const numMap = {
-                    '001': 'BL',
-                    '002': 'SO',
-                    '003': 'GP',
-                    '004': 'BJ'
-                };
-                if (numMap[codeMatch[1]]) {
-                    return numMap[codeMatch[1]];
-                }
-            }
-            return data.code.substring(0, 2).toUpperCase();
-        }
-        
-        // 3. 默认返回 HQ
-        return 'HQ';
+        // 3. 默认返回 AD
+        return 'AD';
     },
 
     // ==================== ID 生成器 ====================
@@ -599,8 +592,21 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 客户相关（含客户ID生成）====================
+    // ==================== 客户相关 ====================
     
+    async getCustomers(filters = {}) {
+        const profile = await this.getCurrentProfile();
+        let query = supabaseClient.from('customers').select('*, stores(name, code)').order('registered_date', { ascending: false });
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
     async createCustomer(customerData) {
         const profile = await this.getCurrentProfile();
         const storeId = customerData.store_id || profile.store_id;
@@ -627,19 +633,6 @@ const SupabaseAPI = {
             .select()
             .single();
         
-        if (error) throw error;
-        return data;
-    },
-
-    async getCustomers(filters = {}) {
-        const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('customers').select('*, stores(name, code)').order('registered_date', { ascending: false });
-        
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('store_id', profile.store_id);
-        }
-        
-        const { data, error } = await query;
         if (error) throw error;
         return data;
     },
