@@ -782,7 +782,7 @@ input:focus, select:focus, textarea:focus {
     #app { padding: 12px; }
     
     .dashboard-header { margin-bottom: 16px; }
-    .dashboard-header h1 { font-size: var(--font-md); }
+    .dashboard-header h2 { font-size: var(--font-md); }
     
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
