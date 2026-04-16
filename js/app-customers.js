@@ -1,5 +1,5 @@
 // app-customers.js - 完整修复版
-// 修复内容：Admin可创建客户（选择门店）、客户ID显示、Admin创建订单（选择门店）
+// 修复内容：客户ID生成显示、Admin可选择门店、Admin创建订单可选门店
 
 window.APP = window.APP || {};
 
@@ -28,7 +28,7 @@ const CustomersModule = {
                         <td class="phone-cell">${Utils.escapeHtml(c.phone || '-')}</td>
                         <td class="address-cell">${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
                         <td class="address-cell">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
-                        ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')}</td>` : ''}
+                        ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')} (${Utils.escapeHtml(c.stores?.code || '-')})</td>` : ''}
                         <td class="action-cell">
                             <button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>
                             <button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>
@@ -150,7 +150,6 @@ const CustomersModule = {
         var livingSameAsKtp = livingOpt === 'same';
         var livingAddress = livingSameAsKtp ? null : document.getElementById("customerLivingAddress").value.trim();
         
-        // 获取门店ID（Admin 需要选择，非 Admin 使用自己的门店）
         var isAdmin = AUTH.isAdmin();
         var storeId;
         
@@ -312,7 +311,6 @@ const CustomersModule = {
 
     createOrderForCustomer: async function(customerId) {
         try {
-            // 检查是否有活跃订单
             const { data: existingOrders } = await supabaseClient
                 .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
             if (existingOrders && existingOrders.length > 0) {
@@ -333,14 +331,12 @@ const CustomersModule = {
             var t = (key) => Utils.t(key);
             var isAdmin = AUTH.isAdmin();
             
-            // 获取门店列表（Admin 需要选择门店）
             var stores = await SUPABASE.getAllStores();
             var storeOptions = '';
             for (var store of stores) {
                 storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${Utils.escapeHtml(store.code || '-')})</option>`;
             }
             
-            // 默认选中客户所属门店
             var defaultStoreId = customer.store_id;
             
             var storeSelectionHtml = '';
@@ -353,7 +349,10 @@ const CustomersModule = {
                         </select>
                     </div>
                     <script>
-                        document.getElementById('orderStoreId').value = '${defaultStoreId}';
+                        setTimeout(function() {
+                            var select = document.getElementById('orderStoreId');
+                            if (select) select.value = '${defaultStoreId}';
+                        }, 100);
                     </script>
                 `;
             }
@@ -406,7 +405,6 @@ const CustomersModule = {
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var notes = document.getElementById("notes").value;
         
-        // 获取门店ID（Admin 需要从下拉框获取）
         var isAdmin = AUTH.isAdmin();
         var storeId = null;
         if (isAdmin) {
@@ -432,7 +430,7 @@ const CustomersModule = {
                 loan_amount: amount,
                 notes: notes,
                 customer_id: customerId,
-                store_id: storeId  // Admin 指定的门店，非 Admin 时为 null（会使用用户自己的门店）
+                store_id: storeId
             };
             
             var newOrder = await Order.create(orderData);
@@ -596,7 +594,6 @@ const CustomersModule = {
     }
 };
 
-// 合并到 window.APP
 for (var key in CustomersModule) {
     if (typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
