@@ -520,6 +520,7 @@ input:focus, select:focus, textarea:focus {
     .toolbar {
         gap: 8px;
         margin-bottom: 16px;
+        justify-content: center;  /* 添加这行：按钮水平居中 */
     }
     
     .toolbar button {
