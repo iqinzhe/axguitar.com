@@ -1,5 +1,5 @@
-// app-payments.js - 修复版
-// 修复内容：缴费页面确认文字优化（"入账"而非"支出"）
+// app-payments.js - 完整修复版
+// 修复内容：缴费页面确认文字优化（使用"入账"而非"支出"）
 
 window.APP = window.APP || {};
 
@@ -259,7 +259,7 @@ const PaymentsModule = {
         }
         
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
-        // 优化确认文字：使用"入账"而非"支出"
+        // 优化确认文字：使用"入账"概念
         if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName}?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，支付方式：${methodName}？`)) {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
@@ -275,7 +275,7 @@ const PaymentsModule = {
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
-        // 优化确认文字：使用"入账"
+        // 优化确认文字：使用"入账"概念
         if (confirm((lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName}?` : `确认入账利息 ${months} 个月，支付方式：${methodName}？`))) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
@@ -293,7 +293,7 @@ const PaymentsModule = {
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
-        // 优化确认文字：使用"入账"
+        // 优化确认文字：使用"入账"概念
         if (confirm((lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} via ${methodName}?` : `确认入账本金 ${Utils.formatCurrency(amount)}，支付方式：${methodName}？`))) {
             try {
                 await Order.recordPrincipalPayment(orderId, amount, method);
@@ -305,7 +305,6 @@ const PaymentsModule = {
     }
 };
 
-// 合并到 window.APP
 for (var key in PaymentsModule) {
     if (typeof PaymentsModule[key] === 'function') {
         window.APP[key] = PaymentsModule[key];
