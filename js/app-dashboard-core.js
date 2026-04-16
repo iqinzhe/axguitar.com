@@ -1,6 +1,5 @@
-// app-dashboard-core.js - 核心功能模块（完整版）
-// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
-// 门店用户可见：利润再投资、本金循环
+// app-dashboard-core.js - 核心功能模块（完整修复版）
+// 修复：资金管理类型选项根据数据库角色正确显示
 
 window.APP = window.APP || {};
 
@@ -103,7 +102,7 @@ const DashboardCore = {
             editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); }
         };
         var handler = navHandlers[page];
-        if (handler) handler();
+        if (handler) await handler();
         else this.renderDashboard();
     },
 
@@ -133,7 +132,7 @@ const DashboardCore = {
                 customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); }
             };
             var handler = backHandlers[prev.page];
-            if (handler) handler();
+            if (handler) await handler();
             else this.renderDashboard();
         } else {
             this.renderDashboard();
@@ -318,7 +317,7 @@ const DashboardCore = {
                 </div>
                 
                 <div class="card">
-                    <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.user.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工')})</h3>
+                    <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user?.name || '-')} (${AUTH.user?.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.user?.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工')})</h3>
                     <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
                     <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan' : '管理费: (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
                     ${!isAdmin ? `<p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
@@ -328,15 +327,17 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 资金管理模态框 ====================
+    // ==================== 资金管理模态框（修复版）====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
-        var isAdmin = AUTH.isAdmin();
+        
+        // 直接从数据库获取当前用户信息，确保角色正确
         var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = (profile?.role === 'admin');
+        var currentStoreId = profile?.store_id;
         
         var stores = await SUPABASE.getAllStores();
-        var currentStoreId = profile?.store_id;
         
         var storeOptions = '';
         for (var store of stores) {
@@ -349,7 +350,7 @@ const DashboardCore = {
             transactions = await SUPABASE.getCapitalTransactions();
         } catch(e) { console.error(e); }
         
-        // ========== 关键：门店用户可以看到两个选项 ==========
+        // 根据角色显示不同的交易类型
         var typeOptions = '';
         if (isAdmin) {
             typeOptions = `
@@ -358,7 +359,6 @@ const DashboardCore = {
                 <option value="dividend">📊 ${lang === 'id' ? 'Dividen' : '利润分红'}</option>
             `;
         } else {
-            // 店长/员工：显示利润再投资和本金循环
             typeOptions = `
                 <option value="reinvestment">🔄 ${lang === 'id' ? 'Reinvestasi Laba (Bunga)' : '利润再投资（利息）'}</option>
                 <option value="capital_circulation">🔄 ${lang === 'id' ? 'Sirkulasi Modal (Pokok)' : '本金循环（回收本金）'}</option>
@@ -490,7 +490,10 @@ const DashboardCore = {
         var amount = Utils.parseNumberFromCommas(amountStr);
         var description = document.getElementById('capitalDesc').value.trim();
         var transactionDate = document.getElementById('capitalDate').value;
-        var isAdmin = AUTH.isAdmin();
+        
+        // 直接从数据库获取角色
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = (profile?.role === 'admin');
         
         if (!amount || amount <= 0) {
             alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
@@ -510,8 +513,6 @@ const DashboardCore = {
             var targetStore = stores.find(s => s.id === targetStoreId);
             targetStoreName = targetStore?.name || '-';
         } else {
-            // 店长/员工：自动使用当前门店
-            const profile = await SUPABASE.getCurrentProfile();
             targetStoreId = profile.store_id;
             var currentStore = await SUPABASE.getStoreName(targetStoreId);
             targetStoreName = currentStore;
@@ -539,8 +540,6 @@ const DashboardCore = {
         if (!confirm(confirmMsg)) return;
         
         try {
-            const profile = await SUPABASE.getCurrentProfile();
-            
             var defaultDesc = '';
             if (type === 'reinvestment') {
                 defaultDesc = lang === 'id' ? 'Reinvestasi laba dari bunga' : '利息利润再投资';
@@ -587,7 +586,7 @@ const DashboardCore = {
 
             var userRows = '';
             for (var u of users) {
-                var isCurrent = u.id === AUTH.user.id;
+                var isCurrent = u.id === AUTH.user?.id;
                 var storeName = '';
                 if (u.role === 'admin') {
                     storeName = lang === 'id' ? 'Kantor' : '总部';
