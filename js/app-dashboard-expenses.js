@@ -52,9 +52,9 @@ const DashboardExpenses = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
-                    <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    <div class="header-actions">                      
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                         ${PERMISSION.canReconcile() ? `<button onclick="APP.balanceExpenses()" class="btn-balance warning">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
                     </div>
                 </div>
