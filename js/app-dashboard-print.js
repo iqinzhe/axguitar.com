@@ -33,7 +33,7 @@ const DashboardPrint = {
                     @media print {
                         @page { size: A4; margin: 15mm 12mm; }
                         body { margin: 0; padding: 0; font-size: 12pt; }
-                        .no-print, .toolbar button:not(.print-btn), button:not(.print-btn) { display: none !important; }
+                        .no-print, .toolbar button:not(.print-btn), button:not(.print-btn), .btn-back, .btn-export, .btn-balance, .btn-detail { display: none !important; }
                         .toolbar { display: block !important; text-align: center; }
                         .print-btn { display: inline-block !important; }
                         table { border-collapse: collapse; width: 100%; }
@@ -169,7 +169,7 @@ const DashboardPrint = {
                     @media print {
                         @page { size: A4; margin: 15mm 12mm; }
                         body { margin: 0; padding: 0; }
-                        .no-print, .toolbar button:not(.print-btn), button:not(.print-btn) { display: none !important; }
+                        .no-print, .toolbar button:not(.print-btn), button:not(.print-btn), .btn-back, .btn-export, .btn-balance, .btn-detail { display: none !important; }
                         .toolbar { display: block !important; text-align: center; }
                         .print-btn { display: inline-block !important; }
                         table { border-collapse: collapse; width: 100%; }
@@ -265,7 +265,6 @@ const DashboardPrint = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardPrint) {
     if (typeof DashboardPrint[key] === 'function') {
         window.APP[key] = DashboardPrint[key];
