@@ -1,5 +1,5 @@
 // app-payments.js - 完整修复版
-// 修复内容：缴费页面确认文字优化（使用"入账"而非"支出"）
+// 修复内容：缴费页面确认文字优化（使用"入账"概念）、头部按钮优化
 
 window.APP = window.APP || {};
 
@@ -110,8 +110,12 @@ const PaymentsModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Pembayaran' : '缴费'}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <button onclick="APP.viewOrder('${order.order_id}')" class="btn-detail">📄 ${lang === 'id' ? 'Lihat Detail Order' : '查看订单详情'}</button>
+                    </div>
                 </div>
+                
                 <div class="card order-summary">
                     <div class="summary-grid">
                         <div class="summary-item"><div class="summary-label">${t('customer_name')}</div><div class="summary-value">${Utils.escapeHtml(order.customer_name)}</div></div>
@@ -123,7 +127,9 @@ const PaymentsModule = {
                         <div class="summary-item"><div class="summary-label">${lang === 'id' ? 'Bunga Dibayar' : '已付利息期数'}</div><div class="summary-value">${order.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</div></div>
                     </div>
                 </div>
+                
                 ${adminFeeSection}
+                
                 <div class="card interest-card">
                     <h3>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3>
                     <p class="info-note">📌 ${lang === 'id' ? 'Setiap pembayaran memperpanjang pinjaman 1 bulan secara otomatis' : '📌 每次付息后自动延续1个月，到期日同步更新'}</p>
@@ -155,6 +161,7 @@ const PaymentsModule = {
                         </table>
                     </div>
                 </div>
+                
                 <div class="card principal-card">
                     <h3>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金还款'}</h3>
                     <p class="info-note">📌 ${lang === 'id' ? `Total pinjaman: ${Utils.formatCurrency(order.loan_amount)} | Sudah dibayar: ${Utils.formatCurrency(order.principal_paid)} | Sisa: ${Utils.formatCurrency(remainingPrincipal)}` : `📌 贷款总额: ${Utils.formatCurrency(order.loan_amount)} | 已还: ${Utils.formatCurrency(order.principal_paid)} | 剩余: ${Utils.formatCurrency(remainingPrincipal)}`}</p>
@@ -173,10 +180,6 @@ const PaymentsModule = {
                             <tbody>${principalRows}</tbody>
                         </table>
                     </div>
-                </div>
-                <div class="toolbar">
-                    <button onclick="APP.viewOrder('${order.order_id}')">📄 ${lang === 'id' ? 'Lihat Detail Order' : '查看订单详情'}</button>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                 </div>
                 <style>
                     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
