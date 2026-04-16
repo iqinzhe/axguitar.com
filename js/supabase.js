@@ -1,6 +1,5 @@
-// supabase.js - 完整最终版
-// 资金类型：investment(启动资金), withdrawal(本金提取), dividend(利润分红), 
-//          reinvestment(利润再投资), capital_circulation(本金循环)
+// supabase.js - 完整最终版（含资金管理优化）
+// 包含：注资(投资)、提现(还本)、分红、分店资金账户查询、防重复机制
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -642,8 +641,242 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 资金注资/提现/分红/再投资 API ====================
+    // ==================== 🆕 资金管理优化函数（新增） ====================
     
+    // 生成唯一业务单号（防重复）
+    _generateBizNo: function(prefix) {
+        return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+    },
+
+    // 获取分店当前资金状态（实时计算）
+    async getShopAccount(storeId) {
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        
+        if (!targetStoreId) {
+            return { principal_balance: 0, profit_balance: 0, total_invested: 0, total_withdrawn: 0, total_profit: 0, total_dividend: 0 };
+        }
+        
+        // 1. 计算注资总额（总部给这个分店的钱）
+        const { data: investments } = await supabaseClient
+            .from('capital_transactions')
+            .select('amount')
+            .eq('target_store_id', targetStoreId)
+            .in('type', ['investment', 'reinvestment', 'capital_circulation']);
+        
+        const totalInvested = (investments || []).reduce((s, t) => s + t.amount, 0);
+        
+        // 2. 计算已还本金（分店还给总部的本金）
+        const { data: withdrawals } = await supabaseClient
+            .from('capital_transactions')
+            .select('amount')
+            .eq('store_id', targetStoreId)
+            .eq('type', 'withdrawal');
+        
+        const totalWithdrawn = (withdrawals || []).reduce((s, t) => s + t.amount, 0);
+        
+        // 3. 计算已分红（分店给总部的分红）
+        const { data: dividends } = await supabaseClient
+            .from('capital_transactions')
+            .select('amount')
+            .eq('store_id', targetStoreId)
+            .eq('type', 'dividend');
+        
+        const totalDividend = (dividends || []).reduce((s, t) => s + t.amount, 0);
+        
+        // 4. 计算分店赚取的利润（管理费 + 利息收入）
+        const { data: orders } = await supabaseClient
+            .from('orders')
+            .select('id')
+            .eq('store_id', targetStoreId);
+        
+        const orderIds = orders?.map(o => o.id) || [];
+        
+        let totalProfit = 0;
+        if (orderIds.length > 0) {
+            const { data: payments } = await supabaseClient
+                .from('payment_history')
+                .select('type, amount')
+                .in('order_id', orderIds)
+                .in('type', ['admin_fee', 'interest']);
+            
+            totalProfit = (payments || []).reduce((s, p) => s + p.amount, 0);
+        }
+        
+        // 本金余额 = 总投资 - 已还本金
+        const principalBalance = totalInvested - totalWithdrawn;
+        
+        // 未分配利润 = 总利润 - 已分红
+        const undistributedProfit = totalProfit - totalDividend;
+        
+        return {
+            principal_balance: principalBalance,
+            profit_balance: undistributedProfit,
+            total_invested: totalInvested,
+            total_withdrawn: totalWithdrawn,
+            total_profit: totalProfit,
+            total_dividend: totalDividend
+        };
+    },
+
+    // 注资（总部给分店）- 管理员专用
+    async investToShop(shopId, amount, paymentMethod, description, transactionDate) {
+        const profile = await this.getCurrentProfile();
+        
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat melakukan investasi' : '只有管理员可以注资');
+        }
+        
+        if (!amount || amount <= 0) {
+            throw new Error(Utils.lang === 'id' ? 'Jumlah tidak valid' : '金额无效');
+        }
+        
+        // 生成唯一业务单号防止重复
+        const bizNo = this._generateBizNo('INV');
+        
+        // 插入资金流水
+        const { data, error } = await supabaseClient
+            .from('capital_transactions')
+            .insert({
+                biz_no: bizNo,
+                store_id: null,  // 来源：总部
+                target_store_id: shopId,
+                type: 'investment',
+                payment_method: paymentMethod,
+                amount: amount,
+                description: description || (Utils.lang === 'id' ? 'Investasi modal' : '注资'),
+                transaction_date: transactionDate || new Date().toISOString().split('T')[0],
+                created_by: profile.id
+            })
+            .select()
+            .single();
+        
+        if (error) {
+            if (error.code === '23505') {
+                throw new Error(Utils.lang === 'id' ? '重复提交，请稍后再试' : '重复提交，请稍后再试');
+            }
+            throw error;
+        }
+        
+        return data;
+    },
+
+    // 提现还本（分店还本金给总部）- 店长/员工可用
+    async withdrawFromShop(shopId, amount, paymentMethod, description, transactionDate) {
+        const profile = await this.getCurrentProfile();
+        
+        // 检查权限：店长或员工只能操作自己的门店
+        if (profile?.role !== 'admin' && profile?.store_id !== shopId) {
+            throw new Error(Utils.lang === 'id' ? 'Anda hanya dapat mengelola toko sendiri' : '您只能管理自己的门店');
+        }
+        
+        // 获取分店当前本金余额
+        const account = await this.getShopAccount(shopId);
+        
+        if (account.principal_balance < amount) {
+            throw new Error(Utils.lang === 'id' 
+                ? `Sisa pokok tidak mencukupi. Tersedia: ${this.formatCurrency(account.principal_balance)}`
+                : `本金余额不足。可用: ${this.formatCurrency(account.principal_balance)}`);
+        }
+        
+        const bizNo = this._generateBizNo('WTD');
+        
+        const { data, error } = await supabaseClient
+            .from('capital_transactions')
+            .insert({
+                biz_no: bizNo,
+                store_id: shopId,  // 来源：分店
+                target_store_id: null,  // 去向：总部
+                type: 'withdrawal',
+                payment_method: paymentMethod,
+                amount: amount,
+                description: description || (Utils.lang === 'id' ? 'Penarikan modal (pembayaran pokok)' : '本金提现'),
+                transaction_date: transactionDate || new Date().toISOString().split('T')[0],
+                created_by: profile.id
+            })
+            .select()
+            .single();
+        
+        if (error) {
+            if (error.code === '23505') {
+                throw new Error(Utils.lang === 'id' ? '重复提交，请稍后再试' : '重复提交，请稍后再试');
+            }
+            throw error;
+        }
+        
+        return data;
+    },
+
+    // 分红（分店分配利润给总部）- 店长/员工可用
+    async distributeDividend(shopId, amount, paymentMethod, description, transactionDate) {
+        const profile = await this.getCurrentProfile();
+        
+        // 检查权限：店长或员工只能操作自己的门店
+        if (profile?.role !== 'admin' && profile?.store_id !== shopId) {
+            throw new Error(Utils.lang === 'id' ? 'Anda hanya dapat mengelola toko sendiri' : '您只能管理自己的门店');
+        }
+        
+        // 获取分店当前未分配利润
+        const account = await this.getShopAccount(shopId);
+        
+        if (account.profit_balance < amount) {
+            throw new Error(Utils.lang === 'id' 
+                ? `Sisa laba tidak mencukupi. Tersedia: ${this.formatCurrency(account.profit_balance)}`
+                : `未分配利润不足。可用: ${this.formatCurrency(account.profit_balance)}`);
+        }
+        
+        const bizNo = this._generateBizNo('DIV');
+        
+        const { data, error } = await supabaseClient
+            .from('capital_transactions')
+            .insert({
+                biz_no: bizNo,
+                store_id: shopId,  // 来源：分店
+                target_store_id: null,  // 去向：总部
+                type: 'dividend',
+                payment_method: paymentMethod,
+                amount: amount,
+                description: description || (Utils.lang === 'id' ? 'Pembagian dividen / laba' : '利润分红'),
+                transaction_date: transactionDate || new Date().toISOString().split('T')[0],
+                created_by: profile.id
+            })
+            .select()
+            .single();
+        
+        if (error) {
+            if (error.code === '23505') {
+                throw new Error(Utils.lang === 'id' ? '重复提交，请稍后再试' : '重复提交，请稍后再试');
+            }
+            throw error;
+        }
+        
+        return data;
+    },
+
+    // 获取所有分店的资金汇总（用于管理员报表）
+    async getAllShopsCapitalSummary() {
+        const stores = await this.getAllStores();
+        const summary = [];
+        
+        for (const store of stores) {
+            const account = await this.getShopAccount(store.id);
+            summary.push({
+                store_id: store.id,
+                store_name: store.name,
+                store_code: store.code,
+                principal_balance: account.principal_balance,
+                profit_balance: account.profit_balance,
+                total_invested: account.total_invested,
+                total_withdrawn: account.total_withdrawn,
+                total_profit: account.total_profit,
+                total_dividend: account.total_dividend
+            });
+        }
+        
+        return summary;
+    },
+
+    // 获取资金流水（支持门店过滤）
     async getCapitalTransactions() {
         const profile = await this.getCurrentProfile();
         
@@ -657,51 +890,11 @@ const SupabaseAPI = {
             .order('transaction_date', { ascending: false });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('store_id', profile.store_id);
+            // 店长/员工：只看到自己门店相关的交易（作为来源或去向）
+            query = query.or(`store_id.eq.${profile.store_id},target_store_id.eq.${profile.store_id}`);
         }
         
         const { data, error } = await query;
-        if (error) throw error;
-        return data;
-    },
-
-    async addCapitalTransaction(transaction) {
-        const profile = await this.getCurrentProfile();
-        
-        const validTypes = ['investment', 'withdrawal', 'dividend', 'reinvestment', 'capital_circulation'];
-        if (!validTypes.includes(transaction.type)) {
-            throw new Error(Utils.lang === 'id' ? 'Tipe transaksi tidak valid' : '交易类型无效');
-        }
-        
-        // 权限验证
-        if (transaction.type === 'reinvestment' || transaction.type === 'capital_circulation') {
-            // 利润再投资 和 本金循环：门店可以操作
-            if (!profile?.store_id) {
-                throw new Error(Utils.lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
-            }
-            transaction.store_id = profile.store_id;
-            transaction.target_store_id = profile.store_id;
-        } else {
-            // 启动资金/本金提取/利润分红：只有 Admin 可以操作
-            if (profile?.role !== 'admin') {
-                throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
-            }
-            if (!transaction.target_store_id) {
-                throw new Error(Utils.lang === 'id' ? 'Harap pilih tujuan aliran dana' : '请选择资金流向');
-            }
-        }
-        
-        const { data, error } = await supabaseClient.from('capital_transactions').insert({
-            store_id: transaction.store_id,
-            target_store_id: transaction.target_store_id,
-            type: transaction.type,
-            payment_method: transaction.payment_method,
-            amount: transaction.amount,
-            description: transaction.description || '',
-            transaction_date: transaction.transaction_date || new Date().toISOString().split('T')[0],
-            created_by: profile.id
-        }).select().single();
-        
         if (error) throw error;
         return data;
     },
