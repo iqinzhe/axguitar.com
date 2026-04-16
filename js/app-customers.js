@@ -80,9 +80,9 @@ const CustomersModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
-                    <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    <div class="header-actions">                        
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
                 
