@@ -54,15 +54,16 @@ window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);  // 修复 console.er → console.error
 });
 
+var initTimeout = setTimeout(function() {
+    showError('加载超时，请刷新页面重试');
+}, 10000);  // 10秒超时
+
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
+        clearTimeout(initTimeout);
         try {
-            if (!window.APP) {
-                throw new Error('APP module not loaded');
-            }
-            if (typeof window.APP.init !== 'function') {
-                throw new Error('APP.init is not a function');
-            }
+            if (!window.APP) throw new Error('APP module not loaded');
+            if (typeof window.APP.init !== 'function') throw new Error('APP.init is not a function');
             window.APP.init();
         } catch (err) {
             console.error('Init error:', err);
