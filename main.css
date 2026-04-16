@@ -48,6 +48,29 @@ body {
     background: var(--bg);
 }
 
+/* ===== 统一 Logo 图片大小 ===== */
+.dashboard-header h1 img,
+.page-header h1 img,
+h1 img,
+.login-logo {
+    height: 1.2em;
+    width: auto;
+    vertical-align: middle;
+}
+
+/* 所有标题中的图片统一大小 */
+h1 img, h2 img, h3 img {
+    height: 1em;
+    width: auto;
+    vertical-align: middle;
+}
+
+/* 打印页面 Logo */
+.print-header .logo img {
+    height: 1.2em;
+    width: auto;
+}
+
 /* ===== 页面头部统一布局 ===== */
 .page-header {
     display: flex;
@@ -167,7 +190,7 @@ body {
 }
 
 .dashboard-header h1 img {
-    height: 1.0em;
+    height: 1.2em;
     width: auto;
     vertical-align: middle;
 }
@@ -646,7 +669,8 @@ input:focus, select:focus, textarea:focus {
     text-align: center;
 }
 .login-logo {
-    height: 32px;
+    height: 1.2em;
+    width: auto;
     vertical-align: middle;
 }
 .lang-toggle {
