@@ -1,3 +1,5 @@
+// store.js - 修复版（门店编码自动生成）
+
 const StoreManager = {
     stores: [],
     _loaded: false,
@@ -9,7 +11,61 @@ const StoreManager = {
         return this.stores;
     },
 
-    async createStore(code, name, address, phone) {
+    async _generateStoreCode(name) {
+        await this.loadStores(true);
+        
+        // 门店名称到代码的映射表
+        const nameToCode = {
+            'bangil': 'BL',
+            'gempol': 'GP',
+            'sidoarjo': 'SO',
+            'beji': 'BJ',
+            'kantor pusat': 'HQ',
+            'pusat': 'HQ',
+            'surabaya': 'SBY',
+            'jakarta': 'JKT',
+            'malang': 'MLG',
+            'kediri': 'KDR',
+            'blitar': 'BLT',
+            'probolinggo': 'PBG',
+            'pasuruan': 'PSR',
+            'lumajang': 'LMJ',
+            'jember': 'JMR',
+            'banyuwangi': 'BYW'
+        };
+        
+        const nameLower = name.toLowerCase();
+        let baseCode = 'ST';
+        
+        // 1. 根据名称映射
+        for (const [key, val] of Object.entries(nameToCode)) {
+            if (nameLower.includes(key)) {
+                baseCode = val;
+                break;
+            }
+        }
+        
+        // 2. 如果没有映射，取前两个字母
+        if (baseCode === 'ST') {
+            const letters = name.replace(/[^A-Za-z]/g, '').toUpperCase();
+            baseCode = letters.substring(0, 2);
+            if (baseCode.length < 2) baseCode = 'ST';
+        }
+        
+        // 3. 检查是否重复，如果重复则添加数字
+        let finalCode = baseCode;
+        let counter = 1;
+        while (this.stores.some(s => s.code === finalCode)) {
+            finalCode = `${baseCode}${counter}`;
+            counter++;
+        }
+        
+        return finalCode;
+    },
+
+    async createStore(name, address, phone) {
+        // 自动生成门店编码
+        const code = await this._generateStoreCode(name);
         const newStore = await SUPABASE.createStore(code, name, address, phone);
         this.stores.push(newStore);
         this.stores.sort((a, b) => a.name.localeCompare(b.name));
@@ -197,7 +253,7 @@ const StoreManager = {
             grandTotal.bankBalance += bankBalance;
             
             storeStatsRows += `<tr>
-                <td style="border:1px solid #cbd5e1;padding:8px;"><strong>${Utils.escapeHtml(store.name)}</strong></td>
+                <td style="border:1px solid #cbd5e1;padding:8px;"><strong>${Utils.escapeHtml(store.name)}</strong><br><small style="color:#64748b;">${Utils.escapeHtml(store.code)}</small></td>
                 <td style="border:1px solid #cbd5e1;padding:8px;">${ordsCount}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;">${activeCount}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalLoan)}</td>
@@ -211,7 +267,6 @@ const StoreManager = {
             　　　`;
         }
 
-        // 生成门店列表行（包含 WA 号码输入框）
         let storeRows = '';
         if (this.stores.length === 0) {
             storeRows = `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
@@ -304,7 +359,7 @@ const StoreManager = {
                     </table>
                 </div>
                 <p style="font-size:12px; color:#64748b; margin-top:8px;">
-                    💡 ${lang === 'id' ? 'Klik pada kolom WA untuk mengedit nomor. Contoh: 6281234567890' : '点击 WA 列编辑号码。示例: 6281234567890'}
+                    💡 ${lang === 'id' ? 'Kode toko dibuat otomatis berdasarkan nama. Klik pada kolom WA untuk mengedit nomor. Contoh: 6281234567890' : '门店编码根据名称自动生成。点击 WA 列编辑号码。示例: 6281234567890'}
                 </p>
             </div>
 
@@ -312,13 +367,9 @@ const StoreManager = {
                 <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>${lang === 'id' ? 'Kode Toko' : '门店编码'} *</label>
-                        <input id="newStoreCode" placeholder="STORE_004">
-                        <small style="color:#64748b;font-size:11px;">${lang === 'id' ? 'Contoh: BL, GP, SO' : '例如: BL, GP, SO'}</small>
-                    </div>
-                    <div class="form-group">
                         <label>${lang === 'id' ? 'Nama Toko' : '门店名称'} *</label>
-                        <input id="newStoreName" placeholder="${lang === 'id' ? 'Nama Toko' : '门店名称'}">
+                        <input id="newStoreName" placeholder="${lang === 'id' ? 'Contoh: Bangil, Gempol' : '例如: Bangil, Gempol'}">
+                        <small style="color:#64748b;font-size:11px;">${lang === 'id' ? 'Kode toko akan dibuat otomatis' : '门店编码将自动生成'}</small>
                     </div>
                     <div class="form-group">
                         <label>${lang === 'id' ? 'Alamat' : '地址'}</label>
