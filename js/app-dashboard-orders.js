@@ -1,5 +1,5 @@
 // app-dashboard-orders.js - 订单功能模块
-// 包含：订单列表、查看订单、编辑订单、删除订单、打印订单
+// 包含：订单列表、查看订单、编辑订单、删除订单、打印订单、缴费明细
 
 window.APP = window.APP || {};
 
@@ -50,8 +50,13 @@ const DashboardOrders = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📋 ${t('order_list')}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    </div>
                 </div>
+                
                 <div class="toolbar">
                     <input type="text" id="searchInput" placeholder="🔍 ${t('search')}..." value="${Utils.escapeHtml(this.searchKeyword)}">
                     <button onclick="APP.searchOrders()">${t('search')}</button>
@@ -61,9 +66,8 @@ const DashboardOrders = {
                         <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${t('active')}</option>
                         <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${t('completed')}</option>
                     </select>
-                    <button onclick="Storage.exportOrdersToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
-                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>
+                
                 <div class="table-container">
                     <table class="data-table order-table">
                         <thead>
@@ -132,15 +136,19 @@ const DashboardOrders = {
                     　　　`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td><tr>`;
             }
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📄 ${t('view')} ${t('order_list')}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <button onclick="APP.printOrder('${order.order_id}')" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    </div>
                 </div>
+                
                 <div class="card">
                     <h3>${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
                     <p><strong>ID:</strong> ${Utils.escapeHtml(order.order_id)}</p>
@@ -178,7 +186,6 @@ const DashboardOrders = {
                         ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
                         ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')" class="warning">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
                         <button onclick="APP.sendWAReminder('${order.order_id}')" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
-                        <button onclick="APP.printOrder('${order.order_id}')" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
                 </div>`;
         } catch (error) {
@@ -209,7 +216,9 @@ const DashboardOrders = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>✏️ ${t('edit')}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    </div>
                 </div>
                 <div class="card">
                     <div class="form-grid">
@@ -345,7 +354,7 @@ const DashboardOrders = {
                     <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
                     <td>${Utils.formatDate(p.date)}</td>
                     <td>${typeMap[p.type] || p.type}</td>
-                    <td>${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
                     <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                     <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                     <td>${Utils.escapeHtml(p.description || '-')}</td>
@@ -355,14 +364,20 @@ const DashboardOrders = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h2>
-                    <button onclick="APP.goBack()">↩️ ${Utils.t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button>
+                        <button onclick="Storage.exportPaymentsToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    </div>
                 </div>
+                
                 <div class="stats-grid">
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div></div>
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Total Bunga' : '利息总额'}</div></div>
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Total Pokok' : '本金总额'}</div></div>
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
                 </div>
+                
                 <div class="table-container">
                     <table class="payment-table">
                         <thead>
@@ -380,10 +395,6 @@ const DashboardOrders = {
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
-                </div>
-                <div class="toolbar">
-                    <button onclick="Storage.exportPaymentsToCSV()">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
-                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                 </div>`;
         } catch (error) {
             console.error("showPaymentHistory error:", error);
@@ -392,7 +403,6 @@ const DashboardOrders = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardOrders) {
     if (typeof DashboardOrders[key] === 'function') {
         window.APP[key] = DashboardOrders[key];
