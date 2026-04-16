@@ -568,7 +568,6 @@ input:focus, select:focus, textarea:focus {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==================== 手机端布局 ==================== */
-
 @media (max-width: 640px) {
     /* 容器内边距 */
     #app {
@@ -586,24 +585,28 @@ input:focus, select:focus, textarea:focus {
         padding: 10px 6px;
     }
     
-    /* 工具栏按钮间距优化 - 减少误触 */
+    /* 工具栏：等宽按钮，文字超长截断 */
     .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        justify-content: center;
-        align-items: center;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 10px;
         margin-bottom: 16px;
     }
     
     .toolbar button {
-        padding: 10px 14px;
+        padding: 10px 6px;
         font-size: var(--font-sm);
-        flex: 0 0 auto;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        width: 100%;
     }
     
-    /* 卡片内边距和间距优化 - 减少稀疏感 */
+    /* 卡片内边距和间距优化 */
     .card {
         padding: 12px;
         margin-bottom: 12px;
@@ -692,8 +695,13 @@ input:focus, select:focus, textarea:focus {
 
 /* 极小屏微调 */
 @media (max-width: 400px) {
+    .toolbar {
+        grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
+        gap: 8px;
+    }
+    
     .toolbar button {
-        padding: 8px 10px;
+        padding: 8px 4px;
         font-size: var(--font-xxs);
     }
     
