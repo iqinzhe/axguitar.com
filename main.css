@@ -21,11 +21,11 @@
     --shadow-md: 0 6px 18px rgba(0,0,0,0.08);
     
     --font-xxs: 0.8rem;    /* 12.8px - 最小号 */
-    --font-xs: 1.0rem;     /* 16px   - 小号 */
-    --font-sm: 1.15rem;    /* 18.4px - 正常 */
-    --font-md: 1.25rem;    /* 20px   - 中号 */
-    --font-lg: 1.35rem;    /* 21.6px - 大号 */
-    --font-xl: 1.45rem;    /* 23.2px - 特大 */
+    --font-xs: 0.9rem;     /* 16px   - 小号 */
+    --font-sm: 1.0rem;    /* 18.4px - 正常 */
+    --font-md: 1.15rem;    /* 20px   - 中号 */
+    --font-lg: 1.25rem;    /* 21.6px - 大号 */
+    --font-xl: 1.35rem;    /* 23.2px - 特大 */
 }
 
 html { font-size: 16px; }
