@@ -1,5 +1,5 @@
-// app-dashboard-core.js - 核心功能模块
-// 包含：初始化、登录、登出、路由、导航、用户管理
+// app-dashboard-core.js - 核心功能模块（完整资金管理版）
+// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
 
 window.APP = window.APP || {};
 
@@ -329,7 +329,7 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 注资/提现模态框 ====================
+    // ==================== 资金管理模态框（增强版） ====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
@@ -338,10 +338,18 @@ const DashboardCore = {
         var isAdmin = AUTH.isAdmin();
         var currentStoreId = AUTH.user?.store_id;
         
+        // 获取各分店资金状态（仅管理员可见）
+        var shopAccounts = isAdmin ? await SUPABASE.getAllShopsCapitalSummary() : [];
+        
         var storeOptions = '';
         for (var store of stores) {
             if (!isAdmin && store.id !== currentStoreId) continue;
-            storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${Utils.escapeHtml(store.code || '-')})</option>`;
+            var accountInfo = shopAccounts.find(a => a.store_id === store.id);
+            var balanceText = '';
+            if (accountInfo && isAdmin) {
+                balanceText = ` (💰本金:${Utils.formatCurrency(accountInfo.principal_balance)} | 📊利润:${Utils.formatCurrency(accountInfo.profit_balance)})`;
+            }
+            storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${Utils.escapeHtml(store.code || '-')})${balanceText}</option>`;
         }
         
         var transactions = [];
@@ -351,37 +359,60 @@ const DashboardCore = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="6" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金记录'}</td></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金记录'}</td></tr>`;
         } else {
             var typeMap = {
-                investment: lang === 'id' ? '💰 Investasi' : '💰 注资',
-                withdrawal: lang === 'id' ? '📤 Penarikan' : '📤 提现',
-                dividend: lang === 'id' ? '📊 Dividen' : '📊 分红'
+                investment: lang === 'id' ? '💰 注资' : '💰 注资',
+                withdrawal: lang === 'id' ? '📤 提现(还本)' : '📤 提现(还本)',
+                dividend: lang === 'id' ? '📊 分红' : '📊 分红',
+                reinvestment: lang === 'id' ? '🔄 利润再投资' : '🔄 利润再投资',
+                capital_circulation: lang === 'id' ? '🔄 本金循环' : '🔄 本金循环'
             };
-            for (var txn of transactions.slice(0, 10)) {
-                var sourceStoreName = txn.source_store?.name || '-';
-                var targetStoreName = txn.target_store?.name || '-';
-                var flowText = sourceStoreName === targetStoreName ? targetStoreName : `${sourceStoreName} → ${targetStoreName}`;
+            for (var txn of transactions.slice(0, 20)) {
+                var sourceStoreName = txn.source_store?.name || (txn.store_id ? (txn.source_store?.name || '-') : '总部');
+                var targetStoreName = txn.target_store?.name || (txn.target_store_id ? (txn.target_store?.name || '-') : '总部');
+                var flowText = `${sourceStoreName} → ${targetStoreName}`;
+                var amountClass = (txn.type === 'investment') ? 'income' : 'expense';
                 transactionRows += `<tr>
-                    <td class="date-cell">${Utils.formatDate(txn.transaction_date)}</td>
-                    <td class="text-center">${typeMap[txn.type] || txn.type}</td>
-                    <td class="text-center">${txn.payment_method === 'cash' ? '🏦 ' + (lang === 'id' ? 'Tunai' : '现金') : '🏧 ' + (lang === 'id' ? 'Bank' : '银行')}</td>
-                    <td class="text-center">${flowText}</td>
-                    <td class="text-right ${txn.type === 'investment' ? 'income' : 'expense'}">${Utils.formatCurrency(txn.amount)}</td>
-                    <td class="desc-cell">${Utils.escapeHtml(txn.description || '-')}</td>
+                    <td class="date-cell" style="padding:6px;">${Utils.formatDate(txn.transaction_date)}</td>
+                    <td class="text-center" style="padding:6px;">${typeMap[txn.type] || txn.type}</td>
+                    <td class="text-center" style="padding:6px;">${txn.payment_method === 'cash' ? '🏦 ' + (lang === 'id' ? '现金' : '现金') : '🏧 银行'}</td>
+                    <td class="text-center" style="padding:6px;">${flowText}</td>
+                    <td class="text-right ${amountClass}" style="padding:6px;">${Utils.formatCurrency(txn.amount)}</td>
+                    <td class="desc-cell" style="padding:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
+                    <td class="text-center" style="padding:6px;font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
                 　　　`;
             }
+        }
+        
+        // 如果是店长/员工，只显示本店资金状态
+        var shopAccountHtml = '';
+        if (!isAdmin && currentStoreId) {
+            var myAccount = await SUPABASE.getShopAccount(currentStoreId);
+            shopAccountHtml = `
+                <div class="card" style="margin-bottom:16px;background:#f0fdf4;border-left:4px solid #22c55e;padding:12px;">
+                    <h4 style="margin:0 0 8px 0;">🏪 ${lang === 'id' ? 'Status Toko Saya' : '本店资金状态'}</h4>
+                    <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px;">
+                        <div><strong>💰 ${lang === 'id' ? 'Sisa Pokok (Hutang)' : '剩余本金(欠总部)'}:</strong> ${Utils.formatCurrency(myAccount.principal_balance)}</div>
+                        <div><strong>📊 ${lang === 'id' ? 'Laba Belum Dibagi' : '未分配利润'}:</strong> ${Utils.formatCurrency(myAccount.profit_balance)}</div>
+                        <div><strong>💵 ${lang === 'id' ? 'Total Investasi' : '总投资'}:</strong> ${Utils.formatCurrency(myAccount.total_invested)}</div>
+                        <div><strong>📤 ${lang === 'id' ? 'Total Penarikan' : '总提现'}:</strong> ${Utils.formatCurrency(myAccount.total_withdrawn)}</div>
+                    </div>
+                </div>
+            `;
         }
         
         var modal = document.createElement('div');
         modal.id = 'capitalModal';
         modal.className = 'modal-overlay';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width:750px;">
+            <div class="modal-content" style="max-width:950px;max-height:85vh;overflow-y:auto;">
                 <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                    <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Kelola Modal' : '资金管理'}</h3>
+                    <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Kelola Modal & Laba' : '资金与利润管理'}</h3>
                     <button onclick="document.getElementById('capitalModal').remove()" style="background:transparent;color:#64748b;font-size:20px;border:none;cursor:pointer;">✖</button>
                 </div>
+                
+                ${shopAccountHtml}
                 
                 <div class="modal-section" style="margin-bottom:24px;">
                     <h4 style="margin:0 0 12px 0;">📝 ${lang === 'id' ? 'Tambah Transaksi Baru' : '新增交易'}</h4>
@@ -389,25 +420,25 @@ const DashboardCore = {
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Tipe' : '类型'}</label>
                             <select id="capitalType">
-                                <option value="investment">💰 ${lang === 'id' ? 'Investasi (Tambah Modal)' : '注资（增加本金）'}</option>
-                                <option value="withdrawal">📤 ${lang === 'id' ? 'Penarikan (Ambil Modal)' : '提现（取出本金）'}</option>
-                                <option value="dividend">📊 ${lang === 'id' ? 'Dividen (Bagi Hasil)' : '分红（利润分配）'}</option>
+                                <option value="investment">💰 ${lang === 'id' ? '注资 (总部→分店)' : '注资 (总部→分店)'}</option>
+                                <option value="withdrawal">📤 ${lang === 'id' ? '提现还本 (分店→总部)' : '提现还本 (分店→总部)'}</option>
+                                <option value="dividend">📊 ${lang === 'id' ? '分红 (分店→总部)' : '分红 (分店→总部)'}</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Metode' : '方式'}</label>
                             <select id="capitalMethod">
-                                <option value="cash">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</option>
-                                <option value="bank">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</option>
+                                <option value="cash">🏦 ${lang === 'id' ? '现金 (保险柜)' : '现金 (保险柜)'}</option>
+                                <option value="bank">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</label>
+                            <label>${lang === 'id' ? 'Pilih Toko' : '选择门店'}</label>
                             <select id="capitalTargetStore">
                                 ${storeOptions}
                             </select>
                             <small style="color:#64748b;font-size:11px;display:block;margin-top:4px;">
-                                💡 ${lang === 'id' ? 'Pilih toko penerima dana' : '选择资金接收方门店'}
+                                💡 ${lang === 'id' ? '注资: 选择接收方门店 | 提现/分红: 选择来源门店' : '注资: 选择接收方门店 | 提现/分红: 选择来源门店'}
                             </small>
                         </div>
                         <div class="form-group">
@@ -424,21 +455,22 @@ const DashboardCore = {
                         </div>
                     </div>
                     <div class="form-actions" style="margin-top:16px;">
-                        <button onclick="APP.saveCapitalTransaction()" class="success">💾 ${lang === 'id' ? 'Simpan Transaksi' : '保存交易'}</button>
+                        <button onclick="APP.saveCapitalTransactionEnhanced()" class="success" id="saveCapitalBtn">💾 ${lang === 'id' ? 'Simpan Transaksi' : '保存交易'}</button>
                     </div>
                 </div>
                 
                 <h4 style="margin:16px 0 12px 0;">📋 ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h4>
-                <div class="table-container" style="max-height:300px;overflow-y:auto;">
-                    <table class="data-table" style="width:100%;">
+                <div class="table-container" style="max-height:350px;overflow-y:auto;">
+                    <table class="data-table" style="width:100%;font-size:12px;">
                         <thead>
                             <tr>
-                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
-                                <th>${lang === 'id' ? 'Metode' : '方式'}</th>
-                                <th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th>
-                                <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <th style="padding:6px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th style="padding:6px;">${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                <th style="padding:6px;">${lang === 'id' ? 'Metode' : '方式'}</th>
+                                <th style="padding:6px;">${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th>
+                                <th style="padding:6px;" class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th style="padding:6px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <th style="padding:6px;">${lang === 'id' ? 'No. Transaksi' : '交易号'}</th>
                             </tr>
                         </thead>
                         <tbody>${transactionRows}</tbody>
@@ -454,9 +486,22 @@ const DashboardCore = {
         
         var amountInput = document.getElementById('capitalAmount');
         if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+        
+        // 根据用户角色禁用某些选项
+        if (!isAdmin) {
+            var typeSelect = document.getElementById('capitalType');
+            if (typeSelect) {
+                // 店长/员工只能进行提现还本和分红（从本店划出资金）
+                typeSelect.innerHTML = `
+                    <option value="withdrawal">📤 ${lang === 'id' ? '提现还本 (本店→总部)' : '提现还本 (本店→总部)'}</option>
+                    <option value="dividend">📊 ${lang === 'id' ? '分红 (本店→总部)' : '分红 (本店→总部)'}</option>
+                `;
+            }
+        }
     },
 
-    saveCapitalTransaction: async function() {
+    // ==================== 保存资金交易（增强版，带防重复和余额检查） ====================
+    saveCapitalTransactionEnhanced: async function() {
         var lang = Utils.lang;
         var type = document.getElementById('capitalType').value;
         var paymentMethod = document.getElementById('capitalMethod').value;
@@ -465,6 +510,7 @@ const DashboardCore = {
         var amount = Utils.parseNumberFromCommas(amountStr);
         var description = document.getElementById('capitalDesc').value.trim();
         var transactionDate = document.getElementById('capitalDate').value;
+        var saveBtn = document.getElementById('saveCapitalBtn');
         
         if (!amount || amount <= 0) {
             alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
@@ -472,42 +518,52 @@ const DashboardCore = {
         }
         
         if (!targetStoreId) {
-            alert(lang === 'id' ? 'Harap pilih aliran dana' : '请选择资金流向');
+            alert(lang === 'id' ? 'Harap pilih toko' : '请选择门店');
             return;
         }
         
-        var stores = await SUPABASE.getAllStores();
-        var targetStore = stores.find(s => s.id === targetStoreId);
-        var targetStoreName = targetStore?.name || '-';
-        
-        var typeText = type === 'investment' ? (lang === 'id' ? 'investasi' : '注资') : 
-                       type === 'withdrawal' ? (lang === 'id' ? 'penarikan' : '提现') : 
-                       (lang === 'id' ? 'dividen' : '分红');
-        var methodText = paymentMethod === 'cash' ? (lang === 'id' ? 'Brankas' : '保险柜') : 'Bank BNI';
-        
-        if (!confirm(lang === 'id' ? 
-            `Konfirmasi ${typeText} ${Utils.formatCurrency(amount)} via ${methodText}\nAliran Dana: ${targetStoreName}?` : 
-            `确认${typeText} ${Utils.formatCurrency(amount)}，方式：${methodText}\n资金流向：${targetStoreName}？`)) {
-            return;
+        // 防重复：禁用按钮
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = lang === 'id' ? '⏳ Menyimpan...' : '⏳ 保存中...';
         }
         
         try {
-            const profile = await SUPABASE.getCurrentProfile();
-            await SUPABASE.addCapitalTransaction({
-                store_id: profile.store_id,
-                target_store_id: targetStoreId,
-                type: type,
-                payment_method: paymentMethod,
-                amount: amount,
-                description: description || (type === 'investment' ? (lang === 'id' ? 'Setoran modal' : '注资') : ''),
-                transaction_date: transactionDate
-            });
-            alert(lang === 'id' ? 'Transaksi modal berhasil disimpan' : '资金交易保存成功');
+            var result;
+            
+            if (type === 'investment') {
+                // 注资：总部给分店（仅管理员可操作）
+                result = await SUPABASE.investToShop(targetStoreId, amount, paymentMethod, description, transactionDate);
+                alert(lang === 'id' 
+                    ? `✅ Investasi ${Utils.formatCurrency(amount)} berhasil!` 
+                    : `✅ 注资 ${Utils.formatCurrency(amount)} 成功！`);
+            } 
+            else if (type === 'withdrawal') {
+                // 提现还本：分店还本金给总部
+                result = await SUPABASE.withdrawFromShop(targetStoreId, amount, paymentMethod, description, transactionDate);
+                alert(lang === 'id' 
+                    ? `✅ Penarikan pokok ${Utils.formatCurrency(amount)} berhasil!` 
+                    : `✅ 本金提现 ${Utils.formatCurrency(amount)} 成功！`);
+            }
+            else if (type === 'dividend') {
+                // 分红：分店分配利润给总部
+                result = await SUPABASE.distributeDividend(targetStoreId, amount, paymentMethod, description, transactionDate);
+                alert(lang === 'id' 
+                    ? `✅ Dividen ${Utils.formatCurrency(amount)} berhasil!` 
+                    : `✅ 分红 ${Utils.formatCurrency(amount)} 成功！`);
+            }
+            
+            // 刷新页面数据
             document.getElementById('capitalModal')?.remove();
             await this.renderDashboard();
+            
         } catch (error) {
-            console.error("saveCapitalTransaction error:", error);
+            console.error("saveCapitalTransactionEnhanced error:", error);
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = lang === 'id' ? '💾 Simpan Transaksi' : '💾 保存交易';
+            }
         }
     },
 
@@ -887,6 +943,7 @@ Terima kasih,
     }
 };
 
+// 合并到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
         key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
