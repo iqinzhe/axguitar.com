@@ -1,5 +1,6 @@
-// app-customers.js - 完整修复版
-// 修复内容：客户ID生成显示、Admin可选择门店、Admin创建订单可选门店、头部按钮优化
+// app-customers.js - 完整最终版
+// 功能：客户管理
+// 权限：Admin 只能查看所有门店客户（不能增/改），店长/员工只能操作本门店客户
 
 window.APP = window.APP || {};
 
@@ -17,7 +18,7 @@ const CustomersModule = {
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}<tr></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 8 : 7}" class="text-center">${t('no_data')}</td></tr>`;
             } else {
                 for (var c of customers) {
                     rows += `<tr>
@@ -30,18 +31,50 @@ const CustomersModule = {
                         <td class="address-cell">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
                         ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')} (${Utils.escapeHtml(c.stores?.code || '-')})</td>` : ''}
                         <td class="action-cell">
-                            <button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>
-                            <button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>
+                            ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
                         </td>
                     　　　`;
                 }
             }
 
-            var stores = await SUPABASE.getAllStores();
-            var storeOptions = '<option value="">-- ' + (lang === 'id' ? 'Pilih Toko' : '选择门店') + ' --</option>';
-            for (var store of stores) {
-                storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${Utils.escapeHtml(store.code || '-')})</option>`;
+            // Admin 不显示"新增客户"卡片
+            var addCustomerCardHtml = '';
+            if (!isAdmin) {
+                addCustomerCardHtml = `
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户'}</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>${t('customer_name')} *</label>
+                            <input type="text" id="customerName" placeholder="${t('customer_name')}">
+                        </div>
+                        <div class="form-group">
+                            <label>${t('phone')} *</label>
+                            <input type="text" id="customerPhone" placeholder="${t('phone')}">
+                        </div>
+                        <div class="form-group">
+                            <label>${t('ktp_number')}</label>
+                            <input type="text" id="customerKtp" placeholder="${t('ktp_number')}">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</label>
+                            <textarea id="customerKtpAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址'}"></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</label>
+                            <div class="address-option">
+                                <label><input type="radio" name="livingAddrOpt" value="same" checked onchange="APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
+                                <label><input type="radio" name="livingAddrOpt" value="different" onchange="APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）'}</label>
+                            </div>
+                            <textarea id="customerLivingAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址'}" style="display:none;margin-top:8px;"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button onclick="APP.addCustomer()" class="success">💾 ${lang === 'id' ? 'Simpan Nasabah' : '保存客户'}</button>
+                        </div>
+                    </div>
+                </div>`;
             }
 
             document.getElementById("app").innerHTML = `
@@ -75,46 +108,8 @@ const CustomersModule = {
                     </div>
                 </div>
                 
-                <div class="card">
-                    <h3>${lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户'}</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>${t('customer_name')} *</label>
-                            <input type="text" id="customerName" placeholder="${t('customer_name')}">
-                        </div>
-                        <div class="form-group">
-                            <label>${t('phone')} *</label>
-                            <input type="text" id="customerPhone" placeholder="${t('phone')}">
-                        </div>
-                        <div class="form-group">
-                            <label>${t('ktp_number')}</label>
-                            <input type="text" id="customerKtp" placeholder="${t('ktp_number')}">
-                        </div>
-                        ${isAdmin ? `
-                        <div class="form-group">
-                            <label>${lang === 'id' ? 'Toko' : '门店'} *</label>
-                            <select id="customerStoreId">
-                                ${storeOptions}
-                            </select>
-                        </div>
-                        ` : ''}
-                        <div class="form-group full-width">
-                            <label>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</label>
-                            <textarea id="customerKtpAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址'}"></textarea>
-                        </div>
-                        <div class="form-group full-width">
-                            <label>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</label>
-                            <div class="address-option">
-                                <label><input type="radio" name="livingAddrOpt" value="same" checked onchange="APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
-                                <label><input type="radio" name="livingAddrOpt" value="different" onchange="APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）'}</label>
-                            </div>
-                            <textarea id="customerLivingAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址'}" style="display:none;margin-top:8px;"></textarea>
-                        </div>
-                        <div class="form-actions">
-                            <button onclick="APP.addCustomer()" class="success">💾 ${lang === 'id' ? 'Simpan Nasabah' : '保存客户'}</button>
-                        </div>
-                    </div>
-                </div>
+                ${addCustomerCardHtml}
+                
                 <style>
                     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
                     .customer-table { width: 100%; border-collapse: collapse; }
@@ -142,7 +137,15 @@ const CustomersModule = {
     },
 
     addCustomer: async function() {
+        var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
+        
+        // Admin 不能创建客户
+        if (isAdmin) {
+            alert(lang === 'id' ? 'Administrator tidak dapat menambah nasabah. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能添加客户，请使用店长或员工账号登录。');
+            return;
+        }
+        
         var name = document.getElementById("customerName").value.trim();
         var ktp = document.getElementById("customerKtp").value.trim();
         var phone = document.getElementById("customerPhone").value.trim();
@@ -150,30 +153,18 @@ const CustomersModule = {
         var livingOpt = document.querySelector('input[name="livingAddrOpt"]:checked')?.value || 'same';
         var livingSameAsKtp = livingOpt === 'same';
         var livingAddress = livingSameAsKtp ? null : document.getElementById("customerLivingAddress").value.trim();
-        
-        var isAdmin = AUTH.isAdmin();
-        var storeId;
-        
-        if (isAdmin) {
-            storeId = document.getElementById("customerStoreId")?.value;
-            if (!storeId) {
-                alert(lang === 'id' ? 'Harap pilih toko' : '请选择门店');
-                return;
-            }
-        } else {
-            const profile = await SUPABASE.getCurrentProfile();
-            storeId = profile?.store_id;
-            if (!storeId) {
-                alert(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
-                return;
-            }
-        }
 
         if (!name) { alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写'); return; }
         if (!phone) { alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写'); return; }
 
         try {
             const profile = await SUPABASE.getCurrentProfile();
+            const storeId = profile?.store_id;
+            
+            if (!storeId) {
+                alert(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
+                return;
+            }
             
             const customerData = {
                 store_id: storeId,
@@ -199,7 +190,15 @@ const CustomersModule = {
     },
 
     editCustomer: async function(customerId) {
+        var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
+        
+        // Admin 不能编辑客户
+        if (isAdmin) {
+            alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
+            return;
+        }
+        
         var t = (key) => Utils.t(key);
         try {
             const { data: c, error } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
@@ -253,7 +252,15 @@ const CustomersModule = {
     },
 
     _saveEditCustomer: async function(customerId) {
+        var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
+        
+        // Admin 不能编辑客户
+        if (isAdmin) {
+            alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
+            return;
+        }
+        
         var name = document.getElementById('ec_name').value.trim();
         var phone = document.getElementById('ec_phone').value.trim();
         var ktp = document.getElementById('ec_ktp').value.trim();
@@ -311,6 +318,15 @@ const CustomersModule = {
     },
 
     createOrderForCustomer: async function(customerId) {
+        var isAdmin = AUTH.isAdmin();
+        var lang = Utils.lang;
+        
+        // Admin 不能创建订单
+        if (isAdmin) {
+            alert(lang === 'id' ? 'Administrator tidak dapat membuat order. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能创建订单，请使用店长或员工账号登录。');
+            return;
+        }
+        
         try {
             const { data: existingOrders } = await supabaseClient
                 .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
@@ -328,35 +344,12 @@ const CustomersModule = {
 
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
-            var lang = Utils.lang;
             var t = (key) => Utils.t(key);
-            var isAdmin = AUTH.isAdmin();
             
-            var stores = await SUPABASE.getAllStores();
-            var storeOptions = '';
-            for (var store of stores) {
-                storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${Utils.escapeHtml(store.code || '-')})</option>`;
-            }
-            
-            var defaultStoreId = customer.store_id;
-            
-            var storeSelectionHtml = '';
-            if (isAdmin) {
-                storeSelectionHtml = `
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Pilih Toko' : '选择门店'} *</label>
-                        <select id="orderStoreId">
-                            ${storeOptions}
-                        </select>
-                    </div>
-                    <script>
-                        setTimeout(function() {
-                            var select = document.getElementById('orderStoreId');
-                            if (select) select.value = '${defaultStoreId}';
-                        }, 100);
-                    </script>
-                `;
-            }
+            // 获取当前用户的门店信息
+            const profile = await SUPABASE.getCurrentProfile();
+            const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
+            const userStoreCode = profile?.stores?.code || '-';
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -377,9 +370,13 @@ const CustomersModule = {
                         <p><strong>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}:</strong> ${customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')}</p>
                         <p><strong>${lang === 'id' ? 'Toko Asal' : '所属门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')} (${Utils.escapeHtml(customer.stores?.code || '-')})</p>
                     </div>
+                    
+                    <div class="store-info-banner" style="background:#e0f2fe; padding:10px 15px; border-radius:8px; margin-bottom:16px;">
+                        <span>🏪 ${lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店'}: <strong>${Utils.escapeHtml(userStoreName)} (${Utils.escapeHtml(userStoreCode)})</strong></span>
+                    </div>
+                    
                     <h3>${t('collateral_info')}</h3>
                     <div class="form-grid">
-                        ${storeSelectionHtml}
                         <div class="form-group full-width"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
                         <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input"></div>
                         <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div>
@@ -394,6 +391,7 @@ const CustomersModule = {
                     .customer-info-display { background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
                     .customer-info-display p { margin: 6px 0; }
                     .amount-input { text-align: right; }
+                    .store-info-banner { background: #e0f2fe; padding: 10px 15px; border-radius: 8px; margin-bottom: 16px; }
                 </style>`;
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
@@ -409,16 +407,6 @@ const CustomersModule = {
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var notes = document.getElementById("notes").value;
         
-        var isAdmin = AUTH.isAdmin();
-        var storeId = null;
-        if (isAdmin) {
-            storeId = document.getElementById("orderStoreId")?.value;
-            if (!storeId) {
-                alert(Utils.lang === 'id' ? 'Harap pilih toko' : '请选择门店');
-                return;
-            }
-        }
-        
         if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
         
         try {
@@ -429,12 +417,17 @@ const CustomersModule = {
                 .single();
             
             var orderData = {
-                customer: { name: customer.name, ktp: customer.ktp_number || '', phone: customer.phone, address: customer.ktp_address || customer.address || '' },
+                customer: { 
+                    name: customer.name, 
+                    ktp: customer.ktp_number || '', 
+                    phone: customer.phone, 
+                    address: customer.ktp_address || customer.address || '' 
+                },
                 collateral_name: collateral,
                 loan_amount: amount,
                 notes: notes,
                 customer_id: customerId,
-                store_id: storeId
+                store_id: null  // 不传，让后端使用当前用户的门店
             };
             
             var newOrder = await Order.create(orderData);
@@ -606,6 +599,7 @@ const CustomersModule = {
     }
 };
 
+// 合并到 window.APP
 for (var key in CustomersModule) {
     if (typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
