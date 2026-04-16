@@ -1,4 +1,4 @@
-// app-dashboard-core.js - 核心功能模块（完整版）
+// app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增栏目按钮等!）
 // 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
 
 window.APP = window.APP || {};
