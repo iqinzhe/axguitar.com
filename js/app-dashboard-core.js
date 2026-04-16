@@ -217,7 +217,7 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（核心）====================
+    // ==================== 仪表盘 ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -243,9 +243,11 @@ const DashboardCore = {
             var bankWithdrawal = cashFlow.capital?.bank?.withdrawal || 0;
             
             document.getElementById("app").innerHTML = `
-                <div class="dashboard-header">
+                <div class="page-header">
                     <h1><img src="/icons/system-jf.png" alt="JF!"> JF! by Gadai</h1>
-                    <div>${this.historyStack.length > 0 ? `<button onclick="APP.goBack()">↩️ ${t('back')}</button>` : ''}</div>
+                    <div class="header-actions">
+                        ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
+                    </div>
                 </div>
                 
                 <div class="cashflow-summary">
@@ -551,7 +553,10 @@ const DashboardCore = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>👥 ${t('user_management')}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    </div>
                 </div>
                 <div class="card"><h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
                     <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
@@ -565,8 +570,7 @@ const DashboardCore = {
                         <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label><select id="newStoreId">${storeOptions}</select></div>
                         <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button></div>
                     </div>
-                </div>
-                <div class="toolbar"><button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button></div>`;
+                </div>`;
         } catch (error) { console.error("showUserManagement error:", error); alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna' : '加载用户管理失败'); }
     },
 
@@ -610,7 +614,6 @@ const DashboardCore = {
     },
 
     // ==================== WA 提醒功能 ====================
-
     getSenderWANumber: async function(storeId) {
         var storeWANumber = await SUPABASE.getStoreWANumber(storeId);
         if (storeWANumber) {
@@ -865,13 +868,12 @@ Terima kasih,
     },
     
     addStore: async function() {
-        var code = document.getElementById("newStoreCode").value.trim();
         var name = document.getElementById("newStoreName").value.trim();
         var address = document.getElementById("newStoreAddress").value;
         var phone = document.getElementById("newStorePhone").value;
         var lang = Utils.lang;
-        if (!code || !name) { alert(lang === 'id' ? 'Kode dan nama toko harus diisi' : '门店编码和名称必须填写'); return; }
-        try { await StoreManager.createStore(code, name, address, phone); alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功'); await StoreManager.renderStoreManagement(); } 
+        if (!name) { alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写'); return; }
+        try { await StoreManager.createStore(name, address, phone); alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功'); await StoreManager.renderStoreManagement(); } 
         catch (error) { console.error("addStore error:", error); alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message); }
     },
     
@@ -885,7 +887,6 @@ Terima kasih,
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
         key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
