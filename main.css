@@ -183,7 +183,7 @@ h3 { font-size: var(--font-md); }
 .cashflow-item .value { font-size: var(--font-xl); font-weight: 700; }
 .cashflow-item .value.negative { color: #fca5a5; }
 
-/* 新增：现金流详情文字，与上方总投资文字大小一致 */
+/* 现金流详情文字，与上方总投资文字大小一致 */
 .cashflow-detail {
     font-size: var(--font-xs);
     opacity: 0.8;
@@ -271,9 +271,6 @@ h3 { font-size: var(--font-md); }
         gap: 4px;
     }
 }
-
-/* 手机端（≤640px）保持原样，不做任何修改 */
-/* 您现有的手机端样式完全保留，不受影响 */
 
 /* ===== 按钮 ===== */
 button {
@@ -586,42 +583,40 @@ input:focus, select:focus, textarea:focus {
     }
     
     .stat-card {
-        padding: 10px 6px;  /* 减小内边距：原 12px 8px → 10px 6px */
+        padding: 10px 6px;
     }
     
-    /* ===== 问题1修复：工具栏按钮间距优化 ===== */
+    /* 工具栏按钮间距优化 - 减少误触 */
     .toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;           /* 增大按钮间距，减少误触 */
+        gap: 12px;
         justify-content: center;
         align-items: center;
         margin-bottom: 16px;
     }
     
     .toolbar button {
-        padding: 10px 14px;   /* 调整内边距 */
+        padding: 10px 14px;
         font-size: var(--font-sm);
-        flex: 0 0 auto;       /* 防止按钮被拉伸 */
+        flex: 0 0 auto;
         white-space: nowrap;
     }
     
-    /* ===== 问题2修复：工具栏下方区域行距和内边距优化 ===== */
-    /* 压缩卡片间距 */
+    /* 卡片内边距和间距优化 - 减少稀疏感 */
     .card {
-        padding: 12px;        /* 原 14px → 12px */
-        margin-bottom: 12px;  /* 原 16px → 12px */
+        padding: 12px;
+        margin-bottom: 12px;
     }
     
-    /* 压缩卡片内文字行距 */
+    /* 压缩卡片内文字间距 */
     .card p, .card h3 {
-        margin: 0 0 6px 0;    /* 减小段落间距 */
-        line-height: 1.4;      /* 适当减小行高 */
+        margin: 0 0 6px 0;
+        line-height: 1.4;
     }
     
-    /* 卡片内标题与内容间距 */
     .card h3 {
-        margin-bottom: 8px;    /* 标题下方间距 */
+        margin-bottom: 8px;
     }
     
     /* 表格横向滚动 */
@@ -645,7 +640,7 @@ input:focus, select:focus, textarea:focus {
     .payment-table td,
     .order-table td,
     .customer-table td {
-        padding: 6px 5px;      /* 原 8px 6px → 6px 5px，减小表格内边距 */
+        padding: 6px 5px;
         white-space: nowrap;
     }
     
@@ -685,8 +680,8 @@ input:focus, select:focus, textarea:focus {
     
     /* 现金流详情文字间距优化 */
     .cashflow-detail {
-        margin-top: 4px;       /* 原 6px → 4px */
-        line-height: 1.3;      /* 原 1.4 → 1.3，更紧凑 */
+        margin-top: 4px;
+        line-height: 1.3;
     }
     
     .capital-summary {
@@ -698,7 +693,7 @@ input:focus, select:focus, textarea:focus {
 /* 极小屏微调 */
 @media (max-width: 400px) {
     .toolbar button {
-        padding: 8px 10px;     /* 极小屏进一步减小 */
+        padding: 8px 10px;
         font-size: var(--font-xxs);
     }
     
@@ -711,3 +706,78 @@ input:focus, select:focus, textarea:focus {
     }
 }
 
+/* ==================== 模态框通用样式 ==================== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-content {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 550px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.modal-content h3 {
+    font-size: var(--font-md);
+    margin-bottom: 16px;
+}
+
+.modal-content h4 {
+    font-size: var(--font-sm);
+    margin: 0 0 12px 0;
+    font-weight: 600;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* ===== 小按钮样式 ===== */
+.btn-small {
+    padding: 4px 8px;
+    font-size: var(--font-xs);
+    border-radius: 6px;
+    background: #e2e8f0;
+    color: var(--text-main);
+}
+.btn-small:hover {
+    background: #cbd5e1;
+    transform: none;
+}
+.btn-small.success {
+    background: var(--success);
+    color: white;
+}
+.btn-small.danger {
+    background: var(--danger);
+    color: white;
+}
+.btn-small.print-btn {
+    background: #64748b;
+    color: white;
+}
+
+/* ===== 打印按钮专用 ===== */
+.print-btn {
+    background: #64748b;
+}
+.print-btn:hover {
+    background: #475569;
+}
