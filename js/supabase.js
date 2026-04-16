@@ -1,4 +1,5 @@
-// supabase.js - 完整版（包含资金流向 target_store_id 字段）
+// supabase.js - 完整修复版
+// 修复内容：订单ID生成、客户ID生成、资金统计、门店代码映射
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -108,68 +109,63 @@ const SupabaseAPI = {
         return data;
     },
 
-    async getOrders(filters = {}) {
-        const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('orders').select('*');
-        
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('store_id', profile.store_id);
-        }
-        
-        if (filters.status && filters.status !== 'all') {
-            query = query.eq('status', filters.status);
-        }
-        if (filters.search) {
-            query = query.or(
-                `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_id.ilike.%${filters.search}%`
-            );
-        }
-        query = query.order('created_at', { ascending: false });
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        return data;
-    },
-
-    async getOrder(orderId) {
-        const { data, error } = await supabaseClient
-            .from('orders').select('*').eq('order_id', orderId).single();
-        if (error) throw error;
-
-        const profile = await this.getCurrentProfile();
-        if (profile?.role !== 'admin' && profile?.store_id && data.store_id !== profile.store_id) {
-            throw new Error(Utils.lang === 'id' ? 'Tidak ada akses ke order ini' : '无权访问此订单');
-        }
-
-        return data;
-    },
-
-    async getPaymentHistory(orderId) {
-        const order = await this.getOrder(orderId);
-        const { data, error } = await supabaseClient
-            .from('payment_history').select('*')
-            .eq('order_id', order.id)
-            .order('date', { ascending: false });
-        if (error) throw error;
-        return { order, payments: data };
-    },
-
+    // ==================== 门店代码映射 ====================
+    
     async _getStorePrefix(storeId) {
-        if (!storeId) return 'AD';
+        if (!storeId) return 'HQ';
+        
         const { data, error } = await supabaseClient
             .from('stores')
             .select('code, name')
             .eq('id', storeId)
             .single();
+        
         if (error || !data) return 'ST';
-        if (data.code) return data.code.substring(0, 2).toUpperCase();
-        const name = data.name.toLowerCase();
-        if (name.includes('bangil')) return 'BL';
-        if (name.includes('gempol')) return 'GP';
-        if (name.includes('sidoarjo')) return 'SO';
-        return 'ST';
+        
+        // 门店名称到代码的映射表
+        const nameToCode = {
+            'bangil': 'BL',
+            'gempol': 'GP',
+            'sidoarjo': 'SO',
+            'beji': 'BJ',
+            'kantor pusat': 'HQ',
+            'pusat': 'HQ',
+            'surabaya': 'SBY',
+            'jakarta': 'JKT'
+        };
+        
+        const nameLower = data.name.toLowerCase();
+        
+        // 1. 优先根据名称映射
+        for (const [key, val] of Object.entries(nameToCode)) {
+            if (nameLower.includes(key)) {
+                return val;
+            }
+        }
+        
+        // 2. 其次使用门店编码的前两位
+        if (data.code && data.code.trim()) {
+            const codeMatch = data.code.match(/STORE_(\d+)/);
+            if (codeMatch) {
+                const numMap = {
+                    '001': 'BL',
+                    '002': 'SO',
+                    '003': 'GP',
+                    '004': 'BJ'
+                };
+                if (numMap[codeMatch[1]]) {
+                    return numMap[codeMatch[1]];
+                }
+            }
+            return data.code.substring(0, 2).toUpperCase();
+        }
+        
+        // 3. 默认返回 HQ
+        return 'HQ';
     },
 
+    // ==================== ID 生成器 ====================
+    
     async _generateOrderId(role, storeId) {
         let prefix = 'AD';
         if (role !== 'admin') {
@@ -205,6 +201,85 @@ const SupabaseAPI = {
         return `${prefix}-${dateCode}-${serial}`;
     },
 
+    async _generateCustomerId(storeId) {
+        const prefix = await this._getStorePrefix(storeId);
+        
+        const now = new Date();
+        const yy = now.getFullYear().toString().slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const dateCode = `${yy}${mm}${dd}`;
+        
+        const { data: customers, error } = await supabaseClient
+            .from('customers')
+            .select('customer_id')
+            .like('customer_id', `${prefix}-${dateCode}-%`);
+        
+        let maxNumber = 0;
+        if (customers && customers.length > 0) {
+            for (const c of customers) {
+                const match = c.customer_id.match(new RegExp(`${prefix}-${dateCode}-(\\d+)$`));
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    if (num > maxNumber) maxNumber = num;
+                }
+            }
+        }
+        
+        const nextNumber = maxNumber + 1;
+        const serial = String(nextNumber).padStart(3, '0');
+        
+        return `${prefix}-${dateCode}-${serial}`;
+    },
+
+    // ==================== 订单相关 ====================
+    
+    async getOrders(filters = {}) {
+        const profile = await this.getCurrentProfile();
+        let query = supabaseClient.from('orders').select('*, stores(code, name)');
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        if (filters.status && filters.status !== 'all') {
+            query = query.eq('status', filters.status);
+        }
+        if (filters.search) {
+            query = query.or(
+                `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_id.ilike.%${filters.search}%`
+            );
+        }
+        query = query.order('created_at', { ascending: false });
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    async getOrder(orderId) {
+        const { data, error } = await supabaseClient
+            .from('orders').select('*, stores(code, name)').eq('order_id', orderId).single();
+        if (error) throw error;
+
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin' && profile?.store_id && data.store_id !== profile.store_id) {
+            throw new Error(Utils.lang === 'id' ? 'Tidak ada akses ke order ini' : '无权访问此订单');
+        }
+
+        return data;
+    },
+
+    async getPaymentHistory(orderId) {
+        const order = await this.getOrder(orderId);
+        const { data, error } = await supabaseClient
+            .from('payment_history').select('*')
+            .eq('order_id', order.id)
+            .order('date', { ascending: false });
+        if (error) throw error;
+        return { order, payments: data };
+    },
+
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
@@ -215,7 +290,7 @@ const SupabaseAPI = {
         
         while (retryCount < 3) {
             try {
-                const orderId = await this._generateOrderId(profile.role, profile.store_id);
+                const orderId = await this._generateOrderId(profile.role, orderData.store_id || profile.store_id);
                 
                 const newOrder = {
                     order_id: orderId,
@@ -234,7 +309,7 @@ const SupabaseAPI = {
                     principal_paid: 0,
                     principal_remaining: orderData.loan_amount,
                     status: 'active',
-                    store_id: profile.store_id,
+                    store_id: orderData.store_id || profile.store_id,
                     created_by: profile.id,
                     notes: orderData.notes || '',
                     customer_id: orderData.customer_id || null,
@@ -337,12 +412,18 @@ const SupabaseAPI = {
         const paidAmount = Math.min(amount, remainingPrincipal);
         const newPrincipalPaid = order.principal_paid + paidAmount;
         const newPrincipalRemaining = order.loan_amount - newPrincipalPaid;
-        let updates = { principal_paid: newPrincipalPaid, principal_remaining: newPrincipalRemaining };
+        
+        let updates = { 
+            principal_paid: newPrincipalPaid, 
+            principal_remaining: newPrincipalRemaining 
+        };
+        
         if (newPrincipalRemaining <= 0) {
             updates = { ...updates, status: 'completed', monthly_interest: 0 };
         } else {
             updates.monthly_interest = newPrincipalRemaining * 0.10;
         }
+        
         const { error: e1 } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
         if (e1) throw e1;
         
@@ -518,12 +599,56 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 资金注资/提现 API（含流向字段）====================
+    // ==================== 客户相关（含客户ID生成）====================
+    
+    async createCustomer(customerData) {
+        const profile = await this.getCurrentProfile();
+        const storeId = customerData.store_id || profile.store_id;
+        
+        // 生成客户ID
+        const customerId = await this._generateCustomerId(storeId);
+        
+        const { data, error } = await supabaseClient
+            .from('customers')
+            .insert({
+                customer_id: customerId,
+                store_id: storeId,
+                name: customerData.name,
+                ktp_number: customerData.ktp_number || null,
+                phone: customerData.phone,
+                ktp_address: customerData.ktp_address || null,
+                address: customerData.address || null,
+                living_same_as_ktp: customerData.living_same_as_ktp,
+                living_address: customerData.living_address || null,
+                registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
+                created_by: profile.id,
+                updated_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+        
+        if (error) throw error;
+        return data;
+    },
+
+    async getCustomers(filters = {}) {
+        const profile = await this.getCurrentProfile();
+        let query = supabaseClient.from('customers').select('*, stores(name, code)').order('registered_date', { ascending: false });
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    // ==================== 资金注资/提现 API ====================
     
     async getCapitalTransactions() {
         const profile = await this.getCurrentProfile();
         
-        // 关联查询来源门店和目标门店的名称
         let query = supabaseClient
             .from('capital_transactions')
             .select(`
@@ -545,12 +670,10 @@ const SupabaseAPI = {
     async addCapitalTransaction(transaction) {
         const profile = await this.getCurrentProfile();
         
-        // 只有管理员可以管理资金
         if (profile?.role !== 'admin') {
             throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengelola modal' : '只有管理员可以管理资金');
         }
         
-        // 验证 target_store_id 必须存在
         if (!transaction.target_store_id) {
             throw new Error(Utils.lang === 'id' ? 'Harap pilih tujuan aliran dana' : '请选择资金流向');
         }
@@ -577,23 +700,19 @@ const SupabaseAPI = {
             .select('type, payment_method, amount, target_store_id, store_id');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('store_id', profile.store_id);
+            query = query.or(`store_id.eq.${profile.store_id},target_store_id.eq.${profile.store_id}`);
         }
         
         const { data, error } = await query;
         if (error) throw error;
         
         if (byStore) {
-            // 按门店汇总（基于 target_store_id 接收方）
             const storeMap = {};
             for (const t of data || []) {
                 const targetId = t.target_store_id;
                 if (!storeMap[targetId]) {
                     storeMap[targetId] = { 
-                        investment: 0,    // 注资（收到钱）
-                        withdrawal: 0,    // 提现（拿出钱）
-                        dividend: 0,      // 分红（拿出钱）
-                        net: 0
+                        investment: 0, withdrawal: 0, dividend: 0, net: 0
                     };
                 }
                 if (t.type === 'investment') {
@@ -610,7 +729,6 @@ const SupabaseAPI = {
             return { byStore: storeMap };
         }
         
-        // 原有逻辑：按支付方式汇总
         let cashInvestment = 0, bankInvestment = 0;
         let cashWithdrawal = 0, bankWithdrawal = 0;
         
@@ -633,7 +751,6 @@ const SupabaseAPI = {
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
-        // 获取收入（缴费记录）
         let incomeQuery = supabaseClient.from('payment_history').select('type, amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             const { data: orders } = await supabaseClient.from('orders').select('id').eq('store_id', profile.store_id);
@@ -652,7 +769,6 @@ const SupabaseAPI = {
             }
         }
         
-        // 获取支出（运营支出）
         let expenseQuery = supabaseClient.from('expenses').select('amount, payment_method');
         if (profile?.role !== 'admin' && profile?.store_id) {
             expenseQuery = expenseQuery.eq('store_id', profile.store_id);
@@ -665,10 +781,9 @@ const SupabaseAPI = {
             else if (e.payment_method === 'bank') bankExpense += e.amount;
         }
         
-        // 获取资金（注资/提现/分红）- 基于 target_store_id 统计各门店实际收到的资金
-        let capitalQuery = supabaseClient.from('capital_transactions').select('type, payment_method, amount, target_store_id');
+        let capitalQuery = supabaseClient.from('capital_transactions').select('type, payment_method, amount, store_id, target_store_id');
         if (profile?.role !== 'admin' && profile?.store_id) {
-            capitalQuery = capitalQuery.eq('target_store_id', profile.store_id);
+            capitalQuery = capitalQuery.or(`store_id.eq.${profile.store_id},target_store_id.eq.${profile.store_id}`);
         }
         const { data: capitals } = await capitalQuery;
         
@@ -676,12 +791,22 @@ const SupabaseAPI = {
         let cashWithdrawal = 0, bankWithdrawal = 0;
         
         for (const t of capitals || []) {
-            if (t.type === 'investment') {
-                if (t.payment_method === 'cash') cashInvestment += t.amount;
-                else if (t.payment_method === 'bank') bankInvestment += t.amount;
-            } else if (t.type === 'withdrawal' || t.type === 'dividend') {
-                if (t.payment_method === 'cash') cashWithdrawal += t.amount;
-                else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
+            if (profile?.role === 'admin') {
+                if (t.type === 'investment') {
+                    if (t.payment_method === 'cash') cashInvestment += t.amount;
+                    else if (t.payment_method === 'bank') bankInvestment += t.amount;
+                } else if (t.type === 'withdrawal' || t.type === 'dividend') {
+                    if (t.payment_method === 'cash') cashWithdrawal += t.amount;
+                    else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
+                }
+            } else {
+                if (t.target_store_id === profile.store_id && t.type === 'investment') {
+                    if (t.payment_method === 'cash') cashInvestment += t.amount;
+                    else if (t.payment_method === 'bank') bankInvestment += t.amount;
+                } else if (t.store_id === profile.store_id && (t.type === 'withdrawal' || t.type === 'dividend')) {
+                    if (t.payment_method === 'cash') cashWithdrawal += t.amount;
+                    else if (t.payment_method === 'bank') bankWithdrawal += t.amount;
+                }
             }
         }
         
@@ -763,7 +888,7 @@ const SupabaseAPI = {
 
     async getOrdersNeedReminder() {
         const profile = await this.getCurrentProfile();
-        const reminderDays = 2; // 固定提前2天
+        const reminderDays = 2;
         
         let query = supabaseClient
             .from('orders')
