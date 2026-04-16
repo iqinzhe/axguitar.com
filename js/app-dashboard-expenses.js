@@ -52,11 +52,17 @@ const DashboardExpenses = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
-                    <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                    <div class="header-actions">
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        ${PERMISSION.canReconcile() ? `<button onclick="APP.balanceExpenses()" class="btn-balance warning">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
+                    </div>
                 </div>
+                
                 <div class="card">
                     <h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: <span class="total-expense">${Utils.formatCurrency(totalAmount)}</span></h3>
                 </div>
+                
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
                     <div class="table-container">
@@ -76,6 +82,7 @@ const DashboardExpenses = {
                         </table>
                     </div>
                 </div>
+                
                 <div class="card">
                     <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增运营支出'}</h3>
                     <div class="form-grid">
@@ -91,10 +98,6 @@ const DashboardExpenses = {
                         <div class="form-group full-width"><label>${lang === 'id' ? 'Deskripsi' : '描述'}</label><textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}"></textarea></div>
                         <div class="form-actions"><button onclick="APP.addExpense()" class="success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button></div>
                     </div>
-                </div>
-                <div class="toolbar">
-                    <button onclick="APP.printCurrentPage()" class="success print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                    ${PERMISSION.canReconcile() ? `<button onclick="APP.balanceExpenses()" class="warning">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
                 </div>`;
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
@@ -201,7 +204,6 @@ const DashboardExpenses = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardExpenses) {
     if (typeof DashboardExpenses[key] === 'function') {
         window.APP[key] = DashboardExpenses[key];
