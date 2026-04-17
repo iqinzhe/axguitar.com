@@ -160,7 +160,7 @@ const DashboardCore = {
                     <div class="lang-toggle">
                         <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
                     </div>
-                    <h2 class="login-title"><img src="/icon-192.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>
+                    <h2 class="login-title"><img src="/icon-32.png" alt="JF! Sistem Gadai" class="logo-icon">
                     <h3>${t('login')}</h3>
                     <div class="form-group">
                         <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
