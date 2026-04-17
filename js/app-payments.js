@@ -1,4 +1,5 @@
-// app-payments.js - 修复版（本金还款历史显示门店净利 + 强制刷新）
+// app-payments.js - 修复版
+// 修复内容：unlockAdminFee 调用修改（配合 supabase.js 的新方法）
 
 window.APP = window.APP || {};
 
@@ -23,7 +24,6 @@ const PaymentsModule = {
             var interestPayments = payments.filter(p => p.type === 'interest');
             var principalPayments = payments.filter(p => p.type === 'principal');
             
-            // 修复：添加 profit 映射
             var methodMap = { 
                 cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', 
                 bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI',
@@ -36,6 +36,8 @@ const PaymentsModule = {
                 interestRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
             } else {
                 for (var p of interestPayments) {
+                    // 跳过已作废的记录
+                    if (p.is_voided) continue;
                     var methodClass = p.payment_method === 'cash' ? 'method-cash' : (p.payment_method === 'bank' ? 'method-bank' : 'method-profit');
                     interestRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
@@ -47,12 +49,14 @@ const PaymentsModule = {
                 }
             }
 
-            // 本金还款历史（修复显示门店净利）
+            // 本金还款历史
             var principalRows = '';
             if (principalPayments.length === 0) {
                 principalRows = `<tr><td colspan="4" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
             } else {
                 for (var p of principalPayments) {
+                    // 跳过已作废的记录
+                    if (p.is_voided) continue;
                     var methodClass = p.payment_method === 'cash' ? 'method-cash' : (p.payment_method === 'bank' ? 'method-bank' : 'method-profit');
                     principalRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
@@ -79,10 +83,14 @@ const PaymentsModule = {
             // 管理费区域（已支付则锁定）
             var adminFeeSection = '';
             if (order.admin_fee_paid) {
+                // 检查是否有作废记录（显示提示）
+                const voidedPayment = payments.find(p => p.type === 'admin_fee' && p.is_voided);
+                const voidedHint = voidedPayment ? `<span class="voided-hint" style="font-size:11px; color:#f59e0b; margin-left:8px;">⚠️ ${lang === 'id' ? 'Pembayaran sebelumnya telah dibatalkan' : '之前的支付已作废'}</span>` : '';
+                
                 adminFeeSection = `
                     <div class="admin-fee-paid locked-section">
-                        <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ✅ ${lang === 'id' ? 'Sudah dibayar' : '已支付'} (${Utils.formatDate(order.admin_fee_paid_date)})</span>
-                        ${isAdmin ? `<button onclick="APP.unlockAdminFee('${order.order_id}')" class="btn-small warning" style="margin-left:10px;">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
+                        <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ✅ ${lang === 'id' ? 'Sudah dibayar' : '已支付'} (${Utils.formatDate(order.admin_fee_paid_date)})${voidedHint}</span>
+                        ${isAdmin ? `<button onclick="APP.unlockAdminFee('${order.order_id}')" class="btn-small warning" style="margin-left:10px;">🔓 ${lang === 'id' ? 'Buka Kunci & Batalkan' : '解锁并作废'}</button>` : ''}
                     </div>
                 `;
             } else {
@@ -108,7 +116,6 @@ const PaymentsModule = {
                 `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(currentMonthlyInterest * i)}</option>`
             ).join('');
 
-            // 本金还款 - 入账方式选项（三选一）
             var principalTargetOptions = `
                 <div class="payment-method-group" style="margin-top:8px;">
                     <div class="payment-method-title">${lang === 'id' ? 'Metode Pemasukan' : '入账方式'}:</div>
@@ -156,13 +163,11 @@ const PaymentsModule = {
                     </div>
                 </div>
                 
-                <!-- 管理费区域 -->
                 <div class="card admin-fee-card">
                     <h3>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'}</h3>
                     ${adminFeeSection}
                 </div>
                 
-                <!-- 利息缴费区域 -->
                 <div class="card interest-card">
                     <h3>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3>
                     <p class="info-note">📌 ${lang === 'id' ? 'Bunga akan langsung masuk ke Laba Bersih Toko' : '📌 利息将直接入账到门店净利'}</p>
@@ -188,7 +193,6 @@ const PaymentsModule = {
                     </div>
                 </div>
                 
-                <!-- 本金还款区域 -->
                 <div class="card principal-card">
                     <h3>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金还款'}</h3>
                     <p class="info-note">📌 ${lang === 'id' ? `Total pinjaman: ${Utils.formatCurrency(order.loan_amount)} | Sudah dibayar: ${Utils.formatCurrency(order.principal_paid)} | Sisa: ${Utils.formatCurrency(remainingPrincipal)}` : `📌 贷款总额: ${Utils.formatCurrency(order.loan_amount)} | 已还: ${Utils.formatCurrency(order.principal_paid)} | 剩余: ${Utils.formatCurrency(remainingPrincipal)}`}</p>
@@ -242,6 +246,7 @@ const PaymentsModule = {
                     button.success { background: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
                     button.warning { background: #d97706; color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
                     .method-profit { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+                    .voided-hint { font-size: 11px; color: #f59e0b; }
                     @media (max-width: 768px) {
                         .order-summary .summary-grid { grid-template-columns: repeat(2, 1fr); }
                         .interest-input-group, .principal-input-group { flex-direction: column; align-items: stretch; }
@@ -249,7 +254,6 @@ const PaymentsModule = {
                     }
                 </style>`;
 
-            // 绑定事件
             var adminFeeSelect = document.getElementById('adminFeeAmount');
             var customAdminFee = document.getElementById('customAdminFee');
             if (adminFeeSelect) {
@@ -267,7 +271,6 @@ const PaymentsModule = {
         }
     },
 
-    // 管理费缴费（强制刷新页面）
     payAdminFeeWithMethod: async function(orderId) {
         var method = document.querySelector('input[name="adminFeeMethod"]:checked')?.value || 'cash';
         var adminFeeSelect = document.getElementById('adminFeeAmount');
@@ -290,7 +293,6 @@ const PaymentsModule = {
         if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName} ke Laba Bersih Toko?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，入账方式：${methodName}，进入门店净利？`)) {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
-                // 强制刷新页面以确保状态更新
                 window.location.reload();
             } catch (error) { 
                 alert('Error: ' + error.message); 
@@ -298,19 +300,24 @@ const PaymentsModule = {
         }
     },
 
-    // 管理员解锁管理费
+    // ✅ 修复3：解锁管理费（调用 SUPABASE 的新方法）
     unlockAdminFee: async function(orderId) {
         var lang = Utils.lang;
-        if (!confirm(lang === 'id' ? 'Buka kunci Admin Fee? Ini akan memungkinkan pembayaran ulang.' : '解锁管理费？这将允许重新缴费。')) return;
+        if (!confirm(lang === 'id' 
+            ? '⚠️ Membuka kunci Admin Fee akan menandai pembayaran sebelumnya sebagai DIBATALKAN.\n\nApakah Anda yakin ingin melanjutkan?'
+            : '⚠️ 解锁管理费将把之前的支付记录标记为【已作废】。\n\n是否继续？')) return;
+        
         try {
             await SUPABASE.unlockAdminFee(orderId);
+            alert(lang === 'id' 
+                ? '✅ Admin Fee telah dibuka kunci. Pembayaran sebelumnya telah ditandai sebagai batal. Anda dapat melakukan pembayaran ulang.'
+                : '✅ 管理费已解锁。之前的支付记录已标记为作废。您可以重新缴费。');
             window.location.reload();
         } catch (error) {
             alert('Error: ' + error.message);
         }
     },
 
-    // 利息缴费（强制刷新页面）
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
@@ -326,7 +333,6 @@ const PaymentsModule = {
         }
     },
 
-    // 本金还款（强制刷新页面）
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
