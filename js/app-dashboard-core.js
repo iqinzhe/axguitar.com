@@ -1,6 +1,6 @@
 // app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增栏目按钮等!）
 // 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
-// 修改：仪表盘资金管理改为三资金池（保险柜、银行BNI、门店净利）
+// 修改：仪表盘资金管理改为三资金池（保险柜、银行BNI、门店净利），使用 cashFlow.profit.balance
 
 window.APP = window.APP || {};
 
@@ -221,16 +221,15 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（修改为三资金池） ====================
+    // ==================== 仪表盘（三资金池） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
         this.saveCurrentPageState();
         try {
             var report = await Order.getReport();
-            // 获取三资金池数据
+            // 获取三资金池数据（新版 getCashFlowSummary 返回 cash, bank, profit, total）
             var cashFlow = await SUPABASE.getCashFlowSummary();
-            var profitBalance = await SUPABASE.getStoreProfitBalance(); // 门店净利
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
             var isAdmin = AUTH.isAdmin();
@@ -243,12 +242,10 @@ const DashboardCore = {
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
-            // 保险柜和银行余额（从cashFlow获取）
-            var cashBalance = cashFlow.cash.balance;
-            var bankBalance = cashFlow.bank.balance;
-            
-            // 门店净利
-            var netProfit = profitBalance;
+            // 从 cashFlow 获取各池子余额
+            var cashBalance = cashFlow.cash?.balance ?? 0;
+            var bankBalance = cashFlow.bank?.balance ?? 0;
+            var profitBalance = cashFlow.profit?.balance ?? 0;
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -278,9 +275,9 @@ const DashboardCore = {
                         </div>
                         <div class="cashflow-item">
                             <div class="label">📊 ${lang === 'id' ? 'Laba Bersih Toko' : '门店净利'}</div>
-                            <div class="value ${netProfit < 0 ? 'negative' : ''}">${Utils.formatCurrency(netProfit)}</div>
+                            <div class="value ${profitBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(profitBalance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? 'Pendapatan - Pengeluaran' : '收入 - 支出'}
+                                ${lang === 'id' ? 'Pendapatan - Pengeluaran - Dividen' : '收入 - 支出 - 分红'}
                             </div>
                         </div>
                     </div>
@@ -336,7 +333,7 @@ const DashboardCore = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}<tr></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
         } else {
             var typeMap = {
                 investment: lang === 'id' ? '💰 注资' : '💰 注资',
@@ -640,7 +637,7 @@ const DashboardCore = {
                 　　　`;
             }
 
-            if (users.length === 0) userRows = `<td><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
+            if (users.length === 0) userRows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
 
             var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
             for (var s of stores) storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
