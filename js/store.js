@@ -1,6 +1,8 @@
-// store.js - 完整修复版
-// 门店编码自动生成：STORE_000, STORE_001, STORE_002...
-// 头部按钮已优化
+// store.js - 完整修复版 v4.0
+// 修复内容：
+// 1. 统一使用 cash_flow_records 计算门店余额（与 getCashFlowSummary 保持一致）
+// 2. 移除手动从 payment_history 累加余额的逻辑
+// 3. 优化门店财务汇总的余额计算
 
 const StoreManager = {
     stores: [],
@@ -134,6 +136,46 @@ const StoreManager = {
         }
     },
 
+    // ==================== 获取门店余额（统一使用 cash_flow_records） ====================
+    async _getStoreCashFlowBalance(storeId) {
+        try {
+            // 只获取未作废的现金流记录
+            const { data: flows, error } = await supabaseClient
+                .from('cash_flow_records')
+                .select('direction, amount, source_target, flow_type')
+                .eq('store_id', storeId)
+                .eq('is_voided', false);
+            
+            if (error) {
+                console.warn(`获取门店 ${storeId} 现金流失败:`, error);
+                return { cashBalance: 0, bankBalance: 0, totalBalance: 0 };
+            }
+            
+            let cashBalance = 0;
+            let bankBalance = 0;
+            
+            for (const flow of flows || []) {
+                const amount = flow.amount || 0;
+                if (flow.direction === 'inflow') {
+                    if (flow.source_target === 'cash') cashBalance += amount;
+                    else if (flow.source_target === 'bank') bankBalance += amount;
+                } else if (flow.direction === 'outflow') {
+                    if (flow.source_target === 'cash') cashBalance -= amount;
+                    else if (flow.source_target === 'bank') bankBalance -= amount;
+                }
+            }
+            
+            return {
+                cashBalance: cashBalance,
+                bankBalance: bankBalance,
+                totalBalance: cashBalance + bankBalance
+            };
+        } catch (error) {
+            console.error(`获取门店 ${storeId} 余额失败:`, error);
+            return { cashBalance: 0, bankBalance: 0, totalBalance: 0 };
+        }
+    },
+
     async renderStoreManagement() {
         await this.loadStores();
         const lang = Utils.lang;
@@ -141,8 +183,9 @@ const StoreManager = {
         
         console.log('开始加载门店管理数据...');
         
+        // 获取所有门店的基础数据（订单、支出）
         const [allOrdersResult, allExpensesResult, allPaymentsResult, cashFlow] = await Promise.all([
-            supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid'),
+            supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid'),
             supabaseClient.from('expenses').select('id, store_id, amount, payment_method'),
             supabaseClient.from('payment_history').select('id, order_id, type, amount, payment_method'),
             SUPABASE.getCashFlowSummary()
@@ -180,7 +223,7 @@ const StoreManager = {
         }
         
         let grandTotal = { 
-            orders: 0, active: 0, loan: 0, adminFee: 0, interest: 0, 
+            orders: 0, active: 0, loan: 0, adminFee: 0, serviceFee: 0, interest: 0, 
             principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
         };
         
@@ -196,30 +239,20 @@ const StoreManager = {
             const activeCount = orders.filter(o => o.status === 'active').length;
             const totalLoan = orders.reduce((s, o) => s + (o.loan_amount || 0), 0);
             const totalAdminFee = orders.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
+            const totalServiceFee = orders.reduce((s, o) => s + (o.service_fee_paid || 0), 0);
             const totalInterest = orders.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
             const totalPrincipal = orders.reduce((s, o) => s + (o.principal_paid || 0), 0);
-            const totalIncome = totalAdminFee + totalInterest;
+            const totalIncome = totalAdminFee + totalServiceFee + totalInterest;
             const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
             
-            let cashIncome = 0, bankIncome = 0;
-            for (const p of payments) {
-                if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
-                    if (p.payment_method === 'cash') cashIncome += p.amount;
-                    else if (p.payment_method === 'bank') bankIncome += p.amount;
-                }
-            }
-            let cashExpense = 0, bankExpense = 0;
-            for (const e of expenses) {
-                if (e.payment_method === 'cash') cashExpense += e.amount;
-                else if (e.payment_method === 'bank') bankExpense += e.amount;
-            }
-            const cashBalance = cashIncome - cashExpense;
-            const bankBalance = bankIncome - bankExpense;
+            // ==================== 使用统一的 cash_flow_records 计算余额 ====================
+            const { cashBalance, bankBalance } = await this._getStoreCashFlowBalance(store.id);
             
             grandTotal.orders += ordsCount;
             grandTotal.active += activeCount;
             grandTotal.loan += totalLoan;
             grandTotal.adminFee += totalAdminFee;
+            grandTotal.serviceFee += totalServiceFee;
             grandTotal.interest += totalInterest;
             grandTotal.principal += totalPrincipal;
             grandTotal.expenses += totalExpenses;
@@ -233,6 +266,7 @@ const StoreManager = {
                 <td style="border:1px solid #cbd5e1;padding:8px;">${activeCount}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalLoan)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalAdminFee)}</td>
+                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalServiceFee)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalInterest)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalPrincipal)}</td>
                 <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalIncome)}</td>
@@ -245,7 +279,7 @@ const StoreManager = {
         let storeRows = '';
         if (this.stores.length === 0) {
             storeRows = `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
-            storeStatsRows = `<tr><td colspan="11" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            storeStatsRows = `<tr><td colspan="12" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
         } else {
             for (const store of this.stores) {
                 storeRows += `<tr>
@@ -293,12 +327,15 @@ const StoreManager = {
                         <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
                     </div>
                 </div>
+                <p class="info-note" style="font-size:11px; color:#64748b; margin-top:8px;">
+                    💡 ${lang === 'id' ? 'Saldo berdasarkan catatan arus kas (cash_flow_records) - mencakup semua transaksi masuk dan keluar.' : '余额基于资金流记录 (cash_flow_records) - 包含所有流入流出交易。'}
+                </p>
             </div>
 
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                 <div class="table-container" style="overflow-x: auto;">
-                    <table class="data-table" style="min-width:1000px;">
+                    <table class="data-table" style="min-width:1200px;">
                         <thead>
                             <tr>
                                 <th>${lang === 'id' ? 'Toko' : '门店'}</th>
@@ -306,9 +343,10 @@ const StoreManager = {
                                 <th>${t('active')}</th>
                                 <th>${t('total_loan')}</th>
                                 <th>${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                                <th>${lang === 'id' ? 'Service Fee' : '服务费'}</th>
                                 <th>${lang === 'id' ? 'Bunga' : '利息'}</th>
                                 <th>${lang === 'id' ? 'Pokok' : '本金'}</th>
-                                <th>${lang === 'id' ? 'Pendapatan' : '管理费+利息'}</th>
+                                <th>${lang === 'id' ? 'Pendapatan' : '收入'}</th>
                                 <th>${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
                                 <th>🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
                                 <th>🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
@@ -366,6 +404,7 @@ const StoreManager = {
             <style>
                 .data-table td input { width: 140px; font-size: 12px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; }
                 .data-table td input:focus { outline: none; border-color: #2563eb; }
+                .info-note { font-size: 11px; color: #64748b; margin-top: 8px; }
             </style>
         `;
     }
