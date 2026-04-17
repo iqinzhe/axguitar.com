@@ -1,5 +1,5 @@
-// app-payments.js - 完整修复版
-// 修复内容：缴费页面确认文字优化（使用"入账"概念）、头部按钮优化
+// app-payments.js - 完整版
+// 修改：管理费和利息自动入账到门店净利，本金可选择返还池（银行/保险柜/门店净利）
 
 window.APP = window.APP || {};
 
@@ -24,6 +24,9 @@ const PaymentsModule = {
             var principalPayments = payments.filter(p => p.type === 'principal');
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
 
+            // 获取门店净利余额（用于提示）
+            var profitBalance = await SUPABASE.getStoreProfitBalance();
+
             var interestRows = '';
             if (interestPayments.length === 0) {
                 interestRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
@@ -41,7 +44,7 @@ const PaymentsModule = {
 
             var principalRows = '';
             if (principalPayments.length === 0) {
-                principalRows = `<tr><td colspan="4" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
+                principalRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
             } else {
                 for (var p of principalPayments) {
                     principalRows += `<tr>
@@ -49,6 +52,7 @@ const PaymentsModule = {
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                         <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
+                        <td class="desc-cell">${p.principal_return_pool ? (p.principal_return_pool === 'cash' ? '🏦 Brankas' : p.principal_return_pool === 'bank' ? '🏧 Bank BNI' : '📊 Laba Bersih') : '-'}</td>
                     　　　`;
                 }
             }
@@ -78,6 +82,7 @@ const PaymentsModule = {
                         </div>
                         ${adminFeeOptions}
                         <button onclick="APP.payAdminFeeWithMethod('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
+                        <p class="info-note" style="margin-top:8px;">📌 ${lang === 'id' ? 'Admin Fee akan langsung masuk ke Laba Bersih Toko' : '管理费将直接入账到门店净利'}</p>
                     </div>
                    </div>`
                 : `<div class="admin-fee-paid">
@@ -96,6 +101,14 @@ const PaymentsModule = {
                         <div class="payment-method-options">
                             <label><input type="radio" name="principalMethod" value="cash" checked> 🏦 ${t('cash')}</label>
                             <label><input type="radio" name="principalMethod" value="bank"> 🏧 ${t('bank')}</label>
+                        </div>
+                    </div>
+                    <div class="principal-return-group">
+                        <div class="payment-method-title">${lang === 'id' ? 'Dana Pokok Dikembalikan ke' : '本金返还到'}:</div>
+                        <div class="payment-method-options">
+                            <label><input type="radio" name="principalReturnPool" value="bank" checked> 🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</label>
+                            <label><input type="radio" name="principalReturnPool" value="cash"> 🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</label>
+                            <label><input type="radio" name="principalReturnPool" value="profit"> 📊 ${lang === 'id' ? 'Laba Bersih Toko' : '门店净利'} (${Utils.formatCurrency(profitBalance)})</label>
                         </div>
                     </div>
                     <div class="principal-input-group">
@@ -132,7 +145,7 @@ const PaymentsModule = {
                 
                 <div class="card interest-card">
                     <h3>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3>
-                    <p class="info-note">📌 ${lang === 'id' ? 'Setiap pembayaran memperpanjang pinjaman 1 bulan secara otomatis' : '📌 每次付息后自动延续1个月，到期日同步更新'}</p>
+                    <p class="info-note">📌 ${lang === 'id' ? 'Setiap pembayaran memperpanjang pinjaman 1 bulan secara otomatis. Bunga akan langsung masuk ke Laba Bersih Toko.' : '📌 每次付息后自动延续1个月。利息将直接入账到门店净利。'}</p>
                     <div class="payment-method-group">
                         <div class="payment-method-title">${lang === 'id' ? 'Metode Pembayaran Bunga' : '利息支付方式'}:</div>
                         <div class="payment-method-options">
@@ -175,6 +188,7 @@ const PaymentsModule = {
                                     <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
                                     <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                    <th>${lang === 'id' ? 'Dikembalikan ke' : '返还池'}</th>
                                 </tr>
                             </thead>
                             <tbody>${principalRows}</tbody>
@@ -200,6 +214,7 @@ const PaymentsModule = {
                     .info-note { font-size: 12px; color: #64748b; margin-bottom: 10px; }
                     .subtitle { font-size: 13px; margin: 12px 0 8px; color: #64748b; }
                     .interest-input-group, .principal-input-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+                    .principal-return-group { margin: 12px 0; }
                     .interest-months { width: auto; min-width: 200px; margin: 0; }
                     .principal-amount { width: 180px; text-align: right; }
                     .remaining-principal { font-size: 12px; color: #64748b; margin-top: 8px; }
@@ -262,8 +277,7 @@ const PaymentsModule = {
         }
         
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
-        // 优化确认文字：使用"入账"概念
-        if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName}?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，支付方式：${methodName}？`)) {
+        if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName}? (Akan masuk ke Laba Bersih Toko)` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，支付方式：${methodName}？（将入账到门店净利）`)) {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
                 await this.showPayment(orderId); 
@@ -278,8 +292,7 @@ const PaymentsModule = {
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
-        // 优化确认文字：使用"入账"概念
-        if (confirm((lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName}?` : `确认入账利息 ${months} 个月，支付方式：${methodName}？`))) {
+        if (confirm((lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName}? (Akan masuk ke Laba Bersih Toko)` : `确认入账利息 ${months} 个月，支付方式：${methodName}？（将入账到门店净利）`))) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
                 await this.showPayment(orderId);
@@ -293,13 +306,14 @@ const PaymentsModule = {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var method = document.querySelector('input[name="principalMethod"]:checked')?.value || 'cash';
+        var returnPool = document.querySelector('input[name="principalReturnPool"]:checked')?.value || 'bank';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
+        var returnPoolName = returnPool === 'cash' ? (Utils.lang === 'id' ? 'Brankas' : '保险柜') : (returnPool === 'bank' ? (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI') : (Utils.lang === 'id' ? 'Laba Bersih Toko' : '门店净利'));
         var lang = Utils.lang;
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
-        // 优化确认文字：使用"入账"概念
-        if (confirm((lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} via ${methodName}?` : `确认入账本金 ${Utils.formatCurrency(amount)}，支付方式：${methodName}？`))) {
+        if (confirm((lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} via ${methodName}? Dana akan dikembalikan ke ${returnPoolName}.` : `确认入账本金 ${Utils.formatCurrency(amount)}，支付方式：${methodName}？资金将返还到 ${returnPoolName}。`))) {
             try {
-                await Order.recordPrincipalPayment(orderId, amount, method);
+                await Order.recordPrincipalPayment(orderId, amount, method, returnPool);
                 await this.showPayment(orderId);
             } catch (error) { 
                 alert('Error: ' + error.message); 
