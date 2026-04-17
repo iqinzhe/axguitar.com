@@ -1,11 +1,11 @@
 // app-dashboard-report.js - 报表功能模块
 // 包含：财务报表、门店财务汇总
+// 修改：增加门店净利显示，适配新资金池结构
 
 window.APP = window.APP || {};
 
 const DashboardReport = {
 
-    // ==================== 财务报表 ====================
     showReport: async function() {
         this.currentPage = 'report';
         this.saveCurrentPageState();
@@ -69,7 +69,7 @@ const DashboardReport = {
                 var storeReports = [];
                 var grandTotal = { 
                     orders: 0, active: 0, loan: 0, adminFee: 0, interest: 0, 
-                    principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
+                    principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0, profitBalance: 0
                 };
 
                 for (var store of stores) {
@@ -100,6 +100,9 @@ const DashboardReport = {
                     }
                     const cashBalance = cashIncome - cashExpense;
                     const bankBalance = bankIncome - bankExpense;
+                    
+                    // 获取门店净利（使用现有函数）
+                    const profitBalance = await SUPABASE.getStoreProfitBalance(store.id);
 
                     storeReports.push({ 
                         store, 
@@ -112,7 +115,8 @@ const DashboardReport = {
                         totalExpenses, 
                         totalIncome,
                         cashBalance,
-                        bankBalance
+                        bankBalance,
+                        profitBalance
                     });
 
                     grandTotal.orders += ords.length;
@@ -125,6 +129,7 @@ const DashboardReport = {
                     grandTotal.income += totalIncome;
                     grandTotal.cashBalance += cashBalance;
                     grandTotal.bankBalance += bankBalance;
+                    grandTotal.profitBalance += profitBalance;
                 }
 
                 var storeHtml = storeReports.length === 0 
@@ -143,6 +148,7 @@ const DashboardReport = {
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="value expense">${Utils.formatCurrency(r.totalExpenses)}</div></div>
                             <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="value">${Utils.formatCurrency(r.cashBalance)}</div></div>
                             <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="value">${Utils.formatCurrency(r.bankBalance)}</div></div>
+                            <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '门店净利'}</div><div class="value ${r.profitBalance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(r.profitBalance)}</div></div>
                         </div>
                     </div>`).join('');
 
@@ -161,6 +167,7 @@ const DashboardReport = {
                         <div class="cashflow-stats">
                             <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div></div>
                             <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(cashFlow.bank.balance)}</div></div>
+                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '门店净利'}</div><div class="value">${Utils.formatCurrency(cashFlow.profit.balance)}</div></div>
                             <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div></div>
                         </div>
                     </div>
@@ -178,6 +185,7 @@ const DashboardReport = {
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="stat-value expense">${Utils.formatCurrency(grandTotal.expenses)}</div></div>
                             <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.cashBalance)}</div></div>
                             <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.bankBalance)}</div></div>
+                            <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '门店净利'}</div><div class="stat-value ${grandTotal.profitBalance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(grandTotal.profitBalance)}</div></div>
                         </div>
                     </div>
                     
@@ -206,6 +214,7 @@ const DashboardReport = {
                 }
                 const cashBalance = cashIncome - cashExpense;
                 const bankBalance = bankIncome - bankExpense;
+                const profitBalance = await SUPABASE.getStoreProfitBalance(storeId);
                 
                 const totalLoan = storeOrders.reduce((s, o) => s + (o.loan_amount || 0), 0);
                 const totalAdminFee = storeOrders.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
@@ -230,7 +239,8 @@ const DashboardReport = {
                         <div class="cashflow-stats">
                             <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashBalance)}</div></div>
                             <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(bankBalance)}</div></div>
-                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashBalance + bankBalance)}</div></div>
+                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '门店净利'}</div><div class="value">${Utils.formatCurrency(profitBalance)}</div></div>
+                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashBalance + bankBalance + profitBalance)}</div></div>
                         </div>
                     </div>
                     
@@ -245,6 +255,7 @@ const DashboardReport = {
                         <div class="stat-card"><div class="stat-value income">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
                         <div class="stat-card"><div class="stat-value expense">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
                         <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
+                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(profitBalance)}</div><div>${lang === 'id' ? 'Laba Bersih' : '净利'}</div></div>
                     </div>`;
             }
         } catch (err) {
