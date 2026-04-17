@@ -1,6 +1,7 @@
 // app-dashboard-core.js - 核心功能模块（完整版）
 // 包含：初始化、登录、登出、路由、导航、操作员管理、资金管理
 // 修改：仪表盘三资金池、操作员管理文字、注资表单（仅管理员）
+// 修改：删除重复的“资金管理”标题，只保留按钮
 
 window.APP = window.APP || {};
 
@@ -160,7 +161,7 @@ const DashboardCore = {
                     <div class="lang-toggle">
                         <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
                     </div>
-                    <h2 class="login-title"><img src="/icon-32.png" alt="JF! Sistem Gadai" class="logo-icon">
+                    <h2 class="login-title"><img src="/icons/system-jf.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>
                     <h3>${t('login')}</h3>
                     <div class="form-group">
                         <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
@@ -247,15 +248,14 @@ const DashboardCore = {
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h1><img src="/icon-32.png" alt="JF! Sistem Gadai" class="logo-icon">
+                    <h1><img src="/icons/system-jf.png" alt="JF!"> JF! by Gadai</h1>
                     <div class="header-actions">
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
                     </div>
                 </div>
                 
                 <div class="cashflow-summary">
-                    <h3>💰 ${lang === 'id' ? 'MANAJEMEN DANA' : '资金管理'}</h3>
-                    <div style="text-align:right; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:10px;">
                         <button onclick="APP.showCapitalModal()" class="capital-btn" style="background:rgba(255,255,255,0.2); border:none; padding:4px 12px; border-radius:6px; color:white;">🏦 ${lang === 'id' ? 'Manajemen Modal' : '资金管理'}</button>
                     </div>
                     <div class="cashflow-stats">
@@ -335,7 +335,7 @@ const DashboardCore = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}<tr></tr>`;
         } else {
             var typeMap = {
                 investment: lang === 'id' ? '💰 注资' : '💰 注资',
@@ -601,7 +601,7 @@ const DashboardCore = {
         }
         
         if (rows === '') {
-            rows = `<tr><td colspan="7" style="text-align:center; padding:20px;">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</td></tr>`;
+            rows = `<tr><td colspan="7" style="text-align:center; padding:20px;">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}<tr></tr>`;
         }
         
         tbody.innerHTML = rows;
