@@ -3,7 +3,6 @@
 
 const Order = {
     async create(data) {
-        // data 中应包含 loan_source: 'cash', 'bank', 'profit'
         const orderData = {
             customer_name: data.customer.name,
             customer_ktp: data.customer.ktp,
@@ -14,22 +13,19 @@ const Order = {
             admin_fee: data.admin_fee || 30000,
             notes: data.notes,
             customer_id: data.customer_id || null,
-            loan_source: data.loan_source || 'bank'  // 新增：资金来源
+            loan_source: data.loan_source || 'bank'
         };
         return await SUPABASE.createOrder(orderData);
     },
     
-    // 管理费：直接入账门店净利
     async recordAdminFee(orderId, paymentMethod, adminFeeAmount) { 
         return await SUPABASE.recordAdminFee(orderId, paymentMethod, adminFeeAmount); 
     },
     
-    // 利息：直接入账门店净利
     async recordInterestPayment(orderId, monthsPaid, paymentMethod) { 
         return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod); 
     },
     
-    // 本金：根据目标返还到不同资金池（bank/cash/profit）
     async recordPrincipalPayment(orderId, amount, paymentMethod, target) { 
         return await SUPABASE.recordPrincipalPayment(orderId, amount, paymentMethod, target); 
     },
