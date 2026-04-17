@@ -101,7 +101,6 @@ const DashboardReport = {
                     const cashBalance = cashIncome - cashExpense;
                     const bankBalance = bankIncome - bankExpense;
                     
-                    // 获取门店净利（使用现有函数）
                     const profitBalance = await SUPABASE.getStoreProfitBalance(store.id);
 
                     storeReports.push({ 
