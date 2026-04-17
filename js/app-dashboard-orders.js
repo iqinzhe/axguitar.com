@@ -301,7 +301,7 @@ const DashboardOrders = {
                 <div class="no-print"><button class="btn-print" onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button><button class="btn-close" onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button></div>
                 <div class="header">
                     <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;">
-                        <img src="/icons/system-jf.png" alt="JF!" style="height:32px;">
+                        <img src="/icon-32.png" alt="JF! Sistem Gadai" class="logo-icon">
                         <h1 style="margin:0;">JF! by Gadai</h1>
                     </div>
                     <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${order.order_id}</strong> | ${Utils.formatDate(order.created_at)}</p>
