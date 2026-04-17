@@ -1,8 +1,6 @@
 // app-customers.js - 完整最终版
 // 权限：拉黑（店长/员工），解除（仅管理员），查看黑名单（管理员看全部，店长看本店）
-// 布局：客户列表（上方）→ 新增客户（中间）→ 黑名单列表（下方）
-// 修改：客户列表操作按钮只保留 "➕ 建立订单" 和 "🚫 拉黑"
-// 修改：新建订单时增加资金来源选择（银行BNI/保险柜/门店净利）
+// 修改：管理员不显示"建立订单"按钮；隐藏门店后端编码
 
 window.APP = window.APP || {};
 
@@ -39,6 +37,9 @@ const CustomersModule = {
                         blacklistReason = '<small style="color:#dc2626; display:block; font-size:10px;">原因: ' + Utils.escapeHtml(blacklistStatus[c.id].substring(0, 30)) + '</small>';
                     }
                     
+                    // 门店名称：隐藏后端编码，只显示名称
+                    var storeDisplayName = c.stores?.name || '-';
+                    
                     rows += `<tr>
                         <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}${blacklistBadge}${blacklistReason}</td>
                         <td class="date-cell">${Utils.formatDate(c.registered_date)}</td>
@@ -47,9 +48,9 @@ const CustomersModule = {
                         <td class="phone-cell">${Utils.escapeHtml(c.phone || '-')}</td>
                         <td class="address-cell">${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
                         <td class="address-cell">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
-                        ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')} (${Utils.escapeHtml(c.stores?.code || '-')})</td>` : ''}
+                        ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(storeDisplayName)}</td>` : ''}
                         <td class="action-cell">
-                            <button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>
+                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${canBlacklist && !isBlacklisted ? `<button onclick="APP.showBlacklistCustomerModal('${c.id}', '${Utils.escapeHtml(c.name)}')" class="btn-small" style="background:#d97706;color:white;">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
                             ${isAdmin && isBlacklisted ? `<button onclick="APP.removeFromBlacklist('${c.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus Blacklist' : '解除拉黑'}</button>` : ''}
                         </td>
@@ -85,6 +86,7 @@ const CustomersModule = {
             if (blacklistCount > 0) {
                 for (var item of blacklistData) {
                     var customer = item.customers;
+                    var storeDisplayName = customer?.stores?.name || '-';
                     blacklistRows += `<tr>
                         <td class="customer-id-cell">${Utils.escapeHtml(customer?.customer_id || '-')}</td>
                         <td class="name-cell">${Utils.escapeHtml(customer?.name || '-')}</td>
@@ -94,7 +96,7 @@ const CustomersModule = {
                         <td class="date-cell">${Utils.formatDate(item.blacklisted_at)}</td>
                         <td class="action-cell">
                             ${isAdmin ? `<button onclick="APP.removeFromBlacklist('${customer.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus' : '解除'}</button>` : ''}
-                        </td>
+                         </td
                     　　　`;
                 }
             }
@@ -311,8 +313,8 @@ const CustomersModule = {
             this.currentCustomerId = customerId;
             var t = (key) => Utils.t(key);
             const profile = await SUPABASE.getCurrentProfile();
-            const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
-            const userStoreCode = profile?.stores?.code || '-';
+            // 门店名称：隐藏后端编码，只显示名称
+            var userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             var cashFlow = await SUPABASE.getCashFlowSummary();
             var cashBalance = cashFlow.cash?.balance ?? 0;
             var bankBalance = cashFlow.bank?.balance ?? 0;
@@ -320,8 +322,8 @@ const CustomersModule = {
             document.getElementById("app").innerHTML = `
                 <div class="page-header"><h2>📝 ${t('create_order')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button></div></div>
                 <div class="card"><h3>${t('customer_info')}</h3>
-                    <div class="customer-info-display"><p><strong>${lang === 'id' ? 'ID Nasabah' : '客户ID'}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}:</strong> ${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</p><p><strong>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}:</strong> ${customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')}</p><p><strong>${lang === 'id' ? 'Toko Asal' : '所属门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')} (${Utils.escapeHtml(customer.stores?.code || '-')})</p></div>
-                    <div class="store-info-banner" style="background:#e0f2fe; padding:10px 15px; border-radius:8px; margin-bottom:16px;"><span>🏪 ${lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店'}: <strong>${Utils.escapeHtml(userStoreName)} (${Utils.escapeHtml(userStoreCode)})</strong></span></div>
+                    <div class="customer-info-display"><p><strong>${lang === 'id' ? 'ID Nasabah' : '客户ID'}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}:</strong> ${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</p><p><strong>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}:</strong> ${customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')}</p><p><strong>${lang === 'id' ? 'Toko Asal' : '所属门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')}</p></div>
+                    <div class="store-info-banner" style="background:#e0f2fe; padding:10px 15px; border-radius:8px; margin-bottom:16px;"><span>🏪 ${lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店'}: <strong>${Utils.escapeHtml(userStoreName)}</strong></span></div>
                     <h3>${t('collateral_info')}</h3>
                     <div class="form-grid">
                         <div class="form-group full-width"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
@@ -399,7 +401,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         var blacklistData = await APP.getBlacklist();
         if (blacklistData.length === 0) { alert(lang === 'id' ? 'Tidak ada data blacklist' : '暂无黑名单数据'); return; }
-        var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'}</title><style>body{font-family:'Segoe UI',Arial,sans-serif;margin:20px;font-size:12px}.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}.header h1{margin:0;font-size:18px;color:#dc2626}.header p{margin:5px 0;color:#666;font-size:11px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#fef3c7;font-weight:600}.footer{margin-top:20px;text-align:center;font-size:10px;color:#666;border-top:1px solid #ccc;padding-top:10px}@media print{@page{size:A4 landscape;margin:10mm}body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>🚫 JF! by Gadai - ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'}</h1><p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div><table><thead><tr><th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'KTP' : 'KTP'}</th><th>${lang === 'id' ? 'Telepon' : '电话'}</th><th>${lang === 'id' ? 'Alasan' : '拉黑原因'}</th><th>${lang === 'id' ? 'Tanggal' : '拉黑日期'}</th></tr></thead><tbody>`;
+        var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'}</title><style>body{font-family:'Segoe UI',Arial,sans-serif;margin:20px;font-size:12px}.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}.header h1{margin:0;font-size:18px;color:#dc2626}.header p{margin:5px 0;color:#666;font-size:11px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#fef3c7;font-weight:600}.footer{margin-top:20px;text-align:center;font-size:10px;color:#666;border-top:1px solid #ccc;padding-top:10px}@media print{@page{size:A4 landscape;margin:10mm}body{margin:0}.no-print{display:none}}</style></head><body><div class="header"><h1>🚫 JF! by Gadai - ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'}</h1><p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div><tr><thead><tr><th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'KTP' : 'KTP'}</th><th>${lang === 'id' ? 'Telepon' : '电话'}</th><th>${lang === 'id' ? 'Alasan' : '拉黑原因'}</th><th>${lang === 'id' ? 'Tanggal' : '拉黑日期'}</th></tr></thead><tbody>`;
         for (var item of blacklistData) {
             var customer = item.customers;
             printContent += `<tr><td style="padding:8px;">${Utils.escapeHtml(customer?.customer_id || '-')}</td><td style="padding:8px;">${Utils.escapeHtml(customer?.name || '-')}</td><td style="padding:8px;">${Utils.escapeHtml(customer?.ktp_number || '-')}</td><td style="padding:8px;">${Utils.escapeHtml(customer?.phone || '-')}</td><td style="padding:8px;">${Utils.escapeHtml(item.reason)}</td><td style="padding:8px;">${Utils.formatDate(item.blacklisted_at)}</td></tr>`;
@@ -441,7 +443,8 @@ const CustomersModule = {
             const { data: customer } = await supabaseClient.from('customers').select('*, stores(name, code)').eq('id', customerId).single();
             const { data: orders, error } = await supabaseClient.from('orders').select('*, stores(code, name)').eq('customer_id', customerId).order('created_at', { ascending: false });
             if (error) throw error;
-            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            // 状态文字：将"active"显示为"未结清"
+            var statusMap = { active: lang === 'id' ? 'Belum Lunas' : '未结清', completed: t('status_completed'), liquidated: t('status_liquidated') };
             var rows = orders && orders.length > 0 ? orders.map(o => {
                 var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                 return `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td class="date-cell">${Utils.formatDate(o.created_at)}</td><td class="text-right">${Utils.formatCurrency(o.loan_amount)}</td><td class="text-right">${Utils.formatCurrency(o.principal_paid)}</td><td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td><td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td><td class="action-cell"><button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}</button>${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}</td></tr>`;
@@ -467,7 +470,7 @@ const CustomersModule = {
                 allPayments = data || [];
             }
             var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
-            var rows = allPayments.length === 0 ? `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>` : allPayments.map(p => `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td>${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td><td class="text-right">${Utils.formatCurrency(p.amount)}</td><td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td><td>${Utils.escapeHtml(p.description || '-')}</td></tr>`).join('');
+            var rows = allPayments.length === 0 ? `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>` : allPayments.map(p => `<td><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td>${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td><td class="text-right">${Utils.formatCurrency(p.amount)}</td><td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td><td>${Utils.escapeHtml(p.description || '-')}</td></tr>`).join('');
             document.getElementById("app").innerHTML = `<div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p></div><div class="card"><h3>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h3><div class="table-container"><table class="payment-table"><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th>${lang === 'id' ? 'Bulan' : '月数'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>${rows}</tbody></table></div></div><style>.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.customer-summary{background:#f8fafc}.text-right{text-align:right}.text-center{text-align:center}</style>`;
         } catch (error) { console.error("showCustomerPaymentHistory error:", error); alert(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败'); }
     }
