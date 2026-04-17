@@ -1,6 +1,7 @@
-// app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增或删减栏目按钮等!!!）
-// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
-// 修改：仪表盘资金管理改为三资金池（保险柜、银行BNI、门店净利），使用 cashFlow.profit.balance
+// app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增栏目按钮等!）
+// 包含：初始化、登录、登出、路由、导航、员工管理、资金管理
+// 修改：仪表盘资金管理改为三资金池（保险柜、银行BNI、门店净利）
+// 注意：按钮文字“用户管理”已改为“员工管理”（通过 utils.js 翻译实现）
 
 window.APP = window.APP || {};
 
@@ -228,7 +229,6 @@ const DashboardCore = {
         this.saveCurrentPageState();
         try {
             var report = await Order.getReport();
-            // 获取三资金池数据（新版 getCashFlowSummary 返回 cash, bank, profit, total）
             var cashFlow = await SUPABASE.getCashFlowSummary();
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
@@ -242,7 +242,6 @@ const DashboardCore = {
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
-            // 从 cashFlow 获取各池子余额
             var cashBalance = cashFlow.cash?.balance ?? 0;
             var bankBalance = cashFlow.bank?.balance ?? 0;
             var profitBalance = cashFlow.profit?.balance ?? 0;
@@ -317,7 +316,7 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 资金管理模态框（简化版：只显示流水） ====================
+    // ==================== 资金管理模态框 ====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
@@ -333,7 +332,7 @@ const DashboardCore = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}<tr></tr>`;
         } else {
             var typeMap = {
                 investment: lang === 'id' ? '💰 注资' : '💰 注资',
@@ -440,7 +439,6 @@ const DashboardCore = {
         window._capitalTransactionsData = transactions;
     },
 
-    // ==================== 资金流水筛选功能 ====================
     filterCapitalTransactions: function() {
         var storeId = document.getElementById('filterStore')?.value;
         var type = document.getElementById('filterType')?.value;
@@ -564,7 +562,7 @@ const DashboardCore = {
             if (txn.type === 'investment') { sourceName = '总部'; targetName = txn.target_store?.name || '分店'; }
             else if (txn.type === 'withdrawal' || txn.type === 'dividend') { sourceName = txn.source_store?.name || '分店'; targetName = '总部'; }
             var methodText = txn.payment_method === 'cash' ? '现金' : '银行';
-            printContent += `<tr><td>${Utils.formatDate(txn.transaction_date)}</td><td>${typeMap[txn.type] || txn.type}</td><td>${methodText}</td><td>${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td><td class="text-right">${Utils.formatCurrency(txn.amount)}</td><td>${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
+            printContent += `<tr><td style="padding:8px;">${Utils.formatDate(txn.transaction_date)}</td><td style="padding:8px;">${typeMap[txn.type] || txn.type}</td><td style="padding:8px;">${methodText}</td><td style="padding:8px;">${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td><td style="padding:8px; text-align:right;">${Utils.formatCurrency(txn.amount)}</td><td style="padding:8px;">${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
         }
         
         printContent += `</tbody></table><div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div>
@@ -603,7 +601,7 @@ const DashboardCore = {
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
-    // ==================== 用户管理 ====================
+    // ==================== 员工管理 ====================
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -634,7 +632,7 @@ const DashboardCore = {
                     <td>${roleText}</td>
                     <td>${Utils.escapeHtml(storeName)}</td>
                     <td class="action-cell">${actionHtml}</td>
-                　　　`;
+                </tr>`;
             }
 
             if (users.length === 0) userRows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
@@ -650,20 +648,20 @@ const DashboardCore = {
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
                 </div>
-                <div class="card"><h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
+                <div class="card"><h3>${lang === 'id' ? 'Daftar Karyawan' : '员工列表'}</h3>
                     <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
                 </div>
-                <div class="card"><h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
+                <div class="card"><h3>${lang === 'id' ? 'Tambah Karyawan Baru' : '添加新员工'}</h3>
                     <div class="form-grid">
                         <div class="form-group"><label>${t('username')} *</label><input id="newUsername" placeholder="email@domain.com"></div>
                         <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="newRole"><option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option></select></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label><select id="newStoreId">${storeOptions}</select></div>
-                        <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button></div>
+                        <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Karyawan' : '添加员工'}</button></div>
                     </div>
                 </div>`;
-        } catch (error) { console.error("showUserManagement error:", error); alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna' : '加载用户管理失败'); }
+        } catch (error) { console.error("showUserManagement error:", error); alert(Utils.lang === 'id' ? 'Gagal memuat manajemen karyawan' : '加载员工管理失败'); }
     },
 
     addUser: async function() {
@@ -673,12 +671,12 @@ const DashboardCore = {
         var role = document.getElementById("newRole").value;
         var storeId = document.getElementById("newStoreId").value;
         if (!username || !password || !name) { alert(Utils.lang === 'id' ? 'Harap isi semua field' : '请填写所有字段'); return; }
-        try { await AUTH.addUser(username, password, name, role, storeId || null); alert((Utils.lang === 'id' ? 'Pengguna "' : '用户 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！')); await this.showUserManagement(); } 
+        try { await AUTH.addUser(username, password, name, role, storeId || null); alert((Utils.lang === 'id' ? 'Karyawan "' : '员工 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！')); await this.showUserManagement(); } 
         catch (error) { alert('Error: ' + error.message); }
     },
 
     deleteUser: async function(userId) {
-        if (confirm(Utils.lang === 'id' ? 'Hapus pengguna ini?' : '删除此用户？')) {
+        if (confirm(Utils.lang === 'id' ? 'Hapus karyawan ini?' : '删除此员工？')) {
             try { await AUTH.deleteUser(userId); await this.showUserManagement(); } 
             catch (error) { alert('Error: ' + error.message); }
         }
@@ -693,19 +691,19 @@ const DashboardCore = {
             var modal = document.createElement('div');
             modal.id = 'editUserModal';
             modal.className = 'modal-overlay';
-            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
+            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Karyawan' : '修改员工角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
             document.body.appendChild(modal);
-        } catch (error) { alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败'); }
+        } catch (error) { alert(lang === 'id' ? 'Gagal memuat data karyawan' : '加载员工数据失败'); }
     },
 
     _saveUserRole: async function(userId) {
         var lang = Utils.lang;
         var newRole = document.getElementById('editRoleSelect').value;
-        try { await AUTH.updateUser(userId, { role: newRole }); document.getElementById('editUserModal')?.remove(); alert(lang === 'id' ? 'Peran pengguna berhasil diubah' : '用户角色已修改'); await this.showUserManagement(); } 
+        try { await AUTH.updateUser(userId, { role: newRole }); document.getElementById('editUserModal')?.remove(); alert(lang === 'id' ? 'Peran karyawan berhasil diubah' : '员工角色已修改'); await this.showUserManagement(); } 
         catch (error) { alert('Error: ' + error.message); }
     },
 
-    // ==================== WA 提醒功能（简化版） ====================
+    // ==================== WA 提醒功能 ====================
     getSenderWANumber: async function(storeId) {
         var storeWANumber = await SUPABASE.getStoreWANumber(storeId);
         return storeWANumber || null;
@@ -829,7 +827,6 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 黑名单页面入口 ====================
     showBlacklist: async function() {
         if (typeof window.APP.showBlacklist === 'function') {
             await window.APP.showBlacklist();
@@ -839,7 +836,6 @@ const DashboardCore = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
         key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
