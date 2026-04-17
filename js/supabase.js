@@ -1,7 +1,7 @@
-// supabase.js - 完整修复版 v3.0
+// supabase.js - 完整修复版 v4.0
 // 修改内容：
 // 1. 新增服务费支持（利率可选 1%, 2%, 3%）
-// 2. 新增贷款发放记录 recordLoanDisbursement
+// 2. 新增贷款发放记录 recordLoanDisbursement（防重复发放）
 // 3. 移除净利选项，利息和本金还款只能选择 cash/bank
 // 4. 新增统一资金流向记录函数
 
@@ -225,9 +225,6 @@ const SupabaseAPI = {
     },
 
     // ==================== 统一资金流向记录 ====================
-    // flow_type: 'loan_disbursement', 'admin_fee', 'service_fee', 'interest', 'principal', 'expense'
-    // direction: 'outflow' (支出) 或 'inflow' (收入)
-    // source_target: 'cash' 或 'bank'
     
     async recordCashFlow(flowData) {
         const profile = await this.getCurrentProfile();
@@ -253,12 +250,25 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 贷款发放记录 ====================
+    // ==================== 贷款发放记录（防重复） ====================
     async recordLoanDisbursement(orderId, amount, source, description) {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
         
-        // 记录资金流出（从保险柜或银行支付给客户）
+        // 检查是否已经发放过贷款
+        const { data: existingFlow, error: checkError } = await supabaseClient
+            .from('cash_flow_records')
+            .select('id')
+            .eq('order_id', order.id)
+            .eq('flow_type', 'loan_disbursement')
+            .maybeSingle();
+        
+        if (existingFlow) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Pinjaman sudah dicairkan sebelumnya' 
+                : '贷款已发放过');
+        }
+        
         const flowRecord = await this.recordCashFlow({
             store_id: order.store_id,
             flow_type: 'loan_disbursement',
@@ -345,9 +355,7 @@ const SupabaseAPI = {
             try {
                 const orderId = await this._generateOrderId(profile.role, targetStoreId);
                 
-                // 计算月利息 = 贷款金额 × 10%
                 const monthlyInterest = orderData.loan_amount * 0.10;
-                // 服务费金额 = 贷款金额 × 服务费百分比
                 const serviceFeeAmount = orderData.loan_amount * (serviceFeePercent / 100);
                 
                 const newOrder = {
@@ -434,7 +442,6 @@ const SupabaseAPI = {
         const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
         
-        // 记录资金流入（管理费进入保险柜或银行）
         await this.recordCashFlow({
             store_id: order.store_id,
             flow_type: 'admin_fee',
@@ -450,7 +457,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 服务费记录（新增） ====================
+    // ==================== 服务费记录 ====================
     async recordServiceFee(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -482,7 +489,6 @@ const SupabaseAPI = {
         const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
         
-        // 记录资金流入（服务费进入保险柜或银行）
         await this.recordCashFlow({
             store_id: order.store_id,
             flow_type: 'service_fee',
@@ -498,7 +504,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 利息记录（只能选择 cash/bank） ====================
+    // ==================== 利息记录 ====================
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -529,7 +535,6 @@ const SupabaseAPI = {
         const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
         
-        // 记录资金流入（利息进入保险柜或银行）
         await this.recordCashFlow({
             store_id: order.store_id,
             flow_type: 'interest',
@@ -545,7 +550,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 本金还款（只能选择 cash/bank，移除 profit 选项） ====================
+    // ==================== 本金还款 ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -605,7 +610,6 @@ const SupabaseAPI = {
         const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
         
-        // 记录资金流入（本金进入保险柜或银行）
         await this.recordCashFlow({
             store_id: order.store_id,
             flow_type: 'principal',
@@ -863,90 +867,6 @@ const SupabaseAPI = {
 
     // ==================== 资金管理函数 ====================
     
-    _generateBizNo: function(prefix) {
-        return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-    },
-
-    // 获取门店资金汇总（基于 cash_flow_records 计算）
-    async getShopAccount(storeId) {
-        const targetStoreId = storeId || await this.getCurrentStoreId();
-        
-        if (!targetStoreId) {
-            return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
-        }
-        
-        // 从 cash_flow_records 计算门店资金余额
-        const { data: flows, error } = await supabaseClient
-            .from('cash_flow_records')
-            .select('direction, amount, source_target')
-            .eq('store_id', targetStoreId);
-        
-        if (error) {
-            console.warn("getShopAccount error:", error);
-            return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
-        }
-        
-        let cashBalance = 0;
-        let bankBalance = 0;
-        
-        for (const flow of flows || []) {
-            const amount = flow.amount || 0;
-            if (flow.direction === 'inflow') {
-                if (flow.source_target === 'cash') cashBalance += amount;
-                else if (flow.source_target === 'bank') bankBalance += amount;
-            } else if (flow.direction === 'outflow') {
-                if (flow.source_target === 'cash') cashBalance -= amount;
-                else if (flow.source_target === 'bank') bankBalance -= amount;
-            }
-        }
-        
-        return {
-            cash_balance: cashBalance,
-            bank_balance: bankBalance,
-            total_balance: cashBalance + bankBalance
-        };
-    },
-
-    // 获取门店净利（总收入 - 总支出）
-    async getShopProfit(storeId) {
-        const targetStoreId = storeId || await this.getCurrentStoreId();
-        
-        if (!targetStoreId) {
-            return { total_income: 0, total_expense: 0, profit: 0 };
-        }
-        
-        const { data: flows, error } = await supabaseClient
-            .from('cash_flow_records')
-            .select('direction, amount, flow_type')
-            .eq('store_id', targetStoreId);
-        
-        if (error) {
-            console.warn("getShopProfit error:", error);
-            return { total_income: 0, total_expense: 0, profit: 0 };
-        }
-        
-        let totalIncome = 0;
-        let totalExpense = 0;
-        
-        // 收入类型：admin_fee, service_fee, interest, principal
-        // 支出类型：loan_disbursement, expense
-        for (const flow of flows || []) {
-            const amount = flow.amount || 0;
-            if (flow.direction === 'inflow') {
-                totalIncome += amount;
-            } else if (flow.direction === 'outflow') {
-                totalExpense += amount;
-            }
-        }
-        
-        return {
-            total_income: totalIncome,
-            total_expense: totalExpense,
-            profit: totalIncome - totalExpense
-        };
-    },
-
-    // 获取门店资金流水
     async getCashFlowRecords(storeId = null, startDate = null, endDate = null) {
         const profile = await this.getCurrentProfile();
         const targetStoreId = storeId || profile?.store_id;
@@ -978,133 +898,46 @@ const SupabaseAPI = {
         return data;
     },
 
-    async investToShop(shopId, amount, paymentMethod, description, transactionDate) {
-        const profile = await this.getCurrentProfile();
+    // 获取门店资金汇总（基于 cash_flow_records 计算）
+    async getShopAccount(storeId) {
+        const targetStoreId = storeId || await this.getCurrentStoreId();
         
-        if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat melakukan investasi' : '只有管理员可以注资');
+        if (!targetStoreId) {
+            return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
         }
         
-        if (!amount || amount <= 0) {
-            throw new Error(Utils.lang === 'id' ? 'Jumlah tidak valid' : '金额无效');
-        }
-        
-        const bizNo = this._generateBizNo('INV');
-        
-        const { data, error } = await supabaseClient
-            .from('capital_transactions')
-            .insert({
-                biz_no: bizNo,
-                store_id: null,
-                target_store_id: shopId,
-                type: 'investment',
-                payment_method: paymentMethod,
-                amount: amount,
-                description: description || (Utils.lang === 'id' ? 'Investasi modal' : '注资'),
-                transaction_date: transactionDate || new Date().toISOString().split('T')[0],
-                created_by: profile.id
-            })
-            .select()
-            .single();
+        const { data: flows, error } = await supabaseClient
+            .from('cash_flow_records')
+            .select('direction, amount, source_target')
+            .eq('store_id', targetStoreId);
         
         if (error) {
-            if (error.code === '23505') {
-                throw new Error(Utils.lang === 'id' ? '重复提交，请稍后再试' : '重复提交，请稍后再试');
+            console.warn("getShopAccount error:", error);
+            return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
+        }
+        
+        let cashBalance = 0;
+        let bankBalance = 0;
+        
+        for (const flow of flows || []) {
+            const amount = flow.amount || 0;
+            if (flow.direction === 'inflow') {
+                if (flow.source_target === 'cash') cashBalance += amount;
+                else if (flow.source_target === 'bank') bankBalance += amount;
+            } else if (flow.direction === 'outflow') {
+                if (flow.source_target === 'cash') cashBalance -= amount;
+                else if (flow.source_target === 'bank') bankBalance -= amount;
             }
-            throw error;
         }
         
-        // 同时记录资金流入（注资进入门店）
-        await this.recordCashFlow({
-            store_id: shopId,
-            flow_type: 'investment',
-            direction: 'inflow',
-            amount: amount,
-            source_target: paymentMethod,
-            description: description || (Utils.lang === 'id' ? 'Investasi modal' : '注资'),
-            reference_id: bizNo
-        });
-        
-        return data;
+        return {
+            cash_balance: cashBalance,
+            bank_balance: bankBalance,
+            total_balance: cashBalance + bankBalance
+        };
     },
 
-    async withdrawFromShop(shopId, amount, paymentMethod, description, transactionDate) {
-        const profile = await this.getCurrentProfile();
-        
-        if (profile?.role !== 'admin' && profile?.store_id !== shopId) {
-            throw new Error(Utils.lang === 'id' ? 'Anda hanya dapat mengelola toko sendiri' : '您只能管理自己的门店');
-        }
-        
-        const account = await this.getShopAccount(shopId);
-        const sourceBalance = paymentMethod === 'cash' ? account.cash_balance : account.bank_balance;
-        
-        if (sourceBalance < amount) {
-            throw new Error(Utils.lang === 'id' 
-                ? `Sisa saldo tidak mencukupi. Tersedia: ${this.formatCurrency(sourceBalance)}`
-                : `余额不足。可用: ${this.formatCurrency(sourceBalance)}`);
-        }
-        
-        const bizNo = this._generateBizNo('WTD');
-        
-        const { data, error } = await supabaseClient
-            .from('capital_transactions')
-            .insert({
-                biz_no: bizNo,
-                store_id: shopId,
-                target_store_id: null,
-                type: 'withdrawal',
-                payment_method: paymentMethod,
-                amount: amount,
-                description: description || (Utils.lang === 'id' ? 'Penarikan modal (pembayaran pokok)' : '本金提现'),
-                transaction_date: transactionDate || new Date().toISOString().split('T')[0],
-                created_by: profile.id
-            })
-            .select()
-            .single();
-        
-        if (error) {
-            if (error.code === '23505') {
-                throw new Error(Utils.lang === 'id' ? '重复提交，请稍后再试' : '重复提交，请稍后再试');
-            }
-            throw error;
-        }
-        
-        // 同时记录资金流出（提现从门店扣除）
-        await this.recordCashFlow({
-            store_id: shopId,
-            flow_type: 'withdrawal',
-            direction: 'outflow',
-            amount: amount,
-            source_target: paymentMethod,
-            description: description || (Utils.lang === 'id' ? 'Penarikan modal' : '提现'),
-            reference_id: bizNo
-        });
-        
-        return data;
-    },
-
-    async getCapitalTransactions() {
-        const profile = await this.getCurrentProfile();
-        
-        let query = supabaseClient
-            .from('capital_transactions')
-            .select(`
-                *,
-                source_store:stores!capital_transactions_store_id_fkey(name, code),
-                target_store:stores!capital_transactions_target_store_id_fkey(name, code)
-            `)
-            .order('transaction_date', { ascending: false });
-        
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.or(`store_id.eq.${profile.store_id},target_store_id.eq.${profile.store_id}`);
-        }
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        return data;
-    },
-
-    // ==================== 现金流汇总（基于 cash_flow_records） ====================
+    // ==================== 现金流汇总（门店版：不显示净利） ====================
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
@@ -1155,9 +988,6 @@ const SupabaseAPI = {
                 expense: totalExpense,
                 netIncome: totalIncome - totalExpense,
                 balance: cashBalance + bankBalance 
-            },
-            profit: {
-                balance: totalIncome - totalExpense
             }
         };
     },
@@ -1184,7 +1014,6 @@ const SupabaseAPI = {
         
         if (error) throw error;
         
-        // 记录资金流出（运营支出）
         await this.recordCashFlow({
             store_id: expenseData.store_id || profile?.store_id,
             flow_type: 'expense',
