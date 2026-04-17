@@ -1,4 +1,4 @@
-// app-payments.js - 完整修复版（三资金池，优化缴费页面结构）
+// app-payments.js - 修复版（本金还款历史显示门店净利 + 强制刷新）
 
 window.APP = window.APP || {};
 
@@ -22,7 +22,13 @@ const PaymentsModule = {
 
             var interestPayments = payments.filter(p => p.type === 'interest');
             var principalPayments = payments.filter(p => p.type === 'principal');
-            var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+            
+            // 修复：添加 profit 映射
+            var methodMap = { 
+                cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', 
+                bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI',
+                profit: lang === 'id' ? '📊 Laba Bersih' : '📊 门店净利'
+            };
 
             // 利息缴费历史
             var interestRows = '';
@@ -30,26 +36,28 @@ const PaymentsModule = {
                 interestRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
             } else {
                 for (var p of interestPayments) {
+                    var methodClass = p.payment_method === 'cash' ? 'method-cash' : (p.payment_method === 'bank' ? 'method-bank' : 'method-profit');
                     interestRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
                         <td class="text-center">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
+                        <td><span class="payment-method-badge ${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
                     </tr>`;
                 }
             }
 
-            // 本金还款历史
+            // 本金还款历史（修复显示门店净利）
             var principalRows = '';
             if (principalPayments.length === 0) {
                 principalRows = `<tr><td colspan="4" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
             } else {
                 for (var p of principalPayments) {
+                    var methodClass = p.payment_method === 'cash' ? 'method-cash' : (p.payment_method === 'bank' ? 'method-bank' : 'method-profit');
                     principalRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
+                        <td><span class="payment-method-badge ${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
                     </tr>`;
                 }
@@ -233,6 +241,7 @@ const PaymentsModule = {
                     .btn-small { padding: 4px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; }
                     button.success { background: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
                     button.warning { background: #d97706; color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+                    .method-profit { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
                     @media (max-width: 768px) {
                         .order-summary .summary-grid { grid-template-columns: repeat(2, 1fr); }
                         .interest-input-group, .principal-input-group { flex-direction: column; align-items: stretch; }
@@ -258,7 +267,7 @@ const PaymentsModule = {
         }
     },
 
-    // 管理费缴费
+    // 管理费缴费（强制刷新页面）
     payAdminFeeWithMethod: async function(orderId) {
         var method = document.querySelector('input[name="adminFeeMethod"]:checked')?.value || 'cash';
         var adminFeeSelect = document.getElementById('adminFeeAmount');
@@ -281,7 +290,8 @@ const PaymentsModule = {
         if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName} ke Laba Bersih Toko?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，入账方式：${methodName}，进入门店净利？`)) {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
-                await this.showPayment(orderId); 
+                // 强制刷新页面以确保状态更新
+                window.location.reload();
             } catch (error) { 
                 alert('Error: ' + error.message); 
             }
@@ -294,13 +304,13 @@ const PaymentsModule = {
         if (!confirm(lang === 'id' ? 'Buka kunci Admin Fee? Ini akan memungkinkan pembayaran ulang.' : '解锁管理费？这将允许重新缴费。')) return;
         try {
             await SUPABASE.unlockAdminFee(orderId);
-            await this.showPayment(orderId);
+            window.location.reload();
         } catch (error) {
             alert('Error: ' + error.message);
         }
     },
 
-    // 利息缴费
+    // 利息缴费（强制刷新页面）
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
@@ -309,14 +319,14 @@ const PaymentsModule = {
         if (confirm(lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName} ke Laba Bersih Toko?` : `确认入账利息 ${months} 个月，入账方式：${methodName}，进入门店净利？`)) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
-                await this.showPayment(orderId);
+                window.location.reload();
             } catch (error) { 
                 alert('Error: ' + error.message); 
             }
         }
     },
 
-    // 本金还款
+    // 本金还款（强制刷新页面）
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -326,9 +336,8 @@ const PaymentsModule = {
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
         if (confirm(lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} ke ${targetName}?` : `确认入账本金 ${Utils.formatCurrency(amount)} 到 ${targetName}？`)) {
             try {
-                // 本金还款时，payment_method 记录为入账方式（target）
                 await Order.recordPrincipalPayment(orderId, amount, target === 'cash' ? 'cash' : (target === 'bank' ? 'bank' : 'profit'), target);
-                await this.showPayment(orderId);
+                window.location.reload();
             } catch (error) { 
                 alert('Error: ' + error.message); 
             }
