@@ -1,6 +1,8 @@
-// app-dashboard-core.js - 完整修复版
-// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
-// 修复：仪表盘添加净利卡片
+// app-dashboard-core.js - 仪表盘布局优化版
+// 修改内容：
+// 1. 新增支出汇总卡片
+// 2. 桌面端：4列×2行布局
+// 3. 移动端：2列×4行布局（响应式）
 
 window.APP = window.APP || {};
 
@@ -221,7 +223,7 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（修复版 - 添加净利卡片） ====================
+    // ==================== 仪表盘（布局优化版） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -246,8 +248,41 @@ const DashboardCore = {
             var bankInvestment = cashFlow.capital?.bank?.investment || 0;
             var bankWithdrawal = cashFlow.capital?.bank?.withdrawal || 0;
             
-            // ✅ 获取净利（来自修复后的 cashFlow）
+            // 获取净利
             var profitBalance = cashFlow.profit?.balance || 0;
+            
+            // ✅ 新增：获取支出汇总（运营支出总额）
+            var totalExpenses = 0;
+            try {
+                const profile = await SUPABASE.getCurrentProfile();
+                let expenseQuery = supabaseClient.from('expenses').select('amount');
+                if (profile?.role !== 'admin' && profile?.store_id) {
+                    expenseQuery = expenseQuery.eq('store_id', profile.store_id);
+                }
+                const { data: expenses } = await expenseQuery;
+                totalExpenses = expenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
+            } catch(e) { console.warn("获取支出汇总失败:", e); }
+            
+            // 准备卡片数据
+            // 顺序：总订单数, 贷款总额, 进行中, 已结清, 已收管理费, 已收利息, 支出汇总, 净利
+            var cards = [
+                { label: t('total_orders'), value: report.total_orders, type: 'number' },
+                { label: t('total_loan'), value: Utils.formatCurrency(report.total_loan_amount), type: 'currency' },
+                { label: t('active'), value: report.active_orders, type: 'number' },
+                { label: t('completed'), value: report.completed_orders, type: 'number' },
+                { label: lang === 'id' ? 'Admin Fee' : '管理费', value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
+                { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
+                { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' },
+                { label: lang === 'id' ? 'Laba Bersih' : '净利', value: Utils.formatCurrency(profitBalance), type: 'currency', class: profitBalance >= 0 ? 'income' : 'expense' }
+            ];
+            
+            // 生成卡片 HTML
+            var cardsHtml = cards.map(card => `
+                <div class="stat-card ${card.class || ''}">
+                    <div class="stat-value ${card.class || ''}">${card.value}</div>
+                    <div class="stat-label">${card.label}</div>
+                </div>
+            `).join('');
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -302,15 +337,9 @@ const DashboardCore = {
                     </div>
                 </div>
                 
-                <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-value">${report.total_orders}</div><div>${t('total_orders')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${report.active_orders}</div><div>${t('active')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${report.completed_orders}</div><div>${t('completed')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_loan_amount)}</div><div>${t('total_loan')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
-                    <!-- ✅ 新增净利卡片 -->
-                    <div class="stat-card"><div class="stat-value ${profitBalance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(profitBalance)}</div><div>${lang === 'id' ? 'Laba Bersih' : '净利'}</div></div>
+                <!-- ✅ 优化后的统计卡片布局：桌面端4x2，移动端2x4 -->
+                <div class="stats-grid-optimized">
+                    ${cardsHtml}
                 </div>
                 
                 <div class="toolbar">
@@ -335,27 +364,90 @@ const DashboardCore = {
                 </div>
                 
                 <style>
-                    .stats-grid {
+                    /* 桌面端：4列x2行布局 */
+                    .stats-grid-optimized {
                         display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                        gap: 12px;
-                        margin-bottom: 20px;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 16px;
+                        margin-bottom: 24px;
                     }
+                    
                     .stat-card {
                         background: #ffffff;
-                        border-radius: 12px;
-                        padding: 16px 12px;
+                        border-radius: 16px;
+                        padding: 20px 12px;
                         text-align: center;
                         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                         border: 1px solid #e2e8f0;
+                        transition: transform 0.2s, box-shadow 0.2s;
                     }
+                    
+                    .stat-card:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                    }
+                    
                     .stat-value {
-                        font-size: 20px;
+                        font-size: 24px;
                         font-weight: 700;
-                        margin-bottom: 4px;
+                        margin-bottom: 8px;
+                        line-height: 1.2;
                     }
-                    .stat-value.income { color: #10b981; }
-                    .stat-value.expense { color: #ef4444; }
+                    
+                    .stat-label {
+                        font-size: 13px;
+                        color: #64748b;
+                        font-weight: 500;
+                    }
+                    
+                    .stat-value.income {
+                        color: #10b981;
+                    }
+                    
+                    .stat-value.expense {
+                        color: #ef4444;
+                    }
+                    
+                    .stat-card.income .stat-value {
+                        color: #10b981;
+                    }
+                    
+                    .stat-card.expense .stat-value {
+                        color: #ef4444;
+                    }
+                    
+                    /* 手机端：2列x4行布局 */
+                    @media (max-width: 768px) {
+                        .stats-grid-optimized {
+                            grid-template-columns: repeat(2, 1fr);
+                            gap: 12px;
+                            margin-bottom: 20px;
+                        }
+                        
+                        .stat-card {
+                            padding: 14px 8px;
+                        }
+                        
+                        .stat-value {
+                            font-size: 18px;
+                        }
+                        
+                        .stat-label {
+                            font-size: 11px;
+                        }
+                    }
+                    
+                    /* 平板端适配 */
+                    @media (min-width: 769px) and (max-width: 1024px) {
+                        .stats-grid-optimized {
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 14px;
+                        }
+                        
+                        .stat-value {
+                            font-size: 20px;
+                        }
+                    }
                 </style>`;
         } catch (err) {
             document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
@@ -600,7 +692,7 @@ const DashboardCore = {
         </head><body>
         <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h1>
         <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
-        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
+        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th><tr></thead><tbody>`;
         
         var typeMap = { investment: '注资', withdrawal: '还本', dividend: '分红' };
         for (var txn of transactions) {
