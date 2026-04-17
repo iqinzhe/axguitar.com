@@ -1,5 +1,9 @@
-// supabase.js - 完整最终版（含资金管理优化）
-// 包含：注资(投资)、提现(还本)、分红、分店资金账户查询、防重复机制
+// supabase.js - 完整修复版
+// 修复内容：
+// 1. 本金还款描述使用剩余本金判断（原错误使用贷款总额）
+// 2. getCashFlowSummary 添加 profit 字段
+// 3. 新增 unlockAdminFee 函数（作废原记录防止重复入账）
+// 4. 超额还款确认对话框
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -362,7 +366,7 @@ const SupabaseAPI = {
             date: new Date().toISOString().split('T')[0],
             type: 'admin_fee',
             amount: feeAmount,
-            description: `Administrasi Fee / 管理费 (${Utils.formatCurrency(feeAmount)})`,
+            description: `Administrasi Fee / 管理费 (${this.formatCurrency(feeAmount)})`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -403,11 +407,29 @@ const SupabaseAPI = {
         return true;
     },
 
+    // ==================== 本金还款（修复版） ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
         const remainingPrincipal = order.loan_amount - order.principal_paid;
-        const paidAmount = Math.min(amount, remainingPrincipal);
+        
+        // ✅ 修复1：使用剩余本金判断是否超额
+        let paidAmount = amount;
+        let isAdjusted = false;
+        
+        if (amount > remainingPrincipal) {
+            // ✅ 修复5：超额还款时弹出确认对话框
+            const confirmMsg = Utils.lang === 'id' 
+                ? `⚠️ Jumlah yang dimasukkan (${this.formatCurrency(amount)}) melebihi sisa pokok (${this.formatCurrency(remainingPrincipal)}).\n\nApakah Anda ingin membayar ${this.formatCurrency(remainingPrincipal)} untuk melunasi pokok?`
+                : `⚠️ 输入金额 (${this.formatCurrency(amount)}) 超过剩余本金 (${this.formatCurrency(remainingPrincipal)}).\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`;
+            
+            if (!confirm(confirmMsg)) {
+                throw new Error(Utils.lang === 'id' ? 'Pembayaran dibatalkan' : '付款已取消');
+            }
+            paidAmount = remainingPrincipal;
+            isAdjusted = true;
+        }
+        
         const newPrincipalPaid = order.principal_paid + paidAmount;
         const newPrincipalRemaining = order.loan_amount - newPrincipalPaid;
         
@@ -425,18 +447,70 @@ const SupabaseAPI = {
         const { error: e1 } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
         if (e1) throw e1;
         
+        // ✅ 修复1：使用剩余本金判断是否全额还款
+        const isFullRepayment = paidAmount >= remainingPrincipal;
+        const description = isFullRepayment 
+            ? (Utils.lang === 'id' ? 'Pelunasan Pokok / 全额还款' : '全额还款')
+            : (Utils.lang === 'id' ? 'Pembayaran Pokok / 部分还款' : '部分还款');
+        
+        // 添加调整备注
+        const finalDescription = isAdjusted 
+            ? `${description} (${Utils.lang === 'id' ? 'jumlah disesuaikan otomatis' : '金额已自动调整'})`
+            : description;
+        
         const paymentData = {
             order_id: order.id,
             date: new Date().toISOString().split('T')[0],
             type: 'principal',
             amount: paidAmount,
-            description: paidAmount >= order.loan_amount ? 'Pelunasan Pokok / 全额还款' : 'Pembayaran Pokok / 部分还款',
+            description: finalDescription,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
         
         const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
         if (e2) throw e2;
+        return true;
+    },
+
+    // ==================== 解锁管理费（修复版 - 作废原记录） ====================
+    async unlockAdminFee(orderId, reason = 'admin_correction') {
+        const profile = await this.getCurrentProfile();
+        
+        // 权限检查：只有管理员可以解锁
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Hanya administrator yang dapat membuka kunci Admin Fee' 
+                : '只有管理员可以解锁管理费');
+        }
+        
+        const order = await this.getOrder(orderId);
+        
+        // 1. 标记原有管理费支付记录为已作废
+        const { error: markError } = await supabaseClient
+            .from('payment_history')
+            .update({ 
+                is_voided: true, 
+                void_reason: reason,
+                voided_at: new Date().toISOString(),
+                voided_by: profile.id
+            })
+            .eq('order_id', order.id)
+            .eq('type', 'admin_fee');
+        
+        if (markError) throw markError;
+        
+        // 2. 解锁管理费（允许重新支付）
+        const { error: updateError } = await supabaseClient
+            .from('orders')
+            .update({ 
+                admin_fee_paid: false,
+                admin_fee_paid_date: null
+            })
+            .eq('order_id', orderId);
+        
+        if (updateError) throw updateError;
+        
         return true;
     },
 
@@ -641,14 +715,12 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 🆕 资金管理优化函数（新增） ====================
+    // ==================== 资金管理函数 ====================
     
-    // 生成唯一业务单号（防重复）
     _generateBizNo: function(prefix) {
         return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
     },
 
-    // 获取分店当前资金状态（实时计算）
     async getShopAccount(storeId) {
         const profile = await this.getCurrentProfile();
         const targetStoreId = storeId || profile?.store_id;
@@ -657,7 +729,6 @@ const SupabaseAPI = {
             return { principal_balance: 0, profit_balance: 0, total_invested: 0, total_withdrawn: 0, total_profit: 0, total_dividend: 0 };
         }
         
-        // 1. 计算注资总额（总部给这个分店的钱）
         const { data: investments } = await supabaseClient
             .from('capital_transactions')
             .select('amount')
@@ -666,7 +737,6 @@ const SupabaseAPI = {
         
         const totalInvested = (investments || []).reduce((s, t) => s + t.amount, 0);
         
-        // 2. 计算已还本金（分店还给总部的本金）
         const { data: withdrawals } = await supabaseClient
             .from('capital_transactions')
             .select('amount')
@@ -675,7 +745,6 @@ const SupabaseAPI = {
         
         const totalWithdrawn = (withdrawals || []).reduce((s, t) => s + t.amount, 0);
         
-        // 3. 计算已分红（分店给总部的分红）
         const { data: dividends } = await supabaseClient
             .from('capital_transactions')
             .select('amount')
@@ -684,7 +753,6 @@ const SupabaseAPI = {
         
         const totalDividend = (dividends || []).reduce((s, t) => s + t.amount, 0);
         
-        // 4. 计算分店赚取的利润（管理费 + 利息收入）
         const { data: orders } = await supabaseClient
             .from('orders')
             .select('id')
@@ -703,10 +771,7 @@ const SupabaseAPI = {
             totalProfit = (payments || []).reduce((s, p) => s + p.amount, 0);
         }
         
-        // 本金余额 = 总投资 - 已还本金
         const principalBalance = totalInvested - totalWithdrawn;
-        
-        // 未分配利润 = 总利润 - 已分红
         const undistributedProfit = totalProfit - totalDividend;
         
         return {
@@ -719,7 +784,6 @@ const SupabaseAPI = {
         };
     },
 
-    // 注资（总部给分店）- 管理员专用
     async investToShop(shopId, amount, paymentMethod, description, transactionDate) {
         const profile = await this.getCurrentProfile();
         
@@ -731,15 +795,13 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? 'Jumlah tidak valid' : '金额无效');
         }
         
-        // 生成唯一业务单号防止重复
         const bizNo = this._generateBizNo('INV');
         
-        // 插入资金流水
         const { data, error } = await supabaseClient
             .from('capital_transactions')
             .insert({
                 biz_no: bizNo,
-                store_id: null,  // 来源：总部
+                store_id: null,
                 target_store_id: shopId,
                 type: 'investment',
                 payment_method: paymentMethod,
@@ -761,16 +823,13 @@ const SupabaseAPI = {
         return data;
     },
 
-    // 提现还本（分店还本金给总部）- 店长/员工可用
     async withdrawFromShop(shopId, amount, paymentMethod, description, transactionDate) {
         const profile = await this.getCurrentProfile();
         
-        // 检查权限：店长或员工只能操作自己的门店
         if (profile?.role !== 'admin' && profile?.store_id !== shopId) {
             throw new Error(Utils.lang === 'id' ? 'Anda hanya dapat mengelola toko sendiri' : '您只能管理自己的门店');
         }
         
-        // 获取分店当前本金余额
         const account = await this.getShopAccount(shopId);
         
         if (account.principal_balance < amount) {
@@ -785,8 +844,8 @@ const SupabaseAPI = {
             .from('capital_transactions')
             .insert({
                 biz_no: bizNo,
-                store_id: shopId,  // 来源：分店
-                target_store_id: null,  // 去向：总部
+                store_id: shopId,
+                target_store_id: null,
                 type: 'withdrawal',
                 payment_method: paymentMethod,
                 amount: amount,
@@ -807,16 +866,13 @@ const SupabaseAPI = {
         return data;
     },
 
-    // 分红（分店分配利润给总部）- 店长/员工可用
     async distributeDividend(shopId, amount, paymentMethod, description, transactionDate) {
         const profile = await this.getCurrentProfile();
         
-        // 检查权限：店长或员工只能操作自己的门店
         if (profile?.role !== 'admin' && profile?.store_id !== shopId) {
             throw new Error(Utils.lang === 'id' ? 'Anda hanya dapat mengelola toko sendiri' : '您只能管理自己的门店');
         }
         
-        // 获取分店当前未分配利润
         const account = await this.getShopAccount(shopId);
         
         if (account.profit_balance < amount) {
@@ -831,8 +887,8 @@ const SupabaseAPI = {
             .from('capital_transactions')
             .insert({
                 biz_no: bizNo,
-                store_id: shopId,  // 来源：分店
-                target_store_id: null,  // 去向：总部
+                store_id: shopId,
+                target_store_id: null,
                 type: 'dividend',
                 payment_method: paymentMethod,
                 amount: amount,
@@ -853,7 +909,6 @@ const SupabaseAPI = {
         return data;
     },
 
-    // 获取所有分店的资金汇总（用于管理员报表）
     async getAllShopsCapitalSummary() {
         const stores = await this.getAllStores();
         const summary = [];
@@ -876,7 +931,6 @@ const SupabaseAPI = {
         return summary;
     },
 
-    // 获取资金流水（支持门店过滤）
     async getCapitalTransactions() {
         const profile = await this.getCurrentProfile();
         
@@ -890,7 +944,6 @@ const SupabaseAPI = {
             .order('transaction_date', { ascending: false });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
-            // 店长/员工：只看到自己门店相关的交易（作为来源或去向）
             query = query.or(`store_id.eq.${profile.store_id},target_store_id.eq.${profile.store_id}`);
         }
         
@@ -961,6 +1014,7 @@ const SupabaseAPI = {
         };
     },
 
+    // ==================== 现金流汇总（修复版 - 添加 profit 字段） ====================
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
@@ -1027,6 +1081,22 @@ const SupabaseAPI = {
         const cashBalance = (cashInvestment - cashWithdrawal) + cashIncome - cashExpense;
         const bankBalance = (bankInvestment - bankWithdrawal) + bankIncome - bankExpense;
         
+        // ✅ 修复2：添加 profit 字段
+        let profitBalance = 0;
+        
+        if (profile?.role === 'admin') {
+            const stores = await this.getAllStores();
+            let totalProfit = 0;
+            for (const store of stores) {
+                const account = await this.getShopAccount(store.id);
+                totalProfit += account.profit_balance;
+            }
+            profitBalance = totalProfit;
+        } else if (profile?.store_id) {
+            const account = await this.getShopAccount(profile.store_id);
+            profitBalance = account.profit_balance;
+        }
+        
         return {
             capital: {
                 cash: { investment: cashInvestment, withdrawal: cashWithdrawal, net: cashInvestment - cashWithdrawal },
@@ -1049,6 +1119,10 @@ const SupabaseAPI = {
                 expense: cashExpense + bankExpense,
                 netIncome: (cashIncome + bankIncome) - (cashExpense + bankExpense),
                 balance: cashBalance + bankBalance 
+            },
+            // ✅ 新增 profit 字段
+            profit: {
+                balance: profitBalance
             }
         };
     },
