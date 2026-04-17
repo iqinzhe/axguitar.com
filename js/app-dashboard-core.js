@@ -1,8 +1,8 @@
-// app-dashboard-core.js - 仪表盘布局优化版 v3.0
+// app-dashboard-core.js - 仪表盘布局优化版 v4.0
 // 修改内容：
-// 1. 更新资金汇总卡片显示（基于新的资金流）
-// 2. 新增服务费统计显示
-// 3. 更新现金流向显示
+// 1. 移除所有门店界面的净利显示
+// 2. 现金流汇总只显示保险柜、银行、总现金
+// 3. 统计卡片不包含净利
 
 window.APP = window.APP || {};
 
@@ -223,7 +223,7 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（资金流优化版） ====================
+    // ==================== 仪表盘（无净利版） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -255,8 +255,7 @@ const DashboardCore = {
                 totalExpenses = expenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
             } catch(e) { console.warn("获取支出汇总失败:", e); }
             
-            // 准备卡片数据
-            // 顺序：总订单数, 贷款总额, 进行中, 已结清, 已收管理费, 已收服务费, 已收利息, 支出汇总, 净利
+            // 准备卡片数据（8个卡片，不包含净利）
             var cards = [
                 { label: t('total_orders'), value: report.total_orders, type: 'number' },
                 { label: t('total_loan'), value: Utils.formatCurrency(report.total_loan_amount), type: 'currency' },
@@ -265,8 +264,7 @@ const DashboardCore = {
                 { label: lang === 'id' ? 'Admin Fee' : '管理费', value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Service Fee' : '服务费', value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
-                { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' },
-                { label: lang === 'id' ? 'Laba Bersih' : '净利', value: Utils.formatCurrency(cashFlow.profit?.balance || 0), type: 'currency', class: (cashFlow.profit?.balance || 0) >= 0 ? 'income' : 'expense' }
+                { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' }
             ];
             
             // 生成卡片 HTML
@@ -297,38 +295,38 @@ const DashboardCore = {
                             <strong>${Utils.formatCurrency(cashFlow.bank.balance)}</strong>
                         </div>
                         <div>
-                            <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Riwayat Modal' : '资金流水'}</button>
+                            <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Riwayat Transaksi' : '资金流水'}</button>
                         </div>
                     </div>
                     ` : ''}
                     
-// 修改后的 cashflow-stats 只保留三个卡片：
-<div class="cashflow-stats">
-    <div class="cashflow-item">
-        <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-        <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
-        <div class="cashflow-detail">
-            ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
-            ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
-        </div>
-    </div>
-    <div class="cashflow-item">
-        <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-        <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
-        <div class="cashflow-detail">
-            ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
-            ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
-        </div>
-    </div>
-    <div class="cashflow-item">
-        <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
-        <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
-        <div class="cashflow-detail">
-            📈 ${lang === 'id' ? 'Pendapatan' : '收入'}: +${Utils.formatCurrency(cashFlow.total.income)}<br>
-            📉 ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.total.expense)}
-        </div>
-    </div>
-</div>
+                    <div class="cashflow-stats">
+                        <div class="cashflow-item">
+                            <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
+                            <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
+                            <div class="cashflow-detail">
+                                ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
+                                ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
+                            </div>
+                        </div>
+                        <div class="cashflow-item">
+                            <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
+                            <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
+                            <div class="cashflow-detail">
+                                ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
+                                ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
+                            </div>
+                        </div>
+                        <div class="cashflow-item">
+                            <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
+                            <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
+                            <div class="cashflow-detail">
+                                📈 ${lang === 'id' ? 'Pendapatan' : '收入'}: +${Utils.formatCurrency(cashFlow.total.income)}<br>
+                                📉 ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.total.expense)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="stats-grid-optimized">
                     ${cardsHtml}
@@ -356,7 +354,6 @@ const DashboardCore = {
                 </div>
                 
                 <style>
-                    /* 桌面端：4列x3行布局（9个卡片） */
                     .stats-grid-optimized {
                         display: grid;
                         grid-template-columns: repeat(4, 1fr);
@@ -400,15 +397,6 @@ const DashboardCore = {
                         color: #ef4444;
                     }
                     
-                    .stat-card.income .stat-value {
-                        color: #10b981;
-                    }
-                    
-                    .stat-card.expense .stat-value {
-                        color: #ef4444;
-                    }
-                    
-                    /* 手机端：2列x5行布局 */
                     @media (max-width: 768px) {
                         .stats-grid-optimized {
                             grid-template-columns: repeat(2, 1fr);
@@ -429,7 +417,6 @@ const DashboardCore = {
                         }
                     }
                     
-                    /* 平板端适配 */
                     @media (min-width: 769px) and (max-width: 1024px) {
                         .stats-grid-optimized {
                             grid-template-columns: repeat(4, 1fr);
@@ -455,7 +442,6 @@ const DashboardCore = {
         var isAdmin = AUTH.isAdmin();
         var currentStoreId = AUTH.user?.store_id;
         
-        // 获取资金流水（基于 cash_flow_records）
         var transactions = [];
         try {
             transactions = await SUPABASE.getCashFlowRecords();
@@ -686,7 +672,7 @@ const DashboardCore = {
         </head><body>
         <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h1>
         <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
-        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
+        <tr><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
         
         for (var txn of transactions) {
             var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
