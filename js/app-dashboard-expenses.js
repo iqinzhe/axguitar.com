@@ -1,9 +1,8 @@
-// app-dashboard-expenses.js - 支出功能模块 v3.0
-// 修改内容：
-// 1. 运营支出使用新的资金流记录
-// 2. 支出记录自动创建 cash_flow_records
-// 3. 平账功能优化
-// 4. 支出分类优化
+// app-dashboard-expenses.js - 支出功能模块 v4.0
+// 修复内容：
+// 1. 删除支出时同步删除 cash_flow_records 中的关联记录（严重3）
+// 2. 优化支出编辑时的资金流同步
+// 3. 增加删除前的二次确认
 
 window.APP = window.APP || {};
 
@@ -50,7 +49,7 @@ const DashboardExpenses = {
                     </tr>`;
                 }
             } else {
-                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td><tr>`;
             }
 
             // 支出类别选项
@@ -194,6 +193,7 @@ const DashboardExpenses = {
                     .select('id, amount')
                     .eq('reference_id', expenseId)
                     .eq('flow_type', 'expense')
+                    .eq('is_voided', false)
                     .maybeSingle();
                 
                 if (cashFlow) {
@@ -212,15 +212,61 @@ const DashboardExpenses = {
         }
     },
 
+    // ==================== 删除支出（修复版：同步删除 cash_flow_records） ====================
     deleteExpense: async function(expenseId) {
         var lang = Utils.lang;
-        if (!confirm(lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？')) return;
+        
+        // 获取支出信息用于确认
+        const { data: expense, error: fetchError } = await supabaseClient
+            .from('expenses')
+            .select('category, amount, expense_date')
+            .eq('id', expenseId)
+            .single();
+        
+        if (fetchError) {
+            console.error("获取支出信息失败:", fetchError);
+        }
+        
+        var confirmMsg = lang === 'id' 
+            ? `Hapus pengeluaran ini?\n\nKategori: ${expense?.category || '-'}\nJumlah: ${Utils.formatCurrency(expense?.amount || 0)}\nTanggal: ${expense?.expense_date || '-'}\n\n⚠️ Data ini akan dihapus dari sistem dan tidak dapat dipulihkan.`
+            : `删除此支出记录？\n\n类别: ${expense?.category || '-'}\n金额: ${Utils.formatCurrency(expense?.amount || 0)}\n日期: ${expense?.expense_date || '-'}\n\n⚠️ 此数据将从系统中删除，无法恢复。`;
+        
+        if (!confirm(confirmMsg)) return;
+        
         try {
-            // 先删除对应的资金流记录
-            await supabaseClient.from('cash_flow_records').delete().eq('reference_id', expenseId).eq('flow_type', 'expense');
+            // 1. 先查找并删除关联的现金流记录
+            const { data: cashFlows, error: findFlowError } = await supabaseClient
+                .from('cash_flow_records')
+                .select('id')
+                .eq('reference_id', expenseId)
+                .eq('flow_type', 'expense');
             
-            const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
-            if (error) throw error;
+            if (findFlowError) {
+                console.warn("查找关联现金流记录失败:", findFlowError);
+            } else if (cashFlows && cashFlows.length > 0) {
+                // 删除所有关联的现金流记录
+                const cashFlowIds = cashFlows.map(cf => cf.id);
+                const { error: deleteFlowError } = await supabaseClient
+                    .from('cash_flow_records')
+                    .delete()
+                    .in('id', cashFlowIds);
+                
+                if (deleteFlowError) {
+                    console.error("删除关联现金流记录失败:", deleteFlowError);
+                    throw new Error(lang === 'id' 
+                        ? 'Gagal menghapus catatan arus kas terkait' 
+                        : '删除关联现金流记录失败');
+                }
+            }
+            
+            // 2. 删除支出记录
+            const { error: deleteExpenseError } = await supabaseClient
+                .from('expenses')
+                .delete()
+                .eq('id', expenseId);
+            
+            if (deleteExpenseError) throw deleteExpenseError;
+            
             alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
             await this.showExpenses();
         } catch (error) {
