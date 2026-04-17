@@ -1,5 +1,6 @@
-// app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增栏目按钮等!）
+// app-dashboard-core.js - 完整修复版
 // 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
+// 修复：仪表盘添加净利卡片
 
 window.APP = window.APP || {};
 
@@ -63,7 +64,7 @@ const DashboardCore = {
             paymentHistory: async () => await self.showPaymentHistory(),
             customerOrders: async () => { if (self.currentCustomerId) await self.showCustomerOrders(self.currentCustomerId); },
             customerPaymentHistory: async () => { if (self.currentCustomerId) await self.showCustomerPaymentHistory(self.currentCustomerId); },
-            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
+            blacklist: async () => await self.showBlacklist()
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -101,7 +102,7 @@ const DashboardCore = {
             viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
             payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
             editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); },
-            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
+            blacklist: async () => await self.showBlacklist()
         };
         var handler = navHandlers[page];
         if (handler) handler();
@@ -132,7 +133,7 @@ const DashboardCore = {
                 paymentHistory: async () => await self.showPaymentHistory(),
                 customerOrders: async () => { if (prev.customerId) await self.showCustomerOrders(prev.customerId); },
                 customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); },
-                blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
+                blacklist: async () => await self.showBlacklist()
             };
             var handler = backHandlers[prev.page];
             if (handler) handler();
@@ -220,7 +221,7 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘 ====================
+    // ==================== 仪表盘（修复版 - 添加净利卡片） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -244,6 +245,9 @@ const DashboardCore = {
             var cashWithdrawal = cashFlow.capital?.cash?.withdrawal || 0;
             var bankInvestment = cashFlow.capital?.bank?.investment || 0;
             var bankWithdrawal = cashFlow.capital?.bank?.withdrawal || 0;
+            
+            // ✅ 获取净利（来自修复后的 cashFlow）
+            var profitBalance = cashFlow.profit?.balance || 0;
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -305,6 +309,8 @@ const DashboardCore = {
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_loan_amount)}</div><div>${t('total_loan')}</div></div>
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
                     <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
+                    <!-- ✅ 新增净利卡片 -->
+                    <div class="stat-card"><div class="stat-value ${profitBalance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(profitBalance)}</div><div>${lang === 'id' ? 'Laba Bersih' : '净利'}</div></div>
                 </div>
                 
                 <div class="toolbar">
@@ -326,13 +332,37 @@ const DashboardCore = {
                     <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
                     <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan' : '管理费: (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
                     ${!isAdmin ? `<p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
-                </div>`;
+                </div>
+                
+                <style>
+                    .stats-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                        gap: 12px;
+                        margin-bottom: 20px;
+                    }
+                    .stat-card {
+                        background: #ffffff;
+                        border-radius: 12px;
+                        padding: 16px 12px;
+                        text-align: center;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        border: 1px solid #e2e8f0;
+                    }
+                    .stat-value {
+                        font-size: 20px;
+                        font-weight: 700;
+                        margin-bottom: 4px;
+                    }
+                    .stat-value.income { color: #10b981; }
+                    .stat-value.expense { color: #ef4444; }
+                </style>`;
         } catch (err) {
             document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
         }
     },
 
-    // ==================== 资金管理模态框（简化版：只显示流水） ====================
+    // ==================== 资金管理模态框 ====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
@@ -455,7 +485,6 @@ const DashboardCore = {
         window._capitalTransactionsData = transactions;
     },
 
-    // ==================== 资金流水筛选功能 ====================
     filterCapitalTransactions: function() {
         var storeId = document.getElementById('filterStore')?.value;
         var type = document.getElementById('filterType')?.value;
@@ -720,7 +749,7 @@ const DashboardCore = {
         catch (error) { alert('Error: ' + error.message); }
     },
 
-    // ==================== WA 提醒功能（简化版） ====================
+    // ==================== WA 提醒功能 ====================
     getSenderWANumber: async function(storeId) {
         var storeWANumber = await SUPABASE.getStoreWANumber(storeId);
         return storeWANumber || null;
@@ -844,9 +873,7 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 黑名单页面入口 ====================
     showBlacklist: async function() {
-        // 这个函数由 app-blacklist.js 提供
         if (typeof window.APP.showBlacklist === 'function') {
             await window.APP.showBlacklist();
         } else {
@@ -855,7 +882,6 @@ const DashboardCore = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
         key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
