@@ -1,4 +1,4 @@
-// app-payments.js - 完整版（支持三资金池：管理费/利息入门店净利，本金可选返还池）
+// app-payments.js - 完整修复版（支持三资金池：管理费/利息入门店净利，本金可选返还池）
 // 修复内容：缴费页面增加资金去向选择，管理费和利息自动入账门店净利，本金可选返还到银行/保险柜/门店净利
 
 window.APP = window.APP || {};
@@ -35,7 +35,7 @@ const PaymentsModule = {
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                         <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
-                    　　　`;
+                    </tr>`;
                 }
             }
 
@@ -49,7 +49,7 @@ const PaymentsModule = {
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                         <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
-                    　　　`;
+                    </tr>`;
                 }
             }
 
@@ -89,7 +89,6 @@ const PaymentsModule = {
                 `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(currentMonthlyInterest * i)}</option>`
             ).join('');
 
-            // 本金返还目标选项（三选一）
             var principalTargetOptions = `
                 <div class="payment-method-group" style="margin-top:8px;">
                     <div class="payment-method-title">${lang === 'id' ? 'Tujuan Pengembalian Pokok' : '本金返还去向'}:</div>
@@ -164,15 +163,7 @@ const PaymentsModule = {
                     <h4 class="subtitle">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</h4>
                     <div class="table-container">
                         <table class="payment-history-table">
-                            <thead>
-                                <tr>
-                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                    <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Bulan' : '月数'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead>
                             <tbody>${interestRows}</tbody>
                         </table>
                     </div>
@@ -185,14 +176,7 @@ const PaymentsModule = {
                     <h4 class="subtitle">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</h4>
                     <div class="table-container">
                         <table class="payment-history-table">
-                            <thead>
-                                <tr>
-                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                    <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead>
                             <tbody>${principalRows}</tbody>
                         </table>
                     </div>
@@ -272,7 +256,9 @@ const PaymentsModule = {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
                 await this.showPayment(orderId); 
-            } catch (error) { alert('Error: ' + error.message); }
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
         }
     },
 
@@ -281,11 +267,13 @@ const PaymentsModule = {
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
-        if (confirm((lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName} ke Laba Bersih Toko?` : `确认入账利息 ${months} 个月，支付方式：${methodName}，进入门店净利？`))) {
+        if (confirm(lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName} ke Laba Bersih Toko?` : `确认入账利息 ${months} 个月，支付方式：${methodName}，进入门店净利？`)) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
                 await this.showPayment(orderId);
-            } catch (error) { alert('Error: ' + error.message); }
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
         }
     },
 
@@ -298,11 +286,13 @@ const PaymentsModule = {
         var targetName = target === 'cash' ? (Utils.lang === 'id' ? 'Brankas' : '保险柜') : (target === 'bank' ? (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI') : (Utils.lang === 'id' ? 'Laba Bersih Toko' : '门店净利'));
         var lang = Utils.lang;
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
-        if (confirm((lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} via ${methodName} ke ${targetName}?` : `确认入账本金 ${Utils.formatCurrency(amount)}，支付方式：${methodName}，返还到：${targetName}？`))) {
+        if (confirm(lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} via ${methodName} ke ${targetName}?` : `确认入账本金 ${Utils.formatCurrency(amount)}，支付方式：${methodName}，返还到：${targetName}？`)) {
             try {
                 await Order.recordPrincipalPayment(orderId, amount, method, target);
                 await this.showPayment(orderId);
-            } catch (error) { alert('Error: ' + error.message); }
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
         }
     }
 };
