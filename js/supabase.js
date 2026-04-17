@@ -1,9 +1,9 @@
-// supabase.js - 完整修复版 v4.0
-// 修改内容：
-// 1. 新增服务费支持（利率可选 1%, 2%, 3%）
-// 2. 新增贷款发放记录 recordLoanDisbursement（防重复发放）
-// 3. 移除净利选项，利息和本金还款只能选择 cash/bank
-// 4. 新增统一资金流向记录函数
+// supabase.js - 完整修复版 v5.0
+// 修复内容：
+// 1. 修复非管理员支付记录过滤不可靠问题（使用子查询替代 JOIN 条件）
+// 2. 管理费解锁时同步处理 cash_flow_records（作废原记录）
+// 3. 新增现金净利计算函数（剔除本金）
+// 4. 优化 getAllPayments 性能
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -241,13 +241,58 @@ const SupabaseAPI = {
                 description: flowData.description || '',
                 recorded_by: profile?.id,
                 recorded_at: new Date().toISOString(),
-                reference_id: flowData.reference_id || null
+                reference_id: flowData.reference_id || null,
+                is_voided: false,
+                void_reason: null,
+                voided_at: null,
+                voided_by: null
             })
             .select()
             .single();
         
         if (error) throw error;
         return data;
+    },
+    
+    // ==================== 作废资金流记录 ====================
+    async voidCashFlow(originalFlowId, reason) {
+        const profile = await this.getCurrentProfile();
+        
+        // 标记原记录为作废
+        const { error: voidError } = await supabaseClient
+            .from('cash_flow_records')
+            .update({
+                is_voided: true,
+                void_reason: reason,
+                voided_at: new Date().toISOString(),
+                voided_by: profile?.id
+            })
+            .eq('id', originalFlowId);
+        
+        if (voidError) throw voidError;
+        
+        // 创建反向冲销记录（可选，用于保持余额计算正确）
+        const { data: originalFlow } = await supabaseClient
+            .from('cash_flow_records')
+            .select('*')
+            .eq('id', originalFlowId)
+            .single();
+        
+        if (originalFlow) {
+            await this.recordCashFlow({
+                store_id: originalFlow.store_id,
+                flow_type: originalFlow.flow_type + '_reversal',
+                direction: originalFlow.direction === 'inflow' ? 'outflow' : 'inflow',
+                amount: originalFlow.amount,
+                source_target: originalFlow.source_target,
+                order_id: originalFlow.order_id,
+                customer_id: originalFlow.customer_id,
+                description: `冲销: ${originalFlow.description} (原因: ${reason})`,
+                reference_id: originalFlow.reference_id
+            });
+        }
+        
+        return true;
     },
 
     // ==================== 贷款发放记录（防重复） ====================
@@ -261,6 +306,7 @@ const SupabaseAPI = {
             .select('id')
             .eq('order_id', order.id)
             .eq('flow_type', 'loan_disbursement')
+            .eq('is_voided', false)
             .maybeSingle();
         
         if (existingFlow) {
@@ -625,7 +671,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 解锁管理费 ====================
+    // ==================== 解锁管理费（修复版：同步处理 cash_flow_records） ====================
     async unlockAdminFee(orderId, reason = 'admin_correction') {
         const profile = await this.getCurrentProfile();
         
@@ -637,19 +683,51 @@ const SupabaseAPI = {
         
         const order = await this.getOrder(orderId);
         
-        const { error: markError } = await supabaseClient
+        // 1. 找到原管理费的 payment_history 记录
+        const { data: adminFeePayment, error: findError } = await supabaseClient
             .from('payment_history')
-            .update({ 
-                is_voided: true, 
-                void_reason: reason,
-                voided_at: new Date().toISOString(),
-                voided_by: profile.id
-            })
+            .select('id, amount')
             .eq('order_id', order.id)
-            .eq('type', 'admin_fee');
+            .eq('type', 'admin_fee')
+            .eq('is_voided', false)
+            .maybeSingle();
         
-        if (markError) throw markError;
+        if (findError) throw findError;
         
+        // 2. 找到对应的 cash_flow_records 记录
+        let adminFeeCashFlow = null;
+        if (adminFeePayment) {
+            const { data: cashFlow, error: cashFlowError } = await supabaseClient
+                .from('cash_flow_records')
+                .select('id')
+                .eq('reference_id', order.order_id)
+                .eq('flow_type', 'admin_fee')
+                .eq('is_voided', false)
+                .maybeSingle();
+            
+            if (!cashFlowError && cashFlow) {
+                adminFeeCashFlow = cashFlow;
+                // 作废现金流记录
+                await this.voidCashFlow(adminFeeCashFlow.id, reason);
+            }
+        }
+        
+        // 3. 标记 payment_history 为作废
+        if (adminFeePayment) {
+            const { error: markError } = await supabaseClient
+                .from('payment_history')
+                .update({ 
+                    is_voided: true, 
+                    void_reason: reason,
+                    voided_at: new Date().toISOString(),
+                    voided_by: profile.id
+                })
+                .eq('id', adminFeePayment.id);
+            
+            if (markError) throw markError;
+        }
+        
+        // 4. 更新订单状态：管理费未支付
         const { error: updateError } = await supabaseClient
             .from('orders')
             .update({ 
@@ -669,8 +747,15 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus order' : '只有管理员可以删除订单');
         }
         const order = await this.getOrder(orderId);
+        
+        // 先删除关联的 cash_flow_records
+        await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
+        
+        // 再删除 payment_history
         const { error: e1 } = await supabaseClient.from('payment_history').delete().eq('order_id', order.id);
         if (e1) throw e1;
+        
+        // 最后删除订单
         const { error: e2 } = await supabaseClient.from('orders').delete().eq('order_id', orderId);
         if (e2) throw e2;
         return true;
@@ -737,37 +822,58 @@ const SupabaseAPI = {
         };
     },
 
+    // ==================== 获取所有支付记录（修复版：安全过滤） ====================
     async getAllPayments() {
         const profile = await this.getCurrentProfile();
-        let query = supabaseClient
-            .from('payment_history')
-            .select('*, orders!left(order_id, customer_name, store_id)')
-            .order('date', { ascending: false });
+        
+        // 方案1：先获取当前用户有权限的订单ID列表
+        let orderQuery = supabaseClient.from('orders').select('id');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('orders.store_id', profile.store_id);
+            orderQuery = orderQuery.eq('store_id', profile.store_id);
         }
         
-        const { data, error } = await query;
-        if (error) {
-            console.warn("Payment query with join failed, falling back:", error);
-            const { data: payments, error: payError } = await supabaseClient
-                .from('payment_history')
-                .select('*')
-                .order('date', { ascending: false });
-            if (payError) throw payError;
-            
-            for (var p of payments) {
-                const { data: order } = await supabaseClient
-                    .from('orders')
-                    .select('order_id, customer_name, store_id')
-                    .eq('id', p.order_id)
-                    .single();
-                p.orders = order;
-            }
-            return payments;
+        const { data: accessibleOrders, error: orderError } = await orderQuery;
+        
+        if (orderError) {
+            console.error("获取订单列表失败:", orderError);
+            // 降级方案：返回空数组
+            return [];
         }
-        return data;
+        
+        const accessibleOrderIds = accessibleOrders.map(o => o.id);
+        
+        if (accessibleOrderIds.length === 0) {
+            return [];
+        }
+        
+        // 方案2：使用 IN 查询过滤支付记录
+        const { data: payments, error: payError } = await supabaseClient
+            .from('payment_history')
+            .select('*')
+            .in('order_id', accessibleOrderIds)
+            .order('date', { ascending: false });
+        
+        if (payError) {
+            console.error("获取支付记录失败:", payError);
+            throw payError;
+        }
+        
+        // 补充订单信息（用于显示）
+        const orderMap = {};
+        for (const order of accessibleOrders) {
+            orderMap[order.id] = order;
+        }
+        
+        const result = [];
+        for (const p of payments) {
+            result.push({
+                ...p,
+                orders: orderMap[p.order_id] || null
+            });
+        }
+        
+        return result;
     },
 
     async getAllUsers() {
@@ -878,6 +984,7 @@ const SupabaseAPI = {
         let query = supabaseClient
             .from('cash_flow_records')
             .select('*, orders(order_id, customer_name)')
+            .eq('is_voided', false)  // 只获取未作废的记录
             .order('recorded_at', { ascending: false });
         
         if (profile?.role !== 'admin' && targetStoreId) {
@@ -909,7 +1016,8 @@ const SupabaseAPI = {
         const { data: flows, error } = await supabaseClient
             .from('cash_flow_records')
             .select('direction, amount, source_target')
-            .eq('store_id', targetStoreId);
+            .eq('store_id', targetStoreId)
+            .eq('is_voided', false);
         
         if (error) {
             console.warn("getShopAccount error:", error);
@@ -941,7 +1049,7 @@ const SupabaseAPI = {
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
         
-        let query = supabaseClient.from('cash_flow_records').select('direction, amount, source_target, flow_type');
+        let query = supabaseClient.from('cash_flow_records').select('direction, amount, source_target, flow_type').eq('is_voided', false);
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
@@ -970,6 +1078,19 @@ const SupabaseAPI = {
         const cashBalance = cashInflow - cashOutflow;
         const bankBalance = bankInflow - bankOutflow;
         
+        // 计算现金净利（剔除本金）
+        let incomeInflowExcludingPrincipal = 0;
+        let totalOutflowAll = 0;
+        for (const flow of flows || []) {
+            const amount = flow.amount || 0;
+            if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
+                incomeInflowExcludingPrincipal += amount;
+            } else if (flow.direction === 'outflow') {
+                totalOutflowAll += amount;
+            }
+        }
+        const netProfit = incomeInflowExcludingPrincipal - totalOutflowAll;
+        
         return {
             cash: { 
                 income: cashInflow, 
@@ -988,7 +1109,8 @@ const SupabaseAPI = {
                 expense: totalExpense,
                 netIncome: totalIncome - totalExpense,
                 balance: cashBalance + bankBalance 
-            }
+            },
+            netProfit: { balance: netProfit }
         };
     },
 
