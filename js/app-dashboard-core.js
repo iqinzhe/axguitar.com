@@ -1,7 +1,5 @@
-// app-dashboard-core.js - 核心功能模块（完整版）
-// 包含：初始化、登录、登出、路由、导航、操作员管理、资金管理
-// 修改：仪表盘三资金池、操作员管理文字、注资表单（仅管理员）
-// 修改：删除重复的“资金管理”标题，只保留按钮
+// app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增栏目按钮等!）
+// 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
 
 window.APP = window.APP || {};
 
@@ -65,7 +63,7 @@ const DashboardCore = {
             paymentHistory: async () => await self.showPaymentHistory(),
             customerOrders: async () => { if (self.currentCustomerId) await self.showCustomerOrders(self.currentCustomerId); },
             customerPaymentHistory: async () => { if (self.currentCustomerId) await self.showCustomerPaymentHistory(self.currentCustomerId); },
-            blacklist: async () => await self.showBlacklist()
+            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -103,7 +101,7 @@ const DashboardCore = {
             viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
             payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
             editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); },
-            blacklist: async () => await self.showBlacklist()
+            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
         };
         var handler = navHandlers[page];
         if (handler) handler();
@@ -134,7 +132,7 @@ const DashboardCore = {
                 paymentHistory: async () => await self.showPaymentHistory(),
                 customerOrders: async () => { if (prev.customerId) await self.showCustomerOrders(prev.customerId); },
                 customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); },
-                blacklist: async () => await self.showBlacklist()
+                blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
             };
             var handler = backHandlers[prev.page];
             if (handler) handler();
@@ -222,7 +220,7 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（三资金池） ====================
+    // ==================== 仪表盘 ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -242,9 +240,10 @@ const DashboardCore = {
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
-            var cashBalance = cashFlow.cash?.balance ?? 0;
-            var bankBalance = cashFlow.bank?.balance ?? 0;
-            var profitBalance = cashFlow.profit?.balance ?? 0;
+            var cashInvestment = cashFlow.capital?.cash?.investment || 0;
+            var cashWithdrawal = cashFlow.capital?.cash?.withdrawal || 0;
+            var bankInvestment = cashFlow.capital?.bank?.investment || 0;
+            var bankWithdrawal = cashFlow.capital?.bank?.withdrawal || 0;
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -255,24 +254,46 @@ const DashboardCore = {
                 </div>
                 
                 <div class="cashflow-summary">
-                    <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:10px;">
-                        <button onclick="APP.showCapitalModal()" class="capital-btn" style="background:rgba(255,255,255,0.2); border:none; padding:4px 12px; border-radius:6px; color:white;">🏦 ${lang === 'id' ? 'Manajemen Modal' : '资金管理'}</button>
+                    <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
+                    
+                    ${isAdmin ? `
+                    <div class="capital-summary">
+                        <div class="capital-summary-text">
+                            <span>💰 ${lang === 'id' ? 'Total Investasi' : '总投资'}:</span>
+                            <strong>${Utils.formatCurrency(cashInvestment + bankInvestment)}</strong>
+                            <span>📤 ${lang === 'id' ? 'Penarikan' : '提现'}:</span>
+                            <strong>${Utils.formatCurrency(cashWithdrawal + bankWithdrawal)}</strong>
+                        </div>
+                        <div>
+                            <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Riwayat Modal' : '资金流水'}</button>
+                        </div>
                     </div>
+                    ` : ''}
+                    
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                            <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
-                            <div class="cashflow-detail">${lang === 'id' ? 'Saldo tidak boleh negatif' : '余额不可为负数'}</div>
+                            <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
+                            <div class="cashflow-detail">
+                                ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(cashInvestment)} / -${Utils.formatCurrency(cashWithdrawal)}<br>
+                                ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.cash.income)} / -${Utils.formatCurrency(cashFlow.cash.expense)}
+                            </div>
                         </div>
                         <div class="cashflow-item">
                             <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                            <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
-                            <div class="cashflow-detail">${lang === 'id' ? 'Negatif = Hutang' : '负数 = 负债'}</div>
+                            <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
+                            <div class="cashflow-detail">
+                                ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(bankInvestment)} / -${Utils.formatCurrency(bankWithdrawal)}<br>
+                                ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.bank.income)} / -${Utils.formatCurrency(cashFlow.bank.expense)}
+                            </div>
                         </div>
                         <div class="cashflow-item">
-                            <div class="label">📊 ${lang === 'id' ? 'Laba Bersih Toko' : '门店净利'}</div>
-                            <div class="value ${profitBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(profitBalance)}</div>
-                            <div class="cashflow-detail">${lang === 'id' ? 'Pendapatan - Pengeluaran - Dividen' : '收入 - 支出 - 分红'}</div>
+                            <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
+                            <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
+                            <div class="cashflow-detail">
+                                📈 ${lang === 'id' ? 'Pendapatan' : '收入'}: +${Utils.formatCurrency(cashFlow.total.income)}<br>
+                                📉 ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.total.expense)}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -281,9 +302,9 @@ const DashboardCore = {
                     <div class="stat-card"><div class="stat-value">${report.total_orders}</div><div>${t('total_orders')}</div></div>
                     <div class="stat-card"><div class="stat-value">${report.active_orders}</div><div>${t('active')}</div></div>
                     <div class="stat-card"><div class="stat-value">${report.completed_orders}</div><div>${t('completed')}</div></div>
-                    <div class="stat-card"><div class="stat-value">- ${Utils.formatCurrency(report.total_loan_amount)}</div><div>${t('total_loan')}</div></div>
-                    <div class="stat-card"><div class="stat-value">+ ${Utils.formatCurrency(report.total_admin_fees)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
-                    <div class="stat-card"><div class="stat-value">+ ${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_loan_amount)}</div><div>${t('total_loan')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
                 </div>
                 
                 <div class="toolbar">
@@ -311,13 +332,13 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 资金管理模态框（含注资表单，仅管理员可见） ====================
+    // ==================== 资金管理模态框（简化版：只显示流水） ====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
-        var isAdmin = AUTH.isAdmin();
         
         var stores = await SUPABASE.getAllStores();
+        var isAdmin = AUTH.isAdmin();
         var currentStoreId = AUTH.user?.store_id;
         
         var transactions = [];
@@ -325,17 +346,9 @@ const DashboardCore = {
             transactions = await SUPABASE.getCapitalTransactions();
         } catch(e) { console.error(e); }
         
-        var storeList = [];
-        if (isAdmin) {
-            storeList = stores;
-        } else {
-            var currentStore = stores.find(s => s.id === currentStoreId);
-            if (currentStore) storeList = [currentStore];
-        }
-        
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}<tr></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
         } else {
             var typeMap = {
                 investment: lang === 'id' ? '💰 注资' : '💰 注资',
@@ -368,55 +381,20 @@ const DashboardCore = {
                     <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
                     <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                     <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
-                　　　`;
+                </tr>`;
             }
         }
         
-        var storeOptions = '<option value="">' + (lang === 'id' ? 'Pilih Toko' : '选择门店') + '</option>';
-        for (var store of storeList) {
+        var storeOptions = '<option value="all">' + (lang === 'id' ? 'Semua Toko' : '全部门店') + '</option>';
+        for (var store of stores) {
+            if (!isAdmin && store.id !== currentStoreId) continue;
             storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)}</option>`;
-        }
-        
-        var investmentFormHtml = '';
-        if (isAdmin) {
-            investmentFormHtml = `
-                <div style="background:#f0fdf4; padding:15px; border-radius:10px; margin-bottom:20px; border:1px solid #bbf7d0;">
-                    <h4 style="margin:0 0 12px 0; color:#166534;">💰 ${lang === 'id' ? 'Investasi ke Toko' : '注资到门店'}</h4>
-                    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
-                        <div style="flex:2; min-width:150px;">
-                            <label style="display:block; font-size:12px; margin-bottom:4px;">${lang === 'id' ? 'Toko' : '门店'} *</label>
-                            <select id="investStoreId" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">${storeOptions}</select>
-                        </div>
-                        <div style="flex:1; min-width:120px;">
-                            <label style="display:block; font-size:12px; margin-bottom:4px;">${lang === 'id' ? 'Jumlah' : '金额'} *</label>
-                            <input type="text" id="investAmount" placeholder="0" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1; text-align:right;">
-                        </div>
-                        <div style="flex:1; min-width:120px;">
-                            <label style="display:block; font-size:12px; margin-bottom:4px;">${lang === 'id' ? 'Metode' : '方式'}</label>
-                            <select id="investMethod" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
-                                <option value="cash">🏦 ${lang === 'id' ? 'Tunai' : '现金'}</option>
-                                <option value="bank">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</option>
-                            </select>
-                        </div>
-                        <div style="flex:1; min-width:100px;">
-                            <label style="display:block; font-size:12px; margin-bottom:4px;">${lang === 'id' ? 'Tanggal' : '日期'}</label>
-                            <input type="date" id="investDate" value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e1;">
-                        </div>
-                        <div>
-                            <button onclick="APP.doInvestToShop()" class="success" style="background:#166534; padding:8px 16px;">✅ ${lang === 'id' ? 'Investasi' : '注资'}</button>
-                        </div>
-                    </div>
-                    <div style="font-size:11px; color:#64748b; margin-top:8px;">
-                        💡 ${lang === 'id' ? 'Investasi akan menambah saldo pokok toko' : '注资将增加门店的本金余额'}
-                    </div>
-                </div>
-            `;
         }
         
         var modalHtml = `
             <div class="modal-content" style="max-width:1000px; max-height:85vh; overflow-y:auto;">
                 <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Manajemen Modal' : '资金管理'}</h3>
+                    <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h3>
                     <div style="display:flex; gap:8px;">
                         <button onclick="APP.printCapitalTransactions()" class="btn-small print-btn" style="background:#64748b; color:white;">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.exportCapitalTransactionsToCSV()" class="btn-small" style="background:#10b981; color:white;">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
@@ -424,12 +402,9 @@ const DashboardCore = {
                     </div>
                 </div>
                 
-                ${investmentFormHtml}
-                
                 <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
                     <select id="filterStore" style="width:auto; min-width:150px;">
-                        <option value="all">${lang === 'id' ? 'Semua Toko' : '全部门店'}</option>
-                        ${storeOptions.replace('<option value="">选择门店</option>', '')}
+                        ${storeOptions}
                     </select>
                     <select id="filterType" style="width:auto; min-width:120px;">
                         <option value="all">${lang === 'id' ? 'Semua Tipe' : '全部类型'}</option>
@@ -443,7 +418,7 @@ const DashboardCore = {
                     <button onclick="APP.resetCapitalFilters()" class="btn-small">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                 </div>
                 
-                <div class="table-container" style="max-height:400px; overflow-y:auto;" id="capitalTransactionsTable">
+                <div class="table-container" style="max-height:450px; overflow-y:auto;" id="capitalTransactionsTable">
                     <table class="data-table" style="width:100%; font-size:13px; border-collapse:collapse;">
                         <thead style="position:sticky; top:0; background:#f1f5f9;">
                             <tr>
@@ -463,7 +438,9 @@ const DashboardCore = {
                 </div>
                 
                 <div class="modal-actions" style="display:flex; justify-content:space-between; margin-top:16px;">
-                    <div><span style="font-size:12px; color:#64748b;">📋 ${lang === 'id' ? 'Total' : '总计'}: <span id="totalAmount">${Utils.formatCurrency(transactions.reduce((s, t) => s + t.amount, 0))}</span></span></div>
+                    <div>
+                        <span style="font-size:12px; color:#64748b;">📋 ${lang === 'id' ? 'Total' : '总计'}: <span id="totalAmount">${Utils.formatCurrency(transactions.reduce((s, t) => s + t.amount, 0))}</span></span>
+                    </div>
                     <button onclick="document.getElementById('capitalModal').remove()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
                 </div>
             </div>
@@ -476,47 +453,9 @@ const DashboardCore = {
         document.body.appendChild(modal);
         
         window._capitalTransactionsData = transactions;
-        
-        var investAmount = document.getElementById('investAmount');
-        if (investAmount && Utils.bindAmountFormat) Utils.bindAmountFormat(investAmount);
     },
 
-    doInvestToShop: async function() {
-        var lang = Utils.lang;
-        var storeId = document.getElementById('investStoreId')?.value;
-        var amountStr = document.getElementById('investAmount')?.value;
-        var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
-        var method = document.getElementById('investMethod')?.value || 'cash';
-        var transactionDate = document.getElementById('investDate')?.value || new Date().toISOString().split('T')[0];
-        
-        if (!storeId) {
-            alert(lang === 'id' ? 'Pilih toko terlebih dahulu' : '请先选择门店');
-            return;
-        }
-        if (!amount || amount <= 0) {
-            alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
-            return;
-        }
-        
-        var storeName = document.getElementById('investStoreId').options[document.getElementById('investStoreId').selectedIndex]?.text || '';
-        
-        if (!confirm(lang === 'id' 
-            ? `Konfirmasi investasi ${Utils.formatCurrency(amount)} ke ${storeName} via ${method === 'cash' ? 'Tunai' : 'Bank BNI'}?` 
-            : `确认注资 ${Utils.formatCurrency(amount)} 到 ${storeName}，方式：${method === 'cash' ? '现金' : '银行BNI'}？`)) {
-            return;
-        }
-        
-        try {
-            await SUPABASE.investToShop(storeId, amount, method, null, transactionDate);
-            alert(lang === 'id' ? '✅ Investasi berhasil!' : '✅ 注资成功！');
-            document.getElementById('capitalModal')?.remove();
-            await this.showCapitalModal();
-            await this.renderDashboard();
-        } catch (error) {
-            alert(lang === 'id' ? 'Gagal: ' + error.message : '失败：' + error.message);
-        }
-    },
-
+    // ==================== 资金流水筛选功能 ====================
     filterCapitalTransactions: function() {
         var storeId = document.getElementById('filterStore')?.value;
         var type = document.getElementById('filterType')?.value;
@@ -597,11 +536,11 @@ const DashboardCore = {
                 <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
                 <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                 <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
-            　　　`;
+            </tr>`;
         }
         
         if (rows === '') {
-            rows = `<tr><td colspan="7" style="text-align:center; padding:20px;">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}<tr></tr>`;
+            rows = `<tr><td colspan="7" style="text-align:center; padding:20px;">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</td></tr>`;
         }
         
         tbody.innerHTML = rows;
@@ -640,7 +579,7 @@ const DashboardCore = {
             if (txn.type === 'investment') { sourceName = '总部'; targetName = txn.target_store?.name || '分店'; }
             else if (txn.type === 'withdrawal' || txn.type === 'dividend') { sourceName = txn.source_store?.name || '分店'; targetName = '总部'; }
             var methodText = txn.payment_method === 'cash' ? '现金' : '银行';
-            printContent += `<tr><td style="padding:8px;">${Utils.formatDate(txn.transaction_date)}</td><td style="padding:8px;">${typeMap[txn.type] || txn.type}</td><td style="padding:8px;">${methodText}</td><td style="padding:8px;">${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td><td style="padding:8px; text-align:right;">${Utils.formatCurrency(txn.amount)}</td><td style="padding:8px;">${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
+            printContent += `<tr><td>${Utils.formatDate(txn.transaction_date)}</td><td>${typeMap[txn.type] || txn.type}</td><td>${methodText}</td><td>${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td><td class="text-right">${Utils.formatCurrency(txn.amount)}</td><td>${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
         }
         
         printContent += `</tbody></table><div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div>
@@ -679,7 +618,7 @@ const DashboardCore = {
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
-    // ==================== 操作员管理 ====================
+    // ==================== 用户管理 ====================
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -726,20 +665,20 @@ const DashboardCore = {
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
                 </div>
-                <div class="card"><h3>${lang === 'id' ? 'Daftar Operator' : '操作员列表'}</h3>
+                <div class="card"><h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
                     <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
                 </div>
-                <div class="card"><h3>${lang === 'id' ? 'Tambah Operator Baru' : '添加新操作员'}</h3>
+                <div class="card"><h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
                     <div class="form-grid">
                         <div class="form-group"><label>${t('username')} *</label><input id="newUsername" placeholder="email@domain.com"></div>
                         <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="newRole"><option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option></select></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label><select id="newStoreId">${storeOptions}</select></div>
-                        <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Operator' : '添加操作员'}</button></div>
+                        <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button></div>
                     </div>
                 </div>`;
-        } catch (error) { console.error("showUserManagement error:", error); alert(Utils.lang === 'id' ? 'Gagal memuat manajemen operator' : '加载操作员管理失败'); }
+        } catch (error) { console.error("showUserManagement error:", error); alert(Utils.lang === 'id' ? 'Gagal memuat manajemen pengguna' : '加载用户管理失败'); }
     },
 
     addUser: async function() {
@@ -749,12 +688,12 @@ const DashboardCore = {
         var role = document.getElementById("newRole").value;
         var storeId = document.getElementById("newStoreId").value;
         if (!username || !password || !name) { alert(Utils.lang === 'id' ? 'Harap isi semua field' : '请填写所有字段'); return; }
-        try { await AUTH.addUser(username, password, name, role, storeId || null); alert((Utils.lang === 'id' ? 'Operator "' : '操作员 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！')); await this.showUserManagement(); } 
+        try { await AUTH.addUser(username, password, name, role, storeId || null); alert((Utils.lang === 'id' ? 'Pengguna "' : '用户 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！')); await this.showUserManagement(); } 
         catch (error) { alert('Error: ' + error.message); }
     },
 
     deleteUser: async function(userId) {
-        if (confirm(Utils.lang === 'id' ? 'Hapus operator ini?' : '删除此操作员？')) {
+        if (confirm(Utils.lang === 'id' ? 'Hapus pengguna ini?' : '删除此用户？')) {
             try { await AUTH.deleteUser(userId); await this.showUserManagement(); } 
             catch (error) { alert('Error: ' + error.message); }
         }
@@ -769,19 +708,19 @@ const DashboardCore = {
             var modal = document.createElement('div');
             modal.id = 'editUserModal';
             modal.className = 'modal-overlay';
-            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Operator' : '修改操作员角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
+            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
             document.body.appendChild(modal);
-        } catch (error) { alert(lang === 'id' ? 'Gagal memuat data operator' : '加载操作员数据失败'); }
+        } catch (error) { alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败'); }
     },
 
     _saveUserRole: async function(userId) {
         var lang = Utils.lang;
         var newRole = document.getElementById('editRoleSelect').value;
-        try { await AUTH.updateUser(userId, { role: newRole }); document.getElementById('editUserModal')?.remove(); alert(lang === 'id' ? 'Peran operator berhasil diubah' : '操作员角色已修改'); await this.showUserManagement(); } 
+        try { await AUTH.updateUser(userId, { role: newRole }); document.getElementById('editUserModal')?.remove(); alert(lang === 'id' ? 'Peran pengguna berhasil diubah' : '用户角色已修改'); await this.showUserManagement(); } 
         catch (error) { alert('Error: ' + error.message); }
     },
 
-    // ==================== WA 提醒功能 ====================
+    // ==================== WA 提醒功能（简化版） ====================
     getSenderWANumber: async function(storeId) {
         var storeWANumber = await SUPABASE.getStoreWANumber(storeId);
         return storeWANumber || null;
@@ -905,7 +844,9 @@ const DashboardCore = {
         }
     },
 
+    // ==================== 黑名单页面入口 ====================
     showBlacklist: async function() {
+        // 这个函数由 app-blacklist.js 提供
         if (typeof window.APP.showBlacklist === 'function') {
             await window.APP.showBlacklist();
         } else {
@@ -914,6 +855,7 @@ const DashboardCore = {
     }
 };
 
+// 合并到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
         key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
