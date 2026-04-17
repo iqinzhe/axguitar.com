@@ -1,6 +1,7 @@
 // app-customers.js - 完整最终版
 // 功能：客户管理
 // 权限：Admin 只能查看所有门店客户（不能增/改），店长/员工只能操作本门店客户
+// 新增：服务费百分比选项（1%, 2%, 3%）
 
 window.APP = window.APP || {};
 
@@ -18,24 +19,24 @@ const CustomersModule = {
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 8 : 7}" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 8 : 7}" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var c of customers) {
                     rows += `<tr>
-                        <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}</td>
-                        <td class="date-cell">${Utils.formatDate(c.registered_date)}</td>
-                        <td class="name-cell">${Utils.escapeHtml(c.name)}</td>
-                        <td class="ktp-cell">${Utils.escapeHtml(c.ktp_number || '-')}</td>
-                        <td class="phone-cell">${Utils.escapeHtml(c.phone || '-')}</td>
-                        <td class="address-cell">${Utils.escapeHtml(c.ktp_address || c.address || '-')}</td>
-                        <td class="address-cell">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
-                        ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')} (${Utils.escapeHtml(c.stores?.code || '-')})</td>` : ''}
+                        <td class="customer-id-cell">${Utils.escapeHtml(c.customer_id || '-')}<\/td>
+                        <td class="date-cell">${Utils.formatDate(c.registered_date)}<\/td>
+                        <td class="name-cell">${Utils.escapeHtml(c.name)}<\/td>
+                        <td class="ktp-cell">${Utils.escapeHtml(c.ktp_number || '-')}<\/td>
+                        <td class="phone-cell">${Utils.escapeHtml(c.phone || '-')}<\/td>
+                        <td class="address-cell">${Utils.escapeHtml(c.ktp_address || c.address || '-')}<\/td>
+                        <td class="address-cell">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}<\/td>
+                        ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')} (${Utils.escapeHtml(c.stores?.code || '-')})<\/td>` : ''}
                         <td class="action-cell">
-                            ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
-                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
-                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                        </td>
-                    　　　`;
+                            ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}<\/button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}<\/button>` : ''}
+                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}<\/button>` : ''}
+                        <\/td>
+                    <\/tr>`;
                 }
             }
 
@@ -140,7 +141,6 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能创建客户
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat menambah nasabah. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能添加客户，请使用店长或员工账号登录。');
             return;
@@ -193,7 +193,6 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能编辑客户
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
             return;
@@ -255,7 +254,6 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能编辑客户
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
             return;
@@ -321,7 +319,6 @@ const CustomersModule = {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         
-        // Admin 不能创建订单
         if (isAdmin) {
             alert(lang === 'id' ? 'Administrator tidak dapat membuat order. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能创建订单，请使用店长或员工账号登录。');
             return;
@@ -346,7 +343,6 @@ const CustomersModule = {
             this.currentCustomerId = customerId;
             var t = (key) => Utils.t(key);
             
-            // 获取当前用户的门店信息
             const profile = await SUPABASE.getCurrentProfile();
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             const userStoreCode = profile?.stores?.code || '-';
@@ -379,6 +375,16 @@ const CustomersModule = {
                     <div class="form-grid">
                         <div class="form-group full-width"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
                         <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input"></div>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Service Fee (%)' : '服务费 (%)'}</label>
+                            <select id="serviceFeePercent" class="service-fee-select">
+                                <option value="0">0% ${lang === 'id' ? '(Tidak Ada)' : '(无)'}</option>
+                                <option value="1">1%</option>
+                                <option value="2">2%</option>
+                                <option value="3">3%</option>
+                            </select>
+                            <small style="color:#64748b;">${lang === 'id' ? 'Biaya layanan per bulan (dihitung dari jumlah pinjaman)' : '每月服务费（按贷款金额计算）'}</small>
+                        </div>
                         <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div>
                         <div class="form-actions">
                             <button onclick="APP.saveOrderWithCustomer('${customerId}')" class="success">💾 ${t('save')}</button>
@@ -392,6 +398,7 @@ const CustomersModule = {
                     .customer-info-display p { margin: 6px 0; }
                     .amount-input { text-align: right; }
                     .store-info-banner { background: #e0f2fe; padding: 10px 15px; border-radius: 8px; margin-bottom: 16px; }
+                    .service-fee-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
                 </style>`;
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
@@ -406,6 +413,7 @@ const CustomersModule = {
         var amountStr = document.getElementById("amount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var notes = document.getElementById("notes").value;
+        var serviceFeePercent = parseInt(document.getElementById("serviceFeePercent").value) || 0;
         
         if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
         
@@ -425,9 +433,10 @@ const CustomersModule = {
                 },
                 collateral_name: collateral,
                 loan_amount: amount,
+                service_fee_percent: serviceFeePercent,
                 notes: notes,
                 customer_id: customerId,
-                store_id: null  // 不传，让后端使用当前用户的门店
+                store_id: null
             };
             
             var newOrder = await Order.create(orderData);
@@ -461,18 +470,18 @@ const CustomersModule = {
             var rows = orders && orders.length > 0 ? orders.map(o => {
                 var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                 return `<tr>
-                    <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
-                    <td class="date-cell">${Utils.formatDate(o.created_at)}</td>
-                    <td class="text-right">${Utils.formatCurrency(o.loan_amount)}</td>
-                    <td class="text-right">${Utils.formatCurrency(o.principal_paid)}</td>
-                    <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
-                    <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
+                    <td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
+                    <td class="date-cell">${Utils.formatDate(o.created_at)}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(o.principal_paid)}<\/td>
+                    <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
+                    <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/td>
                     <td class="action-cell">
-                        <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}</button>
-                        ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                    </td>
-                　　　`;
-            }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
+                        <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}<\/button>
+                        ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}<\/button>` : ''}
+                    <\/td>
+                <\/tr>`;
+            }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -542,18 +551,18 @@ const CustomersModule = {
                 const { data } = await supabaseClient.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false });
                 allPayments = data || [];
             }
-            var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
+            var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', service_fee: lang === 'id' ? 'Service Fee' : '服务费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`
+                ? `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
-                    <td class="date-cell">${Utils.formatDate(p.date)}</td>
-                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td>${typeMap[p.type] || p.type}</td>
-                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                    <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
-                    <td>${Utils.escapeHtml(p.description || '-')}</td>
-                　　　`).join('');
+                    <td class="date-cell">${Utils.formatDate(p.date)}<\/td>
+                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
+                    <td>${typeMap[p.type] || p.type}<\/td>
+                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                    <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}<\/span><\/td>
+                    <td>${Utils.escapeHtml(p.description || '-')}<\/td>
+                <\/tr>`).join('');
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'} - ${Utils.escapeHtml(customer.name)}</h2>
