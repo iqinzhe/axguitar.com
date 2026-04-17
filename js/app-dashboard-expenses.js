@@ -1,5 +1,9 @@
-// app-dashboard-expenses.js - 支出功能模块
-// 包含：运营支出、平账功能
+// app-dashboard-expenses.js - 支出功能模块 v3.0
+// 修改内容：
+// 1. 运营支出使用新的资金流记录
+// 2. 支出记录自动创建 cash_flow_records
+// 3. 平账功能优化
+// 4. 支出分类优化
 
 window.APP = window.APP || {};
 
@@ -49,6 +53,16 @@ const DashboardExpenses = {
                 rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
             }
 
+            // 支出类别选项
+            const expenseCategories = lang === 'id' 
+                ? ['Listrik', 'Air', 'Internet', 'Gaji Karyawan', 'Sewa Tempat', 'ATK', 'Perbaikan', 'Transportasi', 'Lainnya']
+                : ['电费', '水费', '网络费', '员工工资', '场地租金', '办公用品', '维修', '交通费', '其他'];
+
+            var categoryOptions = '';
+            for (var cat of expenseCategories) {
+                categoryOptions += `<option value="${cat}">${cat}</option>`;
+            }
+
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
@@ -88,17 +102,33 @@ const DashboardExpenses = {
                     <div class="form-grid">
                         <div class="form-group"><label>${lang === 'id' ? 'Tanggal' : '日期'} *</label><input type="date" id="expenseDate" value="${todayDate}"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Jumlah' : '金额'} *</label><input type="text" id="expenseAmount" placeholder="0" class="amount-input"></div>
-                        <div class="form-group"><label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label><input type="text" id="expenseCategory" placeholder="${lang === 'id' ? 'Contoh: Listrik, Gaji' : '例如：电费、工资'}"></div>
+                        <div class="form-group"><label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label>
+                            <select id="expenseCategory">
+                                <option value="">${lang === 'id' ? 'Pilih kategori' : '选择类别'}</option>
+                                ${categoryOptions}
+                            </select>
+                        </div>
                         <div class="form-group"><label>${lang === 'id' ? 'Metode Pembayaran' : '支付方式'} *</label>
                             <select id="expenseMethod">
                                 <option value="cash">🏦 ${t('cash')}</option>
                                 <option value="bank">🏧 ${t('bank')}</option>
                             </select>
                         </div>
-                        <div class="form-group full-width"><label>${lang === 'id' ? 'Deskripsi' : '描述'}</label><textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}"></textarea></div>
+                        <div class="form-group full-width"><label>${lang === 'id' ? 'Deskripsi' : '描述'}</label>
+                            <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}"></textarea>
+                        </div>
                         <div class="form-actions"><button onclick="APP.addExpense()" class="success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button></div>
                     </div>
-                </div>`;
+                    <p class="info-note" style="margin-top:12px; font-size:12px; color:#64748b;">
+                        💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}
+                    </p>
+                </div>
+                <style>
+                    .total-expense { color: #dc2626; font-size: 20px; }
+                    .info-note { font-size: 12px; color: #64748b; margin-top: 12px; }
+                    .reconciled-badge { background: #d1fae5; color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+                    .locked-badge { background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+                </style>`;
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
@@ -122,12 +152,17 @@ const DashboardExpenses = {
         
         try {
             const profile = await SUPABASE.getCurrentProfile();
-            const { error } = await supabaseClient.from('expenses').insert({
-                store_id: profile.store_id, expense_date: expenseDate, category: category, amount: amount,
-                description: description || null, created_by: profile.id, is_locked: true, is_reconciled: false,
+            
+            // 使用 SUPABASE.addExpense 自动记录资金流
+            const result = await SUPABASE.addExpense({
+                store_id: profile.store_id,
+                expense_date: expenseDate,
+                category: category,
+                amount: amount,
+                description: description || null,
                 payment_method: paymentMethod
             });
-            if (error) throw error;
+            
             alert(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
             await this.showExpenses();
         } catch (error) {
@@ -147,8 +182,27 @@ const DashboardExpenses = {
             }
             var newAmount = prompt(lang === 'id' ? 'Masukkan jumlah baru:' : '请输入新金额:', expense.amount);
             if (newAmount && !isNaN(parseFloat(newAmount))) {
-                const { error: updateError } = await supabaseClient.from('expenses').update({ amount: parseFloat(newAmount) }).eq('id', expenseId);
+                const newAmountNum = parseFloat(newAmount);
+                const amountDiff = newAmountNum - expense.amount;
+                
+                const { error: updateError } = await supabaseClient.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
                 if (updateError) throw updateError;
+                
+                // 更新对应的资金流记录
+                const { data: cashFlow } = await supabaseClient
+                    .from('cash_flow_records')
+                    .select('id, amount')
+                    .eq('reference_id', expenseId)
+                    .eq('flow_type', 'expense')
+                    .maybeSingle();
+                
+                if (cashFlow) {
+                    await supabaseClient.from('cash_flow_records').update({ 
+                        amount: newAmountNum,
+                        description: `${expense.category} - ${expense.description || ''}`.trim()
+                    }).eq('id', cashFlow.id);
+                }
+                
                 alert(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
                 await this.showExpenses();
             }
@@ -162,6 +216,9 @@ const DashboardExpenses = {
         var lang = Utils.lang;
         if (!confirm(lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？')) return;
         try {
+            // 先删除对应的资金流记录
+            await supabaseClient.from('cash_flow_records').delete().eq('reference_id', expenseId).eq('flow_type', 'expense');
+            
             const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
             if (error) throw error;
             alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
@@ -192,7 +249,11 @@ const DashboardExpenses = {
         }
         if (!confirm(lang === 'id' ? `Rekonsiliasi pengeluaran dari ${startDate} sampai ${endDate}?` : `确认平账 ${startDate} 至 ${endDate} 期间的支出？`)) return;
         try {
-            const { data, error } = await supabaseClient.from('expenses').update({ is_reconciled: true, reconciled_at: new Date().toISOString(), reconciled_by: AUTH.user.id }).gte('expense_date', startDate).lte('expense_date', endDate).eq('is_reconciled', false);
+            const { data, error } = await supabaseClient.from('expenses').update({ 
+                is_reconciled: true, 
+                reconciled_at: new Date().toISOString(), 
+                reconciled_by: AUTH.user.id 
+            }).gte('expense_date', startDate).lte('expense_date', endDate).eq('is_reconciled', false);
             if (error) throw error;
             var count = data?.length || 0;
             alert(lang === 'id' ? `Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.` : `平账完成！已平账 ${count} 条支出记录。`);
