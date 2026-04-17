@@ -1,5 +1,4 @@
-// supabase.js - 完整最终版（三资金池：保险柜、银行BNI、门店净利）
-// 修复：本金还款不影响门店净利；管理员汇总扣除分红；统一净利计算
+// supabase.js - 完整最终版（基础框架结构，栏框卡片按钮等固定不变）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
