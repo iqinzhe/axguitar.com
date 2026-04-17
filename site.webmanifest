@@ -7,99 +7,17 @@
 "display": "standalone",
 "background_color": "#0f172a",
 "theme_color": "#3b82f6",
-"orientation": "portrait",
-"lang": "id",
-"dir": "ltr",
 
 "icons": [
 {
-"src": "/icons/system-jf.png?v=2",
-"sizes": "512x512",
-"type": "image/png",
-"purpose": "any maskable"
-},
-{
-"src": "/icons/favicon-192x192.png?v=2",
+"src": "/icon-192.png?v=2",
 "sizes": "192x192",
-"type": "image/png",
-"purpose": "any maskable"
+"type": "image/png"
 },
 {
-"src": "/icons/favicon-96x96.png?v=2",
-"sizes": "96x96",
-"type": "image/png"
-}
-],
-
-"shortcuts": [
-{
-"name": "Buat Kontrak Baru",
-"short_name": "Kontrak",
-"description": "Buat perjanjian pinjaman baru",
-"url": "/?action=newOrder",
-"icons": [
-{
-"src": "/icons/shortcut-new-96x96.png?v=2",
-"sizes": "96x96",
+"src": "/icon-512.png?v=2",
+"sizes": "512x512",
 "type": "image/png"
 }
 ]
-},
-{
-"name": "Bayar Angsuran",
-"short_name": "Bayar",
-"description": "Catat pembayaran",
-"url": "/?action=payment",
-"icons": [
-{
-"src": "/icons/shortcut-payment-96x96.png?v=2",
-"sizes": "96x96",
-"type": "image/png"
-}
-]
-},
-{
-"name": "Nasabah",
-"short_name": "Nasabah",
-"description": "Kelola data nasabah",
-"url": "/?action=customers",
-"icons": [
-{
-"src": "/icons/shortcut-clients-96x96.png?v=2",
-"sizes": "96x96",
-"type": "image/png"
-}
-]
-},
-{
-"name": "Laporan",
-"short_name": "Laporan",
-"description": "Lihat laporan keuangan",
-"url": "/?action=report",
-"icons": [
-{
-"src": "/icons/shortcut-report-96x96.png?v=2",
-"sizes": "96x96",
-"type": "image/png"
-}
-]
-}
-],
-
-"screenshots": [
-{
-"src": "/screenshots/dashboard-desktop.png",
-"sizes": "1280x720",
-"type": "image/png",
-"form_factor": "wide"
-},
-{
-"src": "/screenshots/orders-mobile.png",
-"sizes": "750x1334",
-"type": "image/png",
-"form_factor": "narrow"
-}
-],
-
-"prefer_related_applications": false
 }
