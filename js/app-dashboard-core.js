@@ -1,5 +1,6 @@
 // app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增栏目按钮等!）
 // 包含：初始化、登录、登出、路由、导航、用户管理、资金管理
+// 修改：仪表盘资金管理改为三资金池（保险柜、银行BNI、门店净利）
 
 window.APP = window.APP || {};
 
@@ -63,7 +64,7 @@ const DashboardCore = {
             paymentHistory: async () => await self.showPaymentHistory(),
             customerOrders: async () => { if (self.currentCustomerId) await self.showCustomerOrders(self.currentCustomerId); },
             customerPaymentHistory: async () => { if (self.currentCustomerId) await self.showCustomerPaymentHistory(self.currentCustomerId); },
-            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
+            blacklist: async () => await self.showBlacklist()
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -101,7 +102,7 @@ const DashboardCore = {
             viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
             payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
             editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); },
-            blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
+            blacklist: async () => await self.showBlacklist()
         };
         var handler = navHandlers[page];
         if (handler) handler();
@@ -132,7 +133,7 @@ const DashboardCore = {
                 paymentHistory: async () => await self.showPaymentHistory(),
                 customerOrders: async () => { if (prev.customerId) await self.showCustomerOrders(prev.customerId); },
                 customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); },
-                blacklist: async () => await self.showBlacklist()  // 新增：黑名单页面
+                blacklist: async () => await self.showBlacklist()
             };
             var handler = backHandlers[prev.page];
             if (handler) handler();
@@ -220,14 +221,16 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘 ====================
+    // ==================== 仪表盘（修改为三资金池） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
         this.saveCurrentPageState();
         try {
             var report = await Order.getReport();
+            // 获取三资金池数据
             var cashFlow = await SUPABASE.getCashFlowSummary();
+            var profitBalance = await SUPABASE.getStoreProfitBalance(); // 门店净利
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
             var isAdmin = AUTH.isAdmin();
@@ -240,10 +243,12 @@ const DashboardCore = {
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
-            var cashInvestment = cashFlow.capital?.cash?.investment || 0;
-            var cashWithdrawal = cashFlow.capital?.cash?.withdrawal || 0;
-            var bankInvestment = cashFlow.capital?.bank?.investment || 0;
-            var bankWithdrawal = cashFlow.capital?.bank?.withdrawal || 0;
+            // 保险柜和银行余额（从cashFlow获取）
+            var cashBalance = cashFlow.cash.balance;
+            var bankBalance = cashFlow.bank.balance;
+            
+            // 门店净利
+            var netProfit = profitBalance;
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -254,45 +259,28 @@ const DashboardCore = {
                 </div>
                 
                 <div class="cashflow-summary">
-                    <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
-                    
-                    ${isAdmin ? `
-                    <div class="capital-summary">
-                        <div class="capital-summary-text">
-                            <span>💰 ${lang === 'id' ? 'Total Investasi' : '总投资'}:</span>
-                            <strong>${Utils.formatCurrency(cashInvestment + bankInvestment)}</strong>
-                            <span>📤 ${lang === 'id' ? 'Penarikan' : '提现'}:</span>
-                            <strong>${Utils.formatCurrency(cashWithdrawal + bankWithdrawal)}</strong>
-                        </div>
-                        <div>
-                            <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Riwayat Modal' : '资金流水'}</button>
-                        </div>
-                    </div>
-                    ` : ''}
+                    <h3>💰 ${lang === 'id' ? 'MANAJEMEN DANA' : '资金管理'}</h3>
                     
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                            <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
+                            <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(cashInvestment)} / -${Utils.formatCurrency(cashWithdrawal)}<br>
-                                ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.cash.income)} / -${Utils.formatCurrency(cashFlow.cash.expense)}
+                                ${lang === 'id' ? 'Saldo tidak boleh negatif' : '余额不可为负数'}
                             </div>
                         </div>
                         <div class="cashflow-item">
                             <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                            <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
+                            <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(bankInvestment)} / -${Utils.formatCurrency(bankWithdrawal)}<br>
-                                ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.bank.income)} / -${Utils.formatCurrency(cashFlow.bank.expense)}
+                                ${lang === 'id' ? 'Negatif = Hutang' : '负数 = 负债'}
                             </div>
                         </div>
                         <div class="cashflow-item">
-                            <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
-                            <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
+                            <div class="label">📊 ${lang === 'id' ? 'Laba Bersih Toko' : '门店净利'}</div>
+                            <div class="value ${netProfit < 0 ? 'negative' : ''}">${Utils.formatCurrency(netProfit)}</div>
                             <div class="cashflow-detail">
-                                📈 ${lang === 'id' ? 'Pendapatan' : '收入'}: +${Utils.formatCurrency(cashFlow.total.income)}<br>
-                                📉 ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.total.expense)}
+                                ${lang === 'id' ? 'Pendapatan - Pengeluaran' : '收入 - 支出'}
                             </div>
                         </div>
                     </div>
@@ -302,9 +290,9 @@ const DashboardCore = {
                     <div class="stat-card"><div class="stat-value">${report.total_orders}</div><div>${t('total_orders')}</div></div>
                     <div class="stat-card"><div class="stat-value">${report.active_orders}</div><div>${t('active')}</div></div>
                     <div class="stat-card"><div class="stat-value">${report.completed_orders}</div><div>${t('completed')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_loan_amount)}</div><div>${t('total_loan')}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_admin_fees)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
+                    <div class="stat-card"><div class="stat-value">- ${Utils.formatCurrency(report.total_loan_amount)}</div><div>${t('total_loan')}</div></div>
+                    <div class="stat-card"><div class="stat-value">+ ${Utils.formatCurrency(report.total_admin_fees)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
+                    <div class="stat-card"><div class="stat-value">+ ${Utils.formatCurrency(report.total_interest)}</div><div>${lang === 'id' ? 'Bunga Diterima' : '已收利息'}</div></div>
                 </div>
                 
                 <div class="toolbar">
@@ -348,7 +336,7 @@ const DashboardCore = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}<tr></tr>`;
         } else {
             var typeMap = {
                 investment: lang === 'id' ? '💰 注资' : '💰 注资',
@@ -381,7 +369,7 @@ const DashboardCore = {
                     <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
                     <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                     <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
-                </tr>`;
+                　　　`;
             }
         }
         
@@ -536,7 +524,7 @@ const DashboardCore = {
                 <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
                 <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                 <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
-            </tr>`;
+            　　　`;
         }
         
         if (rows === '') {
@@ -649,10 +637,10 @@ const DashboardCore = {
                     <td>${roleText}</td>
                     <td>${Utils.escapeHtml(storeName)}</td>
                     <td class="action-cell">${actionHtml}</td>
-                </tr>`;
+                　　　`;
             }
 
-            if (users.length === 0) userRows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
+            if (users.length === 0) userRows = `<td><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
 
             var storeOptions = `<option value="">${lang === 'id' ? 'Pilih Toko' : '选择门店'}</option>`;
             for (var s of stores) storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)}</option>`;
@@ -846,7 +834,6 @@ const DashboardCore = {
 
     // ==================== 黑名单页面入口 ====================
     showBlacklist: async function() {
-        // 这个函数由 app-blacklist.js 提供
         if (typeof window.APP.showBlacklist === 'function') {
             await window.APP.showBlacklist();
         } else {
