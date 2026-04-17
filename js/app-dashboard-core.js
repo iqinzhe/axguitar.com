@@ -1,7 +1,7 @@
 // app-dashboard-core.js - 核心功能模块（框架结构固定，不能新增栏目按钮等!）
-// 包含：初始化、登录、登出、路由、导航、员工管理、资金管理
+// 包含：初始化、登录、登出、路由、导航、操作员管理、资金管理
 // 修改：仪表盘资金管理改为三资金池（保险柜、银行BNI、门店净利）
-// 注意：按钮文字“用户管理”已改为“员工管理”（通过 utils.js 翻译实现）
+// 修改：用户管理 → 操作员管理（文字已全部修改）
 
 window.APP = window.APP || {};
 
@@ -332,7 +332,7 @@ const DashboardCore = {
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}<tr></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
         } else {
             var typeMap = {
                 investment: lang === 'id' ? '💰 注资' : '💰 注资',
@@ -554,7 +554,7 @@ const DashboardCore = {
         </head><body>
         <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h1>
         <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
-        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
+        <tr><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
         
         var typeMap = { investment: '注资', withdrawal: '还本', dividend: '分红' };
         for (var txn of transactions) {
@@ -601,7 +601,7 @@ const DashboardCore = {
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
-    // ==================== 员工管理 ====================
+    // ==================== 操作员管理 ====================
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -648,20 +648,20 @@ const DashboardCore = {
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                     </div>
                 </div>
-                <div class="card"><h3>${lang === 'id' ? 'Daftar Karyawan' : '员工列表'}</h3>
+                <div class="card"><h3>${lang === 'id' ? 'Daftar Operator' : '操作员列表'}</h3>
                     <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
                 </div>
-                <div class="card"><h3>${lang === 'id' ? 'Tambah Karyawan Baru' : '添加新员工'}</h3>
+                <div class="card"><h3>${lang === 'id' ? 'Tambah Operator Baru' : '添加新操作员'}</h3>
                     <div class="form-grid">
                         <div class="form-group"><label>${t('username')} *</label><input id="newUsername" placeholder="email@domain.com"></div>
                         <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="newRole"><option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option></select></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label><select id="newStoreId">${storeOptions}</select></div>
-                        <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Karyawan' : '添加员工'}</button></div>
+                        <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Operator' : '添加操作员'}</button></div>
                     </div>
                 </div>`;
-        } catch (error) { console.error("showUserManagement error:", error); alert(Utils.lang === 'id' ? 'Gagal memuat manajemen karyawan' : '加载员工管理失败'); }
+        } catch (error) { console.error("showUserManagement error:", error); alert(Utils.lang === 'id' ? 'Gagal memuat manajemen operator' : '加载操作员管理失败'); }
     },
 
     addUser: async function() {
@@ -671,12 +671,12 @@ const DashboardCore = {
         var role = document.getElementById("newRole").value;
         var storeId = document.getElementById("newStoreId").value;
         if (!username || !password || !name) { alert(Utils.lang === 'id' ? 'Harap isi semua field' : '请填写所有字段'); return; }
-        try { await AUTH.addUser(username, password, name, role, storeId || null); alert((Utils.lang === 'id' ? 'Karyawan "' : '员工 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！')); await this.showUserManagement(); } 
+        try { await AUTH.addUser(username, password, name, role, storeId || null); alert((Utils.lang === 'id' ? 'Operator "' : '操作员 "') + username + '" ' + (Utils.lang === 'id' ? 'berhasil ditambahkan!' : '添加成功！')); await this.showUserManagement(); } 
         catch (error) { alert('Error: ' + error.message); }
     },
 
     deleteUser: async function(userId) {
-        if (confirm(Utils.lang === 'id' ? 'Hapus karyawan ini?' : '删除此员工？')) {
+        if (confirm(Utils.lang === 'id' ? 'Hapus operator ini?' : '删除此操作员？')) {
             try { await AUTH.deleteUser(userId); await this.showUserManagement(); } 
             catch (error) { alert('Error: ' + error.message); }
         }
@@ -691,15 +691,15 @@ const DashboardCore = {
             var modal = document.createElement('div');
             modal.id = 'editUserModal';
             modal.className = 'modal-overlay';
-            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Karyawan' : '修改员工角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
+            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Operator' : '修改操作员角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
             document.body.appendChild(modal);
-        } catch (error) { alert(lang === 'id' ? 'Gagal memuat data karyawan' : '加载员工数据失败'); }
+        } catch (error) { alert(lang === 'id' ? 'Gagal memuat data operator' : '加载操作员数据失败'); }
     },
 
     _saveUserRole: async function(userId) {
         var lang = Utils.lang;
         var newRole = document.getElementById('editRoleSelect').value;
-        try { await AUTH.updateUser(userId, { role: newRole }); document.getElementById('editUserModal')?.remove(); alert(lang === 'id' ? 'Peran karyawan berhasil diubah' : '员工角色已修改'); await this.showUserManagement(); } 
+        try { await AUTH.updateUser(userId, { role: newRole }); document.getElementById('editUserModal')?.remove(); alert(lang === 'id' ? 'Peran operator berhasil diubah' : '操作员角色已修改'); await this.showUserManagement(); } 
         catch (error) { alert('Error: ' + error.message); }
     },
 
