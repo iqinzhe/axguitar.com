@@ -1,4 +1,4 @@
-// utils.js - 完整最终版（翻译“用户管理”改为“员工管理”）
+// utils.js - 完整最终版（翻译“用户管理”改为“操作员管理”）
 
 const Utils = {
     lang: localStorage.getItem('jf_language') || 'id',
@@ -25,7 +25,7 @@ const Utils = {
             view: "Lihat", search: "Cari", reset: "Reset", confirm: "Konfirmasi",
             dashboard: "Dasbor", create_order: "Buat Pesanan", order_list: "Daftar Pesanan",
             financial_report: "Laporan Keuangan",
-            user_management: "Manajemen Karyawan",
+            user_management: "Manajemen Operator",
             backup_restore: "Cadangan & Pemulihan", total_orders: "Total Pesanan",
             active: "Berjalan", completed: "Lunas", liquidated: "Dilikuidasi",
             total_loan: "Total Pinjaman", customer_info: "Informasi Pelanggan",
@@ -46,7 +46,7 @@ const Utils = {
             view: "查看", search: "搜索", reset: "重置", confirm: "确认",
             dashboard: "仪表板", create_order: "新建订单", order_list: "订单列表",
             financial_report: "财务报表",
-            user_management: "员工管理",
+            user_management: "操作员管理",
             backup_restore: "备份恢复", total_orders: "总订单数", active: "进行中", completed: "已结清", liquidated: "已变卖",
             total_loan: "贷款总额", customer_info: "客户信息", customer_name: "客户姓名",
             ktp_number: "KTP号码", phone: "手机号", address: "地址", collateral_info: "典当信息",
