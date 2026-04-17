@@ -1,9 +1,9 @@
-// supabase.js - 完整修复版 v5.0
+// supabase.js - 完整修复版 v5.0（包含乐观锁）
 // 修复内容：
-// 1. 修复非管理员支付记录过滤不可靠问题（使用子查询替代 JOIN 条件）
-// 2. 管理费解锁时同步处理 cash_flow_records（作废原记录）
-// 3. 新增现金净利计算函数（剔除本金）
-// 4. 优化 getAllPayments 性能
+// 1. 修复非管理员支付记录过滤不可靠问题（严重2）
+// 2. 管理费解锁时同步处理 cash_flow_records（隐患3）
+// 3. 新增乐观锁防止并发问题（隐患1）
+// 4. 新增现金净利计算函数（剔除本金）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -550,125 +550,238 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 利息记录 ====================
+    // ==================== 利息记录（带乐观锁） ====================
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
-        const remainingPrincipal = order.loan_amount - order.principal_paid;
-        if (remainingPrincipal <= 0) throw new Error('本金已结清');
-        const monthlyInterest = remainingPrincipal * 0.10;
-        const totalInterest = monthlyInterest * months;
         
-        const { error: e1 } = await supabaseClient.from('orders').update({
-            interest_paid_months: order.interest_paid_months + months,
-            interest_paid_total: order.interest_paid_total + totalInterest,
-            next_interest_due_date: this.calculateNextDueDate(order.created_at, order.interest_paid_months + months),
-            monthly_interest: monthlyInterest
-        }).eq('order_id', orderId);
-        if (e1) throw e1;
+        // 最多重试3次
+        let retryCount = 0;
+        const maxRetries = 3;
         
-        const paymentData = {
-            order_id: order.id,
-            date: new Date().toISOString().split('T')[0],
-            type: 'interest',
-            months: months,
-            amount: totalInterest,
-            description: `Bunga ${months} bulan / 利息${months}个月`,
-            recorded_by: profile.id,
-            payment_method: paymentMethod
-        };
+        while (retryCount < maxRetries) {
+            // 重新获取最新订单数据
+            const currentOrder = await this.getOrder(orderId);
+            const remainingPrincipal = currentOrder.loan_amount - currentOrder.principal_paid;
+            
+            if (remainingPrincipal <= 0) {
+                throw new Error('本金已结清');
+            }
+            
+            const monthlyInterest = remainingPrincipal * 0.10;
+            const totalInterest = monthlyInterest * months;
+            
+            const newInterestPaidMonths = currentOrder.interest_paid_months + months;
+            const newInterestPaidTotal = currentOrder.interest_paid_total + totalInterest;
+            
+            // 乐观锁：只更新 interest_paid_months 等于当前值的记录
+            const { error: e1 } = await supabaseClient
+                .from('orders')
+                .update({
+                    interest_paid_months: newInterestPaidMonths,
+                    interest_paid_total: newInterestPaidTotal,
+                    next_interest_due_date: this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths),
+                    monthly_interest: monthlyInterest
+                })
+                .eq('order_id', orderId)
+                .eq('interest_paid_months', currentOrder.interest_paid_months);  // 乐观锁条件
+            
+            if (e1) {
+                if (e1.code === 'PGRST116' || (e1.message && e1.message.includes('0 rows'))) {
+                    console.warn(`乐观锁冲突: 订单 ${orderId} 利息支付重试 ${retryCount + 1}/${maxRetries}`);
+                    retryCount++;
+                    if (retryCount >= maxRetries) {
+                        throw new Error(Utils.lang === 'id' 
+                            ? 'Data pesanan telah berubah, silakan coba lagi' 
+                            : '订单数据已变更，请重试');
+                    }
+                    continue;
+                }
+                throw e1;
+            }
+            
+            // 检查是否真的更新了记录
+            const { data: checkOrder, error: checkError } = await supabaseClient
+                .from('orders')
+                .select('interest_paid_months')
+                .eq('order_id', orderId)
+                .single();
+            
+            if (checkError) throw checkError;
+            
+            if (checkOrder.interest_paid_months !== newInterestPaidMonths) {
+                console.warn(`乐观锁冲突: 订单 ${orderId} 利息支付未生效，重试 ${retryCount + 1}/${maxRetries}`);
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    throw new Error(Utils.lang === 'id' 
+                        ? 'Data pesanan telah berubah, silakan coba lagi' 
+                        : '订单数据已变更，请重试');
+                }
+                continue;
+            }
+            
+            // 更新成功，记录支付历史
+            const paymentData = {
+                order_id: currentOrder.id,
+                date: new Date().toISOString().split('T')[0],
+                type: 'interest',
+                months: months,
+                amount: totalInterest,
+                description: `Bunga ${months} bulan / 利息${months}个月`,
+                recorded_by: profile.id,
+                payment_method: paymentMethod
+            };
+            
+            const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
+            if (e2) throw e2;
+            
+            await this.recordCashFlow({
+                store_id: currentOrder.store_id,
+                flow_type: 'interest',
+                direction: 'inflow',
+                amount: totalInterest,
+                source_target: paymentMethod,
+                order_id: currentOrder.id,
+                customer_id: currentOrder.customer_id,
+                description: `Bunga ${months} bulan / 利息 - ${currentOrder.order_id}`,
+                reference_id: currentOrder.order_id
+            });
+            
+            return true;
+        }
         
-        const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
-        if (e2) throw e2;
-        
-        await this.recordCashFlow({
-            store_id: order.store_id,
-            flow_type: 'interest',
-            direction: 'inflow',
-            amount: totalInterest,
-            source_target: paymentMethod,
-            order_id: order.id,
-            customer_id: order.customer_id,
-            description: `Bunga ${months} bulan / 利息 - ${order.order_id}`,
-            reference_id: order.order_id
-        });
-        
-        return true;
+        throw new Error(Utils.lang === 'id' 
+            ? 'Gagal memproses pembayaran bunga setelah beberapa kali percobaan' 
+            : '多次尝试后仍无法处理利息付款');
     },
 
-    // ==================== 本金还款 ====================
+    // ==================== 本金还款（带乐观锁） ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
-        const remainingPrincipal = order.loan_amount - order.principal_paid;
         
-        let paidAmount = amount;
-        let isAdjusted = false;
+        // 最多重试3次
+        let retryCount = 0;
+        const maxRetries = 3;
         
-        if (amount > remainingPrincipal) {
-            const confirmMsg = Utils.lang === 'id' 
-                ? `⚠️ Jumlah yang dimasukkan (${this.formatCurrency(amount)}) melebihi sisa pokok (${this.formatCurrency(remainingPrincipal)}).\n\nApakah Anda ingin membayar ${this.formatCurrency(remainingPrincipal)} untuk melunasi pokok?`
-                : `⚠️ 输入金额 (${this.formatCurrency(amount)}) 超过剩余本金 (${this.formatCurrency(remainingPrincipal)}).\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`;
+        while (retryCount < maxRetries) {
+            // 重新获取最新订单数据（确保读取最新版本）
+            const currentOrder = await this.getOrder(orderId);
+            const remainingPrincipal = currentOrder.loan_amount - currentOrder.principal_paid;
             
-            if (!confirm(confirmMsg)) {
-                throw new Error(Utils.lang === 'id' ? 'Pembayaran dibatalkan' : '付款已取消');
+            let paidAmount = amount;
+            let isAdjusted = false;
+            
+            if (amount > remainingPrincipal) {
+                const confirmMsg = Utils.lang === 'id' 
+                    ? `⚠️ Jumlah yang dimasukkan (${this.formatCurrency(amount)}) melebihi sisa pokok (${this.formatCurrency(remainingPrincipal)}).\n\nApakah Anda ingin membayar ${this.formatCurrency(remainingPrincipal)} untuk melunasi pokok?`
+                    : `⚠️ 输入金额 (${this.formatCurrency(amount)}) 超过剩余本金 (${this.formatCurrency(remainingPrincipal)}).\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`;
+                
+                if (!confirm(confirmMsg)) {
+                    throw new Error(Utils.lang === 'id' ? 'Pembayaran dibatalkan' : '付款已取消');
+                }
+                paidAmount = remainingPrincipal;
+                isAdjusted = true;
             }
-            paidAmount = remainingPrincipal;
-            isAdjusted = true;
+            
+            const newPrincipalPaid = currentOrder.principal_paid + paidAmount;
+            const newPrincipalRemaining = currentOrder.loan_amount - newPrincipalPaid;
+            
+            let updates = { 
+                principal_paid: newPrincipalPaid, 
+                principal_remaining: newPrincipalRemaining 
+            };
+            
+            if (newPrincipalRemaining <= 0) {
+                updates = { ...updates, status: 'completed', monthly_interest: 0 };
+            } else {
+                updates.monthly_interest = newPrincipalRemaining * 0.10;
+            }
+            
+            // 乐观锁：只更新 principal_paid 等于当前值的记录
+            const { error: e1 } = await supabaseClient
+                .from('orders')
+                .update(updates)
+                .eq('order_id', orderId)
+                .eq('principal_paid', currentOrder.principal_paid);  // 乐观锁条件
+            
+            if (e1) {
+                // 检查是否是乐观锁冲突（更新了0行）
+                if (e1.code === 'PGRST116' || (e1.message && e1.message.includes('0 rows'))) {
+                    console.warn(`乐观锁冲突: 订单 ${orderId} 本金支付重试 ${retryCount + 1}/${maxRetries}`);
+                    retryCount++;
+                    if (retryCount >= maxRetries) {
+                        throw new Error(Utils.lang === 'id' 
+                            ? 'Data pesanan telah berubah, silakan coba lagi' 
+                            : '订单数据已变更，请重试');
+                    }
+                    continue;  // 重试
+                }
+                throw e1;
+            }
+            
+            // 检查是否真的更新了记录
+            const { data: checkOrder, error: checkError } = await supabaseClient
+                .from('orders')
+                .select('principal_paid')
+                .eq('order_id', orderId)
+                .single();
+            
+            if (checkError) throw checkError;
+            
+            if (checkOrder.principal_paid !== newPrincipalPaid) {
+                // 更新失败，重试
+                console.warn(`乐观锁冲突: 订单 ${orderId} 本金支付未生效，重试 ${retryCount + 1}/${maxRetries}`);
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    throw new Error(Utils.lang === 'id' 
+                        ? 'Data pesanan telah berubah, silakan coba lagi' 
+                        : '订单数据已变更，请重试');
+                }
+                continue;
+            }
+            
+            // 更新成功，记录支付历史
+            const isFullRepayment = paidAmount >= remainingPrincipal;
+            const description = isFullRepayment 
+                ? (Utils.lang === 'id' ? 'Pelunasan Pokok / 全额还款' : '全额还款')
+                : (Utils.lang === 'id' ? 'Pembayaran Pokok / 部分还款' : '部分还款');
+            
+            const finalDescription = isAdjusted 
+                ? `${description} (${Utils.lang === 'id' ? 'jumlah disesuaikan otomatis' : '金额已自动调整'})`
+                : description;
+            
+            const paymentData = {
+                order_id: currentOrder.id,
+                date: new Date().toISOString().split('T')[0],
+                type: 'principal',
+                amount: paidAmount,
+                description: finalDescription,
+                recorded_by: profile.id,
+                payment_method: paymentMethod
+            };
+            
+            const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
+            if (e2) throw e2;
+            
+            await this.recordCashFlow({
+                store_id: currentOrder.store_id,
+                flow_type: 'principal',
+                direction: 'inflow',
+                amount: paidAmount,
+                source_target: paymentMethod,
+                order_id: currentOrder.id,
+                customer_id: currentOrder.customer_id,
+                description: description,
+                reference_id: currentOrder.order_id
+            });
+            
+            return true;
         }
         
-        const newPrincipalPaid = order.principal_paid + paidAmount;
-        const newPrincipalRemaining = order.loan_amount - newPrincipalPaid;
-        
-        let updates = { 
-            principal_paid: newPrincipalPaid, 
-            principal_remaining: newPrincipalRemaining 
-        };
-        
-        if (newPrincipalRemaining <= 0) {
-            updates = { ...updates, status: 'completed', monthly_interest: 0 };
-        } else {
-            updates.monthly_interest = newPrincipalRemaining * 0.10;
-        }
-        
-        const { error: e1 } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
-        if (e1) throw e1;
-        
-        const isFullRepayment = paidAmount >= remainingPrincipal;
-        const description = isFullRepayment 
-            ? (Utils.lang === 'id' ? 'Pelunasan Pokok / 全额还款' : '全额还款')
-            : (Utils.lang === 'id' ? 'Pembayaran Pokok / 部分还款' : '部分还款');
-        
-        const finalDescription = isAdjusted 
-            ? `${description} (${Utils.lang === 'id' ? 'jumlah disesuaikan otomatis' : '金额已自动调整'})`
-            : description;
-        
-        const paymentData = {
-            order_id: order.id,
-            date: new Date().toISOString().split('T')[0],
-            type: 'principal',
-            amount: paidAmount,
-            description: finalDescription,
-            recorded_by: profile.id,
-            payment_method: paymentMethod
-        };
-        
-        const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
-        if (e2) throw e2;
-        
-        await this.recordCashFlow({
-            store_id: order.store_id,
-            flow_type: 'principal',
-            direction: 'inflow',
-            amount: paidAmount,
-            source_target: paymentMethod,
-            order_id: order.id,
-            customer_id: order.customer_id,
-            description: description,
-            reference_id: order.order_id
-        });
-        
-        return true;
+        throw new Error(Utils.lang === 'id' 
+            ? 'Gagal memproses pembayaran setelah beberapa kali percobaan' 
+            : '多次尝试后仍无法处理付款');
     },
 
     // ==================== 解锁管理费（修复版：同步处理 cash_flow_records） ====================
