@@ -1,6 +1,5 @@
 // app-dashboard-orders.js - 订单功能模块
 // 包含：订单列表、查看订单、编辑订单、删除订单、打印订单、缴费明细
-// 修改：管理员不显示"缴费"按钮；"进行中"改为"未结清"
 
 window.APP = window.APP || {};
 
@@ -16,8 +15,7 @@ const DashboardOrders = {
         try {
             var filters = { status: this.currentFilter, search: this.searchKeyword };
             var orders = await SUPABASE.getOrders(filters);
-            // 状态文字映射：active -> 未结清
-            var statusMap = { active: lang === 'id' ? 'Belum Lunas' : '未结清', completed: t('status_completed'), liquidated: t('status_liquidated') };
+            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var stores = await SUPABASE.getAllStores();
             var storeMap = {};
             for (var s of stores) storeMap[s.id] = s.name;
@@ -28,8 +26,6 @@ const DashboardOrders = {
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
-                    // 门店名称：隐藏后端编码，只显示名称
-                    var storeDisplayName = storeMap[o.store_id] || '-';
                     rows += `<tr>
                         <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
                         <td>${Utils.escapeHtml(o.customer_name)}</td>
@@ -39,10 +35,10 @@ const DashboardOrders = {
                         <td class="text-right">${Utils.formatCurrency(o.monthly_interest || 0)}</td>
                         <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
                         <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(storeDisplayName)}</td>` : ''}
+                        ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
                         <td class="action-cell">
                             <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}</button>
-                            ${!isAdmin && o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                             ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️ ${t('delete')}</button>` : ''}
                             <button onclick="APP.printOrder('${o.order_id}')" class="btn-small print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                             ${o.is_locked ? `<span class="locked-icon">🔒</span>` : ''}
@@ -67,7 +63,7 @@ const DashboardOrders = {
                     <button onclick="APP.resetSearch()">${t('reset')}</button>
                     <select id="statusFilter" onchange="APP.filterOrders(this.value)">
                         <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${t('total_orders')}</option>
-                        <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${lang === 'id' ? 'Belum Lunas' : '未结清'}</option>
+                        <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${t('active')}</option>
                         <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${t('completed')}</option>
                     </select>
                 </div>
@@ -123,8 +119,7 @@ const DashboardOrders = {
             if (!order) { alert('Order not found'); this.goBack(); return; }
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
-            // 状态文字：active -> 未结清
-            var statusMap = { active: lang === 'id' ? 'Belum Lunas' : '未结清', completed: t('status_completed'), liquidated: t('status_liquidated') };
+            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
             
             var payRows = '';
@@ -141,7 +136,7 @@ const DashboardOrders = {
                     　　　`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td><tr>`;
             }
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
@@ -188,7 +183,7 @@ const DashboardOrders = {
                     
                     <div class="toolbar">
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                        ${!AUTH.isAdmin() && order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
+                        ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
                         ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')" class="warning">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
                         <button onclick="APP.sendWAReminder('${order.order_id}')" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
                     </div>
@@ -270,7 +265,6 @@ const DashboardOrders = {
             if (!order) { alert(Utils.lang === 'id' ? 'Order tidak ditemukan' : '订单不存在'); return; }
             var lang = Utils.lang;
             var methodMap = { cash: lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)', bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' };
-            var storeName = order.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             
             var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${order.order_id}</title>
             <style>
@@ -279,7 +273,6 @@ const DashboardOrders = {
                 .print-container { max-width: 210mm; margin: 0 auto; padding: 5mm; }
                 .header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #1e293b; padding-bottom: 10px; }
                 .header h1 { font-size: 18px; margin: 5px 0; }
-                .store-info { text-align: center; margin-bottom: 10px; font-size: 10px; color: #475569; }
                 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
                 .section { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; }
                 .section h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
@@ -301,12 +294,11 @@ const DashboardOrders = {
                 <div class="no-print"><button class="btn-print" onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button><button class="btn-close" onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button></div>
                 <div class="header">
                     <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;">
-                        <img src="/icon-32.png" alt="JF! Sistem Gadai" class="logo-icon">
+                        <img src="/icons/system-jf.png" alt="JF!" style="height:32px;">
                         <h1 style="margin:0;">JF! by Gadai</h1>
                     </div>
                     <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${order.order_id}</strong> | ${Utils.formatDate(order.created_at)}</p>
                 </div>
-                <div class="store-info">🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</div>
                 <div class="two-col">
                     <div class="section"><h3>📋 ${lang === 'id' ? 'Informasi Pelanggan' : '客户信息'}</h3>
                         <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama' : '姓名'}:</div><div>${Utils.escapeHtml(order.customer_name)}</div></div>
@@ -327,7 +319,7 @@ const DashboardOrders = {
                 printContent += `<tr><td>${Utils.formatDate(p.date)}</td><td>${tt}</td><td class="text-right">${Utils.formatCurrency(p.amount)}</td><td>${methodMap[p.payment_method] || '-'}</td></tr>`;
             }
             printContent += `</tbody></table></div>
-                <div class="footer">
+                <div class="footer" style="margin-top:20px; padding-top:10px; border-top:1px solid #ccc; text-align:center; font-size:9px; color:#666;">
                     <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
                     <div>${lang === 'id' ? 'Terima kasih atas kepercayaan Anda' : '感谢您的信任'}</div>
                     <div>${lang === 'id' ? 'Bukti ini dicetak secara elektronik dan tidak memerlukan tanda tangan' : '本凭证为电子打印，无需签名'}</div>
