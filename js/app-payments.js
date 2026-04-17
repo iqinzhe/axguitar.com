@@ -1,5 +1,9 @@
-// app-payments.js - 修复版
-// 修复内容：unlockAdminFee 调用修改（配合 supabase.js 的新方法）
+// app-payments.js - 完整修复版 v3.0
+// 修改内容：
+// 1. 新增服务费缴费功能（利率可选 1%, 2%, 3%）
+// 2. 利息缴费移除净利选项，只能选择 cash/bank
+// 3. 本金还款移除净利选项，只能选择 cash/bank
+// 4. 新增贷款发放记录入口（订单创建后记录资金流出）
 
 window.APP = window.APP || {};
 
@@ -23,12 +27,30 @@ const PaymentsModule = {
 
             var interestPayments = payments.filter(p => p.type === 'interest');
             var principalPayments = payments.filter(p => p.type === 'principal');
+            var serviceFeePayments = payments.filter(p => p.type === 'service_fee');
             
             var methodMap = { 
                 cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', 
-                bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI',
-                profit: lang === 'id' ? '📊 Laba Bersih' : '📊 门店净利'
+                bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI'
             };
+
+            // 服务费历史
+            var serviceFeeRows = '';
+            if (serviceFeePayments.length === 0) {
+                serviceFeeRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran service fee' : '暂无服务费记录'}</td></tr>`;
+            } else {
+                for (var p of serviceFeePayments) {
+                    if (p.is_voided) continue;
+                    var methodClass = p.payment_method === 'cash' ? 'method-cash' : 'method-bank';
+                    serviceFeeRows += `<tr>
+                        <td class="date-cell">${Utils.formatDate(p.date)}</td>
+                        <td class="text-center">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
+                        <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                        <td><span class="payment-method-badge ${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
+                        <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
+                    </tr>`;
+                }
+            }
 
             // 利息缴费历史
             var interestRows = '';
@@ -36,9 +58,8 @@ const PaymentsModule = {
                 interestRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
             } else {
                 for (var p of interestPayments) {
-                    // 跳过已作废的记录
                     if (p.is_voided) continue;
-                    var methodClass = p.payment_method === 'cash' ? 'method-cash' : (p.payment_method === 'bank' ? 'method-bank' : 'method-profit');
+                    var methodClass = p.payment_method === 'cash' ? 'method-cash' : 'method-bank';
                     interestRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
                         <td class="text-center">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
@@ -55,9 +76,8 @@ const PaymentsModule = {
                 principalRows = `<tr><td colspan="4" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
             } else {
                 for (var p of principalPayments) {
-                    // 跳过已作废的记录
                     if (p.is_voided) continue;
-                    var methodClass = p.payment_method === 'cash' ? 'method-cash' : (p.payment_method === 'bank' ? 'method-bank' : 'method-profit');
+                    var methodClass = p.payment_method === 'cash' ? 'method-cash' : 'method-bank';
                     principalRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
@@ -83,7 +103,6 @@ const PaymentsModule = {
             // 管理费区域（已支付则锁定）
             var adminFeeSection = '';
             if (order.admin_fee_paid) {
-                // 检查是否有作废记录（显示提示）
                 const voidedPayment = payments.find(p => p.type === 'admin_fee' && p.is_voided);
                 const voidedHint = voidedPayment ? `<span class="voided-hint" style="font-size:11px; color:#f59e0b; margin-left:8px;">⚠️ ${lang === 'id' ? 'Pembayaran sebelumnya telah dibatalkan' : '之前的支付已作废'}</span>` : '';
                 
@@ -111,6 +130,41 @@ const PaymentsModule = {
                 `;
             }
 
+            // 服务费选项（利率 1%, 2%, 3%）
+            var serviceFeePercent = order.service_fee_percent || 0;
+            var serviceFeePerMonth = order.service_fee_amount || 0;
+            var serviceFeeOptions = '';
+            
+            if (serviceFeePercent > 0) {
+                serviceFeeOptions = `
+                    <div class="service-fee-section">
+                        <div class="service-fee-info">
+                            <div class="service-fee-rate">
+                                💰 <strong>${lang === 'id' ? 'Service Fee' : '服务费'}:</strong> ${serviceFeePercent}% ${lang === 'id' ? 'per bulan' : '每月'} = ${Utils.formatCurrency(serviceFeePerMonth)}/${lang === 'id' ? 'bln' : '个月'}
+                            </div>
+                            <div class="service-fee-input-group">
+                                <label class="service-fee-label">${lang === 'id' ? 'Ambil untuk' : '收取'}:</label>
+                                <select id="serviceFeeMonths" class="service-fee-months">
+                                    <option value="1">1 ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(serviceFeePerMonth)}</option>
+                                    <option value="2">2 ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(serviceFeePerMonth * 2)}</option>
+                                    <option value="3">3 ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(serviceFeePerMonth * 3)}</option>
+                                </select>
+                            </div>
+                            <div class="payment-method-group">
+                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pemasukan' : '入账方式'}:</div>
+                                <div class="payment-method-options">
+                                    <label><input type="radio" name="serviceFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                    <label><input type="radio" name="serviceFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
+                                </div>
+                            </div>
+                            <button onclick="APP.payServiceFee('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Service Fee' : '记录服务费'}</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                serviceFeeOptions = `<p class="info-note">📌 ${lang === 'id' ? 'Service fee tidak diatur untuk order ini' : '该订单未设置服务费'}</p>`;
+            }
+
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             var interestOptions = [1, 2, 3].map(i =>
                 `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(currentMonthlyInterest * i)}</option>`
@@ -122,7 +176,6 @@ const PaymentsModule = {
                     <div class="payment-method-options">
                         <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</label>
                         <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</label>
-                        <label><input type="radio" name="principalTarget" value="profit"> 📊 ${lang === 'id' ? 'Laba Bersih Toko' : '门店净利'}</label>
                     </div>
                     <div class="info-note" style="font-size:11px; margin-top:4px;">
                         💡 ${lang === 'id' ? 'Pilih kemana pokok akan dikembalikan (sesuai sumber pinjaman awal)' : '选择本金返还到哪里（应与贷款时资金来源一致）'}
@@ -168,9 +221,23 @@ const PaymentsModule = {
                     ${adminFeeSection}
                 </div>
                 
+                <div class="card service-fee-card">
+                    <h3>💰 ${lang === 'id' ? 'Service Fee' : '服务费'}</h3>
+                    <p class="info-note">📌 ${lang === 'id' ? 'Service fee adalah biaya layanan yang dihitung dari persentase pinjaman' : '服务费是按贷款百分比计算的费用'}</p>
+                    ${serviceFeeOptions}
+                    
+                    <h4 class="subtitle">📋 ${lang === 'id' ? 'Riwayat Pembayaran Service Fee' : '服务费缴费历史'}</h4>
+                    <div class="table-container">
+                        <table class="payment-history-table">
+                            <thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Bulan' : '月数'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead>
+                            <tbody>${serviceFeeRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+                
                 <div class="card interest-card">
                     <h3>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3>
-                    <p class="info-note">📌 ${lang === 'id' ? 'Bunga akan langsung masuk ke Laba Bersih Toko' : '📌 利息将直接入账到门店净利'}</p>
+                    <p class="info-note">📌 ${lang === 'id' ? 'Bunga akan langsung masuk ke Brankas atau Bank BNI' : '利息将直接入账到保险柜或银行'}</p>
                     <div class="interest-input-group">
                         <label class="interest-label">${lang === 'id' ? 'Ambil untuk' : '收取'}:</label>
                         <select id="interestMonths" class="interest-months">${interestOptions}</select>
@@ -222,6 +289,10 @@ const PaymentsModule = {
                     .admin-fee-input-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
                     .admin-fee-select { width: auto; min-width: 150px; margin: 0; }
                     .admin-fee-custom { width: 150px; }
+                    .service-fee-section { background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 0; border-left: 3px solid #3b82f6; }
+                    .service-fee-rate { margin-bottom: 12px; font-size: 14px; }
+                    .service-fee-input-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+                    .service-fee-months { width: auto; min-width: 200px; margin: 0; }
                     .payment-method-group { background: #f8fafc; border-radius: 8px; padding: 10px 12px; margin: 10px 0; border: 1px solid #e2e8f0; }
                     .payment-method-group.inline { display: inline-flex; align-items: center; gap: 12px; background: transparent; padding: 0; margin: 0; border: none; }
                     .payment-method-title { font-size: 12px; font-weight: 500; color: #64748b; margin-bottom: 8px; }
@@ -245,12 +316,11 @@ const PaymentsModule = {
                     .btn-small { padding: 4px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; }
                     button.success { background: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
                     button.warning { background: #d97706; color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
-                    .method-profit { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
                     .voided-hint { font-size: 11px; color: #f59e0b; }
                     @media (max-width: 768px) {
                         .order-summary .summary-grid { grid-template-columns: repeat(2, 1fr); }
-                        .interest-input-group, .principal-input-group { flex-direction: column; align-items: stretch; }
-                        .interest-months, .principal-amount { width: 100%; }
+                        .interest-input-group, .principal-input-group, .service-fee-input-group { flex-direction: column; align-items: stretch; }
+                        .interest-months, .principal-amount, .service-fee-months { width: 100%; }
                     }
                 </style>`;
 
@@ -290,7 +360,7 @@ const PaymentsModule = {
         }
         
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
-        if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName} ke Laba Bersih Toko?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，入账方式：${methodName}，进入门店净利？`)) {
+        if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName}?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，入账方式：${methodName}？`)) {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
                 window.location.reload();
@@ -300,7 +370,23 @@ const PaymentsModule = {
         }
     },
 
-    // ✅ 修复3：解锁管理费（调用 SUPABASE 的新方法）
+    // 新增：服务费缴费
+    payServiceFee: async function(orderId) {
+        var months = parseInt(document.getElementById("serviceFeeMonths").value);
+        var method = document.querySelector('input[name="serviceFeeMethod"]:checked')?.value || 'cash';
+        var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
+        var lang = Utils.lang;
+        
+        if (confirm(lang === 'id' ? `Konfirmasi pemasukan Service Fee ${months} bulan via ${methodName}?` : `确认入账服务费 ${months} 个月，入账方式：${methodName}？`)) {
+            try {
+                await Order.recordServiceFee(orderId, months, method);
+                window.location.reload();
+            } catch (error) { 
+                alert('Error: ' + error.message); 
+            }
+        }
+    },
+
     unlockAdminFee: async function(orderId) {
         var lang = Utils.lang;
         if (!confirm(lang === 'id' 
@@ -323,7 +409,7 @@ const PaymentsModule = {
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
-        if (confirm(lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName} ke Laba Bersih Toko?` : `确认入账利息 ${months} 个月，入账方式：${methodName}，进入门店净利？`)) {
+        if (confirm(lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName}?` : `确认入账利息 ${months} 个月，入账方式：${methodName}？`)) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
                 window.location.reload();
@@ -337,12 +423,12 @@ const PaymentsModule = {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
-        var targetName = target === 'cash' ? (Utils.lang === 'id' ? 'Brankas' : '保险柜') : (target === 'bank' ? (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI') : (Utils.lang === 'id' ? 'Laba Bersih Toko' : '门店净利'));
+        var targetName = target === 'cash' ? (Utils.lang === 'id' ? 'Brankas' : '保险柜') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
         if (confirm(lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} ke ${targetName}?` : `确认入账本金 ${Utils.formatCurrency(amount)} 到 ${targetName}？`)) {
             try {
-                await Order.recordPrincipalPayment(orderId, amount, target === 'cash' ? 'cash' : (target === 'bank' ? 'bank' : 'profit'), target);
+                await Order.recordPrincipalPayment(orderId, amount, target);
                 window.location.reload();
             } catch (error) { 
                 alert('Error: ' + error.message); 
