@@ -1,5 +1,6 @@
 // app-dashboard-print.js - 打印功能模块
 // 包含：打印当前页、保存PDF、打印选项
+// 修改：打印时自动添加门店/总部信息
 
 window.APP = window.APP || {};
 
@@ -10,6 +11,16 @@ const DashboardPrint = {
     saveAsPDF: function() {
         var lang = Utils.lang;
         var printContent = document.getElementById("app").cloneNode(true);
+        
+        // 获取当前门店/总部信息
+        var isAdmin = AUTH.isAdmin();
+        var storeName = AUTH.getCurrentStoreName();
+        var userRole = AUTH.user?.role;
+        var roleText = userRole === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : 
+                       userRole === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                       (lang === 'id' ? 'Staf' : '员工');
+        var userName = AUTH.user?.name || '-';
+        var printDateTime = new Date().toLocaleString();
         
         var styles = '';
         var styleNodes = document.querySelectorAll('style, link[rel="stylesheet"]');
@@ -68,7 +79,7 @@ const DashboardPrint = {
                             padding-bottom: 10px;
                             border-bottom: 2px solid #333;
                         }
-                        body { padding-top: 80px; padding-bottom: 50px; }
+                        body { padding-top: 100px; padding-bottom: 50px; }
                     }
                     .print-header { display: none; }
                     .print-footer { display: none; }
@@ -79,6 +90,8 @@ const DashboardPrint = {
                     .print-logo { text-align: center; margin-bottom: 10px; }
                     .print-logo img { height: 36px; vertical-align: middle; }
                     .print-title { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 20px; }
+                    .print-store-info { text-align: center; font-size: 10pt; color: #475569; margin-bottom: 15px; }
+                    .print-user-info { text-align: center; font-size: 9pt; color: #64748b; margin-bottom: 10px; }
                     .empty-row-placeholder td { height: 30px; }
                 </style>
             </head>
@@ -88,7 +101,14 @@ const DashboardPrint = {
                         <img src="/icons/system-jf.png" alt="JF!"> JF! by Gadai
                     </div>
                     <div class="print-title">${lang === 'id' ? 'Laporan Sistem Manajemen Gadai' : '典当管理系统报表'}</div>
-                    <div>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</div>
+                    <div class="print-store-info">
+                        🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}
+                        ${isAdmin ? ` (${lang === 'id' ? 'Kantor Pusat' : '总部'})` : ''}
+                    </div>
+                    <div class="print-user-info">
+                        👤 ${lang === 'id' ? 'Dicetak oleh' : '打印人'}: ${Utils.escapeHtml(userName)} (${roleText}) | 
+                        📅 ${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${printDateTime}
+                    </div>
                 </div>
                 
                 ${printContent.outerHTML}
@@ -97,6 +117,7 @@ const DashboardPrint = {
                     <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
                     <div>${lang === 'id' ? 'Terima kasih atas kepercayaan Anda' : '感谢您的信任'}</div>
                     <div>${lang === 'id' ? 'Laporan ini dicetak secara elektronik dan tidak memerlukan tanda tangan' : '本报告为电子打印，无需签名'}</div>
+                    <div>🏪 ${Utils.escapeHtml(storeName)} ${isAdmin ? `(${lang === 'id' ? 'Kantor Pusat' : '总部'})` : ''}</div>
                 </div>
                 
                 <script>
@@ -157,6 +178,16 @@ const DashboardPrint = {
         var styles = document.querySelector('link[rel="stylesheet"]')?.href || 'main.css';
         var lang = Utils.lang;
         
+        // 获取当前门店/总部信息
+        var isAdmin = AUTH.isAdmin();
+        var storeName = AUTH.getCurrentStoreName();
+        var userRole = AUTH.user?.role;
+        var roleText = userRole === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : 
+                       userRole === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                       (lang === 'id' ? 'Staf' : '员工');
+        var userName = AUTH.user?.name || '-';
+        var printDateTime = new Date().toLocaleString();
+        
         var printWindow = window.open('', '_blank');
         printWindow.document.write(`
             <!DOCTYPE html>
@@ -202,7 +233,7 @@ const DashboardPrint = {
                             border-bottom: 2px solid #333;
                             margin-bottom: 20px;
                         }
-                        body { padding-top: 80px; padding-bottom: 50px; }
+                        body { padding-top: 100px; padding-bottom: 50px; }
                     }
                     .print-header { display: none; }
                     .print-footer { display: none; }
@@ -212,6 +243,8 @@ const DashboardPrint = {
                     }
                     .print-header .logo { font-size: 16pt; font-weight: bold; color: #2563eb; }
                     .print-header .logo img { height: 32px; vertical-align: middle; }
+                    .print-store-info { text-align: center; font-size: 10pt; color: #475569; margin: 5px 0; }
+                    .print-user-info { text-align: center; font-size: 9pt; color: #64748b; margin-bottom: 10px; }
                     .empty-row-placeholder td { height: 30px; }
                 </style>
             </head>
@@ -220,8 +253,14 @@ const DashboardPrint = {
                     <div class="logo">
                         <img src="/icons/system-jf.png" alt="JF!"> JF! by Gadai
                     </div>
-                    <div>${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
-                    <div>${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${new Date().toLocaleString()}</div>
+                    <div class="print-store-info">
+                        🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}
+                        ${isAdmin ? ` (${lang === 'id' ? 'Kantor Pusat' : '总部'})` : ''}
+                    </div>
+                    <div class="print-user-info">
+                        👤 ${lang === 'id' ? 'Dicetak oleh' : '打印人'}: ${Utils.escapeHtml(userName)} (${roleText}) | 
+                        📅 ${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${printDateTime}
+                    </div>
                 </div>
                 
                 ${printContent.outerHTML}
@@ -230,6 +269,7 @@ const DashboardPrint = {
                     <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
                     <div>${lang === 'id' ? 'Terima kasih atas kepercayaan Anda' : '感谢您的信任'}</div>
                     <div>${lang === 'id' ? 'Laporan ini dicetak secara elektronik dan tidak memerlukan tanda tangan' : '本报告为电子打印，无需签名'}</div>
+                    <div>🏪 ${Utils.escapeHtml(storeName)} ${isAdmin ? `(${lang === 'id' ? 'Kantor Pusat' : '总部'})` : ''}</div>
                 </div>
                 
                 <script>
