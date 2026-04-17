@@ -1,5 +1,4 @@
-// app-payments.js - 完整修复版（支持三资金池：管理费/利息入门店净利，本金可选返还池）
-// 修复内容：缴费页面增加资金去向选择，管理费和利息自动入账门店净利，本金可选返还到银行/保险柜/门店净利
+// app-payments.js - 完整修复版（三资金池，优化缴费页面结构）
 
 window.APP = window.APP || {};
 
@@ -19,11 +18,13 @@ const PaymentsModule = {
             var t = (key) => Utils.t(key);
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             var currentMonthlyInterest = remainingPrincipal * 0.10;
+            var isAdmin = AUTH.isAdmin();
 
             var interestPayments = payments.filter(p => p.type === 'interest');
             var principalPayments = payments.filter(p => p.type === 'principal');
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
 
+            // 利息缴费历史
             var interestRows = '';
             if (interestPayments.length === 0) {
                 interestRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran bunga' : '暂无利息记录'}</td></tr>`;
@@ -39,6 +40,7 @@ const PaymentsModule = {
                 }
             }
 
+            // 本金还款历史
             var principalRows = '';
             if (principalPayments.length === 0) {
                 principalRows = `<tr><td colspan="4" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'}</td></tr>`;
@@ -53,6 +55,7 @@ const PaymentsModule = {
                 }
             }
 
+            // 管理费下拉选项
             var adminFeeOptions = `
                 <div class="admin-fee-input-group">
                     <select id="adminFeeAmount" class="admin-fee-select">
@@ -65,33 +68,42 @@ const PaymentsModule = {
                 </div>
             `;
 
-            var adminFeeSection = !order.admin_fee_paid
-                ? `<div class="admin-fee-section">
-                    <div class="admin-fee-info">
-                        <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ❌ ${lang === 'id' ? 'Belum dibayar' : '未支付'}</span>
-                        <div class="payment-method-group inline">
-                            <div class="payment-method-title">${lang === 'id' ? 'Metode Pembayaran' : '支付方式'}:</div>
-                            <div class="payment-method-options">
-                                <label><input type="radio" name="adminFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
-                                <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
-                            </div>
-                        </div>
-                        ${adminFeeOptions}
-                        <button onclick="APP.payAdminFeeWithMethod('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran' : '记录收款'}</button>
+            // 管理费区域（已支付则锁定）
+            var adminFeeSection = '';
+            if (order.admin_fee_paid) {
+                adminFeeSection = `
+                    <div class="admin-fee-paid locked-section">
+                        <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ✅ ${lang === 'id' ? 'Sudah dibayar' : '已支付'} (${Utils.formatDate(order.admin_fee_paid_date)})</span>
+                        ${isAdmin ? `<button onclick="APP.unlockAdminFee('${order.order_id}')" class="btn-small warning" style="margin-left:10px;">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
                     </div>
-                   </div>`
-                : `<div class="admin-fee-paid">
-                    <span>📋 <strong>${lang === 'id' ? 'Admin Fee' : '管理费'}</strong>: ${Utils.formatCurrency(order.admin_fee)} ✅ ${lang === 'id' ? 'Sudah dibayar' : '已支付'} (${Utils.formatDate(order.admin_fee_paid_date)})</span>
-                   </div>`;
+                `;
+            } else {
+                adminFeeSection = `
+                    <div class="admin-fee-section">
+                        <div class="admin-fee-info">
+                            <div class="admin-fee-amount">${adminFeeOptions}</div>
+                            <div class="payment-method-group inline">
+                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pemasukan' : '入账方式'}:</div>
+                                <div class="payment-method-options">
+                                    <label><input type="radio" name="adminFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                    <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
+                                </div>
+                            </div>
+                            <button onclick="APP.payAdminFeeWithMethod('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pemasukan' : '记录收款'}</button>
+                        </div>
+                    </div>
+                `;
+            }
 
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             var interestOptions = [1, 2, 3].map(i =>
                 `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(currentMonthlyInterest * i)}</option>`
             ).join('');
 
+            // 本金还款 - 入账方式选项（三选一）
             var principalTargetOptions = `
                 <div class="payment-method-group" style="margin-top:8px;">
-                    <div class="payment-method-title">${lang === 'id' ? 'Tujuan Pengembalian Pokok' : '本金返还去向'}:</div>
+                    <div class="payment-method-title">${lang === 'id' ? 'Metode Pemasukan' : '入账方式'}:</div>
                     <div class="payment-method-options">
                         <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</label>
                         <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</label>
@@ -105,19 +117,12 @@ const PaymentsModule = {
 
             var principalInputSection = remainingPrincipal > 0
                 ? `<div class="principal-section">
-                    <div class="payment-method-group">
-                        <div class="payment-method-title">${lang === 'id' ? 'Metode Pembayaran Pokok' : '本金支付方式'}:</div>
-                        <div class="payment-method-options">
-                            <label><input type="radio" name="principalMethod" value="cash" checked> 🏦 ${t('cash')}</label>
-                            <label><input type="radio" name="principalMethod" value="bank"> 🏧 ${t('bank')}</label>
-                        </div>
-                    </div>
-                    ${principalTargetOptions}
                     <div class="principal-input-group">
                         <label class="principal-label">${lang === 'id' ? 'Jumlah bayar pokok' : '本次还款金额'} (IDR):</label>
                         <input type="text" id="principalAmount" class="principal-amount" placeholder="${lang === 'id' ? 'Masukkan jumlah' : '输入金额'}">
                         <button onclick="APP.payPrincipalWithMethod('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Bayar Pokok' : '支付本金'}</button>
                     </div>
+                    ${principalTargetOptions}
                     <p class="remaining-principal">${lang === 'id' ? 'Sisa pokok' : '剩余本金'}: <strong>${Utils.formatCurrency(remainingPrincipal)}</strong></p>
                    </div>`
                 : `<p class="principal-complete">✅ ${lang === 'id' ? 'Pokok sudah LUNAS' : '本金已全部结清'}</p>`;
@@ -143,23 +148,29 @@ const PaymentsModule = {
                     </div>
                 </div>
                 
-                ${adminFeeSection}
+                <!-- 管理费区域 -->
+                <div class="card admin-fee-card">
+                    <h3>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'}</h3>
+                    ${adminFeeSection}
+                </div>
                 
+                <!-- 利息缴费区域 -->
                 <div class="card interest-card">
                     <h3>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3>
                     <p class="info-note">📌 ${lang === 'id' ? 'Bunga akan langsung masuk ke Laba Bersih Toko' : '📌 利息将直接入账到门店净利'}</p>
+                    <div class="interest-input-group">
+                        <label class="interest-label">${lang === 'id' ? 'Ambil untuk' : '收取'}:</label>
+                        <select id="interestMonths" class="interest-months">${interestOptions}</select>
+                    </div>
                     <div class="payment-method-group">
-                        <div class="payment-method-title">${lang === 'id' ? 'Metode Pembayaran Bunga' : '利息支付方式'}:</div>
+                        <div class="payment-method-title">${lang === 'id' ? 'Metode Pemasukan' : '入账方式'}:</div>
                         <div class="payment-method-options">
                             <label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label>
                             <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
                         </div>
                     </div>
-                    <div class="interest-input-group">
-                        <label class="interest-label">${lang === 'id' ? 'Bayar untuk' : '支付'}:</label>
-                        <select id="interestMonths" class="interest-months">${interestOptions}</select>
-                        <button onclick="APP.payInterestWithMethod('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pembayaran Bunga' : '记录利息付款'}</button>
-                    </div>
+                    <button onclick="APP.payInterestWithMethod('${order.order_id}')" class="success">✅ ${lang === 'id' ? 'Catat Pemasukan Bunga' : '记录利息付款'}</button>
+                    
                     <h4 class="subtitle">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</h4>
                     <div class="table-container">
                         <table class="payment-history-table">
@@ -169,6 +180,7 @@ const PaymentsModule = {
                     </div>
                 </div>
                 
+                <!-- 本金还款区域 -->
                 <div class="card principal-card">
                     <h3>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金还款'}</h3>
                     <p class="info-note">📌 ${lang === 'id' ? `Total pinjaman: ${Utils.formatCurrency(order.loan_amount)} | Sudah dibayar: ${Utils.formatCurrency(order.principal_paid)} | Sisa: ${Utils.formatCurrency(remainingPrincipal)}` : `📌 贷款总额: ${Utils.formatCurrency(order.loan_amount)} | 已还: ${Utils.formatCurrency(order.principal_paid)} | 剩余: ${Utils.formatCurrency(remainingPrincipal)}`}</p>
@@ -191,16 +203,23 @@ const PaymentsModule = {
                     .summary-value.success { color: #10b981; }
                     .summary-value.primary { color: #3b82f6; }
                     .order-id { font-family: monospace; }
-                    .admin-fee-section { background: #fef3c7; padding: 12px 15px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid #f59e0b; }
-                    .admin-fee-paid { background: #d1fae5; padding: 10px 15px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid #10b981; }
+                    .admin-fee-section { background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 0; border-left: 3px solid #f59e0b; }
+                    .admin-fee-paid { background: #d1fae5; padding: 15px; border-radius: 8px; margin-bottom: 0; border-left: 3px solid #10b981; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+                    .locked-section { background: #e2e8f0; border-left: 3px solid #64748b; }
+                    .admin-fee-amount { margin-bottom: 10px; }
                     .admin-fee-input-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
                     .admin-fee-select { width: auto; min-width: 150px; margin: 0; }
                     .admin-fee-custom { width: 150px; }
-                    .payment-method-group.inline { display: inline-flex; align-items: center; gap: 8px; background: transparent; padding: 0; margin: 0; }
+                    .payment-method-group { background: #f8fafc; border-radius: 8px; padding: 10px 12px; margin: 10px 0; border: 1px solid #e2e8f0; }
+                    .payment-method-group.inline { display: inline-flex; align-items: center; gap: 12px; background: transparent; padding: 0; margin: 0; border: none; }
+                    .payment-method-title { font-size: 12px; font-weight: 500; color: #64748b; margin-bottom: 8px; }
+                    .payment-method-options { display: flex; gap: 16px; flex-wrap: wrap; }
+                    .payment-method-options label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
                     .info-note { font-size: 12px; color: #64748b; margin-bottom: 10px; }
                     .subtitle { font-size: 13px; margin: 12px 0 8px; color: #64748b; }
-                    .interest-input-group, .principal-input-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+                    .interest-input-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
                     .interest-months { width: auto; min-width: 200px; margin: 0; }
+                    .principal-input-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
                     .principal-amount { width: 180px; text-align: right; }
                     .remaining-principal { font-size: 12px; color: #64748b; margin-top: 8px; }
                     .principal-complete { color: #10b981; font-weight: 500; }
@@ -211,6 +230,9 @@ const PaymentsModule = {
                     .text-center { text-align: center; }
                     .text-muted { color: #94a3b8; }
                     .desc-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                    .btn-small { padding: 4px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; }
+                    button.success { background: #16a34a; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+                    button.warning { background: #d97706; color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
                     @media (max-width: 768px) {
                         .order-summary .summary-grid { grid-template-columns: repeat(2, 1fr); }
                         .interest-input-group, .principal-input-group { flex-direction: column; align-items: stretch; }
@@ -218,6 +240,7 @@ const PaymentsModule = {
                     }
                 </style>`;
 
+            // 绑定事件
             var adminFeeSelect = document.getElementById('adminFeeAmount');
             var customAdminFee = document.getElementById('customAdminFee');
             if (adminFeeSelect) {
@@ -235,11 +258,13 @@ const PaymentsModule = {
         }
     },
 
+    // 管理费缴费
     payAdminFeeWithMethod: async function(orderId) {
         var method = document.querySelector('input[name="adminFeeMethod"]:checked')?.value || 'cash';
         var adminFeeSelect = document.getElementById('adminFeeAmount');
         var customAdminFeeInput = document.getElementById('customAdminFee');
         var adminFeeAmount = 30000;
+        
         if (adminFeeSelect) {
             if (adminFeeSelect.value === 'custom') {
                 adminFeeAmount = Utils.parseNumberFromCommas(customAdminFeeInput?.value || '0');
@@ -251,8 +276,9 @@ const PaymentsModule = {
                 adminFeeAmount = parseInt(adminFeeSelect.value);
             }
         }
+        
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
-        if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName} ke Laba Bersih Toko?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，支付方式：${methodName}，进入门店净利？`)) {
+        if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName} ke Laba Bersih Toko?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，入账方式：${methodName}，进入门店净利？`)) {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
                 await this.showPayment(orderId); 
@@ -262,12 +288,25 @@ const PaymentsModule = {
         }
     },
 
+    // 管理员解锁管理费
+    unlockAdminFee: async function(orderId) {
+        var lang = Utils.lang;
+        if (!confirm(lang === 'id' ? 'Buka kunci Admin Fee? Ini akan memungkinkan pembayaran ulang.' : '解锁管理费？这将允许重新缴费。')) return;
+        try {
+            await SUPABASE.unlockAdminFee(orderId);
+            await this.showPayment(orderId);
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    },
+
+    // 利息缴费
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
-        if (confirm(lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName} ke Laba Bersih Toko?` : `确认入账利息 ${months} 个月，支付方式：${methodName}，进入门店净利？`)) {
+        if (confirm(lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName} ke Laba Bersih Toko?` : `确认入账利息 ${months} 个月，入账方式：${methodName}，进入门店净利？`)) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
                 await this.showPayment(orderId);
@@ -277,18 +316,18 @@ const PaymentsModule = {
         }
     },
 
+    // 本金还款
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
-        var method = document.querySelector('input[name="principalMethod"]:checked')?.value || 'cash';
         var target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
-        var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var targetName = target === 'cash' ? (Utils.lang === 'id' ? 'Brankas' : '保险柜') : (target === 'bank' ? (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI') : (Utils.lang === 'id' ? 'Laba Bersih Toko' : '门店净利'));
         var lang = Utils.lang;
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
-        if (confirm(lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} via ${methodName} ke ${targetName}?` : `确认入账本金 ${Utils.formatCurrency(amount)}，支付方式：${methodName}，返还到：${targetName}？`)) {
+        if (confirm(lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} ke ${targetName}?` : `确认入账本金 ${Utils.formatCurrency(amount)} 到 ${targetName}？`)) {
             try {
-                await Order.recordPrincipalPayment(orderId, amount, method, target);
+                // 本金还款时，payment_method 记录为入账方式（target）
+                await Order.recordPrincipalPayment(orderId, amount, target === 'cash' ? 'cash' : (target === 'bank' ? 'bank' : 'profit'), target);
                 await this.showPayment(orderId);
             } catch (error) { 
                 alert('Error: ' + error.message); 
