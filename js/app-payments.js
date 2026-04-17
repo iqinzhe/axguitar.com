@@ -1,4 +1,4 @@
-// app-payments.js - 完整修复版（支持三资金池：管理费/利息入门店净利，本金可选返还池）
+// app-payments.js - 完整版（支持三资金池：管理费/利息入门店净利，本金可选返还池）
 // 修复内容：缴费页面增加资金去向选择，管理费和利息自动入账门店净利，本金可选返还到银行/保险柜/门店净利
 
 window.APP = window.APP || {};
@@ -236,22 +236,14 @@ const PaymentsModule = {
 
             var adminFeeSelect = document.getElementById('adminFeeAmount');
             var customAdminFee = document.getElementById('customAdminFee');
-            
             if (adminFeeSelect) {
                 adminFeeSelect.addEventListener('change', function() {
-                    if (customAdminFee) {
-                        customAdminFee.style.display = this.value === 'custom' ? 'inline-block' : 'none';
-                    }
+                    if (customAdminFee) customAdminFee.style.display = this.value === 'custom' ? 'inline-block' : 'none';
                 });
             }
-            
-            if (customAdminFee && Utils.bindAmountFormat) {
-                Utils.bindAmountFormat(customAdminFee);
-            }
-            
+            if (customAdminFee && Utils.bindAmountFormat) Utils.bindAmountFormat(customAdminFee);
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
-            
         } catch (error) {
             console.error("showPayment error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat halaman pembayaran' : '加载缴费页面失败');
@@ -264,7 +256,6 @@ const PaymentsModule = {
         var adminFeeSelect = document.getElementById('adminFeeAmount');
         var customAdminFeeInput = document.getElementById('customAdminFee');
         var adminFeeAmount = 30000;
-        
         if (adminFeeSelect) {
             if (adminFeeSelect.value === 'custom') {
                 adminFeeAmount = Utils.parseNumberFromCommas(customAdminFeeInput?.value || '0');
@@ -276,16 +267,12 @@ const PaymentsModule = {
                 adminFeeAmount = parseInt(adminFeeSelect.value);
             }
         }
-        
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
-        // 确认文字：管理费直接入账门店净利
         if (confirm(Utils.lang === 'id' ? `Konfirmasi pemasukan Admin Fee ${Utils.formatCurrency(adminFeeAmount)} via ${methodName} ke Laba Bersih Toko?` : `确认入账管理费 ${Utils.formatCurrency(adminFeeAmount)}，支付方式：${methodName}，进入门店净利？`)) {
             try { 
                 await Order.recordAdminFee(orderId, method, adminFeeAmount); 
                 await this.showPayment(orderId); 
-            } catch (error) { 
-                alert('Error: ' + error.message); 
-            }
+            } catch (error) { alert('Error: ' + error.message); }
         }
     },
 
@@ -294,14 +281,11 @@ const PaymentsModule = {
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
-        // 确认文字：利息直接入账门店净利
         if (confirm((lang === 'id' ? `Konfirmasi pemasukan bunga ${months} bulan via ${methodName} ke Laba Bersih Toko?` : `确认入账利息 ${months} 个月，支付方式：${methodName}，进入门店净利？`))) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
                 await this.showPayment(orderId);
-            } catch (error) { 
-                alert('Error: ' + error.message); 
-            }
+            } catch (error) { alert('Error: ' + error.message); }
         }
     },
 
@@ -309,25 +293,20 @@ const PaymentsModule = {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var method = document.querySelector('input[name="principalMethod"]:checked')?.value || 'cash';
-        var target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank'; // 'cash', 'bank', 'profit'
+        var target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var targetName = target === 'cash' ? (Utils.lang === 'id' ? 'Brankas' : '保险柜') : (target === 'bank' ? (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI') : (Utils.lang === 'id' ? 'Laba Bersih Toko' : '门店净利'));
         var lang = Utils.lang;
         if (isNaN(amount) || amount <= 0) { alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
-        // 确认文字：本金返还到指定池子
         if (confirm((lang === 'id' ? `Konfirmasi pemasukan pokok ${Utils.formatCurrency(amount)} via ${methodName} ke ${targetName}?` : `确认入账本金 ${Utils.formatCurrency(amount)}，支付方式：${methodName}，返还到：${targetName}？`))) {
             try {
                 await Order.recordPrincipalPayment(orderId, amount, method, target);
                 await this.showPayment(orderId);
-            } catch (error) { 
-                alert('Error: ' + error.message); 
-            }
+            } catch (error) { alert('Error: ' + error.message); }
         }
     }
 };
 
 for (var key in PaymentsModule) {
-    if (typeof PaymentsModule[key] === 'function') {
-        window.APP[key] = PaymentsModule[key];
-    }
+    if (typeof PaymentsModule[key] === 'function') window.APP[key] = PaymentsModule[key];
 }
