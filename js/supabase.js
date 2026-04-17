@@ -1,5 +1,5 @@
 // supabase.js - 完整最终版（三资金池：保险柜、银行BNI、门店净利）
-// 修改：移除余额不足报错，允许创建订单（记负数账）
+// 修复：本金还款不影响门店净利；管理员汇总扣除分红；统一净利计算
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -300,7 +300,7 @@ const SupabaseAPI = {
             } else if (loanSource === 'bank' && cashFlow.bank.balance < loanAmount) {
                 console.warn(`⚠️ 银行余额不足: 当前 ${this.formatCurrency(cashFlow.bank.balance)}, 贷款 ${this.formatCurrency(loanAmount)} (允许负余额记账)`);
             } else if (loanSource === 'profit') {
-                const profitBalance = await this.getStoreProfitBalance(targetStoreId);
+                const profitBalance = cashFlow.profit.balance;
                 if (profitBalance < loanAmount) {
                     console.warn(`⚠️ 门店净利不足: 当前 ${this.formatCurrency(profitBalance)}, 贷款 ${this.formatCurrency(loanAmount)} (允许负余额记账)`);
                 }
@@ -442,7 +442,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 本金返还（只增加选定的返还池） ====================
+    // ==================== 本金返还（只增加选定的返还池，不影响门店净利） ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash', target = 'bank') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -700,47 +700,7 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 🆕 门店净利计算 ====================
-    
-    async getStoreProfitBalance(storeId = null) {
-        const profile = await this.getCurrentProfile();
-        const targetStoreId = storeId || profile?.store_id;
-        
-        if (!targetStoreId) return 0;
-        
-        const { data: orders } = await supabaseClient
-            .from('orders')
-            .select('id')
-            .eq('store_id', targetStoreId);
-        
-        const orderIds = orders?.map(o => o.id) || [];
-        let totalIncome = 0;
-        if (orderIds.length > 0) {
-            const { data: payments } = await supabaseClient
-                .from('payment_history')
-                .select('type, amount')
-                .in('order_id', orderIds)
-                .in('type', ['admin_fee', 'interest']);
-            totalIncome = (payments || []).reduce((s, p) => s + p.amount, 0);
-        }
-        
-        const { data: expenses } = await supabaseClient
-            .from('expenses')
-            .select('amount')
-            .eq('store_id', targetStoreId);
-        const totalExpense = (expenses || []).reduce((s, e) => s + e.amount, 0);
-        
-        const { data: dividends } = await supabaseClient
-            .from('capital_transactions')
-            .select('amount')
-            .eq('store_id', targetStoreId)
-            .eq('type', 'dividend');
-        const totalDividend = (dividends || []).reduce((s, d) => s + d.amount, 0);
-        
-        return totalIncome - totalExpense - totalDividend;
-    },
-
-    // ==================== 🆕 现金流汇总（三资金池） ====================
+    // ==================== 🆕 现金流汇总（三资金池 - 统一入口） ====================
     
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
@@ -770,16 +730,20 @@ const SupabaseAPI = {
             const amount = p.amount;
             
             if (p.type === 'admin_fee' || p.type === 'interest') {
+                // 管理费和利息：增加对应现金/银行，同时增加门店净利
                 if (method === 'cash') cashIncome += amount;
                 else if (method === 'bank') bankIncome += amount;
                 if (target === 'profit') profitIncome += amount;
             } 
             else if (p.type === 'principal') {
+                // 本金还款：只增加目标池子，不影响门店净利
                 if (target === 'cash') cashIncome += amount;
                 else if (target === 'bank') bankIncome += amount;
-                else if (target === 'profit') profitIncome += amount;
+                // 注意：target === 'profit' 时，本金返还到门店净利，但这不是利润，所以不增加 profitIncome
+                // 门店净利只记录管理费和利息，不记录本金
             }
             else if (p.type === 'loan_disbursement') {
+                // 贷款发放：从目标池子扣除
                 if (target === 'cash') cashExpense += amount;
                 else if (target === 'bank') bankExpense += amount;
                 else if (target === 'profit') profitExpense += amount;
@@ -802,21 +766,19 @@ const SupabaseAPI = {
         const bankBalance = bankIncome - (bankExpense + bankExpenseOps);
         let profitBalance = profitIncome - profitExpense - totalOpsExpense;
         
-        // 扣除已分红
-        if (!isAdmin && storeId) {
-            const { data: dividends } = await supabaseClient
-                .from('capital_transactions')
-                .select('amount')
-                .eq('store_id', storeId)
-                .eq('type', 'dividend');
-            const totalDividend = (dividends || []).reduce((s, d) => s + d.amount, 0);
-            profitBalance -= totalDividend;
-        }
+        // 扣除已分红（无论管理员还是门店，都要扣除分红）
+        const { data: dividends } = await supabaseClient
+            .from('capital_transactions')
+            .select('amount')
+            .eq(isAdmin ? 'target_store_id' : 'store_id', isAdmin ? null : storeId)
+            .eq('type', 'dividend');
+        const totalDividend = (dividends || []).reduce((s, d) => s + d.amount, 0);
+        profitBalance -= totalDividend;
         
         return {
             cash: { income: cashIncome, expense: cashExpense + cashExpenseOps, balance: cashBalance },
             bank: { income: bankIncome, expense: bankExpense + bankExpenseOps, balance: bankBalance },
-            profit: { income: profitIncome, expense: profitExpense + totalOpsExpense, balance: profitBalance },
+            profit: { income: profitIncome, expense: profitExpense + totalOpsExpense + totalDividend, balance: profitBalance },
             total: { balance: cashBalance + bankBalance + profitBalance }
         };
     },
@@ -859,21 +821,8 @@ const SupabaseAPI = {
         
         const totalDividend = (dividends || []).reduce((s, t) => s + t.amount, 0);
         
-        const { data: orders } = await supabaseClient
-            .from('orders')
-            .select('id')
-            .eq('store_id', targetStoreId);
-        
-        const orderIds = orders?.map(o => o.id) || [];
-        let totalProfit = 0;
-        if (orderIds.length > 0) {
-            const { data: payments } = await supabaseClient
-                .from('payment_history')
-                .select('type, amount')
-                .in('order_id', orderIds)
-                .in('type', ['admin_fee', 'interest']);
-            totalProfit = (payments || []).reduce((s, p) => s + p.amount, 0);
-        }
+        const cashFlow = await this.getCashFlowSummary();
+        const totalProfit = cashFlow.profit.income || 0;
         
         const principalBalance = totalInvested - totalWithdrawn;
         const undistributedProfit = totalProfit - totalDividend;
