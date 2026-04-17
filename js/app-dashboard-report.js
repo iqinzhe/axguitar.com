@@ -1,9 +1,9 @@
-// app-dashboard-report.js - 修复版 v3.0
-// 修改内容：
-// 1. 更新报表使用新的资金流数据（cash_flow_records）
-// 2. 新增服务费统计
-// 3. 门店净利基于收入-支出计算
-// 4. 优化报表加载性能
+// app-dashboard-report.js
+// 修复内容：
+// 1. 净利计算剔除本金回收（principal 不计入收入）
+// 2. 区分「毛利」和「现金净利」
+// 3. 移除无意义的 cashBalance + bankBalance + profitBalance 相加
+// 4. 优化报表指标命名
 
 window.APP = window.APP || {};
 
@@ -83,7 +83,8 @@ const DashboardReport = {
                 var storeReports = [];
                 var grandTotal = { 
                     orders: 0, active: 0, loan: 0, adminFee: 0, serviceFee: 0, interest: 0, 
-                    principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0, profitBalance: 0
+                    principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0, 
+                    grossProfit: 0, netProfit: 0  // 毛利和现金净利分开
                 };
 
                 for (var store of stores) {
@@ -100,12 +101,19 @@ const DashboardReport = {
                     const totalInterest = ords.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
                     const totalPrincipal = ords.reduce((s, o) => s + (o.principal_paid || 0), 0);
                     const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
-                    const totalIncome = totalAdminFee + totalServiceFee + totalInterest;
+                    
+                    // 毛利 = 管理费 + 服务费 + 利息（不含本金）
+                    const grossProfit = totalAdminFee + totalServiceFee + totalInterest;
                     
                     // 基于资金流计算现金和银行余额
                     let cashBalance = 0, bankBalance = 0;
+                    // 现金净利 = 所有收入类资金流入 - 所有支出类资金流出（不含本金）
+                    let totalIncomeInflow = 0;   // 收入类流入（admin_fee, service_fee, interest）
+                    let totalOutflow = 0;          // 所有流出（loan_disbursement, expense）
+                    
                     for (const flow of flows) {
                         const amount = flow.amount || 0;
+                        // 计算余额
                         if (flow.direction === 'inflow') {
                             if (flow.source_target === 'cash') cashBalance += amount;
                             else if (flow.source_target === 'bank') bankBalance += amount;
@@ -113,15 +121,20 @@ const DashboardReport = {
                             if (flow.source_target === 'cash') cashBalance -= amount;
                             else if (flow.source_target === 'bank') bankBalance -= amount;
                         }
+                        
+                        // 计算现金净利：只将收入类（不含本金）计入流入，所有流出都计入
+                        if (flow.direction === 'inflow') {
+                            // 本金回款（principal）不计入净利
+                            if (flow.flow_type !== 'principal') {
+                                totalIncomeInflow += amount;
+                            }
+                        } else if (flow.direction === 'outflow') {
+                            totalOutflow += amount;
+                        }
                     }
                     
-                    // 计算门店净利（基于资金流：总收入 - 总支出）
-                    let totalInflow = 0, totalOutflow = 0;
-                    for (const flow of flows) {
-                        if (flow.direction === 'inflow') totalInflow += flow.amount;
-                        else if (flow.direction === 'outflow') totalOutflow += flow.amount;
-                    }
-                    const profitBalance = totalInflow - totalOutflow;
+                    // 现金净利 = 收入类流入 - 所有流出
+                    const netProfit = totalIncomeInflow - totalOutflow;
 
                     storeReports.push({ 
                         store, 
@@ -133,10 +146,10 @@ const DashboardReport = {
                         totalInterest, 
                         totalPrincipal, 
                         totalExpenses, 
-                        totalIncome,
+                        grossProfit,    // 毛利
+                        netProfit,      // 现金净利
                         cashBalance,
-                        bankBalance,
-                        profitBalance
+                        bankBalance
                     });
 
                     grandTotal.orders += ords.length;
@@ -147,10 +160,10 @@ const DashboardReport = {
                     grandTotal.interest += totalInterest;
                     grandTotal.principal += totalPrincipal;
                     grandTotal.expenses += totalExpenses;
-                    grandTotal.income += totalIncome;
+                    grandTotal.grossProfit += grossProfit;
+                    grandTotal.netProfit += netProfit;
                     grandTotal.cashBalance += cashBalance;
                     grandTotal.bankBalance += bankBalance;
-                    grandTotal.profitBalance += profitBalance;
                 }
 
                 var storeHtml = storeReports.length === 0 
@@ -165,12 +178,12 @@ const DashboardReport = {
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Admin Fee' : '管理费'}</div><div class="value income">${Utils.formatCurrency(r.totalAdminFee)}</div></div>
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Service Fee' : '服务费'}</div><div class="value income">${Utils.formatCurrency(r.totalServiceFee)}</div></div>
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Bunga' : '利息收入'}</div><div class="value income">${Utils.formatCurrency(r.totalInterest)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="value">${Utils.formatCurrency(r.totalPrincipal)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+服务费+利息'}</div><div class="value income">${Utils.formatCurrency(r.totalIncome)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金回收'}</div><div class="value">${Utils.formatCurrency(r.totalPrincipal)}</div></div>
+                            <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}</div><div class="value income">${Utils.formatCurrency(r.grossProfit)}</div></div>
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="value expense">${Utils.formatCurrency(r.totalExpenses)}</div></div>
                             <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="value">${Utils.formatCurrency(r.cashBalance)}</div></div>
                             <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="value">${Utils.formatCurrency(r.bankBalance)}</div></div>
-                            <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '门店净利'}</div><div class="value ${r.profitBalance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(r.profitBalance)}</div></div>
+                            <div class="report-store-stat"><div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div><div class="value ${r.netProfit >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(r.netProfit)}</div></div>
                         </div>
                     </div>`).join('');
 
@@ -189,7 +202,7 @@ const DashboardReport = {
                         <div class="cashflow-stats">
                             <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div></div>
                             <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(cashFlow.bank.balance)}</div></div>
-                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '净利'}</div><div class="value">${Utils.formatCurrency(cashFlow.profit?.balance || 0)}</div></div>
+                            <div class="cashflow-item"><div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div><div class="value">${Utils.formatCurrency(cashFlow.netProfit?.balance || 0)}</div></div>
                             <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div><div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div></div>
                         </div>
                     </div>
@@ -203,12 +216,12 @@ const DashboardReport = {
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Admin Fee' : '管理费'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.adminFee)}</div></div>
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Service Fee' : '服务费'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.serviceFee)}</div></div>
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Bunga' : '利息收入'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.interest)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.principal)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pendapatan' : '管理费+服务费+利息'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.income)}</div></div>
+                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金回收'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.principal)}</div></div>
+                            <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}</div><div class="stat-value income">${Utils.formatCurrency(grandTotal.grossProfit)}</div></div>
                             <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="stat-value expense">${Utils.formatCurrency(grandTotal.expenses)}</div></div>
                             <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.cashBalance)}</div></div>
                             <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="stat-value">${Utils.formatCurrency(grandTotal.bankBalance)}</div></div>
-                            <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '净利'}</div><div class="stat-value ${grandTotal.profitBalance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(grandTotal.profitBalance)}</div></div>
+                            <div class="report-store-stat"><div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div><div class="stat-value ${grandTotal.netProfit >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(grandTotal.netProfit)}</div></div>
                         </div>
                     </div>
                     
@@ -226,24 +239,28 @@ const DashboardReport = {
                 
                 // 基于资金流计算现金和银行余额
                 let cashBalance = 0, bankBalance = 0;
+                // 现金净利 = 收入类流入 - 所有流出（不含本金）
+                let totalIncomeInflow = 0;
+                let totalOutflow = 0;
+                
                 for (const flow of flows) {
                     const amount = flow.amount || 0;
                     if (flow.direction === 'inflow') {
                         if (flow.source_target === 'cash') cashBalance += amount;
                         else if (flow.source_target === 'bank') bankBalance += amount;
+                        // 本金回款（principal）不计入净利
+                        if (flow.flow_type !== 'principal') {
+                            totalIncomeInflow += amount;
+                        }
                     } else if (flow.direction === 'outflow') {
                         if (flow.source_target === 'cash') cashBalance -= amount;
                         else if (flow.source_target === 'bank') bankBalance -= amount;
+                        totalOutflow += amount;
                     }
                 }
                 
-                // 计算门店净利（基于资金流：总收入 - 总支出）
-                let totalInflow = 0, totalOutflow = 0;
-                for (const flow of flows) {
-                    if (flow.direction === 'inflow') totalInflow += flow.amount;
-                    else if (flow.direction === 'outflow') totalOutflow += flow.amount;
-                }
-                const profitBalance = totalInflow - totalOutflow;
+                // 现金净利 = 收入类流入 - 所有流出
+                const netProfit = totalIncomeInflow - totalOutflow;
                 
                 const totalLoan = storeOrders.reduce((s, o) => s + (o.loan_amount || 0), 0);
                 const totalAdminFee = storeOrders.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
@@ -251,8 +268,9 @@ const DashboardReport = {
                 const totalInterest = storeOrders.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
                 const totalPrincipal = storeOrders.reduce((s, o) => s + (o.principal_paid || 0), 0);
                 const totalExpenses = storeExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-                const totalIncome = totalAdminFee + totalServiceFee + totalInterest;
-                const grossProfit = totalIncome - totalExpenses;
+                
+                // 毛利 = 管理费 + 服务费 + 利息（不含本金）
+                const grossProfit = totalAdminFee + totalServiceFee + totalInterest;
 
                 document.getElementById("app").innerHTML = `
                     <div class="page-header">
@@ -269,8 +287,8 @@ const DashboardReport = {
                         <div class="cashflow-stats">
                             <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashBalance)}</div></div>
                             <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(bankBalance)}</div></div>
-                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '净利'}</div><div class="value">${Utils.formatCurrency(profitBalance)}</div></div>
-                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashBalance + bankBalance + profitBalance)}</div></div>
+                            <div class="cashflow-item"><div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div><div class="value">${Utils.formatCurrency(netProfit)}</div></div>
+                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div><div class="value">${Utils.formatCurrency(cashBalance + bankBalance)}</div></div>
                         </div>
                     </div>
                     
@@ -283,12 +301,27 @@ const DashboardReport = {
                         <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
                     </div>
                     <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-value income">${Utils.formatCurrency(totalIncome)}</div><div>${lang === 'id' ? 'Total Pendapatan' : '总收入'}</div></div>
+                        <div class="stat-card"><div class="stat-value income">${Utils.formatCurrency(grossProfit)}</div><div>📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
                         <div class="stat-card"><div class="stat-value expense">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit)}</div><div>${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(profitBalance)}</div><div>${lang === 'id' ? 'Laba Bersih' : '净利'}</div></div>
+                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit - totalExpenses)}</div><div>${lang === 'id' ? 'Laba Sebelum Bunga & Pajak' : '息税前利润'}</div></div>
+                        <div class="stat-card"><div class="stat-value ${netProfit >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(netProfit)}</div><div>💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div></div>
                     </div>`;
             }
+            
+            // 更新 cashFlow 对象，添加 netProfit 字段供 admin 视图使用
+            if (typeof cashFlow.netProfit === 'undefined') {
+                // 计算整体现金净利（不含本金）
+                let totalIncomeInflow = 0, totalOutflowAll = 0;
+                for (const flow of cashFlows) {
+                    if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
+                        totalIncomeInflow += flow.amount;
+                    } else if (flow.direction === 'outflow') {
+                        totalOutflowAll += flow.amount;
+                    }
+                }
+                cashFlow.netProfit = { balance: totalIncomeInflow - totalOutflowAll };
+            }
+            
         } catch (err) {
             console.error("showReport error:", err);
             alert(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报告失败');
