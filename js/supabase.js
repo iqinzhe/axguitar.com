@@ -540,6 +540,23 @@ const SupabaseAPI = {
         return true;
     },
 
+    // 管理员解锁管理费（允许重新缴纳）
+    unlockAdminFee: async function(orderId) {
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat membuka kunci' : '只有管理员可以解锁');
+        }
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({
+                admin_fee_paid: false,
+                admin_fee_paid_date: null
+            })
+            .eq('order_id', orderId);
+        if (error) throw error;
+        return true;
+    },
+    
     async getReport() {
         const orders = await this.getOrders();
         const activeOrders = orders.filter(o => o.status === 'active');
