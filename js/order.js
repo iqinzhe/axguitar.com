@@ -1,6 +1,3 @@
-// order.js - 典当订单核心逻辑（支持三资金池）
-// 修改：记录管理费/利息时自动入账门店净利，记录本金时根据目标入账不同资金池
-
 const Order = {
     async create(data) {
         const orderData = {
@@ -12,8 +9,7 @@ const Order = {
             loan_amount: data.loan_amount,
             admin_fee: data.admin_fee || 30000,
             notes: data.notes,
-            customer_id: data.customer_id || null,
-            loan_source: data.loan_source || 'bank'
+            customer_id: data.customer_id || null
         };
         return await SUPABASE.createOrder(orderData);
     },
@@ -26,8 +22,8 @@ const Order = {
         return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod); 
     },
     
-    async recordPrincipalPayment(orderId, amount, paymentMethod, target) { 
-        return await SUPABASE.recordPrincipalPayment(orderId, amount, paymentMethod, target); 
+    async recordPrincipalPayment(orderId, amount, paymentMethod) { 
+        return await SUPABASE.recordPrincipalPayment(orderId, amount, paymentMethod); 
     },
     
     getCurrentMonthlyInterest(order) { 
