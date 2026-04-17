@@ -1,5 +1,5 @@
 // supabase.js - 完整最终版（三资金池：保险柜、银行BNI、门店净利）
-// 包含：注资(投资)、提现(还本)、分红、门店净利计算、贷款发放/本金返还/管理费利息双重记账
+// 修改：移除余额不足报错，允许创建订单（记负数账）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -274,7 +274,7 @@ const SupabaseAPI = {
         return date.toISOString().split('T')[0];
     },
 
-    // ==================== 创建订单（带资金来源扣除） ====================
+    // ==================== 创建订单（允许负余额，仅记录警告） ====================
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
@@ -292,23 +292,17 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? 'Toko tidak ditemukan' : '未找到门店信息');
         }
         
-        // 检查资金池余额（仅非管理员）
+        // 余额检查：仅记录警告，不阻止创建订单（允许负余额记账）
         if (profile.role !== 'admin') {
             const cashFlow = await this.getCashFlowSummary();
             if (loanSource === 'cash' && cashFlow.cash.balance < loanAmount) {
-                throw new Error(Utils.lang === 'id' 
-                    ? `Saldo Brankas tidak mencukupi. Tersedia: ${this.formatCurrency(cashFlow.cash.balance)}`
-                    : `保险柜余额不足。可用: ${this.formatCurrency(cashFlow.cash.balance)}`);
+                console.warn(`⚠️ 保险柜余额不足: 当前 ${this.formatCurrency(cashFlow.cash.balance)}, 贷款 ${this.formatCurrency(loanAmount)} (允许负余额记账)`);
             } else if (loanSource === 'bank' && cashFlow.bank.balance < loanAmount) {
-                throw new Error(Utils.lang === 'id' 
-                    ? `Saldo Bank BNI tidak mencukupi. Tersedia: ${this.formatCurrency(cashFlow.bank.balance)}`
-                    : `银行余额不足。可用: ${this.formatCurrency(cashFlow.bank.balance)}`);
+                console.warn(`⚠️ 银行余额不足: 当前 ${this.formatCurrency(cashFlow.bank.balance)}, 贷款 ${this.formatCurrency(loanAmount)} (允许负余额记账)`);
             } else if (loanSource === 'profit') {
                 const profitBalance = await this.getStoreProfitBalance(targetStoreId);
                 if (profitBalance < loanAmount) {
-                    throw new Error(Utils.lang === 'id' 
-                        ? `Laba Bersih Toko tidak mencukupi. Tersedia: ${this.formatCurrency(profitBalance)}`
-                        : `门店净利不足。可用: ${this.formatCurrency(profitBalance)}`);
+                    console.warn(`⚠️ 门店净利不足: 当前 ${this.formatCurrency(profitBalance)}, 贷款 ${this.formatCurrency(loanAmount)} (允许负余额记账)`);
                 }
             }
         }
