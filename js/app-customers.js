@@ -1,6 +1,7 @@
 // app-customers.js - 完整最终版
 // 权限：拉黑（店长/员工），解除（仅管理员），查看黑名单（管理员看全部，店长看本店）
 // 布局：客户列表（上方）→ 新增客户（中间）→ 黑名单列表（下方）
+// 修改：客户列表操作按钮只保留 "➕ 建立订单" 和 "🚫 拉黑"
 
 window.APP = window.APP || {};
 
@@ -29,7 +30,7 @@ const CustomersModule = {
                 blacklistCustomerIds.push(b.customer_id);
             }
             
-            // 生成客户列表行
+            // 生成客户列表行 - 只保留两个按钮：建立订单 和 拉黑
             var rows = '';
             if (!customers || customers.length === 0) {
                 rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${lang === 'id' ? 'Tidak ada data nasabah' : '暂无客户数据'}</td></tr>`;
@@ -53,13 +54,9 @@ const CustomersModule = {
                         <td class="address-cell">${Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'))}</td>
                         ${isAdmin ? `<td class="store-cell">${Utils.escapeHtml(c.stores?.name || '-')} (${Utils.escapeHtml(c.stores?.code || '-')})</td>` : ''}
                         <td class="action-cell">
-                            ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
-                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
-                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                            <button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>
                             ${canBlacklist && !isBlacklisted ? `<button onclick="APP.showBlacklistCustomerModal('${c.id}', '${Utils.escapeHtml(c.name)}')" class="btn-small" style="background:#d97706;color:white;">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
                             ${isAdmin && isBlacklisted ? `<button onclick="APP.removeFromBlacklist('${c.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus Blacklist' : '解除拉黑'}</button>` : ''}
-                            <button onclick="APP.showCustomerOrders('${c.id}')" class="btn-small">📋 ${lang === 'id' ? 'Order' : '订单'}</button>
-                            <button onclick="APP.showCustomerPaymentHistory('${c.id}')" class="btn-small">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>
                         </td>
                     　　　`;
                 }
@@ -118,7 +115,6 @@ const CustomersModule = {
                         <td class="date-cell">${Utils.formatDate(item.blacklisted_at)}</td>
                         <td class="action-cell">
                             ${isAdmin ? `<button onclick="APP.removeFromBlacklist('${customer.id}')" class="btn-small success">🔓 ${lang === 'id' ? 'Hapus' : '解除'}</button>` : ''}
-                            <button onclick="APP.showCustomerOrders('${customer.id}')" class="btn-small">📋 ${lang === 'id' ? 'Order' : '订单'}</button>
                         </td>
                     　　　`;
                 }
@@ -181,7 +177,7 @@ const CustomersModule = {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${blacklistCount > 0 ? blacklistRows : `<td><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada nasabah dalam blacklist' : '暂无黑名单客户'}</td></tr>`}
+                                ${blacklistCount > 0 ? blacklistRows : `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada nasabah dalam blacklist' : '暂无黑名单客户'}</td></tr>`}
                             </tbody>
                         </table>
                     </div>
@@ -440,7 +436,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（带黑名单检查） ====================
+    // ==================== 创建订单（带黑名单检查，且增加资金来源选择） ====================
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -481,6 +477,15 @@ const CustomersModule = {
             const profile = await SUPABASE.getCurrentProfile();
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             const userStoreCode = profile?.stores?.code || '-';
+            
+            // 获取当前门店的资金池余额（用于提示）
+            var cashBalance = 0, bankBalance = 0, profitBalance = 0;
+            try {
+                var cashFlow = await SUPABASE.getCashFlowSummary();
+                cashBalance = cashFlow.cash.balance;
+                bankBalance = cashFlow.bank.balance;
+                profitBalance = await SUPABASE.getStoreProfitBalance();
+            } catch(e) { console.warn(e); }
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -510,6 +515,13 @@ const CustomersModule = {
                     <div class="form-grid">
                         <div class="form-group full-width"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
                         <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input"></div>
+                        <div class="form-group"><label>💰 ${lang === 'id' ? 'Sumber Dana Pinjaman' : '贷款资金来源'} *</label>
+                            <select id="loanSource">
+                                <option value="bank">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'} (${Utils.formatCurrency(bankBalance)})</option>
+                                <option value="cash">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'} (${Utils.formatCurrency(cashBalance)})</option>
+                                <option value="profit">📊 ${lang === 'id' ? 'Laba Bersih Toko' : '门店净利'} (${Utils.formatCurrency(profitBalance)})</option>
+                            </select>
+                        </div>
                         <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div>
                         <div class="form-actions">
                             <button onclick="APP.saveOrderWithCustomer('${customerId}')" class="success">💾 ${t('save')}</button>
@@ -537,6 +549,7 @@ const CustomersModule = {
         var amountStr = document.getElementById("amount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var notes = document.getElementById("notes").value;
+        var loanSource = document.getElementById("loanSource").value; // 'cash', 'bank', 'profit'
         
         if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
         
@@ -558,7 +571,8 @@ const CustomersModule = {
                 loan_amount: amount,
                 notes: notes,
                 customer_id: customerId,
-                store_id: null
+                store_id: null,
+                loan_source: loanSource  // 新增：资金来源
             };
             
             var newOrder = await Order.create(orderData);
@@ -754,7 +768,7 @@ const CustomersModule = {
                         ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     </td>
                 　　　`;
-            }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
+            }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}</td></td>`;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -826,7 +840,7 @@ const CustomersModule = {
             }
             var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
             var rows = allPayments.length === 0
-                ? `<td><td colspan="7" class="text-center">${t('no_data')}</td></tr>`
+                ? `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
                     <td class="date-cell">${Utils.formatDate(p.date)}</td>
                     <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
