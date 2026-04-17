@@ -1,4 +1,5 @@
-// app-dashboard-report.js - 报表功能模块（使用统一的 cashFlow.profit.balance）
+// app-dashboard-report.js - 修复版
+// 修复内容：门店净利显示（使用 getShopAccount 获取正确值）
 
 window.APP = window.APP || {};
 
@@ -86,6 +87,8 @@ const DashboardReport = {
                     
                     let cashIncome = 0, bankIncome = 0;
                     for (const p of payments) {
+                        // 跳过已作废的记录
+                        if (p.is_voided) continue;
                         if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
                             if (p.payment_method === 'cash') cashIncome += p.amount;
                             else if (p.payment_method === 'bank') bankIncome += p.amount;
@@ -99,8 +102,9 @@ const DashboardReport = {
                     const cashBalance = cashIncome - cashExpense;
                     const bankBalance = bankIncome - bankExpense;
                     
-                    // 使用统一的 cashFlow 获取门店净利
-                    const profitBalance = cashFlow.profit?.balance || 0;
+                    // ✅ 修复4：使用 getShopAccount 获取正确的门店净利
+                    const shopAccount = await SUPABASE.getShopAccount(store.id);
+                    const profitBalance = shopAccount.profit_balance;
 
                     storeReports.push({ 
                         store, 
@@ -165,7 +169,7 @@ const DashboardReport = {
                         <div class="cashflow-stats">
                             <div class="cashflow-item"><div class="label">🏦 ${t('cash')}</div><div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div></div>
                             <div class="cashflow-item"><div class="label">🏧 ${t('bank')}</div><div class="value">${Utils.formatCurrency(cashFlow.bank.balance)}</div></div>
-                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '门店净利'}</div><div class="value">${Utils.formatCurrency(cashFlow.profit.balance)}</div></div>
+                            <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Laba Bersih' : '门店净利'}</div><div class="value">${Utils.formatCurrency(cashFlow.profit?.balance || 0)}</div></div>
                             <div class="cashflow-item"><div class="label">📊 ${lang === 'id' ? 'Total' : '总计'}</div><div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div></div>
                         </div>
                     </div>
@@ -200,6 +204,8 @@ const DashboardReport = {
                 
                 let cashIncome = 0, bankIncome = 0;
                 for (const p of storePayments) {
+                    // 跳过已作废的记录
+                    if (p.is_voided) continue;
                     if (p.type === 'admin_fee' || p.type === 'interest' || p.type === 'principal') {
                         if (p.payment_method === 'cash') cashIncome += p.amount;
                         else if (p.payment_method === 'bank') bankIncome += p.amount;
@@ -212,7 +218,10 @@ const DashboardReport = {
                 }
                 const cashBalance = cashIncome - cashExpense;
                 const bankBalance = bankIncome - bankExpense;
-                const profitBalance = cashFlow.profit?.balance || 0;
+                
+                // ✅ 修复4：使用 getShopAccount 获取正确的门店净利
+                const shopAccount = await SUPABASE.getShopAccount(storeId);
+                const profitBalance = shopAccount.profit_balance;
                 
                 const totalLoan = storeOrders.reduce((s, o) => s + (o.loan_amount || 0), 0);
                 const totalAdminFee = storeOrders.reduce((s, o) => s + (o.admin_fee_paid ? (o.admin_fee || 0) : 0), 0);
