@@ -1,8 +1,8 @@
-// app-dashboard-core.js - 仪表盘布局优化版
+// app-dashboard-core.js - 仪表盘布局优化版 v3.0
 // 修改内容：
-// 1. 新增支出汇总卡片
-// 2. 桌面端：4列×2行布局
-// 3. 移动端：2列×4行布局（响应式）
+// 1. 更新资金汇总卡片显示（基于新的资金流）
+// 2. 新增服务费统计显示
+// 3. 更新现金流向显示
 
 window.APP = window.APP || {};
 
@@ -223,7 +223,7 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（布局优化版） ====================
+    // ==================== 仪表盘（资金流优化版） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -243,15 +243,7 @@ const DashboardCore = {
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
-            var cashInvestment = cashFlow.capital?.cash?.investment || 0;
-            var cashWithdrawal = cashFlow.capital?.cash?.withdrawal || 0;
-            var bankInvestment = cashFlow.capital?.bank?.investment || 0;
-            var bankWithdrawal = cashFlow.capital?.bank?.withdrawal || 0;
-            
-            // 获取净利
-            var profitBalance = cashFlow.profit?.balance || 0;
-            
-            // ✅ 新增：获取支出汇总（运营支出总额）
+            // 获取运营支出总额
             var totalExpenses = 0;
             try {
                 const profile = await SUPABASE.getCurrentProfile();
@@ -264,16 +256,17 @@ const DashboardCore = {
             } catch(e) { console.warn("获取支出汇总失败:", e); }
             
             // 准备卡片数据
-            // 顺序：总订单数, 贷款总额, 进行中, 已结清, 已收管理费, 已收利息, 支出汇总, 净利
+            // 顺序：总订单数, 贷款总额, 进行中, 已结清, 已收管理费, 已收服务费, 已收利息, 支出汇总, 净利
             var cards = [
                 { label: t('total_orders'), value: report.total_orders, type: 'number' },
                 { label: t('total_loan'), value: Utils.formatCurrency(report.total_loan_amount), type: 'currency' },
                 { label: t('active'), value: report.active_orders, type: 'number' },
                 { label: t('completed'), value: report.completed_orders, type: 'number' },
                 { label: lang === 'id' ? 'Admin Fee' : '管理费', value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
+                { label: lang === 'id' ? 'Service Fee' : '服务费', value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' },
-                { label: lang === 'id' ? 'Laba Bersih' : '净利', value: Utils.formatCurrency(profitBalance), type: 'currency', class: profitBalance >= 0 ? 'income' : 'expense' }
+                { label: lang === 'id' ? 'Laba Bersih' : '净利', value: Utils.formatCurrency(cashFlow.profit?.balance || 0), type: 'currency', class: (cashFlow.profit?.balance || 0) >= 0 ? 'income' : 'expense' }
             ];
             
             // 生成卡片 HTML
@@ -298,10 +291,10 @@ const DashboardCore = {
                     ${isAdmin ? `
                     <div class="capital-summary">
                         <div class="capital-summary-text">
-                            <span>💰 ${lang === 'id' ? 'Total Investasi' : '总投资'}:</span>
-                            <strong>${Utils.formatCurrency(cashInvestment + bankInvestment)}</strong>
-                            <span>📤 ${lang === 'id' ? 'Penarikan' : '提现'}:</span>
-                            <strong>${Utils.formatCurrency(cashWithdrawal + bankWithdrawal)}</strong>
+                            <span>💰 ${lang === 'id' ? 'Saldo Kas' : '现金余额'}:</span>
+                            <strong>${Utils.formatCurrency(cashFlow.cash.balance)}</strong>
+                            <span>🏧 ${lang === 'id' ? 'Saldo Bank' : '银行余额'}:</span>
+                            <strong>${Utils.formatCurrency(cashFlow.bank.balance)}</strong>
                         </div>
                         <div>
                             <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Riwayat Modal' : '资金流水'}</button>
@@ -314,16 +307,16 @@ const DashboardCore = {
                             <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(cashInvestment)} / -${Utils.formatCurrency(cashWithdrawal)}<br>
-                                ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.cash.income)} / -${Utils.formatCurrency(cashFlow.cash.expense)}
+                                ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
+                                ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
                             </div>
                         </div>
                         <div class="cashflow-item">
                             <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? 'Modal' : '本金'}: +${Utils.formatCurrency(bankInvestment)} / -${Utils.formatCurrency(bankWithdrawal)}<br>
-                                ${lang === 'id' ? 'Operasional' : '运营'}: +${Utils.formatCurrency(cashFlow.bank.income)} / -${Utils.formatCurrency(cashFlow.bank.expense)}
+                                ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
+                                ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
                             </div>
                         </div>
                         <div class="cashflow-item">
@@ -337,7 +330,6 @@ const DashboardCore = {
                     </div>
                 </div>
                 
-                <!-- ✅ 优化后的统计卡片布局：桌面端4x2，移动端2x4 -->
                 <div class="stats-grid-optimized">
                     ${cardsHtml}
                 </div>
@@ -359,12 +351,12 @@ const DashboardCore = {
                 <div class="card">
                     <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.user.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工')})</h3>
                     <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
-                    <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan' : '管理费: (签合同支付) | 利息: 10%/月 (每月支付)'}</p>
+                    <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: 1%-3% per bulan' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: 1%-3%/月'}</p>
                     ${!isAdmin ? `<p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
                 </div>
                 
                 <style>
-                    /* 桌面端：4列x2行布局 */
+                    /* 桌面端：4列x3行布局（9个卡片） */
                     .stats-grid-optimized {
                         display: grid;
                         grid-template-columns: repeat(4, 1fr);
@@ -416,7 +408,7 @@ const DashboardCore = {
                         color: #ef4444;
                     }
                     
-                    /* 手机端：2列x4行布局 */
+                    /* 手机端：2列x5行布局 */
                     @media (max-width: 768px) {
                         .stats-grid-optimized {
                             grid-template-columns: repeat(2, 1fr);
@@ -463,46 +455,40 @@ const DashboardCore = {
         var isAdmin = AUTH.isAdmin();
         var currentStoreId = AUTH.user?.store_id;
         
+        // 获取资金流水（基于 cash_flow_records）
         var transactions = [];
         try {
-            transactions = await SUPABASE.getCapitalTransactions();
+            transactions = await SUPABASE.getCashFlowRecords();
         } catch(e) { console.error(e); }
         
         var transactionRows = '';
         if (transactions.length === 0) {
-            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi modal' : '暂无资金流水'}</td></tr>`;
+            transactionRows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada transaksi' : '暂无资金流水'}</td></tr>`;
         } else {
             var typeMap = {
-                investment: lang === 'id' ? '💰 注资' : '💰 注资',
-                withdrawal: lang === 'id' ? '📤 还本' : '📤 还本',
-                dividend: lang === 'id' ? '📊 分红' : '📊 分红',
-                reinvestment: lang === 'id' ? '🔄 再投资' : '🔄 再投资',
-                capital_circulation: lang === 'id' ? '🔄 本金循环' : '🔄 本金循环'
+                loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+                admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
+                service_fee: lang === 'id' ? '💼 Service Fee' : '💼 服务费',
+                interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
+                principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
+                expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
+                investment: lang === 'id' ? '💰 Investasi' : '💰 注资',
+                withdrawal: lang === 'id' ? '📤 Penarikan' : '📤 提现'
             };
             
             for (var txn of transactions) {
-                var sourceName = '总部';
-                var targetName = '总部';
-                
-                if (txn.type === 'investment') {
-                    sourceName = '总部';
-                    targetName = txn.target_store?.name || (txn.target_store_id ? '分店' : '总部');
-                } else if (txn.type === 'withdrawal' || txn.type === 'dividend') {
-                    sourceName = txn.source_store?.name || (txn.store_id ? '分店' : '总部');
-                    targetName = '总部';
-                }
-                
-                var methodText = txn.payment_method === 'cash' ? '🏦 现金' : '🏧 银行';
-                var amountClass = (txn.type === 'investment') ? 'income' : 'expense';
+                var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
+                var directionClass = txn.direction === 'inflow' ? 'income' : 'expense';
+                var methodText = txn.source_target === 'cash' ? '🏦 Tunai' : '🏧 Bank';
                 
                 transactionRows += `<tr>
-                    <td style="padding:8px; white-space:nowrap;">${Utils.formatDate(txn.transaction_date)}</td>
-                    <td style="padding:8px;">${typeMap[txn.type] || txn.type}</td>
+                    <td style="padding:8px; white-space:nowrap;">${Utils.formatDate(txn.recorded_at)}</td>
+                    <td style="padding:8px;">${typeMap[txn.flow_type] || txn.flow_type}</td>
                     <td style="padding:8px;">${methodText}</td>
-                    <td style="padding:8px;">${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td>
-                    <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
+                    <td style="padding:8px;">${directionText}</td>
+                    <td style="padding:8px; text-align:right;" class="${directionClass}">${Utils.formatCurrency(txn.amount)}</td>
                     <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
-                    <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
+                    <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? txn.orders.order_id : '-'}</td>
                 </tr>`;
             }
         }
@@ -516,7 +502,7 @@ const DashboardCore = {
         var modalHtml = `
             <div class="modal-content" style="max-width:1000px; max-height:85vh; overflow-y:auto;">
                 <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h3>
+                    <h3 style="margin:0;">🏦 ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h3>
                     <div style="display:flex; gap:8px;">
                         <button onclick="APP.printCapitalTransactions()" class="btn-small print-btn" style="background:#64748b; color:white;">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.exportCapitalTransactionsToCSV()" class="btn-small" style="background:#10b981; color:white;">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
@@ -530,9 +516,17 @@ const DashboardCore = {
                     </select>
                     <select id="filterType" style="width:auto; min-width:120px;">
                         <option value="all">${lang === 'id' ? 'Semua Tipe' : '全部类型'}</option>
-                        <option value="investment">💰 ${lang === 'id' ? '注资' : '注资'}</option>
-                        <option value="withdrawal">📤 ${lang === 'id' ? '还本' : '还本'}</option>
-                        <option value="dividend">📊 ${lang === 'id' ? '分红' : '分红'}</option>
+                        <option value="loan_disbursement">💰 ${lang === 'id' ? 'Pencairan Pinjaman' : '贷款发放'}</option>
+                        <option value="admin_fee">📋 ${lang === 'id' ? 'Admin Fee' : '管理费'}</option>
+                        <option value="service_fee">💼 ${lang === 'id' ? 'Service Fee' : '服务费'}</option>
+                        <option value="interest">📈 ${lang === 'id' ? 'Bunga' : '利息'}</option>
+                        <option value="principal">🏦 ${lang === 'id' ? 'Pokok' : '本金'}</option>
+                        <option value="expense">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</option>
+                    </select>
+                    <select id="filterDirection" style="width:auto; min-width:100px;">
+                        <option value="all">${lang === 'id' ? 'Semua Arah' : '全部方向'}</option>
+                        <option value="inflow">📈 ${lang === 'id' ? 'Masuk' : '流入'}</option>
+                        <option value="outflow">📉 ${lang === 'id' ? 'Keluar' : '流出'}</option>
                     </select>
                     <input type="date" id="filterDateStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}" style="width:auto;">
                     <input type="date" id="filterDateEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}" style="width:auto;">
@@ -547,10 +541,10 @@ const DashboardCore = {
                                 <th style="padding:8px;">${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                 <th style="padding:8px;">${lang === 'id' ? 'Tipe' : '类型'}</th>
                                 <th style="padding:8px;">${lang === 'id' ? 'Metode' : '方式'}</th>
-                                <th style="padding:8px;">${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th>
+                                <th style="padding:8px;">${lang === 'id' ? 'Arah' : '方向'}</th>
                                 <th style="padding:8px; text-align:right;">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                 <th style="padding:8px;">${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                <th style="padding:8px;">${lang === 'id' ? 'No. Transaksi' : '交易号'}</th>
+                                <th style="padding:8px;">${lang === 'id' ? 'ID Pesanan' : '订单号'}</th>
                             </tr>
                         </thead>
                         <tbody id="capitalTransactionsBody">
@@ -580,22 +574,18 @@ const DashboardCore = {
     filterCapitalTransactions: function() {
         var storeId = document.getElementById('filterStore')?.value;
         var type = document.getElementById('filterType')?.value;
+        var direction = document.getElementById('filterDirection')?.value;
         var dateStart = document.getElementById('filterDateStart')?.value;
         var dateEnd = document.getElementById('filterDateEnd')?.value;
         
         var transactions = window._capitalTransactionsData || [];
         
         var filtered = transactions.filter(function(txn) {
-            if (storeId && storeId !== 'all') {
-                if (txn.type === 'investment') {
-                    if (txn.target_store_id !== storeId) return false;
-                } else {
-                    if (txn.store_id !== storeId) return false;
-                }
-            }
-            if (type && type !== 'all' && txn.type !== type) return false;
-            if (dateStart && txn.transaction_date < dateStart) return false;
-            if (dateEnd && txn.transaction_date > dateEnd) return false;
+            if (storeId && storeId !== 'all' && txn.store_id !== storeId) return false;
+            if (type && type !== 'all' && txn.flow_type !== type) return false;
+            if (direction && direction !== 'all' && txn.direction !== direction) return false;
+            if (dateStart && txn.recorded_at < dateStart) return false;
+            if (dateEnd && txn.recorded_at > dateEnd) return false;
             return true;
         });
         
@@ -605,11 +595,13 @@ const DashboardCore = {
     resetCapitalFilters: function() {
         var filterStore = document.getElementById('filterStore');
         var filterType = document.getElementById('filterType');
+        var filterDirection = document.getElementById('filterDirection');
         var filterDateStart = document.getElementById('filterDateStart');
         var filterDateEnd = document.getElementById('filterDateEnd');
         
         if (filterStore) filterStore.value = 'all';
         if (filterType) filterType.value = 'all';
+        if (filterDirection) filterDirection.value = 'all';
         if (filterDateStart) filterDateStart.value = '';
         if (filterDateEnd) filterDateEnd.value = '';
         
@@ -622,11 +614,14 @@ const DashboardCore = {
         if (!tbody) return;
         
         var typeMap = {
-            investment: lang === 'id' ? '💰 注资' : '💰 注资',
-            withdrawal: lang === 'id' ? '📤 还本' : '📤 还本',
-            dividend: lang === 'id' ? '📊 分红' : '📊 分红',
-            reinvestment: lang === 'id' ? '🔄 再投资' : '🔄 再投资',
-            capital_circulation: lang === 'id' ? '🔄 本金循环' : '🔄 本金循环'
+            loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+            admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
+            service_fee: lang === 'id' ? '💼 Service Fee' : '💼 服务费',
+            interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
+            principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
+            expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
+            investment: lang === 'id' ? '💰 Investasi' : '💰 注资',
+            withdrawal: lang === 'id' ? '📤 Penarikan' : '📤 提现'
         };
         
         var totalAmount = 0;
@@ -635,28 +630,18 @@ const DashboardCore = {
         for (var txn of transactions) {
             totalAmount += txn.amount;
             
-            var sourceName = '总部';
-            var targetName = '总部';
-            
-            if (txn.type === 'investment') {
-                sourceName = '总部';
-                targetName = txn.target_store?.name || (txn.target_store_id ? '分店' : '总部');
-            } else if (txn.type === 'withdrawal' || txn.type === 'dividend') {
-                sourceName = txn.source_store?.name || (txn.store_id ? '分店' : '总部');
-                targetName = '总部';
-            }
-            
-            var methodText = txn.payment_method === 'cash' ? '🏦 现金' : '🏧 银行';
-            var amountClass = (txn.type === 'investment') ? 'income' : 'expense';
+            var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
+            var directionClass = txn.direction === 'inflow' ? 'income' : 'expense';
+            var methodText = txn.source_target === 'cash' ? '🏦 Tunai' : '🏧 Bank';
             
             rows += `<tr>
-                <td style="padding:8px; white-space:nowrap;">${Utils.formatDate(txn.transaction_date)}</td>
-                <td style="padding:8px;">${typeMap[txn.type] || txn.type}</td>
+                <td style="padding:8px; white-space:nowrap;">${Utils.formatDate(txn.recorded_at)}</td>
+                <td style="padding:8px;">${typeMap[txn.flow_type] || txn.flow_type}</td>
                 <td style="padding:8px;">${methodText}</td>
-                <td style="padding:8px;">${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td>
-                <td style="padding:8px; text-align:right;" class="${amountClass}">${Utils.formatCurrency(txn.amount)}</td>
+                <td style="padding:8px;">${directionText}</td>
+                <td style="padding:8px; text-align:right;" class="${directionClass}">${Utils.formatCurrency(txn.amount)}</td>
                 <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
-                <td style="padding:8px; text-align:center; font-size:11px;">${txn.biz_no ? txn.biz_no.substr(0, 12) + '...' : '-'}</td>
+                <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? txn.orders.order_id : '-'}</td>
             </tr>`;
         }
         
@@ -676,7 +661,16 @@ const DashboardCore = {
         var lang = Utils.lang;
         var transactions = window._capitalTransactionsData || [];
         
-        var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</title>
+        var typeMap = {
+            loan_disbursement: lang === 'id' ? 'Pencairan Pinjaman' : '贷款发放',
+            admin_fee: lang === 'id' ? 'Admin Fee' : '管理费',
+            service_fee: lang === 'id' ? 'Service Fee' : '服务费',
+            interest: lang === 'id' ? 'Bunga' : '利息',
+            principal: lang === 'id' ? 'Pokok' : '本金',
+            expense: lang === 'id' ? 'Pengeluaran' : '运营支出'
+        };
+        
+        var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</title>
         <style>
             body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; font-size: 12px; }
             .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
@@ -690,17 +684,14 @@ const DashboardCore = {
             @media print { @page { size: A4 landscape; margin: 10mm; } body { margin: 0; } .no-print { display: none; } }
         </style>
         </head><body>
-        <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Modal' : '资金流水记录'}</h1>
+        <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h1>
         <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
-        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Aliran Dana' : '资金流向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th><tr></thead><tbody>`;
+        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
         
-        var typeMap = { investment: '注资', withdrawal: '还本', dividend: '分红' };
         for (var txn of transactions) {
-            var sourceName = '总部', targetName = '总部';
-            if (txn.type === 'investment') { sourceName = '总部'; targetName = txn.target_store?.name || '分店'; }
-            else if (txn.type === 'withdrawal' || txn.type === 'dividend') { sourceName = txn.source_store?.name || '分店'; targetName = '总部'; }
-            var methodText = txn.payment_method === 'cash' ? '现金' : '银行';
-            printContent += `<tr><td>${Utils.formatDate(txn.transaction_date)}</td><td>${typeMap[txn.type] || txn.type}</td><td>${methodText}</td><td>${Utils.escapeHtml(sourceName)} → ${Utils.escapeHtml(targetName)}</td><td class="text-right">${Utils.formatCurrency(txn.amount)}</td><td>${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
+            var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
+            var methodText = txn.source_target === 'cash' ? 'Tunai' : 'Bank';
+            printContent += `<tr><td>${Utils.formatDate(txn.recorded_at)}</td><td>${typeMap[txn.flow_type] || txn.flow_type}</td><td>${methodText}</td><td>${directionText}</td><td class="text-right">${Utils.formatCurrency(txn.amount)}</td><td>${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
         }
         
         printContent += `</tbody></table><div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div>
@@ -717,15 +708,29 @@ const DashboardCore = {
         var transactions = window._capitalTransactionsData || [];
         if (transactions.length === 0) { alert(lang === 'id' ? 'Tidak ada data untuk diekspor' : '没有数据可导出'); return; }
         
-        var headers = lang === 'id' ? ['Tanggal', 'Tipe', 'Metode', 'Sumber', 'Tujuan', 'Jumlah', 'Keterangan'] : ['日期', '类型', '方式', '来源', '去向', '金额', '说明'];
+        var typeMap = {
+            loan_disbursement: lang === 'id' ? 'Pencairan Pinjaman' : '贷款发放',
+            admin_fee: lang === 'id' ? 'Admin Fee' : '管理费',
+            service_fee: lang === 'id' ? 'Service Fee' : '服务费',
+            interest: lang === 'id' ? 'Bunga' : '利息',
+            principal: lang === 'id' ? 'Pokok' : '本金',
+            expense: lang === 'id' ? 'Pengeluaran' : '运营支出'
+        };
+        
+        var headers = lang === 'id' ? ['Tanggal', 'Tipe', 'Metode', 'Arah', 'Jumlah', 'Keterangan', 'ID Pesanan'] : ['日期', '类型', '方式', '方向', '金额', '说明', '订单号'];
         var rows = [];
         for (var txn of transactions) {
-            var typeText = txn.type === 'investment' ? '注资' : (txn.type === 'withdrawal' ? '还本' : '分红');
-            var methodText = txn.payment_method === 'cash' ? '现金' : '银行';
-            var sourceName = '总部', targetName = '总部';
-            if (txn.type === 'investment') { sourceName = '总部'; targetName = txn.target_store?.name || '分店'; }
-            else if (txn.type === 'withdrawal' || txn.type === 'dividend') { sourceName = txn.source_store?.name || '分店'; targetName = '总部'; }
-            rows.push([Utils.formatDate(txn.transaction_date), typeText, methodText, sourceName, targetName, txn.amount, txn.description || '']);
+            var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
+            var methodText = txn.source_target === 'cash' ? 'Tunai' : 'Bank';
+            rows.push([
+                Utils.formatDate(txn.recorded_at),
+                typeMap[txn.flow_type] || txn.flow_type,
+                methodText,
+                directionText,
+                txn.amount,
+                txn.description || '',
+                txn.orders?.order_id || ''
+            ]);
         }
         
         var csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -733,7 +738,7 @@ const DashboardCore = {
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
         a.href = url;
-        a.download = `jf_capital_transactions_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `jf_cash_flow_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
