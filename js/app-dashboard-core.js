@@ -1,8 +1,10 @@
-// app-dashboard-core.js - 仪表盘布局优化版 v4.0
+// app-dashboard-core.js - 仪表盘布局优化版 v5.0
 // 修改内容：
 // 1. 移除所有门店界面的净利显示
 // 2. 现金流汇总只显示保险柜、银行、总现金
 // 3. 统计卡片不包含净利
+// 4. 新增资金管理区域（内部互转功能）
+// 5. 新增内部转账历史记录查看（仅管理员）
 
 window.APP = window.APP || {};
 
@@ -162,7 +164,7 @@ const DashboardCore = {
                     <div class="lang-toggle">
                         <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
                     </div>
-                    <h2 class="login-title"><img src="icons/favicon-192x192.png" alt="JF!" class="login-logo"> by Gadai</h2>
+                    <h2 class="login-title"><img src="/icon-32.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>
                     <h3>${t('login')}</h3>
                     <div class="form-group">
                         <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
@@ -223,7 +225,7 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（无净利版） ====================
+    // ==================== 仪表盘（资金管理版） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -277,14 +279,14 @@ const DashboardCore = {
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h1><img src="icons/favicon-192x192.png" alt="JF!"> by Gadai</h1>
+                    <h1><img src="/icon-32.png" alt="JF!"> JF! by Gadai</h1>
                     <div class="header-actions">
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
                     </div>
                 </div>
                 
                 <div class="cashflow-summary">
-                    <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
+                    <h3>💰 ${lang === 'id' ? '资金管理' : '资金管理'}</h3>
                     
                     ${isAdmin ? `
                     <div class="capital-summary">
@@ -296,33 +298,50 @@ const DashboardCore = {
                         </div>
                         <div>
                             <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Riwayat Transaksi' : '资金流水'}</button>
+                            <button onclick="APP.showInternalTransferHistory()" class="capital-btn" style="margin-left:8px;">🔄 ${lang === 'id' ? 'Riwayat Transfer' : '转账记录'}</button>
                         </div>
                     </div>
                     ` : ''}
                     
                     <div class="cashflow-stats">
+                        <!-- 保险柜 -->
                         <div class="cashflow-item">
-                            <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
+                            <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
-                                ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
+                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
+                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
                             </div>
                         </div>
+                        
+                        <!-- 银行BNI -->
                         <div class="cashflow-item">
-                            <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
+                            <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? 'Pemasukan' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
-                                ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
+                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
+                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
                             </div>
                         </div>
-                        <div class="cashflow-item">
-                            <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
-                            <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
-                            <div class="cashflow-detail">
-                                📈 ${lang === 'id' ? 'Pendapatan' : '收入'}: +${Utils.formatCurrency(cashFlow.total.income)}<br>
-                                📉 ${lang === 'id' ? 'Pengeluaran' : '支出'}: -${Utils.formatCurrency(cashFlow.total.expense)}
+                        
+                        <!-- 内部互转 -->
+                        <div class="cashflow-item internal-transfer-item">
+                            <div class="label">🔄 ${lang === 'id' ? '内部互转' : '内部互转'}</div>
+                            <div class="transfer-buttons">
+                                <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">
+                                    🏦→🏧 ${lang === 'id' ? '现金存入银行' : '现金存入银行'}
+                                </button>
+                                <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">
+                                    🏧→🏦 ${lang === 'id' ? '银行取出现金' : '银行取出现金'}
+                                </button>
+                                ${isAdmin ? `
+                                <button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq">
+                                    🏢 ${lang === 'id' ? '上缴总部' : '上缴总部'}
+                                </button>
+                                ` : ''}
+                            </div>
+                            <div class="cashflow-detail" style="margin-top:8px;">
+                                💡 ${lang === 'id' ? '保险柜现金过多时可存入银行，不足时可从银行提取' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
                             </div>
                         </div>
                     </div>
@@ -397,6 +416,59 @@ const DashboardCore = {
                         color: #ef4444;
                     }
                     
+                    /* 内部互转区域样式 */
+                    .internal-transfer-item {
+                        background: linear-gradient(135deg, #1e293b, #0f172a);
+                        color: white;
+                    }
+                    
+                    .transfer-buttons {
+                        display: flex;
+                        gap: 10px;
+                        flex-wrap: wrap;
+                        margin: 10px 0;
+                    }
+                    
+                    .transfer-btn {
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        border: none;
+                        transition: all 0.2s;
+                    }
+                    
+                    .transfer-btn.cash-to-bank {
+                        background: #10b981;
+                        color: white;
+                    }
+                    
+                    .transfer-btn.cash-to-bank:hover {
+                        background: #059669;
+                        transform: translateY(-1px);
+                    }
+                    
+                    .transfer-btn.bank-to-cash {
+                        background: #f59e0b;
+                        color: white;
+                    }
+                    
+                    .transfer-btn.bank-to-cash:hover {
+                        background: #d97706;
+                        transform: translateY(-1px);
+                    }
+                    
+                    .transfer-btn.store-to-hq {
+                        background: #8b5cf6;
+                        color: white;
+                    }
+                    
+                    .transfer-btn.store-to-hq:hover {
+                        background: #7c3aed;
+                        transform: translateY(-1px);
+                    }
+                    
                     @media (max-width: 768px) {
                         .stats-grid-optimized {
                             grid-template-columns: repeat(2, 1fr);
@@ -414,6 +486,15 @@ const DashboardCore = {
                         
                         .stat-label {
                             font-size: 11px;
+                        }
+                        
+                        .transfer-buttons {
+                            flex-direction: column;
+                        }
+                        
+                        .transfer-btn {
+                            width: 100%;
+                            text-align: center;
                         }
                     }
                     
@@ -459,7 +540,9 @@ const DashboardCore = {
                 principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
                 expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
                 investment: lang === 'id' ? '💰 Investasi' : '💰 注资',
-                withdrawal: lang === 'id' ? '📤 Penarikan' : '📤 提现'
+                withdrawal: lang === 'id' ? '📤 Penarikan' : '📤 提现',
+                internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
+                internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
             };
             
             for (var txn of transactions) {
@@ -607,7 +690,9 @@ const DashboardCore = {
             principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
             expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
             investment: lang === 'id' ? '💰 Investasi' : '💰 注资',
-            withdrawal: lang === 'id' ? '📤 Penarikan' : '📤 提现'
+            withdrawal: lang === 'id' ? '📤 Penarikan' : '📤 提现',
+            internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
+            internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
         };
         
         var totalAmount = 0;
@@ -672,7 +757,7 @@ const DashboardCore = {
         </head><body>
         <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h1>
         <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
-        <tr><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
+        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
         
         for (var txn of transactions) {
             var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
@@ -962,6 +1047,378 @@ const DashboardCore = {
         } else {
             alert(Utils.lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
         }
+    },
+
+    // ==================== 内部转账功能 ====================
+
+    // 显示转账模态框
+    showTransferModal: async function(transferType) {
+        var lang = Utils.lang;
+        var isAdmin = AUTH.isAdmin();
+        var profile = await SUPABASE.getCurrentProfile();
+        
+        var title = '';
+        var fromLabel = '';
+        var toLabel = '';
+        var maxAmount = 0;
+        var hint = '';
+        
+        switch(transferType) {
+            case 'cash_to_bank':
+                title = lang === 'id' ? '🏦→🏧 现金存入银行' : '🏦→🏧 现金存入银行';
+                fromLabel = lang === 'id' ? '从保险柜取出' : '从保险柜取出';
+                toLabel = lang === 'id' ? '存入银行' : '存入银行';
+                const cashFlow = await SUPABASE.getCashFlowSummary();
+                maxAmount = cashFlow.cash.balance;
+                hint = lang === 'id' ? `保险柜可用余额: ${Utils.formatCurrency(maxAmount)}` : `保险柜可用余额: ${Utils.formatCurrency(maxAmount)}`;
+                break;
+            case 'bank_to_cash':
+                title = lang === 'id' ? '🏧→🏦 银行取出现金' : '🏧→🏦 银行取出现金';
+                fromLabel = lang === 'id' ? '从银行取出' : '从银行取出';
+                toLabel = lang === 'id' ? '存入保险柜' : '存入保险柜';
+                const cashFlow2 = await SUPABASE.getCashFlowSummary();
+                maxAmount = cashFlow2.bank.balance;
+                hint = lang === 'id' ? `银行可用余额: ${Utils.formatCurrency(maxAmount)}` : `银行可用余额: ${Utils.formatCurrency(maxAmount)}`;
+                break;
+            case 'store_to_hq':
+                if (!isAdmin) {
+                    alert(lang === 'id' ? 'Hanya administrator yang dapat melakukan setoran ke kantor pusat' : '只有管理员可以执行上缴总部操作');
+                    return;
+                }
+                title = lang === 'id' ? '🏢 上缴总部' : '🏢 上缴总部';
+                fromLabel = lang === 'id' ? '从门店银行取出' : '从门店银行取出';
+                toLabel = lang === 'id' ? '上缴总部' : '上缴总部';
+                const shopAccount = await SUPABASE.getShopAccount(profile?.store_id);
+                maxAmount = shopAccount.bank_balance;
+                hint = lang === 'id' ? `门店银行可用余额: ${Utils.formatCurrency(maxAmount)}` : `门店银行可用余额: ${Utils.formatCurrency(maxAmount)}`;
+                break;
+            default:
+                return;
+        }
+        
+        if (maxAmount <= 0) {
+            alert(lang === 'id' ? '余额不足，无法进行转账' : '余额不足，无法进行转账');
+            return;
+        }
+        
+        var modalHtml = `
+            <div class="modal-content" style="max-width:450px;">
+                <h3>${title}</h3>
+                <div class="form-group">
+                    <label>${fromLabel}</label>
+                    <input type="text" id="transferAmount" placeholder="0" class="amount-input">
+                    <small style="color:#64748b;">${hint}</small>
+                </div>
+                <div class="form-group">
+                    <label>${toLabel}</label>
+                    <div class="transfer-info" style="background:#f0fdf4; padding:10px; border-radius:8px;">
+                        <strong>→ ${Utils.formatCurrency(0)}</strong> ${lang === 'id' ? '将转入' : '将转入'}
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>${lang === 'id' ? 'Keterangan' : '说明'}</label>
+                    <textarea id="transferDesc" rows="2" placeholder="${lang === 'id' ? '转账说明（可选）' : '转账说明（可选）'}"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button onclick="APP.executeTransfer('${transferType}', ${maxAmount})" class="success">✅ ${lang === 'id' ? 'Konfirmasi Transfer' : '确认转账'}</button>
+                    <button onclick="document.getElementById('transferModal').remove()">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                </div>
+            </div>
+        `;
+        
+        var modal = document.createElement('div');
+        modal.id = 'transferModal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = modalHtml;
+        document.body.appendChild(modal);
+        
+        // 绑定金额格式化
+        var amountInput = document.getElementById('transferAmount');
+        if (amountInput && Utils.bindAmountFormat) {
+            Utils.bindAmountFormat(amountInput);
+            amountInput.addEventListener('input', function() {
+                var val = Utils.parseNumberFromCommas(this.value) || 0;
+                var transferInfo = document.querySelector('.transfer-info strong');
+                if (transferInfo) {
+                    transferInfo.innerHTML = Utils.formatCurrency(val);
+                }
+            });
+        }
+    },
+
+    // 执行转账
+    executeTransfer: async function(transferType, maxAmount) {
+        var lang = Utils.lang;
+        var amountStr = document.getElementById('transferAmount').value;
+        var amount = Utils.parseNumberFromCommas(amountStr) || 0;
+        var description = document.getElementById('transferDesc')?.value || '';
+        var profile = await SUPABASE.getCurrentProfile();
+        
+        if (amount <= 0) {
+            alert(lang === 'id' ? 'Masukkan jumlah transfer' : '请输入转账金额');
+            return;
+        }
+        
+        if (amount > maxAmount) {
+            alert(lang === 'id' ? `Jumlah melebihi saldo. Maksimal: ${Utils.formatCurrency(maxAmount)}` : `金额超过余额。最大: ${Utils.formatCurrency(maxAmount)}`);
+            return;
+        }
+        
+        try {
+            switch(transferType) {
+                case 'cash_to_bank':
+                    await SUPABASE.recordInternalTransfer({
+                        transfer_type: 'cash_to_bank',
+                        from_account: 'cash',
+                        to_account: 'bank',
+                        amount: amount,
+                        description: description || (lang === 'id' ? '现金存入银行' : '现金存入银行'),
+                        store_id: profile?.store_id
+                    });
+                    alert(lang === 'id' ? `✅ 现金存入银行成功: ${Utils.formatCurrency(amount)}` : `✅ 现金存入银行成功: ${Utils.formatCurrency(amount)}`);
+                    break;
+                    
+                case 'bank_to_cash':
+                    await SUPABASE.recordInternalTransfer({
+                        transfer_type: 'bank_to_cash',
+                        from_account: 'bank',
+                        to_account: 'cash',
+                        amount: amount,
+                        description: description || (lang === 'id' ? '银行取出现金' : '银行取出现金'),
+                        store_id: profile?.store_id
+                    });
+                    alert(lang === 'id' ? `✅ 银行取出现金成功: ${Utils.formatCurrency(amount)}` : `✅ 银行取出现金成功: ${Utils.formatCurrency(amount)}`);
+                    break;
+                    
+                case 'store_to_hq':
+                    await SUPABASE.remitToHeadquarters(profile?.store_id, amount, description);
+                    alert(lang === 'id' ? `✅ 上缴总部成功: ${Utils.formatCurrency(amount)}` : `✅ 上缴总部成功: ${Utils.formatCurrency(amount)}`);
+                    break;
+            }
+            
+            document.getElementById('transferModal')?.remove();
+            await this.renderDashboard();
+            
+        } catch (error) {
+            alert(lang === 'id' ? '转账失败: ' + error.message : '转账失败：' + error.message);
+        }
+    },
+
+    // 查看内部转账历史记录（总部功能）
+    showInternalTransferHistory: async function() {
+        var lang = Utils.lang;
+        var isAdmin = AUTH.isAdmin();
+        
+        if (!isAdmin) {
+            alert(lang === 'id' ? 'Hanya administrator yang dapat melihat riwayat transfer internal' : '只有管理员可以查看内部转账记录');
+            return;
+        }
+        
+        try {
+            var stores = await SUPABASE.getAllStores();
+            var transfers = await SUPABASE.getInternalTransfers();
+            
+            var storeOptions = '<option value="all">' + (lang === 'id' ? 'Semua Toko' : '全部门店') + '</option>';
+            for (var store of stores) {
+                storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)}</option>`;
+            }
+            
+            var typeMap = {
+                'cash_to_bank': lang === 'id' ? '🏦→🏧 现金存入银行' : '🏦→🏧 现金存入银行',
+                'bank_to_cash': lang === 'id' ? '🏧→🏦 银行取出现金' : '🏧→🏦 银行取出现金',
+                'store_to_hq': lang === 'id' ? '🏢 上缴总部' : '🏢 上缴总部'
+            };
+            
+            var rows = '';
+            if (transfers.length === 0) {
+                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</td></tr>`;
+            } else {
+                for (var t of transfers) {
+                    rows += `<tr>
+                        <td>${Utils.formatDate(t.transfer_date)}</td>
+                        <td>${Utils.escapeHtml(t.stores?.name || '-')}</td>
+                        <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
+                        <td>${t.from_account} → ${t.to_account}</td>
+                        <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
+                        <td>${Utils.escapeHtml(t.description || '-')}</td>
+                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
+                    </tr>`;
+                }
+            }
+            
+            var modalHtml = `
+                <div class="modal-content" style="max-width:900px; max-height:85vh; overflow-y:auto;">
+                    <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h3 style="margin:0;">🔄 ${lang === 'id' ? 'Riwayat Transfer Internal' : '内部转账记录'}</h3>
+                        <button onclick="document.getElementById('historyModal').remove()" style="background:transparent; font-size:20px; cursor:pointer;">✖</button>
+                    </div>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+                        <select id="filterStore" style="width:auto; min-width:150px;">
+                            ${storeOptions}
+                        </select>
+                        <select id="filterType" style="width:auto; min-width:150px;">
+                            <option value="all">${lang === 'id' ? 'Semua Tipe' : '全部类型'}</option>
+                            <option value="cash_to_bank">🏦→🏧 ${lang === 'id' ? '现金存入银行' : '现金存入银行'}</option>
+                            <option value="bank_to_cash">🏧→🏦 ${lang === 'id' ? '银行取出现金' : '银行取出现金'}</option>
+                            <option value="store_to_hq">🏢 ${lang === 'id' ? '上缴总部' : '上缴总部'}</option>
+                        </select>
+                        <input type="date" id="filterDateStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
+                        <input type="date" id="filterDateEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
+                        <button onclick="APP.filterInternalTransferHistory()" class="btn-small">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
+                        <button onclick="APP.resetInternalTransferFilters()" class="btn-small">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="data-table" style="width:100%; font-size:13px;">
+                            <thead>
+                                <tr>
+                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                    <th>${lang === 'id' ? 'Transfer' : '转账'}</th>
+                                    <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                    <th>${lang === 'id' ? 'Dibuat oleh' : '操作人'}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transferHistoryBody">
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="modal-actions" style="margin-top:16px;">
+                        <button onclick="APP.exportInternalTransferToCSV()" class="btn-small" style="background:#10b981; color:white;">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                        <button onclick="document.getElementById('historyModal').remove()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                    </div>
+                </div>
+            `;
+            
+            var modal = document.createElement('div');
+            modal.id = 'historyModal';
+            modal.className = 'modal-overlay';
+            modal.innerHTML = modalHtml;
+            document.body.appendChild(modal);
+            
+            window._internalTransfersData = transfers;
+            
+        } catch (error) {
+            console.error("showInternalTransferHistory error:", error);
+            alert(lang === 'id' ? 'Gagal memuat riwayat transfer' : '加载转账记录失败');
+        }
+    },
+
+    // 筛选内部转账历史
+    filterInternalTransferHistory: function() {
+        var storeId = document.getElementById('filterStore')?.value;
+        var type = document.getElementById('filterType')?.value;
+        var dateStart = document.getElementById('filterDateStart')?.value;
+        var dateEnd = document.getElementById('filterDateEnd')?.value;
+        
+        var transfers = window._internalTransfersData || [];
+        
+        var filtered = transfers.filter(function(t) {
+            if (storeId && storeId !== 'all' && t.store_id !== storeId) return false;
+            if (type && type !== 'all' && t.transfer_type !== type) return false;
+            if (dateStart && t.transfer_date < dateStart) return false;
+            if (dateEnd && t.transfer_date > dateEnd) return false;
+            return true;
+        });
+        
+        this._renderInternalTransferHistory(filtered);
+    },
+
+    // 重置筛选条件
+    resetInternalTransferFilters: function() {
+        var filterStore = document.getElementById('filterStore');
+        var filterType = document.getElementById('filterType');
+        var filterDateStart = document.getElementById('filterDateStart');
+        var filterDateEnd = document.getElementById('filterDateEnd');
+        
+        if (filterStore) filterStore.value = 'all';
+        if (filterType) filterType.value = 'all';
+        if (filterDateStart) filterDateStart.value = '';
+        if (filterDateEnd) filterDateEnd.value = '';
+        
+        this.filterInternalTransferHistory();
+    },
+
+    // 渲染内部转账历史表格
+    _renderInternalTransferHistory: function(transfers) {
+        var lang = Utils.lang;
+        var tbody = document.getElementById('transferHistoryBody');
+        if (!tbody) return;
+        
+        var typeMap = {
+            'cash_to_bank': lang === 'id' ? '🏦→🏧 现金存入银行' : '🏦→🏧 现金存入银行',
+            'bank_to_cash': lang === 'id' ? '🏧→🏦 银行取出现金' : '🏧→🏦 银行取出现金',
+            'store_to_hq': lang === 'id' ? '🏢 上缴总部' : '🏢 上缴总部'
+        };
+        
+        var rows = '';
+        if (transfers.length === 0) {
+            rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}<tr></tr>`;
+        } else {
+            for (var t of transfers) {
+                rows += `<tr>
+                    <td style="padding:8px;">${Utils.formatDate(t.transfer_date)}</td>
+                    <td style="padding:8px;">${Utils.escapeHtml(t.stores?.name || '-')}</td>
+                    <td style="padding:8px;">${typeMap[t.transfer_type] || t.transfer_type}</td>
+                    <td style="padding:8px;">${t.from_account} → ${t.to_account}</td>
+                    <td style="padding:8px; text-align:right;">${Utils.formatCurrency(t.amount)}</td>
+                    <td style="padding:8px;">${Utils.escapeHtml(t.description || '-')}</td>
+                    <td style="padding:8px;">${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
+                </tr>`;
+            }
+        }
+        
+        tbody.innerHTML = rows;
+    },
+
+    // 导出内部转账记录到CSV
+    exportInternalTransferToCSV: async function() {
+        var lang = Utils.lang;
+        var transfers = window._internalTransfersData || [];
+        
+        if (transfers.length === 0) {
+            alert(lang === 'id' ? 'Tidak ada data untuk diekspor' : '没有数据可导出');
+            return;
+        }
+        
+        var typeMap = {
+            'cash_to_bank': lang === 'id' ? '现金存入银行' : '现金存入银行',
+            'bank_to_cash': lang === 'id' ? '银行取出现金' : '银行取出现金',
+            'store_to_hq': lang === 'id' ? '上缴总部' : '上缴总部'
+        };
+        
+        var headers = lang === 'id' 
+            ? ['Tanggal', 'Toko', 'Tipe Transfer', 'Transfer', 'Jumlah', 'Keterangan', 'Dibuat oleh']
+            : ['日期', '门店', '转账类型', '转账', '金额', '说明', '操作人'];
+        
+        var rows = [];
+        for (var t of transfers) {
+            rows.push([
+                t.transfer_date,
+                t.stores?.name || '-',
+                typeMap[t.transfer_type] || t.transfer_type,
+                `${t.from_account} → ${t.to_account}`,
+                t.amount,
+                t.description || '-',
+                t.created_by_profile?.name || '-'
+            ]);
+        }
+        
+        var csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+        var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = `jf_internal_transfers_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     }
 };
 
