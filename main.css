@@ -1,6 +1,5 @@
 /* =====================================================
    JF! by Gadai - 典当管理系统
-   版本：2.0（资金管理优化版）
    ===================================================== */
 
 /* ===== 1. 全局变量 ===== */
@@ -179,20 +178,22 @@ button:disabled, button.disabled { opacity: 0.6; cursor: not-allowed; transform:
     margin: 0;
 }
 
-/* ===== 6. 现金流汇总卡片 ===== */
+/* ===== 6. 现金流汇总卡片（优化版：深色背景 + 白色文字 + 高对比度） ===== */
 .cashflow-summary {
-    background: linear-gradient(135deg, #2563eb, #60a5fa);
+    background: linear-gradient(135deg, #1e40af, #1e3a8a);
     border-radius: var(--radius);
     padding: 20px;
-    color: white;
+    color: #ffffff;
     box-shadow: var(--shadow-md);
     margin-bottom: 24px;
 }
 
 .cashflow-summary h3 {
-    color: rgba(255,255,255,0.95);
+    color: #ffffff;
     margin: 0 0 16px 0;
     font-size: var(--font-md);
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 .cashflow-stats {
@@ -202,52 +203,79 @@ button:disabled, button.disabled { opacity: 0.6; cursor: not-allowed; transform:
 }
 
 .cashflow-item {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255, 255, 255, 0.12);
     border-radius: 10px;
     padding: 14px;
-    backdrop-filter: blur(6px);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .cashflow-item .label {
     font-size: var(--font-sm);
     opacity: 0.9;
     margin-bottom: 8px;
+    color: #e2e8f0;
 }
 
 .cashflow-item .value {
     font-size: var(--font-xl);
     font-weight: 700;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.cashflow-item .value.negative { color: #fca5a5; }
+.cashflow-item .value.negative {
+    color: #fca5a5;
+}
+
 .cashflow-detail {
     font-size: var(--font-xs);
     opacity: 0.8;
     margin-top: 6px;
+    color: #cbd5e1;
 }
 
-/* 资金管理区域 */
+/* 资金管理区域（在现金流卡片内部） */
 .capital-summary {
     display: flex;
     justify-content: space-between;
     margin-bottom: 16px;
     padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
     flex-wrap: wrap;
     gap: 10px;
 }
 
-.capital-summary-text { font-size: var(--font-xs); }
-.capital-summary-text strong { font-weight: 600; }
+.capital-summary-text {
+    font-size: var(--font-xs);
+    color: #e2e8f0;
+}
+
+.capital-summary-text strong {
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 12px 0 4px;
+}
+
+.capital-summary-text span {
+    margin-right: 8px;
+}
 
 .capital-btn {
-    background: rgba(255,255,255,0.2) !important;
-    border: none !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
     padding: 4px 12px !important;
     font-size: var(--font-xs) !important;
     border-radius: 6px !important;
+    color: #ffffff !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
-.capital-btn:hover { background: rgba(255,255,255,0.3) !important; transform: none !important; }
+
+.capital-btn:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
 
 /* ===== 7. 统计卡片 ===== */
 .stats-grid {
