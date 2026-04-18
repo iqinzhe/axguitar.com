@@ -1,10 +1,8 @@
-// app-dashboard-core.js - 仪表盘布局优化版 v1.0
-// 修改内容：
-// 1. 移除所有门店界面的净利显示
-// 2. 现金流汇总只显示保险柜、银行、总现金
-// 3. 统计卡片不包含净利
-// 4. 新增资金管理区域（内部互转功能）
-// 5. 新增内部转账历史记录查看（仅管理员）
+// app-dashboard-core.js - 完整修复版 v2.0
+// 修复内容：
+// 1. sessionStorage 不再存储订单ID、客户ID等敏感信息（中危2）
+// 2. 刷新时仅恢复页面，敏感数据从服务器重新获取
+// 3. 优化页面状态管理
 
 window.APP = window.APP || {};
 
@@ -16,30 +14,52 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
+    // ==================== 修复中危2：移除敏感信息的存储 ====================
     saveCurrentPageState: function() {
+        // 只保存页面名称和筛选条件（非敏感信息）
         sessionStorage.setItem('jf_current_page', this.currentPage);
-        sessionStorage.setItem('jf_current_orderId', this.currentOrderId || '');
-        sessionStorage.setItem('jf_current_customerId', this.currentCustomerId || '');
-        sessionStorage.setItem('jf_current_filter', this.currentFilter);
-        sessionStorage.setItem('jf_current_keyword', this.searchKeyword);
+        sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
+        sessionStorage.setItem('jf_current_keyword', this.searchKeyword || "");
+        // 注意：订单ID和客户ID不再存储到 sessionStorage
+        // 这些敏感信息需要时从 URL 参数或重新加载获取
+    },
+    
+    // 恢复页面状态（不含敏感ID）
+    restorePageState: function() {
+        return {
+            page: sessionStorage.getItem('jf_current_page'),
+            filter: sessionStorage.getItem('jf_current_filter') || "all",
+            keyword: sessionStorage.getItem('jf_current_keyword') || ""
+        };
+    },
+    
+    // 清除所有存储的状态
+    clearPageState: function() {
+        sessionStorage.removeItem('jf_current_page');
+        sessionStorage.removeItem('jf_current_filter');
+        sessionStorage.removeItem('jf_current_keyword');
+        // 确保不存储敏感信息
+        this.currentOrderId = null;
+        this.currentCustomerId = null;
     },
 
     init: async function() {
         document.getElementById("app").innerHTML = '<div class="loading-container"><div class="loader"></div><p class="loading-text">🔄 Loading system...</p></div>';
         await AUTH.init();
         
-        var savedPage = sessionStorage.getItem('jf_current_page');
-        var savedOrderId = sessionStorage.getItem('jf_current_orderId');
-        var savedCustomerId = sessionStorage.getItem('jf_current_customerId');
-        var savedFilter = sessionStorage.getItem('jf_current_filter');
-        var savedKeyword = sessionStorage.getItem('jf_current_keyword');
+        // 修复：只恢复页面名称和筛选条件，不恢复敏感ID
+        var savedState = this.restorePageState();
+        var savedPage = savedState.page;
+        var savedFilter = savedState.filter;
+        var savedKeyword = savedState.keyword;
         
         if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
             this.currentPage = savedPage;
-            this.currentOrderId = savedOrderId || null;
-            this.currentCustomerId = savedCustomerId || null;
             this.currentFilter = savedFilter || "all";
             this.searchKeyword = savedKeyword || "";
+            // 敏感ID置空，需要时重新从服务器获取
+            this.currentOrderId = null;
+            this.currentCustomerId = null;
             await this.refreshCurrentPage();
         } else {
             await this.router();
@@ -57,17 +77,48 @@ const DashboardCore = {
             dashboard: async () => await self.renderDashboard(),
             orderTable: async () => await self.showOrderTable(),
             createOrder: () => self.showCreateOrder(),
-            viewOrder: async () => { if (self.currentOrderId) await self.viewOrder(self.currentOrderId); },
-            payment: async () => { if (self.currentOrderId) await self.showPayment(self.currentOrderId); },
-            editOrder: async () => { if (self.currentOrderId) await self.editOrder(self.currentOrderId); },
+            viewOrder: async () => { 
+                if (self.currentOrderId) {
+                    await self.viewOrder(self.currentOrderId);
+                } else {
+                    // 如果没有订单ID，跳转到订单列表
+                    await self.showOrderTable();
+                }
+            },
+            payment: async () => { 
+                if (self.currentOrderId) {
+                    await self.showPayment(self.currentOrderId);
+                } else {
+                    await self.showOrderTable();
+                }
+            },
+            editOrder: async () => { 
+                if (self.currentOrderId) {
+                    await self.editOrder(self.currentOrderId);
+                } else {
+                    await self.showOrderTable();
+                }
+            },
             report: async () => await self.showReport(),
             userManagement: async () => await self.showUserManagement(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
             expenses: async () => await self.showExpenses(),
             customers: async () => await self.showCustomers(),
             paymentHistory: async () => await self.showPaymentHistory(),
-            customerOrders: async () => { if (self.currentCustomerId) await self.showCustomerOrders(self.currentCustomerId); },
-            customerPaymentHistory: async () => { if (self.currentCustomerId) await self.showCustomerPaymentHistory(self.currentCustomerId); },
+            customerOrders: async () => { 
+                if (self.currentCustomerId) {
+                    await self.showCustomerOrders(self.currentCustomerId);
+                } else {
+                    await self.showCustomers();
+                }
+            },
+            customerPaymentHistory: async () => { 
+                if (self.currentCustomerId) {
+                    await self.showCustomerPaymentHistory(self.currentCustomerId);
+                } else {
+                    await self.showCustomers();
+                }
+            },
             blacklist: async () => await self.showBlacklist()
         };
         var handler = handlers[this.currentPage];
@@ -85,9 +136,12 @@ const DashboardCore = {
             keyword: this.searchKeyword
         });
         this.currentPage = page;
+        
+        // 只存储非敏感参数
         if (params.orderId) this.currentOrderId = params.orderId;
         if (params.customerId) this.currentCustomerId = params.customerId;
         
+        // 保存页面状态（不含敏感ID）
         this.saveCurrentPageState();
         
         var self = this;
@@ -123,6 +177,7 @@ const DashboardCore = {
             this.currentFilter = prev.filter || "all";
             this.searchKeyword = prev.keyword || "";
             
+            // 保存页面状态（不含敏感ID）
             this.saveCurrentPageState();
             
             var backHandlers = {
@@ -149,6 +204,7 @@ const DashboardCore = {
 
     renderLogin: async function() {
         this.currentPage = 'login';
+        this.clearPageState();  // 清除所有存储状态
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         
@@ -202,12 +258,9 @@ const DashboardCore = {
     },
 
     logout: async function() {
-        sessionStorage.removeItem('jf_current_page');
-        sessionStorage.removeItem('jf_current_orderId');
-        sessionStorage.removeItem('jf_current_customerId');
-        sessionStorage.removeItem('jf_current_filter');
-        sessionStorage.removeItem('jf_current_keyword');
-        
+        // 登出时清除所有存储的状态
+        this.clearPageState();
+        sessionStorage.clear();  // 清除所有 sessionStorage
         await AUTH.logout();
         await this.router();
     },
@@ -269,7 +322,6 @@ const DashboardCore = {
                 { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' }
             ];
             
-            // 生成卡片 HTML
             var cardsHtml = cards.map(card => `
                 <div class="stat-card ${card.class || ''}">
                     <div class="stat-value ${card.class || ''}">${card.value}</div>
@@ -304,7 +356,6 @@ const DashboardCore = {
                     ` : ''}
                     
                     <div class="cashflow-stats">
-                        <!-- 保险柜 -->
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
@@ -314,7 +365,6 @@ const DashboardCore = {
                             </div>
                         </div>
                         
-                        <!-- 银行BNI -->
                         <div class="cashflow-item">
                             <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
@@ -324,7 +374,6 @@ const DashboardCore = {
                             </div>
                         </div>
                         
-                        <!-- 内部互转 -->
                         <div class="cashflow-item internal-transfer-item">
                             <div class="label">🔄 ${lang === 'id' ? '内部互转' : '内部互转'}</div>
                             <div class="transfer-buttons">
@@ -416,7 +465,6 @@ const DashboardCore = {
                         color: #ef4444;
                     }
                     
-                    /* 内部互转区域样式 */
                     .internal-transfer-item {
                         background: linear-gradient(135deg, #1e293b, #0f172a);
                         color: white;
@@ -557,7 +605,7 @@ const DashboardCore = {
                     <td style="padding:8px;">${directionText}</td>
                     <td style="padding:8px; text-align:right;" class="${directionClass}">${Utils.formatCurrency(txn.amount)}</td>
                     <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
-                    <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? txn.orders.order_id : '-'}</td>
+                    <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? Utils.escapeHtml(txn.orders.order_id) : '-'}</td>
                 </tr>`;
             }
         }
@@ -712,7 +760,7 @@ const DashboardCore = {
                 <td style="padding:8px;">${directionText}</td>
                 <td style="padding:8px; text-align:right;" class="${directionClass}">${Utils.formatCurrency(txn.amount)}</td>
                 <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
-                <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? txn.orders.order_id : '-'}</td>
+                <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? Utils.escapeHtml(txn.orders.order_id) : '-'}</td>
             </tr>`;
         }
         
@@ -798,7 +846,7 @@ const DashboardCore = {
                 typeMap[txn.flow_type] || txn.flow_type,
                 methodText,
                 directionText,
-                txn.amount,
+                txn.amount,  // 原始数值，不使用 formatCurrency
                 txn.description || '',
                 txn.orders?.order_id || ''
             ]);
@@ -926,7 +974,7 @@ const DashboardCore = {
     generateWAText: function(order, senderNumber) {
         var lang = Utils.lang;
         var remainingPrincipal = order.loan_amount - order.principal_paid;
-        var monthlyInterest = remainingPrincipal * 0.10;
+        var monthlyInterest = remainingPrincipal * Utils.MONTHLY_INTEREST_RATE;
         var dueDate = Utils.formatDate(order.next_interest_due_date);
         return lang === 'id' 
             ? `Halo *${Utils.escapeHtml(order.customer_name)}*,\n\nKami ingin mengingatkan bahwa pembayaran bunga pinjaman Anda akan jatuh tempo *dalam 2 hari*.\n\n📋 *ID Pesanan:* ${order.order_id}\n💰 *Sisa Pokok:* ${Utils.formatCurrency(remainingPrincipal)}\n📅 *Bunga per Bulan:* ${Utils.formatCurrency(monthlyInterest)}\n⏰ *Tanggal Jatuh Tempo:* ${dueDate}\n\nMohon persiapkan pembayaran Anda.\n\nTerima kasih,\n*${AUTH.getCurrentStoreName()}*\n📞 ${senderNumber}`
@@ -1051,7 +1099,6 @@ const DashboardCore = {
 
     // ==================== 内部转账功能 ====================
 
-    // 显示转账模态框
     showTransferModal: async function(transferType) {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -1132,7 +1179,6 @@ const DashboardCore = {
         modal.innerHTML = modalHtml;
         document.body.appendChild(modal);
         
-        // 绑定金额格式化
         var amountInput = document.getElementById('transferAmount');
         if (amountInput && Utils.bindAmountFormat) {
             Utils.bindAmountFormat(amountInput);
@@ -1146,7 +1192,6 @@ const DashboardCore = {
         }
     },
 
-    // 执行转账
     executeTransfer: async function(transferType, maxAmount) {
         var lang = Utils.lang;
         var amountStr = document.getElementById('transferAmount').value;
@@ -1204,7 +1249,6 @@ const DashboardCore = {
         }
     },
 
-    // 查看内部转账历史记录（总部功能）
     showInternalTransferHistory: async function() {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -1309,7 +1353,6 @@ const DashboardCore = {
         }
     },
 
-    // 筛选内部转账历史
     filterInternalTransferHistory: function() {
         var storeId = document.getElementById('filterStore')?.value;
         var type = document.getElementById('filterType')?.value;
@@ -1329,7 +1372,6 @@ const DashboardCore = {
         this._renderInternalTransferHistory(filtered);
     },
 
-    // 重置筛选条件
     resetInternalTransferFilters: function() {
         var filterStore = document.getElementById('filterStore');
         var filterType = document.getElementById('filterType');
@@ -1344,7 +1386,6 @@ const DashboardCore = {
         this.filterInternalTransferHistory();
     },
 
-    // 渲染内部转账历史表格
     _renderInternalTransferHistory: function(transfers) {
         var lang = Utils.lang;
         var tbody = document.getElementById('transferHistoryBody');
@@ -1358,7 +1399,7 @@ const DashboardCore = {
         
         var rows = '';
         if (transfers.length === 0) {
-            rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}<tr></tr>`;
+            rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</td></tr>`;
         } else {
             for (var t of transfers) {
                 rows += `<tr>
@@ -1376,7 +1417,6 @@ const DashboardCore = {
         tbody.innerHTML = rows;
     },
 
-    // 导出内部转账记录到CSV
     exportInternalTransferToCSV: async function() {
         var lang = Utils.lang;
         var transfers = window._internalTransfersData || [];
@@ -1403,7 +1443,7 @@ const DashboardCore = {
                 t.stores?.name || '-',
                 typeMap[t.transfer_type] || t.transfer_type,
                 `${t.from_account} → ${t.to_account}`,
-                t.amount,
+                t.amount,  // 原始数值
                 t.description || '-',
                 t.created_by_profile?.name || '-'
             ]);
