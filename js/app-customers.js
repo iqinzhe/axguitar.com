@@ -315,98 +315,185 @@ const CustomersModule = {
         }
     },
 
-    createOrderForCustomer: async function(customerId) {
-        var isAdmin = AUTH.isAdmin();
-        var lang = Utils.lang;
-        
-        if (isAdmin) {
-            alert(lang === 'id' ? 'Administrator tidak dapat membuat order. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能创建订单，请使用店长或员工账号登录。');
+createOrderForCustomer: async function(customerId) {
+    var isAdmin = AUTH.isAdmin();
+    var lang = Utils.lang;
+    
+    if (isAdmin) {
+        alert(lang === 'id' ? 'Administrator tidak dapat membuat order. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能创建订单，请使用店长或员工账号登录。');
+        return;
+    }
+    
+    try {
+        const { data: existingOrders } = await supabaseClient
+            .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
+        if (existingOrders && existingOrders.length > 0) {
+            alert(Utils.lang === 'id' ? 'Nasabah ini masih memiliki order aktif.' : '该客户还有未结清的订单。');
             return;
         }
         
-        try {
-            const { data: existingOrders } = await supabaseClient
-                .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
-            if (existingOrders && existingOrders.length > 0) {
-                alert(Utils.lang === 'id' ? 'Nasabah ini masih memiliki order aktif.' : '该客户还有未结清的订单。');
-                return;
-            }
-            
-            const { data: customer, error } = await supabaseClient
-                .from('customers')
-                .select('*, stores(name, code)')
-                .eq('id', customerId)
-                .single();
-            if (error) throw error;
+        const { data: customer, error } = await supabaseClient
+            .from('customers')
+            .select('*, stores(name, code)')
+            .eq('id', customerId)
+            .single();
+        if (error) throw error;
 
-            this.currentPage = 'createOrder';
-            this.currentCustomerId = customerId;
-            var t = (key) => Utils.t(key);
-            
-            const profile = await SUPABASE.getCurrentProfile();
-            const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
-            const userStoreCode = profile?.stores?.code || '-';
+        this.currentPage = 'createOrder';
+        this.currentCustomerId = customerId;
+        var t = (key) => Utils.t(key);
+        
+        const profile = await SUPABASE.getCurrentProfile();
+        const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
+        const userStoreCode = profile?.stores?.code || '-';
+        
+        // 管理费默认金额（可配置）
+        const defaultAdminFee = 30000;
 
-            document.getElementById("app").innerHTML = `
-                <div class="page-header">
-                    <h2>📝 ${t('create_order')}</h2>
-                    <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                    </div>
+        document.getElementById("app").innerHTML = `
+            <div class="page-header">
+                <h2>📝 ${t('create_order')}</h2>
+                <div class="header-actions">
+                    <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>${t('customer_info')}</h3>
+                <div class="customer-info-display">
+                    <p><strong>${lang === 'id' ? 'ID Nasabah' : '客户ID'}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p>
+                    <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
+                    <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p>
+                    <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
+                    <p><strong>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}:</strong> ${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</p>
+                    <p><strong>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}:</strong> ${customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')}</p>
+                    <p><strong>${lang === 'id' ? 'Toko Asal' : '所属门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')} (${Utils.escapeHtml(customer.stores?.code || '-')})</p>
                 </div>
                 
-                <div class="card">
-                    <h3>${t('customer_info')}</h3>
-                    <div class="customer-info-display">
-                        <p><strong>${lang === 'id' ? 'ID Nasabah' : '客户ID'}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p>
-                        <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
-                        <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p>
-                        <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
-                        <p><strong>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}:</strong> ${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</p>
-                        <p><strong>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}:</strong> ${customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')}</p>
-                        <p><strong>${lang === 'id' ? 'Toko Asal' : '所属门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')} (${Utils.escapeHtml(customer.stores?.code || '-')})</p>
+                <div class="store-info-banner" style="background:#e0f2fe; padding:10px 15px; border-radius:8px; margin-bottom:16px;">
+                    <span>🏪 ${lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店'}: <strong>${Utils.escapeHtml(userStoreName)} (${Utils.escapeHtml(userStoreCode)})</strong></span>
+                </div>
+                
+                <h3>${t('collateral_info')}</h3>
+                <div class="form-grid">
+                    <div class="form-group full-width"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
+                    <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input"></div>
+                    
+                    <!-- 服务费选项 -->
+                    <div class="form-group">
+                        <label>${lang === 'id' ? 'Service Fee (%)' : '服务费 (%)'}</label>
+                        <select id="serviceFeePercent" class="service-fee-select">
+                            <option value="0">0% ${lang === 'id' ? '(Tidak Ada)' : '(无)'}</option>
+                            <option value="1">1%</option>
+                            <option value="2">2%</option>
+                            <option value="3">3%</option>
+                        </select>
+                        <small style="color:#64748b;">${lang === 'id' ? 'Biaya layanan per bulan (dihitung dari jumlah pinjaman)' : '每月服务费（按贷款金额计算）'}</small>
                     </div>
                     
-                    <div class="store-info-banner" style="background:#e0f2fe; padding:10px 15px; border-radius:8px; margin-bottom:16px;">
-                        <span>🏪 ${lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店'}: <strong>${Utils.escapeHtml(userStoreName)} (${Utils.escapeHtml(userStoreCode)})</strong></span>
+                    <!-- ========== 新增：管理费收款选项 ========== -->
+                    <div class="form-group">
+                        <label>📋 ${lang === 'id' ? 'Admin Fee (Sekali)' : '管理费（一次性）'}</label>
+                        <div class="admin-fee-options">
+                            <div class="admin-fee-amount">
+                                <strong>${Utils.formatCurrency(defaultAdminFee)}</strong>
+                                <small style="color:#64748b; margin-left:8px;">${lang === 'id' ? 'Dibayar saat kontrak' : '签合同支付'}</small>
+                            </div>
+                            <div class="payment-method-group" style="margin-top:8px; background:#f8fafc; padding:8px 12px; border-radius:8px;">
+                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pemasukan' : '入账方式'}:</div>
+                                <div class="payment-method-options">
+                                    <label><input type="radio" name="adminFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                    <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    <!-- ========== 管理费收款选项结束 ========== -->
                     
-                    <h3>${t('collateral_info')}</h3>
-                    <div class="form-grid">
-                        <div class="form-group full-width"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
-                        <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input"></div>
-                        <div class="form-group">
-                            <label>${lang === 'id' ? 'Service Fee (%)' : '服务费 (%)'}</label>
-                            <select id="serviceFeePercent" class="service-fee-select">
-                                <option value="0">0% ${lang === 'id' ? '(Tidak Ada)' : '(无)'}</option>
-                                <option value="1">1%</option>
-                                <option value="2">2%</option>
-                                <option value="3">3%</option>
-                            </select>
-                            <small style="color:#64748b;">${lang === 'id' ? 'Biaya layanan per bulan (dihitung dari jumlah pinjaman)' : '每月服务费（按贷款金额计算）'}</small>
-                        </div>
-                        <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div>
-                        <div class="form-actions">
-                            <button onclick="APP.saveOrderWithCustomer('${customerId}')" class="success">💾 ${t('save')}</button>
-                            <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
-                        </div>
+                    <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div>
+                    <div class="form-actions">
+                        <button onclick="APP.saveOrderWithCustomer('${customerId}')" class="success">💾 ${t('save')}</button>
+                        <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
                     </div>
                 </div>
-                <style>
-                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                    .customer-info-display { background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
-                    .customer-info-display p { margin: 6px 0; }
-                    .amount-input { text-align: right; }
-                    .store-info-banner { background: #e0f2fe; padding: 10px 15px; border-radius: 8px; margin-bottom: 16px; }
-                    .service-fee-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
-                </style>`;
-            var amountInput = document.getElementById("amount");
-            if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
-        } catch (error) {
-            console.error("createOrderForCustomer error:", error);
-            alert(Utils.lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
+            </div>
+            <style>
+                .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+                .customer-info-display { background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
+                .customer-info-display p { margin: 6px 0; }
+                .amount-input { text-align: right; }
+                .store-info-banner { background: #e0f2fe; padding: 10px 15px; border-radius: 8px; margin-bottom: 16px; }
+                .service-fee-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
+                .admin-fee-options { background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 3px solid #d97706; }
+                .admin-fee-amount { margin-bottom: 8px; }
+            </style>`;
+        var amountInput = document.getElementById("amount");
+        if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+    } catch (error) {
+        console.error("createOrderForCustomer error:", error);
+        alert(Utils.lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
+    }
+},
+
+saveOrderWithCustomer: async function(customerId) {
+    var collateral = document.getElementById("collateral").value.trim();
+    var amountStr = document.getElementById("amount").value;
+    var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
+    var notes = document.getElementById("notes").value;
+    var serviceFeePercent = parseInt(document.getElementById("serviceFeePercent").value) || 0;
+    
+    // ========== 新增：获取管理费支付方式 ==========
+    var adminFeeMethod = document.querySelector('input[name="adminFeeMethod"]:checked')?.value || 'cash';
+    var adminFeeAmount = 30000;  // 固定管理费金额，可改为从配置读取
+    
+    if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
+    
+    try {
+        const { data: customer } = await supabaseClient
+            .from('customers')
+            .select('*')
+            .eq('id', customerId)
+            .single();
+        
+        // 1. 创建订单
+        var orderData = {
+            customer: { 
+                name: customer.name, 
+                ktp: customer.ktp_number || '', 
+                phone: customer.phone, 
+                address: customer.ktp_address || customer.address || '' 
+            },
+            collateral_name: collateral,
+            loan_amount: amount,
+            service_fee_percent: serviceFeePercent,
+            notes: notes,
+            customer_id: customerId,
+            store_id: null
+        };
+        
+        var newOrder = await Order.create(orderData);
+        
+        // ========== 新增：2. 收取管理费（一次性） ==========
+        if (adminFeeAmount > 0) {
+            try {
+                await Order.recordAdminFee(newOrder.order_id, adminFeeMethod, adminFeeAmount);
+                console.log(`✅ 管理费已收取: ${Utils.formatCurrency(adminFeeAmount)} 方式: ${adminFeeMethod}`);
+            } catch (adminFeeError) {
+                console.error("管理费收取失败:", adminFeeError);
+                // 管理费收取失败不影响订单创建，但需要提示
+                alert(Utils.lang === 'id' 
+                    ? `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`
+                    : `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`);
+            }
         }
-    },
+        
+        alert(Utils.t('order_created') + "\nID: " + newOrder.order_id);
+        this.goBack();
+    } catch (error) {
+        console.error("saveOrderWithCustomer error:", error);
+        alert(Utils.lang === 'id' ? 'Gagal menyimpan order: ' + error.message : '保存订单失败：' + error.message);
+    }
+},               
 
     saveOrderWithCustomer: async function(customerId) {
         var collateral = document.getElementById("collateral").value.trim();
