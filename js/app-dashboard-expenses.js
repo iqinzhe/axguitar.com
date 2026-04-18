@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - 支出功能模块 v4.0
+// app-dashboard-expenses.js - 支出功能模块 v1.0
 // 修复内容：
 // 1. 删除支出时同步删除 cash_flow_records 中的关联记录（严重3）
 // 2. 优化支出编辑时的资金流同步
