@@ -1,8 +1,5 @@
-// supabase.js - 完整修复版 v2.0
-// 修复内容：
-// 1. 门店编码与前缀从数据库动态读取（修复高危2）
-// 2. 移除硬编码的 Map 映射
-// 3. 优化 ID 生成器性能（缓存门店前缀）
+// supabase.js - 完整修复版 v1.0
+// 包含：乐观锁重试、详细错误提示、内部转账功能、资金管理
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -10,10 +7,6 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let _profileCache = null;
-let _storePrefixCache = new Map();  // 门店前缀缓存
-let _storesCache = null;            // 门店列表缓存
-let _storesCacheTime = 0;
-const STORES_CACHE_TTL = 5 * 60 * 1000;  // 5分钟缓存
 
 const SupabaseAPI = {
     getClient() { return supabaseClient; },
@@ -78,9 +71,6 @@ const SupabaseAPI = {
 
     clearCache() {
         _profileCache = null;
-        _storePrefixCache.clear();
-        _storesCache = null;
-        _storesCacheTime = 0;
     },
 
     async isAdmin() {
@@ -113,82 +103,53 @@ const SupabaseAPI = {
         if (error) throw error;
     },
 
-    // ==================== 门店相关（带缓存） ====================
-    async getAllStores(forceRefresh = false) {
-        const now = Date.now();
-        if (!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_CACHE_TTL) {
-            return _storesCache;
-        }
-        
+    async getAllStores() {
         const { data, error } = await supabaseClient.from('stores').select('*').order('code');
         if (error) throw error;
-        
-        _storesCache = data;
-        _storesCacheTime = now;
-        
-        // 预加载前缀缓存
-        for (const store of data) {
-            if (store.prefix) {
-                _storePrefixCache.set(store.id, store.prefix);
-                _storePrefixCache.set(store.code, store.prefix);
-            }
-        }
-        
         return data;
     },
 
-    // ==================== 修复高危2：动态获取门店前缀 ====================
+    // ==================== 门店代码到前缀的映射 ====================
+    
     async _getStorePrefix(storeId) {
         if (!storeId) return 'AD';
         
-        // 检查缓存
-        if (_storePrefixCache.has(storeId)) {
-            return _storePrefixCache.get(storeId);
-        }
+        const { data, error } = await supabaseClient
+            .from('stores')
+            .select('code, name')
+            .eq('id', storeId)
+            .single();
         
-        try {
-            const { data, error } = await supabaseClient
-                .from('stores')
-                .select('prefix, code')
-                .eq('id', storeId)
-                .single();
-            
-            if (error || !data) {
-                console.warn(`获取门店 ${storeId} 前缀失败:`, error);
-                return 'AD';
-            }
-            
-            // 优先使用 prefix 字段，其次根据 code 推断，最后默认 AD
-            let prefix = data.prefix;
-            if (!prefix && data.code) {
-                prefix = this._inferPrefixFromCode(data.code);
-            }
-            if (!prefix) {
-                prefix = 'AD';
-            }
-            
-            _storePrefixCache.set(storeId, prefix);
-            if (data.code) {
-                _storePrefixCache.set(data.code, prefix);
-            }
-            
-            return prefix;
-        } catch (err) {
-            console.error("_getStorePrefix error:", err);
-            return 'AD';
-        }
-    },
-    
-    // 根据门店编码推断前缀（兼容旧数据）
-    _inferPrefixFromCode(code) {
-        const codeToPrefixMap = {
+        if (error || !data) return 'AD';
+        
+        const codeToPrefix = {
             'STORE_000': 'AD',
             'STORE_001': 'BL',
             'STORE_002': 'SO',
             'STORE_003': 'GP',
-            'STORE_004': 'BJ'
+            'STORE_004': 'BJ',
         };
-        return codeToPrefixMap[code] || 'AD';
+        
+        if (data.code && codeToPrefix[data.code]) {
+            return codeToPrefix[data.code];
+        }
+        
+        const nameToPrefix = {
+            'kantor': 'AD',
+            'bangil': 'BL',
+            'gempol': 'GP',
+            'sidoarjo': 'SO',
+            'beji': 'BJ'
+        };
+        
+        const nameLower = data.name.toLowerCase();
+        for (const [key, val] of Object.entries(nameToPrefix)) {
+            if (nameLower.includes(key)) {
+                return val;
+            }
+        }
+        
+        return 'AD';
     },
 
     // ==================== ID 生成器 ====================
@@ -289,6 +250,7 @@ const SupabaseAPI = {
         return data;
     },
     
+    // ==================== 作废资金流记录 ====================
     async voidCashFlow(originalFlowId, reason) {
         const profile = await this.getCurrentProfile();
         
@@ -327,6 +289,7 @@ const SupabaseAPI = {
         return true;
     },
 
+    // ==================== 贷款发放记录（防重复） ====================
     async recordLoanDisbursement(orderId, amount, source, description) {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -431,8 +394,7 @@ const SupabaseAPI = {
             try {
                 const orderId = await this._generateOrderId(profile.role, targetStoreId);
                 
-                // 使用 Utils 中的利率常量
-                const monthlyInterest = orderData.loan_amount * Utils.MONTHLY_INTEREST_RATE;
+                const monthlyInterest = orderData.loan_amount * 0.10;
                 const serviceFeeAmount = orderData.loan_amount * (serviceFeePercent / 100);
                 
                 const newOrder = {
@@ -459,9 +421,9 @@ const SupabaseAPI = {
                     created_by: profile.id,
                     notes: orderData.notes || '',
                     customer_id: orderData.customer_id || null,
-                    is_locked: true,
-                    locked_at: new Date().toISOString(),
-                    locked_by: profile.id
+                    is_locked: false,
+                    locked_at: null,
+                    locked_by: null
                 };
 
                 const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
@@ -534,6 +496,7 @@ const SupabaseAPI = {
         return true;
     },
 
+    // ==================== 服务费记录 ====================
     async recordServiceFee(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -580,7 +543,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 利息记录 ====================
+    // ==================== 利息记录（带乐观锁重试 - 详细错误信息版） ====================
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -599,8 +562,7 @@ const SupabaseAPI = {
                 }
                 
                 const remainingPrincipal = currentOrder.loan_amount - currentOrder.principal_paid;
-                // 使用 Utils 中的利率常量
-                const monthlyInterest = remainingPrincipal * Utils.MONTHLY_INTEREST_RATE;
+                const monthlyInterest = remainingPrincipal * 0.10;
                 const totalInterest = monthlyInterest * months;
                 
                 const newInterestPaidMonths = currentOrder.interest_paid_months + months;
@@ -639,6 +601,17 @@ const SupabaseAPI = {
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
+                    // 检查是否因订单被锁定（is_locked=true）导致RLS拒绝写入
+                    const checkOrder = await this.getOrder(orderId);
+                    if (checkOrder &&
+                        checkOrder.interest_paid_months === currentOrder.interest_paid_months &&
+                        checkOrder.principal_paid === currentOrder.principal_paid &&
+                        checkOrder.status === 'active') {
+                        // 数据未被并发修改，说明是 is_locked=true 的RLS策略阻止了写入
+                        throw new Error(Utils.lang === 'id'
+                            ? `❌ 保存失败！该订单处于锁定状态，缴费操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行缴费。`
+                            : `❌ 保存失败！该订单处于锁定状态，缴费操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行缴费。`);
+                    }
                     retryCount++;
                     if (retryCount >= maxRetries) {
                         throw new Error(Utils.lang === 'id' 
@@ -649,6 +622,7 @@ const SupabaseAPI = {
                     continue;
                 }
                 
+                // 记录支付历史
                 const paymentData = {
                     order_id: currentOrder.id,
                     date: new Date().toISOString().split('T')[0],
@@ -700,7 +674,7 @@ const SupabaseAPI = {
         throw lastError;
     },
 
-    // ==================== 本金还款 ====================
+    // ==================== 本金还款（带乐观锁重试 - 详细错误信息版） ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -756,7 +730,7 @@ const SupabaseAPI = {
                     updates.monthly_interest = 0;
                     updates.completed_at = new Date().toISOString();
                 } else {
-                    updates.monthly_interest = newPrincipalRemaining * Utils.MONTHLY_INTEREST_RATE;
+                    updates.monthly_interest = newPrincipalRemaining * 0.10;
                 }
                 
                 const { data: updatedOrder, error: updateError } = await supabaseClient
@@ -786,6 +760,16 @@ const SupabaseAPI = {
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
+                    // 检查是否因订单被锁定（is_locked=true）导致RLS拒绝写入
+                    const checkOrder2 = await this.getOrder(orderId);
+                    if (checkOrder2 &&
+                        checkOrder2.principal_paid === currentOrder.principal_paid &&
+                        checkOrder2.interest_paid_months === currentOrder.interest_paid_months &&
+                        checkOrder2.status === 'active') {
+                        throw new Error(Utils.lang === 'id'
+                            ? `❌ 保存失败！该订单处于锁定状态，还款操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行还款。`
+                            : `❌ 保存失败！该订单处于锁定状态，还款操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行还款。`);
+                    }
                     retryCount++;
                     if (retryCount >= maxRetries) {
                         throw new Error(Utils.lang === 'id' 
@@ -796,12 +780,18 @@ const SupabaseAPI = {
                     continue;
                 }
                 
+                // 记录支付历史
+                const isFullRepayment = paidAmount >= remainingPrincipal;
+                const description = isFullRepayment 
+                    ? (Utils.lang === 'id' ? '✅ 全额还款结清' : '✅ 全额还款结清')
+                    : (Utils.lang === 'id' ? '部分还款' : '部分还款');
+                
                 const paymentData = {
                     order_id: currentOrder.id,
                     date: new Date().toISOString().split('T')[0],
                     type: 'principal',
                     amount: paidAmount,
-                    description: isAdjusted ? '全额还款结清' : '部分还款',
+                    description: description,
                     recorded_by: profile.id,
                     payment_method: paymentMethod
                 };
@@ -822,11 +812,11 @@ const SupabaseAPI = {
                     source_target: paymentMethod,
                     order_id: currentOrder.id,
                     customer_id: currentOrder.customer_id,
-                    description: isAdjusted ? '全额还款结清' : '部分还款',
+                    description: isFullRepayment ? '全额还款结清' : '部分还款',
                     reference_id: currentOrder.order_id
                 });
                 
-                if (isCompleted) {
+                if (isFullRepayment) {
                     alert(Utils.lang === 'id' 
                         ? `✅ 保存成功！本金已结清，订单完成。\n\n还款金额: ${this.formatCurrency(paidAmount)}`
                         : `✅ 保存成功！本金已结清，订单完成。\n\n还款金额: ${this.formatCurrency(paidAmount)}`);
@@ -852,6 +842,7 @@ const SupabaseAPI = {
         throw lastError;
     },
 
+    // ==================== 解锁管理费 ====================
     async unlockAdminFee(orderId, reason = 'admin_correction') {
         const profile = await this.getCurrentProfile();
         
@@ -990,10 +981,11 @@ const SupabaseAPI = {
             total_service_fees: orders.reduce((s, o) => s + (o.service_fee_paid || 0), 0),
             total_interest: orders.reduce((s, o) => s + o.interest_paid_total, 0),
             total_principal: orders.reduce((s, o) => s + o.principal_paid, 0),
-            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * Utils.MONTHLY_INTEREST_RATE), 0)
+            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * 0.10), 0)
         };
     },
 
+    // ==================== 获取所有支付记录（安全过滤） ====================
     async getAllPayments() {
         const profile = await this.getCurrentProfile();
         
@@ -1050,50 +1042,10 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 修复高危2：门店创建时自动生成 prefix ====================
-    async _generateStorePrefix() {
-        const stores = await this.getAllStores(true);
-        
-        // 总部固定为 AD
-        const nameLower = arguments[0]?.toLowerCase() || '';
-        if (nameLower.includes('kantor') || nameLower.includes('pusat') || nameLower.includes('总部')) {
-            return 'AD';
-        }
-        
-        // 获取现有门店的序号，生成新前缀
-        // 使用字母序列: BL, GP, SO, BJ, ...
-        const existingPrefixes = stores
-            .map(s => s.prefix)
-            .filter(p => p && p !== 'AD');
-        
-        const prefixList = ['BL', 'GP', 'SO', 'BJ', 'PG', 'ML', 'SB', 'PS', 'KT', 'SR'];
-        
-        for (const prefix of prefixList) {
-            if (!existingPrefixes.includes(prefix)) {
-                return prefix;
-            }
-        }
-        
-        // 如果预定义前缀都用完了，使用字母组合
-        let nextNum = existingPrefixes.length + 1;
-        return `S${String(nextNum).padStart(2, '0')}`;
-    },
-
     async createStore(code, name, address, phone) {
-        // 自动生成 prefix
-        const prefix = await this._generateStorePrefix(name);
-        
         const { data, error } = await supabaseClient
-            .from('stores')
-            .insert({ code, name, address, phone, prefix })
-            .select()
-            .single();
-        
+            .from('stores').insert({ code, name, address, phone }).select().single();
         if (error) throw error;
-        
-        // 更新缓存
-        this.clearCache();
-        
         return data;
     },
 
@@ -1101,10 +1053,6 @@ const SupabaseAPI = {
         const { data, error } = await supabaseClient
             .from('stores').update(updates).eq('id', id).select().single();
         if (error) throw error;
-        
-        // 更新缓存
-        this.clearCache();
-        
         return data;
     },
 
@@ -1135,8 +1083,6 @@ const SupabaseAPI = {
         
         const { error } = await supabaseClient.from('stores').delete().eq('id', id);
         if (error) throw error;
-        
-        this.clearCache();
         return true;
     },
 
