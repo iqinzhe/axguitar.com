@@ -1,8 +1,9 @@
-// app-payments.js - 完整修复版 v1.0
+// app-payments.js - 完整修复版 v5.0
 // 修改内容：
 // 1. 新增贷款发放记录按钮
 // 2. 管理费"记录收款"改为"已收款"，点击后锁定
 // 3. 移除所有净利相关显示
+// 4. 优化缴费界面布局
 
 window.APP = window.APP || {};
 
@@ -297,6 +298,7 @@ const PaymentsModule = {
                         </table>
                     </div>
                 </div>
+                
                 <style>
                     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
                     .order-summary .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
@@ -383,7 +385,6 @@ const PaymentsModule = {
         var methodName = method === 'cash' ? (Utils.lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)') : (Utils.lang === 'id' ? 'Bank BNI' : '银行BNI');
         var lang = Utils.lang;
         
-        // 获取订单信息以显示管理费金额
         var order = await SUPABASE.getOrder(orderId);
         
         if (confirm(lang === 'id' 
