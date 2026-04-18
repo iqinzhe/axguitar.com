@@ -1,19 +1,32 @@
-// utils.js - 完整最终版 v3.0
+// utils.js - 完整最终版 v4.0
 // 修改内容：
-// 1. 新增服务费相关翻译
-// 2. 新增服务费百分比选项
-// 3. 更新导出CSV格式（包含服务费）
+// 1. 新增全局利率常量 MONTHLY_INTEREST_RATE（修复高危1）
+// 2. CSV 导出金额使用原始数值（修复中危3）
+// 3. 新增服务费相关翻译
+// 4. 新增服务费百分比选项
 
 const Utils = {
     lang: localStorage.getItem('jf_language') || 'id',
     db: null,
+    
+    // ==================== 修复高危1：利率常量 ====================
+    MONTHLY_INTEREST_RATE: 0.10,  // 月利率 10%
+    
+    // 服务费百分比选项
+    serviceFeePercentOptions: [
+        { value: 0, label: '0% (Tidak Ada)' },
+        { value: 1, label: '1%' },
+        { value: 2, label: '2%' },
+        { value: 3, label: '3%' }
+    ],
 
     setDb(db) {
         this.db = db;
     },
 
+    // 使用常量计算月利息
     calculateMonthlyInterest(loanAmount) {
-        return loanAmount * 0.10;
+        return loanAmount * this.MONTHLY_INTEREST_RATE;
     },
 
     calculateServiceFee(loanAmount, percent) {
@@ -25,14 +38,6 @@ const Utils = {
         date.setMonth(date.getMonth() + paidMonths + 1);
         return date.toISOString().split('T')[0];
     },
-
-    // 服务费百分比选项
-    serviceFeePercentOptions: [
-        { value: 0, label: '0% (Tidak Ada)' },
-        { value: 1, label: '1%' },
-        { value: 2, label: '2%' },
-        { value: 3, label: '3%' }
-    ],
 
     translations: {
         id: {
@@ -114,6 +119,11 @@ const Utils = {
             style: 'currency', currency: 'IDR', minimumFractionDigits: 0
         }).format(amount);
     },
+    
+    // 获取原始数值（用于CSV导出）
+    getRawAmount(amount) {
+        return amount || 0;
+    },
 
     formatDate(dateStr) {
         if (!dateStr) return '-';
@@ -132,17 +142,20 @@ const Utils = {
         URL.revokeObjectURL(url);
     },
 
+    // ==================== 修复中危3：CSV导出使用原始数值 ====================
     exportToCSV(orders, filename) {
         const headers = this.lang === 'id'
             ? ['ID Pesanan', 'Pelanggan', 'Pinjaman', 'Admin Fee', 'Service Fee', 'Bunga Bulanan', 'Status', 'Tanggal Dibuat']
             : ['订单ID', '客户', '贷款金额', '管理费', '服务费', '月利息', '状态', '创建日期'];
         const rows = orders.map(o => [
-            o.order_id, o.customer_name,
-            this.formatCurrency(o.loan_amount),
-            this.formatCurrency(o.admin_fee),
-            this.formatCurrency(o.service_fee_amount || 0),
-            this.formatCurrency(o.monthly_interest),
-            o.status, this.formatDate(o.created_at)
+            o.order_id, 
+            o.customer_name,
+            this.getRawAmount(o.loan_amount),  // 原始数值
+            this.getRawAmount(o.admin_fee),     // 原始数值
+            this.getRawAmount(o.service_fee_amount || 0), // 原始数值
+            this.getRawAmount(o.monthly_interest), // 原始数值
+            o.status, 
+            this.formatDate(o.created_at)
         ]);
         const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -174,7 +187,7 @@ const Utils = {
             p.date,
             typeMap[p.type] || p.type,
             p.months || '-',
-            this.formatCurrency(p.amount),
+            this.getRawAmount(p.amount),  // 原始数值
             methodMap[p.payment_method] || '-',
             p.description || '-'
         ]);
@@ -205,7 +218,7 @@ const Utils = {
             typeMap[f.flow_type] || f.flow_type,
             f.source_target === 'cash' ? (this.lang === 'id' ? 'Tunai' : '现金') : (this.lang === 'id' ? 'Bank' : '银行'),
             f.direction === 'inflow' ? (this.lang === 'id' ? 'Masuk' : '流入') : (this.lang === 'id' ? 'Keluar' : '流出'),
-            this.formatCurrency(f.amount),
+            this.getRawAmount(f.amount),  // 原始数值
             f.description || '-',
             f.orders?.order_id || '-'
         ]);
@@ -276,7 +289,6 @@ const Utils = {
         return '<tr>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '</tr>';
     },
 
-    // 获取服务费百分比选项HTML
     getServiceFeeOptionsHtml: function(selectedPercent = 0) {
         var options = '';
         for (var opt of this.serviceFeePercentOptions) {
