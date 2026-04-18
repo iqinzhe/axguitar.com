@@ -1,5 +1,9 @@
-// supabase.js - 完整修复版 v1.0
-// 包含：乐观锁重试、详细错误提示、内部转账功能、资金管理
+// supabase.js - 完整修复版 v2.0
+// 修复内容：
+// 1. 创建订单时自动锁定 (is_locked = true)
+// 2. updateOrder 中添加锁定检查，禁止修改锁定订单的基础信息
+// 3. 缴费操作不检查锁定状态（允许正常缴费）
+// 4. 门店前缀从数据库动态读取（需要执行 SQL 添加 prefix 字段）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -7,6 +11,10 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let _profileCache = null;
+let _storePrefixCache = new Map();
+let _storesCache = null;
+let _storesCacheTime = 0;
+const STORES_CACHE_TTL = 5 * 60 * 1000;
 
 const SupabaseAPI = {
     getClient() { return supabaseClient; },
@@ -71,6 +79,9 @@ const SupabaseAPI = {
 
     clearCache() {
         _profileCache = null;
+        _storePrefixCache.clear();
+        _storesCache = null;
+        _storesCacheTime = 0;
     },
 
     async isAdmin() {
@@ -103,53 +114,70 @@ const SupabaseAPI = {
         if (error) throw error;
     },
 
-    async getAllStores() {
+    async getAllStores(forceRefresh = false) {
+        const now = Date.now();
+        if (!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_CACHE_TTL) {
+            return _storesCache;
+        }
+        
         const { data, error } = await supabaseClient.from('stores').select('*').order('code');
         if (error) throw error;
+        
+        _storesCache = data;
+        _storesCacheTime = now;
+        
+        for (const store of data) {
+            if (store.prefix) {
+                _storePrefixCache.set(store.id, store.prefix);
+                _storePrefixCache.set(store.code, store.prefix);
+            }
+        }
+        
         return data;
     },
 
-    // ==================== 门店代码到前缀的映射 ====================
+    // ==================== 门店前缀（动态获取） ====================
     
     async _getStorePrefix(storeId) {
         if (!storeId) return 'AD';
         
-        const { data, error } = await supabaseClient
-            .from('stores')
-            .select('code, name')
-            .eq('id', storeId)
-            .single();
-        
-        if (error || !data) return 'AD';
-        
-        const codeToPrefix = {
-            'STORE_000': 'AD',
-            'STORE_001': 'BL',
-            'STORE_002': 'SO',
-            'STORE_003': 'GP',
-            'STORE_004': 'BJ',
-        };
-        
-        if (data.code && codeToPrefix[data.code]) {
-            return codeToPrefix[data.code];
+        if (_storePrefixCache.has(storeId)) {
+            return _storePrefixCache.get(storeId);
         }
         
-        const nameToPrefix = {
-            'kantor': 'AD',
-            'bangil': 'BL',
-            'gempol': 'GP',
-            'sidoarjo': 'SO',
-            'beji': 'BJ'
-        };
-        
-        const nameLower = data.name.toLowerCase();
-        for (const [key, val] of Object.entries(nameToPrefix)) {
-            if (nameLower.includes(key)) {
-                return val;
+        try {
+            const { data, error } = await supabaseClient
+                .from('stores')
+                .select('prefix, code')
+                .eq('id', storeId)
+                .single();
+            
+            if (error || !data) {
+                console.warn(`获取门店 ${storeId} 前缀失败:`, error);
+                return 'AD';
             }
+            
+            let prefix = data.prefix;
+            if (!prefix && data.code) {
+                const codeToPrefixMap = {
+                    'STORE_000': 'AD',
+                    'STORE_001': 'BL',
+                    'STORE_002': 'SO',
+                    'STORE_003': 'GP',
+                    'STORE_004': 'BJ'
+                };
+                prefix = codeToPrefixMap[data.code] || 'AD';
+            }
+            if (!prefix) prefix = 'AD';
+            
+            _storePrefixCache.set(storeId, prefix);
+            if (data.code) _storePrefixCache.set(data.code, prefix);
+            
+            return prefix;
+        } catch (err) {
+            console.error("_getStorePrefix error:", err);
+            return 'AD';
         }
-        
-        return 'AD';
     },
 
     // ==================== ID 生成器 ====================
@@ -250,7 +278,6 @@ const SupabaseAPI = {
         return data;
     },
     
-    // ==================== 作废资金流记录 ====================
     async voidCashFlow(originalFlowId, reason) {
         const profile = await this.getCurrentProfile();
         
@@ -289,10 +316,8 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 贷款发放记录（防重复） ====================
     async recordLoanDisbursement(orderId, amount, source, description) {
         const order = await this.getOrder(orderId);
-        const profile = await this.getCurrentProfile();
         
         const { data: existingFlow, error: checkError } = await supabaseClient
             .from('cash_flow_records')
@@ -394,9 +419,10 @@ const SupabaseAPI = {
             try {
                 const orderId = await this._generateOrderId(profile.role, targetStoreId);
                 
-                const monthlyInterest = orderData.loan_amount * 0.10;
+                const monthlyInterest = orderData.loan_amount * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 const serviceFeeAmount = orderData.loan_amount * (serviceFeePercent / 100);
                 
+                // ==================== 修复：创建订单时自动锁定 ====================
                 const newOrder = {
                     order_id: orderId,
                     customer_name: orderData.customer_name,
@@ -421,9 +447,10 @@ const SupabaseAPI = {
                     created_by: profile.id,
                     notes: orderData.notes || '',
                     customer_id: orderData.customer_id || null,
-                    is_locked: false,
-                    locked_at: null,
-                    locked_by: null
+                    // ✅ 创建订单后立即锁定，防止修改基础信息
+                    is_locked: true,
+                    locked_at: new Date().toISOString(),
+                    locked_by: profile.id
                 };
 
                 const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
@@ -437,7 +464,7 @@ const SupabaseAPI = {
                     throw error;
                 }
                 
-                console.log(`✅ 订单创建成功: ${orderId} (门店: ${targetStoreId})`);
+                console.log(`✅ 订单创建成功: ${orderId} (门店: ${targetStoreId})，已锁定`);
                 return data;
                 
             } catch (err) {
@@ -543,7 +570,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 利息记录（带乐观锁重试 - 详细错误信息版） ====================
+    // ==================== 利息记录（乐观锁重试版） ====================
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -562,12 +589,13 @@ const SupabaseAPI = {
                 }
                 
                 const remainingPrincipal = currentOrder.loan_amount - currentOrder.principal_paid;
-                const monthlyInterest = remainingPrincipal * 0.10;
+                const monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 const totalInterest = monthlyInterest * months;
                 
                 const newInterestPaidMonths = currentOrder.interest_paid_months + months;
                 const newInterestPaidTotal = currentOrder.interest_paid_total + totalInterest;
                 
+                // 注意：这里不检查 is_locked，允许锁定订单继续缴费
                 const { data: updatedOrder, error: updateError } = await supabaseClient
                     .from('orders')
                     .update({
@@ -601,16 +629,16 @@ const SupabaseAPI = {
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
-                    // 检查是否因订单被锁定（is_locked=true）导致RLS拒绝写入
+                    // 检查是否因其他原因失败
                     const checkOrder = await this.getOrder(orderId);
                     if (checkOrder &&
                         checkOrder.interest_paid_months === currentOrder.interest_paid_months &&
                         checkOrder.principal_paid === currentOrder.principal_paid &&
                         checkOrder.status === 'active') {
-                        // 数据未被并发修改，说明是 is_locked=true 的RLS策略阻止了写入
+                        // 数据未被并发修改，可能是 RLS 策略问题
                         throw new Error(Utils.lang === 'id'
-                            ? `❌ 保存失败！该订单处于锁定状态，缴费操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行缴费。`
-                            : `❌ 保存失败！该订单处于锁定状态，缴费操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行缴费。`);
+                            ? `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`
+                            : `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`);
                     }
                     retryCount++;
                     if (retryCount >= maxRetries) {
@@ -674,7 +702,7 @@ const SupabaseAPI = {
         throw lastError;
     },
 
-    // ==================== 本金还款（带乐观锁重试 - 详细错误信息版） ====================
+    // ==================== 本金还款（乐观锁重试版） ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -730,9 +758,10 @@ const SupabaseAPI = {
                     updates.monthly_interest = 0;
                     updates.completed_at = new Date().toISOString();
                 } else {
-                    updates.monthly_interest = newPrincipalRemaining * 0.10;
+                    updates.monthly_interest = newPrincipalRemaining * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 }
                 
+                // 注意：这里不检查 is_locked，允许锁定订单继续还款
                 const { data: updatedOrder, error: updateError } = await supabaseClient
                     .from('orders')
                     .update(updates)
@@ -760,15 +789,14 @@ const SupabaseAPI = {
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
-                    // 检查是否因订单被锁定（is_locked=true）导致RLS拒绝写入
-                    const checkOrder2 = await this.getOrder(orderId);
-                    if (checkOrder2 &&
-                        checkOrder2.principal_paid === currentOrder.principal_paid &&
-                        checkOrder2.interest_paid_months === currentOrder.interest_paid_months &&
-                        checkOrder2.status === 'active') {
+                    const checkOrder = await this.getOrder(orderId);
+                    if (checkOrder &&
+                        checkOrder.principal_paid === currentOrder.principal_paid &&
+                        checkOrder.interest_paid_months === currentOrder.interest_paid_months &&
+                        checkOrder.status === 'active') {
                         throw new Error(Utils.lang === 'id'
-                            ? `❌ 保存失败！该订单处于锁定状态，还款操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行还款。`
-                            : `❌ 保存失败！该订单处于锁定状态，还款操作被拒绝。\n\n请联系店长或管理员先解锁订单（订单号: ${orderId}），再进行还款。`);
+                            ? `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`
+                            : `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`);
                     }
                     retryCount++;
                     if (retryCount >= maxRetries) {
@@ -842,89 +870,30 @@ const SupabaseAPI = {
         throw lastError;
     },
 
-    // ==================== 解锁管理费 ====================
-    async unlockAdminFee(orderId, reason = 'admin_correction') {
-        const profile = await this.getCurrentProfile();
-        
-        if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' 
-                ? '只有管理员可以解锁管理费'
-                : '只有管理员可以解锁管理费');
-        }
-        
-        const order = await this.getOrder(orderId);
-        
-        const { data: adminFeePayment, error: findError } = await supabaseClient
-            .from('payment_history')
-            .select('id, amount')
-            .eq('order_id', order.id)
-            .eq('type', 'admin_fee')
-            .eq('is_voided', false)
-            .maybeSingle();
-        
-        if (findError) throw findError;
-        
-        let adminFeeCashFlow = null;
-        if (adminFeePayment) {
-            const { data: cashFlow, error: cashFlowError } = await supabaseClient
-                .from('cash_flow_records')
-                .select('id')
-                .eq('reference_id', order.order_id)
-                .eq('flow_type', 'admin_fee')
-                .eq('is_voided', false)
-                .maybeSingle();
-            
-            if (!cashFlowError && cashFlow) {
-                adminFeeCashFlow = cashFlow;
-                await this.voidCashFlow(adminFeeCashFlow.id, reason);
-            }
-        }
-        
-        if (adminFeePayment) {
-            const { error: markError } = await supabaseClient
-                .from('payment_history')
-                .update({ 
-                    is_voided: true, 
-                    void_reason: reason,
-                    voided_at: new Date().toISOString(),
-                    voided_by: profile.id
-                })
-                .eq('id', adminFeePayment.id);
-            
-            if (markError) throw markError;
-        }
-        
-        const { error: updateError } = await supabaseClient
-            .from('orders')
-            .update({ 
-                admin_fee_paid: false,
-                admin_fee_paid_date: null
-            })
-            .eq('order_id', orderId);
-        
-        if (updateError) throw updateError;
-        
-        return true;
-    },
-
-    async deleteOrder(orderId) {
-        const profile = await this.getCurrentProfile();
-        if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? '只有管理员可以删除订单' : '只有管理员可以删除订单');
-        }
-        const order = await this.getOrder(orderId);
-        
-        await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
-        
-        const { error: e1 } = await supabaseClient.from('payment_history').delete().eq('order_id', order.id);
-        if (e1) throw e1;
-        
-        const { error: e2 } = await supabaseClient.from('orders').delete().eq('order_id', orderId);
-        if (e2) throw e2;
-        return true;
-    },
-
+    // ==================== 更新订单（带锁定检查 - 双层保险） ====================
     async updateOrder(orderId, updateData, customerId) {
+        // ✅ 第一层检查：获取订单当前状态
+        const currentOrder = await this.getOrder(orderId);
+        
+        // 定义敏感字段（基础信息，不允许在锁定时修改）
+        const sensitiveFields = [
+            'customer_name', 'customer_ktp', 'customer_phone', 'customer_address',
+            'collateral_name', 'loan_amount', 'admin_fee', 'service_fee_percent'
+        ];
+        
+        // 检查是否尝试更新敏感字段
+        const isUpdatingSensitive = sensitiveFields.some(field => 
+            updateData.hasOwnProperty(field)
+        );
+        
+        // 如果订单已锁定且尝试更新敏感字段，拒绝操作
+        if (currentOrder.is_locked && isUpdatingSensitive) {
+            throw new Error(Utils.lang === 'id' 
+                ? '❌ 订单已锁定，无法修改基础信息（客户姓名、质押物、贷款金额等）。\n\n如需修改，请联系管理员解锁订单。'
+                : '❌ 订单已锁定，无法修改基础信息（客户姓名、质押物、贷款金额等）。\n\n如需修改，请联系管理员解锁订单。');
+        }
+        
+        // 执行更新
         const { data, error } = await supabaseClient
             .from('orders').update(updateData).eq('order_id', orderId).select().single();
         if (error) throw error;
@@ -969,6 +938,23 @@ const SupabaseAPI = {
         return true;
     },
 
+    async deleteOrder(orderId) {
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' ? '只有管理员可以删除订单' : '只有管理员可以删除订单');
+        }
+        const order = await this.getOrder(orderId);
+        
+        await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
+        
+        const { error: e1 } = await supabaseClient.from('payment_history').delete().eq('order_id', order.id);
+        if (e1) throw e1;
+        
+        const { error: e2 } = await supabaseClient.from('orders').delete().eq('order_id', orderId);
+        if (e2) throw e2;
+        return true;
+    },
+
     async getReport() {
         const orders = await this.getOrders();
         const activeOrders = orders.filter(o => o.status === 'active');
@@ -981,11 +967,11 @@ const SupabaseAPI = {
             total_service_fees: orders.reduce((s, o) => s + (o.service_fee_paid || 0), 0),
             total_interest: orders.reduce((s, o) => s + o.interest_paid_total, 0),
             total_principal: orders.reduce((s, o) => s + o.principal_paid, 0),
-            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * 0.10), 0)
+            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * (Utils.MONTHLY_INTEREST_RATE || 0.10)), 0)
         };
     },
 
-    // ==================== 获取所有支付记录（安全过滤） ====================
+    // ==================== 获取所有支付记录 ====================
     async getAllPayments() {
         const profile = await this.getCurrentProfile();
         
