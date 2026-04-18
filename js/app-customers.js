@@ -1,8 +1,9 @@
-// app-customers.js - 完整修复版 v5.0
+// app-customers.js - 完整修复版 v5.1
 // 功能：客户管理
 // 权限：Admin 只能查看所有门店客户（不能增/改），店长/员工只能操作本门店客户
-// 新增：管理费选项（30K/40K/50K + 手工输入）
-// 新增：服务费百分比选项（1%, 2%, 3%）+ 显示计算金额
+// 新增：管理费选项（30K/40K/50K + 手工输入）使用下拉选择
+// 新增：服务费百分比选项（1%, 2%, 3%）+ 实时显示计算金额
+// 新增：服务费和管理费都有独立的入账方式选择
 // 新增：贷款资金来源选择（保险柜现金 / 银行BNI）
 // 新增：质押物备注说明字段
 
@@ -317,6 +318,61 @@ const CustomersModule = {
         }
     },
 
+    // ==================== 辅助函数 ====================
+    updateServiceFeeDisplay: function() {
+        var amountStr = document.getElementById("amount")?.value || "0";
+        var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
+        var percent = parseInt(document.getElementById("serviceFeePercent")?.value) || 0;
+        var serviceFee = amount * (percent / 100);
+        var displayEl = document.getElementById("serviceFeeDisplay");
+        var amountDisplayEl = document.getElementById("serviceFeeAmount");
+        
+        if (displayEl) {
+            if (percent > 0 && amount > 0) {
+                displayEl.innerHTML = `💰 ${Utils.formatCurrency(serviceFee)} ${Utils.lang === 'id' ? 'per bulan' : '每月'}`;
+                if (amountDisplayEl) amountDisplayEl.value = serviceFee;
+            } else if (percent > 0 && amount === 0) {
+                displayEl.innerHTML = `📝 ${Utils.lang === 'id' ? 'Masukkan jumlah pinjaman terlebih dahulu' : '请先输入贷款金额'}`;
+                if (amountDisplayEl) amountDisplayEl.value = 0;
+            } else {
+                displayEl.innerHTML = '';
+                if (amountDisplayEl) amountDisplayEl.value = 0;
+            }
+        }
+    },
+    
+    updateAdminFeeSelect: function() {
+        var select = document.getElementById("adminFeeSelect");
+        var selectedValue = select?.value;
+        var manualContainer = document.getElementById("adminFeeManualContainer");
+        var manualInput = document.getElementById("adminFeeManual");
+        var hiddenInput = document.getElementById("adminFeeAmount");
+        
+        if (selectedValue === "manual") {
+            if (manualContainer) manualContainer.style.display = "block";
+            if (manualInput) {
+                var manualVal = manualInput.value.replace(/[^0-9]/g, '');
+                if (hiddenInput) hiddenInput.value = manualVal || 0;
+            }
+        } else {
+            if (manualContainer) manualContainer.style.display = "none";
+            if (hiddenInput) hiddenInput.value = selectedValue || 30000;
+            if (manualInput) manualInput.value = "";
+        }
+    },
+    
+    updateAdminFeeManual: function() {
+        var manualInput = document.getElementById("adminFeeManual");
+        var hiddenInput = document.getElementById("adminFeeAmount");
+        var select = document.getElementById("adminFeeSelect");
+        
+        if (manualInput) {
+            var num = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(manualInput.value) : parseInt(manualInput.value.replace(/[,\s]/g, '')) || 0;
+            if (hiddenInput) hiddenInput.value = num;
+            if (select) select.value = "manual";
+        }
+    },
+
     // ==================== 创建订单（完整版） ====================
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
@@ -349,19 +405,6 @@ const CustomersModule = {
             const profile = await SUPABASE.getCurrentProfile();
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             const userStoreCode = profile?.stores?.code || '-';
-            
-            // 管理费预设选项
-            const adminFeeOptions = [30000, 40000, 50000];
-            const adminFeeRadios = adminFeeOptions.map(fee => 
-                `<label style="margin-right:16px;"><input type="radio" name="adminFeeRadio" value="${fee}" onchange="APP.updateAdminFeeInput(${fee})"> ${Utils.formatCurrency(fee)}</label>`
-            ).join('');
-            
-            const adminFeeManualHtml = `
-                <div style="margin-top:8px;">
-                    <label style="font-size:12px; color:#64748b;">${lang === 'id' ? 'Atau input manual' : '或手动输入'}:</label>
-                    <input type="text" id="adminFeeManual" placeholder="${Utils.formatCurrency(0)}" class="amount-input" style="width:150px; margin-left:8px;" oninput="APP.updateAdminFeeFromManual(this.value)">
-                </div>
-            `;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -383,7 +426,7 @@ const CustomersModule = {
                         <p><strong>${lang === 'id' ? 'Toko Asal' : '所属门店'}:</strong> ${Utils.escapeHtml(customer.stores?.name || '-')} (${Utils.escapeHtml(customer.stores?.code || '-')})</p>
                     </div>
                     
-                    <div class="store-info-banner" style="background:#e0f2fe; padding:10px 15px; border-radius:8px; margin-bottom:16px;">
+                    <div class="store-info-banner">
                         <span>🏪 ${lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店'}: <strong>${Utils.escapeHtml(userStoreName)} (${Utils.escapeHtml(userStoreCode)})</strong></span>
                     </div>
                     
@@ -403,18 +446,18 @@ const CustomersModule = {
                         <!-- 第二行：贷款金额 + 资金来源 -->
                         <div class="form-group">
                             <label>${t('loan_amount')} *</label>
-                            <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input">
+                            <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input" oninput="APP.updateServiceFeeDisplay()">
                         </div>
                         <div class="form-group">
                             <label>💰 ${lang === 'id' ? 'Sumber Dana Pinjaman' : '贷款资金来源'}</label>
-                            <div class="payment-method-options" style="margin-top:4px;">
+                            <div class="payment-method-options">
                                 <label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label>
                                 <label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label>
                             </div>
                             <small style="color:#64748b;">${lang === 'id' ? 'Dana pinjaman berasal dari' : '贷款资金从哪里发放'}</small>
                         </div>
                         
-                        <!-- 第三行：服务费 + 管理费 -->
+                        <!-- ========== 服务费区域 ========== -->
                         <div class="form-group">
                             <label>💰 ${lang === 'id' ? 'Service Fee (%)' : '服务费 (%)'}</label>
                             <select id="serviceFeePercent" class="service-fee-select" onchange="APP.updateServiceFeeDisplay()">
@@ -423,25 +466,39 @@ const CustomersModule = {
                                 <option value="2">2%</option>
                                 <option value="3">3%</option>
                             </select>
-                            <div id="serviceFeeDisplay" style="font-size:12px; color:#f59e0b; margin-top:4px;"></div>
+                            <div id="serviceFeeDisplay" class="service-fee-display"></div>
+                            <input type="hidden" id="serviceFeeAmount" value="0">
                             <small style="color:#64748b;">${lang === 'id' ? 'Semakin tinggi pinjaman dan semakin lama tenor, service fee semakin besar' : '贷款金额越高时间越久，服务费越贵'}</small>
                         </div>
+                        <div class="form-group">
+                            <label>📋 ${lang === 'id' ? 'Metode Pemasukan Service Fee' : '服务费入账方式'}</label>
+                            <div class="payment-method-options">
+                                <label><input type="radio" name="serviceFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                <label><input type="radio" name="serviceFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
+                            </div>
+                        </div>
                         
+                        <!-- ========== 管理费区域 ========== -->
                         <div class="form-group">
                             <label>📋 ${lang === 'id' ? 'Admin Fee (Sekali)' : '管理费（一次性）'}</label>
                             <div class="admin-fee-options">
-                                <div class="admin-fee-presets">
-                                    ${adminFeeRadios}
+                                <select id="adminFeeSelect" class="admin-fee-select" onchange="APP.updateAdminFeeSelect()">
+                                    <option value="30000">Rp 30.000</option>
+                                    <option value="40000">Rp 40.000</option>
+                                    <option value="50000">Rp 50.000</option>
+                                    <option value="manual">✏️ ${lang === 'id' ? 'Input Manual' : '手动输入'}</option>
+                                </select>
+                                <div id="adminFeeManualContainer" style="display:none; margin-top:8px;">
+                                    <input type="text" id="adminFeeManual" placeholder="${Utils.formatCurrency(0)}" class="amount-input" style="width:100%;" oninput="APP.updateAdminFeeManual()">
                                 </div>
-                                ${adminFeeManualHtml}
                                 <input type="hidden" id="adminFeeAmount" value="30000">
                             </div>
-                            <div class="payment-method-group" style="margin-top:8px; background:#f8fafc; padding:8px 12px; border-radius:8px;">
-                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pemasukan' : '入账方式'}:</div>
-                                <div class="payment-method-options">
-                                    <label><input type="radio" name="adminFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
-                                    <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
-                                </div>
+                        </div>
+                        <div class="form-group">
+                            <label>📋 ${lang === 'id' ? 'Metode Pemasukan Admin Fee' : '管理费入账方式'}</label>
+                            <div class="payment-method-options">
+                                <label><input type="radio" name="adminFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
                             </div>
                         </div>
                         
@@ -463,48 +520,33 @@ const CustomersModule = {
                     .customer-info-display p { margin: 6px 0; }
                     .amount-input { text-align: right; }
                     .store-info-banner { background: #e0f2fe; padding: 10px 15px; border-radius: 8px; margin-bottom: 16px; }
-                    .service-fee-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
+                    
+                    .service-fee-select, .admin-fee-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 14px; }
+                    .service-fee-display { font-size: 14px; font-weight: 600; color: #f59e0b; margin-top: 6px; padding: 6px; background: #fffbeb; border-radius: 6px; text-align: center; }
+                    
                     .admin-fee-options { background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 3px solid #d97706; }
-                    .admin-fee-presets { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
-                    .admin-fee-presets label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+                    
+                    .payment-method-options { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 6px; }
+                    .payment-method-options label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
                     
                     /* 桌面端：两列布局 */
                     @media (min-width: 769px) {
-                        .two-col-grid {
-                            display: grid;
-                            grid-template-columns: 1fr 1fr;
-                            gap: 16px;
-                        }
-                        .two-col-grid .full-width {
-                            grid-column: span 2;
-                        }
+                        .two-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+                        .two-col-grid .full-width { grid-column: span 2; }
                     }
                     
                     /* 手机端：单列布局 */
                     @media (max-width: 768px) {
-                        .two-col-grid {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 12px;
-                        }
-                        .admin-fee-presets { justify-content: space-between; }
-                    }
-                    
-                    .payment-method-options {
-                        display: flex;
-                        gap: 16px;
-                        flex-wrap: wrap;
-                    }
-                    .payment-method-options label {
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 6px;
-                        cursor: pointer;
+                        .two-col-grid { display: flex; flex-direction: column; gap: 12px; }
+                        .payment-method-options { justify-content: flex-start; }
                     }
                 </style>`;
             
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+            
+            var manualInput = document.getElementById("adminFeeManual");
+            if (manualInput && Utils.bindAmountFormat) Utils.bindAmountFormat(manualInput);
             
             // 初始化服务费显示
             this.updateServiceFeeDisplay();
@@ -512,42 +554,6 @@ const CustomersModule = {
         } catch (error) {
             console.error("createOrderForCustomer error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
-        }
-    },
-    
-    // 更新服务费显示
-    updateServiceFeeDisplay: function() {
-        var amountStr = document.getElementById("amount")?.value || "0";
-        var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
-        var percent = parseInt(document.getElementById("serviceFeePercent")?.value) || 0;
-        var serviceFee = amount * (percent / 100);
-        var displayEl = document.getElementById("serviceFeeDisplay");
-        if (displayEl) {
-            if (percent > 0 && amount > 0) {
-                displayEl.innerHTML = `💰 ${Utils.formatCurrency(serviceFee)} ${Utils.lang === 'id' ? 'per bulan' : '每月'}`;
-            } else if (percent > 0 && amount === 0) {
-                displayEl.innerHTML = `📝 ${Utils.lang === 'id' ? 'Masukkan jumlah pinjaman terlebih dahulu' : '请先输入贷款金额'}`;
-            } else {
-                displayEl.innerHTML = '';
-            }
-        }
-    },
-    
-    // 更新管理费（预设按钮）
-    updateAdminFeeInput: function(fee) {
-        document.getElementById('adminFeeAmount').value = fee;
-        var manualInput = document.getElementById('adminFeeManual');
-        if (manualInput) manualInput.value = Utils.formatNumberWithCommas(fee);
-    },
-    
-    // 更新管理费（手动输入）
-    updateAdminFeeFromManual: function(value) {
-        var num = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(value) : parseInt(value.replace(/[,\s]/g, '')) || 0;
-        document.getElementById('adminFeeAmount').value = num;
-        // 取消预设按钮的选中状态
-        var radios = document.querySelectorAll('input[name="adminFeeRadio"]');
-        if (radios) {
-            radios.forEach(r => r.checked = false);
         }
     },
 
@@ -558,7 +564,11 @@ const CustomersModule = {
         var amountStr = document.getElementById("amount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var notes = document.getElementById("notes").value;
+        
+        // 服务费
         var serviceFeePercent = parseInt(document.getElementById("serviceFeePercent").value) || 0;
+        var serviceFeeAmount = amount * (serviceFeePercent / 100);
+        var serviceFeeMethod = document.querySelector('input[name="serviceFeeMethod"]:checked')?.value || 'cash';
         
         // 管理费
         var adminFeeAmount = parseInt(document.getElementById("adminFeeAmount").value) || 0;
@@ -611,7 +621,20 @@ const CustomersModule = {
                 }
             }
             
-            // 3. 收取管理费
+            // 3. 收取服务费（每月服务费，首次收取1个月）
+            if (serviceFeeAmount > 0) {
+                try {
+                    await Order.recordServiceFee(newOrder.order_id, 1, serviceFeeMethod);
+                    console.log(`✅ 服务费已收取: ${Utils.formatCurrency(serviceFeeAmount)} 方式: ${serviceFeeMethod}`);
+                } catch (serviceFeeError) {
+                    console.error("服务费收取失败:", serviceFeeError);
+                    alert(lang === 'id' 
+                        ? `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`
+                        : `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`);
+                }
+            }
+            
+            // 4. 收取管理费
             if (adminFeeAmount > 0) {
                 try {
                     await Order.recordAdminFee(newOrder.order_id, adminFeeMethod, adminFeeAmount);
@@ -801,5 +824,5 @@ for (var key in CustomersModule) {
 
 // 暴露辅助函数
 window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
-window.APP.updateAdminFeeInput = CustomersModule.updateAdminFeeInput;
-window.APP.updateAdminFeeFromManual = CustomersModule.updateAdminFeeFromManual;
+window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
+window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
