@@ -1,9 +1,10 @@
-// app-dashboard-orders.js - 完整修复版 v2.0
+// app-dashboard-orders.js - 完整修复版 v2.1
 // 修复内容：
-// 1. 修复 printOrder 函数中的 XSS 风险（中危1）
+// 1. 修复 printOrder 函数中的 XSS 风险
 // 2. 所有动态字段添加 escapeHtml 转义
 // 3. onclick 属性改用 data-* 属性 + 事件委托
 // 4. 统一使用 Utils.MONTHLY_INTEREST_RATE 常量
+// 5. 隐藏总部的缴费按钮（管理员不能缴费）
 
 window.APP = window.APP || {};
 
@@ -43,12 +44,12 @@ const DashboardOrders = {
                         ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
                         <td class="action-cell">
                             <button class="btn-small view-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">👁️ ${t('view')}</button>
-                            ${o.status === 'active' ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                             ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">🗑️ ${t('delete')}</button>` : ''}
                             <button class="btn-small print-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                             ${o.is_locked ? `<span class="locked-icon">🔒</span>` : ''}
                         </td>
-                    　　　`;
+                    　　`;
                 }
             }
 
@@ -155,6 +156,7 @@ const DashboardOrders = {
             if (!order) { alert('Order not found'); this.goBack(); return; }
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
+            var isAdmin = AUTH.isAdmin();
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
             
@@ -219,7 +221,7 @@ const DashboardOrders = {
                     
                     <div class="toolbar">
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                        ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
+                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
                         ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')" class="warning">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
                         <button class="wa-reminder-btn" data-order-id="${Utils.escapeHtml(order.order_id)}" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
                     </div>
@@ -314,7 +316,6 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 修复中危1：printOrder XSS 风险 ====================
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -325,7 +326,6 @@ const DashboardOrders = {
                 bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' 
             };
             
-            // 安全构建支付记录行（所有字段都转义）
             var paymentRows = '';
             for (var p of payments) {
                 var typeText = '';
@@ -348,7 +348,6 @@ const DashboardOrders = {
                 paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}</td></tr>`;
             }
             
-            // 安全构建所有字段
             var safeOrderId = Utils.escapeHtml(order.order_id);
             var safeCustomerName = Utils.escapeHtml(order.customer_name);
             var safeCustomerKtp = Utils.escapeHtml(order.customer_ktp || '-');
