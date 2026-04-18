@@ -1,25 +1,54 @@
-// app-payments.js - 完整修复版 v5.8
+// app-payments.js - 完整修复版 v5.9
 // 修复：订单摘要使用表格布局，服务费显示具体金额
 // 修复：使用 Utils.MONTHLY_INTEREST_RATE 常量替代硬编码利率
+// 修复：添加门店权限检查，总部不能进行缴费操作
 
 window.APP = window.APP || {};
 
 const PaymentsModule = {
 
     showPayment: async function(orderId) {
+        // ==================== 权限检查：总部不能进行缴费操作 ====================
+        if (AUTH.isAdmin()) {
+            alert(Utils.lang === 'id' 
+                ? '⚠️ Administrator tidak dapat melakukan pembayaran. Silakan login sebagai Manajer Toko atau Staf.'
+                : '⚠️ 管理员不能进行缴费操作。请使用店长或员工账号登录。');
+            APP.goBack();
+            return;
+        }
+        
+        // 检查当前用户是否有门店（店长或员工必须有门店）
+        const profile = await SUPABASE.getCurrentProfile();
+        if (!profile?.store_id) {
+            alert(Utils.lang === 'id' 
+                ? '⚠️ Akun Anda tidak terhubung dengan toko mana pun. Hubungi administrator.'
+                : '⚠️ 您的账号未关联任何门店。请联系管理员。');
+            APP.goBack();
+            return;
+        }
+        
         this.currentPage = 'payment';
         this.currentOrderId = orderId;
         this.saveCurrentPageState();
+        
         try {
             var order = await SUPABASE.getOrder(orderId);
             if (!order) return;
+            
+            // 确保订单属于当前用户的门店
+            if (order.store_id !== profile.store_id) {
+                alert(Utils.lang === 'id' 
+                    ? '⚠️ Anda tidak memiliki akses ke pesanan ini. Pesanan ini milik toko lain.'
+                    : '⚠️ 您无权访问此订单。此订单属于其他门店。');
+                APP.goBack();
+                return;
+            }
 
             var { payments } = await SUPABASE.getPaymentHistory(orderId);
 
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
             var remainingPrincipal = order.loan_amount - order.principal_paid;
-            // 修复高危1：使用利率常量
             var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
 
             // 获取利息和本金支付记录
@@ -109,7 +138,6 @@ const PaymentsModule = {
                 <!-- 订单摘要 - 表格布局 -->
                 <div class="card summary-card">
                     <table class="summary-table">
-                        <!-- 第一行：客户信息 -->
                         <tr>
                             <td class="label">${t('customer_name')}</td>
                             <td class="value">${Utils.escapeHtml(order.customer_name)}</td>
@@ -118,7 +146,6 @@ const PaymentsModule = {
                             <td class="label">${t('loan_amount')}</td>
                             <td class="value">${Utils.formatCurrency(order.loan_amount)}</td>
                         </tr>
-                        <!-- 第二行：本金和利息信息 -->
                         <tr>
                             <td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</td>
                             <td class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}</td>
@@ -127,14 +154,11 @@ const PaymentsModule = {
                             <td class="label">${lang === 'id' ? 'Jatuh Tempo' : '下次到期'}</td>
                             <td class="value">${nextDueDate}</td>
                         </tr>
-                        <!-- 第三行：已付利息 -->
                         <tr>
                             <td class="label">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</td>
                             <td class="value" colspan="5">${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${interestPayments.length} ${lang === 'id' ? 'kali' : '次'})</td>
                         </tr>
-                        <!-- 分隔行 -->
                         <tr class="divider"><td colspan="6"></td></tr>
-                        <!-- 第四行：典当物品 -->
                         <tr>
                             <td class="label">💎 ${lang === 'id' ? 'Nama Barang' : '物品名称'}</td>
                             <td class="value" colspan="2">${Utils.escapeHtml(order.collateral_name || '-')}</td>
@@ -147,16 +171,14 @@ const PaymentsModule = {
                             <td class="label">💰 ${lang === 'id' ? 'Pinjaman Dicairkan' : '贷款已发放'}</td>
                             <td class="value success-text" colspan="2">${Utils.formatCurrency(order.loan_amount)} (${order.created_at ? Utils.formatDate(order.created_at) : '-'})</td>
                         </tr>
-                        <!-- 分隔行 -->
                         <tr class="divider"><td colspan="6"></td></tr>
-                        <!-- 第五行：已缴纳费用状态 -->
                         <tr class="paid-row">
                             <td class="label">✅ ${lang === 'id' ? 'Admin Fee Dibayar' : '管理费已缴'}</td>
                             <td class="value success-text" colspan="2">${adminFeePaidInfo}</td>
                             <td class="label">✅ ${lang === 'id' ? 'Service Fee Dibayar' : '服务费已缴'}</td>
                             <td class="value success-text" colspan="2">${serviceFeePaidInfo}</td>
                         </tr>
-                     </table>
+                    </table>
                     <div class="summary-note">ℹ️ ${lang === 'id' ? 'Admin Fee, Service Fee, dan pencairan pinjaman telah selesai saat pembuatan order.' : '管理费、服务费和贷款发放已在创建订单时完成。'}</div>
                 </div>
                 
@@ -187,7 +209,7 @@ const PaymentsModule = {
                             <table class="history-table">
                                 <thead><tr><th class="text-center">${lang === 'id' ? 'Ke-' : '第几次'}</th><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
                                 <tbody>${interestRows}</tbody>
-                             </table>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -219,7 +241,7 @@ const PaymentsModule = {
                             <table class="history-table">
                                 <thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th class="text-right">${lang === 'id' ? 'Jumlah Bayar' : '还款金额'}</th><th class="text-right">${lang === 'id' ? 'Total Dibayar' : '累计已还'}</th><th class="text-right">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
                                 <tbody>${principalRows}</tbody>
-                             </table>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -232,7 +254,6 @@ const PaymentsModule = {
                     .btn-back { background: #64748b; color: white; }
                     .btn-detail { background: #8b5cf6; color: white; }
                     
-                    /* 订单摘要表格样式 */
                     .summary-card { padding: 12px 16px; margin-bottom: 20px; }
                     .summary-table { width: 100%; border-collapse: collapse; }
                     .summary-table td { padding: 8px 6px; border: none; }
@@ -247,7 +268,6 @@ const PaymentsModule = {
                     .success-text { color: #10b981; font-weight: 600; }
                     .summary-note { font-size: 0.7rem; color: #94a3b8; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #e2e8f0; text-align: center; }
                     
-                    /* 缴费卡片 */
                     .action-card { margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
                     .action-card .card-header { background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
                     .action-card .card-header h3 { margin: 0; font-size: 1rem; font-weight: 600; }
@@ -314,7 +334,6 @@ const PaymentsModule = {
         var lang = Utils.lang;
         
         var order = await SUPABASE.getOrder(orderId);
-        // 修复高危1：使用利率常量计算当前月利息
         var remainingPrincipal = order.loan_amount - order.principal_paid;
         var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
         var nextInterestNumber = (order.interest_paid_months || 0) + 1;
