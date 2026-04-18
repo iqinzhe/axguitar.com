@@ -818,7 +818,7 @@ input:focus, select:focus, textarea:focus {
         margin-bottom: 12px;
     }
     
-    .stat-card { padding: 10px 6px; }
+    .stat-card { padding: 5px 6px; }
     
     .toolbar {
         grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
