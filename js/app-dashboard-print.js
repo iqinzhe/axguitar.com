@@ -98,7 +98,7 @@ const DashboardPrint = {
             <body>
                 <div class="print-header">
                     <div class="print-logo">
-                        <img src="/icon-192.png" alt="JF!"> JF! by Gadai
+                        <img src="icons/favicon-192x192.png" alt="JF!"> JF! by Gadai
                     </div>
                     <div class="print-title">${lang === 'id' ? 'Laporan Sistem Manajemen Gadai' : '典当管理系统报表'}</div>
                     <div class="print-store-info">
