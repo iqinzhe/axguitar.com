@@ -1,5 +1,6 @@
-// app-payments.js - 完整修复版 v5.7
+// app-payments.js - 完整修复版 v5.8
 // 修复：订单摘要使用表格布局，服务费显示具体金额
+// 修复：使用 Utils.MONTHLY_INTEREST_RATE 常量替代硬编码利率
 
 window.APP = window.APP || {};
 
@@ -18,7 +19,8 @@ const PaymentsModule = {
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
             var remainingPrincipal = order.loan_amount - order.principal_paid;
-            var currentMonthlyInterest = remainingPrincipal * 0.10;
+            // 修复高危1：使用利率常量
+            var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
 
             // 获取利息和本金支付记录
             var interestPayments = payments.filter(p => p.type === 'interest' && !p.is_voided);
@@ -154,7 +156,7 @@ const PaymentsModule = {
                             <td class="label">✅ ${lang === 'id' ? 'Service Fee Dibayar' : '服务费已缴'}</td>
                             <td class="value success-text" colspan="2">${serviceFeePaidInfo}</td>
                         </tr>
-                    </table>
+                     </table>
                     <div class="summary-note">ℹ️ ${lang === 'id' ? 'Admin Fee, Service Fee, dan pencairan pinjaman telah selesai saat pembuatan order.' : '管理费、服务费和贷款发放已在创建订单时完成。'}</div>
                 </div>
                 
@@ -185,7 +187,7 @@ const PaymentsModule = {
                             <table class="history-table">
                                 <thead><tr><th class="text-center">${lang === 'id' ? 'Ke-' : '第几次'}</th><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
                                 <tbody>${interestRows}</tbody>
-                            </table>
+                             </table>
                         </div>
                     </div>
                 </div>
@@ -217,7 +219,7 @@ const PaymentsModule = {
                             <table class="history-table">
                                 <thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th class="text-right">${lang === 'id' ? 'Jumlah Bayar' : '还款金额'}</th><th class="text-right">${lang === 'id' ? 'Total Dibayar' : '累计已还'}</th><th class="text-right">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
                                 <tbody>${principalRows}</tbody>
-                            </table>
+                             </table>
                         </div>
                     </div>
                 </div>
@@ -312,11 +314,14 @@ const PaymentsModule = {
         var lang = Utils.lang;
         
         var order = await SUPABASE.getOrder(orderId);
+        // 修复高危1：使用利率常量计算当前月利息
+        var remainingPrincipal = order.loan_amount - order.principal_paid;
+        var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
         var nextInterestNumber = (order.interest_paid_months || 0) + 1;
         
         if (confirm(lang === 'id' 
-            ? `Konfirmasi penerimaan bunga bulan ke-${nextInterestNumber} untuk order ${order.order_id}?\n\nJumlah: ${Utils.formatCurrency(order.monthly_interest * months)}\nMetode: ${methodName}`
-            : `确认收到订单 ${order.order_id} 的第 ${nextInterestNumber} 期利息？\n\n金额: ${Utils.formatCurrency(order.monthly_interest * months)}\n方式: ${methodName}`)) {
+            ? `Konfirmasi penerimaan bunga bulan ke-${nextInterestNumber} untuk order ${order.order_id}?\n\nJumlah: ${Utils.formatCurrency(currentMonthlyInterest * months)}\nMetode: ${methodName}`
+            : `确认收到订单 ${order.order_id} 的第 ${nextInterestNumber} 期利息？\n\n金额: ${Utils.formatCurrency(currentMonthlyInterest * months)}\n方式: ${methodName}`)) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
                 alert(lang === 'id' ? `✅ Bunga bulan ke-${nextInterestNumber} berhasil dicatat` : `✅ 第 ${nextInterestNumber} 期利息记录成功`);
