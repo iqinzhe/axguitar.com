@@ -1,9 +1,9 @@
-// order.js - 完整修复版 v1.0
+// order.js - 完整修复版 v2.0
 // 修改内容：
-// 1. 新增服务费记录函数 recordServiceFee
-// 2. 新增贷款发放记录函数 recordLoanDisbursement
-// 3. 移除本金还款的 profit 选项参数
-// 4. 利息还款参数调整
+// 1. 使用 Utils.MONTHLY_INTEREST_RATE 常量替代硬编码利率（高危1）
+// 2. 新增服务费记录函数 recordServiceFee
+// 3. 新增贷款发放记录函数 recordLoanDisbursement
+// 4. 移除本金还款的 profit 选项参数
 
 const Order = {
     async create(data) {
@@ -32,12 +32,12 @@ const Order = {
         return await SUPABASE.recordServiceFee(orderId, monthsPaid, paymentMethod); 
     },
     
-    // 利息记录
+    // 利息记录（使用常量）
     async recordInterestPayment(orderId, monthsPaid, paymentMethod) { 
         return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod); 
     },
     
-    // 本金记录（移除 profit 选项）
+    // 本金记录（使用常量计算月利息）
     async recordPrincipalPayment(orderId, amount, paymentMethod) { 
         return await SUPABASE.recordPrincipalPayment(orderId, amount, paymentMethod); 
     },
@@ -47,9 +47,11 @@ const Order = {
         return await SUPABASE.recordLoanDisbursement(orderId, amount, source, description);
     },
     
+    // ==================== 修复高危1：使用利率常量 ====================
     // 获取当前月利息
     getCurrentMonthlyInterest(order) { 
-        return (order.loan_amount - order.principal_paid) * 0.10; 
+        const remainingPrincipal = order.loan_amount - order.principal_paid;
+        return remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
     },
     
     // 获取当前服务费金额
