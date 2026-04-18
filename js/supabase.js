@@ -1,9 +1,10 @@
-// supabase.js - 完整修复版 v5.1
+// supabase.js - 完整修复版 v5.2
 // 修复内容：
 // 1. 修复非管理员支付记录过滤不可靠问题（严重2）
 // 2. 管理费解锁时同步处理 cash_flow_records（隐患3）
 // 3. 乐观锁重试逻辑（本金还款和利息支付）
 // 4. 新增现金净利计算函数（剔除本金）
+// 5. 新增内部转账功能（资金管理）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -1349,18 +1350,6 @@ const SupabaseAPI = {
         return data?.name || '-';
     },
 
-    formatCurrency(amount) {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
-        }).format(amount);
-    },
-
-    formatDate(dateStr) {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('id-ID');
-    }
-};
-
     // ==================== 内部转账相关 API ====================
 
     // 记录内部转账
@@ -1508,7 +1497,19 @@ const SupabaseAPI = {
         });
         
         return transfer;
+    },
+
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
+        }).format(amount);
+    },
+
+    formatDate(dateStr) {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleDateString('id-ID');
     }
+};
 
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
