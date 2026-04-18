@@ -1,4 +1,4 @@
-// permission.js - 权限系统 v2.0
+// permission.js - 权限系统 v1.0
 // 角色定义：
 // - admin: 全部权限
 // - store_manager: 店长权限（审核订单、锁单）
