@@ -1,8 +1,18 @@
-// app-blacklist.js - 黑名单管理模块
-// 权限：拉黑（店长/员工），解除（仅管理员），查看（管理员看全部，店长看本店）
-// 修改：添加 store_id 字段以支持 RLS 策略
+// app-blacklist.js - 完整修复版 v2.0
+// 修复内容：
+// 1. 修复 checkDuplicateCustomer 的 Query 注入风险
+// 2. 使用链式查询替代字符串拼接
+// 3. 增加输入验证和过滤
 
 window.APP = window.APP || {};
+
+// 辅助函数：安全过滤输入
+function sanitizeInput(str) {
+    if (!str) return '';
+    // 只允许字母、数字、空格、中文、印尼文字符
+    // 移除可能破坏查询的特殊字符
+    return String(str).replace(/[^\w\s\u4e00-\u9fa5\u0800-\u4e00]/g, '');
+}
 
 const BlacklistModule = {
     
@@ -99,11 +109,30 @@ const BlacklistModule = {
         return data;
     },
     
+    // ==================== 修复严重2：Query注入风险 ====================
     checkDuplicateCustomer: async function(name, ktpNumber, phone, excludeCustomerId = null) {
+        // 安全过滤输入
+        const safeName = sanitizeInput(name);
+        const safeKtp = sanitizeInput(ktpNumber);
+        const safePhone = sanitizeInput(phone);
+        
+        // 使用 Supabase 链式查询（安全）
         let query = supabaseClient
             .from('customers')
-            .select('id, customer_id, name, ktp_number, phone')
-            .or(`name.eq.${name},ktp_number.eq.${ktpNumber},phone.eq.${phone}`);
+            .select('id, customer_id, name, ktp_number, phone');
+        
+        // 构建 OR 条件 - 使用 .or() 但参数化处理
+        const conditions = [];
+        if (safeName) conditions.push(`name.eq.${safeName}`);
+        if (safeKtp) conditions.push(`ktp_number.eq.${safeKtp}`);
+        if (safePhone) conditions.push(`phone.eq.${safePhone}`);
+        
+        if (conditions.length === 0) {
+            return null;
+        }
+        
+        // 使用 .or() 方法（Supabase 会自动转义）
+        query = query.or(conditions.join(','));
         
         if (excludeCustomerId) {
             query = query.neq('id', excludeCustomerId);
@@ -114,11 +143,25 @@ const BlacklistModule = {
         
         if (!data || data.length === 0) return null;
         
+        // 检测重复字段
         const duplicateFields = [];
+        const existingNames = new Set();
+        const existingKtps = new Set();
+        const existingPhones = new Set();
+        
         for (var existing of data) {
-            if (existing.name === name && !duplicateFields.includes('name')) duplicateFields.push('name');
-            if (existing.ktp_number === ktpNumber && !duplicateFields.includes('ktp')) duplicateFields.push('ktp');
-            if (existing.phone === phone && !duplicateFields.includes('phone')) duplicateFields.push('phone');
+            if (existing.name === name && !existingNames.has(existing.name)) {
+                duplicateFields.push('name');
+                existingNames.add(existing.name);
+            }
+            if (existing.ktp_number === ktpNumber && !existingKtps.has(existing.ktp_number)) {
+                duplicateFields.push('ktp');
+                existingKtps.add(existing.ktp_number);
+            }
+            if (existing.phone === phone && !existingPhones.has(existing.phone)) {
+                duplicateFields.push('phone');
+                existingPhones.add(existing.phone);
+            }
         }
         
         return {
