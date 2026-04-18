@@ -1,5 +1,16 @@
+// auth.js - 完整修复版 v2.0
+// 修复内容：
+// 1. 删除用户时同步删除 Supabase Auth 账号（需后端 Edge Function）
+// 2. 修复 username 登录逻辑（正确使用 email 字段）
+// 3. 增加登录失败次数限制和账号临时锁定
+// 4. 增加 ENTER 键登录支持
+
 const AUTH = {
     user: null,
+    
+    // 登录失败记录（前端临时方案）
+    _loginAttempts: {},
+    _lockedUntil: {},
 
     async init() {
         try {
@@ -17,6 +28,69 @@ const AUTH = {
                 SUPABASE.clearCache();
             }
         });
+        
+        // 绑定 ENTER 键登录
+        this._bindEnterKeyLogin();
+    },
+    
+    _bindEnterKeyLogin() {
+        document.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const appDiv = document.getElementById('app');
+                if (appDiv && appDiv.querySelector('.login-box')) {
+                    if (typeof window.APP.login === 'function') {
+                        await window.APP.login();
+                    }
+                }
+            }
+        });
+    },
+    
+    // 检查账号是否被锁定
+    _isLocked(username) {
+        const now = Date.now();
+        const lockedUntil = this._lockedUntil[username];
+        if (lockedUntil && lockedUntil > now) {
+            const remainingMinutes = Math.ceil((lockedUntil - now) / 60000);
+            alert(Utils.lang === 'id' 
+                ? `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试`
+                : `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试`);
+            return true;
+        }
+        if (lockedUntil && lockedUntil <= now) {
+            delete this._lockedUntil[username];
+            delete this._loginAttempts[username];
+        }
+        return false;
+    },
+    
+    // 记录登录失败
+    _recordLoginFailure(username) {
+        const now = Date.now();
+        if (!this._loginAttempts[username]) {
+            this._loginAttempts[username] = { count: 0, firstAttempt: now };
+        }
+        this._loginAttempts[username].count++;
+        
+        // 5分钟内失败5次，锁定15分钟
+        const elapsed = now - this._loginAttempts[username].firstAttempt;
+        if (elapsed <= 5 * 60 * 1000 && this._loginAttempts[username].count >= 5) {
+            this._lockedUntil[username] = now + 15 * 60 * 1000;
+            delete this._loginAttempts[username];
+            return true; // 已锁定
+        }
+        
+        // 超过5分钟重置计数
+        if (elapsed > 5 * 60 * 1000) {
+            this._loginAttempts[username] = { count: 1, firstAttempt: now };
+        }
+        return false; // 未锁定
+    },
+    
+    // 重置登录失败记录
+    _resetLoginFailure(username) {
+        delete this._loginAttempts[username];
+        delete this._lockedUntil[username];
     },
 
     isLoggedIn() {
@@ -46,29 +120,43 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
+    // ==================== 修复严重3：登录逻辑 ====================
     async login(usernameOrEmail, password) {
         try {
+            // 检查是否被锁定
+            if (this._isLocked(usernameOrEmail)) {
+                return null;
+            }
+            
             let emailToUse = usernameOrEmail;
 
+            // 修复：如果输入不包含 @，则通过 username 或 email 查询实际的 email
             if (!usernameOrEmail.includes('@')) {
                 const { data: profileData, error: profileError } = await supabaseClient
                     .from('user_profiles')
-                    .select('username')
-                    .eq('username', usernameOrEmail)
-                    .single();
+                    .select('username, email')
+                    .or(`username.eq.${usernameOrEmail},email.eq.${usernameOrEmail}`)
+                    .maybeSingle();
 
                 if (profileError || !profileData) {
                     console.error("找不到该用户名:", usernameOrEmail);
+                    this._recordLoginFailure(usernameOrEmail);
                     return null;
                 }
-                emailToUse = profileData.username;
+                // 使用 email 字段（如果存在）或 username 字段
+                emailToUse = profileData.email || profileData.username;
             }
 
             const result = await SUPABASE.login(emailToUse, password);
             if (!result || result.error) {
                 console.error("Login error:", result?.error);
+                this._recordLoginFailure(usernameOrEmail);
                 return null;
             }
+            
+            // 登录成功，重置失败记录
+            this._resetLoginFailure(usernameOrEmail);
+            
             await this.loadCurrentUser();
             if (!this.user) {
                 console.error("Failed to load user profile after login");
@@ -77,6 +165,7 @@ const AUTH = {
             return this.user;
         } catch (error) {
             console.error("LOGIN ERROR:", error);
+            this._recordLoginFailure(usernameOrEmail);
             return null;
         }
     },
@@ -90,7 +179,6 @@ const AUTH = {
                 this.user = null;
             }
         } catch (e) {
-            // 静默处理，用户未登录时不报错
             console.warn("loadCurrentUser error (user not logged in):", e.message);
             this.user = null;
         }
@@ -106,6 +194,7 @@ const AUTH = {
         return await SUPABASE.getAllUsers();
     },
 
+    // ==================== 修复严重1：删除用户时同步删除 Auth 账号 ====================
     async addUser(username, password, name, role, storeId) {
         // 检查是否已存在
         const { data: existing } = await supabaseClient
@@ -145,6 +234,7 @@ const AUTH = {
         const { error: profileError } = await supabaseClient.from('user_profiles').insert({
             id: authUser.user.id,
             username: username,
+            email: username,  // 新增 email 字段
             name: name,
             role: role,
             store_id: storeId || null
@@ -163,8 +253,42 @@ const AUTH = {
                 : '不能删除自己的账号');
         }
         
+        // 获取用户信息以获取 auth 用户 ID
+        const { data: userProfile, error: fetchError } = await supabaseClient
+            .from('user_profiles')
+            .select('id, username')
+            .eq('id', userId)
+            .single();
+        
+        if (fetchError) throw fetchError;
+        
+        // 方案1：调用后端 Edge Function 删除 Auth 用户
+        // 注意：需要部署 Edge Function 或在 Supabase Dashboard 启用
+        try {
+            // 尝试调用 Edge Function（需要预先部署）
+            const { data: edgeData, error: edgeError } = await supabaseClient.functions.invoke('delete-user', {
+                body: { userId: userProfile.id }
+            });
+            
+            if (edgeError) {
+                console.warn("Edge Function 调用失败，尝试直接删除:", edgeError);
+                // 如果 Edge Function 不可用，至少删除 user_profiles
+                // Auth 用户需要管理员在后台手动删除
+                alert(Utils.lang === 'id'
+                    ? '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。'
+                    : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。');
+            }
+        } catch (e) {
+            console.warn("Edge Function 未部署，仅删除 user_profiles:", e);
+            alert(Utils.lang === 'id'
+                ? '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。'
+                : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。');
+        }
+        
+        // 删除 user_profiles 记录
         const { error } = await supabaseClient.from('user_profiles').delete().eq('id', userId);
         if (error) throw error;
+        
         return true;
     },
 
