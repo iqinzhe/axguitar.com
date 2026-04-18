@@ -23,9 +23,14 @@
     </div>
 </div>
 
+<!-- 1. 第三方库 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- 2. 基础工具（最先） -->
 <script src="js/utils.js"></script>
 <script src="js/supabase.js"></script>
+
+<!-- 3. 核心服务 -->
 <script src="js/auth.js"></script>
 <script src="js/permission.js"></script>
 <script src="js/storage.js"></script>
@@ -33,7 +38,7 @@
 <script src="js/store.js"></script>
 <script src="js/migration.js"></script>
 
-<!-- Dashboard 拆分模块 -->
+<!-- 4. Dashboard 模块（按依赖顺序） -->
 <script src="js/app-dashboard-core.js"></script>
 <script src="js/app-dashboard-orders.js"></script>
 <script src="js/app-dashboard-report.js"></script>
@@ -41,7 +46,7 @@
 <script src="js/app-dashboard-print.js"></script>
 <script src="js/app-dashboard.js"></script>
 
-<!-- 其他模块 -->
+<!-- 5. 业务模块 -->
 <script src="js/app-blacklist.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
