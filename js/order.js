@@ -1,4 +1,4 @@
-// order.js - 完整修复版 v3.0
+// order.js - 完整修复版 v1.0
 // 修改内容：
 // 1. 新增服务费记录函数 recordServiceFee
 // 2. 新增贷款发放记录函数 recordLoanDisbursement
