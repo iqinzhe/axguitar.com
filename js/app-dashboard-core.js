@@ -162,7 +162,7 @@ const DashboardCore = {
                     <div class="lang-toggle">
                         <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
                     </div>
-                    <h2 class="login-title"><img src="/favicon-32.png" alt="JF!" class="login-logo"> by Gadai</h2>
+                    <h2 class="login-title"><img src="icons/favicon-192x192.png" alt="JF!" class="login-logo"> by Gadai</h2>
                     <h3>${t('login')}</h3>
                     <div class="form-group">
                         <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
@@ -277,7 +277,7 @@ const DashboardCore = {
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h1><img src="/icon-32.png" alt="JF!"> JF! by Gadai</h1>
+                    <h1><img src="icons/favicon-192x192.png" alt="JF!"> by Gadai</h1>
                     <div class="header-actions">
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
                     </div>
