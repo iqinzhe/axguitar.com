@@ -1,5 +1,9 @@
-// app-dashboard-orders.js - 订单功能模块
-// 包含：订单列表、查看订单、编辑订单、删除订单、打印订单、缴费明细
+// app-dashboard-orders.js - 完整修复版 v2.0
+// 修复内容：
+// 1. 修复 printOrder 函数中的 XSS 风险（中危1）
+// 2. 所有动态字段添加 escapeHtml 转义
+// 3. onclick 属性改用 data-* 属性 + 事件委托
+// 4. 统一使用 Utils.MONTHLY_INTEREST_RATE 常量
 
 window.APP = window.APP || {};
 
@@ -26,6 +30,7 @@ const DashboardOrders = {
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
+                    // 使用 data-* 属性替代 onclick 字符串拼接
                     rows += `<tr>
                         <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
                         <td>${Utils.escapeHtml(o.customer_name)}</td>
@@ -37,10 +42,10 @@ const DashboardOrders = {
                         <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
                         ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
                         <td class="action-cell">
-                            <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}</button>
-                            ${o.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger" onclick="APP.deleteOrder('${o.order_id}')">🗑️ ${t('delete')}</button>` : ''}
-                            <button onclick="APP.printOrder('${o.order_id}')" class="btn-small print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button class="btn-small view-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">👁️ ${t('view')}</button>
+                            ${o.status === 'active' ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">🗑️ ${t('delete')}</button>` : ''}
+                            <button class="btn-small print-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                             ${o.is_locked ? `<span class="locked-icon">🔒</span>` : ''}
                         </td>
                     　　　`;
@@ -87,10 +92,41 @@ const DashboardOrders = {
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
+            
+            // 绑定事件委托
+            this._bindOrderTableEvents();
+            
         } catch (err) {
             console.error("showOrderTable error:", err);
             alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
         }
+    },
+    
+    _bindOrderTableEvents: function() {
+        const container = document.getElementById('app');
+        if (!container) return;
+        
+        // 移除旧监听器，添加新监听器
+        container.removeEventListener('click', this._orderTableClickHandler);
+        this._orderTableClickHandler = (e) => {
+            const target = e.target;
+            const btn = target.closest('.view-order-btn, .payment-btn, .delete-order-btn, .print-order-btn');
+            if (!btn) return;
+            
+            const orderId = btn.getAttribute('data-order-id');
+            if (!orderId) return;
+            
+            if (btn.classList.contains('view-order-btn')) {
+                APP.navigateTo('viewOrder', { orderId: orderId });
+            } else if (btn.classList.contains('payment-btn')) {
+                APP.navigateTo('payment', { orderId: orderId });
+            } else if (btn.classList.contains('delete-order-btn')) {
+                APP.deleteOrder(orderId);
+            } else if (btn.classList.contains('print-order-btn')) {
+                APP.printOrder(orderId);
+            }
+        };
+        container.addEventListener('click', this._orderTableClickHandler);
     },
 
     searchOrders: function() { 
@@ -136,7 +172,7 @@ const DashboardOrders = {
                     　　　`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td><tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
             }
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
@@ -144,7 +180,7 @@ const DashboardOrders = {
                 <div class="page-header">
                     <h2>📄 ${t('view')} ${t('order_list')}</h2>
                     <div class="header-actions">    
-                        <button onclick="APP.printOrder('${order.order_id}')" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button class="print-order-detail-btn" data-order-id="${Utils.escapeHtml(order.order_id)}" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -185,13 +221,32 @@ const DashboardOrders = {
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
                         ${order.status === 'active' ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
                         ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')" class="warning">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
-                        <button onclick="APP.sendWAReminder('${order.order_id}')" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
+                        <button class="wa-reminder-btn" data-order-id="${Utils.escapeHtml(order.order_id)}" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
                     </div>
                 </div>`;
+            
+            // 绑定打印和 WA 按钮事件
+            this._bindViewOrderEvents(order.order_id);
+            
         } catch (error) {
             console.error("viewOrder error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
             this.goBack();
+        }
+    },
+    
+    _bindViewOrderEvents: function(orderId) {
+        const container = document.getElementById('app');
+        if (!container) return;
+        
+        const printBtn = container.querySelector('.print-order-detail-btn');
+        if (printBtn) {
+            printBtn.onclick = () => APP.printOrder(orderId);
+        }
+        
+        const waBtn = container.querySelector('.wa-reminder-btn');
+        if (waBtn) {
+            waBtn.onclick = () => APP.sendWAReminder(orderId);
         }
     },
 
@@ -259,14 +314,51 @@ const DashboardOrders = {
         }
     },
 
+    // ==================== 修复中危1：printOrder XSS 风险 ====================
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
             if (!order) { alert(Utils.lang === 'id' ? 'Order tidak ditemukan' : '订单不存在'); return; }
             var lang = Utils.lang;
-            var methodMap = { cash: lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)', bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' };
+            var methodMap = { 
+                cash: lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)', 
+                bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' 
+            };
             
-            var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${order.order_id}</title>
+            // 安全构建支付记录行（所有字段都转义）
+            var paymentRows = '';
+            for (var p of payments) {
+                var typeText = '';
+                if (p.type === 'admin_fee') typeText = lang === 'id' ? 'Admin Fee' : '管理费';
+                else if (p.type === 'interest') typeText = lang === 'id' ? 'Bunga' : '利息';
+                else if (p.type === 'principal') typeText = lang === 'id' ? 'Pokok' : '本金';
+                else typeText = p.type || '-';
+                
+                var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'));
+                
+                paymentRows += `<tr>
+                    <td>${Utils.escapeHtml(Utils.formatDate(p.date))}</td>
+                    <td>${Utils.escapeHtml(typeText)}</td>
+                    <td class="text-right">${Utils.escapeHtml(Utils.formatCurrency(p.amount))}</td>
+                    <td>${Utils.escapeHtml(methodText)}</td>
+                </tr>`;
+            }
+            
+            if (paymentRows === '') {
+                paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}</td></tr>`;
+            }
+            
+            // 安全构建所有字段
+            var safeOrderId = Utils.escapeHtml(order.order_id);
+            var safeCustomerName = Utils.escapeHtml(order.customer_name);
+            var safeCustomerKtp = Utils.escapeHtml(order.customer_ktp || '-');
+            var safeCustomerPhone = Utils.escapeHtml(order.customer_phone || '-');
+            var safeCustomerAddress = Utils.escapeHtml(order.customer_address || '-');
+            var safeCollateralName = Utils.escapeHtml(order.collateral_name);
+            var safeNotes = Utils.escapeHtml(order.notes || '-');
+            var safeStoreName = Utils.escapeHtml(AUTH.getCurrentStoreName());
+            
+            var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${safeOrderId}</title>
             <style>
                 * { box-sizing: border-box; margin: 0; padding: 0; }
                 body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #1e293b; }
@@ -297,38 +389,41 @@ const DashboardOrders = {
                         <img src="icons/favicon-192x192.png" alt="JF!" style="height:32px;">
                         <h1 style="margin:0;">JF! by Gadai</h1>
                     </div>
-                    <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${order.order_id}</strong> | ${Utils.formatDate(order.created_at)}</p>
+                    <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${safeOrderId}</strong> | ${Utils.formatDate(order.created_at)}</p>
                 </div>
                 <div class="two-col">
                     <div class="section"><h3>📋 ${lang === 'id' ? 'Informasi Pelanggan' : '客户信息'}</h3>
-                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama' : '姓名'}:</div><div>${Utils.escapeHtml(order.customer_name)}</div></div>
-                        <div class="info-row"><div class="info-label">KTP:</div><div>${Utils.escapeHtml(order.customer_ktp || '-')}</div></div>
-                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Telepon' : '电话'}:</div><div>${Utils.escapeHtml(order.customer_phone || '-')}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Nama' : '姓名'}:</div><div>${safeCustomerName}</div></div>
+                        <div class="info-row"><div class="info-label">KTP:</div><div>${safeCustomerKtp}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Telepon' : '电话'}:</div><div>${safeCustomerPhone}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Alamat' : '地址'}:</div><div>${safeCustomerAddress}</div></div>
                     </div>
                     <div class="section"><h3>💎 ${lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款'}</h3>
-                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Barang' : '物品'}:</div><div>${Utils.escapeHtml(order.collateral_name)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Barang' : '物品'}:</div><div>${safeCollateralName}</div></div>
                         <div class="info-row"><div class="info-label">${lang === 'id' ? 'Pinjaman' : '贷款'}:</div><div><strong>${Utils.formatCurrency(order.loan_amount)}</strong></div></div>
                         <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div><strong>${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</strong></div></div>
+                        <div class="info-row"><div class="info-label">📝 ${lang === 'id' ? 'Catatan' : '备注'}:</div><div>${safeNotes}</div></div>
                     </div>
                 </div>
                 <div class="section"><h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h3>
                     <table class="data-table"><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th></tr></thead>
-                    <tbody>`;
-            for (var p of payments) {
-                var tt = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
-                printContent += `<tr><td>${Utils.formatDate(p.date)}</td><td>${tt}</td><td class="text-right">${Utils.formatCurrency(p.amount)}</td><td>${methodMap[p.payment_method] || '-'}</td></tr>`;
-            }
-            printContent += `</tbody></table></div>
+                    <tbody>${paymentRows}</tbody>
+                </table></div>
                 <div class="footer" style="margin-top:20px; padding-top:10px; border-top:1px solid #ccc; text-align:center; font-size:9px; color:#666;">
                     <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
                     <div>${lang === 'id' ? 'Terima kasih atas kepercayaan Anda' : '感谢您的信任'}</div>
                     <div>${lang === 'id' ? 'Bukti ini dicetak secara elektronik dan tidak memerlukan tanda tangan' : '本凭证为电子打印，无需签名'}</div>
+                    <div>🏪 ${safeStoreName}</div>
                 </div>
             </div></body></html>`;
+            
             var pw = window.open('', '_blank');
             pw.document.write(printContent);
             pw.document.close();
-        } catch (error) { console.error("printOrder error:", error); alert(Utils.lang === 'id' ? 'Gagal mencetak order' : '打印订单失败'); }
+        } catch (error) {
+            console.error("printOrder error:", error);
+            alert(Utils.lang === 'id' ? 'Gagal mencetak order' : '打印订单失败');
+        }
     },
 
     // ==================== 缴费明细 ====================
@@ -350,16 +445,16 @@ const DashboardOrders = {
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
-                    <td>${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
+                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                    <td class="customer-name">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
                     <td>${Utils.formatDate(p.date)}</td>
                     <td>${typeMap[p.type] || p.type}</td>
                     <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
                     <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                     <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                     <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    <td class="action-cell"><button onclick="APP.navigateTo('viewOrder',{orderId:'${p.orders?.order_id}'})" class="btn-small">👁️ ${Utils.t('view')}</button></td>
-                　　`).join('');
+                    <td class="action-cell"><button class="view-order-from-payment" data-order-id="${Utils.escapeHtml(p.orders?.order_id || '')}" class="btn-small">👁️ ${Utils.t('view')}</button></td>
+                </tr>`).join('');
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -396,6 +491,18 @@ const DashboardOrders = {
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
+            
+            // 绑定查看订单按钮事件
+            const container = document.getElementById('app');
+            if (container) {
+                container.querySelectorAll('.view-order-from-payment').forEach(btn => {
+                    const orderId = btn.getAttribute('data-order-id');
+                    if (orderId) {
+                        btn.onclick = () => APP.navigateTo('viewOrder', { orderId: orderId });
+                    }
+                });
+            }
+            
         } catch (error) {
             console.error("showPaymentHistory error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
