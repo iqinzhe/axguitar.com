@@ -1,4 +1,4 @@
-// store.js - 完整修复版 v4.0
+// store.js - 完整修复版 v1.0
 // 修复内容：
 // 1. 统一使用 cash_flow_records 计算门店余额（与 getCashFlowSummary 保持一致）
 // 2. 移除手动从 payment_history 累加余额的逻辑
