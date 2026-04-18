@@ -1361,5 +1361,154 @@ const SupabaseAPI = {
     }
 };
 
+    // ==================== 内部转账相关 API ====================
+
+    // 记录内部转账
+    async recordInternalTransfer(transferData) {
+        const profile = await this.getCurrentProfile();
+        
+        // 验证金额
+        if (transferData.amount <= 0) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Jumlah transfer harus lebih dari 0'
+                : '转账金额必须大于0');
+        }
+        
+        // 验证余额是否足够
+        if (transferData.transfer_type === 'cash_to_bank') {
+            const cashFlow = await this.getCashFlowSummary();
+            if (cashFlow.cash.balance < transferData.amount) {
+                throw new Error(Utils.lang === 'id' 
+                    ? `Saldo kas tidak mencukupi. Saldo saat ini: ${this.formatCurrency(cashFlow.cash.balance)}`
+                    : `保险柜余额不足。当前余额: ${this.formatCurrency(cashFlow.cash.balance)}`);
+            }
+        } else if (transferData.transfer_type === 'bank_to_cash') {
+            const cashFlow = await this.getCashFlowSummary();
+            if (cashFlow.bank.balance < transferData.amount) {
+                throw new Error(Utils.lang === 'id' 
+                    ? `Saldo bank tidak mencukupi. Saldo saat ini: ${this.formatCurrency(cashFlow.bank.balance)}`
+                    : `银行余额不足。当前余额: ${this.formatCurrency(cashFlow.bank.balance)}`);
+            }
+        } else if (transferData.transfer_type === 'store_to_hq') {
+            const shopAccount = await this.getShopAccount(transferData.store_id || profile?.store_id);
+            if (shopAccount.bank_balance < transferData.amount) {
+                throw new Error(Utils.lang === 'id' 
+                    ? `Saldo bank toko tidak mencukupi. Saldo saat ini: ${this.formatCurrency(shopAccount.bank_balance)}`
+                    : `门店银行余额不足。当前余额: ${this.formatCurrency(shopAccount.bank_balance)}`);
+            }
+        }
+        
+        // 插入转账记录
+        const { data, error } = await supabaseClient
+            .from('internal_transfers')
+            .insert({
+                transfer_date: transferData.transfer_date || new Date().toISOString().split('T')[0],
+                transfer_type: transferData.transfer_type,
+                from_account: transferData.from_account,
+                to_account: transferData.to_account,
+                amount: transferData.amount,
+                description: transferData.description || '',
+                store_id: transferData.store_id || profile?.store_id,
+                created_by: profile?.id
+            })
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        // 记录现金流（从来源账户扣除）
+        await this.recordCashFlow({
+            store_id: transferData.store_id || profile?.store_id,
+            flow_type: 'internal_transfer_out',
+            direction: 'outflow',
+            amount: transferData.amount,
+            source_target: transferData.from_account === 'hq' ? 'bank' : transferData.from_account,
+            description: `内部转账转出: ${transferData.from_account} → ${transferData.to_account} - ${transferData.description || ''}`,
+            reference_id: data.id
+        });
+        
+        // 记录现金流（向目标账户增加）- 上缴总部时目标账户不记录现金流（总部系统单独处理）
+        if (transferData.to_account !== 'hq') {
+            await this.recordCashFlow({
+                store_id: transferData.store_id || profile?.store_id,
+                flow_type: 'internal_transfer_in',
+                direction: 'inflow',
+                amount: transferData.amount,
+                source_target: transferData.to_account,
+                description: `内部转账转入: ${transferData.from_account} → ${transferData.to_account} - ${transferData.description || ''}`,
+                reference_id: data.id
+            });
+        }
+        
+        return data;
+    },
+
+    // 获取内部转账历史记录
+    async getInternalTransfers(storeId = null, startDate = null, endDate = null) {
+        const profile = await this.getCurrentProfile();
+        
+        let query = supabaseClient
+            .from('internal_transfers')
+            .select('*, stores(name, code), created_by_profile:user_profiles!internal_transfers_created_by_fkey(name)')
+            .order('transfer_date', { ascending: false });
+        
+        // 权限控制：管理员看全部，非管理员只看本门店
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        } else if (profile?.role === 'admin' && storeId && storeId !== 'all') {
+            query = query.eq('store_id', storeId);
+        }
+        
+        if (startDate) {
+            query = query.gte('transfer_date', startDate);
+        }
+        if (endDate) {
+            query = query.lte('transfer_date', endDate);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    // 获取门店可上缴总部的金额（银行余额）
+    async getRemittableAmount(storeId) {
+        const shopAccount = await this.getShopAccount(storeId);
+        // 只能上缴银行账户的资金
+        return shopAccount.bank_balance;
+    },
+
+    // 上缴总部（门店 → 总部）
+    async remitToHeadquarters(storeId, amount, description) {
+        const profile = await this.getCurrentProfile();
+        
+        // 权限检查：只有管理员可以执行上缴总部操作
+        if (profile?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Hanya administrator yang dapat melakukan setoran ke kantor pusat'
+                : '只有管理员可以执行上缴总部操作');
+        }
+        
+        // 检查是否有足够余额
+        const shopAccount = await this.getShopAccount(storeId);
+        if (shopAccount.bank_balance < amount) {
+            throw new Error(Utils.lang === 'id' 
+                ? `Saldo bank tidak mencukupi. Saldo saat ini: ${this.formatCurrency(shopAccount.bank_balance)}`
+                : `银行余额不足。当前余额: ${this.formatCurrency(shopAccount.bank_balance)}`);
+        }
+        
+        // 记录内部转账
+        const transfer = await this.recordInternalTransfer({
+            transfer_type: 'store_to_hq',
+            from_account: 'bank',
+            to_account: 'hq',
+            amount: amount,
+            description: description || (Utils.lang === 'id' ? 'Setoran ke kantor pusat' : '上缴总部'),
+            store_id: storeId
+        });
+        
+        return transfer;
+    }
+
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
