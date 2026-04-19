@@ -93,14 +93,13 @@ body {
 /* ---------- 3. Logo 图片统一大小 ---------- */
 /* 仪表盘及页面头部 Logo */
 h1 img,
-.page-header h1 img,
-h1 img {
+.page-header h1 img {
     height: 32px;
     width: auto;
     vertical-align: middle;
 }
 
-/* 登录页面 Logo 单独控制（已在登录页样式中固定，此处作为补充） */
+/* 登录页面 Logo 单独控制 */
 .login-logo {
     height: 24px;
     width: auto;
@@ -316,12 +315,6 @@ h1 img {
     gap: 6px;
     flex-wrap: nowrap;
     white-space: nowrap;
-}
-
-.login-logo {
-    height: 24px;
-    width: auto;
-    vertical-align: middle;
 }
 
 .lang-toggle {
