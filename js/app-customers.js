@@ -1,7 +1,4 @@
-// app-customers.js - 完整修复版 v2.0（清理版）
-// 功能：客户管理
-// 说明：服务费和管理费都是一次性费用，在创建订单时收取
-// 样式：已全部移至 base.css 和 components.css
+// app-customers.js - 完整修复版 v1.0
 
 window.APP = window.APP || {};
 
