@@ -1,9 +1,4 @@
-// utils.js - 完整最终版 v4.0
-// 修改内容：
-// 1. 新增全局利率常量 MONTHLY_INTEREST_RATE（修复高危1）
-// 2. CSV 导出金额使用原始数值（修复中危3）
-// 3. 新增服务费相关翻译
-// 4. 新增服务费百分比选项
+// utils.js - v1.0
 
 const Utils = {
     lang: localStorage.getItem('jf_language') || 'id',
