@@ -295,7 +295,7 @@ body {
 }
 
 .login-logo {
-    height: 24px;           /* 固定高度 */
+    height: 32px;           /* 固定高度 */
     width: auto;
     vertical-align: middle;
 }
