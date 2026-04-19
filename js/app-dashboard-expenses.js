@@ -1,14 +1,14 @@
-// app-dashboard-expenses.js - 支出功能模块 v1.0
+// app-dashboard-expenses.js - 支出功能模块 v2.0（清理版）
 // 修复内容：
-// 1. 删除支出时同步删除 cash_flow_records 中的关联记录（严重3）
+// 1. 删除支出时同步删除 cash_flow_records 中的关联记录
 // 2. 优化支出编辑时的资金流同步
 // 3. 增加删除前的二次确认
+// 4. 样式已全部移至 base.css 和 components.css
 
 window.APP = window.APP || {};
 
 const DashboardExpenses = {
 
-    // ==================== 运营支出 ====================
     showExpenses: async function() {
         this.currentPage = 'expenses';
         this.saveCurrentPageState();
@@ -49,10 +49,9 @@ const DashboardExpenses = {
                     </tr>`;
                 }
             } else {
-                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td><tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
             }
 
-            // 支出类别选项
             const expenseCategories = lang === 'id' 
                 ? ['Listrik', 'Air', 'Internet', 'Gaji Karyawan', 'Sewa Tempat', 'ATK', 'Perbaikan', 'Transportasi', 'Lainnya']
                 : ['电费', '水费', '网络费', '员工工资', '场地租金', '办公用品', '维修', '交通费', '其他'];
@@ -121,13 +120,7 @@ const DashboardExpenses = {
                     <p class="info-note" style="margin-top:12px; font-size:12px; color:#64748b;">
                         💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}
                     </p>
-                </div>
-                <style>
-                    .total-expense { color: #dc2626; font-size: 20px; }
-                    .info-note { font-size: 12px; color: #64748b; margin-top: 12px; }
-                    .reconciled-badge { background: #d1fae5; color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-                    .locked-badge { background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-                </style>`;
+                </div>`;
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
@@ -152,7 +145,6 @@ const DashboardExpenses = {
         try {
             const profile = await SUPABASE.getCurrentProfile();
             
-            // 使用 SUPABASE.addExpense 自动记录资金流
             const result = await SUPABASE.addExpense({
                 store_id: profile.store_id,
                 expense_date: expenseDate,
@@ -182,12 +174,10 @@ const DashboardExpenses = {
             var newAmount = prompt(lang === 'id' ? 'Masukkan jumlah baru:' : '请输入新金额:', expense.amount);
             if (newAmount && !isNaN(parseFloat(newAmount))) {
                 const newAmountNum = parseFloat(newAmount);
-                const amountDiff = newAmountNum - expense.amount;
                 
                 const { error: updateError } = await supabaseClient.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
                 if (updateError) throw updateError;
                 
-                // 更新对应的资金流记录
                 const { data: cashFlow } = await supabaseClient
                     .from('cash_flow_records')
                     .select('id, amount')
@@ -212,11 +202,9 @@ const DashboardExpenses = {
         }
     },
 
-    // ==================== 删除支出（修复版：同步删除 cash_flow_records） ====================
     deleteExpense: async function(expenseId) {
         var lang = Utils.lang;
         
-        // 获取支出信息用于确认
         const { data: expense, error: fetchError } = await supabaseClient
             .from('expenses')
             .select('category, amount, expense_date')
@@ -234,7 +222,6 @@ const DashboardExpenses = {
         if (!confirm(confirmMsg)) return;
         
         try {
-            // 1. 先查找并删除关联的现金流记录
             const { data: cashFlows, error: findFlowError } = await supabaseClient
                 .from('cash_flow_records')
                 .select('id')
@@ -244,7 +231,6 @@ const DashboardExpenses = {
             if (findFlowError) {
                 console.warn("查找关联现金流记录失败:", findFlowError);
             } else if (cashFlows && cashFlows.length > 0) {
-                // 删除所有关联的现金流记录
                 const cashFlowIds = cashFlows.map(cf => cf.id);
                 const { error: deleteFlowError } = await supabaseClient
                     .from('cash_flow_records')
@@ -259,7 +245,6 @@ const DashboardExpenses = {
                 }
             }
             
-            // 2. 删除支出记录
             const { error: deleteExpenseError } = await supabaseClient
                 .from('expenses')
                 .delete()
