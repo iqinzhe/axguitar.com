@@ -1,11 +1,10 @@
-// app-dashboard-orders.js - 完整修复版 v2.1（清理版）
+// app-dashboard-orders.js - 完整修复版 v3.0
 // 修复内容：
-// 1. 修复 printOrder 函数中的 XSS 风险
-// 2. 所有动态字段添加 escapeHtml 转义
-// 3. onclick 属性改用 data-* 属性 + 事件委托
-// 4. 统一使用 Utils.MONTHLY_INTEREST_RATE 常量
-// 5. 隐藏总部的缴费按钮（管理员不能缴费）
-// 6. 样式已全部移至 base.css 和 components.css
+// 1. 移除编辑订单相关功能（员工/店长不能编辑）
+// 2. 移除锁定/解锁相关功能
+// 3. 增强 XSS 防护（动态属性转义）
+// 4. 删除订单增加详细二次确认
+// 5. 统一使用异步权限检查
 
 window.APP = window.APP || {};
 
@@ -16,7 +15,8 @@ const DashboardOrders = {
         this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
-        var isAdmin = AUTH.isAdmin();
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
         try {
             var filters = { status: this.currentFilter, search: this.searchKeyword };
             var orders = await SUPABASE.getOrders(filters);
@@ -27,7 +27,7 @@ const DashboardOrders = {
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 10 : 9}" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}</td></tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
@@ -42,13 +42,12 @@ const DashboardOrders = {
                         <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
                         ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
                         <td class="action-cell">
-                            <button class="btn-small view-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">👁️ ${t('view')}</button>
-                            ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">🗑️ ${t('delete')}</button>` : ''}
-                            <button class="btn-small print-order-btn" data-order-id="${Utils.escapeHtml(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                            ${o.is_locked ? `<span class="locked-icon">🔒</span>` : ''}
+                            <button class="btn-small view-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">👁️ ${t('view')}</button>
+                            ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🗑️ ${t('delete')}</button>` : ''}
+                            <button class="btn-small print-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </td>
-                    　　`;
+                    　　　`;
                 }
             }
 
@@ -152,14 +151,18 @@ const DashboardOrders = {
             if (!order) { alert('Order not found'); this.goBack(); return; }
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
-            var isAdmin = AUTH.isAdmin();
+            var profile = await SUPABASE.getCurrentProfile();
+            var isAdmin = profile?.role === 'admin';
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+            
+            // 空值保护
+            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
             
             var payRows = '';
             if (payments && payments.length > 0) {
                 for (var p of payments) {
-                    var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
+                    var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'service_fee' ? (lang === 'id' ? 'Service Fee' : '服务费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
                     payRows += `<tr>
                         <td>${Utils.formatDate(p.date)}</td>
                         <td>${typeText}</td>
@@ -170,15 +173,14 @@ const DashboardOrders = {
                     　　　`;
                 }
             } else {
-                payRows = `<td><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td><td/tr>`;
             }
 
-            var remainingPrincipal = order.loan_amount - order.principal_paid;
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📄 ${t('view')} ${t('order_list')}</h2>
                     <div class="header-actions">    
-                        <button class="print-order-detail-btn" data-order-id="${Utils.escapeHtml(order.order_id)}" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button class="print-order-detail-btn" data-order-id="${Utils.escapeAttr(order.order_id)}" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -188,7 +190,6 @@ const DashboardOrders = {
                     <p><strong>ID:</strong> ${Utils.escapeHtml(order.order_id)}</p>
                     <p><strong>${lang === 'id' ? 'Status' : '状态'}:</strong> <span class="status-badge status-${order.status}">${statusMap[order.status] || order.status}</span></p>
                     <p><strong>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
-                    ${order.is_locked ? `<p><strong>🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</strong></p>` : ''}
                     
                     <h3>${t('customer_info')}</h3>
                     <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer_name)}</p>
@@ -202,6 +203,7 @@ const DashboardOrders = {
                     
                     <h3>💰 ${lang === 'id' ? 'Rincian Biaya' : '费用明细'}</h3>
                     <p><strong>${lang === 'id' ? 'Admin Fee' : '管理费'}:</strong> ${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅' : '❌'}</p>
+                    <p><strong>${lang === 'id' ? 'Service Fee' : '服务费'}:</strong> ${Utils.formatCurrency(order.service_fee_amount || 0)} (${order.service_fee_percent || 0}%) ${order.service_fee_paid > 0 ? '✅' : '❌'}</p>
                     <p><strong>${lang === 'id' ? 'Bunga per Bulan' : '月利息'}:</strong> ${Utils.formatCurrency(order.monthly_interest)}</p>
                     <p><strong>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
                     <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
@@ -217,9 +219,8 @@ const DashboardOrders = {
                     
                     <div class="toolbar">
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${order.order_id}'})" class="success">💰 ${t('save')}</button>` : ''}
-                        ${PERMISSION.canUnlockOrder() && order.is_locked ? `<button onclick="APP.unlockOrder('${order.order_id}')" class="warning">🔓 ${lang === 'id' ? 'Buka Kunci' : '解锁'}</button>` : ''}
-                        <button class="wa-reminder-btn" data-order-id="${Utils.escapeHtml(order.order_id)}" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
+                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(order.order_id)}'})" class="success">💰 ${t('save')}</button>` : ''}
+                        <button class="wa-reminder-btn" data-order-id="${Utils.escapeAttr(order.order_id)}" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
                     </div>
                 </div>`;
             
@@ -247,70 +248,57 @@ const DashboardOrders = {
         }
     },
 
-    unlockOrder: async function(orderId) {
-        if (confirm(Utils.lang === 'id' ? 'Buka kunci order ini?' : '解锁此订单？')) {
-            try { await Order.unlockOrder(orderId); await this.viewOrder(orderId); } 
-            catch (error) { alert('Error: ' + error.message); }
-        }
-    },
-
-    editOrder: async function(orderId) {
-        this.currentPage = 'editOrder';
-        this.currentOrderId = orderId;
-        this.saveCurrentPageState();
-        try {
-            var order = await SUPABASE.getOrder(orderId);
-            if (!order) return;
-            var lang = Utils.lang;
-            var t = (key) => Utils.t(key);
-            var canEdit = PERMISSION.canEditOrder(order);
-            if (!canEdit) { alert(lang === 'id' ? 'Order ini sudah terkunci' : '此订单已锁定'); this.goBack(); return; }
-            document.getElementById("app").innerHTML = `
-                <div class="page-header">
-                    <h2>✏️ ${t('edit')}</h2>
-                    <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="form-grid">
-                        <div class="form-group"><label>${t('customer_name')}</label><input id="name" value="${Utils.escapeHtml(order.customer_name)}"></div>
-                        <div class="form-group"><label>${t('ktp_number')}</label><input id="ktp" value="${Utils.escapeHtml(order.customer_ktp)}"></div>
-                        <div class="form-group"><label>${t('phone')}</label><input id="phone" value="${Utils.escapeHtml(order.customer_phone)}"></div>
-                        <div class="form-group"><label>${t('collateral_name')}</label><input id="collateral" value="${Utils.escapeHtml(order.collateral_name)}"></div>
-                        <div class="form-group full-width"><label>${t('address')}</label><textarea id="address">${Utils.escapeHtml(order.customer_address)}</textarea></div>
-                        <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes">${Utils.escapeHtml(order.notes || '')}</textarea></div>
-                        <div class="form-actions">
-                            <button onclick="APP.updateOrder('${order.order_id}')" class="success">💾 ${t('save')}</button>
-                            <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
-                        </div>
-                    </div>
-                </div>`;
-        } catch (error) { console.error("editOrder error:", error); alert('Error loading order'); this.goBack(); }
-    },
-
-    updateOrder: async function(orderId) {
-        var order = await SUPABASE.getOrder(orderId);
-        var updates = {
-            customer: { name: document.getElementById("name").value, ktp: document.getElementById("ktp").value, phone: document.getElementById("phone").value, address: document.getElementById("address").value },
-            collateral_name: document.getElementById("collateral").value,
-            notes: document.getElementById("notes").value
-        };
-        try {
-            await Order.update(orderId, updates, order.customer_id);
-            if (AUTH.isAdmin()) await Order.relockOrder(orderId);
-            alert(Utils.t('order_updated'));
-            this.goBack();
-        } catch (error) { alert('Error: ' + error.message); }
-    },
-
+    // ==================== 编辑订单功能已移除 ====================
+    // 员工和店长不能修改已保存的订单，因此 editOrder 和 updateOrder 已删除
+    
+    // ==================== 删除订单（增强二次确认） ====================
     deleteOrder: async function(orderId) {
-        if (confirm(Utils.t('confirm_delete'))) {
-            try { await Order.delete(orderId); alert(Utils.t('order_deleted')); await this.showOrderTable(); } 
-            catch (error) { alert('Error: ' + error.message); }
+        var lang = Utils.lang;
+        
+        try {
+            // 获取订单详细信息用于确认
+            const order = await SUPABASE.getOrder(orderId);
+            if (!order) {
+                alert(lang === 'id' ? '订单不存在' : '订单不存在');
+                return;
+            }
+            
+            // 详细确认信息
+            const confirmMsg = lang === 'id'
+                ? `⚠️ 确认删除订单？\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n贷款金额: ${Utils.formatCurrency(order.loan_amount)}\n状态: ${order.status}\n\n此操作不可恢复，所有相关缴费记录也将被删除。\n\n确定要删除吗？`
+                : `⚠️ 确认删除订单？\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n贷款金额: ${Utils.formatCurrency(order.loan_amount)}\n状态: ${order.status}\n\n此操作不可恢复，所有相关缴费记录也将被删除。\n\n确定要删除吗？`;
+            
+            if (!confirm(confirmMsg)) return;
+            
+            // 再次确认
+            const finalConfirm = lang === 'id'
+                ? '最后确认：真的要删除此订单吗？此操作无法撤销。'
+                : '最后确认：真的要删除此订单吗？此操作无法撤销。';
+            
+            if (!confirm(finalConfirm)) return;
+            
+            await Order.delete(orderId);
+            
+            // 记录操作日志
+            if (window.Audit) {
+                await window.Audit.log('order_delete', JSON.stringify({
+                    order_id: order.order_id,
+                    customer_name: order.customer_name,
+                    loan_amount: order.loan_amount,
+                    deleted_by: AUTH.user?.id,
+                    deleted_at: new Date().toISOString()
+                }));
+            }
+            
+            alert(Utils.t('order_deleted'));
+            await this.showOrderTable();
+        } catch (error) {
+            console.error("deleteOrder error:", error);
+            alert(lang === 'id' ? '删除失败：' + error.message : '删除失败：' + error.message);
         }
     },
 
+    // ==================== 打印订单 ====================
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -325,6 +313,7 @@ const DashboardOrders = {
             for (var p of payments) {
                 var typeText = '';
                 if (p.type === 'admin_fee') typeText = lang === 'id' ? 'Admin Fee' : '管理费';
+                else if (p.type === 'service_fee') typeText = lang === 'id' ? 'Service Fee' : '服务费';
                 else if (p.type === 'interest') typeText = lang === 'id' ? 'Bunga' : '利息';
                 else if (p.type === 'principal') typeText = lang === 'id' ? 'Pokok' : '本金';
                 else typeText = p.type || '-';
@@ -340,7 +329,7 @@ const DashboardOrders = {
             }
             
             if (paymentRows === '') {
-                paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}</td></tr>`;
+                paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}</td><td/tr>`;
             }
             
             var safeOrderId = Utils.escapeHtml(order.order_id);
@@ -351,6 +340,8 @@ const DashboardOrders = {
             var safeCollateralName = Utils.escapeHtml(order.collateral_name);
             var safeNotes = Utils.escapeHtml(order.notes || '-');
             var safeStoreName = Utils.escapeHtml(AUTH.getCurrentStoreName());
+            
+            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
             
             var printContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${safeOrderId}</title>
             <style>
@@ -395,12 +386,12 @@ const DashboardOrders = {
                     <div class="section"><h3>💎 ${lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款'}</h3>
                         <div class="info-row"><div class="info-label">${lang === 'id' ? 'Barang' : '物品'}:</div><div>${safeCollateralName}</div></div>
                         <div class="info-row"><div class="info-label">${lang === 'id' ? 'Pinjaman' : '贷款'}:</div><div><strong>${Utils.formatCurrency(order.loan_amount)}</strong></div></div>
-                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div><strong>${Utils.formatCurrency(order.loan_amount - order.principal_paid)}</strong></div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div><strong>${Utils.formatCurrency(remainingPrincipal)}</strong></div></div>
                         <div class="info-row"><div class="info-label">📝 ${lang === 'id' ? 'Catatan' : '备注'}:</div><div>${safeNotes}</div></div>
                     </div>
                 </div>
                 <div class="section"><h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h3>
-                    <table class="data-table"><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><tr></thead>
+                    <table class="data-table"><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th></tr></thead>
                     <tbody>${paymentRows}</tbody>
                 </table></div>
                 <div class="footer" style="margin-top:20px; padding-top:10px; border-top:1px solid #ccc; text-align:center; font-size:9px; color:#666;">
@@ -426,17 +417,18 @@ const DashboardOrders = {
         var lang = Utils.lang;
         try {
             var allPayments = await SUPABASE.getAllPayments();
-            var totalAdminFee = 0, totalInterest = 0, totalPrincipal = 0;
+            var totalAdminFee = 0, totalServiceFee = 0, totalInterest = 0, totalPrincipal = 0;
             for (var p of allPayments) {
                 if (p.type === 'admin_fee') totalAdminFee += p.amount;
+                else if (p.type === 'service_fee') totalServiceFee += p.amount;
                 else if (p.type === 'interest') totalInterest += p.amount;
                 else if (p.type === 'principal') totalPrincipal += p.amount;
             }
-            var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
+            var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', service_fee: lang === 'id' ? 'Service Fee' : '服务费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
 
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}</td></tr>`
+                ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}</td><td/tr>`
                 : allPayments.map(p => `<tr>
                     <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
                     <td class="customer-name">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
@@ -446,7 +438,7 @@ const DashboardOrders = {
                     <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                     <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                     <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    <td class="action-cell"><button class="view-order-from-payment" data-order-id="${Utils.escapeHtml(p.orders?.order_id || '')}" class="btn-small">👁️ ${Utils.t('view')}</button></td>
+                    <td class="action-cell"><button class="view-order-from-payment" data-order-id="${Utils.escapeAttr(p.orders?.order_id || '')}" class="btn-small">👁️ ${Utils.t('view')}</button></td>
                 </tr>`).join('');
 
             document.getElementById("app").innerHTML = `
@@ -460,10 +452,11 @@ const DashboardOrders = {
                 </div>
                 
                 <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Total Admin Fee' : '管理费总额'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Total Bunga' : '利息总额'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Total Pokok' : '本金总额'}</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalServiceFee)}</div><div>${lang === 'id' ? 'Service Fee' : '服务费'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Bunga' : '利息'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Pokok' : '本金'}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Semua' : '全部总计'}</div></div>
                 </div>
                 
                 <div class="table-container">
@@ -502,8 +495,25 @@ const DashboardOrders = {
     }
 };
 
+// 辅助函数：转义属性值
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
+
 for (var key in DashboardOrders) {
     if (typeof DashboardOrders[key] === 'function') {
         window.APP[key] = DashboardOrders[key];
     }
 }
+
+// 添加 escapeAttr 到 Utils（如果尚未添加）
+if (!Utils.escapeAttr) {
+    Utils.escapeAttr = escapeAttr;
+}
+
+console.log('✅ app-dashboard-orders.js v3.0 已加载 - 编辑功能已移除，锁定功能已移除');
