@@ -1,5 +1,5 @@
-// app-dashboard-core.js - 完整修复版 v4.0
-// 修复内容：
+// app-dashboard-core.js - 完整修复版 v4.1
+// 修改内容：
 // 1. 移除锁定/解锁订单相关的按钮和功能
 // 2. 移除编辑订单相关的权限（员工/店长不能编辑）
 // 3. 服务费宣传文本改为优惠说明（不写具体数字）
@@ -7,6 +7,7 @@
 // 5. 修复 XSS 风险（动态属性转义）
 // 6. sessionStorage 不再存储敏感信息
 // 7. 工具栏响应式网格布局（管理员5列2行，门店6列1行）
+// 8. 移除员工角色选项（只保留管理员和店长）
 
 window.APP = window.APP || {};
 
@@ -308,7 +309,6 @@ const DashboardCore = {
                 </div>
             `).join('');
             
-            // 动态设置工具栏的 CSS 类名（用于响应式网格布局）
             var toolbarClass = isAdmin ? 'toolbar admin-grid' : 'toolbar store-grid';
             
             var toolbarHtml = `
@@ -328,7 +328,7 @@ const DashboardCore = {
             
             var bottomHtml = `
             <div class="card">
-                <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.user.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工')})</h3>
+                <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
                 <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
                 <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)'}</p>
                 <p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>
@@ -665,7 +665,7 @@ const DashboardCore = {
             printContent += `<tr><td>${Utils.formatDate(txn.recorded_at)}</td><td>${typeMap[txn.flow_type] || txn.flow_type}</td><td>${methodText}</td><td>${directionText}</td><td class="text-right">${Utils.formatCurrency(txn.amount)}</td><td>${Utils.escapeHtml(txn.description || '-')}</td></tr>`;
         }
         
-        printContent += `</tbody><tr><div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div>
+        printContent += `</tbody></table><div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div>
         <div class="no-print" style="text-align:center; margin-top:20px;"><button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
         <button onclick="window.close()" style="margin-left:10px;">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button></div></body></html>`;
         
@@ -740,7 +740,7 @@ const DashboardCore = {
             for (var u of users) {
                 var isCurrent = u.id === AUTH.user.id;
                 var storeName = storeMap[u.store_id] || '-';
-                var roleText = u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : u.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工');
+                var roleText = u.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长');
                 var usernameDisplay = u.username || u.email || '-';
                 var actionHtml = '';
                 if (isCurrent) {
@@ -778,7 +778,12 @@ const DashboardCore = {
                         <div class="form-group"><label>${t('username')} *</label><input id="newUsername" placeholder="email@domain.com"></div>
                         <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password"></div>
                         <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName"></div>
-                        <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="newRole"><option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option></select></div>
+                        <div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label>
+                            <select id="newRole">
+                                <option value="admin">${lang === 'id' ? 'Administrator' : '管理员'}</option>
+                                <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
+                            </select>
+                        </div>
                         <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label><select id="newStoreId">${storeOptions}</select></div>
                         <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Pengguna' : '添加用户'}</button></div>
                     </div>
@@ -814,7 +819,12 @@ const DashboardCore = {
             var modal = document.createElement('div');
             modal.id = 'editUserModal';
             modal.className = 'modal-overlay';
-            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${Utils.escapeAttr(userId)}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
+            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label>
+                <select id="editRoleSelect">
+                    <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option>
+                    <option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
+                </select>
+            </div><div class="modal-actions"><button onclick="APP._saveUserRole('${Utils.escapeAttr(userId)}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
             document.body.appendChild(modal);
         } catch (error) { alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败'); }
     },
@@ -1134,17 +1144,17 @@ const DashboardCore = {
             
             var rows = '';
             if (transfers.length === 0) {
-                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</td></tr>`;
+                rows = `<td><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}<\/td><\/tr>`;
             } else {
                 for (var t of transfers) {
                     rows += `<tr>
-                        <td>${Utils.formatDate(t.transfer_date)}</td>
-                        <td>${Utils.escapeHtml(t.stores?.name || '-')}</td>
-                        <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
-                        <td>${t.from_account} → ${t.to_account}</td>
-                        <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
-                        <td>${Utils.escapeHtml(t.description || '-')}</td>
-                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
+                        <td>${Utils.formatDate(t.transfer_date)}<\/td>
+                        <td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>
+                        <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
+                        <td>${t.from_account} → ${t.to_account}<\/td>
+                        <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
+                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
                     </tr>`;
                 }
             }
@@ -1153,7 +1163,7 @@ const DashboardCore = {
                 <div class="modal-content" style="max-width:900px; max-height:85vh; overflow-y:auto;">
                     <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                         <h3 style="margin:0;">🔄 ${lang === 'id' ? 'Riwayat Transfer Internal' : '内部转账记录'}</h3>
-                        <button onclick="document.getElementById('historyModal').remove()" style="background:transparent; font-size:20px; cursor:pointer;">✖</button>
+                        <button onclick="document.getElementById('historyModal').remove()" style="background:transparent; font-size:20px; cursor:pointer;">✖<\/button>
                     </div>
                     
                     <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
@@ -1258,18 +1268,18 @@ const DashboardCore = {
         
         var rows = '';
         if (transfers.length === 0) {
-            rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</td></tr>`;
+            rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}<\/td><\/tr>`;
         } else {
             for (var t of transfers) {
                 rows += `<tr>
-                    <td style="padding:8px;">${Utils.formatDate(t.transfer_date)}</td>
-                    <td style="padding:8px;">${Utils.escapeHtml(t.stores?.name || '-')}</td>
-                    <td style="padding:8px;">${typeMap[t.transfer_type] || t.transfer_type}</td>
-                    <td style="padding:8px;">${t.from_account} → ${t.to_account}</td>
-                    <td style="padding:8px; text-align:right;">${Utils.formatCurrency(t.amount)}</td>
-                    <td style="padding:8px;">${Utils.escapeHtml(t.description || '-')}</td>
-                    <td style="padding:8px;">${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
-                <tr>`;
+                    <td style="padding:8px;">${Utils.formatDate(t.transfer_date)}<\/td>
+                    <td style="padding:8px;">${Utils.escapeHtml(t.stores?.name || '-')}<\/td>
+                    <td style="padding:8px;">${typeMap[t.transfer_type] || t.transfer_type}<\/td>
+                    <td style="padding:8px;">${t.from_account} → ${t.to_account}<\/td>
+                    <td style="padding:8px; text-align:right;">${Utils.formatCurrency(t.amount)}<\/td>
+                    <td style="padding:8px;">${Utils.escapeHtml(t.description || '-')}<\/td>
+                    <td style="padding:8px;">${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
+                </tr>`;
             }
         }
         
@@ -1343,4 +1353,4 @@ if (typeof Utils !== 'undefined') {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-core.js v4.0 已加载 - 锁定功能已移除，编辑权限已限制，工具栏响应式布局已启用');
+console.log('✅ app-dashboard-core.js v4.1 已加载 - 员工角色已移除，只保留管理员和店长');
