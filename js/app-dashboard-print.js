@@ -1,7 +1,4 @@
-// app-dashboard-print.js - 打印功能模块 v2.0
-// 包含：打印当前页、保存PDF、打印选项
-// 修改：打印时自动添加门店/总部信息
-// 说明：打印样式保留在 JS 中（因为需要独立的打印布局）
+// app-dashboard-print.js - v1.0
 
 window.APP = window.APP || {};
 
