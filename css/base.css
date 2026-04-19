@@ -1293,15 +1293,16 @@ tbody tr:hover {
     }
     
     /* 手机端表格优化 - 移除 white-space: nowrap，让长文本自然换行 */
-    .table-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    th, td {
-        padding: 8px 8px;
-        /* 删除 white-space: nowrap，让地址等长文本自然换行 */
-    }
+/* 手机端表格优化 - 保留 nowrap 确保横向滚动 */
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+th, td {
+    padding: 8px 8px;
+    white-space: nowrap;  /* 恢复：防止换行，配合横向滚动 */
+}
     
     /* 手机端cashflow区块 */
     .cashflow-stats {
