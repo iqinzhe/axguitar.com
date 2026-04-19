@@ -1,9 +1,11 @@
-// app-dashboard-core.js - 完整修复版 v3.0（清理版）
+// app-dashboard-core.js - 完整修复版 v4.0
 // 修复内容：
-// 1. sessionStorage 不再存储订单ID、客户ID等敏感信息
-// 2. 刷新时仅恢复页面，敏感数据从服务器重新获取
-// 3. 优化页面状态管理
-// 4. 样式已全部移至 base.css 和 components.css
+// 1. 移除锁定/解锁订单相关的按钮和功能
+// 2. 移除编辑订单相关的权限（员工/店长不能编辑）
+// 3. 服务费宣传文本改为优惠说明（不写具体数字）
+// 4. 统一使用异步权限检查
+// 5. 修复 XSS 风险（动态属性转义）
+// 6. sessionStorage 不再存储敏感信息
 
 window.APP = window.APP || {};
 
@@ -83,13 +85,7 @@ const DashboardCore = {
                     await self.showOrderTable();
                 }
             },
-            editOrder: async () => { 
-                if (self.currentOrderId) {
-                    await self.editOrder(self.currentOrderId);
-                } else {
-                    await self.showOrderTable();
-                }
-            },
+            // 注意：editOrder 已移除，员工/店长不能编辑订单
             report: async () => await self.showReport(),
             userManagement: async () => await self.showUserManagement(),
             storeManagement: async () => await StoreManager.renderStoreManagement(),
@@ -148,7 +144,7 @@ const DashboardCore = {
             customerPaymentHistory: async () => { if (params.customerId) await self.showCustomerPaymentHistory(params.customerId); },
             viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
             payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
-            editOrder: async () => { if (params.orderId) await self.editOrder(params.orderId); },
+            // 注意：editOrder 已移除
             blacklist: async () => await self.showBlacklist()
         };
         var handler = navHandlers[page];
@@ -274,7 +270,8 @@ const DashboardCore = {
             var cashFlow = await SUPABASE.getCashFlowSummary();
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
-            var isAdmin = AUTH.isAdmin();
+            var profile = await SUPABASE.getCurrentProfile();
+            var isAdmin = profile?.role === 'admin';
             var storeName = AUTH.getCurrentStoreName();
             
             var needRemindOrders = await SUPABASE.getOrdersNeedReminder();
@@ -286,9 +283,8 @@ const DashboardCore = {
             
             var totalExpenses = 0;
             try {
-                const profile = await SUPABASE.getCurrentProfile();
                 let expenseQuery = supabaseClient.from('expenses').select('amount');
-                if (profile?.role !== 'admin' && profile?.store_id) {
+                if (!isAdmin && profile?.store_id) {
                     expenseQuery = expenseQuery.eq('store_id', profile.store_id);
                 }
                 const { data: expenses } = await expenseQuery;
@@ -313,6 +309,7 @@ const DashboardCore = {
                 </div>
             `).join('');
             
+            // 修复：服务费宣传文本改为优惠说明
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h1><img src="icons/pagehead-logo.png" alt="JF!" class="logo-img"> JF! by Gadai</h1>
@@ -401,8 +398,8 @@ const DashboardCore = {
                 <div class="card">
                     <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.user.role === 'store_manager' ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工')})</h3>
                     <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
-                    <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: 1%-3% per bulan' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: 1%-3%/月'}</p>
-                    ${!isAdmin ? `<p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
+                    <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)'}</p>
+                    <p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>
                 </div>`;
         } catch (err) {
             document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
@@ -414,8 +411,9 @@ const DashboardCore = {
         var t = (key) => Utils.t(key);
         
         var stores = await SUPABASE.getAllStores();
-        var isAdmin = AUTH.isAdmin();
-        var currentStoreId = AUTH.user?.store_id;
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
+        var currentStoreId = profile?.store_id;
         
         var transactions = [];
         try {
@@ -452,7 +450,7 @@ const DashboardCore = {
                     <td style="padding:8px; text-align:right;" class="${directionClass}">${Utils.formatCurrency(txn.amount)}</td>
                     <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                     <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? Utils.escapeHtml(txn.orders.order_id) : '-'}</td>
-                </tr>`;
+                　　　`;
             }
         }
         
@@ -607,7 +605,7 @@ const DashboardCore = {
                 <td style="padding:8px; text-align:right;" class="${directionClass}">${Utils.formatCurrency(txn.amount)}</td>
                 <td style="padding:8px; max-width:200px; overflow:hidden; text-overflow:ellipsis;">${Utils.escapeHtml(txn.description || '-')}</td>
                 <td style="padding:8px; text-align:center; font-size:11px;">${txn.orders?.order_id ? Utils.escapeHtml(txn.orders.order_id) : '-'}</td>
-            </tr>`;
+            　　　`;
         }
         
         if (rows === '') {
@@ -651,7 +649,7 @@ const DashboardCore = {
         </head><body>
         <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h1>
         <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
-        <tr><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
+        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
         
         for (var txn of transactions) {
             var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
@@ -714,6 +712,15 @@ const DashboardCore = {
         this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
+        
+        if (!isAdmin) {
+            alert(lang === 'id' ? 'Hanya administrator yang dapat mengakses halaman ini' : '只有管理员可以访问此页面');
+            this.goBack();
+            return;
+        }
+        
         try {
             var users = await AUTH.getAllUsers();
             var stores = await SUPABASE.getAllStores();
@@ -731,7 +738,7 @@ const DashboardCore = {
                 if (isCurrent) {
                     actionHtml = `<span class="current-user-badge">✅ ${lang === 'id' ? 'Saya' : '当前'}</span>`;
                 } else {
-                    actionHtml = `<button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button><button class="btn-small danger" onclick="APP.deleteUser('${u.id}')">🗑️ ${t('delete')}</button>`;
+                    actionHtml = `<button onclick="APP.editUser('${Utils.escapeAttr(u.id)}')" class="btn-small">✏️ ${t('edit')}</button><button class="btn-small danger" onclick="APP.deleteUser('${Utils.escapeAttr(u.id)}')">🗑️ ${t('delete')}</button>`;
                 }
                 userRows += `<tr>
                     <td>${Utils.escapeHtml(usernameDisplay)}</td>
@@ -756,7 +763,7 @@ const DashboardCore = {
                     </div>
                 </div>
                 <div class="card"><h3>${lang === 'id' ? 'Daftar Pengguna' : '用户列表'}</h3>
-                    <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody></table></div>
+                    <div class="table-container"><table class="user-table"><thead><tr><th>${t('username')}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Peran' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${userRows}</tbody>}</table></div>
                 </div>
                 <div class="card"><h3>${lang === 'id' ? 'Tambah Pengguna Baru' : '添加新用户'}</h3>
                     <div class="form-grid">
@@ -783,7 +790,8 @@ const DashboardCore = {
     },
 
     deleteUser: async function(userId) {
-        if (confirm(Utils.lang === 'id' ? 'Hapus pengguna ini?' : '删除此用户？')) {
+        var lang = Utils.lang;
+        if (confirm(lang === 'id' ? 'Hapus pengguna ini? Tindakan ini tidak dapat dibatalkan.' : '删除此用户？此操作不可撤销。')) {
             try { await AUTH.deleteUser(userId); await this.showUserManagement(); } 
             catch (error) { alert('Error: ' + error.message); }
         }
@@ -798,7 +806,7 @@ const DashboardCore = {
             var modal = document.createElement('div');
             modal.id = 'editUserModal';
             modal.className = 'modal-overlay';
-            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${userId}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
+            modal.innerHTML = `<div class="modal-content"><h3>✏️ ${lang === 'id' ? 'Ubah Peran Pengguna' : '修改用户角色'}</h3><div class="form-group"><label>${lang === 'id' ? 'Peran' : '角色'}</label><select id="editRoleSelect"><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>${lang === 'id' ? 'Administrator' : '管理员'}</option><option value="store_manager" ${user.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option><option value="staff" ${user.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option></select></div><div class="modal-actions"><button onclick="APP._saveUserRole('${Utils.escapeAttr(userId)}')" class="success">💾 ${t('save')}</button><button onclick="document.getElementById('editUserModal').remove()">✖ ${t('cancel')}</button></div></div>`;
             document.body.appendChild(modal);
         } catch (error) { alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败'); }
     },
@@ -817,8 +825,9 @@ const DashboardCore = {
 
     generateWAText: function(order, senderNumber) {
         var lang = Utils.lang;
-        var remainingPrincipal = order.loan_amount - order.principal_paid;
-        var monthlyInterest = remainingPrincipal * Utils.MONTHLY_INTEREST_RATE;
+        // 空值保护
+        var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+        var monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
         var dueDate = Utils.formatDate(order.next_interest_due_date);
         return lang === 'id' 
             ? `Halo *${Utils.escapeHtml(order.customer_name)}*,\n\nKami ingin mengingatkan bahwa pembayaran bunga pinjaman Anda akan jatuh tempo *dalam 2 hari*.\n\n📋 *ID Pesanan:* ${order.order_id}\n💰 *Sisa Pokok:* ${Utils.formatCurrency(remainingPrincipal)}\n📅 *Bunga per Bulan:* ${Utils.formatCurrency(monthlyInterest)}\n⏰ *Tanggal Jatuh Tempo:* ${dueDate}\n\nMohon persiapkan pembayaran Anda.\n\nTerima kasih,\n*${AUTH.getCurrentStoreName()}*\n📞 ${senderNumber}`
@@ -943,8 +952,8 @@ const DashboardCore = {
 
     showTransferModal: async function(transferType) {
         var lang = Utils.lang;
-        var isAdmin = AUTH.isAdmin();
         var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
         
         var title = '';
         var fromLabel = '';
@@ -1093,7 +1102,8 @@ const DashboardCore = {
 
     showInternalTransferHistory: async function() {
         var lang = Utils.lang;
-        var isAdmin = AUTH.isAdmin();
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
         
         if (!isAdmin) {
             alert(lang === 'id' ? 'Hanya administrator yang dapat melihat riwayat transfer internal' : '只有管理员可以查看内部转账记录');
@@ -1304,9 +1314,24 @@ const DashboardCore = {
     }
 };
 
+// 辅助函数：转义属性值（XSS防护）
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
+
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
         key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
         window.APP[key] = DashboardCore[key];
     }
 }
+
+// 添加 escapeAttr 到 Utils
+Utils.escapeAttr = escapeAttr;
+
+console.log('✅ app-dashboard-core.js v4.0 已加载 - 锁定功能已移除，编辑权限已限制');
