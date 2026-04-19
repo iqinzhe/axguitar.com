@@ -1,16 +1,16 @@
-// app-dashboard-orders.js - 完整修复版 v2.1
+// app-dashboard-orders.js - 完整修复版 v2.1（清理版）
 // 修复内容：
 // 1. 修复 printOrder 函数中的 XSS 风险
 // 2. 所有动态字段添加 escapeHtml 转义
 // 3. onclick 属性改用 data-* 属性 + 事件委托
 // 4. 统一使用 Utils.MONTHLY_INTEREST_RATE 常量
 // 5. 隐藏总部的缴费按钮（管理员不能缴费）
+// 6. 样式已全部移至 base.css 和 components.css
 
 window.APP = window.APP || {};
 
 const DashboardOrders = {
 
-    // ==================== 订单列表 ====================
     showOrderTable: async function() {
         this.currentPage = 'orderTable';
         this.saveCurrentPageState();
@@ -31,7 +31,6 @@ const DashboardOrders = {
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
-                    // 使用 data-* 属性替代 onclick 字符串拼接
                     rows += `<tr>
                         <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
                         <td>${Utils.escapeHtml(o.customer_name)}</td>
@@ -94,7 +93,6 @@ const DashboardOrders = {
                     </table>
                 </div>`;
             
-            // 绑定事件委托
             this._bindOrderTableEvents();
             
         } catch (err) {
@@ -107,7 +105,6 @@ const DashboardOrders = {
         const container = document.getElementById('app');
         if (!container) return;
         
-        // 移除旧监听器，添加新监听器
         container.removeEventListener('click', this._orderTableClickHandler);
         this._orderTableClickHandler = (e) => {
             const target = e.target;
@@ -146,7 +143,6 @@ const DashboardOrders = {
         this.showOrderTable(); 
     },
 
-    // ==================== 查看订单详情 ====================
     viewOrder: async function(orderId) {
         this.currentPage = 'viewOrder';
         this.currentOrderId = orderId;
@@ -174,7 +170,7 @@ const DashboardOrders = {
                     　　　`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
+                payRows = `<td><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
 
             var remainingPrincipal = order.loan_amount - order.principal_paid;
@@ -227,7 +223,6 @@ const DashboardOrders = {
                     </div>
                 </div>`;
             
-            // 绑定打印和 WA 按钮事件
             this._bindViewOrderEvents(order.order_id);
             
         } catch (error) {
@@ -385,9 +380,9 @@ const DashboardOrders = {
                 <div class="no-print"><button class="btn-print" onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button><button class="btn-close" onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button></div>
                 <div class="header">
                 <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;">
-    <img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">
-    <h1 style="margin:0;">JF! by Gadai</h1>
-</div>
+                    <img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">
+                    <h1 style="margin:0;">JF! by Gadai</h1>
+                </div>
                     <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${safeOrderId}</strong> | ${Utils.formatDate(order.created_at)}</p>
                 </div>
                 <div class="two-col">
@@ -405,7 +400,7 @@ const DashboardOrders = {
                     </div>
                 </div>
                 <div class="section"><h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h3>
-                    <table class="data-table"><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th></tr></thead>
+                    <table class="data-table"><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><tr></thead>
                     <tbody>${paymentRows}</tbody>
                 </table></div>
                 <div class="footer" style="margin-top:20px; padding-top:10px; border-top:1px solid #ccc; text-align:center; font-size:9px; color:#666;">
@@ -425,7 +420,6 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 缴费明细 ====================
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
@@ -491,7 +485,6 @@ const DashboardOrders = {
                     </table>
                 </div>`;
             
-            // 绑定查看订单按钮事件
             const container = document.getElementById('app');
             if (container) {
                 container.querySelectorAll('.view-order-from-payment').forEach(btn => {
