@@ -1,7 +1,7 @@
-// app-customers.js - 完整修复版 v1.0
+// app-customers.js - 完整修复版 v2.0（清理版）
 // 功能：客户管理
 // 说明：服务费和管理费都是一次性费用，在创建订单时收取
-// 样式：服务费和管理费栏目样式完全一致
+// 样式：已全部移至 base.css 和 components.css
 
 window.APP = window.APP || {};
 
@@ -108,23 +108,7 @@ const CustomersModule = {
                     </div>
                 </div>
                 
-                ${addCustomerCardHtml}
-                
-                <style>
-                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                    .customer-table { width: 100%; border-collapse: collapse; }
-                    .customer-table th, .customer-table td { border: 1px solid #cbd5e1; padding: 8px; }
-                    .customer-table th { background: #f8fafc; font-weight: 600; }
-                    .customer-id-cell, .date-cell, .ktp-cell, .phone-cell, .store-cell { white-space: nowrap; }
-                    .address-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                    .action-cell { white-space: nowrap; }
-                    .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
-                    .text-center { text-align: center; }
-                    @media (max-width: 768px) {
-                        .customer-table th, .customer-table td { font-size: 12px; padding: 6px; }
-                        .address-cell { max-width: 120px; }
-                    }
-                </style>`;
+                ${addCustomerCardHtml}`;
         } catch (error) {
             console.error("showCustomers error:", error);
             alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
@@ -316,7 +300,6 @@ const CustomersModule = {
 
     // ==================== 辅助函数 ====================
     
-    // 更新服务费显示（一次性费用）
     updateServiceFeeDisplay: function() {
         var amountStr = document.getElementById("amount")?.value || "0";
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -342,7 +325,6 @@ const CustomersModule = {
         }
     },
     
-    // 更新管理费下拉选择
     updateAdminFeeSelect: function() {
         var select = document.getElementById("adminFeeSelect");
         var selectedValue = select?.value;
@@ -375,7 +357,6 @@ const CustomersModule = {
         }
     },
     
-    // 更新管理费手动输入
     updateAdminFeeManual: function() {
         var manualInput = document.getElementById("adminFeeManual");
         var hiddenInput = document.getElementById("adminFeeAmount");
@@ -397,7 +378,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（完整版） ====================
+    // ==================== 创建订单 ====================
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -456,7 +437,6 @@ const CustomersModule = {
                     
                     <h3>${t('collateral_info')}</h3>
                     <div class="form-grid two-col-grid">
-                        <!-- 第一行：质押物名称 + 备注说明 -->
                         <div class="form-group">
                             <label>${t('collateral_name')} *</label>
                             <input id="collateral" placeholder="${t('collateral_name')}">
@@ -467,7 +447,6 @@ const CustomersModule = {
                             <small style="color:#64748b;">${lang === 'id' ? 'Warna, kondisi, tahun, dll.' : '成色、状况、年份等'}</small>
                         </div>
                         
-                        <!-- 第二行：贷款金额 + 资金来源 -->
                         <div class="form-group">
                             <label>${t('loan_amount')} *</label>
                             <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input" oninput="APP.updateServiceFeeDisplay()">
@@ -481,7 +460,6 @@ const CustomersModule = {
                             <small style="color:#64748b;">${lang === 'id' ? 'Dana pinjaman berasal dari' : '贷款资金从哪里发放'}</small>
                         </div>
                         
-                        <!-- ========== 服务费区域（一次性费用，样式与管理费一致） ========== -->
                         <div class="form-group fee-section">
                             <label>💰 ${lang === 'id' ? 'Service Fee' : '服务费'}</label>
                             <div class="fee-options">
@@ -504,7 +482,6 @@ const CustomersModule = {
                             </div>
                         </div>
                         
-                        <!-- ========== 管理费区域（一次性费用，样式与服务费一致） ========== -->
                         <div class="form-group fee-section">
                             <label>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'}</label>
                             <div class="fee-options">
@@ -540,36 +517,7 @@ const CustomersModule = {
                             <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
                         </div>
                     </div>
-                </div>
-                
-                <style>
-                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                    .customer-info-display { background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
-                    .customer-info-display p { margin: 6px 0; }
-                    .amount-input { text-align: right; }
-                    .store-info-banner { background: #e0f2fe; padding: 10px 15px; border-radius: 8px; margin-bottom: 16px; }
-                    
-                    /* 费用选项区域 - 服务费和管理费样式完全一致 */
-                    .fee-section { margin-bottom: 8px; }
-                    .fee-options { background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 3px solid #d97706; }
-                    .fee-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 14px; background: white; }
-                    .fee-display { font-size: 14px; font-weight: 600; color: #d97706; margin-top: 8px; padding: 6px; background: #fffbeb; border-radius: 6px; text-align: center; }
-                    
-                    .payment-method-options { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 6px; }
-                    .payment-method-options label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
-                    
-                    /* 桌面端：两列布局 */
-                    @media (min-width: 769px) {
-                        .two-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-                        .two-col-grid .full-width { grid-column: span 2; }
-                    }
-                    
-                    /* 手机端：单列布局 */
-                    @media (max-width: 768px) {
-                        .two-col-grid { display: flex; flex-direction: column; gap: 12px; }
-                        .payment-method-options { justify-content: flex-start; }
-                    }
-                </style>`;
+                </div>`;
             
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
@@ -577,7 +525,6 @@ const CustomersModule = {
             var manualInput = document.getElementById("adminFeeManual");
             if (manualInput && Utils.bindAmountFormat) Utils.bindAmountFormat(manualInput);
             
-            // 初始化服务费显示
             this.updateServiceFeeDisplay();
             
         } catch (error) {
@@ -594,19 +541,15 @@ const CustomersModule = {
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var notes = document.getElementById("notes").value;
         
-        // 服务费（一次性）
         var serviceFeePercent = parseInt(document.getElementById("serviceFeePercent").value) || 0;
         var serviceFeeAmount = amount * (serviceFeePercent / 100);
         var serviceFeeMethod = document.querySelector('input[name="serviceFeeMethod"]:checked')?.value || 'cash';
         
-        // 管理费（一次性）
         var adminFeeAmount = parseInt(document.getElementById("adminFeeAmount").value) || 0;
         var adminFeeMethod = document.querySelector('input[name="adminFeeMethod"]:checked')?.value || 'cash';
         
-        // 贷款资金来源
         var loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash';
         
-        // 合并质押物备注
         var fullCollateralName = collateralNote ? `${collateral} (${collateralNote})` : collateral;
         
         if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
@@ -618,7 +561,6 @@ const CustomersModule = {
                 .eq('id', customerId)
                 .single();
             
-            // 1. 创建订单
             var orderData = {
                 customer: { 
                     name: customer.name, 
@@ -636,7 +578,6 @@ const CustomersModule = {
             
             var newOrder = await Order.create(orderData);
             
-            // 2. 记录贷款发放（资金来源）
             if (amount > 0) {
                 try {
                     await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, 
@@ -650,7 +591,6 @@ const CustomersModule = {
                 }
             }
             
-            // 3. 收取服务费（一次性）
             if (serviceFeeAmount > 0) {
                 try {
                     await Order.recordServiceFee(newOrder.order_id, 1, serviceFeeMethod);
@@ -663,7 +603,6 @@ const CustomersModule = {
                 }
             }
             
-            // 4. 收取管理费（一次性）
             if (adminFeeAmount > 0) {
                 try {
                     await Order.recordAdminFee(newOrder.order_id, adminFeeMethod, adminFeeAmount);
@@ -753,18 +692,7 @@ const CustomersModule = {
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
-                </div>
-                <style>
-                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                    .customer-summary { background: #f8fafc; }
-                    .customer-summary p { margin: 6px 0; }
-                    .order-table { width: 100%; border-collapse: collapse; }
-                    .order-table th, .order-table td { border: 1px solid #cbd5e1; padding: 8px; }
-                    .order-table th { background: #f8fafc; }
-                    .text-right { text-align: right; }
-                    .text-center { text-align: center; }
-                    .btn-small { padding: 4px 8px; font-size: 12px; margin: 0 2px; }
-                </style>`;
+                </div>`;
         } catch (error) {
             console.error("showCustomerOrders error:", error);
             alert(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
@@ -830,13 +758,7 @@ const CustomersModule = {
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
-                </div>
-                <style>
-                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-                    .customer-summary { background: #f8fafc; }
-                    .text-right { text-align: right; }
-                    .text-center { text-align: center; }
-                </style>`;
+                </div>`;
         } catch (error) {
             console.error("showCustomerPaymentHistory error:", error);
             alert(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
@@ -844,14 +766,12 @@ const CustomersModule = {
     }
 };
 
-// 合并到 window.APP
 for (var key in CustomersModule) {
     if (typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
     }
 }
 
-// 暴露辅助函数
 window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
