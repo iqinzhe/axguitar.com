@@ -1,6 +1,5 @@
 /* =====================================================
-   base.css - v1.0
-   ===================================================== */
+   base.css - v1.0  ===================================================== */
 
 /* ---------- 1. 全局变量 ---------- */
 :root {
@@ -137,7 +136,7 @@ h1 img,
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-5);
+    margin-bottom: var(--spacing-3);
     flex-wrap: wrap;
     gap: var(--spacing-3);
 }
