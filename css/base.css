@@ -1,7 +1,17 @@
 /* =====================================================
-   base.css - 基础样式 v4.0 (最终版)
+   base.css - 基础样式 v5.0 (响应式修复完整版)
+   修复内容：
+   1. 删除泄漏到全局的重复 .table-container 和 th/td 定义
+   2. 补充 .summary-table 手机端竖向响应式布局
+   3. 统一按钮最小触摸高度 44px（手机端）
+   4. 减少手机端 #app 和 .card 双重 padding
+   5. 新增 390px 超小屏断点
+   6. 修复 .info-box 在手机端的 flex 布局
+   7. 补充 .history-table 手机端最小列宽
+   8. 整理混乱注释，统一代码缩进
    包含：全局变量、重置、布局、表单、模态框、工具类、打印样式
    ===================================================== */
+
 /* ---------- 1. 全局变量 ---------- */
 :root {
     --primary: #2563eb;
@@ -375,7 +385,6 @@ button.danger:hover,
 
 .stat-card:hover {
     box-shadow: var(--shadow-md);
-    /* 移除 transform: translateY(-2px)，统一为只加深阴影 */
 }
 
 .stat-value {
@@ -513,19 +522,21 @@ th {
     background: var(--gray-50);
     color: var(--gray-700);
     border-bottom: 1px solid var(--gray-300);
+    white-space: nowrap; /* 表头不换行，防止列宽塌陷 */
 }
 
 tbody tr:hover {
     background: var(--gray-50);
 }
 
-/* 表格容器（横向滚动） */
+/* 表格容器（横向滚动，含 iOS 顺滑滚动） */
 .table-container {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     margin: var(--spacing-3) 0;
 }
 
-/* 操作列 - 修复：移除无用的 white-space: nowrap */
+/* 操作列 */
 .action-cell {
     display: flex;
     gap: var(--spacing-2);
@@ -675,12 +686,6 @@ tbody tr:hover {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-4);
-}
-
-@media (max-width: 768px) {
-    .two-col-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* 客户信息展示区 */
@@ -1076,6 +1081,7 @@ tbody tr:hover {
     color: var(--gray-600);
     width: 110px;
     background: var(--gray-100);
+    white-space: nowrap;
 }
 
 .summary-table td.value {
@@ -1192,12 +1198,16 @@ tbody tr:hover {
     align-items: center;
     gap: 6px;
     cursor: pointer;
+    /* 增大触摸区域 */
+    padding: var(--spacing-2) 0;
 }
 
 .card-history {
     margin-top: var(--spacing-4);
     padding-top: var(--spacing-4);
     border-top: 1px solid var(--gray-200);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .history-title {
@@ -1209,148 +1219,301 @@ tbody tr:hover {
 .history-table {
     width: 100%;
     font-size: 0.8125rem;
+    min-width: 400px; /* 防止极窄屏幕压缩列宽，配合外层滚动 */
 }
 
 .history-table th,
 .history-table td {
     padding: 8px 10px;
+    white-space: nowrap;
 }
 
 /* =====================================================
-   响应式断点（合并为一个）
+   响应式断点 — 平板端（≤1024px）
    ===================================================== */
 @media (max-width: 1024px) {
-    #app { padding: var(--spacing-4); }
+    #app {
+        padding: var(--spacing-4);
+    }
 }
 
+/* =====================================================
+   响应式断点 — 手机端（≤768px）
+   修复：删除原来泄漏到全局的 .table-container 和 th/td 重复定义
+   ===================================================== */
 @media (max-width: 768px) {
-    #app { 
-        padding: var(--spacing-3);
+
+    /* --- 布局 --- */
+    #app {
+        padding: var(--spacing-2) var(--spacing-3);
     }
-    
+
+    .card {
+        padding: var(--spacing-4);
+    }
+
     .page-header {
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .header-actions {
         width: 100%;
         justify-content: flex-end;
     }
-    
+
+    /* --- 工具栏 --- */
     .toolbar {
         flex-direction: column;
     }
-    
+
     .toolbar input,
     .toolbar select,
     .toolbar button {
         width: 100%;
     }
-    
-    /* 修复问题6：手机端工具栏输入框防止iOS缩放 */
+
+    /* 防止 iOS 自动缩放：输入框字号须 ≥ 16px */
     .toolbar input,
     .toolbar select {
         font-size: 16px;
     }
-    
+
+    /* --- 双列网格 → 单列 --- */
+    .two-col-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* --- 表单 --- */
     .form-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .form-grid .full-width {
         grid-column: span 1;
     }
-    
+
     .form-actions {
         flex-direction: column;
     }
-    
+
     .form-actions button {
         width: 100%;
     }
-    
+
+    /* 表单输入框增大触摸区域，防止 iOS 缩放 */
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 12px var(--spacing-3);
+        font-size: 16px;
+    }
+
+    /* --- 按钮：最小触摸高度 44px（iOS HIG 标准） --- */
+    button {
+        min-height: 44px;
+    }
+
+    .btn-small {
+        min-height: 36px; /* 辅助操作放宽至 36px */
+    }
+
+    /* 缴费操作主按钮放大 */
+    .btn-action {
+        min-height: 48px;
+        font-size: var(--font-md);
+        padding: 14px 20px;
+    }
+
+    /* --- 模态框 --- */
     .modal-overlay {
         padding: var(--spacing-3);
         align-items: flex-start;
     }
-    
+
     .modal-content {
         margin-top: 10vh;
         padding: var(--spacing-5);
         max-width: calc(100% - 32px);
         max-height: 75vh;
     }
-    
+
     .modal-actions {
         flex-direction: column;
         gap: var(--spacing-2);
     }
-    
+
     .modal-actions button {
         width: 100%;
+        min-height: 44px;
         padding: 12px;
     }
-    
-    /* 手机端表格优化 - 移除 white-space: nowrap，让长文本自然换行 */
-/* 手机端表格优化 - 保留 nowrap 确保横向滚动 */
-.table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
 
-th, td {
-    padding: 8px 8px;
-    white-space: nowrap;  /* 恢复：防止换行，配合横向滚动 */
-}
-    
-    /* 手机端cashflow区块 */
-    .cashflow-stats {
-        flex-direction: column;
-    }
-    
-    .cashflow-item {
-        min-width: auto;
-    }
-    
-    .transfer-buttons {
-        flex-direction: column;
-    }
-    
-    .transfer-btn {
-        width: 100%;
-        text-align: center;
-    }
-    
-    /* 手机端统计卡片 */
+    /* --- 统计卡片：2列 --- */
     .stats-grid-optimized {
         grid-template-columns: repeat(2, 1fr);
         gap: var(--spacing-2);
     }
-    
+
     .stat-card {
         padding: var(--spacing-3) var(--spacing-2);
     }
-    
+
     .stat-value {
         font-size: var(--font-md);
     }
-    
+
     .stat-label {
         font-size: var(--font-xs);
     }
-    
-    /* 手机端按钮组 */
+
+    /* --- cashflow区块 --- */
+    .cashflow-stats {
+        flex-direction: column;
+    }
+
+    .cashflow-item {
+        min-width: auto;
+    }
+
+    .transfer-buttons {
+        flex-direction: column;
+    }
+
+    .transfer-btn {
+        width: 100%;
+        text-align: center;
+        min-height: 44px;
+    }
+
+    /* --- 操作列按钮组 --- */
     .action-cell {
         flex-wrap: wrap;
     }
-    
-    /* 手机端表单增大触摸区域 */
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        padding: 12px var(--spacing-3);
-        font-size: 16px;
+
+    /* ----------------------------------------------------------------
+       缴费页面（summary-table）手机端适配
+       原六列横向布局 → 每对 label/value 独占一行的竖向列表
+       ---------------------------------------------------------------- */
+    .summary-table,
+    .summary-table tbody,
+    .summary-table tr,
+    .summary-table td {
+        display: block;
+        width: 100%;
+    }
+
+    /* 隐藏分隔行（手机端靠间距代替） */
+    .summary-table tr.divider {
+        display: none;
+    }
+
+    .summary-table tr {
+        display: flex;
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--gray-200);
+        padding: var(--spacing-1) 0;
+    }
+
+    .summary-table tr:last-child {
+        border-bottom: none;
+    }
+
+    .summary-table td.label {
+        width: 40%;
+        min-width: 90px;
+        font-size: var(--font-xs);
+        padding: 6px 8px;
+    }
+
+    .summary-table td.value {
+        width: 60%;
+        font-size: var(--font-xs);
+        padding: 6px 8px;
+        word-break: break-all;
+    }
+
+    .summary-table tr.paid-row {
+        background: var(--success-light);
+        border-radius: var(--radius-sm);
+    }
+
+    /* --- info-box：竖向排列，防止数字被截断 --- */
+    .info-box {
+        flex-direction: column;
+        gap: var(--spacing-1);
+    }
+
+    .info-box span {
+        font-size: var(--font-xs);
+    }
+
+    /* --- history-table：已通过 min-width 配合 card-history 滚动，无需额外处理 --- */
+
+    /* --- 手机端 th 保持 nowrap 防止列宽塌陷，td 允许换行 --- */
+    th {
+        white-space: nowrap;
+    }
+
+    td {
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    /* 但 history-table 的 td 维持 nowrap 配合 min-width 滚动 */
+    .history-table th,
+    .history-table td {
+        white-space: nowrap;
+    }
+}
+
+/* =====================================================
+   响应式断点 — 超小屏（≤390px，如 iPhone SE）
+   ===================================================== */
+@media (max-width: 390px) {
+
+    #app {
+        padding: var(--spacing-2);
+    }
+
+    .card {
+        padding: var(--spacing-3);
+        border-radius: var(--radius-md);
+    }
+
+    .page-header h1,
+    .page-header h2 {
+        font-size: var(--font-lg);
+    }
+
+    /* 统计卡片在极小屏幕改为单列 */
+    .stats-grid-optimized {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--spacing-1);
+    }
+
+    .stat-value {
+        font-size: var(--font-sm);
+    }
+
+    /* 缴费摘要表 label 列收窄 */
+    .summary-table td.label {
+        width: 45%;
+        font-size: 0.75rem;
+    }
+
+    .summary-table td.value {
+        width: 55%;
+        font-size: 0.75rem;
+    }
+
+    /* 按钮文字略缩小，防止溢出 */
+    .btn-action {
+        font-size: var(--font-sm);
+    }
+
+    .login-box {
+        padding: var(--spacing-4);
     }
 }
 
@@ -1362,20 +1525,20 @@ th, td {
         size: A4;
         margin: 15mm 12mm;
     }
-    
+
     body {
         background: white;
         padding: 0;
         margin: 0;
         font-size: 12pt;
     }
-    
+
     #app {
         max-width: 100%;
         padding: 0;
         margin: 0;
     }
-    
+
     .no-print,
     .toolbar button:not(.print-btn),
     button:not(.print-btn),
@@ -1386,15 +1549,15 @@ th, td {
     .modal-overlay {
         display: none !important;
     }
-    
+
     .toolbar {
         display: block !important;
     }
-    
+
     .print-btn {
         display: inline-block !important;
     }
-    
+
     .card,
     .stat-card,
     .cashflow-summary {
@@ -1404,31 +1567,32 @@ th, td {
         page-break-inside: avoid;
         break-inside: avoid;
     }
-    
+
     .cashflow-summary {
         background: white !important;
         color: black !important;
     }
-    
+
     .cashflow-summary h3 {
         color: black !important;
         border-bottom-color: #ccc !important;
     }
-    
+
     .cashflow-item {
         background: #f5f5f5 !important;
         color: black !important;
     }
-    
+
     thead {
         display: table-header-group;
     }
-    
+
     table {
         page-break-inside: avoid;
     }
-    
+
     th, td {
         border: 1px solid #ccc !important;
+        white-space: normal !important;
     }
 }
