@@ -315,7 +315,7 @@ const DashboardCore = {
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h1><img src="icons/pagehead-logo.png" alt="JF!"> JF! by Gadai</h1>
+                    <h1><img src="icons/pagehead-logo.png" alt="JF!" class="logo-img"> JF! by Gadai</h1>
                     <div class="header-actions">
                         ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
                     </div>
