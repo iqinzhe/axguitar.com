@@ -1,6 +1,10 @@
 /* =====================================================
-   base.css - 基础样式 v1.0 (修复版)
+   base.css - 基础样式 v4.0 (最终版)
+   包含：全局变量、重置、布局、表单、模态框、工具类、打印样式
+   修复：按钮样式、统计卡片、cashflow区块、表格样式、响应式
+   补充：缺失的业务样式
    ===================================================== */
+
 /* ---------- 1. 全局变量 ---------- */
 :root {
     --primary: #2563eb;
@@ -156,7 +160,7 @@ h1 img,
 }
 
 /* =====================================================
-   新增：按钮样式（修复问题1）
+   按钮样式
    ===================================================== */
 
 /* 基础按钮样式 */
@@ -353,7 +357,7 @@ button.danger:hover,
 }
 
 /* =====================================================
-   新增：统计卡片网格（修复问题2）
+   统计卡片网格
    ===================================================== */
 
 .stats-grid-optimized {
@@ -373,8 +377,8 @@ button.danger:hover,
 }
 
 .stat-card:hover {
-    transform: translateY(-2px);
     box-shadow: var(--shadow-md);
+    /* 移除 transform: translateY(-2px)，统一为只加深阴影 */
 }
 
 .stat-value {
@@ -407,7 +411,7 @@ button.danger:hover,
 }
 
 /* =====================================================
-   新增：cashflow区块样式（修复问题3）
+   cashflow区块样式
    ===================================================== */
 
 .cashflow-summary {
@@ -491,7 +495,7 @@ button.danger:hover,
 }
 
 /* =====================================================
-   新增：表格样式（修复问题7）
+   表格样式
    ===================================================== */
 
 table {
@@ -524,9 +528,8 @@ tbody tr:hover {
     margin: var(--spacing-3) 0;
 }
 
-/* 操作列 */
+/* 操作列 - 修复：移除无用的 white-space: nowrap */
 .action-cell {
-    white-space: nowrap;
     display: flex;
     gap: var(--spacing-2);
     flex-wrap: wrap;
@@ -656,7 +659,122 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   7. 工具栏
+   缺失业务样式（补充）
+   ===================================================== */
+
+/* 门店信息横幅 */
+.store-info-banner {
+    background: var(--primary-soft);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-3) var(--spacing-4);
+    margin: var(--spacing-4) 0;
+    font-size: var(--font-xs);
+    color: var(--primary-dark);
+    text-align: center;
+}
+
+/* 两列网格（用于创建订单页面） */
+.two-col-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-4);
+}
+
+@media (max-width: 768px) {
+    .two-col-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 客户信息展示区 */
+.customer-info-display {
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-4);
+    margin-bottom: var(--spacing-5);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--spacing-2);
+}
+
+.customer-info-display p {
+    margin: 0;
+    font-size: var(--font-xs);
+}
+
+/* 地址选项（居住地址同KTP选项） */
+.address-option {
+    display: flex;
+    gap: var(--spacing-4);
+    margin-bottom: var(--spacing-2);
+}
+
+.address-option label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+/* 费用区块 */
+.fee-section {
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
+}
+
+.fee-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.fee-select {
+    width: auto !important;
+    min-width: 120px;
+}
+
+.fee-display {
+    background: var(--success-light);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-xs);
+    color: var(--success-dark);
+    font-weight: 500;
+}
+
+/* 已平账徽章 */
+.reconciled-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--success-light);
+    color: var(--success-dark);
+}
+
+/* 锁定徽章 */
+.locked-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--gray-200);
+    color: var(--gray-600);
+}
+
+/* 总支出金额 */
+.total-expense {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* =====================================================
+   工具栏
    ===================================================== */
 .toolbar {
     display: flex;
@@ -678,7 +796,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   8. 表单组件
+   表单组件
    ===================================================== */
 .form-group {
     margin-bottom: var(--spacing-4);
@@ -730,7 +848,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   9. 模态框
+   模态框
    ===================================================== */
 .modal-overlay {
     position: fixed;
@@ -769,7 +887,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   10. 登录页面
+   登录页面
    ===================================================== */
 .login-container {
     height: 100vh;
@@ -836,7 +954,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   11. 加载动画
+   加载动画
    ===================================================== */
 .loading-container {
     display: flex;
@@ -867,7 +985,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   12. 错误页面（修复问题5：spacing-8）
+   错误页面
    ===================================================== */
 .error-container {
     display: flex;
@@ -882,7 +1000,7 @@ tbody tr:hover {
     max-width: 400px;
     background: white;
     border-radius: var(--radius-xl);
-    padding: var(--spacing-8);  /* 现在已定义 */
+    padding: var(--spacing-8);
     text-align: center;
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--gray-200);
@@ -916,7 +1034,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   13. 工具类
+   工具类
    ===================================================== */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
@@ -939,7 +1057,7 @@ tbody tr:hover {
 .expense { color: var(--danger); }
 
 /* =====================================================
-   14. 缴费页面专用样式
+   缴费页面专用样式
    ===================================================== */
 .summary-card {
     background: var(--gray-50);
@@ -1102,7 +1220,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   15. 响应式断点（修复问题4和问题6）
+   响应式断点（合并为一个）
    ===================================================== */
 @media (max-width: 1024px) {
     #app { padding: var(--spacing-4); }
@@ -1111,8 +1229,6 @@ tbody tr:hover {
 @media (max-width: 768px) {
     #app { 
         padding: var(--spacing-3);
-        /* 修复问题4：移除多余的底部留空，因为应用没有底部导航栏 */
-        /* 原 padding-bottom: 80px 已移除 */
     }
     
     .page-header {
@@ -1179,7 +1295,7 @@ tbody tr:hover {
         padding: 12px;
     }
     
-    /* 手机端表格优化 */
+    /* 手机端表格优化 - 移除 white-space: nowrap，让长文本自然换行 */
     .table-container {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -1187,7 +1303,7 @@ tbody tr:hover {
     
     th, td {
         padding: 8px 8px;
-        white-space: nowrap;
+        /* 删除 white-space: nowrap，让地址等长文本自然换行 */
     }
     
     /* 手机端cashflow区块 */
@@ -1230,20 +1346,18 @@ tbody tr:hover {
     .action-cell {
         flex-wrap: wrap;
     }
-}
-
-/* 手机端表单增大触摸区域 */
-@media (max-width: 768px) {
+    
+    /* 手机端表单增大触摸区域 */
     .form-group input,
     .form-group select,
     .form-group textarea {
         padding: 12px var(--spacing-3);
-        font-size: 16px;  /* 防止iOS缩放 */
+        font-size: 16px;
     }
 }
 
 /* =====================================================
-   16. 打印样式
+   打印样式
    ===================================================== */
 @media print {
     @page {
