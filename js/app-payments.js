@@ -1,19 +1,16 @@
-// app-payments.js - 完整修复版 v7.0
-// 修复内容（本次 v7.0 新增）：
-// [修复1.3] showPayment() 统一使用 SUPABASE.getCurrentProfile() 作为唯一数据源判断角色，
-//           不再混用 AUTH.isAdmin()，消除双缓存不同步导致门店员工被误判为 admin 的问题。
-//           同时调整权限检查顺序：先获取 profile，再判断角色，减少一次重复的异步调用。
+// app-payments.js - 完整修复版 v8.0
+// 修复内容：
+// 1. 统一使用 SUPABASE.getCurrentProfile() 作为唯一角色数据源
+// 2. 空值保护增强
+// 3. 优化错误提示
+// 4. 移除锁定相关逻辑
 
 window.APP = window.APP || {};
 
 const PaymentsModule = {
 
     showPayment: async function(orderId) {
-        // ✅ 修复1.3：统一使用 SUPABASE.getCurrentProfile() 作为唯一角色数据源。
-        //    原来先调用 AUTH.isAdmin()（读 AUTH.user 同步缓存），再调用 getCurrentProfile()
-        //    （读 _profileCache 异步缓存），两个缓存在登录刚完成时可能短暂不一致，
-        //    导致门店员工被误判为 admin 而被提前拦截。
-        //    现在改为一次 getCurrentProfile() 获取全量信息，统一判断。
+        // ✅ 统一使用 SUPABASE.getCurrentProfile() 作为唯一角色数据源
         const profile = await SUPABASE.getCurrentProfile();
 
         // 检查1：用户是否已登录
@@ -64,7 +61,11 @@ const PaymentsModule = {
 
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
-            var remainingPrincipal = order.loan_amount - order.principal_paid;
+            
+            // 空值保护：剩余本金和月利息计算
+            var loanAmount = order.loan_amount || 0;
+            var principalPaid = order.principal_paid || 0;
+            var remainingPrincipal = loanAmount - principalPaid;
             var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
 
             var interestPayments = payments.filter(p => p.type === 'interest' && !p.is_voided);
@@ -78,7 +79,9 @@ const PaymentsModule = {
                 bank: lang === 'id' ? 'Bank BNI' : '银行BNI'
             };
 
-            var serviceFeeAmount = order.service_fee_amount || (order.loan_amount * (order.service_fee_percent || 0) / 100);
+            var serviceFeeAmount = order.service_fee_amount || (loanAmount * (order.service_fee_percent || 0) / 100);
+            var serviceFeePaid = order.service_fee_paid || 0;
+            var isServiceFeePaid = serviceFeePaid >= serviceFeeAmount;
 
             // 利息缴费历史
             var interestRows = '';
@@ -107,7 +110,7 @@ const PaymentsModule = {
                 for (var i = 0; i < principalPayments.length; i++) {
                     var p = principalPayments[i];
                     cumulativePaid += p.amount;
-                    var remainingAfter = order.loan_amount - cumulativePaid;
+                    var remainingAfter = loanAmount - cumulativePaid;
                     principalRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
@@ -133,9 +136,9 @@ const PaymentsModule = {
                 ? `${Utils.formatCurrency(order.admin_fee)} (${methodMap[adminFeePayment.payment_method] || '-'} / ${Utils.formatDate(adminFeePayment.date)})`
                 : (order.admin_fee_paid ? `${Utils.formatCurrency(order.admin_fee)}` : 'Belum dibayar');
             
-            var serviceFeePaidInfo = (order.service_fee_paid || 0) >= serviceFeeAmount && serviceFeePayment
+            var serviceFeePaidInfo = isServiceFeePaid && serviceFeePayment
                 ? `${Utils.formatCurrency(serviceFeeAmount)} (${methodMap[serviceFeePayment.payment_method] || '-'} / ${Utils.formatDate(serviceFeePayment.date)})`
-                : ((order.service_fee_paid || 0) > 0 ? `${Utils.formatCurrency(order.service_fee_paid || 0)}/${Utils.formatCurrency(serviceFeeAmount)}` : 'Belum dibayar');
+                : (serviceFeePaid > 0 ? `${Utils.formatCurrency(serviceFeePaid)}/${Utils.formatCurrency(serviceFeeAmount)}` : 'Belum dibayar');
 
             var nextInterestNumber = interestPayments.length + 1;
 
@@ -144,7 +147,7 @@ const PaymentsModule = {
                     <h2>💰 ${lang === 'id' ? '缴纳 "利息 & 本金" 费用' : '缴纳 "利息 & 本金" 费用'}</h2>
                     <div class="header-actions">
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                        <button onclick="APP.viewOrder('${order.order_id}')" class="btn-detail">📄 ${lang === 'id' ? 'Detail Order' : '订单详情'}</button>
+                        <button onclick="APP.viewOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-detail">📄 ${lang === 'id' ? 'Detail Order' : '订单详情'}</button>
                     </div>
                 </div>
                 
@@ -156,7 +159,7 @@ const PaymentsModule = {
                             <td class="label">ID</td>
                             <td class="value order-id">${Utils.escapeHtml(order.order_id)}</td>
                             <td class="label">${t('loan_amount')}</td>
-                            <td class="value">${Utils.formatCurrency(order.loan_amount)}</td>
+                            <td class="value">${Utils.formatCurrency(loanAmount)}</td>
                         </tr>
                         <tr>
                             <td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</td>
@@ -168,7 +171,7 @@ const PaymentsModule = {
                         </tr>
                         <tr>
                             <td class="label">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</td>
-                            <td class="value" colspan="5">${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${interestPayments.length} ${lang === 'id' ? 'kali' : '次'})</td>
+                            <td class="value" colspan="5">${order.interest_paid_months || 0} ${lang === 'id' ? 'bulan' : '个月'} (${interestPayments.length} ${lang === 'id' ? 'kali' : '次'})</td>
                         </tr>
                         <tr class="divider"><td colspan="6"></td></tr>
                         <tr>
@@ -181,7 +184,7 @@ const PaymentsModule = {
                             <td class="label">📋 ${lang === 'id' ? 'Admin Fee' : '管理费'}</td>
                             <td class="value" colspan="2">${Utils.formatCurrency(order.admin_fee)}</td>
                             <td class="label">💰 ${lang === 'id' ? 'Pinjaman Dicairkan' : '贷款已发放'}</td>
-                            <td class="value success-text" colspan="2">${Utils.formatCurrency(order.loan_amount)} (${order.created_at ? Utils.formatDate(order.created_at) : '-'})</td>
+                            <td class="value success-text" colspan="2">${Utils.formatCurrency(loanAmount)} (${order.created_at ? Utils.formatDate(order.created_at) : '-'})</td>
                         </tr>
                         <tr class="divider"><td colspan="6"></td></tr>
                         <tr class="paid-row">
@@ -212,7 +215,7 @@ const PaymentsModule = {
                                 <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
                             </div>
                         </div>
-                        <button onclick="APP.payInterestWithMethod('${order.order_id}')" class="btn-action success">✅ ${lang === 'id' ? '确认收到上月利息' : '确认收到上月利息'}</button>
+                        <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收到上月利息' : '确认收到上月利息'}</button>
                     </div>
                     <div class="card-history">
                         <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</div>
@@ -229,7 +232,7 @@ const PaymentsModule = {
                     <div class="card-header"><h3>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金还款'}</h3></div>
                     <div class="card-body">
                         <div class="info-box warning-box">
-                            <span>📊 ${lang === 'id' ? '已偿还本金' : '已偿还本金'}: <strong>${Utils.formatCurrency(order.principal_paid)}</strong></span>
+                            <span>📊 ${lang === 'id' ? '已偿还本金' : '已偿还本金'}: <strong>${Utils.formatCurrency(principalPaid)}</strong></span>
                             <span>📊 ${lang === 'id' ? '尚欠本金' : '尚欠本金'}: <strong class="${remainingPrincipal > 0 ? 'text-warning' : 'text-success'}">${Utils.formatCurrency(remainingPrincipal)}</strong></span>
                         </div>
                         <div class="action-input-group">
@@ -243,7 +246,7 @@ const PaymentsModule = {
                                 <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
                             </div>
                         </div>
-                        <button onclick="APP.payPrincipalWithMethod('${order.order_id}')" class="btn-action success">✅ ${lang === 'id' ? '确认收到本金还款' : '确认收到本金还款'}</button>
+                        <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收到本金还款' : '确认收到本金还款'}</button>
                     </div>
                     <div class="card-history">
                         <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</div>
@@ -273,7 +276,11 @@ const PaymentsModule = {
         var lang = Utils.lang;
         
         var order = await SUPABASE.getOrder(orderId);
-        var remainingPrincipal = order.loan_amount - order.principal_paid;
+        
+        // 空值保护
+        var loanAmount = order.loan_amount || 0;
+        var principalPaid = order.principal_paid || 0;
+        var remainingPrincipal = loanAmount - principalPaid;
         var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
         var nextInterestNumber = (order.interest_paid_months || 0) + 1;
         
@@ -282,11 +289,11 @@ const PaymentsModule = {
             : `确认收到订单 ${order.order_id} 的第 ${nextInterestNumber} 期利息？\n\n金额: ${Utils.formatCurrency(currentMonthlyInterest * months)}\n方式: ${methodName}`)) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
-                // 成功提示由 supabase.js 内部 alert 统一处理
+                // 刷新页面
                 window.location.reload();
             } catch (error) {
-                // 错误提示由 supabase.js 内部 alert 统一处理，此处不重复弹窗
                 console.error('payInterestWithMethod error:', error);
+                // 错误提示已由 supabase.js 内部处理
             }
         }
     },
@@ -304,23 +311,44 @@ const PaymentsModule = {
         }
         
         var order = await SUPABASE.getOrder(orderId);
-        var remainingAfter = order.principal_remaining - amount;
+        
+        // 空值保护
+        var loanAmount = order.loan_amount || 0;
+        var principalPaid = order.principal_paid || 0;
+        var remainingAfter = loanAmount - principalPaid - amount;
         
         if (confirm(lang === 'id'
             ? `Konfirmasi penerimaan pembayaran pokok untuk order ${order.order_id}?\n\nJumlah: ${Utils.formatCurrency(amount)}\nSisa pokok setelah pembayaran: ${Utils.formatCurrency(remainingAfter)}\nMetode: ${targetName}`
             : `确认收到订单 ${order.order_id} 的本金还款？\n\n金额: ${Utils.formatCurrency(amount)}\n还款后剩余本金: ${Utils.formatCurrency(remainingAfter)}\n方式: ${targetName}`)) {
             try {
                 await Order.recordPrincipalPayment(orderId, amount, target);
-                // 成功提示由 supabase.js 内部 alert 统一处理
+                // 刷新页面
                 window.location.reload();
             } catch (error) {
-                // 错误提示由 supabase.js 内部 alert 统一处理，此处不重复弹窗
                 console.error('payPrincipalWithMethod error:', error);
+                // 错误提示已由 supabase.js 内部处理
             }
         }
     }
 };
 
+// 辅助函数：转义属性值
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
+
 for (var key in PaymentsModule) {
     if (typeof PaymentsModule[key] === 'function') window.APP[key] = PaymentsModule[key];
 }
+
+// 添加 escapeAttr 到 Utils（如果尚未添加）
+if (!Utils.escapeAttr) {
+    Utils.escapeAttr = escapeAttr;
+}
+
+console.log('✅ app-payments.js v8.0 已加载 - 权限检查统一，空值保护增强');
