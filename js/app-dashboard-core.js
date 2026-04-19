@@ -1,8 +1,9 @@
-// app-dashboard-core.js - 完整修复版 v2.0
+// app-dashboard-core.js - 完整修复版 v3.0（清理版）
 // 修复内容：
-// 1. sessionStorage 不再存储订单ID、客户ID等敏感信息（中危2）
+// 1. sessionStorage 不再存储订单ID、客户ID等敏感信息
 // 2. 刷新时仅恢复页面，敏感数据从服务器重新获取
 // 3. 优化页面状态管理
+// 4. 样式已全部移至 base.css 和 components.css
 
 window.APP = window.APP || {};
 
@@ -14,17 +15,12 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ==================== 修复中危2：移除敏感信息的存储 ====================
     saveCurrentPageState: function() {
-        // 只保存页面名称和筛选条件（非敏感信息）
         sessionStorage.setItem('jf_current_page', this.currentPage);
         sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
         sessionStorage.setItem('jf_current_keyword', this.searchKeyword || "");
-        // 注意：订单ID和客户ID不再存储到 sessionStorage
-        // 这些敏感信息需要时从 URL 参数或重新加载获取
     },
     
-    // 恢复页面状态（不含敏感ID）
     restorePageState: function() {
         return {
             page: sessionStorage.getItem('jf_current_page'),
@@ -33,12 +29,10 @@ const DashboardCore = {
         };
     },
     
-    // 清除所有存储的状态
     clearPageState: function() {
         sessionStorage.removeItem('jf_current_page');
         sessionStorage.removeItem('jf_current_filter');
         sessionStorage.removeItem('jf_current_keyword');
-        // 确保不存储敏感信息
         this.currentOrderId = null;
         this.currentCustomerId = null;
     },
@@ -47,7 +41,6 @@ const DashboardCore = {
         document.getElementById("app").innerHTML = '<div class="loading-container"><div class="loader"></div><p class="loading-text">🔄 Loading system...</p></div>';
         await AUTH.init();
         
-        // 修复：只恢复页面名称和筛选条件，不恢复敏感ID
         var savedState = this.restorePageState();
         var savedPage = savedState.page;
         var savedFilter = savedState.filter;
@@ -57,7 +50,6 @@ const DashboardCore = {
             this.currentPage = savedPage;
             this.currentFilter = savedFilter || "all";
             this.searchKeyword = savedKeyword || "";
-            // 敏感ID置空，需要时重新从服务器获取
             this.currentOrderId = null;
             this.currentCustomerId = null;
             await this.refreshCurrentPage();
@@ -81,7 +73,6 @@ const DashboardCore = {
                 if (self.currentOrderId) {
                     await self.viewOrder(self.currentOrderId);
                 } else {
-                    // 如果没有订单ID，跳转到订单列表
                     await self.showOrderTable();
                 }
             },
@@ -137,11 +128,9 @@ const DashboardCore = {
         });
         this.currentPage = page;
         
-        // 只存储非敏感参数
         if (params.orderId) this.currentOrderId = params.orderId;
         if (params.customerId) this.currentCustomerId = params.customerId;
         
-        // 保存页面状态（不含敏感ID）
         this.saveCurrentPageState();
         
         var self = this;
@@ -177,7 +166,6 @@ const DashboardCore = {
             this.currentFilter = prev.filter || "all";
             this.searchKeyword = prev.keyword || "";
             
-            // 保存页面状态（不含敏感ID）
             this.saveCurrentPageState();
             
             var backHandlers = {
@@ -204,7 +192,7 @@ const DashboardCore = {
 
     renderLogin: async function() {
         this.currentPage = 'login';
-        this.clearPageState();  // 清除所有存储状态
+        this.clearPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         
@@ -258,9 +246,8 @@ const DashboardCore = {
     },
 
     logout: async function() {
-        // 登出时清除所有存储的状态
         this.clearPageState();
-        sessionStorage.clear();  // 清除所有 sessionStorage
+        sessionStorage.clear();
         await AUTH.logout();
         await this.router();
     },
@@ -278,7 +265,6 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 仪表盘（资金管理版） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -298,7 +284,6 @@ const DashboardCore = {
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
-            // 获取运营支出总额
             var totalExpenses = 0;
             try {
                 const profile = await SUPABASE.getCurrentProfile();
@@ -310,7 +295,6 @@ const DashboardCore = {
                 totalExpenses = expenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
             } catch(e) { console.warn("获取支出汇总失败:", e); }
             
-            // 准备卡片数据（8个卡片，不包含净利）
             var cards = [
                 { label: t('total_orders'), value: report.total_orders, type: 'number' },
                 { label: t('total_loan'), value: Utils.formatCurrency(report.total_loan_amount), type: 'currency' },
@@ -419,150 +403,12 @@ const DashboardCore = {
                     <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
                     <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: 1%-3% per bulan' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: 1%-3%/月'}</p>
                     ${!isAdmin ? `<p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>` : ''}
-                </div>
-                
-                <style>
-                    .stats-grid-optimized {
-                        display: grid;
-                        grid-template-columns: repeat(4, 1fr);
-                        gap: 16px;
-                        margin-bottom: 24px;
-                    }
-                    
-                    .stat-card {
-                        background: #ffffff;
-                        border-radius: 16px;
-                        padding: 20px 12px;
-                        text-align: center;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                        border: 1px solid #e2e8f0;
-                        transition: transform 0.2s, box-shadow 0.2s;
-                    }
-                    
-                    .stat-card:hover {
-                        transform: translateY(-2px);
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                    }
-                    
-                    .stat-value {
-                        font-size: 24px;
-                        font-weight: 700;
-                        margin-bottom: 8px;
-                        line-height: 1.2;
-                    }
-                    
-                    .stat-label {
-                        font-size: 13px;
-                        color: #64748b;
-                        font-weight: 500;
-                    }
-                    
-                    .stat-value.income {
-                        color: #10b981;
-                    }
-                    
-                    .stat-value.expense {
-                        color: #ef4444;
-                    }
-                    
-                    .internal-transfer-item {
-                        background: linear-gradient(135deg, #1e293b, #0f172a);
-                        color: white;
-                    }
-                    
-                    .transfer-buttons {
-                        display: flex;
-                        gap: 10px;
-                        flex-wrap: wrap;
-                        margin: 10px 0;
-                    }
-                    
-                    .transfer-btn {
-                        padding: 6px 12px;
-                        border-radius: 6px;
-                        font-size: 12px;
-                        font-weight: 500;
-                        cursor: pointer;
-                        border: none;
-                        transition: all 0.2s;
-                    }
-                    
-                    .transfer-btn.cash-to-bank {
-                        background: #10b981;
-                        color: white;
-                    }
-                    
-                    .transfer-btn.cash-to-bank:hover {
-                        background: #059669;
-                        transform: translateY(-1px);
-                    }
-                    
-                    .transfer-btn.bank-to-cash {
-                        background: #f59e0b;
-                        color: white;
-                    }
-                    
-                    .transfer-btn.bank-to-cash:hover {
-                        background: #d97706;
-                        transform: translateY(-1px);
-                    }
-                    
-                    .transfer-btn.store-to-hq {
-                        background: #8b5cf6;
-                        color: white;
-                    }
-                    
-                    .transfer-btn.store-to-hq:hover {
-                        background: #7c3aed;
-                        transform: translateY(-1px);
-                    }
-                    
-                    @media (max-width: 768px) {
-                        .stats-grid-optimized {
-                            grid-template-columns: repeat(2, 1fr);
-                            gap: 12px;
-                            margin-bottom: 20px;
-                        }
-                        
-                        .stat-card {
-                            padding: 14px 8px;
-                        }
-                        
-                        .stat-value {
-                            font-size: 18px;
-                        }
-                        
-                        .stat-label {
-                            font-size: 11px;
-                        }
-                        
-                        .transfer-buttons {
-                            flex-direction: column;
-                        }
-                        
-                        .transfer-btn {
-                            width: 100%;
-                            text-align: center;
-                        }
-                    }
-                    
-                    @media (min-width: 769px) and (max-width: 1024px) {
-                        .stats-grid-optimized {
-                            grid-template-columns: repeat(4, 1fr);
-                            gap: 14px;
-                        }
-                        
-                        .stat-value {
-                            font-size: 20px;
-                        }
-                    }
-                </style>`;
+                </div>`;
         } catch (err) {
             document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
         }
     },
 
-    // ==================== 资金管理模态框 ====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
@@ -805,7 +651,7 @@ const DashboardCore = {
         </head><body>
         <div class="header"><h1>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h1>
         <p>${lang === 'id' ? 'Tanggal Cetak' : '打印日期'}: ${new Date().toLocaleString()}</p></div>
-        <table><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
+        <tr><thead><tr><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Tipe' : '类型'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th><th>${lang === 'id' ? 'Arah' : '方向'}</th><th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th></tr></thead><tbody>`;
         
         for (var txn of transactions) {
             var directionText = txn.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出');
@@ -846,7 +692,7 @@ const DashboardCore = {
                 typeMap[txn.flow_type] || txn.flow_type,
                 methodText,
                 directionText,
-                txn.amount,  // 原始数值，不使用 formatCurrency
+                txn.amount,
                 txn.description || '',
                 txn.orders?.order_id || ''
             ]);
@@ -863,7 +709,6 @@ const DashboardCore = {
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
-    // ==================== 用户管理 ====================
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -965,7 +810,6 @@ const DashboardCore = {
         catch (error) { alert('Error: ' + error.message); }
     },
 
-    // ==================== WA 提醒功能 ====================
     getSenderWANumber: async function(storeId) {
         var storeWANumber = await SUPABASE.getStoreWANumber(storeId);
         return storeWANumber || null;
@@ -1096,8 +940,6 @@ const DashboardCore = {
             alert(Utils.lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
         }
     },
-
-    // ==================== 内部转账功能 ====================
 
     showTransferModal: async function(transferType) {
         var lang = Utils.lang;
@@ -1443,7 +1285,7 @@ const DashboardCore = {
                 t.stores?.name || '-',
                 typeMap[t.transfer_type] || t.transfer_type,
                 `${t.from_account} → ${t.to_account}`,
-                t.amount,  // 原始数值
+                t.amount,
                 t.description || '-',
                 t.created_by_profile?.name || '-'
             ]);
