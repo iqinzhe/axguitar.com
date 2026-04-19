@@ -1,18 +1,16 @@
-// app-dashboard-print.js - 打印功能模块
+// app-dashboard-print.js - 打印功能模块 v2.0
 // 包含：打印当前页、保存PDF、打印选项
 // 修改：打印时自动添加门店/总部信息
+// 说明：打印样式保留在 JS 中（因为需要独立的打印布局）
 
 window.APP = window.APP || {};
 
 const DashboardPrint = {
 
-    // ==================== 打印/PDF 功能 ====================
-    
     saveAsPDF: function() {
         var lang = Utils.lang;
         var printContent = document.getElementById("app").cloneNode(true);
         
-        // 获取当前门店/总部信息
         var isAdmin = AUTH.isAdmin();
         var storeName = AUTH.getCurrentStoreName();
         var userRole = AUTH.user?.role;
@@ -178,7 +176,6 @@ const DashboardPrint = {
         var styles = document.querySelector('link[rel="stylesheet"]')?.href || 'main.css';
         var lang = Utils.lang;
         
-        // 获取当前门店/总部信息
         var isAdmin = AUTH.isAdmin();
         var storeName = AUTH.getCurrentStoreName();
         var userRole = AUTH.user?.role;
