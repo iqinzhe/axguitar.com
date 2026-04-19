@@ -1,7 +1,6 @@
 /* =====================================================
    base.css - 基础样式 v1.0
-   包含：全局变量、重置、布局、工具类、响应式断点
-   ===================================================== */
+   包含：全局变量、重置、布局、工具类、响应式断点  ===================================================== */
 
 /* ---------- 1. 全局变量 ---------- */
 :root {
@@ -91,7 +90,33 @@ body {
     line-height: 1.5;
 }
 
-/* ---------- 3. 布局容器 ---------- */
+/* ---------- 3. Logo 图片统一大小 ---------- */
+/* 仪表盘及页面头部 Logo */
+h1 img,
+.page-header h2 img,
+h2 img {
+    height: 32px;
+    width: auto;
+    vertical-align: middle;
+}
+
+/* 登录页面 Logo 单独控制（已在登录页样式中固定，此处作为补充） */
+.login-logo {
+    height: 24px;
+    width: auto;
+    vertical-align: middle;
+}
+
+/* 移动端 Logo 略微缩小 */
+@media (max-width: 480px) {
+    h1 img,
+    .page-header h2 img,
+    h2 img {
+        height: 24px;
+    }
+}
+
+/* ---------- 4. 布局容器 ---------- */
 #app {
     max-width: 1400px;
     margin: 0 auto;
@@ -105,7 +130,7 @@ body {
     padding: 0 var(--spacing-4);
 }
 
-/* ---------- 4. 卡片组件 ---------- */
+/* ---------- 5. 卡片组件 ---------- */
 .card {
     background: var(--gray-50);
     border-radius: var(--radius-lg);
@@ -126,7 +151,7 @@ body {
     color: var(--gray-800);
 }
 
-/* ---------- 5. 页面头部 ---------- */
+/* ---------- 6. 页面头部 ---------- */
 .page-header {
     display: flex;
     justify-content: space-between;
@@ -150,7 +175,7 @@ body {
     align-items: center;
 }
 
-/* ---------- 6. 工具栏 ---------- */
+/* ---------- 7. 工具栏 ---------- */
 .toolbar {
     display: flex;
     gap: var(--spacing-3);
@@ -170,7 +195,7 @@ body {
     font-size: var(--font-sm);
 }
 
-/* ---------- 7. 表单组件 ---------- */
+/* ---------- 8. 表单组件 ---------- */
 .form-group {
     margin-bottom: var(--spacing-4);
 }
@@ -220,13 +245,13 @@ body {
     margin-top: var(--spacing-4);
 }
 
-/* ---------- 8. 表格容器 ---------- */
+/* ---------- 9. 表格容器 ---------- */
 .table-container {
     overflow-x: auto;
     margin-top: var(--spacing-3);
 }
 
-/* ---------- 9. 模态框 ---------- */
+/* ---------- 10. 模态框 ---------- */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -263,8 +288,7 @@ body {
     margin-top: var(--spacing-5);
 }
 
-/* ---------- 10. 登录页面 ---------- */
-/* 登录页面 */
+/* ---------- 11. 登录页面 ---------- */
 .login-container {
     height: 100vh;
     display: flex;
@@ -289,18 +313,43 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;              /* 减小间距 */
+    gap: 6px;
     flex-wrap: nowrap;
     white-space: nowrap;
 }
 
 .login-logo {
-    height: 32px;           /* 固定高度 */
+    height: 24px;
     width: auto;
     vertical-align: middle;
 }
 
-/* 超小屏幕 */
+.lang-toggle {
+    text-align: right;
+    margin-bottom: var(--spacing-3);
+}
+
+.lang-btn {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--gray-200);
+    padding: 4px 12px;
+    font-size: var(--font-xs);
+}
+
+.lang-btn:hover {
+    background: var(--primary-soft);
+    transform: none;
+}
+
+.login-note {
+    margin-top: var(--spacing-4);
+    font-size: var(--font-xs);
+    color: var(--gray-400);
+    text-align: center;
+}
+
+/* 超小屏幕登录页面适配 */
 @media (max-width: 400px) {
     .login-title {
         font-size: 1.1rem;
@@ -311,7 +360,7 @@ body {
     }
 }
 
-/* ---------- 11. 加载动画 ---------- */
+/* ---------- 12. 加载动画 ---------- */
 .loading-container {
     display: flex;
     flex-direction: column;
@@ -340,7 +389,7 @@ body {
     font-size: var(--font-sm);
 }
 
-/* ---------- 12. 错误页面 ---------- */
+/* ---------- 13. 错误页面 ---------- */
 .error-container {
     display: flex;
     justify-content: center;
@@ -387,7 +436,7 @@ body {
     border: none;
 }
 
-/* ---------- 13. 工具类 ---------- */
+/* ---------- 14. 工具类 ---------- */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .text-left { text-align: left; }
@@ -408,7 +457,7 @@ body {
 .income { color: var(--success); }
 .expense { color: var(--danger); }
 
-/* ---------- 14. 响应式断点 ---------- */
+/* ---------- 15. 响应式断点 ---------- */
 @media (max-width: 1024px) {
     #app { padding: var(--spacing-4); }
 }
@@ -474,7 +523,7 @@ body {
     }
 }
 
-/* ---------- 15. 打印样式基础 ---------- */
+/* ---------- 16. 打印样式基础 ---------- */
 @media print {
     @page {
         size: A4;
