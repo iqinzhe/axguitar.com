@@ -1,6 +1,6 @@
 /* =====================================================
-   base.css - 基础样式 v2.0
-   职责：全局变量、重置、布局、表单、模态框、工具类、打印样式
+   base.css - 基础样式 v2.0 (合并优化版)
+   包含：全局变量、重置、布局、表单、模态框、工具类、打印样式
    ===================================================== */
 
 /* ---------- 1. 全局变量 ---------- */
@@ -428,7 +428,27 @@ h1 img,
 .income { color: var(--success); }
 .expense { color: var(--danger); }
 
-/* ---------- 15. 响应式断点（仅全局布局） ---------- */
+/* ---------- 15. 统计卡片网格（来自 v1.0 480px 断点） ---------- */
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-2);
+    }
+    
+    .stat-card {
+        padding: var(--spacing-3) var(--spacing-2);
+    }
+    
+    .stat-value {
+        font-size: var(--font-md);
+    }
+    
+    .stat-label {
+        font-size: var(--font-xs);
+    }
+}
+
+/* ---------- 16. 响应式断点（全局布局） ---------- */
 @media (max-width: 1024px) {
     #app { padding: var(--spacing-4); }
 }
@@ -507,7 +527,7 @@ h1 img,
     }
 }
 
-/* ---------- 16. 打印样式 ---------- */
+/* ---------- 17. 打印样式 ---------- */
 @media print {
     @page {
         size: A4;
