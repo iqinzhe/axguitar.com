@@ -1,10 +1,6 @@
-// supabase.js - 完整修复版 v4.0
-// 修复内容：
-// 1. 服务费改为一次性收取（不再按月份累加）
-// 2. 剩余本金计算增加空值保护
-// 3. SQL注入防护增强
-// 4. 统一使用 Utils 工具函数
-// 5. 集成操作日志
+// supabase.js - 完整修复版 v4.0（移除 orders 与 stores 联表查询）
+// 修复内容：避免 orders 与 stores 多外键关系导致的歧义错误
+// 门店名称通过前端 storeMap 映射，不再依赖联表
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -344,9 +340,11 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
+    // ==================== 修复：移除 stores 联表，避免多外键歧义 ====================
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('orders').select('*, stores(code, name)');
+        // 只查询 orders 表，不再联表 stores
+        let query = supabaseClient.from('orders').select('*');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
@@ -369,7 +367,10 @@ const SupabaseAPI = {
 
     async getOrder(orderId) {
         const { data, error } = await supabaseClient
-            .from('orders').select('*, stores(code, name)').eq('order_id', orderId).single();
+            .from('orders')
+            .select('*')  // 移除 stores 联表
+            .eq('order_id', orderId)
+            .single();
         if (error) throw error;
 
         const profile = await this.getCurrentProfile();
@@ -514,7 +515,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 修复：服务费一次性收取，不按月份累加
+    // 服务费一次性收取
     async recordServiceFee(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -523,7 +524,6 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? '该订单未设置服务费' : '该订单未设置服务费');
         }
         
-        // 检查是否已收取过服务费
         if (order.service_fee_paid > 0) {
             throw new Error(Utils.lang === 'id' 
                 ? '服务费已收取，不能重复收取'
@@ -566,7 +566,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 修复：剩余本金计算增加空值保护
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -584,7 +583,6 @@ const SupabaseAPI = {
                         : '❌ 订单已结清，无法支付利息');
                 }
                 
-                // 空值保护
                 const loanAmount = currentOrder.loan_amount || 0;
                 const principalPaid = currentOrder.principal_paid || 0;
                 const remainingPrincipal = loanAmount - principalPaid;
@@ -691,7 +689,6 @@ const SupabaseAPI = {
         throw lastError;
     },
 
-    // 修复：剩余本金计算增加空值保护
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -709,7 +706,6 @@ const SupabaseAPI = {
                         : '❌ 订单已结清，无法还款');
                 }
                 
-                // 空值保护
                 const loanAmount = currentOrder.loan_amount || 0;
                 const principalPaid = currentOrder.principal_paid || 0;
                 const remainingPrincipal = loanAmount - principalPaid;
@@ -1487,7 +1483,6 @@ const SupabaseAPI = {
         return transfer;
     },
 
-    // 统一使用 Utils 工具函数
     formatCurrency(amount) {
         return Utils.formatCurrency(amount);
     },
@@ -1499,3 +1494,5 @@ const SupabaseAPI = {
 
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
+
+console.log('✅ supabase.js v4.0 已加载（移除 orders 与 stores 联表查询）');
