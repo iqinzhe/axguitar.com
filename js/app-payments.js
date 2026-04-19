@@ -1,15 +1,15 @@
-// app-payments.js - 完整修复版 v5.9（清理版）
-// 修复：订单摘要使用表格布局，服务费显示具体金额
-// 修复：使用 Utils.MONTHLY_INTEREST_RATE 常量替代硬编码利率
-// 修复：添加门店权限检查，总部不能进行缴费操作
-// 样式：已全部移至 base.css 和 components.css
+// app-payments.js - 完整修复版 v6.0
+// 修复内容：
+// 1. 管理员（总部）不能进行缴费操作
+// 2. 确保订单属于当前用户门店
+// 3. 添加门店关联检查
 
 window.APP = window.APP || {};
 
 const PaymentsModule = {
 
     showPayment: async function(orderId) {
-        // 权限检查：总部不能进行缴费操作
+        // ✅ 权限检查1：总部不能进行缴费操作
         if (AUTH.isAdmin()) {
             alert(Utils.lang === 'id' 
                 ? '⚠️ Administrator tidak dapat melakukan pembayaran. Silakan login sebagai Manajer Toko atau Staf.'
@@ -18,7 +18,7 @@ const PaymentsModule = {
             return;
         }
         
-        // 检查当前用户是否有门店
+        // ✅ 权限检查2：检查当前用户是否有门店
         const profile = await SUPABASE.getCurrentProfile();
         if (!profile?.store_id) {
             alert(Utils.lang === 'id' 
@@ -36,7 +36,7 @@ const PaymentsModule = {
             var order = await SUPABASE.getOrder(orderId);
             if (!order) return;
             
-            // 确保订单属于当前用户的门店
+            // ✅ 权限检查3：确保订单属于当前用户的门店
             if (order.store_id !== profile.store_id) {
                 alert(Utils.lang === 'id' 
                     ? '⚠️ Anda tidak memiliki akses ke pesanan ini. Pesanan ini milik toko lain.'
@@ -87,7 +87,7 @@ const PaymentsModule = {
             var principalRows = '';
             var cumulativePaid = 0;
             if (principalPayments.length === 0) {
-                principalRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'} <tr></tr>`;
+                principalRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? 'Belum ada pembayaran pokok' : '暂无本金记录'} </td></tr>`;
             } else {
                 for (var i = 0; i < principalPayments.length; i++) {
                     var p = principalPayments[i];
