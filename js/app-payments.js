@@ -1,14 +1,15 @@
-// app-payments.js - 完整修复版 v5.9
+// app-payments.js - 完整修复版 v5.9（清理版）
 // 修复：订单摘要使用表格布局，服务费显示具体金额
 // 修复：使用 Utils.MONTHLY_INTEREST_RATE 常量替代硬编码利率
 // 修复：添加门店权限检查，总部不能进行缴费操作
+// 样式：已全部移至 base.css 和 components.css
 
 window.APP = window.APP || {};
 
 const PaymentsModule = {
 
     showPayment: async function(orderId) {
-        // ==================== 权限检查：总部不能进行缴费操作 ====================
+        // 权限检查：总部不能进行缴费操作
         if (AUTH.isAdmin()) {
             alert(Utils.lang === 'id' 
                 ? '⚠️ Administrator tidak dapat melakukan pembayaran. Silakan login sebagai Manajer Toko atau Staf.'
@@ -17,7 +18,7 @@ const PaymentsModule = {
             return;
         }
         
-        // 检查当前用户是否有门店（店长或员工必须有门店）
+        // 检查当前用户是否有门店
         const profile = await SUPABASE.getCurrentProfile();
         if (!profile?.store_id) {
             alert(Utils.lang === 'id' 
@@ -51,7 +52,6 @@ const PaymentsModule = {
             var remainingPrincipal = order.loan_amount - order.principal_paid;
             var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
 
-            // 获取利息和本金支付记录
             var interestPayments = payments.filter(p => p.type === 'interest' && !p.is_voided);
             var principalPayments = payments.filter(p => p.type === 'principal' && !p.is_voided);
             
@@ -63,7 +63,6 @@ const PaymentsModule = {
                 bank: lang === 'id' ? 'Bank BNI' : '银行BNI'
             };
 
-            // 服务费具体金额
             var serviceFeeAmount = order.service_fee_amount || (order.loan_amount * (order.service_fee_percent || 0) / 100);
 
             // 利息缴费历史
@@ -112,7 +111,6 @@ const PaymentsModule = {
 
             var nextInterestAmount = currentMonthlyInterest;
 
-            // 管理费和服务费支付记录
             var adminFeePayment = payments.find(p => p.type === 'admin_fee' && !p.is_voided);
             var serviceFeePayment = payments.find(p => p.type === 'service_fee' && !p.is_voided);
             
@@ -135,7 +133,6 @@ const PaymentsModule = {
                     </div>
                 </div>
                 
-                <!-- 订单摘要 - 表格布局 -->
                 <div class="card summary-card">
                     <table class="summary-table">
                         <tr>
@@ -158,7 +155,7 @@ const PaymentsModule = {
                             <td class="label">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</td>
                             <td class="value" colspan="5">${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${interestPayments.length} ${lang === 'id' ? 'kali' : '次'})</td>
                         </tr>
-                        <tr class="divider"><td colspan="6"></td></tr>
+                        <tr class="divider"><td colspan="6"> ndash;</tr>
                         <tr>
                             <td class="label">💎 ${lang === 'id' ? 'Nama Barang' : '物品名称'}</td>
                             <td class="value" colspan="2">${Utils.escapeHtml(order.collateral_name || '-')}</td>
@@ -171,7 +168,7 @@ const PaymentsModule = {
                             <td class="label">💰 ${lang === 'id' ? 'Pinjaman Dicairkan' : '贷款已发放'}</td>
                             <td class="value success-text" colspan="2">${Utils.formatCurrency(order.loan_amount)} (${order.created_at ? Utils.formatDate(order.created_at) : '-'})</td>
                         </tr>
-                        <tr class="divider"><td colspan="6"></td></tr>
+                        <tr class="divider"><td colspan="6"> ndash;</tr>
                         <tr class="paid-row">
                             <td class="label">✅ ${lang === 'id' ? 'Admin Fee Dibayar' : '管理费已缴'}</td>
                             <td class="value success-text" colspan="2">${adminFeePaidInfo}</td>
@@ -182,7 +179,6 @@ const PaymentsModule = {
                     <div class="summary-note">ℹ️ ${lang === 'id' ? 'Admin Fee, Service Fee, dan pencairan pinjaman telah selesai saat pembuatan order.' : '管理费、服务费和贷款发放已在创建订单时完成。'}</div>
                 </div>
                 
-                <!-- 利息缴费区域 -->
                 <div class="card action-card">
                     <div class="card-header"><h3>💰 ${lang === 'id' ? 'Pembayaran Bunga' : '利息缴费'}</h3></div>
                     <div class="card-body">
@@ -214,7 +210,6 @@ const PaymentsModule = {
                     </div>
                 </div>
                 
-                <!-- 本金还款区域 -->
                 <div class="card action-card">
                     <div class="card-header"><h3>🏦 ${lang === 'id' ? 'Pembayaran Pokok' : '本金还款'}</h3></div>
                     <div class="card-body">
@@ -244,77 +239,7 @@ const PaymentsModule = {
                             </table>
                         </div>
                     </div>
-                </div>
-                
-                <style>
-                    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-                    .page-header h2 { margin: 0; font-size: 1.25rem; }
-                    .header-actions { display: flex; gap: 8px; }
-                    .btn-back, .btn-detail { padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; border: none; }
-                    .btn-back { background: #64748b; color: white; }
-                    .btn-detail { background: #8b5cf6; color: white; }
-                    
-                    .summary-card { padding: 12px 16px; margin-bottom: 20px; }
-                    .summary-table { width: 100%; border-collapse: collapse; }
-                    .summary-table td { padding: 8px 6px; border: none; }
-                    .summary-table .label { font-weight: 500; color: #64748b; width: 110px; font-size: 0.8rem; }
-                    .summary-table .value { font-weight: 600; color: #1e293b; font-size: 0.85rem; }
-                    .summary-table .value.warning { color: #f59e0b; }
-                    .summary-table .value.success { color: #10b981; }
-                    .summary-table .order-id { font-family: monospace; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; display: inline-block; }
-                    .summary-table .divider td { border-top: 1px solid #e2e8f0; padding: 4px 0; }
-                    .summary-table .paid-row { background: #f0fdf4; border-radius: 8px; }
-                    .summary-table .paid-row td { padding: 6px; }
-                    .success-text { color: #10b981; font-weight: 600; }
-                    .summary-note { font-size: 0.7rem; color: #94a3b8; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #e2e8f0; text-align: center; }
-                    
-                    .action-card { margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-                    .action-card .card-header { background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
-                    .action-card .card-header h3 { margin: 0; font-size: 1rem; font-weight: 600; }
-                    .action-card .card-body { padding: 16px; }
-                    .action-card .card-history { border-top: 1px solid #e2e8f0; padding: 12px 16px; background: #fafafa; }
-                    
-                    .info-box { background: #e0f2fe; padding: 10px 12px; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 0.85rem; }
-                    .warning-box { background: #fef3c7; }
-                    .info-box strong { font-size: 1rem; }
-                    
-                    .action-input-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-                    .action-label { font-weight: 600; font-size: 0.85rem; color: #475569; min-width: 80px; }
-                    .action-select { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.85rem; background: white; min-width: 200px; }
-                    .action-input { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.85rem; width: 200px; text-align: right; }
-                    
-                    .payment-method-group { background: #f8fafc; border-radius: 8px; padding: 10px 12px; margin: 12px 0; border: 1px solid #e2e8f0; }
-                    .payment-method-title { font-size: 0.7rem; font-weight: 500; color: #64748b; margin-bottom: 6px; }
-                    .payment-method-options { display: flex; gap: 20px; flex-wrap: wrap; }
-                    .payment-method-options label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer; }
-                    
-                    .btn-action { width: 100%; padding: 10px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; margin-top: 8px; }
-                    .btn-action.success { background: #16a34a; color: white; }
-                    .btn-action.success:hover { background: #15803d; }
-                    
-                    .history-title { font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 10px; }
-                    .history-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-                    .history-table th, .history-table td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
-                    .history-table th { background: #f1f5f9; font-weight: 600; color: #475569; }
-                    .history-table .text-right { text-align: right; }
-                    .history-table .text-center { text-align: center; }
-                    .text-muted { color: #94a3b8; }
-                    .text-warning { color: #f59e0b; }
-                    .text-success { color: #10b981; }
-                    
-                    @media (max-width: 768px) {
-                        .summary-table, .summary-table tbody, .summary-table tr, .summary-table td { display: block; width: 100%; }
-                        .summary-table tr { margin-bottom: 8px; }
-                        .summary-table td { display: flex; justify-content: space-between; padding: 4px 0; }
-                        .summary-table .label { width: auto; min-width: 100px; }
-                        .summary-table .value { text-align: right; }
-                        .summary-table .divider td { display: none; }
-                        .action-input-group { flex-direction: column; align-items: stretch; }
-                        .action-select, .action-input { width: 100%; }
-                        .payment-method-options { justify-content: flex-start; }
-                        .info-box { flex-direction: column; align-items: center; text-align: center; }
-                    }
-                </style>`;
+                </div>`;
 
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
@@ -326,7 +251,6 @@ const PaymentsModule = {
         }
     },
 
-    // 利息支付
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
@@ -357,7 +281,6 @@ const PaymentsModule = {
         }
     },
 
-    // 本金支付
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
