@@ -1,6 +1,4 @@
-// supabase.js - 完整修复版 v4.0（移除 orders 与 stores 联表查询）
-// 修复内容：避免 orders 与 stores 多外键关系导致的歧义错误
-// 门店名称通过前端 storeMap 映射，不再依赖联表
+// supabase.js - v1.0
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
