@@ -1,6 +1,13 @@
 /* =====================================================
-   base.css - 基础样式 v2.0 (合并优化版)
-   包含：全局变量、重置、布局、表单、模态框、工具类、打印样式
+   base.css - 基础样式 v3.0 (修复版)
+   修复内容：
+   - 补充按钮样式 (.btn-small, .btn-back, .btn-print, .capital-btn, .transfer-btn等)
+   - 补充统计卡片网格 (.stats-grid-optimized, .stat-card)
+   - 补充cashflow区块样式 (.cashflow-summary, .cashflow-stats, .cashflow-item等)
+   - 修复手机端底部空间预留问题
+   - 修复spacing-8变量缺失
+   - 补充表格样式 (table, th, td, .action-cell)
+   - 手机端toolbar输入框16px防止缩放
    ===================================================== */
 
 /* ---------- 1. 全局变量 ---------- */
@@ -41,6 +48,8 @@
     --spacing-4: 16px;
     --spacing-5: 20px;
     --spacing-6: 24px;
+    --spacing-7: 28px;
+    --spacing-8: 32px;
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
@@ -110,11 +119,11 @@ h1 img,
 
 /* ---------- 5. 卡片组件 ---------- */
 .card {
-    background: var(--gray-50);
+    background: white;
     border-radius: var(--radius-lg);
     border: 1px solid var(--gray-200);
     box-shadow: var(--shadow-sm);
-    padding: var(--spacing-4);
+    padding: var(--spacing-5);
     transition: var(--transition);
     margin-bottom: var(--spacing-5);
 }
@@ -125,8 +134,10 @@ h1 img,
 
 .card h3 {
     font-size: var(--font-md);
-    margin-bottom: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
     color: var(--gray-800);
+    padding-bottom: var(--spacing-2);
+    border-bottom: 1px solid var(--gray-200);
 }
 
 /* ---------- 6. 页面头部 ---------- */
@@ -153,7 +164,509 @@ h1 img,
     align-items: center;
 }
 
-/* ---------- 7. 工具栏 ---------- */
+/* =====================================================
+   新增：按钮样式（修复问题1）
+   ===================================================== */
+
+/* 基础按钮样式 */
+button {
+    padding: var(--spacing-2) var(--spacing-4);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    font-size: var(--font-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+button:hover {
+    background: var(--gray-200);
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 小按钮 */
+.btn-small {
+    padding: 4px 10px;
+    font-size: 0.8125rem;
+    border-radius: var(--radius-sm);
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+}
+
+.btn-small:hover {
+    background: var(--gray-200);
+}
+
+/* 返回按钮 */
+.btn-back {
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    color: var(--gray-600);
+}
+
+.btn-back:hover {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+/* 打印按钮 */
+.btn-print {
+    background: var(--gray-600);
+    color: white;
+}
+
+.btn-print:hover {
+    background: var(--gray-700);
+}
+
+/* 导出按钮 */
+.btn-export {
+    background: var(--success);
+    color: white;
+}
+
+.btn-export:hover {
+    background: var(--success-dark);
+}
+
+/* 平账按钮 */
+.btn-balance {
+    background: var(--warning);
+    color: white;
+}
+
+.btn-balance:hover {
+    background: var(--warning-dark);
+}
+
+/* 详情按钮 */
+.btn-detail {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-detail:hover {
+    background: var(--primary-dark);
+}
+
+/* 成功按钮（绿色） */
+button.success,
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+button.success:hover,
+.btn-success:hover {
+    background: var(--success-dark);
+}
+
+/* 警告按钮（橙色） */
+button.warning,
+.btn-warning {
+    background: var(--warning);
+    color: white;
+}
+
+button.warning:hover,
+.btn-warning:hover {
+    background: var(--warning-dark);
+}
+
+/* 危险按钮（红色） */
+button.danger,
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+button.danger:hover,
+.btn-danger:hover {
+    background: var(--danger-dark);
+}
+
+/* 高亮提醒按钮 */
+.warning.highlight {
+    background: var(--warning);
+    color: white;
+    box-shadow: 0 0 0 2px var(--warning-light);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--warning-light); }
+    50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3); }
+}
+
+/* 资金管理按钮 */
+.capital-btn {
+    background: var(--primary);
+    color: white;
+    padding: var(--spacing-2) var(--spacing-4);
+    font-size: var(--font-xs);
+}
+
+.capital-btn:hover {
+    background: var(--primary-dark);
+}
+
+/* 转账按钮 */
+.transfer-btn {
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-xs);
+    border-radius: var(--radius-md);
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+}
+
+.transfer-btn.cash-to-bank {
+    background: #e0f2fe;
+    color: #0369a1;
+    border-color: #7dd3fc;
+}
+
+.transfer-btn.bank-to-cash {
+    background: #fef3c7;
+    color: #b45309;
+    border-color: #fde68a;
+}
+
+.transfer-btn.store-to-hq {
+    background: #f1f5f9;
+    color: #475569;
+    border-color: #cbd5e1;
+}
+
+.transfer-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* 缴费操作按钮 */
+.btn-action {
+    padding: 12px 20px;
+    font-size: var(--font-sm);
+    width: 100%;
+    margin-top: var(--spacing-3);
+}
+
+/* =====================================================
+   新增：统计卡片网格（修复问题2）
+   ===================================================== */
+
+.stats-grid-optimized {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-5);
+}
+
+.stat-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    padding: var(--spacing-4) var(--spacing-3);
+    text-align: center;
+    transition: var(--transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-value {
+    font-size: var(--font-2xl);
+    font-weight: 700;
+    margin-bottom: var(--spacing-2);
+    color: var(--gray-800);
+}
+
+.stat-value.income {
+    color: var(--success);
+}
+
+.stat-value.expense {
+    color: var(--danger);
+}
+
+.stat-label {
+    font-size: var(--font-xs);
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+/* 统计网格（用于报表页） */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-5);
+}
+
+/* =====================================================
+   新增：cashflow区块样式（修复问题3）
+   ===================================================== */
+
+.cashflow-summary {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-5);
+    margin-bottom: var(--spacing-5);
+    color: white;
+}
+
+.cashflow-summary h3 {
+    color: white;
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+    margin-bottom: var(--spacing-4);
+}
+
+.cashflow-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-4);
+}
+
+.cashflow-item {
+    flex: 1;
+    min-width: 150px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-3) var(--spacing-4);
+    backdrop-filter: blur(4px);
+}
+
+.cashflow-item .label {
+    font-size: var(--font-xs);
+    opacity: 0.8;
+    margin-bottom: var(--spacing-2);
+}
+
+.cashflow-item .value {
+    font-size: var(--font-lg);
+    font-weight: 700;
+}
+
+.cashflow-item .value.negative {
+    color: #f87171;
+}
+
+.cashflow-detail {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-top: var(--spacing-2);
+    line-height: 1.4;
+}
+
+/* 内部转账区块 */
+.internal-transfer-item {
+    flex: 2;
+    min-width: 280px;
+}
+
+.transfer-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-2);
+}
+
+/* 资金汇总区块（用于报表页轻量版） */
+.cashflow-summary.light {
+    background: white;
+    border: 1px solid var(--gray-200);
+    color: var(--gray-800);
+}
+
+.cashflow-summary.light h3 {
+    color: var(--gray-800);
+    border-bottom-color: var(--gray-200);
+}
+
+.cashflow-summary.light .cashflow-item {
+    background: var(--gray-50);
+}
+
+/* =====================================================
+   新增：表格样式（修复问题7）
+   ===================================================== */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-xs);
+}
+
+th, td {
+    padding: 12px 12px;
+    border-bottom: 1px solid var(--gray-200);
+    text-align: left;
+    vertical-align: middle;
+}
+
+th {
+    font-weight: 600;
+    background: var(--gray-50);
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-300);
+}
+
+tbody tr:hover {
+    background: var(--gray-50);
+}
+
+/* 表格容器（横向滚动） */
+.table-container {
+    overflow-x: auto;
+    margin: var(--spacing-3) 0;
+}
+
+/* 操作列 */
+.action-cell {
+    white-space: nowrap;
+    display: flex;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+}
+
+/* 状态徽章 */
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background: var(--success-light);
+    color: var(--success-dark);
+}
+
+.status-completed {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.status-liquidated {
+    background: var(--danger-light);
+    color: var(--danger-dark);
+}
+
+/* 支付方式徽章 */
+.payment-method-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.method-cash {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.method-bank {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+/* 订单ID样式 */
+.order-id {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+}
+
+/* 客户表格 */
+.customer-table th,
+.customer-table td {
+    padding: 10px 8px;
+}
+
+/* 缴费历史表格 */
+.payment-table th,
+.payment-table td {
+    padding: 10px 12px;
+}
+
+/* 门店汇总表格 */
+.data-table {
+    font-size: 0.8125rem;
+}
+
+.data-table th {
+    background: var(--gray-100);
+    font-weight: 600;
+}
+
+/* 报告门店区块 */
+.report-store-section {
+    margin-bottom: var(--spacing-5);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.report-store-header {
+    background: var(--primary);
+    color: white;
+    padding: var(--spacing-3) var(--spacing-4);
+    font-weight: 600;
+}
+
+.report-store-stats {
+    padding: var(--spacing-4);
+    background: white;
+}
+
+.report-grid-5x2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--spacing-3);
+}
+
+.report-store-stat .label {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-bottom: 4px;
+}
+
+.report-store-stat .value {
+    font-size: var(--font-sm);
+    font-weight: 600;
+}
+
+.report-store-stat .value.income {
+    color: var(--success);
+}
+
+.report-store-stat .value.expense {
+    color: var(--danger);
+}
+
+/* 门店汇总卡片 */
+.grand-total-card {
+    background: linear-gradient(135deg, var(--primary-soft) 0%, white 100%);
+    margin-bottom: var(--spacing-5);
+}
+
+/* =====================================================
+   7. 工具栏
+   ===================================================== */
 .toolbar {
     display: flex;
     gap: var(--spacing-3);
@@ -173,7 +686,9 @@ h1 img,
     font-size: var(--font-sm);
 }
 
-/* ---------- 8. 表单组件 ---------- */
+/* =====================================================
+   8. 表单组件
+   ===================================================== */
 .form-group {
     margin-bottom: var(--spacing-4);
 }
@@ -223,13 +738,9 @@ h1 img,
     margin-top: var(--spacing-4);
 }
 
-/* ---------- 9. 表格容器 ---------- */
-.table-container {
-    overflow-x: auto;
-    margin-top: var(--spacing-3);
-}
-
-/* ---------- 10. 模态框 ---------- */
+/* =====================================================
+   9. 模态框
+   ===================================================== */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -266,7 +777,9 @@ h1 img,
     margin-top: var(--spacing-5);
 }
 
-/* ---------- 11. 登录页面 ---------- */
+/* =====================================================
+   10. 登录页面
+   ===================================================== */
 .login-container {
     height: 100vh;
     display: flex;
@@ -331,7 +844,9 @@ h1 img,
     }
 }
 
-/* ---------- 12. 加载动画 ---------- */
+/* =====================================================
+   11. 加载动画
+   ===================================================== */
 .loading-container {
     display: flex;
     flex-direction: column;
@@ -360,7 +875,9 @@ h1 img,
     font-size: var(--font-sm);
 }
 
-/* ---------- 13. 错误页面 ---------- */
+/* =====================================================
+   12. 错误页面（修复问题5：spacing-8）
+   ===================================================== */
 .error-container {
     display: flex;
     justify-content: center;
@@ -374,7 +891,7 @@ h1 img,
     max-width: 400px;
     background: white;
     border-radius: var(--radius-xl);
-    padding: var(--spacing-8);
+    padding: var(--spacing-8);  /* 现在已定义 */
     text-align: center;
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--gray-200);
@@ -407,7 +924,9 @@ h1 img,
     border: none;
 }
 
-/* ---------- 14. 工具类 ---------- */
+/* =====================================================
+   13. 工具类
+   ===================================================== */
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .text-left { text-align: left; }
@@ -428,34 +947,181 @@ h1 img,
 .income { color: var(--success); }
 .expense { color: var(--danger); }
 
-/* ---------- 15. 统计卡片网格（来自 v1.0 480px 断点） ---------- */
-@media (max-width: 480px) {
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-2);
-    }
-    
-    .stat-card {
-        padding: var(--spacing-3) var(--spacing-2);
-    }
-    
-    .stat-value {
-        font-size: var(--font-md);
-    }
-    
-    .stat-label {
-        font-size: var(--font-xs);
-    }
+/* =====================================================
+   14. 缴费页面专用样式
+   ===================================================== */
+.summary-card {
+    background: var(--gray-50);
+    margin-bottom: var(--spacing-4);
 }
 
-/* ---------- 16. 响应式断点（全局布局） ---------- */
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.summary-table td {
+    padding: 8px 12px;
+    border: none;
+}
+
+.summary-table td.label {
+    font-weight: 600;
+    color: var(--gray-600);
+    width: 110px;
+    background: var(--gray-100);
+}
+
+.summary-table td.value {
+    color: var(--gray-800);
+}
+
+.summary-table td.order-id {
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--primary-dark);
+}
+
+.summary-table tr.divider td {
+    border-top: 1px solid var(--gray-200);
+    padding: 0;
+    height: 1px;
+}
+
+.summary-table tr.paid-row td {
+    background: var(--success-light);
+    font-weight: 500;
+}
+
+.summary-note {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: var(--spacing-3);
+    padding-top: var(--spacing-2);
+    border-top: 1px solid var(--gray-200);
+}
+
+.action-card {
+    margin-bottom: var(--spacing-5);
+}
+
+.action-card .card-header {
+    margin-bottom: var(--spacing-4);
+}
+
+.action-card .card-header h3 {
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+.action-card .card-body {
+    margin-bottom: var(--spacing-4);
+}
+
+.info-box {
+    background: var(--primary-soft);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+}
+
+.info-box.warning-box {
+    background: var(--warning-light);
+}
+
+.info-box strong {
+    font-weight: 700;
+    color: var(--primary-dark);
+}
+
+.action-input-group {
+    margin-bottom: var(--spacing-4);
+}
+
+.action-label {
+    display: block;
+    margin-bottom: var(--spacing-2);
+    font-weight: 500;
+    color: var(--gray-600);
+}
+
+.action-select {
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: var(--font-sm);
+}
+
+.action-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: var(--font-sm);
+}
+
+.payment-method-group {
+    margin-bottom: var(--spacing-4);
+}
+
+.payment-method-title {
+    font-weight: 500;
+    color: var(--gray-600);
+    margin-bottom: var(--spacing-2);
+}
+
+.payment-method-options {
+    display: flex;
+    gap: var(--spacing-4);
+    flex-wrap: wrap;
+}
+
+.payment-method-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.card-history {
+    margin-top: var(--spacing-4);
+    padding-top: var(--spacing-4);
+    border-top: 1px solid var(--gray-200);
+}
+
+.history-title {
+    font-weight: 600;
+    margin-bottom: var(--spacing-3);
+    color: var(--gray-700);
+}
+
+.history-table {
+    width: 100%;
+    font-size: 0.8125rem;
+}
+
+.history-table th,
+.history-table td {
+    padding: 8px 10px;
+}
+
+/* =====================================================
+   15. 响应式断点（修复问题4和问题6）
+   ===================================================== */
 @media (max-width: 1024px) {
     #app { padding: var(--spacing-4); }
 }
 
 @media (max-width: 768px) {
     #app { 
-        padding: var(--spacing-3) var(--spacing-3) 80px var(--spacing-3);
+        padding: var(--spacing-3);
+        /* 修复问题4：移除多余的底部留空，因为应用没有底部导航栏 */
+        /* 原 padding-bottom: 80px 已移除 */
     }
     
     .page-header {
@@ -476,6 +1142,12 @@ h1 img,
     .toolbar select,
     .toolbar button {
         width: 100%;
+    }
+    
+    /* 修复问题6：手机端工具栏输入框防止iOS缩放 */
+    .toolbar input,
+    .toolbar select {
+        font-size: 16px;
     }
     
     .form-grid {
@@ -515,6 +1187,58 @@ h1 img,
         width: 100%;
         padding: 12px;
     }
+    
+    /* 手机端表格优化 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    th, td {
+        padding: 8px 8px;
+        white-space: nowrap;
+    }
+    
+    /* 手机端cashflow区块 */
+    .cashflow-stats {
+        flex-direction: column;
+    }
+    
+    .cashflow-item {
+        min-width: auto;
+    }
+    
+    .transfer-buttons {
+        flex-direction: column;
+    }
+    
+    .transfer-btn {
+        width: 100%;
+        text-align: center;
+    }
+    
+    /* 手机端统计卡片 */
+    .stats-grid-optimized {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-2);
+    }
+    
+    .stat-card {
+        padding: var(--spacing-3) var(--spacing-2);
+    }
+    
+    .stat-value {
+        font-size: var(--font-md);
+    }
+    
+    .stat-label {
+        font-size: var(--font-xs);
+    }
+    
+    /* 手机端按钮组 */
+    .action-cell {
+        flex-wrap: wrap;
+    }
 }
 
 /* 手机端表单增大触摸区域 */
@@ -523,11 +1247,13 @@ h1 img,
     .form-group select,
     .form-group textarea {
         padding: 12px var(--spacing-3);
-        font-size: 16px;
+        font-size: 16px;  /* 防止iOS缩放 */
     }
 }
 
-/* ---------- 17. 打印样式 ---------- */
+/* =====================================================
+   16. 打印样式
+   ===================================================== */
 @media print {
     @page {
         size: A4;
@@ -554,7 +1280,7 @@ h1 img,
     .btn-export,
     .btn-balance,
     .btn-detail,
-    .bottom-nav {
+    .modal-overlay {
         display: none !important;
     }
     
@@ -573,9 +1299,33 @@ h1 img,
         box-shadow: none !important;
         background: white !important;
         page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    
+    .cashflow-summary {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .cashflow-summary h3 {
+        color: black !important;
+        border-bottom-color: #ccc !important;
+    }
+    
+    .cashflow-item {
+        background: #f5f5f5 !important;
+        color: black !important;
     }
     
     thead {
         display: table-header-group;
+    }
+    
+    table {
+        page-break-inside: avoid;
+    }
+    
+    th, td {
+        border: 1px solid #ccc !important;
     }
 }
