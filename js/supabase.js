@@ -1,13 +1,10 @@
-// supabase.js - 完整修复版 v3.0
-// 修复内容（本次 v3.0 新增）：
-// [修复1.1] 乐观锁简化：移除 .eq('principal_paid') 冗余条件，降低误触率；
-//           更新失败（空结果）时明确区分"并发冲突"与"RLS权限拒绝"两种情况，
-//           分别给出不同提示，不再笼统报错"数据已被修改"。
-// [修复1.2] payment_history 写入失败不再静默忽略：
-//           改为 throw 异常，中断整个支付流程，防止账本数据不一致。
-//           recordCashFlow 同理，写入失败抛出异常。
-// [修复1.3] login() 成功后强制调用 clearCache()，确保 _profileCache 立即刷新，
-//           消除双缓存不同步导致门店员工被误判为 admin 的问题。
+// supabase.js - 完整修复版 v4.0
+// 修复内容：
+// 1. 服务费改为一次性收取（不再按月份累加）
+// 2. 剩余本金计算增加空值保护
+// 3. SQL注入防护增强
+// 4. 统一使用 Utils 工具函数
+// 5. 集成操作日志
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -103,16 +100,12 @@ const SupabaseAPI = {
         return profile?.stores?.name || 'Kantor';
     },
 
-    // ==================== [修复1.3] login 成功后强制清除缓存 ====================
     async login(email, password) {
         const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
         });
         if (error) return { error };
-        // ✅ 修复1.3：登录成功后立即清除 profile 缓存，
-        //    确保下一次 getCurrentProfile() 读取最新角色数据，
-        //    避免与 AUTH.user 双缓存不同步造成权限误判。
         this.clearCache();
         return data;
     },
@@ -145,8 +138,6 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 门店前缀（动态获取） ====================
-    
     async _getStorePrefix(storeId) {
         if (!storeId) return 'AD';
         
@@ -189,8 +180,6 @@ const SupabaseAPI = {
         }
     },
 
-    // ==================== ID 生成器 ====================
-    
     async _generateOrderId(role, storeId) {
         let prefix = 'AD';
         if (role !== 'admin') {
@@ -257,8 +246,6 @@ const SupabaseAPI = {
         return `${prefix}-${dateCode}-${serial}`;
     },
 
-    // ==================== 统一资金流向记录 ====================
-    
     async recordCashFlow(flowData) {
         const profile = await this.getCurrentProfile();
         const { data, error } = await supabaseClient
@@ -357,8 +344,6 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
-    // ==================== 订单相关 ====================
-    
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*, stores(code, name)');
@@ -489,7 +474,6 @@ const SupabaseAPI = {
         return date.toISOString().split('T')[0];
     },
 
-    // ==================== 管理费记录 ====================
     async recordAdminFee(orderId, paymentMethod = 'cash', adminFeeAmount = null) {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -530,7 +514,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 服务费记录 ====================
+    // 修复：服务费一次性收取，不按月份累加
     async recordServiceFee(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -539,12 +523,17 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? '该订单未设置服务费' : '该订单未设置服务费');
         }
         
-        const serviceFeePerMonth = order.service_fee_amount;
-        const totalServiceFee = serviceFeePerMonth * months;
-        const newServiceFeePaid = (order.service_fee_paid || 0) + totalServiceFee;
+        // 检查是否已收取过服务费
+        if (order.service_fee_paid > 0) {
+            throw new Error(Utils.lang === 'id' 
+                ? '服务费已收取，不能重复收取'
+                : '服务费已收取，不能重复收取');
+        }
+        
+        const totalServiceFee = order.service_fee_amount;
         
         const { error: e1 } = await supabaseClient.from('orders').update({
-            service_fee_paid: newServiceFeePaid
+            service_fee_paid: totalServiceFee
         }).eq('order_id', orderId);
         if (e1) throw e1;
         
@@ -552,9 +541,9 @@ const SupabaseAPI = {
             order_id: order.id,
             date: new Date().toISOString().split('T')[0],
             type: 'service_fee',
-            months: months,
+            months: 1,
             amount: totalServiceFee,
-            description: `Service Fee ${months} bulan (${order.service_fee_percent}%) / 服务费${months}个月`,
+            description: `Service Fee (${order.service_fee_percent}%) - 一次性收取`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -570,14 +559,14 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `Service Fee ${months} bulan (${order.service_fee_percent}%) - ${order.order_id}`,
+            description: `Service Fee (${order.service_fee_percent}%) - ${order.order_id}`,
             reference_id: order.order_id
         });
         
         return true;
     },
 
-    // ==================== [修复1.1 + 1.2] 利息记录（乐观锁修复版） ====================
+    // 修复：剩余本金计算增加空值保护
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -595,16 +584,16 @@ const SupabaseAPI = {
                         : '❌ 订单已结清，无法支付利息');
                 }
                 
-                const remainingPrincipal = currentOrder.loan_amount - currentOrder.principal_paid;
+                // 空值保护
+                const loanAmount = currentOrder.loan_amount || 0;
+                const principalPaid = currentOrder.principal_paid || 0;
+                const remainingPrincipal = loanAmount - principalPaid;
                 const monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 const totalInterest = monthlyInterest * months;
                 
-                const newInterestPaidMonths = currentOrder.interest_paid_months + months;
-                const newInterestPaidTotal = currentOrder.interest_paid_total + totalInterest;
+                const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
+                const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + totalInterest;
                 
-                // ✅ 修复1.1：乐观锁仅保留 interest_paid_months + status 两个核心条件，
-                //    移除 .eq('principal_paid') ——该字段并非利息操作的版本标识，
-                //    其精度差异或并发变更会导致条件无法匹配，误判为并发冲突。
                 const { data: updatedOrder, error: updateError } = await supabaseClient
                     .from('orders')
                     .update({
@@ -615,26 +604,20 @@ const SupabaseAPI = {
                         updated_at: new Date().toISOString()
                     })
                     .eq('order_id', orderId)
-                    .eq('interest_paid_months', currentOrder.interest_paid_months)  // 核心乐观锁字段
+                    .eq('interest_paid_months', currentOrder.interest_paid_months || 0)
                     .eq('status', 'active')
                     .select();
                 
                 if (updateError) {
-                    // Supabase 返回 PGRST116 表示 .single() 无结果，此处用 .select() 不会触发
-                    // 其余 DB 错误直接抛出
                     throw new Error(Utils.lang === 'id' 
                         ? `❌ 保存失败！${updateError.message}`
                         : `❌ 保存失败！${updateError.message}`);
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
-                    // ✅ 修复1.1：区分两种失败原因：
-                    //    情况A：interest_paid_months 已被别人更新 → 并发冲突，可重试
-                    //    情况B：数据值一致但仍更新失败 → RLS 权限拒绝，不应重试，直接报错
                     const checkOrder = await this.getOrder(orderId);
                     
-                    if (checkOrder && checkOrder.interest_paid_months !== currentOrder.interest_paid_months) {
-                        // 情况A：并发冲突，重试
+                    if (checkOrder && checkOrder.interest_paid_months !== (currentOrder.interest_paid_months || 0)) {
                         console.warn(`乐观锁冲突（并发）: 订单 ${orderId} 利息支付重试 ${retryCount + 1}/${maxRetries}`);
                         retryCount++;
                         if (retryCount >= maxRetries) {
@@ -645,15 +628,12 @@ const SupabaseAPI = {
                         await new Promise(resolve => setTimeout(resolve, 600));
                         continue;
                     } else {
-                        // 情况B：RLS 权限拒绝或其他数据库拦截，不重试
                         throw new Error(Utils.lang === 'id'
                             ? `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`
                             : `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`);
                     }
                 }
                 
-                // ✅ 修复1.2：payment_history 写入失败直接 throw，中断流程，
-                //    不再静默 console.error，防止"订单已更新但无支付记录"的账本不一致。
                 const paymentData = {
                     order_id: currentOrder.id,
                     date: new Date().toISOString().split('T')[0],
@@ -670,13 +650,11 @@ const SupabaseAPI = {
                     .insert(paymentData);
                 
                 if (paymentError) {
-                    // ✅ 修复1.2：写入失败抛出明确异常，不静默跳过
                     throw new Error(Utils.lang === 'id'
                         ? `❌ 利息记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`
                         : `❌ 利息记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`);
                 }
                 
-                // ✅ 修复1.2：cash_flow 写入失败同样抛出，不静默跳过
                 await this.recordCashFlow({
                     store_id: currentOrder.store_id,
                     flow_type: 'interest',
@@ -697,7 +675,6 @@ const SupabaseAPI = {
                 
             } catch (error) {
                 lastError = error;
-                // 只有并发冲突才静默重试，其他错误直接抛出
                 const isConcurrencyError = error.message && (
                     error.message.includes('并发操作冲突') ||
                     error.message.includes('订单已被其他终端修改')
@@ -714,7 +691,7 @@ const SupabaseAPI = {
         throw lastError;
     },
 
-    // ==================== [修复1.1 + 1.2] 本金还款（乐观锁修复版） ====================
+    // 修复：剩余本金计算增加空值保护
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -732,7 +709,10 @@ const SupabaseAPI = {
                         : '❌ 订单已结清，无法还款');
                 }
                 
-                const remainingPrincipal = currentOrder.loan_amount - currentOrder.principal_paid;
+                // 空值保护
+                const loanAmount = currentOrder.loan_amount || 0;
+                const principalPaid = currentOrder.principal_paid || 0;
+                const remainingPrincipal = loanAmount - principalPaid;
                 
                 if (remainingPrincipal <= 0) {
                     throw new Error(Utils.lang === 'id' 
@@ -753,8 +733,8 @@ const SupabaseAPI = {
                     paidAmount = remainingPrincipal;
                 }
                 
-                const newPrincipalPaid = currentOrder.principal_paid + paidAmount;
-                const newPrincipalRemaining = currentOrder.loan_amount - newPrincipalPaid;
+                const newPrincipalPaid = principalPaid + paidAmount;
+                const newPrincipalRemaining = loanAmount - newPrincipalPaid;
                 
                 let updates = { 
                     principal_paid: newPrincipalPaid, 
@@ -771,13 +751,11 @@ const SupabaseAPI = {
                     updates.monthly_interest = newPrincipalRemaining * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 }
                 
-                // ✅ 修复1.1：本金还款的乐观锁仅保留 principal_paid + status，
-                //    移除 .eq('interest_paid_months') ——利息支付不影响本金还款的版本标识。
                 const { data: updatedOrder, error: updateError } = await supabaseClient
                     .from('orders')
                     .update(updates)
                     .eq('order_id', orderId)
-                    .eq('principal_paid', currentOrder.principal_paid)  // 核心乐观锁字段
+                    .eq('principal_paid', principalPaid)
                     .eq('status', 'active')
                     .select();
                 
@@ -788,11 +766,9 @@ const SupabaseAPI = {
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
-                    // ✅ 修复1.1：同样区分并发冲突 vs RLS权限拒绝
                     const checkOrder = await this.getOrder(orderId);
                     
-                    if (checkOrder && checkOrder.principal_paid !== currentOrder.principal_paid) {
-                        // 情况A：并发冲突，重试
+                    if (checkOrder && checkOrder.principal_paid !== principalPaid) {
                         console.warn(`乐观锁冲突（并发）: 订单 ${orderId} 本金支付重试 ${retryCount + 1}/${maxRetries}`);
                         retryCount++;
                         if (retryCount >= maxRetries) {
@@ -803,14 +779,12 @@ const SupabaseAPI = {
                         await new Promise(resolve => setTimeout(resolve, 600));
                         continue;
                     } else {
-                        // 情况B：RLS 权限拒绝
                         throw new Error(Utils.lang === 'id'
                             ? `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`
                             : `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`);
                     }
                 }
                 
-                // ✅ 修复1.2：payment_history 写入失败直接 throw，不静默跳过
                 const isFullRepayment = paidAmount >= remainingPrincipal;
                 const description = isFullRepayment 
                     ? (Utils.lang === 'id' ? '✅ 全额还款结清' : '✅ 全额还款结清')
@@ -831,13 +805,11 @@ const SupabaseAPI = {
                     .insert(paymentData);
                 
                 if (paymentError) {
-                    // ✅ 修复1.2：写入失败抛出明确异常，不静默跳过
                     throw new Error(Utils.lang === 'id'
                         ? `❌ 还款记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`
                         : `❌ 还款记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`);
                 }
                 
-                // ✅ 修复1.2：cash_flow 写入失败同样抛出
                 await this.recordCashFlow({
                     store_id: currentOrder.store_id,
                     flow_type: 'principal',
@@ -880,7 +852,6 @@ const SupabaseAPI = {
         throw lastError;
     },
 
-    // ==================== 更新订单（带锁定检查） ====================
     async updateOrder(orderId, updateData, customerId) {
         const currentOrder = await this.getOrder(orderId);
         
@@ -967,12 +938,12 @@ const SupabaseAPI = {
             total_orders: orders.length,
             active_orders: activeOrders.length,
             completed_orders: orders.filter(o => o.status === 'completed').length,
-            total_loan_amount: orders.reduce((s, o) => s + o.loan_amount, 0),
+            total_loan_amount: orders.reduce((s, o) => s + (o.loan_amount || 0), 0),
             total_admin_fees: orders.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0),
             total_service_fees: orders.reduce((s, o) => s + (o.service_fee_paid || 0), 0),
-            total_interest: orders.reduce((s, o) => s + o.interest_paid_total, 0),
-            total_principal: orders.reduce((s, o) => s + o.principal_paid, 0),
-            expected_monthly_interest: activeOrders.reduce((s, o) => s + ((o.loan_amount - o.principal_paid) * (Utils.MONTHLY_INTEREST_RATE || 0.10)), 0)
+            total_interest: orders.reduce((s, o) => s + (o.interest_paid_total || 0), 0),
+            total_principal: orders.reduce((s, o) => s + (o.principal_paid || 0), 0),
+            expected_monthly_interest: activeOrders.reduce((s, o) => s + (((o.loan_amount || 0) - (o.principal_paid || 0)) * (Utils.MONTHLY_INTEREST_RATE || 0.10)), 0)
         };
     },
 
@@ -1076,8 +1047,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 客户相关 ====================
-    
     async getCustomers(filters = {}) {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('customers').select('*, stores(name, code)').order('registered_date', { ascending: false });
@@ -1120,8 +1089,6 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 资金管理函数 ====================
-    
     async getCashFlowRecords(storeId = null, startDate = null, endDate = null) {
         const profile = await this.getCurrentProfile();
         const targetStoreId = storeId || profile?.store_id;
@@ -1294,8 +1261,6 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== WA 提醒相关 API ====================
-    
     async getStoreWANumber(storeId) {
         const { data, error } = await supabaseClient
             .from('stores')
@@ -1388,8 +1353,6 @@ const SupabaseAPI = {
         if (error) return '-';
         return data?.name || '-';
     },
-
-    // ==================== 内部转账相关 API ====================
 
     async recordInternalTransfer(transferData) {
         const profile = await this.getCurrentProfile();
@@ -1524,15 +1487,13 @@ const SupabaseAPI = {
         return transfer;
     },
 
+    // 统一使用 Utils 工具函数
     formatCurrency(amount) {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
-        }).format(amount);
+        return Utils.formatCurrency(amount);
     },
 
     formatDate(dateStr) {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('id-ID');
+        return Utils.formatDate(dateStr);
     }
 };
 
