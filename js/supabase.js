@@ -1,9 +1,13 @@
-// supabase.js - 完整修复版 v2.0
-// 修复内容：
-// 1. 创建订单时自动锁定 (is_locked = true)
-// 2. updateOrder 中添加锁定检查，禁止修改锁定订单的基础信息
-// 3. 缴费操作不检查锁定状态（允许正常缴费）
-// 4. 门店前缀从数据库动态读取（需要执行 SQL 添加 prefix 字段）
+// supabase.js - 完整修复版 v3.0
+// 修复内容（本次 v3.0 新增）：
+// [修复1.1] 乐观锁简化：移除 .eq('principal_paid') 冗余条件，降低误触率；
+//           更新失败（空结果）时明确区分"并发冲突"与"RLS权限拒绝"两种情况，
+//           分别给出不同提示，不再笼统报错"数据已被修改"。
+// [修复1.2] payment_history 写入失败不再静默忽略：
+//           改为 throw 异常，中断整个支付流程，防止账本数据不一致。
+//           recordCashFlow 同理，写入失败抛出异常。
+// [修复1.3] login() 成功后强制调用 clearCache()，确保 _profileCache 立即刷新，
+//           消除双缓存不同步导致门店员工被误判为 admin 的问题。
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -99,12 +103,17 @@ const SupabaseAPI = {
         return profile?.stores?.name || 'Kantor';
     },
 
+    // ==================== [修复1.3] login 成功后强制清除缓存 ====================
     async login(email, password) {
         const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
         });
         if (error) return { error };
+        // ✅ 修复1.3：登录成功后立即清除 profile 缓存，
+        //    确保下一次 getCurrentProfile() 读取最新角色数据，
+        //    避免与 AUTH.user 双缓存不同步造成权限误判。
+        this.clearCache();
         return data;
     },
 
@@ -422,7 +431,6 @@ const SupabaseAPI = {
                 const monthlyInterest = orderData.loan_amount * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 const serviceFeeAmount = orderData.loan_amount * (serviceFeePercent / 100);
                 
-                // ==================== 修复：创建订单时自动锁定 ====================
                 const newOrder = {
                     order_id: orderId,
                     customer_name: orderData.customer_name,
@@ -447,7 +455,6 @@ const SupabaseAPI = {
                     created_by: profile.id,
                     notes: orderData.notes || '',
                     customer_id: orderData.customer_id || null,
-                    // ✅ 创建订单后立即锁定，防止修改基础信息
                     is_locked: true,
                     locked_at: new Date().toISOString(),
                     locked_by: profile.id
@@ -570,7 +577,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 利息记录（乐观锁重试版） ====================
+    // ==================== [修复1.1 + 1.2] 利息记录（乐观锁修复版） ====================
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -595,7 +602,9 @@ const SupabaseAPI = {
                 const newInterestPaidMonths = currentOrder.interest_paid_months + months;
                 const newInterestPaidTotal = currentOrder.interest_paid_total + totalInterest;
                 
-                // 注意：这里不检查 is_locked，允许锁定订单继续缴费
+                // ✅ 修复1.1：乐观锁仅保留 interest_paid_months + status 两个核心条件，
+                //    移除 .eq('principal_paid') ——该字段并非利息操作的版本标识，
+                //    其精度差异或并发变更会导致条件无法匹配，误判为并发冲突。
                 const { data: updatedOrder, error: updateError } = await supabaseClient
                     .from('orders')
                     .update({
@@ -606,51 +615,45 @@ const SupabaseAPI = {
                         updated_at: new Date().toISOString()
                     })
                     .eq('order_id', orderId)
-                    .eq('interest_paid_months', currentOrder.interest_paid_months)
-                    .eq('principal_paid', currentOrder.principal_paid)
+                    .eq('interest_paid_months', currentOrder.interest_paid_months)  // 核心乐观锁字段
                     .eq('status', 'active')
                     .select();
                 
                 if (updateError) {
-                    if (updateError.code === 'PGRST116') {
-                        console.warn(`乐观锁冲突: 订单 ${orderId} 利息支付重试 ${retryCount + 1}/${maxRetries}`);
-                        retryCount++;
-                        if (retryCount >= maxRetries) {
-                            throw new Error(Utils.lang === 'id' 
-                                ? `❌ 保存失败！订单数据已被其他操作修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作`
-                                : `❌ 保存失败！订单数据已被其他操作修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作`);
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        continue;
-                    }
+                    // Supabase 返回 PGRST116 表示 .single() 无结果，此处用 .select() 不会触发
+                    // 其余 DB 错误直接抛出
                     throw new Error(Utils.lang === 'id' 
                         ? `❌ 保存失败！${updateError.message}`
                         : `❌ 保存失败！${updateError.message}`);
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
-                    // 检查是否因其他原因失败
+                    // ✅ 修复1.1：区分两种失败原因：
+                    //    情况A：interest_paid_months 已被别人更新 → 并发冲突，可重试
+                    //    情况B：数据值一致但仍更新失败 → RLS 权限拒绝，不应重试，直接报错
                     const checkOrder = await this.getOrder(orderId);
-                    if (checkOrder &&
-                        checkOrder.interest_paid_months === currentOrder.interest_paid_months &&
-                        checkOrder.principal_paid === currentOrder.principal_paid &&
-                        checkOrder.status === 'active') {
-                        // 数据未被并发修改，可能是 RLS 策略问题
+                    
+                    if (checkOrder && checkOrder.interest_paid_months !== currentOrder.interest_paid_months) {
+                        // 情况A：并发冲突，重试
+                        console.warn(`乐观锁冲突（并发）: 订单 ${orderId} 利息支付重试 ${retryCount + 1}/${maxRetries}`);
+                        retryCount++;
+                        if (retryCount >= maxRetries) {
+                            throw new Error(Utils.lang === 'id'
+                                ? `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`
+                                : `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`);
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 600));
+                        continue;
+                    } else {
+                        // 情况B：RLS 权限拒绝或其他数据库拦截，不重试
                         throw new Error(Utils.lang === 'id'
-                            ? `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`
-                            : `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`);
+                            ? `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`
+                            : `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`);
                     }
-                    retryCount++;
-                    if (retryCount >= maxRetries) {
-                        throw new Error(Utils.lang === 'id' 
-                            ? `❌ 保存失败！订单数据已变更。\n\n订单号: ${orderId}\n请刷新页面后重新操作`
-                            : `❌ 保存失败！订单数据已变更。\n\n订单号: ${orderId}\n请刷新页面后重新操作`);
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    continue;
                 }
                 
-                // 记录支付历史
+                // ✅ 修复1.2：payment_history 写入失败直接 throw，中断流程，
+                //    不再静默 console.error，防止"订单已更新但无支付记录"的账本不一致。
                 const paymentData = {
                     order_id: currentOrder.id,
                     date: new Date().toISOString().split('T')[0],
@@ -667,9 +670,13 @@ const SupabaseAPI = {
                     .insert(paymentData);
                 
                 if (paymentError) {
-                    console.error('支付历史记录失败:', paymentError);
+                    // ✅ 修复1.2：写入失败抛出明确异常，不静默跳过
+                    throw new Error(Utils.lang === 'id'
+                        ? `❌ 利息记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`
+                        : `❌ 利息记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`);
                 }
                 
+                // ✅ 修复1.2：cash_flow 写入失败同样抛出，不静默跳过
                 await this.recordCashFlow({
                     store_id: currentOrder.store_id,
                     flow_type: 'interest',
@@ -690,19 +697,24 @@ const SupabaseAPI = {
                 
             } catch (error) {
                 lastError = error;
-                if (retryCount >= maxRetries - 1) {
+                // 只有并发冲突才静默重试，其他错误直接抛出
+                const isConcurrencyError = error.message && (
+                    error.message.includes('并发操作冲突') ||
+                    error.message.includes('订单已被其他终端修改')
+                );
+                if (!isConcurrencyError || retryCount >= maxRetries - 1) {
                     alert(error.message);
                     throw error;
                 }
                 retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 600));
             }
         }
         
         throw lastError;
     },
 
-    // ==================== 本金还款（乐观锁重试版） ====================
+    // ==================== [修复1.1 + 1.2] 本金还款（乐观锁修复版） ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         
@@ -729,7 +741,6 @@ const SupabaseAPI = {
                 }
                 
                 let paidAmount = amount;
-                let isAdjusted = false;
                 
                 if (amount > remainingPrincipal) {
                     const confirmMsg = Utils.lang === 'id' 
@@ -740,7 +751,6 @@ const SupabaseAPI = {
                         throw new Error(Utils.lang === 'id' ? '付款已取消' : '付款已取消');
                     }
                     paidAmount = remainingPrincipal;
-                    isAdjusted = true;
                 }
                 
                 const newPrincipalPaid = currentOrder.principal_paid + paidAmount;
@@ -761,54 +771,46 @@ const SupabaseAPI = {
                     updates.monthly_interest = newPrincipalRemaining * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 }
                 
-                // 注意：这里不检查 is_locked，允许锁定订单继续还款
+                // ✅ 修复1.1：本金还款的乐观锁仅保留 principal_paid + status，
+                //    移除 .eq('interest_paid_months') ——利息支付不影响本金还款的版本标识。
                 const { data: updatedOrder, error: updateError } = await supabaseClient
                     .from('orders')
                     .update(updates)
                     .eq('order_id', orderId)
-                    .eq('principal_paid', currentOrder.principal_paid)
-                    .eq('interest_paid_months', currentOrder.interest_paid_months)
+                    .eq('principal_paid', currentOrder.principal_paid)  // 核心乐观锁字段
                     .eq('status', 'active')
                     .select();
                 
                 if (updateError) {
-                    if (updateError.code === 'PGRST116') {
-                        console.warn(`乐观锁冲突: 订单 ${orderId} 本金支付重试 ${retryCount + 1}/${maxRetries}`);
-                        retryCount++;
-                        if (retryCount >= maxRetries) {
-                            throw new Error(Utils.lang === 'id' 
-                                ? `❌ 保存失败！订单数据已被其他操作修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作`
-                                : `❌ 保存失败！订单数据已被其他操作修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作`);
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        continue;
-                    }
                     throw new Error(Utils.lang === 'id' 
                         ? `❌ 保存失败！${updateError.message}`
                         : `❌ 保存失败！${updateError.message}`);
                 }
                 
                 if (!updatedOrder || updatedOrder.length === 0) {
+                    // ✅ 修复1.1：同样区分并发冲突 vs RLS权限拒绝
                     const checkOrder = await this.getOrder(orderId);
-                    if (checkOrder &&
-                        checkOrder.principal_paid === currentOrder.principal_paid &&
-                        checkOrder.interest_paid_months === currentOrder.interest_paid_months &&
-                        checkOrder.status === 'active') {
+                    
+                    if (checkOrder && checkOrder.principal_paid !== currentOrder.principal_paid) {
+                        // 情况A：并发冲突，重试
+                        console.warn(`乐观锁冲突（并发）: 订单 ${orderId} 本金支付重试 ${retryCount + 1}/${maxRetries}`);
+                        retryCount++;
+                        if (retryCount >= maxRetries) {
+                            throw new Error(Utils.lang === 'id'
+                                ? `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`
+                                : `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`);
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 600));
+                        continue;
+                    } else {
+                        // 情况B：RLS 权限拒绝
                         throw new Error(Utils.lang === 'id'
-                            ? `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`
-                            : `❌ 保存失败！无法更新订单。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员。`);
+                            ? `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`
+                            : `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`);
                     }
-                    retryCount++;
-                    if (retryCount >= maxRetries) {
-                        throw new Error(Utils.lang === 'id' 
-                            ? `❌ 保存失败！订单数据已变更。\n\n订单号: ${orderId}\n请刷新页面后重新操作`
-                            : `❌ 保存失败！订单数据已变更。\n\n订单号: ${orderId}\n请刷新页面后重新操作`);
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    continue;
                 }
                 
-                // 记录支付历史
+                // ✅ 修复1.2：payment_history 写入失败直接 throw，不静默跳过
                 const isFullRepayment = paidAmount >= remainingPrincipal;
                 const description = isFullRepayment 
                     ? (Utils.lang === 'id' ? '✅ 全额还款结清' : '✅ 全额还款结清')
@@ -829,9 +831,13 @@ const SupabaseAPI = {
                     .insert(paymentData);
                 
                 if (paymentError) {
-                    console.error('支付历史记录失败:', paymentError);
+                    // ✅ 修复1.2：写入失败抛出明确异常，不静默跳过
+                    throw new Error(Utils.lang === 'id'
+                        ? `❌ 还款记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`
+                        : `❌ 还款记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`);
                 }
                 
+                // ✅ 修复1.2：cash_flow 写入失败同样抛出
                 await this.recordCashFlow({
                     store_id: currentOrder.store_id,
                     flow_type: 'principal',
@@ -858,42 +864,41 @@ const SupabaseAPI = {
                 
             } catch (error) {
                 lastError = error;
-                if (retryCount >= maxRetries - 1) {
+                const isConcurrencyError = error.message && (
+                    error.message.includes('并发操作冲突') ||
+                    error.message.includes('订单已被其他终端修改')
+                );
+                if (!isConcurrencyError || retryCount >= maxRetries - 1) {
                     alert(error.message);
                     throw error;
                 }
                 retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 600));
             }
         }
         
         throw lastError;
     },
 
-    // ==================== 更新订单（带锁定检查 - 双层保险） ====================
+    // ==================== 更新订单（带锁定检查） ====================
     async updateOrder(orderId, updateData, customerId) {
-        // ✅ 第一层检查：获取订单当前状态
         const currentOrder = await this.getOrder(orderId);
         
-        // 定义敏感字段（基础信息，不允许在锁定时修改）
         const sensitiveFields = [
             'customer_name', 'customer_ktp', 'customer_phone', 'customer_address',
             'collateral_name', 'loan_amount', 'admin_fee', 'service_fee_percent'
         ];
         
-        // 检查是否尝试更新敏感字段
         const isUpdatingSensitive = sensitiveFields.some(field => 
             updateData.hasOwnProperty(field)
         );
         
-        // 如果订单已锁定且尝试更新敏感字段，拒绝操作
         if (currentOrder.is_locked && isUpdatingSensitive) {
             throw new Error(Utils.lang === 'id' 
                 ? '❌ 订单已锁定，无法修改基础信息（客户姓名、质押物、贷款金额等）。\n\n如需修改，请联系管理员解锁订单。'
                 : '❌ 订单已锁定，无法修改基础信息（客户姓名、质押物、贷款金额等）。\n\n如需修改，请联系管理员解锁订单。');
         }
         
-        // 执行更新
         const { data, error } = await supabaseClient
             .from('orders').update(updateData).eq('order_id', orderId).select().single();
         if (error) throw error;
@@ -971,7 +976,6 @@ const SupabaseAPI = {
         };
     },
 
-    // ==================== 获取所有支付记录 ====================
     async getAllPayments() {
         const profile = await this.getCurrentProfile();
         
