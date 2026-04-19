@@ -1,9 +1,4 @@
-// app-payments.js - 完整修复版 v8.0
-// 修复内容：
-// 1. 统一使用 SUPABASE.getCurrentProfile() 作为唯一角色数据源
-// 2. 空值保护增强
-// 3. 优化错误提示
-// 4. 移除锁定相关逻辑
+// app-payments.js - v1.0
 
 window.APP = window.APP || {};
 
