@@ -1,15 +1,6 @@
 /* =====================================================
-   base.css - 基础样式 v3.0 (修复版)
-   修复内容：
-   - 补充按钮样式 (.btn-small, .btn-back, .btn-print, .capital-btn, .transfer-btn等)
-   - 补充统计卡片网格 (.stats-grid-optimized, .stat-card)
-   - 补充cashflow区块样式 (.cashflow-summary, .cashflow-stats, .cashflow-item等)
-   - 修复手机端底部空间预留问题
-   - 修复spacing-8变量缺失
-   - 补充表格样式 (table, th, td, .action-cell)
-   - 手机端toolbar输入框16px防止缩放
+   base.css - 基础样式 v1.0 (修复版)
    ===================================================== */
-
 /* ---------- 1. 全局变量 ---------- */
 :root {
     --primary: #2563eb;
