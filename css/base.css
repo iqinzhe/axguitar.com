@@ -1,5 +1,11 @@
 /* =====================================================
-   base.css - 基础样式 v1.0 
+   base.css - 布局优化版 v2.0
+   修改内容：
+   1. 电脑端：资金管理栏固定1行3列，仪表板栏固定4列2行
+   2. 电脑端：工具栏按钮网格布局（管理员5列2行，门店6列1行）
+   3. 手机端：资金管理栏单列，仪表板栏2列4行
+   4. 手机端：工具栏按钮网格布局，所有字体缩小1号
+   5. 底部信息栏文字整体缩小
    ===================================================== */
 
 /* ---------- 1. 全局变量 ---------- */
@@ -27,13 +33,13 @@
     --gray-700: #334155;
     --gray-800: #1e293b;
     --gray-900: #0f172a;
-    --font-xxs: 0.75rem;
-    --font-xs: 0.875rem;
-    --font-sm: 1rem;
-    --font-md: 1.125rem;
-    --font-lg: 1.25rem;
-    --font-xl: 1.375rem;
-    --font-2xl: 1.5rem;
+    --font-xxs: 0.7rem;
+    --font-xs: 0.8rem;
+    --font-sm: 0.9rem;
+    --font-md: 1rem;
+    --font-lg: 1.125rem;
+    --font-xl: 1.25rem;
+    --font-2xl: 1.35rem;
     --spacing-1: 4px;
     --spacing-2: 8px;
     --spacing-3: 12px;
@@ -191,7 +197,7 @@ button:disabled {
 /* 小按钮 */
 .btn-small {
     padding: 4px 10px;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     border-radius: var(--radius-sm);
     background: var(--gray-100);
     border: 1px solid var(--gray-200);
@@ -354,12 +360,12 @@ button.danger:hover,
 }
 
 /* =====================================================
-   统计卡片网格
+   统计卡片网格 - 电脑端：固定4列2行
    ===================================================== */
 
 .stats-grid-optimized {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: var(--spacing-3);
     margin-bottom: var(--spacing-5);
 }
@@ -368,7 +374,7 @@ button.danger:hover,
     background: white;
     border-radius: var(--radius-lg);
     border: 1px solid var(--gray-200);
-    padding: var(--spacing-4) var(--spacing-3);
+    padding: var(--spacing-2) var(--spacing-2);
     text-align: center;
     transition: var(--transition);
 }
@@ -378,9 +384,9 @@ button.danger:hover,
 }
 
 .stat-value {
-    font-size: var(--font-2xl);
+    font-size: var(--font-md);
     font-weight: 700;
-    margin-bottom: var(--spacing-2);
+    margin-bottom: var(--spacing-1);
     color: var(--gray-800);
 }
 
@@ -407,7 +413,7 @@ button.danger:hover,
 }
 
 /* =====================================================
-   cashflow区块样式
+   cashflow区块样式 - 电脑端：固定1行3列
    ===================================================== */
 
 .cashflow-summary {
@@ -425,14 +431,12 @@ button.danger:hover,
 }
 
 .cashflow-stats {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-4);
 }
 
 .cashflow-item {
-    flex: 1;
-    min-width: 150px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-lg);
     padding: var(--spacing-3) var(--spacing-4);
@@ -455,7 +459,7 @@ button.danger:hover,
 }
 
 .cashflow-detail {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     opacity: 0.7;
     margin-top: var(--spacing-2);
     line-height: 1.4;
@@ -463,8 +467,7 @@ button.danger:hover,
 
 /* 内部转账区块 */
 .internal-transfer-item {
-    flex: 2;
-    min-width: 280px;
+    grid-column: span 1;
 }
 
 .transfer-buttons {
@@ -491,6 +494,57 @@ button.danger:hover,
 }
 
 /* =====================================================
+   工具栏 - 电脑端网格布局
+   管理员：5列2行（共10个按钮）
+   门店：6列1行（共6个按钮）
+   注：网格列数由 JS 动态添加类名控制，CSS 提供基础样式
+   ===================================================== */
+
+.toolbar {
+    display: grid;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-5);
+    padding: var(--spacing-3);
+    background: white;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+}
+
+/* 管理员视图：5列2行 */
+.toolbar.admin-grid {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+/* 门店视图：6列1行 */
+.toolbar.store-grid {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.toolbar button {
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.toolbar input,
+.toolbar select {
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: var(--font-sm);
+}
+
+/* =====================================================
+   底部信息栏 - 文字整体缩小
+   ===================================================== */
+.card p:last-child,
+.card .info-note,
+.footer-note {
+    font-size: var(--font-xxs);
+    color: var(--gray-500);
+}
+
+/* =====================================================
    表格样式
    ===================================================== */
 
@@ -501,7 +555,7 @@ table {
 }
 
 th, td {
-    padding: 12px 12px;
+    padding: 10px 10px;
     border-bottom: 1px solid var(--gray-200);
     text-align: left;
     vertical-align: middle;
@@ -512,33 +566,30 @@ th {
     background: var(--gray-50);
     color: var(--gray-700);
     border-bottom: 1px solid var(--gray-300);
-    white-space: nowrap; /* 表头不换行，防止列宽塌陷 */
+    white-space: nowrap;
 }
 
 tbody tr:hover {
     background: var(--gray-50);
 }
 
-/* 表格容器（横向滚动，含 iOS 顺滑滚动） */
 .table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     margin: var(--spacing-3) 0;
 }
 
-/* 操作列 */
 .action-cell {
     display: flex;
     gap: var(--spacing-2);
     flex-wrap: wrap;
 }
 
-/* 状态徽章 */
 .status-badge {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
 }
 
@@ -557,12 +608,11 @@ tbody tr:hover {
     color: var(--danger-dark);
 }
 
-/* 支付方式徽章 */
 .payment-method-badge {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
 }
 
@@ -576,28 +626,24 @@ tbody tr:hover {
     color: #b45309;
 }
 
-/* 订单ID样式 */
 .order-id {
     font-family: monospace;
     font-weight: 600;
     color: var(--primary-dark);
 }
 
-/* 客户表格 */
 .customer-table th,
 .customer-table td {
-    padding: 10px 8px;
+    padding: 8px 6px;
 }
 
-/* 缴费历史表格 */
 .payment-table th,
 .payment-table td {
-    padding: 10px 12px;
+    padding: 8px 10px;
 }
 
-/* 门店汇总表格 */
 .data-table {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
 }
 
 .data-table th {
@@ -605,7 +651,6 @@ tbody tr:hover {
     font-weight: 600;
 }
 
-/* 报告门店区块 */
 .report-store-section {
     margin-bottom: var(--spacing-5);
     border: 1px solid var(--gray-200);
@@ -632,7 +677,7 @@ tbody tr:hover {
 }
 
 .report-store-stat .label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--gray-500);
     margin-bottom: 4px;
 }
@@ -650,7 +695,6 @@ tbody tr:hover {
     color: var(--danger);
 }
 
-/* 门店汇总卡片 */
 .grand-total-card {
     background: linear-gradient(135deg, var(--primary-soft) 0%, white 100%);
     margin-bottom: var(--spacing-5);
@@ -660,7 +704,6 @@ tbody tr:hover {
    缺失业务样式（补充）
    ===================================================== */
 
-/* 门店信息横幅 */
 .store-info-banner {
     background: var(--primary-soft);
     border-radius: var(--radius-md);
@@ -671,14 +714,12 @@ tbody tr:hover {
     text-align: center;
 }
 
-/* 两列网格（用于创建订单页面） */
 .two-col-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-4);
 }
 
-/* 客户信息展示区 */
 .customer-info-display {
     background: var(--gray-50);
     border-radius: var(--radius-md);
@@ -694,7 +735,6 @@ tbody tr:hover {
     font-size: var(--font-xs);
 }
 
-/* 地址选项（居住地址同KTP选项） */
 .address-option {
     display: flex;
     gap: var(--spacing-4);
@@ -709,7 +749,6 @@ tbody tr:hover {
     cursor: pointer;
 }
 
-/* 费用区块 */
 .fee-section {
     background: var(--gray-50);
     border-radius: var(--radius-md);
@@ -737,54 +776,29 @@ tbody tr:hover {
     font-weight: 500;
 }
 
-/* 已平账徽章 */
 .reconciled-badge {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
     background: var(--success-light);
     color: var(--success-dark);
 }
 
-/* 锁定徽章 */
 .locked-badge {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
     background: var(--gray-200);
     color: var(--gray-600);
 }
 
-/* 总支出金额 */
 .total-expense {
     color: var(--danger);
     font-weight: 700;
-}
-
-/* =====================================================
-   工具栏
-   ===================================================== */
-.toolbar {
-    display: flex;
-    gap: var(--spacing-3);
-    flex-wrap: wrap;
-    margin-bottom: var(--spacing-5);
-    padding: var(--spacing-3);
-    background: white;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--gray-200);
-}
-
-.toolbar input,
-.toolbar select {
-    padding: var(--spacing-2) var(--spacing-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--gray-300);
-    font-size: var(--font-sm);
 }
 
 /* =====================================================
@@ -1096,7 +1110,7 @@ tbody tr:hover {
 }
 
 .summary-note {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--gray-500);
     margin-top: var(--spacing-3);
     padding-top: var(--spacing-2);
@@ -1188,7 +1202,6 @@ tbody tr:hover {
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    /* 增大触摸区域 */
     padding: var(--spacing-2) 0;
 }
 
@@ -1208,8 +1221,8 @@ tbody tr:hover {
 
 .history-table {
     width: 100%;
-    font-size: 0.8125rem;
-    min-width: 400px; /* 防止极窄屏幕压缩列宽，配合外层滚动 */
+    font-size: 0.75rem;
+    min-width: 400px;
 }
 
 .history-table th,
@@ -1229,7 +1242,6 @@ tbody tr:hover {
 
 /* =====================================================
    响应式断点 — 手机端（≤768px）
-   修复：删除原来泄漏到全局的 .table-container 和 th/td 重复定义
    ===================================================== */
 @media (max-width: 768px) {
 
@@ -1239,7 +1251,7 @@ tbody tr:hover {
     }
 
     .card {
-        padding: var(--spacing-4);
+        padding: var(--spacing-3);
     }
 
     .page-header {
@@ -1252,21 +1264,80 @@ tbody tr:hover {
         justify-content: flex-end;
     }
 
-    /* --- 工具栏 --- */
+    /* 手机端：所有字体缩小1号 */
+    body, .card, button, .stat-value, .stat-label, .toolbar button {
+        font-size: 0.85rem;
+    }
+
+    /* --- 资金管理栏：单列 --- */
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
+    .cashflow-item {
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    .cashflow-item .value {
+        font-size: var(--font-md);
+    }
+
+    /* --- 仪表板栏：2列4行 --- */
+    .stats-grid-optimized {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-2);
+    }
+
+    .stat-card {
+        padding: var(--spacing-2);
+    }
+
+    .stat-value {
+        font-size: var(--font-sm);
+    }
+
+    .stat-label {
+        font-size: 0.7rem;
+    }
+
+    /* --- 工具栏：手机端网格布局 --- */
     .toolbar {
-        flex-direction: column;
+        gap: var(--spacing-2);
+        padding: var(--spacing-2);
     }
 
-    .toolbar input,
-    .toolbar select,
+    /* 管理员视图：2列5行 */
+    .toolbar.admin-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* 门店视图：3列2行 */
+    .toolbar.store-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
     .toolbar button {
-        width: 100%;
+        font-size: 0.75rem;
+        padding: var(--spacing-2);
+        min-height: 44px;
+        white-space: normal;
+        word-break: break-word;
     }
 
-    /* 防止 iOS 自动缩放：输入框字号须 ≥ 16px */
+    /* 工具栏输入框 */
     .toolbar input,
     .toolbar select {
-        font-size: 16px;
+        font-size: 0.8rem;
+        padding: var(--spacing-2);
+    }
+
+    /* 底部信息栏：文字再缩小一号 */
+    .card p:last-child,
+    .card .info-note,
+    .footer-note,
+    .summary-note {
+        font-size: 0.65rem;
     }
 
     /* --- 双列网格 → 单列 --- */
@@ -1291,27 +1362,25 @@ tbody tr:hover {
         width: 100%;
     }
 
-    /* 表单输入框增大触摸区域，防止 iOS 缩放 */
     .form-group input,
     .form-group select,
     .form-group textarea {
         padding: 12px var(--spacing-3);
-        font-size: 16px;
+        font-size: 0.9rem;
     }
 
-    /* --- 按钮：最小触摸高度 44px（iOS HIG 标准） --- */
+    /* 按钮最小触摸高度 */
     button {
         min-height: 44px;
     }
 
     .btn-small {
-        min-height: 36px; /* 辅助操作放宽至 36px */
+        min-height: 36px;
     }
 
-    /* 缴费操作主按钮放大 */
     .btn-action {
         min-height: 48px;
-        font-size: var(--font-md);
+        font-size: var(--font-sm);
         padding: 14px 20px;
     }
 
@@ -1323,7 +1392,7 @@ tbody tr:hover {
 
     .modal-content {
         margin-top: 10vh;
-        padding: var(--spacing-5);
+        padding: var(--spacing-4);
         max-width: calc(100% - 32px);
         max-height: 75vh;
     }
@@ -1339,33 +1408,7 @@ tbody tr:hover {
         padding: 12px;
     }
 
-    /* --- 统计卡片：2列 --- */
-    .stats-grid-optimized {
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-2);
-    }
-
-    .stat-card {
-        padding: var(--spacing-3) var(--spacing-2);
-    }
-
-    .stat-value {
-        font-size: var(--font-md);
-    }
-
-    .stat-label {
-        font-size: var(--font-xs);
-    }
-
-    /* --- cashflow区块 --- */
-    .cashflow-stats {
-        flex-direction: column;
-    }
-
-    .cashflow-item {
-        min-width: auto;
-    }
-
+    /* 转账按钮手机端 */
     .transfer-buttons {
         flex-direction: column;
     }
@@ -1376,15 +1419,12 @@ tbody tr:hover {
         min-height: 44px;
     }
 
-    /* --- 操作列按钮组 --- */
+    /* 操作列按钮组 */
     .action-cell {
         flex-wrap: wrap;
     }
 
-    /* ----------------------------------------------------------------
-       缴费页面（summary-table）手机端适配
-       原六列横向布局 → 每对 label/value 独占一行的竖向列表
-       ---------------------------------------------------------------- */
+    /* 缴费页面手机端适配 */
     .summary-table,
     .summary-table tbody,
     .summary-table tr,
@@ -1393,7 +1433,6 @@ tbody tr:hover {
         width: 100%;
     }
 
-    /* 隐藏分隔行（手机端靠间距代替） */
     .summary-table tr.divider {
         display: none;
     }
@@ -1412,13 +1451,13 @@ tbody tr:hover {
     .summary-table td.label {
         width: 40%;
         min-width: 90px;
-        font-size: var(--font-xs);
+        font-size: 0.7rem;
         padding: 6px 8px;
     }
 
     .summary-table td.value {
         width: 60%;
-        font-size: var(--font-xs);
+        font-size: 0.7rem;
         padding: 6px 8px;
         word-break: break-all;
     }
@@ -1428,19 +1467,15 @@ tbody tr:hover {
         border-radius: var(--radius-sm);
     }
 
-    /* --- info-box：竖向排列，防止数字被截断 --- */
     .info-box {
         flex-direction: column;
         gap: var(--spacing-1);
     }
 
     .info-box span {
-        font-size: var(--font-xs);
+        font-size: 0.7rem;
     }
 
-    /* --- history-table：已通过 min-width 配合 card-history 滚动，无需额外处理 --- */
-
-    /* --- 手机端 th 保持 nowrap 防止列宽塌陷，td 允许换行 --- */
     th {
         white-space: nowrap;
     }
@@ -1450,7 +1485,6 @@ tbody tr:hover {
         word-break: break-word;
     }
 
-    /* 但 history-table 的 td 维持 nowrap 配合 min-width 滚动 */
     .history-table th,
     .history-table td {
         white-space: nowrap;
@@ -1467,43 +1501,48 @@ tbody tr:hover {
     }
 
     .card {
-        padding: var(--spacing-3);
+        padding: var(--spacing-2);
         border-radius: var(--radius-md);
     }
 
     .page-header h1,
     .page-header h2 {
-        font-size: var(--font-lg);
+        font-size: var(--font-md);
     }
 
-    /* 统计卡片在极小屏幕改为单列 */
     .stats-grid-optimized {
-        grid-template-columns: 1fr 1fr;
         gap: var(--spacing-1);
     }
 
     .stat-value {
-        font-size: var(--font-sm);
+        font-size: 0.75rem;
     }
 
-    /* 缴费摘要表 label 列收窄 */
+    .stat-label {
+        font-size: 0.65rem;
+    }
+
     .summary-table td.label {
         width: 45%;
-        font-size: 0.75rem;
+        font-size: 0.65rem;
     }
 
     .summary-table td.value {
         width: 55%;
-        font-size: 0.75rem;
+        font-size: 0.65rem;
     }
 
-    /* 按钮文字略缩小，防止溢出 */
     .btn-action {
-        font-size: var(--font-sm);
+        font-size: 0.8rem;
     }
 
     .login-box {
         padding: var(--spacing-4);
+    }
+
+    .toolbar button {
+        font-size: 0.7rem;
+        padding: var(--spacing-1);
     }
 }
 
