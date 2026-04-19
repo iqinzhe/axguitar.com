@@ -1,6 +1,6 @@
 /* =====================================================
    components.css - 组件样式 v2.0
-   更新：统计卡片手机端优化、表格卡片化、报表网格优化
+   职责：按钮、表格、统计卡片、状态标签、业务组件
    ===================================================== */
 
 /* ---------- 1. 按钮组件 ---------- */
@@ -16,12 +16,10 @@ button {
     transition: var(--transition);
 }
 
-/* 手机端按钮增大触摸区域 */
 @media (max-width: 768px) {
     button {
         padding: 12px 16px;
         min-height: 44px;
-        /* 符合触摸目标最小尺寸 */
     }
 }
 
@@ -37,7 +35,6 @@ button.disabled {
     transform: none;
 }
 
-/* 按钮变体 */
 button.success {
     background: var(--success);
 }
@@ -59,7 +56,6 @@ button.danger:hover {
     background: var(--danger-dark);
 }
 
-/* 小按钮（表格内使用） */
 .btn-small {
     padding: 4px 8px;
     font-size: var(--font-xs);
@@ -68,7 +64,6 @@ button.danger:hover {
     color: var(--gray-700);
 }
 
-/* 手机端表格内按钮保持较小，但增加间距 */
 @media (max-width: 768px) {
     .btn-small {
         padding: 8px 12px;
@@ -96,7 +91,6 @@ button.danger:hover {
     color: white;
 }
 
-/* 特殊按钮 */
 .btn-back {
     background: var(--gray-500);
     color: white;
@@ -139,7 +133,7 @@ button.danger:hover {
     background: #7c3aed;
 }
 
-/* ---------- 2. 表格组件 + 手机端卡片化 ---------- */
+/* ---------- 2. 表格组件 ---------- */
 .data-table,
 .order-table,
 .customer-table,
@@ -181,7 +175,6 @@ button.danger:hover {
     background: var(--gray-50);
 }
 
-/* 表格特殊样式 */
 .order-id {
     font-family: monospace;
     font-size: var(--font-xs);
@@ -196,7 +189,6 @@ button.danger:hover {
     margin: 2px;
 }
 
-/* 客户表格特定 */
 .customer-id-cell,
 .date-cell,
 .ktp-cell,
@@ -212,7 +204,7 @@ button.danger:hover {
     white-space: nowrap;
 }
 
-/* ========== 手机端表格卡片化（需要data-label） ========== */
+/* 手机端表格卡片化 */
 @media (max-width: 768px) {
     .data-table,
     .order-table,
@@ -222,7 +214,6 @@ button.danger:hover {
         border: none;
     }
     
-    /* 隐藏表头 */
     .data-table thead,
     .order-table thead,
     .customer-table thead,
@@ -231,7 +222,6 @@ button.danger:hover {
         display: none;
     }
     
-    /* 每行变成独立卡片 */
     .data-table tbody tr,
     .order-table tbody tr,
     .customer-table tbody tr,
@@ -246,7 +236,6 @@ button.danger:hover {
         padding: 12px;
     }
     
-    /* 每个单元格变成flex行 */
     .data-table td,
     .order-table td,
     .customer-table td,
@@ -261,7 +250,6 @@ button.danger:hover {
         font-size: 14px;
     }
     
-    /* 最后一个单元格去掉边框 */
     .data-table td:last-child,
     .order-table td:last-child,
     .customer-table td:last-child,
@@ -270,7 +258,6 @@ button.danger:hover {
         border-bottom: none;
     }
     
-    /* 显示data-label的内容作为字段名 */
     .data-table td::before,
     .order-table td::before,
     .customer-table td::before,
@@ -285,7 +272,6 @@ button.danger:hover {
         min-width: 80px;
     }
     
-    /* 操作单元格特殊处理 */
     .data-table td.action-cell,
     .order-table td.action-cell,
     .customer-table td.action-cell,
@@ -304,7 +290,6 @@ button.danger:hover {
         margin-right: auto;
     }
     
-    /* 地址单元格在手机端取消宽度限制 */
     .address-cell {
         max-width: none;
         white-space: normal;
@@ -312,7 +297,7 @@ button.danger:hover {
     }
 }
 
-/* ---------- 3. 统计卡片（手机端优化） ---------- */
+/* ---------- 3. 统计卡片 ---------- */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -356,7 +341,6 @@ button.danger:hover {
     font-weight: 500;
 }
 
-/* 手机端统计卡片优化（2列，尺寸缩小） */
 @media (max-width: 768px) {
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -366,23 +350,19 @@ button.danger:hover {
     
     .stat-card {
         padding: 12px 8px;
-        /* 缩小内边距 */
         border-radius: var(--radius-lg);
     }
     
     .stat-value {
         font-size: 20px;
-        /* 从24px缩小到20px */
         margin-bottom: 6px;
     }
     
     .stat-label {
         font-size: 12px;
-        /* 从14px缩小到12px */
     }
 }
 
-/* 超小屏幕进一步缩小 */
 @media (max-width: 480px) {
     .stats-grid {
         gap: 8px;
@@ -439,7 +419,6 @@ button.danger:hover {
     color: var(--danger);
 }
 
-/* 支付方式标签 */
 .payment-method-badge {
     display: inline-block;
     padding: 3px 8px;
@@ -457,7 +436,6 @@ button.danger:hover {
     color: var(--primary);
 }
 
-/* 平账/锁定标签 */
 .reconciled-badge {
     background: rgba(16, 185, 129, 0.1);
     color: var(--success);
@@ -510,7 +488,6 @@ button.danger:hover {
     cursor: pointer;
 }
 
-/* 手机端增大单选按钮触摸区域 */
 @media (max-width: 768px) {
     .payment-method-options label {
         padding: 8px 0;
@@ -615,7 +592,6 @@ button.danger:hover {
     color: #cbd5e1;
 }
 
-/* 资金管理区域 */
 .capital-summary {
     display: flex;
     justify-content: space-between;
@@ -790,7 +766,6 @@ button.danger:hover {
     text-align: center;
 }
 
-/* 手机端缴费摘要卡片化 */
 @media (max-width: 768px) {
     .summary-table,
     .summary-table tbody,
@@ -824,7 +799,6 @@ button.danger:hover {
     }
 }
 
-/* 缴费卡片 */
 .action-card {
     margin-bottom: 20px;
     border: 1px solid var(--gray-200);
@@ -854,7 +828,6 @@ button.danger:hover {
     background: #fafafa;
 }
 
-/* 信息框 */
 .info-box {
     background: #e0f2fe;
     padding: 10px 12px;
@@ -883,7 +856,6 @@ button.danger:hover {
     font-size: 1rem;
 }
 
-/* 缴费输入组 */
 .action-input-group {
     display: flex;
     align-items: center;
@@ -931,7 +903,6 @@ button.danger:hover {
     text-align: right;
 }
 
-/* 缴费按钮 */
 .btn-action {
     width: 100%;
     padding: 10px;
@@ -952,7 +923,6 @@ button.danger:hover {
     background: var(--success-dark);
 }
 
-/* 历史表格 */
 .history-title {
     font-size: 0.8rem;
     font-weight: 600;
@@ -1014,7 +984,6 @@ button.danger:hover {
     gap: 12px;
 }
 
-/* 手机端报表网格（2列） */
 @media (max-width: 768px) {
     .report-grid-5x2 {
         grid-template-columns: repeat(2, 1fr);
@@ -1054,7 +1023,6 @@ button.danger:hover {
     font-weight: 600;
 }
 
-/* 门店管理表格 */
 .data-table td input {
     width: 140px;
     font-size: 12px;
@@ -1104,7 +1072,6 @@ button.danger:hover {
     text-align: right;
 }
 
-/* 费用选项区域 */
 .fee-section {
     margin-bottom: 8px;
 }
@@ -1136,7 +1103,6 @@ button.danger:hover {
     text-align: center;
 }
 
-/* 两列布局 */
 .two-col-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1196,17 +1162,4 @@ button.danger:hover {
 .migration-warning {
     color: var(--warning);
     margin-bottom: 15px;
-}
-
-/* ---------- 13. 响应式补充 ---------- */
-@media (min-width: 769px) and (max-width: 1024px) {
-    .stats-grid,
-    .stats-grid-optimized {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 14px;
-    }
-    
-    .stat-value {
-        font-size: var(--font-lg);
-    }
 }
