@@ -1,8 +1,4 @@
-// app-blacklist.js - 完整修复版 v2.0
-// 修复内容：
-// 1. 修复 checkDuplicateCustomer 的 Query 注入风险
-// 2. 使用链式查询替代字符串拼接
-// 3. 增加输入验证和过滤
+// app-blacklist.js - 完整修复版 v1.0
 
 window.APP = window.APP || {};
 
