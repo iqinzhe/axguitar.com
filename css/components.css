@@ -575,4 +575,638 @@ button.danger:hover {
     gap: 16px;
 }
 
-@media (max
+@media (max-width: 768px) {
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+
+.cashflow-item {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 14px;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cashflow-item .label {
+    font-size: var(--font-sm);
+    opacity: 0.9;
+    margin-bottom: 8px;
+    color: #e2e8f0;
+}
+
+.cashflow-item .value {
+    font-size: var(--font-xl);
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.cashflow-item .value.negative {
+    color: #fca5a5;
+}
+
+.cashflow-detail {
+    font-size: var(--font-xs);
+    opacity: 0.8;
+    margin-top: 6px;
+    color: #cbd5e1;
+}
+
+/* 资金管理区域 */
+.capital-summary {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.capital-summary-text {
+    font-size: var(--font-xs);
+    color: #e2e8f0;
+}
+
+.capital-summary-text strong {
+    font-weight: 600;
+    color: white;
+    margin: 0 12px 0 4px;
+}
+
+.capital-btn {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    padding: 4px 12px !important;
+    font-size: var(--font-xs) !important;
+    border-radius: 6px !important;
+    color: white !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.capital-btn:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ---------- 8. 内部转账区域 ---------- */
+.internal-transfer-item {
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+}
+
+.transfer-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+}
+
+@media (max-width: 768px) {
+    .transfer-buttons {
+        flex-direction: column;
+    }
+    
+    .transfer-btn {
+        width: 100%;
+        text-align: center;
+        padding: 12px;
+    }
+}
+
+.transfer-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.transfer-btn.cash-to-bank {
+    background: var(--success);
+    color: white;
+}
+
+.transfer-btn.cash-to-bank:hover {
+    background: var(--success-dark);
+    transform: translateY(-1px);
+}
+
+.transfer-btn.bank-to-cash {
+    background: var(--warning);
+    color: white;
+}
+
+.transfer-btn.bank-to-cash:hover {
+    background: var(--warning-dark);
+    transform: translateY(-1px);
+}
+
+.transfer-btn.store-to-hq {
+    background: #8b5cf6;
+    color: white;
+}
+
+.transfer-btn.store-to-hq:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+}
+
+/* ---------- 9. 缴费页面样式 ---------- */
+.summary-card {
+    padding: 12px 16px;
+    margin-bottom: 20px;
+}
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.summary-table td {
+    padding: 8px 6px;
+    border: none;
+}
+
+.summary-table .label {
+    font-weight: 500;
+    color: var(--gray-500);
+    width: 110px;
+    font-size: 0.8rem;
+}
+
+.summary-table .value {
+    font-weight: 600;
+    color: var(--gray-800);
+    font-size: 0.85rem;
+}
+
+.summary-table .value.warning {
+    color: var(--warning);
+}
+
+.summary-table .value.success {
+    color: var(--success);
+}
+
+.summary-table .order-id {
+    font-family: monospace;
+    background: var(--gray-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.summary-table .divider td {
+    border-top: 1px solid var(--gray-200);
+    padding: 4px 0;
+}
+
+.summary-table .paid-row {
+    background: #f0fdf4;
+    border-radius: 8px;
+}
+
+.summary-table .paid-row td {
+    padding: 6px;
+}
+
+.success-text {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.summary-note {
+    font-size: 0.7rem;
+    color: var(--gray-400);
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--gray-200);
+    text-align: center;
+}
+
+/* 手机端缴费摘要卡片化 */
+@media (max-width: 768px) {
+    .summary-table,
+    .summary-table tbody,
+    .summary-table tr,
+    .summary-table td {
+        display: block;
+        width: 100%;
+    }
+    
+    .summary-table tr {
+        margin-bottom: 8px;
+    }
+    
+    .summary-table td {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+    }
+    
+    .summary-table .label {
+        width: auto;
+        min-width: 100px;
+    }
+    
+    .summary-table .value {
+        text-align: right;
+    }
+    
+    .summary-table .divider td {
+        display: none;
+    }
+}
+
+/* 缴费卡片 */
+.action-card {
+    margin-bottom: 20px;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.action-card .card-header {
+    background: var(--gray-50);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.action-card .card-header h3 {
+    margin: 0;
+    font-size: var(--font-md);
+    font-weight: 600;
+}
+
+.action-card .card-body {
+    padding: 16px;
+}
+
+.action-card .card-history {
+    border-top: 1px solid var(--gray-200);
+    padding: 12px 16px;
+    background: #fafafa;
+}
+
+/* 信息框 */
+.info-box {
+    background: #e0f2fe;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+    .info-box {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+}
+
+.warning-box {
+    background: #fef3c7;
+}
+
+.info-box strong {
+    font-size: 1rem;
+}
+
+/* 缴费输入组 */
+.action-input-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+    .action-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.action-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+    min-width: 80px;
+}
+
+.action-select {
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: 0.85rem;
+    background: white;
+    min-width: 200px;
+}
+
+@media (max-width: 768px) {
+    .action-select,
+    .action-input {
+        width: 100%;
+    }
+}
+
+.action-input {
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: 0.85rem;
+    width: 200px;
+    text-align: right;
+}
+
+/* 缴费按钮 */
+.btn-action {
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    margin-top: 8px;
+}
+
+.btn-action.success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-action.success:hover {
+    background: var(--success-dark);
+}
+
+/* 历史表格 */
+.history-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: 10px;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.history-table th,
+.history-table td {
+    border: 1px solid var(--gray-200);
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.history-table th {
+    background: var(--gray-100);
+    font-weight: 600;
+    color: var(--gray-600);
+}
+
+.history-table .text-right {
+    text-align: right;
+}
+
+.history-table .text-center {
+    text-align: center;
+}
+
+/* ---------- 10. 报表页面样式 ---------- */
+.report-store-section {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.report-store-header {
+    background: var(--gray-100);
+    padding: 12px 16px;
+    font-weight: 600;
+    font-size: var(--font-sm);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.report-store-stats {
+    padding: 16px;
+}
+
+.report-grid-5x2 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+/* 手机端报表网格（2列） */
+@media (max-width: 768px) {
+    .report-grid-5x2 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+}
+
+.report-store-stat {
+    text-align: center;
+    padding: 8px;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.report-store-stat .label {
+    font-size: var(--font-xs);
+    color: var(--gray-500);
+    margin-bottom: 4px;
+}
+
+.report-store-stat .value {
+    font-size: var(--font-md);
+    font-weight: 600;
+}
+
+.report-store-stat .value.income {
+    color: var(--success);
+}
+
+.report-store-stat .value.expense {
+    color: var(--danger);
+}
+
+.total-expense {
+    font-size: var(--font-lg);
+    color: var(--danger);
+    font-weight: 600;
+}
+
+/* 门店管理表格 */
+.data-table td input {
+    width: 140px;
+    font-size: 12px;
+    padding: 6px;
+    border-radius: 6px;
+    border: 1px solid var(--gray-300);
+}
+
+@media (max-width: 768px) {
+    .data-table td input {
+        width: 100%;
+        padding: 8px;
+    }
+}
+
+.data-table td input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.info-note {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 8px;
+}
+
+/* ---------- 11. 创建订单页面样式 ---------- */
+.customer-info-display {
+    background: var(--gray-50);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+}
+
+.customer-info-display p {
+    margin: 6px 0;
+}
+
+.store-info-banner {
+    background: #e0f2fe;
+    padding: 10px 15px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+}
+
+.amount-input {
+    text-align: right;
+}
+
+/* 费用选项区域 */
+.fee-section {
+    margin-bottom: 8px;
+}
+
+.fee-options {
+    background: #fef3c7;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--warning);
+}
+
+.fee-select {
+    width: 100%;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    font-size: 14px;
+    background: white;
+}
+
+.fee-display {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--warning);
+    margin-top: 8px;
+    padding: 6px;
+    background: #fffbeb;
+    border-radius: 6px;
+    text-align: center;
+}
+
+/* 两列布局 */
+.two-col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.two-col-grid .full-width {
+    grid-column: span 2;
+}
+
+@media (max-width: 768px) {
+    .two-col-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .two-col-grid .full-width {
+        grid-column: span 1;
+    }
+}
+
+/* ---------- 12. 迁移页面样式 ---------- */
+.migration-progress {
+    background: var(--gray-800);
+    padding: 15px;
+    border-radius: var(--radius-md);
+    margin-top: 15px;
+}
+
+.progress-bar-container {
+    background: var(--gray-600);
+    border-radius: 10px;
+    height: 20px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    background: var(--success);
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s;
+}
+
+.progress-stats {
+    margin-top: 8px;
+    color: var(--gray-400);
+    font-size: 13px;
+}
+
+.migration-info {
+    color: var(--gray-400);
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.migration-warning {
+    color: var(--warning);
+    margin-bottom: 15px;
+}
+
+/* ---------- 13. 响应式补充 ---------- */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .stats-grid,
+    .stats-grid-optimized {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+    }
+    
+    .stat-value {
+        font-size: var(--font-lg);
+    }
+}
