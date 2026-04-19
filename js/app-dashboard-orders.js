@@ -1,10 +1,4 @@
-// app-dashboard-orders.js - 完整修复版 v3.0
-// 修复内容：
-// 1. 移除编辑订单相关功能（员工/店长不能编辑）
-// 2. 移除锁定/解锁相关功能
-// 3. 增强 XSS 防护（动态属性转义）
-// 4. 删除订单增加详细二次确认
-// 5. 统一使用异步权限检查
+// app-dashboard-orders.js - v1.0
 
 window.APP = window.APP || {};
 
