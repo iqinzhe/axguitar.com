@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.1（移除搜索功能）
+// app-dashboard-core.js - v2.1（移除搜索功能）- 完整版
 
 window.APP = window.APP || {};
 
@@ -593,7 +593,7 @@ const DashboardCore = {
                         <td>${sourceMap[t.source_target] || t.source_target}</td>
                         <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}</td>
                         <td>${Utils.escapeHtml(t.description || '-')}</td>
-                        <td>${isAdmin ? Utils.escapeHtml(t.stores?.name || '-') : ''}</td>
+                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
                     </tr>`;
                 }
             }
@@ -1473,4 +1473,76 @@ Terima kasih atas kepercayaan Anda.
         } else {
             for (var t of transfers) {
                 rows += `<tr>
-                    <td>${Utils.formatDate(t.transfer_date)}</td
+                    <td>${Utils.formatDate(t.transfer_date)}</td>
+                    <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
+                    <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
+                    <td>${Utils.escapeHtml(t.description || '-')}</td>
+                    <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
+                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                </tr>`;
+            }
+        }
+        
+        tbody.innerHTML = rows;
+    },
+
+    exportInternalTransferToCSV: async function() {
+        var transfers = window._internalTransfersData || [];
+        var lang = Utils.lang;
+        
+        var headers = lang === 'id'
+            ? ['Tanggal', 'Jenis Transfer', 'Jumlah', 'Deskripsi', 'Oleh', 'Toko']
+            : ['日期', '转账类型', '金额', '描述', '操作人', '门店'];
+        
+        var typeMap = {
+            cash_to_bank: lang === 'id' ? 'Kas ke Bank' : '现金存入银行',
+            bank_to_cash: lang === 'id' ? 'Tarik Tunai' : '银行取现',
+            store_to_hq: lang === 'id' ? 'Setoran ke Pusat' : '上缴总部'
+        };
+        
+        var rows = transfers.map(t => [
+            t.transfer_date,
+            typeMap[t.transfer_type] || t.transfer_type,
+            t.amount,
+            t.description || '-',
+            t.created_by_profile?.name || '-',
+            t.stores?.name || '-'
+        ]);
+        
+        var csvContent = [headers, ...rows].map(row => 
+            row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        ).join('\n');
+        
+        var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = `jf_internal_transfers_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
+    }
+};
+
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
+
+for (var key in DashboardCore) {
+    if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
+        key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
+        window.APP[key] = DashboardCore[key];
+    }
+}
+
+if (typeof Utils !== 'undefined') {
+    Utils.escapeAttr = escapeAttr;
+}
+
+console.log('✅ app-dashboard-core.js v2.1 已加载 - 移除搜索功能，完整版');
