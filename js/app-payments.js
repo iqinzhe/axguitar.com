@@ -1,4 +1,4 @@
-// app-payments.js - v1.0
+// app-payments.js - v8.1（修复：PaymentsModule 对象缺少闭合括号 — 缴费按钮失效根因）
 
 window.APP = window.APP || {};
 
@@ -529,6 +529,7 @@ const PaymentsModule = {
             APP.navigateTo('orderTable');
         }
     }
+};
 
 // 辅助函数：转义属性值
 function escapeAttr(str) {
@@ -552,4 +553,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-payments.js v8.0 已加载 - 权限检查统一，空值保护增强');
+console.log('✅ app-payments.js v8.1 已加载 - 修复 PaymentsModule 缺少闭合括号（缴费按钮失效根因）');

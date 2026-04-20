@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.8（修复缴费按钮 + 优化订单列表界面）
+// app-dashboard-orders.js - v2.9（修复：订单列表与详情页月利息/费用状态不一致）
 
 window.APP = window.APP || {};
 
@@ -32,6 +32,10 @@ const DashboardOrders = {
                     var nextDueDate = o.next_interest_due_date || '-';
                     var formattedDueDate = nextDueDate !== '-' ? Utils.formatDate(nextDueDate) : '-';
                     
+                    // 修复：实时计算月利息（基于剩余本金，而非存储的初始值）
+                    var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
+                    var currentMonthlyInterestForList = remainingPrincipalForList * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+                    
                     rows += `
                         <tr class="order-info-row">
                             <td colspan="2" class="order-cell">
@@ -44,7 +48,7 @@ const DashboardOrders = {
                                     <div class="order-line2">
                                         <span class="order-collateral">💎 质押物: ${Utils.escapeHtml(o.collateral_name)}</span>
                                         <span class="order-amount">💰 贷款金额: ${Utils.formatCurrency(o.loan_amount)}</span>
-                                        <span class="order-interest">📈 月利息: ${Utils.formatCurrency(o.monthly_interest || 0)}</span>
+                                        <span class="order-interest">📈 月利息: ${Utils.formatCurrency(currentMonthlyInterestForList)}</span>
                                         <span class="order-paid">✅ 已付利息: ${o.interest_paid_months} 个月</span>
                                         <span class="order-due">📅 下次利息到期: ${formattedDueDate}</span>
                                         ${isAdmin ? `<span class="order-store">🏪 门店: ${Utils.escapeHtml(storeName)}</span>` : ''}
@@ -259,6 +263,7 @@ const DashboardOrders = {
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+            var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             
             var payRows = '';
@@ -305,8 +310,8 @@ const DashboardOrders = {
                     
                     <h3>💰 费用明细</h3>
                     <p><strong>管理费:</strong> ${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅ 已缴' : '❌ 未缴'}</p>
-                    <p><strong>服务费:</strong> ${Utils.formatCurrency(order.service_fee_amount || 0)} (${order.service_fee_percent || 0}%) ${order.service_fee_paid > 0 ? '✅ 已缴' : '❌ 未缴'}</p>
-                    <p><strong>月利息:</strong> ${Utils.formatCurrency(order.monthly_interest)}</p>
+                    <p><strong>服务费:</strong> ${Utils.formatCurrency(order.service_fee_amount || 0)} (${order.service_fee_percent || 0}%) ${(order.service_fee_paid || 0) >= (order.service_fee_amount || 0) && (order.service_fee_amount || 0) > 0 ? '✅ 已缴' : (order.service_fee_amount || 0) === 0 ? '—' : '❌ 未缴'}</p>
+                    <p><strong>月利息（当前）:</strong> ${Utils.formatCurrency(currentMonthlyInterest)} <small style="color:#64748b">（基于剩余本金 ${Utils.formatCurrency(remainingPrincipal)} × 10%）</small></p>
                     <p><strong>已付利息:</strong> ${order.interest_paid_months} 个月 (${Utils.formatCurrency(order.interest_paid_total)})</p>
                     <p><strong>剩余本金:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
                     <p><strong>下次利息到期日:</strong> ${nextDueDate}</p>
