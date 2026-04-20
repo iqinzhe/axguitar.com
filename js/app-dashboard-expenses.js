@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.0
+// app-dashboard-expenses.js - v2.0
 
 window.APP = window.APP || {};
 
@@ -56,6 +56,7 @@ const DashboardExpenses = {
                 categoryOptions += `<option value="${cat}">${cat}</option>`;
             }
 
+            // 移除导出CSV按钮，只保留打印和返回
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
@@ -296,3 +297,5 @@ for (var key in DashboardExpenses) {
         window.APP[key] = DashboardExpenses[key];
     }
 }
+
+console.log('✅ app-dashboard-expenses.js v2.0 已加载 - 移除导出CSV，简化打印');
