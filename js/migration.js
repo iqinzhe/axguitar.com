@@ -1,3 +1,5 @@
+// migration.js - 完整修复版 v1.1
+
 const Migration = {
     isMigrating: false,
     progress: { total: 0, current: 0, success: 0, failed: 0, skipped: 0 },
@@ -137,6 +139,20 @@ const Migration = {
             return null;
         }
     },
+    
+    // 清理旧 localStorage 数据
+    clearOldLocalStorage() {
+        const keysToCheck = ['jf_enterprise_db', 'jf_gadai_backup', 'jf_orders_backup'];
+        let clearedCount = 0;
+        for (const key of keysToCheck) {
+            if (localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+                clearedCount++;
+                console.log(`✅ 已清理旧数据: ${key}`);
+            }
+        }
+        return clearedCount;
+    },
 
     resetProgress() {
         this.progress = { total: 0, current: 0, success: 0, failed: 0, skipped: 0 };
@@ -173,7 +189,15 @@ const Migration = {
             if (this.failedOrders.length > 5) msg += '...';
         }
         alert(msg);
-        if (this.progress.success > 0) location.reload();
+        
+        if (this.progress.success > 0) {
+            // 迁移成功后清理旧 localStorage 数据
+            const cleared = this.clearOldLocalStorage();
+            if (cleared > 0) {
+                console.log(`✅ 迁移完成，已清理 ${cleared} 个旧存储键`);
+            }
+            location.reload();
+        }
     },
 
     renderMigrationUI() {
@@ -190,8 +214,8 @@ const Migration = {
                 <h3>${lang === 'id' ? 'Migrasi dari localStorage ke Supabase' : '从 localStorage 迁移到 Supabase'}</h3>
                 <p class="migration-info">
                     ${lang === 'id'
-                        ? '• Data yang sudah ada di Supabase akan dilewati otomatis<br>• Migrasi berjalan paralel (lebih cepat)<br>• Jika gagal sebagian, data yang sudah berhasil tetap tersimpan'
-                        : '• 已存在于 Supabase 的数据将自动跳过<br>• 并行迁移（速度更快）<br>• 部分失败不影响已成功的记录'}
+                        ? '• Data yang sudah ada di Supabase akan dilewati otomatis<br>• Migrasi berjalan paralel (lebih cepat)<br>• Jika gagal sebagian, data yang sudah berhasil tetap tersimpan<br>• Setelah migrasi selesai, data localStorage lama akan dihapus otomatis'
+                        : '• 已存在于 Supabase 的数据将自动跳过<br>• 并行迁移（速度更快）<br>• 部分失败不影响已成功的记录<br>• 迁移完成后，旧 localStorage 数据将自动删除'}
                 </p>
                 <p class="migration-warning">
                     ⚠️ ${lang === 'id' ? 'Pastikan Anda sudah login sebagai admin sebelum migrasi.' : '请确保在迁移前已以管理员身份登录。'}
@@ -214,3 +238,5 @@ const Migration = {
 };
 
 window.Migration = Migration;
+
+console.log('✅ migration.js v1.1 已加载 - 迁移完成后自动清理旧 localStorage');
