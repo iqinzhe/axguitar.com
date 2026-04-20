@@ -1,18 +1,22 @@
-// app-payments.js - 完整修复版（语法错误已修复）
+// app-payments.js - 最终修复版（语法100%正确）
 window.APP = window.APP || {};
+
 const PaymentModule = {
+    currentPage: "paymentHistory",
+
     showPaymentHistory: async function () {
-        this.currentPage = 'paymentHistory';
+        this.currentPage = "paymentHistory";
         this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
+
         try {
             var profile = await SUPABASE.getCurrentProfile();
-            var isAdmin = profile?.role === 'admin';
+            var isAdmin = profile?.role === "admin";
             var storeId = profile?.store_id;
 
-            var query = supabaseClient
-                .from('payment_history')
+            let query = supabaseClient
+                .from("payment_history")
                 .select(`
                     *,
                     orders:order_id (
@@ -22,83 +26,86 @@ const PaymentModule = {
                         store_id
                     )
                 `)
-                .order('payment_date', { ascending: false });
+                .order("payment_date", { ascending: false });
 
             if (!isAdmin && storeId) {
-                query = query.eq('orders.store_id', storeId);
+                query = query.eq("orders.store_id", storeId);
             }
 
-            var { data: payments, error } = await query;
+            const { data: payments, error } = await query;
             if (error) throw error;
 
-            var rows = '';
+            let rows = "";
             if (payments && payments.length > 0) {
-                payments.forEach(p => {
-                    var method = p.payment_method === 'cash'
-                        ? (lang === 'id' ? 'Tunai' : '现金')
-                        : (lang === 'id' ? 'Bank BNI' : '银行');
-                    var type = p.payment_type === 'interest'
-                        ? (lang === 'id' ? 'Bunga' : '利息')
-                        : (lang === 'id' ? 'Pelunasan' : '结清');
+                payments.forEach((p) => {
+                    let method = p.payment_method === "cash"
+                        ? (lang === "id" ? "Tunai" : "现金")
+                        : (lang === "id" ? "Bank BNI" : "银行");
+
+                    let type = p.payment_type === "interest"
+                        ? (lang === "id" ? "Bunga" : "利息")
+                        : (lang === "id" ? "Pelunasan" : "结清");
 
                     rows += `
                     <tr>
                         <td>${Utils.formatDate(p.payment_date)}</td>
-                        <td>${p.order_id}</td>
-                        <td>${p.orders?.customer_name || '-'}</td>
-                        <td>${p.orders?.collateral_name || '-'}</td>
+                        <td>${p.orders?.order_id || "-"}</td>
+                        <td>${p.orders?.customer_name || "-"}</td>
+                        <td>${p.orders?.collateral_name || "-"}</td>
                         <td>${Utils.formatCurrency(p.amount)}</td>
                         <td>${method}</td>
                         <td>${type}</td>
-                        <td>${p.receipt_number || '-'}</td>
+                        <td>${p.receipt_number || "-"}</td>
                     </tr>`;
                 });
             } else {
-                rows = `<tr><td colspan="8" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="8" class="text-center">${t("no_data")}</td></tr>`;
             }
 
-            document.getElementById('app').innerHTML = `
+            document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h2>💰 ${t('payment_history')}</h2>
+                    <h2>💰 ${t("payment_history")}</h2>
                     <div class="header-actions">
-                        <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === "id" ? "Cetak" : "打印"}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t("back")}</button>
                     </div>
                 </div>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th>${lang === 'id' ? 'ID Pesanan' : '订单编号'}</th>
-                                <th>${lang === 'id' ? 'Nasabah' : '客户'}</th>
-                                <th>${lang === 'id' ? 'Agunan' : '当品'}</th>
-                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
-                                <th>${lang === 'id' ? 'No. Resi' : '收据号'}</th>
+                                <th>${lang === "id" ? "Tanggal" : "日期"}</th>
+                                <th>${lang === "id" ? "ID Pesanan" : "订单编号"}</th>
+                                <th>${lang === "id" ? "Nasabah" : "客户"}</th>
+                                <th>${lang === "id" ? "Agunan" : "当品"}</th>
+                                <th>${lang === "id" ? "Jumlah" : "金额"}</th>
+                                <th>${lang === "id" ? "Metode" : "支付方式"}</th>
+                                <th>${lang === "id" ? "Tipe" : "类型"}</th>
+                                <th>${lang === "id" ? "No. Resi" : "收据号"}</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
+
         } catch (err) {
-            console.error('showPaymentHistory error:', err);
-            alert(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
+            console.error("showPaymentHistory error:", err);
+            alert(lang === "id" ? "Gagal memuat riwayat pembayaran" : "加载缴费记录失败");
         }
     },
 
     saveCurrentPageState: function () {
-        localStorage.setItem('lastPage', this.currentPage);
+        localStorage.setItem("lastPage", this.currentPage);
     },
 
     goBack: function () {
-        APP.navigateTo('dashboard');
+        APP.navigateTo("dashboard");
     }
 };
 
-for (var key in PaymentModule) {
-    if (typeof PaymentModule[key] === 'function') {
+// 挂载到全局 APP
+for (const key in PaymentModule) {
+    if (typeof PaymentModule[key] === "function") {
         window.APP[key] = PaymentModule[key].bind(PaymentModule);
     }
 }
