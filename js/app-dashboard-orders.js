@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.3（移除搜索功能版）
+// app-dashboard-orders.js - v2.4（修复图标重复 + 移除搜索功能）- 完整版
 
 window.APP = window.APP || {};
 
@@ -170,30 +170,20 @@ const DashboardOrders = {
                 font-weight: 500;
                 color: var(--gray-800);
             }
-            .order-collateral::before {
-                content: "💎";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .order-collateral {
+                margin-left: 2px;
             }
-            .order-amount::before {
-                content: "💰";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .order-amount {
+                margin-left: 2px;
             }
-            .order-interest::before {
-                content: "📈";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .order-interest {
+                margin-left: 2px;
             }
-            .order-paid::before {
-                content: "✅";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .order-paid {
+                margin-left: 2px;
             }
-            .order-store::before {
-                content: "🏪";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .order-store {
+                margin-left: 2px;
             }
             .order-line1 span,
             .order-line2 span {
@@ -245,7 +235,6 @@ const DashboardOrders = {
         container.addEventListener('click', this._orderTableClickHandler);
     },
 
-    // 只保留状态筛选，移除搜索相关方法
     filterOrders: function(status) { 
         this.currentFilter = status; 
         this.showOrderTable(); 
@@ -561,7 +550,17 @@ const DashboardOrders = {
                 <div class="table-container">
                     <table class="payment-table">
                         <thead>
-                            <tr><th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th><th>${Utils.t('customer_name')}</th><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th>${lang === 'id' ? 'Bulan' : '月数'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr>
+                            <tr>
+                                <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
+                                <th>${Utils.t('customer_name')}</th>
+                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
+                            </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -603,4 +602,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v2.3 已加载 - 移除搜索功能');
+console.log('✅ app-dashboard-orders.js v2.4 已加载 - 修复图标重复 + 移除搜索功能');
