@@ -1,9 +1,4 @@
-// app-dashboard-report.js
-// 修复内容：
-// 1. 净利计算剔除本金回收（principal 不计入收入）
-// 2. 区分「毛利」和「现金净利」
-// 3. 移除无意义的 cashBalance + bankBalance + profitBalance 相加
-// 4. 优化报表指标命名
+// app-dashboard-report.js - v2.0
 
 window.APP = window.APP || {};
 
@@ -84,7 +79,7 @@ const DashboardReport = {
                 var grandTotal = { 
                     orders: 0, active: 0, loan: 0, adminFee: 0, serviceFee: 0, interest: 0, 
                     principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0, 
-                    grossProfit: 0, netProfit: 0  // 毛利和现金净利分开
+                    grossProfit: 0, netProfit: 0
                 };
 
                 for (var store of stores) {
@@ -102,38 +97,27 @@ const DashboardReport = {
                     const totalPrincipal = ords.reduce((s, o) => s + (o.principal_paid || 0), 0);
                     const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
                     
-                    // 毛利 = 管理费 + 服务费 + 利息（不含本金）
                     const grossProfit = totalAdminFee + totalServiceFee + totalInterest;
                     
-                    // 基于资金流计算现金和银行余额
                     let cashBalance = 0, bankBalance = 0;
-                    // 现金净利 = 所有收入类资金流入 - 所有支出类资金流出（不含本金）
-                    let totalIncomeInflow = 0;   // 收入类流入（admin_fee, service_fee, interest）
-                    let totalOutflow = 0;          // 所有流出（loan_disbursement, expense）
+                    let totalIncomeInflow = 0;
+                    let totalOutflow = 0;
                     
                     for (const flow of flows) {
                         const amount = flow.amount || 0;
-                        // 计算余额
                         if (flow.direction === 'inflow') {
                             if (flow.source_target === 'cash') cashBalance += amount;
                             else if (flow.source_target === 'bank') bankBalance += amount;
-                        } else if (flow.direction === 'outflow') {
-                            if (flow.source_target === 'cash') cashBalance -= amount;
-                            else if (flow.source_target === 'bank') bankBalance -= amount;
-                        }
-                        
-                        // 计算现金净利：只将收入类（不含本金）计入流入，所有流出都计入
-                        if (flow.direction === 'inflow') {
-                            // 本金回款（principal）不计入净利
                             if (flow.flow_type !== 'principal') {
                                 totalIncomeInflow += amount;
                             }
                         } else if (flow.direction === 'outflow') {
+                            if (flow.source_target === 'cash') cashBalance -= amount;
+                            else if (flow.source_target === 'bank') bankBalance -= amount;
                             totalOutflow += amount;
                         }
                     }
                     
-                    // 现金净利 = 收入类流入 - 所有流出
                     const netProfit = totalIncomeInflow - totalOutflow;
 
                     storeReports.push({ 
@@ -146,8 +130,8 @@ const DashboardReport = {
                         totalInterest, 
                         totalPrincipal, 
                         totalExpenses, 
-                        grossProfit,    // 毛利
-                        netProfit,      // 现金净利
+                        grossProfit,
+                        netProfit,
                         cashBalance,
                         bankBalance
                     });
@@ -187,11 +171,11 @@ const DashboardReport = {
                         </div>
                     </div>`).join('');
 
+                // 移除导出CSV按钮，只保留打印和返回
                 document.getElementById("app").innerHTML = `
                     <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
                         <div class="header-actions">
-                            <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                             <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                             <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>                      
                         </div>
@@ -237,9 +221,7 @@ const DashboardReport = {
                 const storeOrderIds = storeOrders.map(o => o.id);
                 const storePayments = allPayments.filter(p => storeOrderIds.includes(p.order_id));
                 
-                // 基于资金流计算现金和银行余额
                 let cashBalance = 0, bankBalance = 0;
-                // 现金净利 = 收入类流入 - 所有流出（不含本金）
                 let totalIncomeInflow = 0;
                 let totalOutflow = 0;
                 
@@ -248,7 +230,6 @@ const DashboardReport = {
                     if (flow.direction === 'inflow') {
                         if (flow.source_target === 'cash') cashBalance += amount;
                         else if (flow.source_target === 'bank') bankBalance += amount;
-                        // 本金回款（principal）不计入净利
                         if (flow.flow_type !== 'principal') {
                             totalIncomeInflow += amount;
                         }
@@ -259,7 +240,6 @@ const DashboardReport = {
                     }
                 }
                 
-                // 现金净利 = 收入类流入 - 所有流出
                 const netProfit = totalIncomeInflow - totalOutflow;
                 
                 const totalLoan = storeOrders.reduce((s, o) => s + (o.loan_amount || 0), 0);
@@ -268,15 +248,13 @@ const DashboardReport = {
                 const totalInterest = storeOrders.reduce((s, o) => s + (o.interest_paid_total || 0), 0);
                 const totalPrincipal = storeOrders.reduce((s, o) => s + (o.principal_paid || 0), 0);
                 const totalExpenses = storeExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-                
-                // 毛利 = 管理费 + 服务费 + 利息（不含本金）
                 const grossProfit = totalAdminFee + totalServiceFee + totalInterest;
 
+                // 移除导出CSV按钮，只保留打印和返回
                 document.getElementById("app").innerHTML = `
                     <div class="page-header">
                         <h2>📊 ${t('financial_report')}</h2>
                         <div class="header-actions">                            
-                            <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                             <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                             <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                         </div>
@@ -308,9 +286,7 @@ const DashboardReport = {
                     </div>`;
             }
             
-            // 更新 cashFlow 对象，添加 netProfit 字段供 admin 视图使用
             if (typeof cashFlow.netProfit === 'undefined') {
-                // 计算整体现金净利（不含本金）
                 let totalIncomeInflow = 0, totalOutflowAll = 0;
                 for (const flow of cashFlows) {
                     if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
@@ -334,3 +310,5 @@ for (var key in DashboardReport) {
         window.APP[key] = DashboardReport[key];
     }
 }
+
+console.log('✅ app-dashboard-report.js v2.0 已加载 - 移除导出CSV，简化打印');
