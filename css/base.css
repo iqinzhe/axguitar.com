@@ -1,4 +1,4 @@
-/* base.css - v1.2 精简版（只保留全局基础样式） */
+/* base.css - v1.3 修复Logo尺寸 + 精简版 */
 
 /* =====================================================
    全局变量
@@ -73,6 +73,29 @@ body {
     background: var(--gray-50);
     color: var(--gray-800);
     line-height: 1.5;
+}
+
+/* =====================================================
+   Logo 图片统一大小 - 修复：使用em相对单位
+   ===================================================== */
+h1 img,
+.page-header h1 img {
+    height: 1.8em;
+    width: auto;
+    vertical-align: middle;
+}
+
+.login-logo {
+    height: 1.8em;
+    width: auto;
+    vertical-align: middle;
+}
+
+@media (max-width: 480px) {
+    h1 img,
+    .page-header h1 img {
+        height: 1.6em;
+    }
 }
 
 /* =====================================================
@@ -718,9 +741,6 @@ tbody tr:hover {
     .login-title {
         font-size: 1.1rem;
         gap: 4px;
-    }
-    .login-logo {
-        height: 20px;
     }
 }
 
