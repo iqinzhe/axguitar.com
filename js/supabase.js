@@ -1,4 +1,4 @@
-// supabase.js - v1.0
+// supabase.js - v4.1（移除搜索功能）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -338,10 +338,9 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
-    // ==================== 修复：移除 stores 联表，避免多外键歧义 ====================
+    // 修复：移除搜索条件
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
-        // 只查询 orders 表，不再联表 stores
         let query = supabaseClient.from('orders').select('*');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
@@ -351,11 +350,8 @@ const SupabaseAPI = {
         if (filters.status && filters.status !== 'all') {
             query = query.eq('status', filters.status);
         }
-        if (filters.search) {
-            query = query.or(
-                `customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,order_id.ilike.%${filters.search}%`
-            );
-        }
+        // 搜索功能已移除
+        
         query = query.order('created_at', { ascending: false });
         
         const { data, error } = await query;
@@ -366,7 +362,7 @@ const SupabaseAPI = {
     async getOrder(orderId) {
         const { data, error } = await supabaseClient
             .from('orders')
-            .select('*')  // 移除 stores 联表
+            .select('*')
             .eq('order_id', orderId)
             .single();
         if (error) throw error;
@@ -513,7 +509,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 服务费一次性收取
     async recordServiceFee(orderId, months, paymentMethod = 'cash') {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -944,7 +939,6 @@ const SupabaseAPI = {
     async getAllPayments() {
         const profile = await this.getCurrentProfile();
         
-        // 修复：必须同时查询 order_id 和 customer_name，否则缴费明细中这两列会显示"-"
         let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
@@ -1044,8 +1038,6 @@ const SupabaseAPI = {
 
     async getCustomers(filters = {}) {
         const profile = await this.getCurrentProfile();
-        // 不使用联表查询 stores，避免因外键或 RLS 权限问题导致加载失败
-        // 门店信息由调用方通过 getAllStores() 单独获取
         let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
@@ -1496,4 +1488,4 @@ const SupabaseAPI = {
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
 
-console.log('✅ supabase.js v4.0 已加载（移除 orders 与 stores 联表查询）');
+console.log('✅ supabase.js v4.1 已加载 - 移除搜索功能');
