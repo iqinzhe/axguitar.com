@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.5（修复缴费按钮事件绑定）
+// app-dashboard-orders.js - v2.7（修复事件绑定，使用全局委托）
 
 window.APP = window.APP || {};
 
@@ -91,7 +91,11 @@ const DashboardOrders = {
                 </div>`;
             
             this._addOrderDoubleRowStyles();
-            this._bindOrderTableEvents();
+            
+            // 延迟绑定事件，确保 DOM 完全渲染
+            setTimeout(() => {
+                this._bindOrderTableEvents();
+            }, 100);
             
         } catch (err) {
             console.error("showOrderTable error:", err);
@@ -210,17 +214,16 @@ const DashboardOrders = {
     },
     
     _bindOrderTableEvents: function() {
-        const container = document.getElementById('app');
-        if (!container) return;
+        console.log('绑定订单表格事件...');
         
-        // 移除旧的事件监听器避免重复
-        if (this._orderTableClickHandler) {
-            container.removeEventListener('click', this._orderTableClickHandler);
+        // 使用 document 全局委托，确保能捕获所有点击
+        if (this._globalClickHandler) {
+            document.removeEventListener('click', this._globalClickHandler);
         }
         
-        this._orderTableClickHandler = (e) => {
+        this._globalClickHandler = (e) => {
             const target = e.target;
-            const btn = target.closest('.view-order-btn, .payment-btn, .delete-order-btn, .print-order-btn');
+            const btn = target.closest('.payment-btn, .view-order-btn, .delete-order-btn, .print-order-btn');
             if (!btn) return;
             
             const orderId = btn.getAttribute('data-order-id');
@@ -229,18 +232,23 @@ const DashboardOrders = {
             e.preventDefault();
             e.stopPropagation();
             
+            console.log('点击按钮:', btn.className, '订单ID:', orderId);
+            
             if (btn.classList.contains('view-order-btn')) {
-                APP.navigateTo('viewOrder', { orderId: orderId });
+                console.log('查看订单:', orderId);
+                window.APP.navigateTo('viewOrder', { orderId: orderId });
             } else if (btn.classList.contains('payment-btn')) {
-                console.log('缴费按钮被点击，订单ID:', orderId);
-                APP.navigateTo('payment', { orderId: orderId });
+                console.log('缴费按钮被点击，跳转到缴费页面:', orderId);
+                window.APP.navigateTo('payment', { orderId: orderId });
             } else if (btn.classList.contains('delete-order-btn')) {
-                APP.deleteOrder(orderId);
+                window.APP.deleteOrder(orderId);
             } else if (btn.classList.contains('print-order-btn')) {
-                APP.printOrder(orderId);
+                window.APP.printOrder(orderId);
             }
         };
-        container.addEventListener('click', this._orderTableClickHandler);
+        
+        document.addEventListener('click', this._globalClickHandler);
+        console.log('✅ 订单表格事件绑定完成');
     },
 
     filterOrders: function(status) { 
@@ -269,12 +277,12 @@ const DashboardOrders = {
                 for (var p of payments) {
                     var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'service_fee' ? (lang === 'id' ? 'Service Fee' : '服务费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
                     payRows += `<tr>
-                        <td>${Utils.formatDate(p.date)}</td>
-                        <td>${typeText}</td>
-                        <td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
-                        <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
-                        <td>${Utils.escapeHtml(p.description || '-')}</td>
+                        <td>${Utils.formatDate(p.date)}<\/td>
+                        <td>${typeText}<\/td>
+                        <td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}<\/td>
+                        <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}<\/span><\/td>
+                        <td>${Utils.escapeHtml(p.description || '-')}<\/td>
                     <\/tr>`;
                 }
             } else {
@@ -418,10 +426,10 @@ const DashboardOrders = {
                 var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'));
                 
                 paymentRows += `<tr>
-                    <td>${Utils.escapeHtml(Utils.formatDate(p.date))}</td>
-                    <td>${Utils.escapeHtml(typeText)}</td>
-                    <td class="text-right">${Utils.escapeHtml(Utils.formatCurrency(p.amount))}</td>
-                    <td>${Utils.escapeHtml(methodText)}</td>
+                    <td>${Utils.escapeHtml(Utils.formatDate(p.date))}<\/td>
+                    <td>${Utils.escapeHtml(typeText)}<\/td>
+                    <td class="text-right">${Utils.escapeHtml(Utils.formatCurrency(p.amount))}<\/td>
+                    <td>${Utils.escapeHtml(methodText)}<\/td>
                 <\/tr>`;
             }
             
@@ -527,15 +535,15 @@ const DashboardOrders = {
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
-                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td class="customer-name">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${typeMap[p.type] || p.type}</td>
-                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                    <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
-                    <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    <td class="action-cell"><button class="view-order-from-payment" data-order-id="${Utils.escapeAttr(p.orders?.order_id || '')}" class="btn-small">👁️ ${Utils.t('view')}</button></td>
+                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
+                    <td class="customer-name">${Utils.escapeHtml(p.orders?.customer_name || '-')}<\/td>
+                    <td>${Utils.formatDate(p.date)}<\/td>
+                    <td>${typeMap[p.type] || p.type}<\/td>
+                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                    <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}<\/span><\/td>
+                    <td>${Utils.escapeHtml(p.description || '-')}<\/td>
+                    <td class="action-cell"><button class="view-order-from-payment" data-order-id="${Utils.escapeAttr(p.orders?.order_id || '')}" class="btn-small">👁️ ${Utils.t('view')}<\/button><\/td>
                 <\/tr>`).join('');
 
             document.getElementById("app").innerHTML = `
@@ -591,6 +599,7 @@ const DashboardOrders = {
     }
 };
 
+// 辅助函数
 function escapeAttr(str) {
     if (!str) return '';
     return String(str)
@@ -600,6 +609,7 @@ function escapeAttr(str) {
         .replace(/`/g, '&#96;');
 }
 
+// 合并到 window.APP
 for (var key in DashboardOrders) {
     if (typeof DashboardOrders[key] === 'function') {
         window.APP[key] = DashboardOrders[key];
@@ -610,4 +620,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v2.5 已加载 - 修复缴费按钮事件绑定');
+console.log('✅ app-dashboard-orders.js v2.7 已加载 - 使用 document 全局委托');
