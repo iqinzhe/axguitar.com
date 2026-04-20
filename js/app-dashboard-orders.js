@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.4（修复图标重复 + 移除搜索功能）- 完整版
+// app-dashboard-orders.js - v2.5（修复缴费按钮事件绑定）
 
 window.APP = window.APP || {};
 
@@ -45,8 +45,8 @@ const DashboardOrders = {
                                         ${isAdmin ? `<span class="order-store">🏪 ${Utils.escapeHtml(storeName)}</span>` : ''}
                                     </div>
                                 </div>
-                            </td>
-                        </tr>
+                            <\/td>
+                        <\/tr>
                     `;
                     
                     rows += `
@@ -56,8 +56,8 @@ const DashboardOrders = {
                                 ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                                 ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🗑️ ${t('delete')}</button>` : ''}
                                 <button class="btn-small print-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                            </td>
-                        </tr>
+                            <\/td>
+                        <\/tr>
                     `;
                 }
             }
@@ -213,7 +213,11 @@ const DashboardOrders = {
         const container = document.getElementById('app');
         if (!container) return;
         
-        container.removeEventListener('click', this._orderTableClickHandler);
+        // 移除旧的事件监听器避免重复
+        if (this._orderTableClickHandler) {
+            container.removeEventListener('click', this._orderTableClickHandler);
+        }
+        
         this._orderTableClickHandler = (e) => {
             const target = e.target;
             const btn = target.closest('.view-order-btn, .payment-btn, .delete-order-btn, .print-order-btn');
@@ -222,9 +226,13 @@ const DashboardOrders = {
             const orderId = btn.getAttribute('data-order-id');
             if (!orderId) return;
             
+            e.preventDefault();
+            e.stopPropagation();
+            
             if (btn.classList.contains('view-order-btn')) {
                 APP.navigateTo('viewOrder', { orderId: orderId });
             } else if (btn.classList.contains('payment-btn')) {
+                console.log('缴费按钮被点击，订单ID:', orderId);
                 APP.navigateTo('payment', { orderId: orderId });
             } else if (btn.classList.contains('delete-order-btn')) {
                 APP.deleteOrder(orderId);
@@ -602,4 +610,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v2.4 已加载 - 修复图标重复 + 移除搜索功能');
+console.log('✅ app-dashboard-orders.js v2.5 已加载 - 修复缴费按钮事件绑定');
