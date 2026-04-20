@@ -944,7 +944,8 @@ const SupabaseAPI = {
     async getAllPayments() {
         const profile = await this.getCurrentProfile();
         
-        let orderQuery = supabaseClient.from('orders').select('id');
+        // 修复：必须同时查询 order_id 和 customer_name，否则缴费明细中这两列会显示"-"
+        let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             orderQuery = orderQuery.eq('store_id', profile.store_id);
@@ -1043,7 +1044,9 @@ const SupabaseAPI = {
 
     async getCustomers(filters = {}) {
         const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('customers').select('*, stores(name, code)').order('registered_date', { ascending: false });
+        // 不使用联表查询 stores，避免因外键或 RLS 权限问题导致加载失败
+        // 门店信息由调用方通过 getAllStores() 单独获取
+        let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
