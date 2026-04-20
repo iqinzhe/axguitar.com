@@ -1,9 +1,8 @@
-/* base.css - 完整修复版 v1.1 */
+/* base.css - v1.2 精简版（只保留全局基础样式） */
 
 /* =====================================================
-   base.css - v1.1  ===================================================== */
-
-/* ---------- 1. 全局变量 ---------- */
+   全局变量
+   ===================================================== */
 :root {
     --primary: #2563eb;
     --primary-light: #60a5fa;
@@ -55,7 +54,9 @@
     --transition: all 0.2s ease;
 }
 
-/* ---------- 2. 重置与基础 ---------- */
+/* =====================================================
+   重置与基础
+   ===================================================== */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -74,29 +75,9 @@ body {
     line-height: 1.5;
 }
 
-/* ---------- 3. Logo 图片统一大小 ---------- */
-h1 img,
-.page-header h1 img {
-    height: 32px;
-    width: auto;
-    vertical-align: middle;
-}
-
-.login-logo {
-    height: 32px;
-    width: auto;
-    vertical-align: middle;
-}
-
-@media (max-width: 480px) {
-    h1 img,
-    .page-header h1 img,
-    h1 img {
-        height: 32px;
-    }
-}
-
-/* ---------- 4. 布局容器 ---------- */
+/* =====================================================
+   布局容器
+   ===================================================== */
 #app {
     max-width: 1400px;
     margin: 0 auto;
@@ -110,7 +91,9 @@ h1 img,
     padding: 0 var(--spacing-4);
 }
 
-/* ---------- 5. 卡片组件 ---------- */
+/* =====================================================
+   卡片组件
+   ===================================================== */
 .card {
     background: white;
     border-radius: var(--radius-lg);
@@ -133,7 +116,9 @@ h1 img,
     border-bottom: 1px solid var(--gray-200);
 }
 
-/* ---------- 6. 页面头部 ---------- */
+/* =====================================================
+   页面头部
+   ===================================================== */
 .page-header {
     display: flex;
     justify-content: space-between;
@@ -158,9 +143,8 @@ h1 img,
 }
 
 /* =====================================================
-   按钮样式  ===================================================== */
-
-/* 基础按钮样式 */
+   按钮样式
+   ===================================================== */
 button {
     padding: var(--spacing-2) var(--spacing-4);
     border-radius: var(--radius-md);
@@ -188,7 +172,6 @@ button:disabled {
     transform: none;
 }
 
-/* 小按钮 */
 .btn-small {
     padding: 4px 10px;
     font-size: 0.75rem;
@@ -201,7 +184,6 @@ button:disabled {
     background: var(--gray-200);
 }
 
-/* 返回按钮 */
 .btn-back {
     background: var(--gray-100);
     border: 1px solid var(--gray-200);
@@ -213,7 +195,6 @@ button:disabled {
     color: var(--gray-700);
 }
 
-/* 打印按钮 */
 .btn-print {
     background: var(--gray-600);
     color: white;
@@ -223,7 +204,6 @@ button:disabled {
     background: var(--gray-700);
 }
 
-/* 导出按钮 */
 .btn-export {
     background: var(--success);
     color: white;
@@ -233,7 +213,6 @@ button:disabled {
     background: var(--success-dark);
 }
 
-/* 平账按钮 */
 .btn-balance {
     background: var(--warning);
     color: white;
@@ -243,7 +222,6 @@ button:disabled {
     background: var(--warning-dark);
 }
 
-/* 详情按钮 */
 .btn-detail {
     background: var(--primary);
     color: white;
@@ -253,7 +231,6 @@ button:disabled {
     background: var(--primary-dark);
 }
 
-/* 成功按钮（绿色） */
 button.success,
 .btn-success {
     background: var(--success);
@@ -265,7 +242,6 @@ button.success:hover,
     background: var(--success-dark);
 }
 
-/* 警告按钮（橙色） */
 button.warning,
 .btn-warning {
     background: var(--warning);
@@ -277,7 +253,6 @@ button.warning:hover,
     background: var(--warning-dark);
 }
 
-/* 危险按钮（红色） */
 button.danger,
 .btn-danger {
     background: var(--danger);
@@ -289,20 +264,6 @@ button.danger:hover,
     background: var(--danger-dark);
 }
 
-/* 高亮提醒按钮 */
-.warning.highlight {
-    background: var(--warning);
-    color: white;
-    box-shadow: 0 0 0 2px var(--warning-light);
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 var(--warning-light); }
-    50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3); }
-}
-
-/* 资金管理按钮 */
 .capital-btn {
     background: var(--primary);
     color: white;
@@ -314,7 +275,6 @@ button.danger:hover,
     background: var(--primary-dark);
 }
 
-/* 转账按钮 */
 .transfer-btn {
     padding: var(--spacing-2) var(--spacing-3);
     font-size: var(--font-xs);
@@ -345,7 +305,6 @@ button.danger:hover,
     transform: translateY(-1px);
 }
 
-/* 缴费操作按钮 */
 .btn-action {
     padding: 12px 20px;
     font-size: var(--font-sm);
@@ -354,9 +313,8 @@ button.danger:hover,
 }
 
 /* =====================================================
-   统计卡片网格 - 电脑端：固定4列2行
+   统计卡片网格
    ===================================================== */
-
 .stats-grid-optimized {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -368,7 +326,7 @@ button.danger:hover,
     background: white;
     border-radius: var(--radius-lg);
     border: 1px solid var(--gray-200);
-    padding: var(--spacing-3) var(--spacing-2);  /* 修复：上下内边距增至 12px */
+    padding: var(--spacing-3) var(--spacing-2);
     text-align: center;
     transition: var(--transition);
 }
@@ -398,7 +356,6 @@ button.danger:hover,
     font-weight: 500;
 }
 
-/* 统计网格（用于报表页） */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -407,9 +364,8 @@ button.danger:hover,
 }
 
 /* =====================================================
-   cashflow区块样式 - 电脑端：固定1行3列
+   资金管理区块
    ===================================================== */
-
 .cashflow-summary {
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     border-radius: var(--radius-xl);
@@ -452,15 +408,13 @@ button.danger:hover,
     color: #f87171;
 }
 
-/* 修复：对比度优化 - 使用固定颜色替代 opacity */
 .cashflow-detail {
-    font-size: 0.75rem;      /* 原 0.7rem → 提高 */
-    color: #94a3b8;          /* 替代 opacity，更可控 */
+    font-size: 0.75rem;
+    color: #94a3b8;
     margin-top: var(--spacing-2);
     line-height: 1.4;
 }
 
-/* 内部转账区块 */
 .internal-transfer-item {
     grid-column: span 1;
 }
@@ -472,7 +426,6 @@ button.danger:hover,
     margin-bottom: var(--spacing-2);
 }
 
-/* 资金汇总区块（用于报表页轻量版） */
 .cashflow-summary.light {
     background: white;
     border: 1px solid var(--gray-200);
@@ -489,12 +442,8 @@ button.danger:hover,
 }
 
 /* =====================================================
-   工具栏 - 电脑端网格布局
-   管理员：5列2行（共10个按钮）
-   门店：6列1行（共6个按钮）
-   注：网格列数由 JS 动态添加类名控制，CSS 提供基础样式
+   工具栏
    ===================================================== */
-
 .toolbar {
     display: grid;
     gap: var(--spacing-2);
@@ -505,12 +454,10 @@ button.danger:hover,
     border: 1px solid var(--gray-200);
 }
 
-/* 管理员视图：5列2行 */
 .toolbar.admin-grid {
     grid-template-columns: repeat(5, 1fr);
 }
 
-/* 门店视图：6列1行 */
 .toolbar.store-grid {
     grid-template-columns: repeat(6, 1fr);
 }
@@ -530,18 +477,13 @@ button.danger:hover,
 }
 
 /* =====================================================
-   底部信息栏 - 文字整体缩小
+   表格容器（响应式滑动）
    ===================================================== */
-.card p:last-child,
-.card .info-note,
-.footer-note {
-    font-size: var(--font-xxs);
-    color: var(--gray-500);
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: var(--spacing-3) 0;
 }
-
-/* =====================================================
-   表格样式
-   ===================================================== */
 
 table {
     width: 100%;
@@ -568,18 +510,15 @@ tbody tr:hover {
     background: var(--gray-50);
 }
 
-.table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: var(--spacing-3) 0;
-}
-
 .action-cell {
     display: flex;
     gap: var(--spacing-2);
     flex-wrap: wrap;
 }
 
+/* =====================================================
+   状态徽章
+   ===================================================== */
 .status-badge {
     display: inline-block;
     padding: 4px 10px;
@@ -625,175 +564,6 @@ tbody tr:hover {
     font-family: monospace;
     font-weight: 600;
     color: var(--primary-dark);
-}
-
-.customer-table th,
-.customer-table td {
-    padding: 8px 6px;
-}
-
-.payment-table th,
-.payment-table td {
-    padding: 8px 10px;
-}
-
-.data-table {
-    font-size: 0.75rem;
-}
-
-.data-table th {
-    background: var(--gray-100);
-    font-weight: 600;
-}
-
-.report-store-section {
-    margin-bottom: var(--spacing-5);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-}
-
-.report-store-header {
-    background: var(--primary);
-    color: white;
-    padding: var(--spacing-3) var(--spacing-4);
-    font-weight: 600;
-}
-
-.report-store-stats {
-    padding: var(--spacing-4);
-    background: white;
-}
-
-.report-grid-5x2 {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: var(--spacing-3);
-}
-
-.report-store-stat .label {
-    font-size: 0.7rem;
-    color: var(--gray-500);
-    margin-bottom: 4px;
-}
-
-.report-store-stat .value {
-    font-size: var(--font-sm);
-    font-weight: 600;
-}
-
-.report-store-stat .value.income {
-    color: var(--success);
-}
-
-.report-store-stat .value.expense {
-    color: var(--danger);
-}
-
-.grand-total-card {
-    background: linear-gradient(135deg, var(--primary-soft) 0%, white 100%);
-    margin-bottom: var(--spacing-5);
-}
-
-/* =====================================================
-   缺失业务样式（补充）
-   ===================================================== */
-
-.store-info-banner {
-    background: var(--primary-soft);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-3) var(--spacing-4);
-    margin: var(--spacing-4) 0;
-    font-size: var(--font-xs);
-    color: var(--primary-dark);
-    text-align: center;
-}
-
-.two-col-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-4);
-}
-
-.customer-info-display {
-    background: var(--gray-50);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-4);
-    margin-bottom: var(--spacing-5);
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: var(--spacing-2);
-}
-
-.customer-info-display p {
-    margin: 0;
-    font-size: var(--font-xs);
-}
-
-.address-option {
-    display: flex;
-    gap: var(--spacing-4);
-    margin-bottom: var(--spacing-2);
-}
-
-.address-option label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: normal;
-    cursor: pointer;
-}
-
-.fee-section {
-    background: var(--gray-50);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-3);
-    margin-bottom: var(--spacing-4);
-}
-
-.fee-options {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-2);
-}
-
-.fee-select {
-    width: auto !important;
-    min-width: 120px;
-}
-
-.fee-display {
-    background: var(--success-light);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--font-xs);
-    color: var(--success-dark);
-    font-weight: 500;
-}
-
-.reconciled-badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    background: var(--success-light);
-    color: var(--success-dark);
-}
-
-.locked-badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    background: var(--gray-200);
-    color: var(--gray-600);
-}
-
-.total-expense {
-    color: var(--danger);
-    font-weight: 700;
 }
 
 /* =====================================================
@@ -849,7 +619,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   模态框 - 修复：使用 dvh 单位
+   模态框
    ===================================================== */
 .modal-overlay {
     position: fixed;
@@ -871,7 +641,7 @@ tbody tr:hover {
     padding: var(--spacing-6);
     width: 100%;
     max-width: 550px;
-    max-height: 85dvh;  /* 修复：使用 dvh 单位，兼容 iOS Safari */
+    max-height: 85dvh;
     overflow-y: auto;
 }
 
@@ -1058,189 +828,9 @@ tbody tr:hover {
 .expense { color: var(--danger); }
 
 /* =====================================================
-   缴费页面专用样式
-   ===================================================== */
-.summary-card {
-    background: var(--gray-50);
-    margin-bottom: var(--spacing-4);
-}
-
-.summary-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.summary-table td {
-    padding: 8px 12px;
-    border: none;
-}
-
-.summary-table td.label {
-    font-weight: 600;
-    color: var(--gray-600);
-    width: 110px;
-    background: var(--gray-100);
-    white-space: nowrap;
-}
-
-.summary-table td.value {
-    color: var(--gray-800);
-}
-
-.summary-table td.order-id {
-    font-family: monospace;
-    font-weight: 700;
-    color: var(--primary-dark);
-}
-
-.summary-table tr.divider td {
-    border-top: 1px solid var(--gray-200);
-    padding: 0;
-    height: 1px;
-}
-
-.summary-table tr.paid-row td {
-    background: var(--success-light);
-    font-weight: 500;
-}
-
-.summary-note {
-    font-size: 0.7rem;
-    color: var(--gray-500);
-    margin-top: var(--spacing-3);
-    padding-top: var(--spacing-2);
-    border-top: 1px solid var(--gray-200);
-}
-
-.action-card {
-    margin-bottom: var(--spacing-5);
-}
-
-.action-card .card-header {
-    margin-bottom: var(--spacing-4);
-}
-
-.action-card .card-header h3 {
-    margin-bottom: 0;
-    border-bottom: none;
-}
-
-.action-card .card-body {
-    margin-bottom: var(--spacing-4);
-}
-
-.info-box {
-    background: var(--primary-soft);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-3);
-    margin-bottom: var(--spacing-4);
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--spacing-2);
-}
-
-.info-box.warning-box {
-    background: var(--warning-light);
-}
-
-.info-box strong {
-    font-weight: 700;
-    color: var(--primary-dark);
-}
-
-.action-input-group {
-    margin-bottom: var(--spacing-4);
-}
-
-.action-label {
-    display: block;
-    margin-bottom: var(--spacing-2);
-    font-weight: 500;
-    color: var(--gray-600);
-}
-
-.action-select {
-    width: 100%;
-    padding: 10px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--gray-300);
-    font-size: var(--font-sm);
-}
-
-.action-input {
-    width: 100%;
-    padding: 10px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--gray-300);
-    font-size: var(--font-sm);
-}
-
-.payment-method-group {
-    margin-bottom: var(--spacing-4);
-}
-
-.payment-method-title {
-    font-weight: 500;
-    color: var(--gray-600);
-    margin-bottom: var(--spacing-2);
-}
-
-.payment-method-options {
-    display: flex;
-    gap: var(--spacing-4);
-    flex-wrap: wrap;
-}
-
-.payment-method-options label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    padding: var(--spacing-2) 0;
-}
-
-.card-history {
-    margin-top: var(--spacing-4);
-    padding-top: var(--spacing-4);
-    border-top: 1px solid var(--gray-200);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-.history-title {
-    font-weight: 600;
-    margin-bottom: var(--spacing-3);
-    color: var(--gray-700);
-}
-
-.history-table {
-    width: 100%;
-    font-size: 0.75rem;
-    min-width: 400px;
-}
-
-.history-table th,
-.history-table td {
-    padding: 8px 10px;
-    white-space: nowrap;
-}
-
-/* =====================================================
-   响应式断点 — 平板端（≤1024px）
-   ===================================================== */
-@media (max-width: 1024px) {
-    #app {
-        padding: var(--spacing-4);
-    }
-}
-
-/* =====================================================
    响应式断点 — 手机端（≤768px）
    ===================================================== */
 @media (max-width: 768px) {
-
-    /* --- 布局 --- */
     #app {
         padding: var(--spacing-2) var(--spacing-3);
     }
@@ -1259,12 +849,10 @@ tbody tr:hover {
         justify-content: flex-end;
     }
 
-    /* 手机端：所有字体缩小1号 */
     body, .card, button, .stat-value, .stat-label, .toolbar button {
         font-size: 0.85rem;
     }
 
-    /* --- 资金管理栏：单列 --- */
     .cashflow-stats {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
@@ -1277,15 +865,12 @@ tbody tr:hover {
     .cashflow-item .value {
         font-size: var(--font-md);
     }
-    
-    /* 修复：手机端 cashflow-detail 对比度 */
+
     .cashflow-detail {
         font-size: 0.7rem;
         color: #94a3b8;
-        opacity: 1;
     }
 
-    /* --- 仪表板栏：2列4行 --- */
     .stats-grid-optimized {
         grid-template-columns: repeat(2, 1fr);
         gap: var(--spacing-2);
@@ -1303,18 +888,15 @@ tbody tr:hover {
         font-size: 0.7rem;
     }
 
-    /* --- 工具栏：手机端网格布局 --- */
     .toolbar {
         gap: var(--spacing-2);
         padding: var(--spacing-2);
     }
 
-    /* 管理员视图：2列5行 */
     .toolbar.admin-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    /* 门店视图：3列2行 */
     .toolbar.store-grid {
         grid-template-columns: repeat(3, 1fr);
     }
@@ -1327,27 +909,12 @@ tbody tr:hover {
         word-break: break-word;
     }
 
-    /* 工具栏输入框 */
     .toolbar input,
     .toolbar select {
         font-size: 0.8rem;
         padding: var(--spacing-2);
     }
 
-    /* 底部信息栏：文字再缩小一号 */
-    .card p:last-child,
-    .card .info-note,
-    .footer-note,
-    .summary-note {
-        font-size: 0.65rem;
-    }
-
-    /* --- 双列网格 → 单列 --- */
-    .two-col-grid {
-        grid-template-columns: 1fr;
-    }
-
-    /* --- 表单 --- */
     .form-grid {
         grid-template-columns: 1fr;
     }
@@ -1371,7 +938,6 @@ tbody tr:hover {
         font-size: 0.9rem;
     }
 
-    /* 按钮最小触摸高度 */
     button {
         min-height: 44px;
     }
@@ -1386,7 +952,6 @@ tbody tr:hover {
         padding: 14px 20px;
     }
 
-    /* --- 模态框 --- */
     .modal-overlay {
         padding: var(--spacing-3);
         align-items: flex-start;
@@ -1396,7 +961,7 @@ tbody tr:hover {
         margin-top: 10vh;
         padding: var(--spacing-4);
         max-width: calc(100% - 32px);
-        max-height: 75dvh;  /* 修复：使用 dvh 单位 */
+        max-height: 75dvh;
     }
 
     .modal-actions {
@@ -1410,7 +975,6 @@ tbody tr:hover {
         padding: 12px;
     }
 
-    /* 转账按钮手机端 */
     .transfer-buttons {
         flex-direction: column;
     }
@@ -1421,61 +985,8 @@ tbody tr:hover {
         min-height: 44px;
     }
 
-    /* 操作列按钮组 */
     .action-cell {
         flex-wrap: wrap;
-    }
-
-    /* 缴费页面手机端适配 */
-    .summary-table,
-    .summary-table tbody,
-    .summary-table tr,
-    .summary-table td {
-        display: block;
-        width: 100%;
-    }
-
-    .summary-table tr.divider {
-        display: none;
-    }
-
-    .summary-table tr {
-        display: flex;
-        flex-wrap: wrap;
-        border-bottom: 1px solid var(--gray-200);
-        padding: var(--spacing-1) 0;
-    }
-
-    .summary-table tr:last-child {
-        border-bottom: none;
-    }
-
-    .summary-table td.label {
-        width: 40%;
-        min-width: 90px;
-        font-size: 0.7rem;
-        padding: 6px 8px;
-    }
-
-    .summary-table td.value {
-        width: 60%;
-        font-size: 0.7rem;
-        padding: 6px 8px;
-        word-break: break-all;
-    }
-
-    .summary-table tr.paid-row {
-        background: var(--success-light);
-        border-radius: var(--radius-sm);
-    }
-
-    .info-box {
-        flex-direction: column;
-        gap: var(--spacing-1);
-    }
-
-    .info-box span {
-        font-size: 0.7rem;
     }
 
     th {
@@ -1486,18 +997,12 @@ tbody tr:hover {
         white-space: normal;
         word-break: break-word;
     }
-
-    .history-table th,
-    .history-table td {
-        white-space: nowrap;
-    }
 }
 
 /* =====================================================
-   响应式断点 — 超小屏（≤390px，如 iPhone SE）
+   响应式断点 — 超小屏（≤390px）
    ===================================================== */
 @media (max-width: 390px) {
-
     #app {
         padding: var(--spacing-2);
     }
@@ -1524,16 +1029,6 @@ tbody tr:hover {
         font-size: 0.65rem;
     }
 
-    .summary-table td.label {
-        width: 45%;
-        font-size: 0.65rem;
-    }
-
-    .summary-table td.value {
-        width: 55%;
-        font-size: 0.65rem;
-    }
-
     .btn-action {
         font-size: 0.8rem;
     }
@@ -1549,7 +1044,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   打印样式 - 统一放在 base.css 中，避免重复定义
+   打印样式
    ===================================================== */
 @media print {
     @page {
@@ -1570,7 +1065,6 @@ tbody tr:hover {
         margin: 0;
     }
 
-    /* 隐藏非打印元素 */
     .no-print,
     .toolbar button:not(.print-btn),
     button:not(.print-btn),
@@ -1582,7 +1076,6 @@ tbody tr:hover {
         display: none !important;
     }
 
-    /* 显示打印按钮 */
     .toolbar {
         display: block !important;
     }
@@ -1591,7 +1084,6 @@ tbody tr:hover {
         display: inline-block !important;
     }
 
-    /* 卡片和表格打印样式 */
     .card,
     .stat-card,
     .cashflow-summary {
@@ -1617,7 +1109,6 @@ tbody tr:hover {
         color: black !important;
     }
 
-    /* 表格表头重复 */
     thead {
         display: table-header-group;
     }
@@ -1630,8 +1121,7 @@ tbody tr:hover {
         border: 1px solid #ccc !important;
         white-space: normal !important;
     }
-    
-    /* 打印页眉页脚 */
+
     .print-header {
         display: block;
         text-align: center;
@@ -1639,7 +1129,7 @@ tbody tr:hover {
         border-bottom: 2px solid #333;
         padding-bottom: 10px;
     }
-    
+
     .print-footer {
         display: block;
         position: fixed;
