@@ -56,14 +56,18 @@ const CustomersModule = {
                         </tr>
                     `;
                     
-                    // 第二行：操作按钮
+                    // 第二行：操作按钮（拉黑与删除用分隔线隔开，降低误操作风险）
                     rows += `
                         <tr class="customer-action-row">
                             <td colspan="2" class="action-cell">
-                                ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
-                                ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
-                                ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${c.id}')" class="btn-small warning">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
-                                ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                                <span class="action-group-main">
+                                    ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
+                                    ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
+                                </span>
+                                ${(!isAdmin || PERMISSION.canDeleteCustomer()) ? `<span class="action-group-danger">` : ''}
+                                    ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${c.id}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+                                    ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                                ${(!isAdmin || PERMISSION.canDeleteCustomer()) ? `</span>` : ''}
                             </td>
                         </tr>
                     `;
@@ -187,6 +191,35 @@ const CustomersModule = {
             .action-cell .btn-small {
                 margin-right: 8px;
                 margin-bottom: 4px;
+            }
+            
+            /* 操作按钮分组：常规操作 vs 危险操作 用竖线隔开 */
+            .action-group-main {
+                display: inline-flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                margin-right: 4px;
+            }
+            
+            .action-group-danger {
+                display: inline-flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                margin-left: 8px;
+                padding-left: 12px;
+                border-left: 2px solid var(--gray-300);
+            }
+            
+            /* 拉黑按钮：独立橙色样式，与普通warning区分 */
+            .btn-blacklist {
+                background: #f97316 !important;
+                color: #fff !important;
+                border-color: #ea580c !important;
+                opacity: 0.85;
+            }
+            .btn-blacklist:hover {
+                opacity: 1;
+                background: #ea580c !important;
             }
             
             .customer-info {

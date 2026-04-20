@@ -383,7 +383,8 @@ const DashboardOrders = {
                     
                     <div class="toolbar">
                         <button onclick="APP.goBack()">↩️ ${t('back')}</button>
-                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(order.order_id)}'})" class="success">💰 ${t('save')}</button>` : ''}
+                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(order.order_id)}'})" class="success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeAttr(order.order_id)}')" class="success">🧾 ${lang === 'id' ? 'Cetak Bukti Lunas' : '打印结清凭证'}</button>` : ''}
                         <button class="wa-reminder-btn" data-order-id="${Utils.escapeAttr(order.order_id)}" class="warning wa-btn">📱 ${lang === 'id' ? 'WA Pengingat' : 'WA提醒'}</button>
                     </div>
                 </div>`;
