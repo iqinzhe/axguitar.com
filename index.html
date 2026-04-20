@@ -25,30 +25,34 @@
 <!-- 1. 第三方库 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 2. 基础工具（最先） -->
-<script src="js/utils.js"></script>
+<!-- 基础模块 -->
 <script src="js/supabase.js"></script>
-
-<!-- 3. 核心服务 -->
+<script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/permission.js"></script>
-<script src="js/storage.js"></script>
 <script src="js/order.js"></script>
 <script src="js/store.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/audit.js"></script>
 <script src="js/migration.js"></script>
 
-<!-- 4. Dashboard 模块（按依赖顺序） -->
-<script src="js/app-dashboard-core.js"></script>
-<script src="js/app-dashboard-orders.js"></script>
-<script src="js/app-dashboard-report.js"></script>
-<script src="js/app-dashboard-expenses.js"></script>
-<script src="js/app-dashboard-print.js"></script>
-<script src="js/app-dashboard.js"></script>
-
-<!-- 5. 业务模块 -->
+<!-- 功能模块 -->
 <script src="js/app-blacklist.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
+
+<!-- 仪表盘拆分模块 -->
+<script src="js/app-dashboard-core.js"></script>
+<script src="js/app-dashboard-funds.js"></script>
+<script src="js/app-dashboard-users.js"></script>
+<script src="js/app-dashboard-wa.js"></script>
+<script src="js/app-dashboard-print.js"></script>
+<script src="js/app-dashboard-orders.js"></script>
+<script src="js/app-dashboard-expenses.js"></script>
+<script src="js/app-dashboard-report.js"></script>
+
+<!-- 调试入口 -->
+<script src="js/app-dashboard-debug.js"></script>
 
 <script>
 // ==================== 全局错误捕获 ====================
