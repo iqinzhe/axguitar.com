@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.0
+// app-dashboard-expenses.js - v2.1（修复运营支出加载失败）
 
 window.APP = window.APP || {};
 
@@ -9,19 +9,88 @@ const DashboardExpenses = {
         this.saveCurrentPageState();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
-        var isAdmin = AUTH.isAdmin();
         try {
             const profile = await SUPABASE.getCurrentProfile();
-            let query = supabaseClient.from('expenses').select('*, stores(name, code)').order('expense_date', { ascending: false });
-            if (!isAdmin && profile?.store_id) query = query.eq('store_id', profile.store_id);
-            const { data: expenses, error } = await query;
-            if (error) throw error;
-            var totalAmount = expenses?.reduce((s, e) => s + e.amount, 0) || 0;
+            const isAdmin = profile?.role === 'admin';
+            
+            // 修复：使用更稳定的查询方式
+            let finalExpenses = [];
+            
+            try {
+                let query = supabaseClient
+                    .from('expenses')
+                    .select(`
+                        *,
+                        stores:store_id (name, code)
+                    `)
+                    .order('expense_date', { ascending: false });
+                
+                // 非管理员只能看到自己门店的支出
+                if (!isAdmin && profile?.store_id) {
+                    query = query.eq('store_id', profile.store_id);
+                }
+                
+                const { data: expenses, error } = await query;
+                
+                if (error) {
+                    console.warn("关联查询失败，尝试简化查询:", error);
+                    // 如果关联查询失败，尝试简化查询
+                    const simpleQuery = supabaseClient
+                        .from('expenses')
+                        .select('*')
+                        .order('expense_date', { ascending: false });
+                    
+                    if (!isAdmin && profile?.store_id) {
+                        simpleQuery.eq('store_id', profile.store_id);
+                    }
+                    
+                    const { data: simpleExpenses, error: simpleError } = await simpleQuery;
+                    if (simpleError) throw simpleError;
+                    
+                    var expensesData = simpleExpenses || [];
+                    
+                    // 手动关联门店信息
+                    var storesMap = {};
+                    try {
+                        const storesData = await SUPABASE.getAllStores();
+                        for (var s of storesData) {
+                            storesMap[s.id] = s;
+                        }
+                    } catch(e) {
+                        console.warn("获取门店信息失败:", e);
+                    }
+                    
+                    finalExpenses = expensesData.map(e => ({
+                        ...e,
+                        stores: storesMap[e.store_id] || { name: '-', code: '-' }
+                    }));
+                } else {
+                    finalExpenses = expenses || [];
+                }
+            } catch (queryError) {
+                console.error("查询支出数据失败:", queryError);
+                // 最终备选方案：直接查询不关联
+                const fallbackQuery = supabaseClient
+                    .from('expenses')
+                    .select('*')
+                    .order('expense_date', { ascending: false });
+                
+                if (!isAdmin && profile?.store_id) {
+                    fallbackQuery.eq('store_id', profile.store_id);
+                }
+                
+                const { data: fallbackExpenses, error: fallbackError } = await fallbackQuery;
+                if (fallbackError) throw fallbackError;
+                
+                finalExpenses = fallbackExpenses || [];
+            }
+            
+            var totalAmount = finalExpenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
             var todayDate = new Date().toISOString().split('T')[0];
 
             var rows = '';
-            if (expenses && expenses.length > 0) {
-                for (var e of expenses) {
+            if (finalExpenses && finalExpenses.length > 0) {
+                for (var e of finalExpenses) {
                     var canEdit = isAdmin && !e.is_reconciled;
                     var actionBtns = '';
                     if (canEdit) {
@@ -33,18 +102,19 @@ const DashboardExpenses = {
                         actionBtns = `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
                     }
                     var methodText = e.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
+                    var storeDisplay = e.stores?.name ? `${Utils.escapeHtml(e.stores.name)} (${Utils.escapeHtml(e.stores.code || '-')})` : '-';
                     rows += `<tr>
                         <td>${Utils.formatDate(e.expense_date)}</td>
                         <td>${Utils.escapeHtml(e.category)}</td>
                         <td class="text-right">${Utils.formatCurrency(e.amount)}</td>
                         <td>${methodText}</td>
                         <td>${Utils.escapeHtml(e.description || '-')}</td>
-                        <td>${Utils.escapeHtml(e.stores?.name || '-')} (${Utils.escapeHtml(e.stores?.code || '-')})</td>
+                        <td>${storeDisplay}</td>
                         <td class="action-cell">${actionBtns}</td>
                     </tr>`;
                 }
             } else {
-                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td><\/tr>`;
             }
 
             const expenseCategories = lang === 'id' 
@@ -56,7 +126,6 @@ const DashboardExpenses = {
                 categoryOptions += `<option value="${cat}">${cat}</option>`;
             }
 
-            // 移除导出CSV按钮，只保留打印和返回
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
@@ -121,7 +190,7 @@ const DashboardExpenses = {
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
             console.error("showExpenses error:", error);
-            alert(lang === 'id' ? 'Gagal memuat pengeluaran' : '加载支出失败');
+            alert(lang === 'id' ? 'Gagal memuat pengeluaran: ' + error.message : '加载支出失败：' + error.message);
         }
     },
 
@@ -298,4 +367,4 @@ for (var key in DashboardExpenses) {
     }
 }
 
-console.log('✅ app-dashboard-expenses.js v2.0 已加载 - 移除导出CSV，简化打印');
+console.log('✅ app-dashboard-expenses.js v2.1 已加载 - 修复运营支出加载失败');
