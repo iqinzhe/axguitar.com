@@ -1,10 +1,9 @@
-// app-dashboard-core.js - v2.2（简化转账提示）- 完整版 第1部分
+// app-dashboard-core.js - v2.3（精简版 - 移除搜索功能 + 简化转账提示）
 
 window.APP = window.APP || {};
 
 const DashboardCore = {
     currentFilter: "all",
-    searchKeyword: "",
     historyStack: [],
     currentPage: "dashboard",
     currentOrderId: null,
@@ -18,8 +17,7 @@ const DashboardCore = {
     restorePageState: function() {
         return {
             page: sessionStorage.getItem('jf_current_page'),
-            filter: sessionStorage.getItem('jf_current_filter') || "all",
-            keyword: ""
+            filter: sessionStorage.getItem('jf_current_filter') || "all"
         };
     },
     
@@ -41,7 +39,6 @@ const DashboardCore = {
         if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
             this.currentPage = savedPage;
             this.currentFilter = savedFilter || "all";
-            this.searchKeyword = "";
             this.currentOrderId = null;
             this.currentCustomerId = null;
             await this.refreshCurrentPage();
@@ -109,8 +106,7 @@ const DashboardCore = {
             page: this.currentPage,
             orderId: this.currentOrderId,
             customerId: this.currentCustomerId,
-            filter: this.currentFilter,
-            keyword: this.searchKeyword
+            filter: this.currentFilter
         });
         this.currentPage = page;
         
@@ -150,7 +146,6 @@ const DashboardCore = {
             this.currentOrderId = prev.orderId;
             this.currentCustomerId = prev.customerId;
             this.currentFilter = prev.filter || "all";
-            this.searchKeyword = prev.keyword || "";
             
             this.saveCurrentPageState();
             
@@ -536,6 +531,7 @@ const DashboardCore = {
         printWindow.document.close();
     },
 
+    // ==================== 资金流水弹窗 ====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -583,7 +579,7 @@ const DashboardCore = {
             
             var rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<tr></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
             } else {
                 for (var t of transactions) {
                     rows += `<tr>
@@ -743,22 +739,22 @@ const DashboardCore = {
                 <meta charset="UTF-8">
                 <title>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</title>
                 <style>
-                    * { box-sizing: border-box; margin: 0; padding: 0; }
-                    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.4; color: #1e293b; padding: 15mm; }
-                    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e293b; padding-bottom: 10px; }
-                    .header h1 { font-size: 18px; margin: 5px 0; }
-                    .store-info { text-align: center; font-size: 10pt; color: #475569; margin: 5px 0; }
-                    .user-info { text-align: center; font-size: 9pt; color: #64748b; margin-bottom: 15px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 10px; }
-                    th { background: #f1f5f9; font-weight: 700; }
-                    .text-right { text-align: right; }
-                    .income { color: #10b981; }
-                    .expense { color: #ef4444; }
-                    .footer { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-                    .no-print { text-align: center; margin-bottom: 15px; }
-                    .no-print button { padding: 6px 14px; margin: 0 5px; cursor: pointer; }
-                    @media print { .no-print { display: none; } @page { size: A4; margin: 15mm; } }
+                    *{box-sizing:border-box;margin:0;padding:0}
+                    body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.4;color:#1e293b;padding:15mm}
+                    .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #1e293b;padding-bottom:10px}
+                    .header h1{font-size:18px;margin:5px 0}
+                    .store-info{text-align:center;font-size:10pt;color:#475569;margin:5px 0}
+                    .user-info{text-align:center;font-size:9pt;color:#64748b;margin-bottom:15px}
+                    table{width:100%;border-collapse:collapse;margin-top:15px}
+                    th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;font-size:10px}
+                    th{background:#f1f5f9;font-weight:700}
+                    .text-right{text-align:right}
+                    .income{color:#10b981}
+                    .expense{color:#ef4444}
+                    .footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:8px}
+                    .no-print{text-align:center;margin-bottom:15px}
+                    .no-print button{padding:6px 14px;margin:0 5px;cursor:pointer}
+                    @media print{.no-print{display:none}@page{size:A4;margin:15mm}}
                 </style>
             </head>
             <body>
@@ -815,8 +811,8 @@ const DashboardCore = {
         URL.revokeObjectURL(url);
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
-    // app-dashboard-core.js - v2.2（简化转账提示）- 完整版 第2部分
 
+    // ==================== 用户管理 ====================
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -840,11 +836,11 @@ const DashboardCore = {
                 for (var u of users) {
                     var storeName = u.stores?.name || (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
                     rows += `<tr>
-                        <td>${Utils.escapeHtml(u.username)}<\/td>
-                        <td>${Utils.escapeHtml(u.name)}<\/td>
-                        <td>${roleMap[u.role] || u.role}<\/td>
-                        <td>${Utils.escapeHtml(storeName)}<\/td>
-                        <td>${Utils.formatDate(u.created_at)}<\/td>
+                        <td>${Utils.escapeHtml(u.username)}</td>
+                        <td>${Utils.escapeHtml(u.name)}</td>
+                        <td>${roleMap[u.role] || u.role}</td>
+                        <td>${Utils.escapeHtml(storeName)}</td>
+                        <td>${Utils.formatDate(u.created_at)}</td>
                         <td class="action-cell">
                             ${AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id ? `
                                 <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')">
@@ -853,7 +849,7 @@ const DashboardCore = {
                                 </select>
                                 <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
                             ` : (u.id === AUTH.user?.id ? (lang === 'id' ? '👤 Anda sendiri' : '👤 当前用户') : '-')}
-                        <\/td>
+                        </td>
                     <\/tr>`;
                 }
             }
@@ -877,14 +873,7 @@ const DashboardCore = {
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
-                                <tr>
-                                    <th>${lang === 'id' ? 'Username' : '用户名'}</th>
-                                    <th>${lang === 'id' ? 'Nama' : '姓名'}</th>
-                                    <th>${lang === 'id' ? 'Role' : '角色'}</th>
-                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}</th>
-                                    <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                </tr>
+                                <tr><th>${lang === 'id' ? 'Username' : '用户名'}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Role' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -983,6 +972,7 @@ const DashboardCore = {
         }
     },
 
+    // ==================== WA 提醒功能 ====================
     getSenderWANumber: async function(storeId) {
         return await SUPABASE.getStoreWANumber(storeId);
     },
@@ -1220,7 +1210,7 @@ Terima kasih atas kepercayaan Anda.
         }
     },
 
-    // ==================== 简化版转账提示 ====================
+    // ==================== 转账功能（简化提示版） ====================
     showTransferModal: async function(transferType) {
         var lang = Utils.lang;
         var title = '';
@@ -1254,7 +1244,6 @@ Terima kasih atas kepercayaan Anda.
                 return;
         }
         
-        // 简化：余额不足直接提示"错误"
         if (maxAmount <= 0) {
             alert(lang === 'id' ? '❌ Saldo tidak mencukupi' : '❌ 余额不足');
             return;
@@ -1323,6 +1312,7 @@ Terima kasih atas kepercayaan Anda.
         }
     },
 
+    // ==================== 内部转账记录 ====================
     showInternalTransferHistory: async function() {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -1342,12 +1332,12 @@ Terima kasih atas kepercayaan Anda.
             } else {
                 for (var t of transfers) {
                     rows += `<tr>
-                        <td>${Utils.formatDate(t.transfer_date)}<\/td>
-                        <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
-                        <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
-                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
-                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                        <td>${Utils.formatDate(t.transfer_date)}</td>
+                        <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
+                        <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
+                        <td>${Utils.escapeHtml(t.description || '-')}</td>
+                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
+                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
                     <\/tr>`;
                 }
             }
@@ -1435,12 +1425,12 @@ Terima kasih atas kepercayaan Anda.
         } else {
             for (var t of transfers) {
                 rows += `<tr>
-                    <td>${Utils.formatDate(t.transfer_date)}<\/td>
-                    <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
-                    <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
-                    <td>${Utils.escapeHtml(t.description || '-')}<\/td>
-                    <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
-                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                    <td>${Utils.formatDate(t.transfer_date)}</td>
+                    <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
+                    <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
+                    <td>${Utils.escapeHtml(t.description || '-')}</td>
+                    <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
+                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
                 <\/tr>`;
             }
         }
@@ -1488,8 +1478,9 @@ function escapeAttr(str) {
 }
 
 for (var key in DashboardCore) {
-    if (typeof DashboardCore[key] === 'function' || key === 'currentFilter' || key === 'searchKeyword' || 
-        key === 'historyStack' || key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
+    if (typeof DashboardCore[key] === 'function' || 
+        key === 'currentFilter' || key === 'historyStack' || 
+        key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
         window.APP[key] = DashboardCore[key];
     }
 }
@@ -1498,4 +1489,4 @@ if (typeof Utils !== 'undefined') {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-core.js v2.2 已加载 - 简化转账提示');
+console.log('✅ app-dashboard-core.js v2.3 已加载 - 精简版（移除搜索功能 + 简化转账提示）');
