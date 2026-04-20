@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.1（双行显示修正版）
+// app-dashboard-orders.js - v2.2（移除搜索功能）
 
 window.APP = window.APP || {};
 
@@ -12,7 +12,8 @@ const DashboardOrders = {
         var profile = await SUPABASE.getCurrentProfile();
         var isAdmin = profile?.role === 'admin';
         try {
-            var filters = { status: this.currentFilter, search: this.searchKeyword };
+            // 移除搜索过滤，只保留状态过滤
+            var filters = { status: this.currentFilter, search: '' };
             var orders = await SUPABASE.getOrders(filters);
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             
@@ -74,9 +75,6 @@ const DashboardOrders = {
                 </div>
                 
                 <div class="toolbar">
-                    <input type="text" id="searchInput" placeholder="🔍 ${t('search')}..." value="${Utils.escapeHtml(this.searchKeyword)}">
-                    <button onclick="APP.searchOrders()">${t('search')}</button>
-                    <button onclick="APP.resetSearch()">${t('reset')}</button>
                     <select id="statusFilter" onchange="APP.filterOrders(this.value)">
                         <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${t('total_orders')}</option>
                         <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${t('active')}</option>
@@ -291,17 +289,7 @@ const DashboardOrders = {
         container.addEventListener('click', this._orderTableClickHandler);
     },
 
-    searchOrders: function() { 
-        this.searchKeyword = document.getElementById("searchInput").value; 
-        this.showOrderTable(); 
-    },
-    
-    resetSearch: function() { 
-        this.searchKeyword = ""; 
-        this.currentFilter = "all"; 
-        this.showOrderTable(); 
-    },
-    
+    // 移除 searchOrders 和 resetSearch 方法
     filterOrders: function(status) { 
         this.currentFilter = status; 
         this.showOrderTable(); 
@@ -334,10 +322,10 @@ const DashboardOrders = {
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                         <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    　　　`;
+                    </tr>`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td><td/tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
             }
 
             document.getElementById("app").innerHTML = `
@@ -481,11 +469,11 @@ const DashboardOrders = {
                     <td>${Utils.escapeHtml(typeText)}</td>
                     <td class="text-right">${Utils.escapeHtml(Utils.formatCurrency(p.amount))}</td>
                     <td>${Utils.escapeHtml(methodText)}</td>
-                　　　`;
+                </tr>`;
             }
             
             if (paymentRows === '') {
-                paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}</td><td/tr>`;
+                paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}</td></tr>`;
             }
             
             var safeOrderId = Utils.escapeHtml(order.order_id);
@@ -584,7 +572,7 @@ const DashboardOrders = {
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
 
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}</td><td/tr>`
+                ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}</td></tr>`
                 : allPayments.map(p => `<tr>
                     <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
                     <td class="customer-name">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
@@ -669,4 +657,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v2.1 已加载 - 双行显示修正版（订单信息和操作分行）');
+console.log('✅ app-dashboard-orders.js v2.2 已加载 - 移除搜索功能');
