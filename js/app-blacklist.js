@@ -1,13 +1,13 @@
-// app-blacklist.js - 完整修复版 v1.0
+// app-blacklist.js - 完整修复版 v1.1
 
 window.APP = window.APP || {};
 
-// 辅助函数：安全过滤输入
+// 辅助函数：安全过滤输入（修复：支持拉丁扩展区字符如 é, ñ）
 function sanitizeInput(str) {
     if (!str) return '';
-    // 只允许字母、数字、空格、中文、印尼文字符
-    // 移除可能破坏查询的特殊字符
-    return String(str).replace(/[^\w\s\u4e00-\u9fa5\u0800-\u4e00]/g, '');
+    // 允许：字母、数字、空格、中文、拉丁扩展区字符（覆盖印尼语/欧洲语言变音字母）
+    // \u00C0-\u024F 覆盖 Latin-1 Supplement + Latin Extended-A/B
+    return String(str).replace(/[^\w\s\u4e00-\u9fa5\u00C0-\u024F]/g, '');
 }
 
 const BlacklistModule = {
@@ -105,9 +105,9 @@ const BlacklistModule = {
         return data;
     },
     
-    // ==================== 修复严重2：Query注入风险 ====================
+    // 修复：使用安全过滤的查询
     checkDuplicateCustomer: async function(name, ktpNumber, phone, excludeCustomerId = null) {
-        // 安全过滤输入
+        // 安全过滤输入（使用修复后的 sanitizeInput）
         const safeName = sanitizeInput(name);
         const safeKtp = sanitizeInput(ktpNumber);
         const safePhone = sanitizeInput(phone);
@@ -173,3 +173,5 @@ for (var key in BlacklistModule) {
         window.APP[key] = BlacklistModule[key];
     }
 }
+
+console.log('✅ app-blacklist.js v1.1 已加载 - 修复正则表达式支持拉丁扩展区字符');
