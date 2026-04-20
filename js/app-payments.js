@@ -1,10 +1,23 @@
-// app-payments.js - 完整原版修复版（无语法错误 · 功能完整）
+// app-payments.js - 修复版
+
 window.APP = window.APP || {};
 
 const PaymentModule = {
     currentPage: 'paymentHistory',
     currentFilter: 'all',
     searchKeyword: '',
+
+    saveCurrentPageState: function() {
+        localStorage.setItem('lastPage', this.currentPage);
+    },
+
+    goBack: function() {
+        if (typeof window.APP.navigateTo === 'function') {
+            window.APP.navigateTo('dashboard');
+        } else {
+            window.location.reload();
+        }
+    },
 
     showPaymentHistory: async function () {
         this.currentPage = 'paymentHistory';
@@ -39,7 +52,7 @@ const PaymentModule = {
 
             let rows = '';
             if (payments && payments.length > 0) {
-                payments.forEach((p) => {
+                for (const p of payments) {
                     let method = p.payment_method === 'cash'
                         ? (lang === 'id' ? 'Tunai' : '现金')
                         : (lang === 'id' ? 'Bank BNI' : '银行');
@@ -59,9 +72,9 @@ const PaymentModule = {
                         <td>${type}</td>
                         <td>${p.receipt_number || '-'}</td>
                     </tr>`;
-                });
+                }
             } else {
-                rows = `<tr><td colspan="8" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="8" class="text-center">${t('no_data')}</td><\/tr>`;
             }
 
             document.getElementById('app').innerHTML = `
@@ -94,19 +107,37 @@ const PaymentModule = {
             console.error('showPaymentHistory error:', err);
             alert(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
         }
-    },
-
-    saveCurrentPageState: function () {
-        localStorage.setItem('lastPage', this.currentPage);
-    },
-
-    goBack: function () {
-        APP.navigateTo('dashboard');
     }
 };
 
+// 安全绑定
 for (const key in PaymentModule) {
-    if (typeof PaymentModule[key] === 'function') {
+    if (PaymentModule.hasOwnProperty(key) && typeof PaymentModule[key] === 'function') {
         window.APP[key] = PaymentModule[key].bind(PaymentModule);
     }
 }
+
+// 确保核心方法存在
+if (typeof window.APP.saveCurrentPageState !== 'function') {
+    window.APP.saveCurrentPageState = function() {
+        if (this.currentPage) {
+            localStorage.setItem('lastPage', this.currentPage);
+        }
+    };
+}
+
+if (typeof window.APP.goBack !== 'function') {
+    window.APP.goBack = function() {
+        const lastPage = localStorage.getItem('lastPage') || 'dashboard';
+        if (typeof this.navigateTo === 'function') {
+            this.navigateTo(lastPage);
+        } else if (typeof window.APP.navigateTo === 'function') {
+            window.APP.navigateTo(lastPage);
+        } else {
+            window.location.href = '#dashboard';
+            location.reload();
+        }
+    };
+}
+
+console.log('✅ app-payments.js 修复版已加载');
