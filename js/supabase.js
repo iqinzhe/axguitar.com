@@ -1,4 +1,4 @@
-// supabase.js - v4.1（移除搜索功能）
+// supabase.js - v4.2（简化错误提示）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -338,7 +338,6 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
-    // 修复：移除搜索条件
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*');
@@ -350,7 +349,6 @@ const SupabaseAPI = {
         if (filters.status && filters.status !== 'all') {
             query = query.eq('status', filters.status);
         }
-        // 搜索功能已移除
         
         query = query.order('created_at', { ascending: false });
         
@@ -713,8 +711,8 @@ const SupabaseAPI = {
                 
                 if (amount > remainingPrincipal) {
                     const confirmMsg = Utils.lang === 'id' 
-                        ? `⚠️ 输入金额 (${this.formatCurrency(amount)}) 超过剩余本金 (${this.formatCurrency(remainingPrincipal)}).\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`
-                        : `⚠️ 输入金额 (${this.formatCurrency(amount)}) 超过剩余本金 (${this.formatCurrency(remainingPrincipal)}).\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`;
+                        ? `⚠️ 输入金额超过剩余本金。\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`
+                        : `⚠️ 输入金额超过剩余本金。\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`;
                     
                     if (!confirm(confirmMsg)) {
                         throw new Error(Utils.lang === 'id' ? '付款已取消' : '付款已取消');
@@ -813,12 +811,12 @@ const SupabaseAPI = {
                 
                 if (isFullRepayment) {
                     alert(Utils.lang === 'id' 
-                        ? `✅ 保存成功！本金已结清，订单完成。\n\n还款金额: ${this.formatCurrency(paidAmount)}`
-                        : `✅ 保存成功！本金已结清，订单完成。\n\n还款金额: ${this.formatCurrency(paidAmount)}`);
+                        ? `✅ 保存成功！本金已结清，订单完成。`
+                        : `✅ 保存成功！本金已结清，订单完成。`);
                 } else {
                     alert(Utils.lang === 'id' 
-                        ? `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录\n\n剩余本金: ${this.formatCurrency(newPrincipalRemaining)}`
-                        : `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录\n\n剩余本金: ${this.formatCurrency(newPrincipalRemaining)}`);
+                        ? `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录`
+                        : `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录`);
                 }
                 
                 return true;
@@ -855,8 +853,8 @@ const SupabaseAPI = {
         
         if (currentOrder.is_locked && isUpdatingSensitive) {
             throw new Error(Utils.lang === 'id' 
-                ? '❌ 订单已锁定，无法修改基础信息（客户姓名、质押物、贷款金额等）。\n\n如需修改，请联系管理员解锁订单。'
-                : '❌ 订单已锁定，无法修改基础信息（客户姓名、质押物、贷款金额等）。\n\n如需修改，请联系管理员解锁订单。');
+                ? '❌ 订单已锁定，无法修改基础信息。'
+                : '❌ 订单已锁定，无法修改基础信息。');
         }
         
         const { data, error } = await supabaseClient
@@ -1348,7 +1346,7 @@ const SupabaseAPI = {
         
         if (transferData.amount <= 0) {
             throw new Error(Utils.lang === 'id' 
-                ? '转账金额必须大于0'
+                ? 'Jumlah transfer harus lebih dari 0'
                 : '转账金额必须大于0');
         }
         
@@ -1356,22 +1354,22 @@ const SupabaseAPI = {
             const cashFlow = await this.getCashFlowSummary();
             if (cashFlow.cash.balance < transferData.amount) {
                 throw new Error(Utils.lang === 'id' 
-                    ? `保险柜余额不足。当前余额: ${this.formatCurrency(cashFlow.cash.balance)}`
-                    : `保险柜余额不足。当前余额: ${this.formatCurrency(cashFlow.cash.balance)}`);
+                    ? 'Saldo tidak mencukupi'
+                    : '余额不足');
             }
         } else if (transferData.transfer_type === 'bank_to_cash') {
             const cashFlow = await this.getCashFlowSummary();
             if (cashFlow.bank.balance < transferData.amount) {
                 throw new Error(Utils.lang === 'id' 
-                    ? `银行余额不足。当前余额: ${this.formatCurrency(cashFlow.bank.balance)}`
-                    : `银行余额不足。当前余额: ${this.formatCurrency(cashFlow.bank.balance)}`);
+                    ? 'Saldo tidak mencukupi'
+                    : '余额不足');
             }
         } else if (transferData.transfer_type === 'store_to_hq') {
             const shopAccount = await this.getShopAccount(transferData.store_id || profile?.store_id);
             if (shopAccount.bank_balance < transferData.amount) {
                 throw new Error(Utils.lang === 'id' 
-                    ? `门店银行余额不足。当前余额: ${this.formatCurrency(shopAccount.bank_balance)}`
-                    : `门店银行余额不足。当前余额: ${this.formatCurrency(shopAccount.bank_balance)}`);
+                    ? 'Saldo tidak mencukupi'
+                    : '余额不足');
             }
         }
         
@@ -1453,15 +1451,15 @@ const SupabaseAPI = {
         
         if (profile?.role !== 'admin') {
             throw new Error(Utils.lang === 'id' 
-                ? '只有管理员可以执行上缴总部操作'
-                : '只有管理员可以执行上缴总部操作');
+                ? 'Hanya admin yang dapat melakukan ini'
+                : '只有管理员可以执行此操作');
         }
         
         const shopAccount = await this.getShopAccount(storeId);
         if (shopAccount.bank_balance < amount) {
             throw new Error(Utils.lang === 'id' 
-                ? `银行余额不足。当前余额: ${this.formatCurrency(shopAccount.bank_balance)}`
-                : `银行余额不足。当前余额: ${this.formatCurrency(shopAccount.bank_balance)}`);
+                ? 'Saldo tidak mencukupi'
+                : '余额不足');
         }
         
         const transfer = await this.recordInternalTransfer({
@@ -1488,4 +1486,4 @@ const SupabaseAPI = {
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
 
-console.log('✅ supabase.js v4.1 已加载 - 移除搜索功能');
+console.log('✅ supabase.js v4.2 已加载 - 简化错误提示');
