@@ -1,4 +1,4 @@
-// supabase.js - v4.2（简化错误提示）
+// supabase.js - v4.3（删除搜索条件版）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -338,6 +338,7 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
+    // 修复：删除搜索条件
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*');
@@ -349,6 +350,7 @@ const SupabaseAPI = {
         if (filters.status && filters.status !== 'all') {
             query = query.eq('status', filters.status);
         }
+        // 搜索功能已移除，不再支持 search 参数
         
         query = query.order('created_at', { ascending: false });
         
@@ -1486,4 +1488,4 @@ const SupabaseAPI = {
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
 
-console.log('✅ supabase.js v4.2 已加载 - 简化错误提示');
+console.log('✅ supabase.js v4.3 已加载 - 删除搜索条件版');
