@@ -1,12 +1,91 @@
-// auth.js - v1.0
-
+// auth.js - 完整修复版 v3.1
 
 const AUTH = {
     user: null,
     
-    // 登录失败记录（前端临时方案）
-    _loginAttempts: {},
-    _lockedUntil: {},
+    // ==================== 登录锁定机制（sessionStorage 持久化） ====================
+    
+    _getLoginAttempts() {
+        const stored = sessionStorage.getItem('jf_login_attempts');
+        return stored ? JSON.parse(stored) : {};
+    },
+    
+    _setLoginAttempts(attempts) {
+        sessionStorage.setItem('jf_login_attempts', JSON.stringify(attempts));
+    },
+    
+    _getLockedUntil() {
+        const stored = sessionStorage.getItem('jf_locked_until');
+        return stored ? JSON.parse(stored) : {};
+    },
+    
+    _setLockedUntil(locked) {
+        sessionStorage.setItem('jf_locked_until', JSON.stringify(locked));
+    },
+    
+    _isLocked(username) {
+        const lockedUntil = this._getLockedUntil();
+        const until = lockedUntil[username];
+        const now = Date.now();
+        if (until && until > now) {
+            const remainingMinutes = Math.ceil((until - now) / 60000);
+            alert(Utils.lang === 'id' 
+                ? `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试`
+                : `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试`);
+            return true;
+        }
+        if (until && until <= now) {
+            const attempts = this._getLoginAttempts();
+            delete lockedUntil[username];
+            delete attempts[username];
+            this._setLockedUntil(lockedUntil);
+            this._setLoginAttempts(attempts);
+        }
+        return false;
+    },
+    
+    _recordLoginFailure(username) {
+        const attempts = this._getLoginAttempts();
+        const lockedUntil = this._getLockedUntil();
+        const now = Date.now();
+        
+        if (!attempts[username]) {
+            attempts[username] = { count: 0, firstAttempt: now };
+        }
+        attempts[username].count++;
+        
+        const elapsed = now - attempts[username].firstAttempt;
+        // 5分钟内失败5次，锁定15分钟
+        if (elapsed <= 5 * 60 * 1000 && attempts[username].count >= 5) {
+            lockedUntil[username] = now + 15 * 60 * 1000;
+            delete attempts[username];
+            this._setLockedUntil(lockedUntil);
+            this._setLoginAttempts(attempts);
+            return true; // 已锁定
+        }
+        
+        // 超过5分钟重置计数
+        if (elapsed > 5 * 60 * 1000) {
+            attempts[username] = { count: 1, firstAttempt: now };
+        }
+        
+        this._setLoginAttempts(attempts);
+        return false; // 未锁定
+    },
+    
+    _resetLoginFailure(username) {
+        const attempts = this._getLoginAttempts();
+        const lockedUntil = this._getLockedUntil();
+        delete attempts[username];
+        delete lockedUntil[username];
+        this._setLoginAttempts(attempts);
+        this._setLockedUntil(lockedUntil);
+    },
+    
+    _clearAllLoginFailures() {
+        sessionStorage.removeItem('jf_login_attempts');
+        sessionStorage.removeItem('jf_locked_until');
+    },
 
     async init() {
         try {
@@ -22,12 +101,10 @@ const AUTH = {
                 SUPABASE.clearCache();
             } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
                 SUPABASE.clearCache();
-                // 刷新后重新加载用户信息
                 this.loadCurrentUser();
             }
         });
         
-        // 绑定 ENTER 键登录
         this._bindEnterKeyLogin();
     },
     
@@ -43,59 +120,12 @@ const AUTH = {
             }
         });
     },
-    
-    // 检查账号是否被锁定
-    _isLocked(username) {
-        const now = Date.now();
-        const lockedUntil = this._lockedUntil[username];
-        if (lockedUntil && lockedUntil > now) {
-            const remainingMinutes = Math.ceil((lockedUntil - now) / 60000);
-            alert(Utils.lang === 'id' 
-                ? `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试`
-                : `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试`);
-            return true;
-        }
-        if (lockedUntil && lockedUntil <= now) {
-            delete this._lockedUntil[username];
-            delete this._loginAttempts[username];
-        }
-        return false;
-    },
-    
-    // 记录登录失败
-    _recordLoginFailure(username) {
-        const now = Date.now();
-        if (!this._loginAttempts[username]) {
-            this._loginAttempts[username] = { count: 0, firstAttempt: now };
-        }
-        this._loginAttempts[username].count++;
-        
-        // 5分钟内失败5次，锁定15分钟
-        const elapsed = now - this._loginAttempts[username].firstAttempt;
-        if (elapsed <= 5 * 60 * 1000 && this._loginAttempts[username].count >= 5) {
-            this._lockedUntil[username] = now + 15 * 60 * 1000;
-            delete this._loginAttempts[username];
-            return true; // 已锁定
-        }
-        
-        // 超过5分钟重置计数
-        if (elapsed > 5 * 60 * 1000) {
-            this._loginAttempts[username] = { count: 1, firstAttempt: now };
-        }
-        return false; // 未锁定
-    },
-    
-    // 重置登录失败记录
-    _resetLoginFailure(username) {
-        delete this._loginAttempts[username];
-        delete this._lockedUntil[username];
-    },
 
     isLoggedIn() {
         return !!this.user;
     },
 
-    // ==================== 同步权限判断（使用缓存，快速响应） ====================
+    // ==================== 同步权限判断 ====================
     isAdmin() {
         return this.user?.role === 'admin';
     },
@@ -112,7 +142,7 @@ const AUTH = {
         return ['admin', 'store_manager', 'staff'].includes(this.user?.role);
     },
     
-    // ==================== 异步权限判断（从数据库获取最新数据，用于敏感操作） ====================
+    // ==================== 异步权限判断 ====================
     async isAdminAsync() {
         const profile = await SUPABASE.getCurrentProfile();
         return profile?.role === 'admin';
@@ -155,7 +185,6 @@ const AUTH = {
             
             let emailToUse = usernameOrEmail;
 
-            // 如果输入不包含 @，则通过 username 或 email 查询实际的 email
             if (!usernameOrEmail.includes('@')) {
                 const { data: profileData, error: profileError } = await supabaseClient
                     .from('user_profiles')
@@ -168,7 +197,6 @@ const AUTH = {
                     this._recordLoginFailure(usernameOrEmail);
                     return null;
                 }
-                // 使用 email 字段（如果存在）或 username 字段
                 emailToUse = profileData.email || profileData.username;
             }
 
@@ -188,7 +216,6 @@ const AUTH = {
                 return null;
             }
             
-            // 记录登录成功日志
             await this._logLoginSuccess(this.user.id);
             
             return this.user;
@@ -199,7 +226,6 @@ const AUTH = {
         }
     },
     
-    // 记录登录成功日志
     async _logLoginSuccess(userId) {
         try {
             if (window.Audit && typeof window.Audit.log === 'function') {
@@ -228,7 +254,6 @@ const AUTH = {
     },
 
     async logout() {
-        // 记录登出日志
         if (this.user && window.Audit) {
             await window.Audit.log('logout', JSON.stringify({
                 user_id: this.user.id,
@@ -236,6 +261,9 @@ const AUTH = {
                 timestamp: new Date().toISOString()
             }));
         }
+        
+        // 清理锁定记录
+        this._clearAllLoginFailures();
         
         this.user = null;
         SUPABASE.clearCache();
@@ -248,7 +276,6 @@ const AUTH = {
 
     // ==================== 用户管理 ====================
     async addUser(username, password, name, role, storeId) {
-        // 检查是否已存在
         const { data: existing } = await supabaseClient
             .from('user_profiles')
             .select('username')
@@ -261,7 +288,6 @@ const AUTH = {
                 : '用户名已存在');
         }
         
-        // 使用 Supabase Auth 创建用户
         const { data: authUser, error: signUpError } = await supabaseClient.auth.signUp({
             email: username,
             password: password,
@@ -282,7 +308,6 @@ const AUTH = {
                 : '创建用户失败');
         }
         
-        // 创建用户资料
         const { error: profileError } = await supabaseClient.from('user_profiles').insert({
             id: authUser.user.id,
             username: username,
@@ -294,7 +319,6 @@ const AUTH = {
         
         if (profileError) throw profileError;
         
-        // 记录操作日志
         if (window.Audit) {
             await window.Audit.log('user_create', JSON.stringify({
                 new_user_id: authUser.user.id,
@@ -310,14 +334,12 @@ const AUTH = {
     },
 
     async deleteUser(userId) {
-        // 不能删除自己
         if (userId === this.user?.id) {
             throw new Error(Utils.lang === 'id' 
                 ? 'Tidak dapat menghapus akun sendiri' 
                 : '不能删除自己的账号');
         }
         
-        // 获取用户信息以获取 auth 用户 ID
         const { data: userProfile, error: fetchError } = await supabaseClient
             .from('user_profiles')
             .select('id, username, name, role')
@@ -326,7 +348,6 @@ const AUTH = {
         
         if (fetchError) throw fetchError;
         
-        // 记录被删除的用户信息（用于日志）
         const deletedUserInfo = {
             id: userProfile.id,
             username: userProfile.username,
@@ -337,30 +358,27 @@ const AUTH = {
             deleted_at: new Date().toISOString()
         };
         
-        // 尝试调用 Edge Function 删除 Auth 用户
         try {
-            const { data: edgeData, error: edgeError } = await supabaseClient.functions.invoke('delete-user', {
+            const { error: edgeError } = await supabaseClient.functions.invoke('delete-user', {
                 body: { userId: userProfile.id }
             });
             
             if (edgeError) {
-                console.warn("Edge Function 调用失败，尝试直接删除:", edgeError);
+                console.warn("Edge Function 调用失败:", edgeError);
                 alert(Utils.lang === 'id'
                     ? '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。'
                     : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。');
             }
         } catch (e) {
-            console.warn("Edge Function 未部署，仅删除 user_profiles:", e);
+            console.warn("Edge Function 未部署:", e);
             alert(Utils.lang === 'id'
                 ? '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。'
                 : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。');
         }
         
-        // 删除 user_profiles 记录
         const { error } = await supabaseClient.from('user_profiles').delete().eq('id', userId);
         if (error) throw error;
         
-        // 记录操作日志
         if (window.Audit) {
             await window.Audit.log('user_delete', JSON.stringify(deletedUserInfo));
         }
@@ -369,7 +387,6 @@ const AUTH = {
     },
 
     async updateUser(userId, updates) {
-        // 获取更新前的用户信息
         const { data: beforeData } = await supabaseClient
             .from('user_profiles')
             .select('*')
@@ -379,7 +396,6 @@ const AUTH = {
         const { error } = await supabaseClient.from('user_profiles').update(updates).eq('id', userId);
         if (error) throw error;
         
-        // 记录操作日志
         if (window.Audit) {
             await window.Audit.log('user_update', JSON.stringify({
                 user_id: userId,
@@ -392,8 +408,6 @@ const AUTH = {
         
         return true;
     },
-    
-    // ==================== 获取当前用户信息 ====================
     
     getCurrentUserId() {
         return this.user?.id || null;
@@ -410,5 +424,4 @@ const AUTH = {
 
 window.AUTH = AUTH;
 
-// 控制台输出确认
-console.log('✅ auth.js v3.0 已加载 - 权限检查已统一，锁定功能已移除');
+console.log('✅ auth.js v3.1 已加载 - 登录锁定使用 sessionStorage 持久化');
