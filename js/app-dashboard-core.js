@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.1（移除搜索功能）- 完整版
+// app-dashboard-core.js - v2.2（简化转账提示）- 完整版 第1部分
 
 window.APP = window.APP || {};
 
@@ -583,7 +583,7 @@ const DashboardCore = {
             
             var rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<tr></tr>`;
             } else {
                 for (var t of transactions) {
                     rows += `<tr>
@@ -649,9 +649,7 @@ const DashboardCore = {
             `;
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
-            
             window._capitalTransactionsData = transactions;
-            
         } catch (error) {
             console.error("showCapitalModal error:", error);
             alert(lang === 'id' ? 'Gagal memuat data transaksi' : '加载交易记录失败');
@@ -672,7 +670,6 @@ const DashboardCore = {
             if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
             return true;
         });
-        
         this._renderCapitalTransactionsTable(filtered);
     },
     
@@ -681,22 +678,18 @@ const DashboardCore = {
         var typeSelect = document.getElementById('capitalFilterType');
         var startInput = document.getElementById('capitalFilterStart');
         var endInput = document.getElementById('capitalFilterEnd');
-        
         if (descInput) descInput.value = '';
         if (typeSelect) typeSelect.value = '';
         if (startInput) startInput.value = '';
         if (endInput) endInput.value = '';
-        
         this.filterCapitalTransactions();
     },
     
     _renderCapitalTransactionsTable: function(transactions) {
         var tbody = document.getElementById('capitalTransactionsBody');
         if (!tbody) return;
-        
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
-        
         var typeMap = {
             loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
             admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
@@ -707,17 +700,14 @@ const DashboardCore = {
             internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
             internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
         };
-        
         var directionMap = {
             inflow: lang === 'id' ? '📥 Masuk' : '📥 流入',
             outflow: lang === 'id' ? '📤 Keluar' : '📤 流出'
         };
-        
         var sourceMap = {
             cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜',
             bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI'
         };
-        
         var rows = '';
         if (transactions.length === 0) {
             rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
@@ -734,20 +724,17 @@ const DashboardCore = {
                 </tr>`;
             }
         }
-        
         tbody.innerHTML = rows;
     },
     
     printCapitalTransactions: function() {
         var modalContent = document.querySelector('#capitalModal .modal-content');
         if (!modalContent) return;
-        
         var printContent = modalContent.cloneNode(true);
         var lang = Utils.lang;
         var storeName = AUTH.getCurrentStoreName();
         var userName = AUTH.user?.name || '-';
         var printDateTime = new Date().toLocaleString();
-        
         var printWindow = window.open('', '_blank');
         printWindow.document.write(`
             <!DOCTYPE html>
@@ -799,11 +786,9 @@ const DashboardCore = {
     exportCapitalTransactionsToCSV: function() {
         var transactions = window._capitalTransactionsData || [];
         var lang = Utils.lang;
-        
         var headers = lang === 'id'
             ? ['Tanggal', 'Tipe', 'Arah', 'Sumber', 'Jumlah', 'Deskripsi']
             : ['日期', '类型', '方向', '来源/去向', '金额', '描述'];
-        
         var typeMap = {
             loan_disbursement: lang === 'id' ? 'Pencairan Pinjaman' : '贷款发放',
             admin_fee: lang === 'id' ? 'Admin Fee' : '管理费',
@@ -812,7 +797,6 @@ const DashboardCore = {
             principal: lang === 'id' ? 'Pokok' : '本金',
             expense: lang === 'id' ? 'Pengeluaran' : '运营支出'
         };
-        
         var rows = transactions.map(t => [
             t.recorded_at.split('T')[0],
             typeMap[t.flow_type] || t.flow_type,
@@ -821,11 +805,7 @@ const DashboardCore = {
             t.amount,
             t.description || '-'
         ]);
-        
-        var csvContent = [headers, ...rows].map(row => 
-            row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-        ).join('\n');
-        
+        var csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
         var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
@@ -833,9 +813,9 @@ const DashboardCore = {
         a.download = `jf_cash_flow_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
+    // app-dashboard-core.js - v2.2（简化转账提示）- 完整版 第2部分
 
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
@@ -855,16 +835,16 @@ const DashboardCore = {
             
             var rows = '';
             if (users.length === 0) {
-                rows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var u of users) {
                     var storeName = u.stores?.name || (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
                     rows += `<tr>
-                        <td>${Utils.escapeHtml(u.username)}</td>
-                        <td>${Utils.escapeHtml(u.name)}</td>
-                        <td>${roleMap[u.role] || u.role}</td>
-                        <td>${Utils.escapeHtml(storeName)}</td>
-                        <td>${Utils.formatDate(u.created_at)}</td>
+                        <td>${Utils.escapeHtml(u.username)}<\/td>
+                        <td>${Utils.escapeHtml(u.name)}<\/td>
+                        <td>${roleMap[u.role] || u.role}<\/td>
+                        <td>${Utils.escapeHtml(storeName)}<\/td>
+                        <td>${Utils.formatDate(u.created_at)}<\/td>
                         <td class="action-cell">
                             ${AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id ? `
                                 <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')">
@@ -873,14 +853,14 @@ const DashboardCore = {
                                 </select>
                                 <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
                             ` : (u.id === AUTH.user?.id ? (lang === 'id' ? '👤 Anda sendiri' : '👤 当前用户') : '-')}
-                        </td>
-                    </tr>`;
+                        <\/td>
+                    <\/tr>`;
                 }
             }
             
-            var storeOptions = '<option value="">' + (lang === 'id' ? 'Pilih toko' : '选择门店') + '</option>';
+            var storeOptions = '<option value="">' + (lang === 'id' ? 'Pilih toko' : '选择门店') + '<\/option>';
             for (var s of stores) {
-                storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})</option>`;
+                storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})<\/option>`;
             }
             
             document.getElementById("app").innerHTML = `
@@ -1145,10 +1125,8 @@ Terima kasih atas kepercayaan Anda.
                 var waText = encodeURIComponent(this.generateWAText(order, senderNumber));
                 var waUrl = `https://wa.me/${customerPhone}?text=${waText}`;
                 window.open(waUrl, '_blank');
-                
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 successCount++;
-                
             } catch (e) {
                 console.error("发送提醒失败:", e);
                 failCount++;
@@ -1242,6 +1220,7 @@ Terima kasih atas kepercayaan Anda.
         }
     },
 
+    // ==================== 简化版转账提示 ====================
     showTransferModal: async function(transferType) {
         var lang = Utils.lang;
         var title = '';
@@ -1275,15 +1254,14 @@ Terima kasih atas kepercayaan Anda.
                 return;
         }
         
+        // 简化：余额不足直接提示"错误"
         if (maxAmount <= 0) {
-            alert(lang === 'id' 
-                ? `Saldo tidak mencukupi. Saldo saat ini: ${Utils.formatCurrency(maxAmount)}`
-                : `余额不足。当前余额: ${Utils.formatCurrency(maxAmount)}`);
+            alert(lang === 'id' ? '❌ Saldo tidak mencukupi' : '❌ 余额不足');
             return;
         }
         
         var amount = prompt(
-            `${title}\n\n${fromLabel}\n${toLabel}\n\n${lang === 'id' ? 'Maksimal transfer' : '最大转账金额'}: ${Utils.formatCurrency(maxAmount)}\n\n${lang === 'id' ? 'Masukkan jumlah:' : '请输入金额:'}`,
+            `${title}\n\n${fromLabel}\n${toLabel}\n\n${lang === 'id' ? 'Maksimal' : '最大'}: ${Utils.formatCurrency(maxAmount)}\n\n${lang === 'id' ? 'Masukkan jumlah:' : '请输入金额:'}`,
             Utils.formatNumberWithCommas(maxAmount)
         );
         
@@ -1296,15 +1274,13 @@ Terima kasih atas kepercayaan Anda.
         }
         
         if (numAmount > maxAmount) {
-            alert(lang === 'id' 
-                ? `Jumlah melebihi saldo. Maksimal: ${Utils.formatCurrency(maxAmount)}`
-                : `金额超过余额。最大: ${Utils.formatCurrency(maxAmount)}`);
+            alert(lang === 'id' ? 'Jumlah melebihi saldo' : '金额超过余额');
             return;
         }
         
         var confirmMsg = lang === 'id'
-            ? `Konfirmasi transfer:\n\nDari: ${fromLabel}\nKe: ${toLabel}\nJumlah: ${Utils.formatCurrency(numAmount)}\n\nLanjutkan?`
-            : `确认转账：\n\n从: ${fromLabel}\n到: ${toLabel}\n金额: ${Utils.formatCurrency(numAmount)}\n\n继续吗？`;
+            ? `Konfirmasi transfer:\n\n${fromLabel} → ${toLabel}\n${Utils.formatCurrency(numAmount)}\n\nLanjutkan?`
+            : `确认转账：\n\n${fromLabel} → ${toLabel}\n${Utils.formatCurrency(numAmount)}\n\n继续吗？`;
         
         if (confirm(confirmMsg)) {
             await this.executeTransfer(transferType, numAmount);
@@ -1325,9 +1301,7 @@ Terima kasih atas kepercayaan Anda.
                     description: lang === 'id' ? 'Transfer kas ke bank' : '现金存入银行',
                     store_id: profile?.store_id
                 });
-                alert(lang === 'id' 
-                    ? `✅ Transfer ${Utils.formatCurrency(amount)} dari Kas ke Bank berhasil`
-                    : `✅ 成功转账 ${Utils.formatCurrency(amount)} 从保险柜到银行`);
+                alert(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
             } else if (transferType === 'bank_to_cash') {
                 await SUPABASE.recordInternalTransfer({
                     transfer_type: 'bank_to_cash',
@@ -1337,19 +1311,15 @@ Terima kasih atas kepercayaan Anda.
                     description: lang === 'id' ? 'Tarik tunai dari bank' : '银行取现',
                     store_id: profile?.store_id
                 });
-                alert(lang === 'id' 
-                    ? `✅ Transfer ${Utils.formatCurrency(amount)} dari Bank ke Kas berhasil`
-                    : `✅ 成功转账 ${Utils.formatCurrency(amount)} 从银行到保险柜`);
+                alert(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
             } else if (transferType === 'store_to_hq') {
                 await SUPABASE.remitToHeadquarters(profile?.store_id, amount, lang === 'id' ? 'Setoran ke kantor pusat' : '上缴总部');
-                alert(lang === 'id' 
-                    ? `✅ Setoran ${Utils.formatCurrency(amount)} ke Kantor Pusat berhasil`
-                    : `✅ 成功上缴 ${Utils.formatCurrency(amount)} 到总部`);
+                alert(lang === 'id' ? '✅ Setoran berhasil' : '✅ 上缴成功');
             }
             
             await this.renderDashboard();
         } catch (error) {
-            alert(lang === 'id' ? 'Transfer gagal: ' + error.message : '转账失败：' + error.message);
+            alert(lang === 'id' ? '❌ Gagal: ' + error.message : '❌ 失败：' + error.message);
         }
     },
 
@@ -1368,17 +1338,17 @@ Terima kasih atas kepercayaan Anda.
             
             var rows = '';
             if (transfers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}<\/td><\/tr>`;
             } else {
                 for (var t of transfers) {
                     rows += `<tr>
-                        <td>${Utils.formatDate(t.transfer_date)}</td>
-                        <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
-                        <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
-                        <td>${Utils.escapeHtml(t.description || '-')}</td>
-                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                    </tr>`;
+                        <td>${Utils.formatDate(t.transfer_date)}<\/td>
+                        <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
+                        <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
+                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
+                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                    <\/tr>`;
                 }
             }
             
@@ -1421,9 +1391,7 @@ Terima kasih atas kepercayaan Anda.
             `;
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
-            
             window._internalTransfersData = transfers;
-            
         } catch (error) {
             console.error("showInternalTransferHistory error:", error);
             alert(lang === 'id' ? 'Gagal memuat riwayat transfer' : '加载转账记录失败');
@@ -1440,66 +1408,56 @@ Terima kasih atas kepercayaan Anda.
             if (endDate && t.transfer_date > endDate) return false;
             return true;
         });
-        
         this._renderInternalTransferHistory(filtered);
     },
 
     resetInternalTransferFilters: function() {
         var startInput = document.getElementById('transferFilterStart');
         var endInput = document.getElementById('transferFilterEnd');
-        
         if (startInput) startInput.value = '';
         if (endInput) endInput.value = '';
-        
         this.filterInternalTransferHistory();
     },
 
     _renderInternalTransferHistory: function(transfers) {
         var tbody = document.getElementById('internalTransferBody');
         if (!tbody) return;
-        
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
-        
         var typeMap = {
             cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行',
             bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取现',
             store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部'
         };
-        
         var rows = '';
         if (transfers.length === 0) {
-            rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td></tr>`;
+            rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}<\/td><\/tr>`;
         } else {
             for (var t of transfers) {
                 rows += `<tr>
-                    <td>${Utils.formatDate(t.transfer_date)}</td>
-                    <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
-                    <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
-                    <td>${Utils.escapeHtml(t.description || '-')}</td>
-                    <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
-                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                </tr>`;
+                    <td>${Utils.formatDate(t.transfer_date)}<\/td>
+                    <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
+                    <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                    <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
+                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                <\/tr>`;
             }
         }
-        
         tbody.innerHTML = rows;
     },
 
     exportInternalTransferToCSV: async function() {
         var transfers = window._internalTransfersData || [];
         var lang = Utils.lang;
-        
         var headers = lang === 'id'
             ? ['Tanggal', 'Jenis Transfer', 'Jumlah', 'Deskripsi', 'Oleh', 'Toko']
             : ['日期', '转账类型', '金额', '描述', '操作人', '门店'];
-        
         var typeMap = {
             cash_to_bank: lang === 'id' ? 'Kas ke Bank' : '现金存入银行',
             bank_to_cash: lang === 'id' ? 'Tarik Tunai' : '银行取现',
             store_to_hq: lang === 'id' ? 'Setoran ke Pusat' : '上缴总部'
         };
-        
         var rows = transfers.map(t => [
             t.transfer_date,
             typeMap[t.transfer_type] || t.transfer_type,
@@ -1508,11 +1466,7 @@ Terima kasih atas kepercayaan Anda.
             t.created_by_profile?.name || '-',
             t.stores?.name || '-'
         ]);
-        
-        var csvContent = [headers, ...rows].map(row => 
-            row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-        ).join('\n');
-        
+        var csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
         var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
@@ -1520,7 +1474,6 @@ Terima kasih atas kepercayaan Anda.
         a.download = `jf_internal_transfers_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     }
 };
@@ -1545,4 +1498,4 @@ if (typeof Utils !== 'undefined') {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-core.js v2.1 已加载 - 移除搜索功能，完整版');
+console.log('✅ app-dashboard-core.js v2.2 已加载 - 简化转账提示');
