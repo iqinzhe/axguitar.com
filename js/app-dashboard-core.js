@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.5 精简版（只保留核心功能）
+// app-dashboard-core.js - v2.6 升级版（仪表板卡片优化）
 
 window.APP = window.APP || {};
 
@@ -281,11 +281,78 @@ const DashboardCore = {
                 totalExpenses = expenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
             } catch(e) { console.warn("获取支出汇总失败:", e); }
             
+            // ==================== 升级1：计算本月新增订单数 ====================
+            const allOrders = await SUPABASE.getOrders();
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+            
+            const thisMonthOrders = allOrders.filter(order => {
+                const orderDate = new Date(order.created_at);
+                return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+            });
+            const thisMonthOrderCount = thisMonthOrders.length;
+            
+            // ==================== 升级1：计算赤字（总流出 - 总收入） ====================
+            // 赤字 = (总流出) - (总流入，不含本金)
+            // 流入（不含本金）：admin_fee, service_fee, interest
+            // 流出：loan_disbursement, expense, internal_transfer_out
+            
+            let totalInflowExcludingPrincipal = 0;
+            let totalOutflow = 0;
+            
+            const allCashFlows = await SUPABASE.getCashFlowRecords();
+            for (const flow of allCashFlows || []) {
+                const amount = flow.amount || 0;
+                if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
+                    totalInflowExcludingPrincipal += amount;
+                } else if (flow.direction === 'outflow') {
+                    totalOutflow += amount;
+                }
+            }
+            const deficit = totalOutflow - totalInflowExcludingPrincipal;
+            
+            // ==================== 升级1：计算已结清且超过2年的订单（自动清理逻辑） ====================
+            // 注意：此逻辑在每次加载仪表板时检查并清理符合条件的订单
+            const twoYearsAgo = new Date();
+            twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+            
+            const completedOrders = allOrders.filter(order => order.status === 'completed');
+            const expiredOrders = completedOrders.filter(order => {
+                const completedDate = order.completed_at || order.updated_at;
+                if (!completedDate) return false;
+                return new Date(completedDate) < twoYearsAgo;
+            });
+            
+            // 自动删除过期订单（保留客户资料）
+            if (expiredOrders.length > 0) {
+                console.log(`检测到 ${expiredOrders.length} 个已结清超过2年的订单，正在自动清理...`);
+                for (const expiredOrder of expiredOrders) {
+                    try {
+                        // 删除关联的现金流记录
+                        await supabaseClient.from('cash_flow_records').delete().eq('order_id', expiredOrder.id);
+                        // 删除缴费记录
+                        await supabaseClient.from('payment_history').delete().eq('order_id', expiredOrder.id);
+                        // 删除订单
+                        await supabaseClient.from('orders').delete().eq('id', expiredOrder.id);
+                        console.log(`已清理过期订单: ${expiredOrder.order_id}`);
+                    } catch (cleanErr) {
+                        console.warn(`清理订单 ${expiredOrder.order_id} 失败:`, cleanErr);
+                    }
+                }
+            }
+            
+            // 重新获取更新后的订单统计
+            const updatedOrders = await SUPABASE.getOrders();
+            const activeOrdersCount = updatedOrders.filter(o => o.status === 'active').length;
+            const completedOrdersCount = updatedOrders.filter(o => o.status === 'completed').length;
+            
+            // 构建卡片（顺序：总订单数(升级)、贷款总额(升级)、进行中、已结清(升级)）
             var cards = [
-                { label: t('total_orders'), value: report.total_orders, type: 'number' },
-                { label: t('total_loan'), value: Utils.formatCurrency(report.total_loan_amount), type: 'currency' },
-                { label: t('active'), value: report.active_orders, type: 'number' },
-                { label: t('completed'), value: report.completed_orders, type: 'number' },
+                { label: `${lang === 'id' ? '本月新增' : '本月新增'}/${t('total_orders')}`, value: `${thisMonthOrderCount}/${report.total_orders}`, type: 'text' },
+                { label: lang === 'id' ? '赤字 (流出-收入)' : '赤字 (流出-收入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
+                { label: t('active'), value: activeOrdersCount, type: 'number' },
+                { label: `${lang === 'id' ? '已结清' : '已结清'} / ${lang === 'id' ? '已失效' : '已失效'}`, value: `${completedOrdersCount} / ${expiredOrders.length}`, type: 'text' },
                 { label: lang === 'id' ? 'Admin Fee' : '管理费', value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Service Fee' : '服务费', value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
@@ -301,7 +368,6 @@ const DashboardCore = {
             
             var toolbarClass = isAdmin ? 'toolbar admin-grid' : 'toolbar store-grid';
             
-            // 门店账户：移除"缴费明细"改为"资金流水"，隐藏"备份与恢复"
             var toolbarHtml = `
             <div class="${toolbarClass}">
                 <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
@@ -477,4 +543,4 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v2.5 已加载 - 精简版（核心路由、登录、仪表盘）');
+console.log('✅ app-dashboard-core.js v2.6 已加载 - 仪表板卡片优化版');
