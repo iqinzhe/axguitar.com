@@ -1,4 +1,4 @@
-// app-dashboard-report.js - v2.0
+// app-dashboard-report.js - 完整修复版 v2.1
 
 window.APP = window.APP || {};
 
@@ -150,26 +150,31 @@ const DashboardReport = {
                     grandTotal.bankBalance += bankBalance;
                 }
 
+                // 修复：门店明细表格添加响应式包裹容器
                 var storeHtml = storeReports.length === 0 
                     ? `<div class="report-store-section"><div class="report-store-header">${lang === 'id' ? 'Tidak ada toko' : '暂无门店'}</div></div>`
-                    : storeReports.map(r => `
-                    <div class="report-store-section">
-                        <div class="report-store-header">🏪 ${Utils.escapeHtml(r.store.name)}</div>
-                        <div class="report-store-stats report-grid-5x2">
-                            <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="value">${r.ords}</div></div>
-                            <div class="report-store-stat"><div class="label">${t('active')}</div><div class="value">${r.active}</div></div>
-                            <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="value">${Utils.formatCurrency(r.totalLoan)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Admin Fee' : '管理费'}</div><div class="value income">${Utils.formatCurrency(r.totalAdminFee)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Service Fee' : '服务费'}</div><div class="value income">${Utils.formatCurrency(r.totalServiceFee)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Bunga' : '利息收入'}</div><div class="value income">${Utils.formatCurrency(r.totalInterest)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金回收'}</div><div class="value">${Utils.formatCurrency(r.totalPrincipal)}</div></div>
-                            <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}</div><div class="value income">${Utils.formatCurrency(r.grossProfit)}</div></div>
-                            <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="value expense">${Utils.formatCurrency(r.totalExpenses)}</div></div>
-                            <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="value">${Utils.formatCurrency(r.cashBalance)}</div></div>
-                            <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="value">${Utils.formatCurrency(r.bankBalance)}</div></div>
-                            <div class="report-store-stat"><div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div><div class="value ${r.netProfit >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(r.netProfit)}</div></div>
+                    : `<div class="table-container" style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+                        <div style="min-width:800px;">
+                            ${storeReports.map(r => `
+                            <div class="report-store-section">
+                                <div class="report-store-header">🏪 ${Utils.escapeHtml(r.store.name)}</div>
+                                <div class="report-store-stats report-grid-5x2">
+                                    <div class="report-store-stat"><div class="label">${t('total_orders')}</div><div class="value">${r.ords}</div></div>
+                                    <div class="report-store-stat"><div class="label">${t('active')}</div><div class="value">${r.active}</div></div>
+                                    <div class="report-store-stat"><div class="label">${t('total_loan')}</div><div class="value">${Utils.formatCurrency(r.totalLoan)}</div></div>
+                                    <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Admin Fee' : '管理费'}</div><div class="value income">${Utils.formatCurrency(r.totalAdminFee)}</div></div>
+                                    <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Service Fee' : '服务费'}</div><div class="value income">${Utils.formatCurrency(r.totalServiceFee)}</div></div>
+                                    <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Bunga' : '利息收入'}</div><div class="value income">${Utils.formatCurrency(r.totalInterest)}</div></div>
+                                    <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Pokok' : '本金回收'}</div><div class="value">${Utils.formatCurrency(r.totalPrincipal)}</div></div>
+                                    <div class="report-store-stat"><div class="label">📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}</div><div class="value income">${Utils.formatCurrency(r.grossProfit)}</div></div>
+                                    <div class="report-store-stat"><div class="label">${lang === 'id' ? 'Total Pengeluaran' : '运营支出总额'}</div><div class="value expense">${Utils.formatCurrency(r.totalExpenses)}</div></div>
+                                    <div class="report-store-stat"><div class="label">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</div><div class="value">${Utils.formatCurrency(r.cashBalance)}</div></div>
+                                    <div class="report-store-stat"><div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</div><div class="value">${Utils.formatCurrency(r.bankBalance)}</div></div>
+                                    <div class="report-store-stat"><div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div><div class="value ${r.netProfit >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(r.netProfit)}</div></div>
+                                </div>
+                            </div>`).join('')}
                         </div>
-                    </div>`).join('');
+                    </div>`;
 
                 // 移除导出CSV按钮，只保留打印和返回
                 document.getElementById("app").innerHTML = `
@@ -270,19 +275,19 @@ const DashboardReport = {
                         </div>
                     </div>
                     
-                    <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-value">${storeOrders.length}</div><div>${t('total_orders')}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalLoan)}</div><div>${t('total_loan')}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalServiceFee)}</div><div>${lang === 'id' ? 'Service Fee' : '服务费'}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Bunga' : '利息收入'}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
-                    </div>
-                    <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-value income">${Utils.formatCurrency(grossProfit)}</div><div>📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
-                        <div class="stat-card"><div class="stat-value expense">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
-                        <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit - totalExpenses)}</div><div>${lang === 'id' ? 'Laba Sebelum Bunga & Pajak' : '息税前利润'}</div></div>
-                        <div class="stat-card"><div class="stat-value ${netProfit >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(netProfit)}</div><div>💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div></div>
+                    <div class="table-container">
+                        <div class="stats-grid" style="min-width:600px;">
+                            <div class="stat-card"><div class="stat-value">${storeOrders.length}</div><div>${t('total_orders')}</div></div>
+                            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalLoan)}</div><div>${t('total_loan')}</div></div>
+                            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${lang === 'id' ? 'Admin Fee' : '管理费'}</div></div>
+                            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalServiceFee)}</div><div>${lang === 'id' ? 'Service Fee' : '服务费'}</div></div>
+                            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${lang === 'id' ? 'Bunga' : '利息收入'}</div></div>
+                            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${lang === 'id' ? 'Pokok' : '本金回收'}</div></div>
+                            <div class="stat-card"><div class="stat-value income">${Utils.formatCurrency(grossProfit)}</div><div>📊 ${lang === 'id' ? 'Laba Kotor' : '毛利'}</div></div>
+                            <div class="stat-card"><div class="stat-value expense">${Utils.formatCurrency(totalExpenses)}</div><div>${lang === 'id' ? 'Total Pengeluaran' : '运营支出'}</div></div>
+                            <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(grossProfit - totalExpenses)}</div><div>${lang === 'id' ? 'Laba Sebelum Bunga & Pajak' : '息税前利润'}</div></div>
+                            <div class="stat-card"><div class="stat-value ${netProfit >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(netProfit)}</div><div>💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div></div>
+                        </div>
                     </div>`;
             }
             
@@ -311,4 +316,4 @@ for (var key in DashboardReport) {
     }
 }
 
-console.log('✅ app-dashboard-report.js v2.0 已加载 - 移除导出CSV，简化打印');
+console.log('✅ app-dashboard-report.js v2.1 已加载 - 添加表格响应式包裹');
