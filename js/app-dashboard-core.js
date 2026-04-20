@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.3（精简版 - 移除搜索功能 + 简化转账提示）
+// app-dashboard-core.js - v2.4（修复：门店资金流水 + 移除搜索 + 简化转账提示 + 权限控制）
 
 window.APP = window.APP || {};
 
@@ -297,13 +297,14 @@ const DashboardCore = {
             
             var toolbarClass = isAdmin ? 'toolbar admin-grid' : 'toolbar store-grid';
             
+            // 修复：门店账户移除"缴费明细"改为"资金流水"，隐藏"备份与恢复"
             var toolbarHtml = `
             <div class="${toolbarClass}">
                 <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
                 <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</button>
+                ${isAdmin ? `<button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</button>` : `<button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>`}
                 <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '备份与恢复'}</button>
+                ${isAdmin ? `<button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '备份与恢复'}</button>` : ''}
                 <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                     📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                 </button>
@@ -399,6 +400,231 @@ const DashboardCore = {
         } catch (err) {
             document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
         }
+    },
+
+    // ==================== 门店资金流水弹窗（替代缴费明细） ====================
+    showCashFlowModal: async function() {
+        var lang = Utils.lang;
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
+        
+        try {
+            let transactions = [];
+            
+            if (isAdmin) {
+                const { data: allFlows } = await supabaseClient
+                    .from('cash_flow_records')
+                    .select('*, orders(order_id, customer_name), stores(name)')
+                    .eq('is_voided', false)
+                    .order('recorded_at', { ascending: false });
+                transactions = allFlows || [];
+            } else {
+                const { data: storeFlows } = await supabaseClient
+                    .from('cash_flow_records')
+                    .select('*, orders(order_id, customer_name)')
+                    .eq('store_id', profile?.store_id)
+                    .eq('is_voided', false)
+                    .order('recorded_at', { ascending: false });
+                transactions = storeFlows || [];
+            }
+            
+            var typeMap = {
+                loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+                admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
+                service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
+                interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
+                principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
+                expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
+                internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
+                internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
+            };
+            
+            var directionMap = {
+                inflow: lang === 'id' ? '📥 Masuk' : '📥 流入',
+                outflow: lang === 'id' ? '📤 Keluar' : '📤 流出'
+            };
+            
+            var sourceMap = {
+                cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜',
+                bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI'
+            };
+            
+            var rows = '';
+            if (transactions.length === 0) {
+                rows = `<tr><td colspan="6" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<\/td><\/tr>`;
+            } else {
+                for (var t of transactions) {
+                    rows += `<tr>
+                        <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
+                        <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
+                        <td>${directionMap[t.direction] || t.direction}<\/td>
+                        <td>${sourceMap[t.source_target] || t.source_target}<\/td>
+                        <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
+                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                    <\/tr>`;
+                }
+            }
+            
+            var modalHtml = `
+                <div id="cashFlowModal" class="modal-overlay">
+                    <div class="modal-content" style="max-width:800px;">
+                        <h3>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h3>
+                        
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+                            <input type="date" id="cashFlowFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
+                            <input type="date" id="cashFlowFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
+                            <button onclick="APP.filterCashFlowModal()" class="btn-small">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
+                            <button onclick="APP.resetCashFlowFilters()" class="btn-small">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
+                            <button onclick="APP.printCashFlowModal()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        </div>
+                        
+                        <div class="table-container" style="max-height:400px; overflow-y:auto;">
+                            <table class="data-table" style="min-width:600px;">
+                                <thead>
+                                    <tr>
+                                        <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                        <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                        <th>${lang === 'id' ? 'Arah' : '方向'}</th>
+                                        <th>${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
+                                        <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                        <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cashFlowModalBody">
+                                    ${rows}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
+                            <button onclick="document.getElementById('cashFlowModal').remove()" class="btn-back">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            window._cashFlowModalData = transactions;
+        } catch (error) {
+            console.error("showCashFlowModal error:", error);
+            alert(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
+        }
+    },
+    
+    filterCashFlowModal: function() {
+        var transactions = window._cashFlowModalData || [];
+        var startDate = document.getElementById('cashFlowFilterStart')?.value;
+        var endDate = document.getElementById('cashFlowFilterEnd')?.value;
+        
+        var filtered = transactions.filter(t => {
+            if (startDate && t.recorded_at < startDate) return false;
+            if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+            return true;
+        });
+        this._renderCashFlowModalTable(filtered);
+    },
+    
+    resetCashFlowFilters: function() {
+        var startInput = document.getElementById('cashFlowFilterStart');
+        var endInput = document.getElementById('cashFlowFilterEnd');
+        if (startInput) startInput.value = '';
+        if (endInput) endInput.value = '';
+        this.filterCashFlowModal();
+    },
+    
+    _renderCashFlowModalTable: function(transactions) {
+        var tbody = document.getElementById('cashFlowModalBody');
+        if (!tbody) return;
+        var lang = Utils.lang;
+        var typeMap = {
+            loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+            admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
+            service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
+            interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
+            principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
+            expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
+            internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
+            internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
+        };
+        var directionMap = {
+            inflow: lang === 'id' ? '📥 Masuk' : '📥 流入',
+            outflow: lang === 'id' ? '📤 Keluar' : '📤 流出'
+        };
+        var sourceMap = {
+            cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜',
+            bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI'
+        };
+        var rows = '';
+        if (transactions.length === 0) {
+            rows = `<tr><td colspan="6" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<\/td><\/tr>`;
+        } else {
+            for (var t of transactions) {
+                rows += `<tr>
+                    <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
+                    <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
+                    <td>${directionMap[t.direction] || t.direction}<\/td>
+                    <td>${sourceMap[t.source_target] || t.source_target}<\/td>
+                    <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
+                    <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                <\/tr>`;
+            }
+        }
+        tbody.innerHTML = rows;
+    },
+    
+    printCashFlowModal: function() {
+        var modalContent = document.querySelector('#cashFlowModal .modal-content');
+        if (!modalContent) return;
+        var printContent = modalContent.cloneNode(true);
+        var lang = Utils.lang;
+        var storeName = AUTH.getCurrentStoreName();
+        var userName = AUTH.user?.name || '-';
+        var printDateTime = new Date().toLocaleString();
+        var printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>JF! by Gadai - ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</title>
+                <style>
+                    *{box-sizing:border-box;margin:0;padding:0}
+                    body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.4;color:#1e293b;padding:15mm}
+                    .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #1e293b;padding-bottom:10px}
+                    .header h1{font-size:18px;margin:5px 0}
+                    .store-info{text-align:center;font-size:10pt;color:#475569;margin:5px 0}
+                    .user-info{text-align:center;font-size:9pt;color:#64748b;margin-bottom:15px}
+                    table{width:100%;border-collapse:collapse;margin-top:15px}
+                    th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;font-size:10px}
+                    th{background:#f1f5f9;font-weight:700}
+                    .text-right{text-align:right}
+                    .income{color:#10b981}
+                    .expense{color:#ef4444}
+                    .footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:8px}
+                    .no-print{text-align:center;margin-bottom:15px}
+                    @media print{.no-print{display:none}@page{size:A4;margin:15mm}}
+                </style>
+            </head>
+            <body>
+                <div class="no-print">
+                    <button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    <button onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                </div>
+                <div class="header">
+                    <h1>JF! by Gadai</h1>
+                    <div class="store-info">🏪 ${Utils.escapeHtml(storeName)}</div>
+                    <div class="user-info">👤 ${Utils.escapeHtml(userName)} | 📅 ${printDateTime}</div>
+                    <h3>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h3>
+                </div>
+                ${printContent.querySelector('.table-container')?.innerHTML || ''}
+                <div class="footer">
+                    <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
+                    <div>${lang === 'id' ? 'Laporan ini dicetak secara elektronik dan tidak memerlukan tanda tangan' : '本报告为电子打印，无需签名'}</div>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     },
 
     printCurrentPage: function() {
@@ -583,14 +809,14 @@ const DashboardCore = {
             } else {
                 for (var t of transactions) {
                     rows += `<tr>
-                        <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}</td>
-                        <td>${typeMap[t.flow_type] || t.flow_type}</td>
-                        <td>${directionMap[t.direction] || t.direction}</td>
-                        <td>${sourceMap[t.source_target] || t.source_target}</td>
-                        <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}</td>
-                        <td>${Utils.escapeHtml(t.description || '-')}</td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                    </tr>`;
+                        <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
+                        <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
+                        <td>${directionMap[t.direction] || t.direction}<\/td>
+                        <td>${sourceMap[t.source_target] || t.source_target}<\/td>
+                        <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
+                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                    <\/tr>`;
                 }
             }
             
@@ -706,18 +932,18 @@ const DashboardCore = {
         };
         var rows = '';
         if (transactions.length === 0) {
-            rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
+            rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<\/td><\/tr>`;
         } else {
             for (var t of transactions) {
                 rows += `<tr>
-                    <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}</td>
-                    <td>${typeMap[t.flow_type] || t.flow_type}</td>
-                    <td>${directionMap[t.direction] || t.direction}</td>
-                    <td>${sourceMap[t.source_target] || t.source_target}</td>
-                    <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}</td>
-                    <td>${Utils.escapeHtml(t.description || '-')}</td>
-                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                </tr>`;
+                    <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
+                    <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
+                    <td>${directionMap[t.direction] || t.direction}<\/td>
+                    <td>${sourceMap[t.source_target] || t.source_target}<\/td>
+                    <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
+                    <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                <\/tr>`;
             }
         }
         tbody.innerHTML = rows;
@@ -753,7 +979,7 @@ const DashboardCore = {
                     .expense{color:#ef4444}
                     .footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:8px}
                     .no-print{text-align:center;margin-bottom:15px}
-                    .no-print button{padding:6px 14px;margin:0 5px;cursor:pointer}
+                    .no-print button{margin:0 5px;padding:6px 14px;cursor:pointer;border:none;border-radius:4px}
                     @media print{.no-print{display:none}@page{size:A4;margin:15mm}}
                 </style>
             </head>
@@ -836,11 +1062,11 @@ const DashboardCore = {
                 for (var u of users) {
                     var storeName = u.stores?.name || (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
                     rows += `<tr>
-                        <td>${Utils.escapeHtml(u.username)}</td>
-                        <td>${Utils.escapeHtml(u.name)}</td>
-                        <td>${roleMap[u.role] || u.role}</td>
-                        <td>${Utils.escapeHtml(storeName)}</td>
-                        <td>${Utils.formatDate(u.created_at)}</td>
+                        <td>${Utils.escapeHtml(u.username)}<\/td>
+                        <td>${Utils.escapeHtml(u.name)}<\/td>
+                        <td>${roleMap[u.role] || u.role}<\/td>
+                        <td>${Utils.escapeHtml(storeName)}<\/td>
+                        <td>${Utils.formatDate(u.created_at)}<\/td>
                         <td class="action-cell">
                             ${AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id ? `
                                 <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')">
@@ -849,7 +1075,7 @@ const DashboardCore = {
                                 </select>
                                 <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
                             ` : (u.id === AUTH.user?.id ? (lang === 'id' ? '👤 Anda sendiri' : '👤 当前用户') : '-')}
-                        </td>
+                        <\/td>
                     <\/tr>`;
                 }
             }
@@ -1332,12 +1558,12 @@ Terima kasih atas kepercayaan Anda.
             } else {
                 for (var t of transfers) {
                     rows += `<tr>
-                        <td>${Utils.formatDate(t.transfer_date)}</td>
-                        <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
-                        <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
-                        <td>${Utils.escapeHtml(t.description || '-')}</td>
-                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                        <td>${Utils.formatDate(t.transfer_date)}<\/td>
+                        <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
+                        <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
+                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                        <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
+                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
                     <\/tr>`;
                 }
             }
@@ -1425,12 +1651,12 @@ Terima kasih atas kepercayaan Anda.
         } else {
             for (var t of transfers) {
                 rows += `<tr>
-                    <td>${Utils.formatDate(t.transfer_date)}</td>
-                    <td>${typeMap[t.transfer_type] || t.transfer_type}</td>
-                    <td class="text-right">${Utils.formatCurrency(t.amount)}</td>
-                    <td>${Utils.escapeHtml(t.description || '-')}</td>
-                    <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>
-                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                    <td>${Utils.formatDate(t.transfer_date)}<\/td>
+                    <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
+                    <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                    <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
+                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
                 <\/tr>`;
             }
         }
@@ -1489,4 +1715,4 @@ if (typeof Utils !== 'undefined') {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-core.js v2.3 已加载 - 精简版（移除搜索功能 + 简化转账提示）');
+console.log('✅ app-dashboard-core.js v2.4 已加载 - 门店资金流水功能 + 权限控制');
