@@ -852,7 +852,7 @@ tbody tr:hover {
    ===================================================== */
 @media (max-width: 768px) {
     #app {
-        padding: var(--spacing-2) var(--spacing-2);
+        padding: 5px 10px;  /* 顶部5px，左右10px */
     }
 
     .card {
@@ -862,7 +862,7 @@ tbody tr:hover {
     
     /* 修复手机端顶部间隙过大的问题 */
     .page-header {
-        margin-bottom: var(--spacing-2);
+        margin-bottom: 5px; 
     }
     
     .card:first-of-type {
@@ -871,7 +871,7 @@ tbody tr:hover {
     
     .cashflow-summary {
         margin-top: 0;
-        margin-bottom: var(--spacing-3);
+        margin-bottom: 8px;
         padding: var(--spacing-3);
     }
 
