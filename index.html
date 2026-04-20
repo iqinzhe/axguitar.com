@@ -25,7 +25,7 @@
 <!-- 1. 第三方库 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 基础模块 -->
+<!-- ==================== 基础模块（必须先加载） ==================== -->
 <script src="js/supabase.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
@@ -36,12 +36,12 @@
 <script src="js/audit.js"></script>
 <script src="js/migration.js"></script>
 
-<!-- 功能模块 -->
+<!-- ==================== 功能模块 ==================== -->
 <script src="js/app-blacklist.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
 
-<!-- 仪表盘拆分模块 -->
+<!-- ==================== 仪表盘拆分模块（按顺序加载） ==================== -->
 <script src="js/app-dashboard-core.js"></script>
 <script src="js/app-dashboard-funds.js"></script>
 <script src="js/app-dashboard-users.js"></script>
@@ -51,9 +51,7 @@
 <script src="js/app-dashboard-expenses.js"></script>
 <script src="js/app-dashboard-report.js"></script>
 
-<!-- 调试入口 -->
-<script src="js/app-dashboard-debug.js"></script>
-
+<!-- ==================== 初始化脚本 ==================== -->
 <script>
 // ==================== 全局错误捕获 ====================
 window.addEventListener('error', function(e) {
@@ -76,6 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof window.APP.init !== 'function') {
                 throw new Error('APP.init is not a function');
             }
+            console.log('🚀 JF! by Gadai - 初始化中...');
             window.APP.init();
         } catch (err) {
             console.error('Init error:', err);
@@ -111,6 +110,19 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
+
+// ==================== 调试信息（可选，开发完成后可删除） ====================
+console.log('📋 模块加载顺序检查:');
+console.log('  - supabase.js: ' + (typeof SUPABASE !== 'undefined' ? '✅' : '❌'));
+console.log('  - utils.js: ' + (typeof Utils !== 'undefined' ? '✅' : '❌'));
+console.log('  - auth.js: ' + (typeof AUTH !== 'undefined' ? '✅' : '❌'));
+console.log('  - permission.js: ' + (typeof PERMISSION !== 'undefined' ? '✅' : '❌'));
+console.log('  - order.js: ' + (typeof Order !== 'undefined' ? '✅' : '❌'));
+console.log('  - store.js: ' + (typeof StoreManager !== 'undefined' ? '✅' : '❌'));
+console.log('  - storage.js: ' + (typeof Storage !== 'undefined' ? '✅' : '❌'));
+console.log('  - audit.js: ' + (typeof Audit !== 'undefined' ? '✅' : '❌'));
+console.log('  - migration.js: ' + (typeof Migration !== 'undefined' ? '✅' : '❌'));
+console.log('  - APP 对象: ' + (typeof window.APP !== 'undefined' ? '✅' : '❌'));
 </script>
 </body>
 </html>
