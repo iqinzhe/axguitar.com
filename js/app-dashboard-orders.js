@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.0
+// app-dashboard-orders.js - v2.0
 
 window.APP = window.APP || {};
 
@@ -15,33 +15,45 @@ const DashboardOrders = {
             var filters = { status: this.currentFilter, search: this.searchKeyword };
             var orders = await SUPABASE.getOrders(filters);
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            
+            // 获取所有门店信息（用于显示门店名称）
             var stores = await SUPABASE.getAllStores();
             var storeMap = {};
             for (var s of stores) storeMap[s.id] = s.name;
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 9 : 8}" class="text-center">${t('no_data')}</td></tr>`;
+                rows = `<tr><td colspan="1" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
-                    rows += `<tr>
-                        <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
-                        <td>${Utils.escapeHtml(o.customer_name)}</td>
-                        <td>${Utils.escapeHtml(o.collateral_name)}</td>
-                        <td class="text-right">${Utils.formatCurrency(o.loan_amount)}</td>
-                        <td class="text-right">${Utils.formatCurrency(o.admin_fee)}</td>
-                        <td class="text-right">${Utils.formatCurrency(o.monthly_interest || 0)}</td>
-                        <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'}</td>
-                        <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(storeMap[o.store_id] || '-')}</td>` : ''}
-                        <td class="action-cell">
-                            <button class="btn-small view-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">👁️ ${t('view')}</button>
-                            ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🗑️ ${t('delete')}</button>` : ''}
-                            <button class="btn-small print-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                        </td>
-                    　　　`;
+                    var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
+                    
+                    // 双行显示：第一行订单基本信息，第二行操作按钮
+                    rows += `<tr class="order-row" data-order-id="${o.order_id}">
+                        <td class="order-cell">
+                            <div class="order-info">
+                                <div class="order-line1">
+                                    <span class="order-id">${Utils.escapeHtml(o.order_id)}<\/span>
+                                    <span class="order-status"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/span>
+                                    <span class="order-customer">${Utils.escapeHtml(o.customer_name)}<\/span>
+                                </div>
+                                <div class="order-line2">
+                                    <span class="order-collateral">💎 ${Utils.escapeHtml(o.collateral_name)}<\/span>
+                                    <span class="order-amount">💰 ${Utils.formatCurrency(o.loan_amount)}<\/span>
+                                    <span class="order-interest">📈 ${Utils.formatCurrency(o.monthly_interest || 0)}/${lang === 'id' ? 'bln' : '月'}<\/span>
+                                    <span class="order-paid">✅ ${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/span>
+                                    ${isAdmin ? `<span class="order-store">🏪 ${Utils.escapeHtml(storeName)}<\/span>` : ''}
+                                </div>
+                            </div>
+                        <\/td>
+                        <td class="action-cell action-cell-second-row">
+                            <button class="btn-small view-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">👁️ ${t('view')}<\/button>
+                            ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}<\/button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🗑️ ${t('delete')}<\/button>` : ''}
+                            <button class="btn-small print-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}<\/button>
+                        <\/td>
+                    <\/tr>`;
                 }
             }
 
@@ -49,7 +61,6 @@ const DashboardOrders = {
                 <div class="page-header">
                     <h2>📋 ${t('order_list')}</h2>
                     <div class="header-actions">
-                        <button onclick="Storage.exportOrdersToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
@@ -67,18 +78,10 @@ const DashboardOrders = {
                 </div>
                 
                 <div class="table-container">
-                    <table class="data-table order-table">
+                    <table class="data-table order-double-row-table">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>${t('customer_name')}</th>
-                                <th>${t('collateral_name')}</th>
-                                <th class="text-right">${t('loan_amount')}</th>
-                                <th class="text-right">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                                <th class="text-right">${lang === 'id' ? 'Bunga/Bulan' : '月利息'}</th>
-                                <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                <th class="text-center">${lang === 'id' ? 'Status' : '状态'}</th>
-                                ${isAdmin ? `<th>${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                <th>${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</th>
                                 <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
                             </tr>
                         </thead>
@@ -86,12 +89,180 @@ const DashboardOrders = {
                     </table>
                 </div>`;
             
+            // 添加双行显示CSS样式
+            this._addOrderDoubleRowStyles();
             this._bindOrderTableEvents();
             
         } catch (err) {
             console.error("showOrderTable error:", err);
             alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
         }
+    },
+    
+    // 添加订单双行显示的CSS样式
+    _addOrderDoubleRowStyles: function() {
+        if (document.getElementById('order-double-row-styles')) return;
+        
+        var style = document.createElement('style');
+        style.id = 'order-double-row-styles';
+        style.textContent = `
+            /* 订单列表双行显示样式 */
+            .order-double-row-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            
+            .order-double-row-table th {
+                padding: 10px 12px;
+                background: var(--gray-100);
+                font-weight: 600;
+            }
+            
+            .order-double-row-table td {
+                padding: 0;
+                vertical-align: top;
+                border-bottom: 1px solid var(--gray-200);
+            }
+            
+            .order-cell {
+                padding: 10px 12px !important;
+                vertical-align: top;
+                width: 65%;
+            }
+            
+            .action-cell-second-row {
+                padding: 10px 12px !important;
+                vertical-align: middle;
+                width: 35%;
+                white-space: nowrap;
+            }
+            
+            .order-info {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            
+            .order-line1 {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 10px;
+                row-gap: 4px;
+            }
+            
+            .order-line2 {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 12px;
+                row-gap: 4px;
+                font-size: 0.75rem;
+                color: var(--gray-500);
+            }
+            
+            .order-id {
+                font-family: monospace;
+                font-weight: 600;
+                color: var(--primary-dark);
+                background: var(--primary-soft);
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.7rem;
+            }
+            
+            .order-customer {
+                font-weight: 500;
+                color: var(--gray-800);
+            }
+            
+            .order-collateral::before {
+                content: "💎";
+                font-size: 0.65rem;
+                margin-right: 2px;
+            }
+            
+            .order-amount::before {
+                content: "💰";
+                font-size: 0.65rem;
+                margin-right: 2px;
+            }
+            
+            .order-interest::before {
+                content: "📈";
+                font-size: 0.65rem;
+                margin-right: 2px;
+            }
+            
+            .order-paid::before {
+                content: "✅";
+                font-size: 0.65rem;
+                margin-right: 2px;
+            }
+            
+            .order-store::before {
+                content: "🏪";
+                font-size: 0.65rem;
+                margin-right: 2px;
+            }
+            
+            /* 限制文字最多2行 */
+            .order-line1 span,
+            .order-line2 span {
+                max-width: 180px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                white-space: normal;
+                word-break: break-word;
+            }
+            
+            /* 手机端适配 */
+            @media (max-width: 768px) {
+                .order-cell {
+                    width: 55%;
+                }
+                .action-cell-second-row {
+                    width: 45%;
+                    white-space: normal;
+                }
+                .action-cell-second-row .btn-small {
+                    display: inline-block;
+                    margin: 2px;
+                    font-size: 0.7rem;
+                    padding: 4px 8px;
+                }
+                .order-line1 {
+                    gap: 6px;
+                }
+                .order-line2 {
+                    gap: 6px;
+                }
+                .order-line1 span,
+                .order-line2 span {
+                    max-width: 120px;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .order-cell {
+                    width: 100%;
+                    display: block;
+                }
+                .action-cell-second-row {
+                    width: 100%;
+                    display: block;
+                    text-align: left;
+                    padding-top: 0 !important;
+                }
+                .order-row td {
+                    display: block;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     },
     
     _bindOrderTableEvents: function() {
@@ -242,9 +413,6 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 编辑订单功能已移除 ====================
-    // 员工和店长不能修改已保存的订单，因此 editOrder 和 updateOrder 已删除
-    
     // ==================== 删除订单（增强二次确认） ====================
     deleteOrder: async function(orderId) {
         var lang = Utils.lang;
@@ -292,7 +460,7 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 打印订单 ====================
+    // ==================== 打印订单（简化版，直接打印） ====================
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -319,7 +487,7 @@ const DashboardOrders = {
                     <td>${Utils.escapeHtml(typeText)}</td>
                     <td class="text-right">${Utils.escapeHtml(Utils.formatCurrency(p.amount))}</td>
                     <td>${Utils.escapeHtml(methodText)}</td>
-                </tr>`;
+                　　　`;
             }
             
             if (paymentRows === '') {
@@ -439,7 +607,6 @@ const DashboardOrders = {
                 <div class="page-header">
                     <h2>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</h2>
                     <div class="header-actions">
-                        <button onclick="Storage.exportPaymentsToCSV()" class="btn-export">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button>                  
                     </div>
@@ -510,4 +677,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v3.0 已加载 - 编辑功能已移除，锁定功能已移除');
+console.log('✅ app-dashboard-orders.js v2.0 已加载 - 双行显示，移除CSV导出，简化打印');
