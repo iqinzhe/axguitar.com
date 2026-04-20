@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.2（移除搜索功能）
+// app-dashboard-orders.js - v2.3（移除搜索功能版）
 
 window.APP = window.APP || {};
 
@@ -12,7 +12,6 @@ const DashboardOrders = {
         var profile = await SUPABASE.getCurrentProfile();
         var isAdmin = profile?.role === 'admin';
         try {
-            // 移除搜索过滤，只保留状态过滤
             var filters = { status: this.currentFilter, search: '' };
             var orders = await SUPABASE.getOrders(filters);
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
@@ -29,7 +28,6 @@ const DashboardOrders = {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                     var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
                     
-                    // 第一行：订单信息
                     rows += `
                         <tr class="order-info-row">
                             <td colspan="2" class="order-cell">
@@ -51,7 +49,6 @@ const DashboardOrders = {
                         </tr>
                     `;
                     
-                    // 第二行：操作按钮
                     rows += `
                         <tr class="order-action-row">
                             <td colspan="2" class="action-cell">
@@ -102,61 +99,48 @@ const DashboardOrders = {
         }
     },
     
-    // 添加订单双行显示的CSS样式
     _addOrderDoubleRowStyles: function() {
         if (document.getElementById('order-double-row-styles')) return;
         
         var style = document.createElement('style');
         style.id = 'order-double-row-styles';
         style.textContent = `
-            /* 订单列表双行显示样式 */
             .order-double-row-table {
                 width: 100%;
                 border-collapse: collapse;
             }
-            
             .order-double-row-table th {
                 padding: 10px 12px;
                 background: var(--gray-100);
                 font-weight: 600;
                 text-align: left;
             }
-            
-            /* 订单信息行 */
             .order-info-row {
                 border-top: 1px solid var(--gray-200);
             }
-            
             .order-info-row td {
                 padding: 12px 12px 6px 12px;
                 border-bottom: none;
             }
-            
-            /* 操作按钮行 */
             .order-action-row td {
                 padding: 6px 12px 12px 12px;
                 border-bottom: 1px solid var(--gray-200);
             }
-            
             .order-cell {
                 width: 100%;
             }
-            
             .action-cell {
                 width: 100%;
             }
-            
             .action-cell .btn-small {
                 margin-right: 8px;
                 margin-bottom: 4px;
             }
-            
             .order-info {
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
             }
-            
             .order-line1 {
                 display: flex;
                 flex-wrap: wrap;
@@ -164,7 +148,6 @@ const DashboardOrders = {
                 gap: 12px;
                 row-gap: 4px;
             }
-            
             .order-line2 {
                 display: flex;
                 flex-wrap: wrap;
@@ -174,7 +157,6 @@ const DashboardOrders = {
                 font-size: 0.75rem;
                 color: var(--gray-500);
             }
-            
             .order-id {
                 font-family: monospace;
                 font-weight: 600;
@@ -184,43 +166,35 @@ const DashboardOrders = {
                 border-radius: 4px;
                 font-size: 0.75rem;
             }
-            
             .order-customer {
                 font-weight: 500;
                 color: var(--gray-800);
             }
-            
             .order-collateral::before {
                 content: "💎";
                 font-size: 0.65rem;
                 margin-right: 2px;
             }
-            
             .order-amount::before {
                 content: "💰";
                 font-size: 0.65rem;
                 margin-right: 2px;
             }
-            
             .order-interest::before {
                 content: "📈";
                 font-size: 0.65rem;
                 margin-right: 2px;
             }
-            
             .order-paid::before {
                 content: "✅";
                 font-size: 0.65rem;
                 margin-right: 2px;
             }
-            
             .order-store::before {
                 content: "🏪";
                 font-size: 0.65rem;
                 margin-right: 2px;
             }
-            
-            /* 限制文字最多2行 */
             .order-line1 span,
             .order-line2 span {
                 max-width: 200px;
@@ -232,32 +206,14 @@ const DashboardOrders = {
                 white-space: normal;
                 word-break: break-word;
             }
-            
-            /* 手机端适配 */
             @media (max-width: 768px) {
-                .order-line1 {
-                    gap: 8px;
-                }
-                .order-line2 {
-                    gap: 8px;
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-                .action-cell .btn-small {
-                    display: inline-block;
-                    margin: 4px 4px 4px 0;
-                }
-                .order-line1 span,
-                .order-line2 span {
-                    max-width: 150px;
-                }
+                .order-line1 { gap: 8px; }
+                .order-line2 { gap: 8px; flex-direction: column; align-items: flex-start; }
+                .action-cell .btn-small { display: inline-block; margin: 4px 4px 4px 0; }
+                .order-line1 span, .order-line2 span { max-width: 150px; }
             }
-            
             @media (max-width: 480px) {
-                .order-line1 span,
-                .order-line2 span {
-                    max-width: 100%;
-                }
+                .order-line1 span, .order-line2 span { max-width: 100%; }
             }
         `;
         document.head.appendChild(style);
@@ -289,7 +245,7 @@ const DashboardOrders = {
         container.addEventListener('click', this._orderTableClickHandler);
     },
 
-    // 移除 searchOrders 和 resetSearch 方法
+    // 只保留状态筛选，移除搜索相关方法
     filterOrders: function(status) { 
         this.currentFilter = status; 
         this.showOrderTable(); 
@@ -322,10 +278,10 @@ const DashboardOrders = {
                         <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                         <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                         <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    </tr>`;
+                    <\/tr>`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
 
             document.getElementById("app").innerHTML = `
@@ -469,11 +425,11 @@ const DashboardOrders = {
                     <td>${Utils.escapeHtml(typeText)}</td>
                     <td class="text-right">${Utils.escapeHtml(Utils.formatCurrency(p.amount))}</td>
                     <td>${Utils.escapeHtml(methodText)}</td>
-                </tr>`;
+                <\/tr>`;
             }
             
             if (paymentRows === '') {
-                paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}</td></tr>`;
+                paymentRows = `<tr><td colspan="4" class="text-center">${lang === 'id' ? 'Tidak ada pembayaran' : '暂无缴费记录'}<\/td><\/tr>`;
             }
             
             var safeOrderId = Utils.escapeHtml(order.order_id);
@@ -572,7 +528,7 @@ const DashboardOrders = {
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
 
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}</td></tr>`
+                ? `<tr><td colspan="9" class="text-center">${Utils.t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
                     <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
                     <td class="customer-name">${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
@@ -583,7 +539,7 @@ const DashboardOrders = {
                     <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
                     <td>${Utils.escapeHtml(p.description || '-')}</td>
                     <td class="action-cell"><button class="view-order-from-payment" data-order-id="${Utils.escapeAttr(p.orders?.order_id || '')}" class="btn-small">👁️ ${Utils.t('view')}</button></td>
-                </tr>`).join('');
+                <\/tr>`).join('');
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -605,17 +561,7 @@ const DashboardOrders = {
                 <div class="table-container">
                     <table class="payment-table">
                         <thead>
-                            <tr>
-                                <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                                <th>${Utils.t('customer_name')}</th>
-                                <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
-                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
-                            </tr>
+                            <tr><th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th><th>${Utils.t('customer_name')}</th><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th>${lang === 'id' ? 'Jenis' : '类型'}</th><th>${lang === 'id' ? 'Bulan' : '月数'}</th><th>${lang === 'id' ? 'Jumlah' : '金额'}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${lang === 'id' ? 'Keterangan' : '说明'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
@@ -657,4 +603,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v2.2 已加载 - 移除搜索功能');
+console.log('✅ app-dashboard-orders.js v2.3 已加载 - 移除搜索功能');
