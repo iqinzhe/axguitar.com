@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.0
+// app-dashboard-orders.js - v2.1（双行显示修正版）
 
 window.APP = window.APP || {};
 
@@ -16,44 +16,51 @@ const DashboardOrders = {
             var orders = await SUPABASE.getOrders(filters);
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             
-            // 获取所有门店信息（用于显示门店名称）
             var stores = await SUPABASE.getAllStores();
             var storeMap = {};
             for (var s of stores) storeMap[s.id] = s.name;
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="1" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="2" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                     var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
                     
-                    // 双行显示：第一行订单基本信息，第二行操作按钮
-                    rows += `<tr class="order-row" data-order-id="${o.order_id}">
-                        <td class="order-cell">
-                            <div class="order-info">
-                                <div class="order-line1">
-                                    <span class="order-id">${Utils.escapeHtml(o.order_id)}<\/span>
-                                    <span class="order-status"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/span>
-                                    <span class="order-customer">${Utils.escapeHtml(o.customer_name)}<\/span>
+                    // 第一行：订单信息
+                    rows += `
+                        <tr class="order-info-row">
+                            <td colspan="2" class="order-cell">
+                                <div class="order-info">
+                                    <div class="order-line1">
+                                        <span class="order-id">${Utils.escapeHtml(o.order_id)}</span>
+                                        <span class="order-status"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></span>
+                                        <span class="order-customer">${Utils.escapeHtml(o.customer_name)}</span>
+                                    </div>
+                                    <div class="order-line2">
+                                        <span class="order-collateral">💎 ${Utils.escapeHtml(o.collateral_name)}</span>
+                                        <span class="order-amount">💰 ${Utils.formatCurrency(o.loan_amount)}</span>
+                                        <span class="order-interest">📈 ${Utils.formatCurrency(o.monthly_interest || 0)}/${lang === 'id' ? 'bln' : '月'}</span>
+                                        <span class="order-paid">✅ ${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</span>
+                                        ${isAdmin ? `<span class="order-store">🏪 ${Utils.escapeHtml(storeName)}</span>` : ''}
+                                    </div>
                                 </div>
-                                <div class="order-line2">
-                                    <span class="order-collateral">💎 ${Utils.escapeHtml(o.collateral_name)}<\/span>
-                                    <span class="order-amount">💰 ${Utils.formatCurrency(o.loan_amount)}<\/span>
-                                    <span class="order-interest">📈 ${Utils.formatCurrency(o.monthly_interest || 0)}/${lang === 'id' ? 'bln' : '月'}<\/span>
-                                    <span class="order-paid">✅ ${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/span>
-                                    ${isAdmin ? `<span class="order-store">🏪 ${Utils.escapeHtml(storeName)}<\/span>` : ''}
-                                </div>
-                            </div>
-                        <\/td>
-                        <td class="action-cell action-cell-second-row">
-                            <button class="btn-small view-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">👁️ ${t('view')}<\/button>
-                            ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}<\/button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🗑️ ${t('delete')}<\/button>` : ''}
-                            <button class="btn-small print-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}<\/button>
-                        <\/td>
-                    <\/tr>`;
+                            </td>
+                        </tr>
+                    `;
+                    
+                    // 第二行：操作按钮
+                    rows += `
+                        <tr class="order-action-row">
+                            <td colspan="2" class="action-cell">
+                                <button class="btn-small view-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">👁️ ${t('view')}</button>
+                                ${o.status === 'active' && !isAdmin ? `<button class="btn-small success payment-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                                ${PERMISSION.canDeleteOrder() ? `<button class="btn-small danger delete-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🗑️ ${t('delete')}</button>` : ''}
+                                <button class="btn-small print-order-btn" data-order-id="${Utils.escapeAttr(o.order_id)}">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            </td>
+                        </tr>
+                    `;
                 }
             }
 
@@ -81,15 +88,13 @@ const DashboardOrders = {
                     <table class="data-table order-double-row-table">
                         <thead>
                             <tr>
-                                <th>${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</th>
-                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                <th colspan="2">${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
             
-            // 添加双行显示CSS样式
             this._addOrderDoubleRowStyles();
             this._bindOrderTableEvents();
             
@@ -116,38 +121,49 @@ const DashboardOrders = {
                 padding: 10px 12px;
                 background: var(--gray-100);
                 font-weight: 600;
+                text-align: left;
             }
             
-            .order-double-row-table td {
-                padding: 0;
-                vertical-align: top;
+            /* 订单信息行 */
+            .order-info-row {
+                border-top: 1px solid var(--gray-200);
+            }
+            
+            .order-info-row td {
+                padding: 12px 12px 6px 12px;
+                border-bottom: none;
+            }
+            
+            /* 操作按钮行 */
+            .order-action-row td {
+                padding: 6px 12px 12px 12px;
                 border-bottom: 1px solid var(--gray-200);
             }
             
             .order-cell {
-                padding: 10px 12px !important;
-                vertical-align: top;
-                width: 65%;
+                width: 100%;
             }
             
-            .action-cell-second-row {
-                padding: 10px 12px !important;
-                vertical-align: middle;
-                width: 35%;
-                white-space: nowrap;
+            .action-cell {
+                width: 100%;
+            }
+            
+            .action-cell .btn-small {
+                margin-right: 8px;
+                margin-bottom: 4px;
             }
             
             .order-info {
                 display: flex;
                 flex-direction: column;
-                gap: 6px;
+                gap: 8px;
             }
             
             .order-line1 {
                 display: flex;
                 flex-wrap: wrap;
                 align-items: center;
-                gap: 10px;
+                gap: 12px;
                 row-gap: 4px;
             }
             
@@ -155,7 +171,7 @@ const DashboardOrders = {
                 display: flex;
                 flex-wrap: wrap;
                 align-items: center;
-                gap: 12px;
+                gap: 16px;
                 row-gap: 4px;
                 font-size: 0.75rem;
                 color: var(--gray-500);
@@ -166,9 +182,9 @@ const DashboardOrders = {
                 font-weight: 600;
                 color: var(--primary-dark);
                 background: var(--primary-soft);
-                padding: 2px 6px;
+                padding: 2px 8px;
                 border-radius: 4px;
-                font-size: 0.7rem;
+                font-size: 0.75rem;
             }
             
             .order-customer {
@@ -209,7 +225,7 @@ const DashboardOrders = {
             /* 限制文字最多2行 */
             .order-line1 span,
             .order-line2 span {
-                max-width: 180px;
+                max-width: 200px;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 display: -webkit-box;
@@ -221,44 +237,28 @@ const DashboardOrders = {
             
             /* 手机端适配 */
             @media (max-width: 768px) {
-                .order-cell {
-                    width: 55%;
-                }
-                .action-cell-second-row {
-                    width: 45%;
-                    white-space: normal;
-                }
-                .action-cell-second-row .btn-small {
-                    display: inline-block;
-                    margin: 2px;
-                    font-size: 0.7rem;
-                    padding: 4px 8px;
-                }
                 .order-line1 {
-                    gap: 6px;
+                    gap: 8px;
                 }
                 .order-line2 {
-                    gap: 6px;
+                    gap: 8px;
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                .action-cell .btn-small {
+                    display: inline-block;
+                    margin: 4px 4px 4px 0;
                 }
                 .order-line1 span,
                 .order-line2 span {
-                    max-width: 120px;
+                    max-width: 150px;
                 }
             }
             
             @media (max-width: 480px) {
-                .order-cell {
-                    width: 100%;
-                    display: block;
-                }
-                .action-cell-second-row {
-                    width: 100%;
-                    display: block;
-                    text-align: left;
-                    padding-top: 0 !important;
-                }
-                .order-row td {
-                    display: block;
+                .order-line1 span,
+                .order-line2 span {
+                    max-width: 100%;
                 }
             }
         `;
@@ -321,7 +321,6 @@ const DashboardOrders = {
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
             
-            // 空值保护
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
             
             var payRows = '';
@@ -413,26 +412,22 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 删除订单（增强二次确认） ====================
     deleteOrder: async function(orderId) {
         var lang = Utils.lang;
         
         try {
-            // 获取订单详细信息用于确认
             const order = await SUPABASE.getOrder(orderId);
             if (!order) {
                 alert(lang === 'id' ? '订单不存在' : '订单不存在');
                 return;
             }
             
-            // 详细确认信息
             const confirmMsg = lang === 'id'
                 ? `⚠️ 确认删除订单？\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n贷款金额: ${Utils.formatCurrency(order.loan_amount)}\n状态: ${order.status}\n\n此操作不可恢复，所有相关缴费记录也将被删除。\n\n确定要删除吗？`
                 : `⚠️ 确认删除订单？\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n贷款金额: ${Utils.formatCurrency(order.loan_amount)}\n状态: ${order.status}\n\n此操作不可恢复，所有相关缴费记录也将被删除。\n\n确定要删除吗？`;
             
             if (!confirm(confirmMsg)) return;
             
-            // 再次确认
             const finalConfirm = lang === 'id'
                 ? '最后确认：真的要删除此订单吗？此操作无法撤销。'
                 : '最后确认：真的要删除此订单吗？此操作无法撤销。';
@@ -441,7 +436,6 @@ const DashboardOrders = {
             
             await Order.delete(orderId);
             
-            // 记录操作日志
             if (window.Audit) {
                 await window.Audit.log('order_delete', JSON.stringify({
                     order_id: order.order_id,
@@ -460,7 +454,6 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 打印订单（简化版，直接打印） ====================
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -656,7 +649,6 @@ const DashboardOrders = {
     }
 };
 
-// 辅助函数：转义属性值
 function escapeAttr(str) {
     if (!str) return '';
     return String(str)
@@ -672,9 +664,8 @@ for (var key in DashboardOrders) {
     }
 }
 
-// 添加 escapeAttr 到 Utils（如果尚未添加）
 if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v2.0 已加载 - 双行显示，移除CSV导出，简化打印');
+console.log('✅ app-dashboard-orders.js v2.1 已加载 - 双行显示修正版（订单信息和操作分行）');
