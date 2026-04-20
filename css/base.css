@@ -1,5 +1,7 @@
+/* base.css - 完整修复版 v1.1 */
+
 /* =====================================================
-   base.css - v1.0  ===================================================== */
+   base.css - v1.1  ===================================================== */
 
 /* ---------- 1. 全局变量 ---------- */
 :root {
@@ -366,7 +368,7 @@ button.danger:hover,
     background: white;
     border-radius: var(--radius-lg);
     border: 1px solid var(--gray-200);
-    padding: var(--spacing-2) var(--spacing-2);
+    padding: var(--spacing-3) var(--spacing-2);  /* 修复：上下内边距增至 12px */
     text-align: center;
     transition: var(--transition);
 }
@@ -450,9 +452,10 @@ button.danger:hover,
     color: #f87171;
 }
 
+/* 修复：对比度优化 - 使用固定颜色替代 opacity */
 .cashflow-detail {
-    font-size: 0.7rem;
-    opacity: 0.7;
+    font-size: 0.75rem;      /* 原 0.7rem → 提高 */
+    color: #94a3b8;          /* 替代 opacity，更可控 */
     margin-top: var(--spacing-2);
     line-height: 1.4;
 }
@@ -846,7 +849,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   模态框
+   模态框 - 修复：使用 dvh 单位
    ===================================================== */
 .modal-overlay {
     position: fixed;
@@ -868,7 +871,7 @@ tbody tr:hover {
     padding: var(--spacing-6);
     width: 100%;
     max-width: 550px;
-    max-height: 85vh;
+    max-height: 85dvh;  /* 修复：使用 dvh 单位，兼容 iOS Safari */
     overflow-y: auto;
 }
 
@@ -1274,6 +1277,13 @@ tbody tr:hover {
     .cashflow-item .value {
         font-size: var(--font-md);
     }
+    
+    /* 修复：手机端 cashflow-detail 对比度 */
+    .cashflow-detail {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        opacity: 1;
+    }
 
     /* --- 仪表板栏：2列4行 --- */
     .stats-grid-optimized {
@@ -1386,7 +1396,7 @@ tbody tr:hover {
         margin-top: 10vh;
         padding: var(--spacing-4);
         max-width: calc(100% - 32px);
-        max-height: 75vh;
+        max-height: 75dvh;  /* 修复：使用 dvh 单位 */
     }
 
     .modal-actions {
@@ -1539,7 +1549,7 @@ tbody tr:hover {
 }
 
 /* =====================================================
-   打印样式
+   打印样式 - 统一放在 base.css 中，避免重复定义
    ===================================================== */
 @media print {
     @page {
@@ -1560,6 +1570,7 @@ tbody tr:hover {
         margin: 0;
     }
 
+    /* 隐藏非打印元素 */
     .no-print,
     .toolbar button:not(.print-btn),
     button:not(.print-btn),
@@ -1571,6 +1582,7 @@ tbody tr:hover {
         display: none !important;
     }
 
+    /* 显示打印按钮 */
     .toolbar {
         display: block !important;
     }
@@ -1579,6 +1591,7 @@ tbody tr:hover {
         display: inline-block !important;
     }
 
+    /* 卡片和表格打印样式 */
     .card,
     .stat-card,
     .cashflow-summary {
@@ -1604,6 +1617,7 @@ tbody tr:hover {
         color: black !important;
     }
 
+    /* 表格表头重复 */
     thead {
         display: table-header-group;
     }
@@ -1615,5 +1629,27 @@ tbody tr:hover {
     th, td {
         border: 1px solid #ccc !important;
         white-space: normal !important;
+    }
+    
+    /* 打印页眉页脚 */
+    .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #333;
+        padding-bottom: 10px;
+    }
+    
+    .print-footer {
+        display: block;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 9pt;
+        color: #666;
+        border-top: 1px solid #ccc;
+        padding-top: 8px;
     }
 }
