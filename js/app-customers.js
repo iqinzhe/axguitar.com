@@ -1,4 +1,4 @@
-// app-customers.js - v2.1（双行显示修正版）
+// app-customers.js - v2.2（修复图标重复）
 
 window.APP = window.APP || {};
 
@@ -34,7 +34,6 @@ const CustomersModule = {
                     var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     
-                    // 第一行：客户基本信息
                     rows += `
                         <tr class="customer-info-row">
                             <td colspan="2" class="customer-cell">
@@ -56,7 +55,6 @@ const CustomersModule = {
                         </tr>
                     `;
                     
-                    // 第二行：操作按钮（拉黑与删除用分隔线隔开，降低误操作风险）
                     rows += `
                         <tr class="customer-action-row">
                             <td colspan="2" class="action-cell">
@@ -144,63 +142,49 @@ const CustomersModule = {
         }
     },
     
-    // 添加客户双行显示的CSS样式
     _addDoubleRowStyles: function() {
         if (document.getElementById('customer-double-row-styles')) return;
         
         var style = document.createElement('style');
         style.id = 'customer-double-row-styles';
         style.textContent = `
-            /* 客户列表双行显示样式 */
             .customer-double-row-table {
                 width: 100%;
                 border-collapse: collapse;
             }
-            
             .customer-double-row-table th {
                 padding: 10px 12px;
                 background: var(--gray-100);
                 font-weight: 600;
                 text-align: left;
             }
-            
-            /* 客户信息行 */
             .customer-info-row {
                 border-top: 1px solid var(--gray-200);
             }
-            
             .customer-info-row td {
                 padding: 12px 12px 6px 12px;
                 border-bottom: none;
             }
-            
-            /* 操作按钮行 */
             .customer-action-row td {
                 padding: 6px 12px 12px 12px;
                 border-bottom: 1px solid var(--gray-200);
             }
-            
             .customer-cell {
                 width: 100%;
             }
-            
             .action-cell {
                 width: 100%;
             }
-            
             .action-cell .btn-small {
                 margin-right: 8px;
                 margin-bottom: 4px;
             }
-            
-            /* 操作按钮分组：常规操作 vs 危险操作 用竖线隔开 */
             .action-group-main {
                 display: inline-flex;
                 flex-wrap: wrap;
                 gap: 4px;
                 margin-right: 4px;
             }
-            
             .action-group-danger {
                 display: inline-flex;
                 flex-wrap: wrap;
@@ -209,8 +193,6 @@ const CustomersModule = {
                 padding-left: 12px;
                 border-left: 2px solid var(--gray-300);
             }
-            
-            /* 拉黑按钮：独立橙色样式，与普通warning区分 */
             .btn-blacklist {
                 background: #f97316 !important;
                 color: #fff !important;
@@ -221,13 +203,11 @@ const CustomersModule = {
                 opacity: 1;
                 background: #ea580c !important;
             }
-            
             .customer-info {
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
             }
-            
             .customer-line1 {
                 display: flex;
                 flex-wrap: wrap;
@@ -235,7 +215,6 @@ const CustomersModule = {
                 gap: 12px;
                 row-gap: 4px;
             }
-            
             .customer-line2 {
                 display: flex;
                 flex-wrap: wrap;
@@ -245,7 +224,6 @@ const CustomersModule = {
                 font-size: 0.75rem;
                 color: var(--gray-500);
             }
-            
             .customer-id {
                 font-family: monospace;
                 font-weight: 600;
@@ -255,48 +233,29 @@ const CustomersModule = {
                 border-radius: 4px;
                 font-size: 0.75rem;
             }
-            
             .customer-name {
                 font-weight: 600;
                 color: var(--gray-800);
             }
-            
             .customer-date {
                 font-size: 0.7rem;
                 color: var(--gray-500);
             }
-            
-            .customer-phone::before {
-                content: "📞";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .customer-phone {
+                margin-left: 2px;
             }
-            
-            .customer-ktp::before {
-                content: "🪪";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .customer-ktp {
+                margin-left: 2px;
             }
-            
-            .customer-ktp-addr::before {
-                content: "🏠";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .customer-ktp-addr {
+                margin-left: 2px;
             }
-            
-            .customer-living-addr::before {
-                content: "📍";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .customer-living-addr {
+                margin-left: 2px;
             }
-            
-            .customer-store::before {
-                content: "🏪";
-                font-size: 0.65rem;
-                margin-right: 2px;
+            .customer-store {
+                margin-left: 2px;
             }
-            
-            /* 限制文字最多2行 */
             .customer-line1 span,
             .customer-line2 span {
                 max-width: 200px;
@@ -308,32 +267,14 @@ const CustomersModule = {
                 white-space: normal;
                 word-break: break-word;
             }
-            
-            /* 手机端适配 */
             @media (max-width: 768px) {
-                .customer-line1 {
-                    gap: 8px;
-                }
-                .customer-line2 {
-                    gap: 8px;
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-                .action-cell .btn-small {
-                    display: inline-block;
-                    margin: 4px 4px 4px 0;
-                }
-                .customer-line1 span,
-                .customer-line2 span {
-                    max-width: 150px;
-                }
+                .customer-line1 { gap: 8px; }
+                .customer-line2 { gap: 8px; flex-direction: column; align-items: flex-start; }
+                .action-cell .btn-small { display: inline-block; margin: 4px 4px 4px 0; }
+                .customer-line1 span, .customer-line2 span { max-width: 150px; }
             }
-            
             @media (max-width: 480px) {
-                .customer-line1 span,
-                .customer-line2 span {
-                    max-width: 100%;
-                }
+                .customer-line1 span, .customer-line2 span { max-width: 100%; }
             }
         `;
         document.head.appendChild(style);
@@ -568,8 +509,6 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 辅助函数 ====================
-    
     updateServiceFeeDisplay: function() {
         var amountStr = document.getElementById("amount")?.value || "0";
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -648,7 +587,6 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单 ====================
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -1044,4 +982,4 @@ window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
 
-console.log('✅ app-customers.js v2.1 已加载 - 双行显示修正版（客户信息和操作分行）');
+console.log('✅ app-customers.js v2.2 已加载 - 修复图标重复');
