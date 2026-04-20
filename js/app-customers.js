@@ -1,4 +1,4 @@
-// app-customers.js - 完整修复版 v2.0
+// app-customers.js - v2.1（双行显示修正版）
 
 window.APP = window.APP || {};
 
@@ -14,7 +14,6 @@ const CustomersModule = {
         try {
             const customers = await SUPABASE.getCustomers();
             
-            // 获取所有门店信息用于显示门店名称
             const stores = await SUPABASE.getAllStores();
             const storeMap = {};
             for (var s of stores) {
@@ -23,10 +22,9 @@ const CustomersModule = {
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 1 : 1}" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="2" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var c of customers) {
-                    // 安全转义所有字段
                     var customerId = Utils.escapeHtml(c.customer_id || '-');
                     var registeredDate = Utils.formatDate(c.registered_date);
                     var name = Utils.escapeHtml(c.name);
@@ -36,31 +34,39 @@ const CustomersModule = {
                     var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     
-                    // 双行显示：第一行基本信息（限制每行最多2行文字）
-                    rows += `<tr class="customer-row" data-customer-id="${c.id}">
-                        <td class="customer-cell">
-                            <div class="customer-info">
-                                <div class="customer-line1">
-                                    <span class="customer-id">${customerId}</span>
-                                    <span class="customer-date">${registeredDate}</span>
-                                    <span class="customer-name">${name}</span>
+                    // 第一行：客户基本信息
+                    rows += `
+                        <tr class="customer-info-row">
+                            <td colspan="2" class="customer-cell">
+                                <div class="customer-info">
+                                    <div class="customer-line1">
+                                        <span class="customer-id">${customerId}</span>
+                                        <span class="customer-date">${registeredDate}</span>
+                                        <span class="customer-name">${name}</span>
+                                        <span class="customer-phone">📞 ${phone}</span>
+                                    </div>
+                                    <div class="customer-line2">
+                                        <span class="customer-ktp">🪪 ${ktpNumber}</span>
+                                        <span class="customer-ktp-addr">🏠 ${ktpAddress}</span>
+                                        <span class="customer-living-addr">📍 ${livingAddress}</span>
+                                        ${isAdmin ? `<span class="customer-store">🏪 ${storeName}</span>` : ''}
+                                    </div>
                                 </div>
-                                <div class="customer-line2">
-                                    <span class="customer-ktp">${ktpNumber}</span>
-                                    <span class="customer-phone">${phone}</span>
-                                    <span class="customer-ktp-addr">${ktpAddress}</span>
-                                    <span class="customer-living-addr">${livingAddress}</span>
-                                    ${isAdmin ? `<span class="customer-store">${storeName}</span>` : ''}
-                                </div>
-                            </div>
-                        </td>
-                        <td class="action-cell action-cell-second-row">
-                            ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}<\/button>` : ''}
-                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}<\/button>` : ''}
-                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}<\/button>` : ''}
-                            ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${c.id}')" class="btn-small warning">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}<\/button>` : ''}
-                        <\/td>
-                    <\/tr>`;
+                            </td>
+                        </tr>
+                    `;
+                    
+                    // 第二行：操作按钮
+                    rows += `
+                        <tr class="customer-action-row">
+                            <td colspan="2" class="action-cell">
+                                ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
+                                ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
+                                ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${c.id}')" class="btn-small warning">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+                                ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                            </td>
+                        </tr>
+                    `;
                 }
             }
 
@@ -113,11 +119,10 @@ const CustomersModule = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
                     <div class="table-container">
-                        <table class="customer-table customer-double-row-table">
+                        <table class="customer-double-row-table">
                             <thead>
                                 <tr>
-                                    <th>${lang === 'id' ? 'Data Nasabah' : '客户资料'}</th>
-                                    <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                    <th colspan="2">${lang === 'id' ? 'Data Nasabah' : '客户资料'}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -127,7 +132,6 @@ const CustomersModule = {
                 
                 ${addCustomerCardHtml}`;
                 
-            // 添加双行显示所需的CSS样式
             this._addDoubleRowStyles();
             
         } catch (error) {
@@ -136,12 +140,12 @@ const CustomersModule = {
         }
     },
     
-    // 添加双行显示的CSS样式
+    // 添加客户双行显示的CSS样式
     _addDoubleRowStyles: function() {
-        if (document.getElementById('double-row-styles')) return;
+        if (document.getElementById('customer-double-row-styles')) return;
         
         var style = document.createElement('style');
-        style.id = 'double-row-styles';
+        style.id = 'customer-double-row-styles';
         style.textContent = `
             /* 客户列表双行显示样式 */
             .customer-double-row-table {
@@ -153,41 +157,48 @@ const CustomersModule = {
                 padding: 10px 12px;
                 background: var(--gray-100);
                 font-weight: 600;
+                text-align: left;
             }
             
-            .customer-double-row-table td {
-                padding: 8px 12px;
-                vertical-align: top;
+            /* 客户信息行 */
+            .customer-info-row {
+                border-top: 1px solid var(--gray-200);
+            }
+            
+            .customer-info-row td {
+                padding: 12px 12px 6px 12px;
+                border-bottom: none;
+            }
+            
+            /* 操作按钮行 */
+            .customer-action-row td {
+                padding: 6px 12px 12px 12px;
                 border-bottom: 1px solid var(--gray-200);
             }
             
-            .customer-row td {
-                padding: 0;
-            }
-            
             .customer-cell {
-                padding: 10px 12px !important;
-                vertical-align: top;
-                width: 70%;
+                width: 100%;
             }
             
-            .action-cell-second-row {
-                padding: 10px 12px !important;
-                vertical-align: middle;
-                width: 30%;
-                white-space: nowrap;
+            .action-cell {
+                width: 100%;
+            }
+            
+            .action-cell .btn-small {
+                margin-right: 8px;
+                margin-bottom: 4px;
             }
             
             .customer-info {
                 display: flex;
                 flex-direction: column;
-                gap: 6px;
+                gap: 8px;
             }
             
             .customer-line1 {
                 display: flex;
                 flex-wrap: wrap;
-                align-items: baseline;
+                align-items: center;
                 gap: 12px;
                 row-gap: 4px;
             }
@@ -195,8 +206,8 @@ const CustomersModule = {
             .customer-line2 {
                 display: flex;
                 flex-wrap: wrap;
-                align-items: baseline;
-                gap: 12px;
+                align-items: center;
+                gap: 16px;
                 row-gap: 4px;
                 font-size: 0.75rem;
                 color: var(--gray-500);
@@ -207,14 +218,9 @@ const CustomersModule = {
                 font-weight: 600;
                 color: var(--primary-dark);
                 background: var(--primary-soft);
-                padding: 2px 6px;
+                padding: 2px 8px;
                 border-radius: 4px;
-                font-size: 0.7rem;
-            }
-            
-            .customer-date {
-                font-size: 0.7rem;
-                color: var(--gray-500);
+                font-size: 0.75rem;
             }
             
             .customer-name {
@@ -222,44 +228,39 @@ const CustomersModule = {
                 color: var(--gray-800);
             }
             
-            .customer-ktp,
-            .customer-phone,
-            .customer-ktp-addr,
-            .customer-living-addr,
-            .customer-store {
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-            }
-            
-            .customer-ktp::before {
-                content: "🪪";
-                font-size: 0.65rem;
-                opacity: 0.7;
+            .customer-date {
+                font-size: 0.7rem;
+                color: var(--gray-500);
             }
             
             .customer-phone::before {
                 content: "📞";
                 font-size: 0.65rem;
-                opacity: 0.7;
+                margin-right: 2px;
+            }
+            
+            .customer-ktp::before {
+                content: "🪪";
+                font-size: 0.65rem;
+                margin-right: 2px;
             }
             
             .customer-ktp-addr::before {
                 content: "🏠";
                 font-size: 0.65rem;
-                opacity: 0.7;
+                margin-right: 2px;
             }
             
             .customer-living-addr::before {
                 content: "📍";
                 font-size: 0.65rem;
-                opacity: 0.7;
+                margin-right: 2px;
             }
             
             .customer-store::before {
                 content: "🏪";
                 font-size: 0.65rem;
-                opacity: 0.7;
+                margin-right: 2px;
             }
             
             /* 限制文字最多2行 */
@@ -277,45 +278,25 @@ const CustomersModule = {
             
             /* 手机端适配 */
             @media (max-width: 768px) {
-                .customer-cell {
-                    width: 60%;
-                }
-                .action-cell-second-row {
-                    width: 40%;
-                    white-space: normal;
-                }
-                .action-cell-second-row .btn-small {
-                    display: inline-block;
-                    margin: 2px;
-                    font-size: 0.7rem;
-                    padding: 4px 8px;
-                }
                 .customer-line1 {
-                    gap: 6px;
+                    gap: 8px;
                 }
                 .customer-line2 {
-                    gap: 6px;
+                    gap: 8px;
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                .action-cell .btn-small {
+                    display: inline-block;
+                    margin: 4px 4px 4px 0;
                 }
                 .customer-line1 span,
                 .customer-line2 span {
-                    max-width: 120px;
+                    max-width: 150px;
                 }
             }
             
             @media (max-width: 480px) {
-                .customer-cell {
-                    width: 100%;
-                    display: block;
-                }
-                .action-cell-second-row {
-                    width: 100%;
-                    display: block;
-                    text-align: left;
-                    padding-top: 0 !important;
-                }
-                .customer-row td {
-                    display: block;
-                }
                 .customer-line1 span,
                 .customer-line2 span {
                     max-width: 100%;
@@ -325,12 +306,10 @@ const CustomersModule = {
         document.head.appendChild(style);
     },
 
-    // 拉黑客户功能
     blacklistCustomer: async function(customerId) {
         var lang = Utils.lang;
         
         try {
-            // 获取客户信息
             const { data: customer, error: customerError } = await supabaseClient
                 .from('customers')
                 .select('name, customer_id')
@@ -339,7 +318,6 @@ const CustomersModule = {
             
             if (customerError) throw customerError;
             
-            // 弹出原因输入框
             var reason = prompt(
                 lang === 'id' 
                     ? `Masukkan alasan blacklist untuk nasabah "${customer.name}" (${customer.customer_id}):\n\nContoh: Telat bayar, Penipuan, dll.`
@@ -352,20 +330,18 @@ const CustomersModule = {
                 return;
             }
             
-            // 确认操作
             if (!confirm(lang === 'id' 
                 ? `⚠️ Yakin akan blacklist nasabah ini?\n\nNama: ${customer.name}\nID: ${customer.customer_id}\nAlasan: ${reason}\n\nNasabah yang di-blacklist tidak dapat membuat order baru.`
                 : `⚠️ 确认拉黑此客户？\n\n客户名: ${customer.name}\n客户ID: ${customer.customer_id}\n原因: ${reason}\n\n被拉黑的客户将无法创建新订单。`)) {
                 return;
             }
             
-            // 调用黑名单模块添加
             if (typeof window.APP.addToBlacklist === 'function') {
                 await window.APP.addToBlacklist(customerId, reason);
                 alert(lang === 'id' 
                     ? `✅ Nasabah "${customer.name}" telah ditambahkan ke blacklist.`
                     : `✅ 客户 "${customer.name}" 已加入黑名单。`);
-                await this.showCustomers(); // 刷新列表
+                await this.showCustomers();
             } else {
                 throw new Error(lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
             }
@@ -916,7 +892,7 @@ const CustomersModule = {
                         ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     <\/td>
                 <\/tr>`;
-            }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            }).join('') : `<td><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -1035,4 +1011,4 @@ window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
 
-console.log('✅ app-customers.js v2.0 已加载 - 修复联表查询错误，双行显示，添加拉黑按钮');
+console.log('✅ app-customers.js v2.1 已加载 - 双行显示修正版（客户信息和操作分行）');
