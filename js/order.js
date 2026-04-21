@@ -1,4 +1,4 @@
-// order.js - v1.1（优化：使用可选链）
+// order.js - v1.0
 
 const Order = {
     async create(data) {
@@ -109,4 +109,3 @@ const Order = {
 
 window.Order = Order;
 
-console.log('✅ order.js v1.1 已加载 - 优化版');
