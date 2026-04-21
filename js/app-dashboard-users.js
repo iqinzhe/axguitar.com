@@ -1,10 +1,9 @@
-// app-dashboard-users.js - v1.0 用户管理模块（从 core.js 拆分）
+// app-dashboard-users.js - v1.1（统一表格样式）
 
 window.APP = window.APP || {};
 
 const DashboardUsers = {
 
-    // ==================== 用户管理 ====================
     showUserManagement: async function() {
         this.currentPage = 'userManagement';
         this.saveCurrentPageState();
@@ -30,17 +29,17 @@ const DashboardUsers = {
                     rows += `<tr>
                         <td>${Utils.escapeHtml(u.username)}<\/td>
                         <td>${Utils.escapeHtml(u.name)}<\/td>
-                        <td>${roleMap[u.role] || u.role}<\/td>
+                        <td class="text-center">${roleMap[u.role] || u.role}<\/td>
                         <td>${Utils.escapeHtml(storeName)}<\/td>
-                        <td>${Utils.formatDate(u.created_at)}<\/td>
+                        <td class="text-center">${Utils.formatDate(u.created_at)}<\/td>
                         <td class="action-cell">
                             ${AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id ? `
-                                <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')">
+                                <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')" class="role-select">
                                     <option value="store_manager" ${u.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
                                     <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option>
                                 </select>
                                 <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
-                            ` : (u.id === AUTH.user?.id ? (lang === 'id' ? '👤 Anda sendiri' : '👤 当前用户') : '-')}
+                            ` : (u.id === AUTH.user?.id ? (lang === 'id' ? '👤 当前用户' : '👤 当前用户') : '-')}
                         <\/td>
                     <\/tr>`;
                 }
@@ -63,9 +62,16 @@ const DashboardUsers = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Operator' : '操作员列表'}</h3>
                     <div class="table-container">
-                        <table class="data-table">
+                        <table class="data-table user-table">
                             <thead>
-                                <tr><th>${lang === 'id' ? 'Username' : '用户名'}</th><th>${lang === 'id' ? 'Nama' : '姓名'}</th><th>${lang === 'id' ? 'Role' : '角色'}</th><th>${lang === 'id' ? 'Toko' : '门店'}</th><th>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}</th><th>${lang === 'id' ? 'Aksi' : '操作'}</th></tr>
+                                <tr>
+                                    <th>${lang === 'id' ? 'Username' : '用户名'}</th>
+                                    <th>${lang === 'id' ? 'Nama' : '姓名'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Role' : '角色'}</th>
+                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                </tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -75,22 +81,62 @@ const DashboardUsers = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Tambah Operator Baru' : '新增操作员'}</h3>
                     <div class="form-grid">
-                        <div class="form-group"><label>${lang === 'id' ? 'Username (Email)' : '用户名（邮箱）'} *</label><input id="newUsername" placeholder="email@domain.com"></div>
-                        <div class="form-group"><label>${t('password')} *</label><input id="newPassword" type="password" placeholder="${t('password')}"></div>
-                        <div class="form-group"><label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label><input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}"></div>
-                        <div class="form-group"><label>${lang === 'id' ? 'Role' : '角色'} *</label>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Username (Email)' : '用户名（邮箱）'} *</label>
+                            <input id="newUsername" placeholder="email@domain.com">
+                        </div>
+                        <div class="form-group">
+                            <label>${t('password')} *</label>
+                            <input id="newPassword" type="password" placeholder="${t('password')}">
+                        </div>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Nama Lengkap' : '姓名'} *</label>
+                            <input id="newName" placeholder="${lang === 'id' ? 'Nama Lengkap' : '姓名'}">
+                        </div>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Role' : '角色'} *</label>
                             <select id="newRole">
                                 <option value="store_manager">${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
                                 <option value="staff">${lang === 'id' ? 'Staf' : '员工'}</option>
                             </select>
                         </div>
-                        <div class="form-group"><label>${lang === 'id' ? 'Toko' : '门店'}</label>
+                        <div class="form-group">
+                            <label>${lang === 'id' ? 'Toko' : '门店'}</label>
                             <select id="newStoreId">${storeOptions}</select>
                             <small>${lang === 'id' ? 'Kosongkan untuk akun pusat (admin tidak dapat ditambah)' : '留空表示总部账号（不可添加管理员）'}</small>
                         </div>
-                        <div class="form-actions"><button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Operator' : '添加操作员'}</button></div>
+                        <div class="form-actions">
+                            <button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Operator' : '添加操作员'}</button>
+                        </div>
                     </div>
-                </div>`;
+                </div>
+                
+                <style>
+                    .user-table .role-select {
+                        padding: 4px 8px;
+                        border-radius: 6px;
+                        border: 1px solid var(--gray-300);
+                        font-size: 0.75rem;
+                        margin-right: 8px;
+                    }
+                    @media (max-width: 768px) {
+                        .user-table th, .user-table td {
+                            padding: 6px 4px;
+                            font-size: 0.7rem;
+                        }
+                        .user-table .role-select {
+                            font-size: 0.65rem;
+                            padding: 2px 4px;
+                        }
+                        .action-cell {
+                            flex-direction: column;
+                            gap: 4px;
+                        }
+                        .action-cell .btn-small {
+                            width: 100%;
+                        }
+                    }
+                </style>`;
         } catch (error) {
             console.error("showUserManagement error:", error);
             alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败');
@@ -165,11 +211,10 @@ const DashboardUsers = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardUsers) {
     if (typeof DashboardUsers[key] === 'function') {
         window.APP[key] = DashboardUsers[key];
     }
 }
 
-console.log('✅ app-dashboard-users.js v1.0 已加载 - 用户管理模块');
+console.log('✅ app-dashboard-users.js v1.1 已加载 - 统一表格样式');
