@@ -1,4 +1,4 @@
-// migration.js - v1.2（优化：精简批量结果统计，使用 optional chaining）
+// migration.js - v1.0
 
 const Migration = {
     isMigrating: false,
@@ -222,4 +222,3 @@ const Migration = {
 
 window.Migration = Migration;
 
-console.log('✅ migration.js v1.2 已加载 - 优化版');
