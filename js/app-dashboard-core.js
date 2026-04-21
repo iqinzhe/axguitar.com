@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.8 优化版（添加汇总标识）
+// app-dashboard-core.js - v2.9 优化版（保存退出 + 确认提示）
 
 window.APP = window.APP || {};
 
@@ -230,11 +230,121 @@ const DashboardCore = {
         await this.router();
     },
 
+    // ==================== 保存退出功能（带确认提示） ====================
     logout: async function() {
+        var lang = Utils.lang;
+        var confirmMsg = lang === 'id' 
+            ? '💾 确认保存并退出登录？\n\n系统将自动保存当前数据，然后退出。'
+            : '💾 确认保存并退出登录？\n\n系统将自动保存当前数据，然后退出。';
+        
+        if (!confirm(confirmMsg)) return;
+        
+        // 显示保存中提示
+        var loadingMsg = this._showSavingMessage(lang === 'id' ? '正在保存数据...' : '正在保存数据...');
+        
+        try {
+            // 保存当前页面可能存在的未保存数据
+            await this._saveCurrentPageData();
+            
+            // 清除保存提示
+            this._hideSavingMessage(loadingMsg);
+            
+            // 显示退出提示
+            var exitMsg = lang === 'id' 
+                ? '✅ 数据已保存，正在退出...'
+                : '✅ 数据已保存，正在退出...';
+            alert(exitMsg);
+            
+        } catch (saveError) {
+            console.error("保存数据失败:", saveError);
+            this._hideSavingMessage(loadingMsg);
+            
+            var errorMsg = lang === 'id'
+                ? '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？'
+                : '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？';
+            
+            if (!confirm(errorMsg)) return;
+        }
+        
+        // 执行退出
         this.clearPageState();
         sessionStorage.clear();
         await AUTH.logout();
         await this.router();
+    },
+    
+    // 显示保存中的提示
+    _showSavingMessage: function(message) {
+        var div = document.createElement('div');
+        div.id = 'saving-overlay';
+        div.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10001; display:flex; align-items:center; justify-content:center;';
+        div.innerHTML = `<div style="background:white; padding:20px 40px; border-radius:12px; display:flex; flex-direction:column; align-items:center; gap:12px;">
+            <div class="loader" style="width:36px; height:36px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:spin 1s linear infinite;"></div>
+            <p style="margin:0; font-size:14px;">${message}</p>
+        </div>`;
+        document.body.appendChild(div);
+        
+        if (!document.getElementById('saving-spinner-style')) {
+            var style = document.createElement('style');
+            style.id = 'saving-spinner-style';
+            style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+            document.head.appendChild(style);
+        }
+        
+        return div;
+    },
+    
+    // 隐藏保存提示
+    _hideSavingMessage: function(element) {
+        if (element && element.remove) element.remove();
+    },
+    
+    // 保存当前页面数据（根据当前页面类型）
+    _saveCurrentPageData: async function() {
+        var currentPage = this.currentPage;
+        
+        switch(currentPage) {
+            case 'customers':
+                // 客户页面：检查是否有正在编辑的新客户表单
+                var customerName = document.getElementById("customerName");
+                if (customerName && customerName.value && customerName.value.trim()) {
+                    console.log("检测到未保存的客户信息，正在自动保存...");
+                    if (typeof window.APP.addCustomer === 'function') {
+                        await window.APP.addCustomer();
+                    }
+                }
+                break;
+                
+            case 'expenses':
+                // 支出页面：检查是否有正在填写的支出表单
+                var expenseAmount = document.getElementById("expenseAmount");
+                if (expenseAmount && expenseAmount.value && parseFloat(expenseAmount.value.replace(/[,\s]/g, '')) > 0) {
+                    console.log("检测到未保存的支出信息，正在自动保存...");
+                    if (typeof window.APP.addExpense === 'function') {
+                        await window.APP.addExpense();
+                    }
+                }
+                break;
+                
+            case 'orderTable':
+                // 订单列表页面：无需自动保存
+                console.log("订单列表页面，无需保存数据");
+                break;
+                
+            case 'dashboard':
+                // 仪表板页面：无需自动保存
+                console.log("仪表板页面，无需保存数据");
+                break;
+                
+            default:
+                console.log(`当前页面 (${currentPage}) 无需自动保存数据`);
+                break;
+        }
+        
+        // 等待一小段时间确保保存完成
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        return true;
     },
 
     toggleLanguage: function() {
@@ -341,9 +451,9 @@ const DashboardCore = {
             // 构建卡片
             var cards = [
                 { label: `${lang === 'id' ? '本月新增' : '本月新增'}/${t('total_orders')}`, value: `${thisMonthOrderCount}/${report.total_orders}`, type: 'text' },
+                { label: lang === 'id' ? '赤字 (流出-收入)' : '赤字 (流出-收入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
                 { label: t('active'), value: activeOrdersCount, type: 'number' },
                 { label: `${lang === 'id' ? '已结清' : '已结清'} / ${lang === 'id' ? '已失效' : '已失效'}`, value: `${completedOrdersCount} / ${expiredOrders.length}`, type: 'text' },
-                { label: lang === 'id' ? '赤字 (流出-收入)' : '赤字 (流出-收入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
                 { label: lang === 'id' ? 'Admin Fee' : '管理费', value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Service Fee' : '服务费', value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
@@ -357,7 +467,7 @@ const DashboardCore = {
                 </div>
             `).join('');
             
-            // Admin 工具栏：缴费明细改为"资金流水"，财务报表改为"业务报表"
+            // Admin 工具栏：缴费明细改为"资金流水"，财务报表改为"业务报表"，退出改为"保存退出"
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = `
@@ -373,7 +483,7 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
                     <button onclick="APP.navigateTo('userManagement')">👥 ${lang === 'id' ? 'Man. Kerja' : '工作管理'}</button>
                     <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
-                    <button onclick="APP.logout()">🚪 ${t('logout')}</button>
+                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button>
                 </div>`;
             } else {
                 toolbarHtml = `
@@ -385,11 +495,11 @@ const DashboardCore = {
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                         📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
-                    <button onclick="APP.logout()">🚪 ${t('logout')}</button>
+                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button>
                 </div>`;
             }
             
-            // Admin资金管理区域：添加"全部门店汇总"标识，只显示3个卡片
+            // Admin资金管理区域：添加"全部门店汇总"标识
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = `
@@ -514,7 +624,7 @@ const DashboardCore = {
                 ${bottomHtml}
             `;
         } catch (err) {
-            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">🚪 ${Utils.t('logout')}</button></div>`;
+            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button></div>`;
         }
     },
 
@@ -589,4 +699,4 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v2.8 已加载 - 添加汇总标识');
+console.log('✅ app-dashboard-core.js v2.9 已加载 - 保存退出 + 确认提示 + 汇总标识');
