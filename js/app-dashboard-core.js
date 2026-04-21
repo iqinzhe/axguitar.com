@@ -481,7 +481,7 @@ const DashboardCore = {
             if (isAdmin) {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3>💰 ${lang === 'id' ? '资金管理 (汇总全部门店)' : '资金管理 (汇总全部门店)'}</h3>
+                    <h3>💰 ${lang === 'id' ? '资金管理汇总 (全部门店)' : '资金管理汇总 (全部门店)'}</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
