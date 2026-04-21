@@ -1,4 +1,4 @@
-// app-customers.js - v1.1（新增固定还款功能）
+// app-customers.js - v1.2（所有用户可见字符串使用 Utils.t()，支持双语）
 
 window.APP = window.APP || {};
 
@@ -96,7 +96,7 @@ const CustomersModule = {
                 <div class="page-header">
                     <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
                     <div class="header-actions">                        
-                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -212,6 +212,7 @@ const CustomersModule = {
 
     blacklistCustomer: async function(customerId) {
         var lang = Utils.lang;
+        var t = Utils.t;
         
         try {
             const { data: customer, error: customerError } = await supabaseClient
@@ -264,9 +265,10 @@ const CustomersModule = {
     addCustomer: async function() {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
+        var t = Utils.t;
         
         if (isAdmin) {
-            alert(lang === 'id' ? '门店业务' : '门店业务');
+            alert(t('store_operation'));
             return;
         }
         
@@ -309,20 +311,20 @@ const CustomersModule = {
             await this.showCustomers();
         } catch (error) {
             console.error("addCustomer error:", error);
-            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            alert(t('save_failed') + ': ' + error.message);
         }
     },
 
     editCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
+        var t = Utils.t;
         
         if (isAdmin) {
-            alert(lang === 'id' ? '门店业务' : '门店业务');
+            alert(t('store_operation'));
             return;
         }
         
-        var t = (key) => Utils.t(key);
         try {
             const { data: c, error } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
             if (error) throw error;
@@ -368,9 +370,10 @@ const CustomersModule = {
     _saveEditCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
+        var t = Utils.t;
         
         if (isAdmin) {
-            alert(lang === 'id' ? '门店业务' : '门店业务');
+            alert(t('store_operation'));
             return;
         }
         
@@ -406,7 +409,7 @@ const CustomersModule = {
 
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
-        if (!confirm(lang === 'id' ? 'Hapus nasabah ini? Semua order terkait juga akan terhapus.' : '删除此客户？相关订单也将被删除。')) return;
+        if (!confirm(Utils.t('confirm_delete'))) return;
         
         try {
             const { data: orders, error: ordersError } = await supabaseClient.from('orders').select('id').eq('customer_id', customerId);
@@ -512,9 +515,10 @@ const CustomersModule = {
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
+        var t = Utils.t;
         
         if (isAdmin) {
-            alert(lang === 'id' ? '门店业务' : '门店业务');
+            alert(t('store_operation'));
             return;
         }
         
@@ -522,7 +526,7 @@ const CustomersModule = {
             const { data: existingOrders } = await supabaseClient
                 .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
             if (existingOrders && existingOrders.length > 0) {
-                alert(Utils.lang === 'id' ? 'Nasabah ini masih memiliki order aktif.' : '该客户还有未结清的订单。');
+                alert(t('customer_has_active_order'));
                 return;
             }
             
@@ -535,7 +539,6 @@ const CustomersModule = {
 
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
-            var t = (key) => Utils.t(key);
             
             const profile = await SUPABASE.getCurrentProfile();
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
@@ -548,12 +551,12 @@ const CustomersModule = {
                     <div class="repayment-type-options">
                         <label class="repayment-option">
                             <input type="radio" name="repaymentType" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)">
-                            <span class="option-title">💰 ${lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款'}</span>
+                            <span class="option-title">💰 ${t('flexible_repayment')}</span>
                             <span class="option-desc">${lang === 'id' ? 'Bunga 8%/bulan, bayar bunga dulu, pokok bisa kapan saja' : '利息8%/月，先付利息，本金随时可还'}</span>
                         </label>
                         <label class="repayment-option">
                             <input type="radio" name="repaymentType" value="fixed" onchange="APP.toggleRepaymentForm(this.value)">
-                            <span class="option-title">📅 ${lang === 'id' ? 'Cicilan Tetap' : '固定还款'}</span>
+                            <span class="option-title">📅 ${t('fixed_repayment')}</span>
                             <span class="option-desc">${lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok), tenor 3-10 bulan' : '每月固定还款（本金+利息），期限3-10个月'}</span>
                         </label>
                     </div>
@@ -564,7 +567,7 @@ const CustomersModule = {
             const fixedRepaymentForm = `
                 <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
                     <div class="form-group">
-                        <label>${lang === 'id' ? '📅 Jangka Waktu (Bulan)' : '📅 还款期限（月）'}</label>
+                        <label>📅 ${t('repayment_term')}</label>
                         <select id="repaymentTerm" class="repayment-term-select" onchange="APP.calculateFixedPayment()">
                             <option value="3">3 ${lang === 'id' ? 'bulan' : '个月'}</option>
                             <option value="4">4 ${lang === 'id' ? 'bulan' : '个月'}</option>
@@ -577,7 +580,7 @@ const CustomersModule = {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>${lang === 'id' ? '💰 Angsuran per Bulan' : '💰 每月还款额'}</label>
+                        <label>💰 ${t('monthly_payment')}</label>
                         <div id="monthlyPaymentDisplay" class="monthly-payment-display">-</div>
                         <small>${lang === 'id' ? 'Jumlah tetap yang harus dibayar setiap bulan' : '每月需支付的固定金额'}</small>
                     </div>
@@ -588,7 +591,7 @@ const CustomersModule = {
             const negotiationForm = `
                 <div class="negotiation-form">
                     <div class="form-group">
-                        <label>${lang === 'id' ? '📈 Suku Bunga (per bulan)' : '📈 月利率'}</label>
+                        <label>📈 ${t('agreed_rate')}</label>
                         <div class="rate-input-group">
                             <input type="number" id="agreedInterestRate" value="8" step="0.5" min="3" max="10" style="width:100px;" onchange="APP.calculateFixedPayment()">
                             <span>%</span>
@@ -596,7 +599,7 @@ const CustomersModule = {
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>${lang === 'id' ? '✨ Biaya Layanan (Service Fee)' : '✨ 服务费'}</label>
+                        <label>✨ ${t('agreed_service_fee')}</label>
                         <div class="rate-input-group">
                             <input type="number" id="agreedServiceFee" value="2" step="0.5" min="0" max="5" style="width:100px;">
                             <span>%</span>
@@ -769,7 +772,7 @@ const CustomersModule = {
             
         } catch (error) {
             console.error("createOrderForCustomer error:", error);
-            alert(Utils.lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
+            alert(lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
         }
     },
 
@@ -811,6 +814,7 @@ const CustomersModule = {
     // ==================== 保存订单 ====================
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
+        var t = Utils.t;
         var collateral = document.getElementById("collateral").value.trim();
         var collateralNote = document.getElementById("collateralNote").value.trim();
         var amountStr = document.getElementById("amount").value;
@@ -831,7 +835,7 @@ const CustomersModule = {
         var loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash';
         var fullCollateralName = collateralNote ? `${collateral} (${collateralNote})` : collateral;
         
-        if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
+        if (!collateral || !amount || amount <= 0) { alert(t('fill_all_fields')); return; }
         
         try {
             const { data: customer } = await supabaseClient
@@ -842,7 +846,7 @@ const CustomersModule = {
             
             const blacklistCheck = await window.APP.isBlacklisted(customerId);
             if (blacklistCheck.isBlacklisted) {
-                alert(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat order baru.' : '❌ 此客户已被拉黑，无法创建新订单。');
+                alert(t('blacklisted_cannot_order'));
                 return;
             }
             
@@ -875,7 +879,7 @@ const CustomersModule = {
                     } catch (serviceFeeError) {
                         console.error("服务费收取失败:", serviceFeeError);
                         alert(lang === 'id' 
-                            ? `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`
+                            ? `⚠️ Pesanan berhasil dibuat, tetapi biaya layanan gagal dicatat: ${serviceFeeError.message}`
                             : `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`);
                     }
                 }
@@ -886,7 +890,7 @@ const CustomersModule = {
             } catch (adminFeeError) {
                 console.error("管理费收取失败:", adminFeeError);
                 alert(lang === 'id' 
-                    ? `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`
+                    ? `⚠️ Pesanan berhasil dibuat, tetapi admin fee gagal dicatat: ${adminFeeError.message}`
                     : `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`);
             }
             
@@ -897,7 +901,7 @@ const CustomersModule = {
                 } catch (loanError) {
                     console.error("贷款发放记录失败:", loanError);
                     alert(lang === 'id' 
-                        ? `⚠️ 订单已创建，但贷款发放记录失败: ${loanError.message}`
+                        ? `⚠️ Pesanan berhasil dibuat, tetapi pencairan pinjaman gagal dicatat: ${loanError.message}`
                         : `⚠️ 订单已创建，但贷款发放记录失败: ${loanError.message}`);
                 }
             }
@@ -908,17 +912,17 @@ const CustomersModule = {
             
             var successMsg = repaymentType === 'fixed'
                 ? (lang === 'id' 
-                    ? `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyPayment)}\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%`
+                    ? `✅ Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nTenor: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyPayment)}\nBunga: ${agreedInterestRate}%\nService Fee: ${agreedServiceFee}%`
                     : `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyPayment)}\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%`)
                 : (lang === 'id'
-                    ? `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%\n最长可延期至10个月`
+                    ? `✅ Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nBunga: ${agreedInterestRate}%\nService Fee: ${agreedServiceFee}%\nMaksimal perpanjangan hingga 10 bulan`
                     : `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%\n最长可延期至10个月`);
             
             alert(successMsg);
             this.goBack();
         } catch (error) {
             console.error("saveOrderWithCustomer error:", error);
-            alert(lang === 'id' ? 'Gagal menyimpan order: ' + error.message : '保存订单失败：' + error.message);
+            alert(t('save_failed') + ': ' + error.message);
         }
     },
 
@@ -927,7 +931,7 @@ const CustomersModule = {
         this.currentCustomerId = customerId;
         this.saveCurrentPageState();
         var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
+        var t = Utils.t;
         try {
             const { data: customer } = await supabaseClient
                 .from('customers')
@@ -944,8 +948,8 @@ const CustomersModule = {
             var rows = orders && orders.length > 0 ? orders.map(o => {
                 var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                 var repaymentTypeText = o.repayment_type === 'fixed' 
-                    ? (lang === 'id' ? '固定' : '固定') 
-                    : (lang === 'id' ? '灵活' : '灵活');
+                    ? (lang === 'id' ? 'Tetap' : '固定') 
+                    : (lang === 'id' ? 'Fleksibel' : '灵活');
                 return `<tr>
                     <td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
                     <td class="date-cell">${Utils.formatDate(o.created_at)}<\/td>
@@ -1025,7 +1029,7 @@ const CustomersModule = {
         this.currentCustomerId = customerId;
         this.saveCurrentPageState();
         var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
+        var t = Utils.t;
         var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
         try {
             const { data: customer } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
