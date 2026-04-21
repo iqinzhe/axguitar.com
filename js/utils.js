@@ -1,4 +1,4 @@
-// utils.js - v1.1（新增固定还款计算函数）
+// utils.js - v1.2（补全所有翻译键，修复印尼语缺失）
 
 const Utils = {
     lang: 'id',
@@ -56,6 +56,7 @@ const Utils = {
 
     translations: {
         id: {
+            // 基础
             login: "Masuk", logout: "Keluar", username: "Nama Pengguna", password: "Kata Sandi",
             save: "Simpan", cancel: "Batal", back: "Kembali", delete: "Hapus", edit: "Edit",
             view: "Lihat", search: "Cari", reset: "Reset", confirm: "Konfirmasi",
@@ -99,7 +100,8 @@ const Utils = {
             clear_filter: "Bersihkan Filter", export: "Ekspor", close: "Tutup",
             search_description: "Cari deskripsi...", all_types: "Semua tipe",
             from_date: "Dari tanggal", to_date: "Sampai tanggal",
-            // 新增固定还款相关翻译
+            
+            // 固定还款相关
             fixed_repayment: "Cicilan Tetap",
             flexible_repayment: "Cicilan Fleksibel",
             repayment_type: "Jenis Cicilan",
@@ -113,9 +115,32 @@ const Utils = {
             early_settlement: "Pelunasan Dipercepat",
             interest_rebate: "Diskon Bunga",
             remaining_term: "Sisa Jangka Waktu",
-            confirm_early_settlement: "Konfirmasi Pelunasan Dipercepat"
+            confirm_early_settlement: "Konfirmasi Pelunasan Dipercepat",
+            
+            // 补充缺失的通用翻译
+            store_operation: "Operasi Toko",
+            save_failed: "Gagal menyimpan",
+            order_not_found: "Pesanan tidak ditemukan",
+            unauthorized: "Tidak memiliki akses",
+            order_locked: "Pesanan terkunci",
+            loan_already_disbursed: "Pinjaman sudah dicairkan",
+            backup_complete: "✅ Cadangan selesai!\\n\\nTelah mengekspor {orders} pesanan, {customers} data nasabah.",
+            restore_confirm: "⚠️ Pemulihan data akan menimpa semua data saat ini!\\n\\nTindakan ini tidak dapat dibatalkan.\\n\\nDisarankan untuk mengekspor data saat ini sebagai cadangan terlebih dahulu.\\n\\nYakin ingin melanjutkan?",
+            save_exit_confirm: "💾 Konfirmasi simpan dan keluar?\\n\\nSistem akan menyimpan data secara otomatis, lalu keluar.",
+            login_required: "Silakan login kembali",
+            invalid_amount: "Jumlah tidak valid",
+            payment_success: "Pembayaran berhasil",
+            order_completed: "Pesanan sudah lunas",
+            customer_has_active_order: "Nasabah ini masih memiliki pesanan aktif.",
+            blacklisted_cannot_order: "❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.",
+            interest_recorded: "Bunga {amount} telah dicatat",
+            principal_recorded: "Pembayaran pokok {amount} telah dicatat",
+            fixed_installment_paid: "Angsuran ke-{month} berhasil dibayar!\\nBunga: {interest}\\nPokok: {principal}\\nSisa angsuran: {remaining} bulan",
+            early_settlement_success: "✅ Pelunasan dipercepat berhasil!\\nJumlah pelunasan: {amount}",
+            confirm_logout: "Apakah Anda yakin ingin keluar? Data yang belum disimpan akan hilang."
         },
         zh: {
+            // 基础（保持原有，略作补充）
             login: "登录", logout: "退出", username: "用户名", password: "密码",
             save: "保存", cancel: "取消", back: "返回", delete: "删除", edit: "编辑",
             view: "查看", search: "搜索", reset: "重置", confirm: "确认",
@@ -159,7 +184,8 @@ const Utils = {
             clear_filter: "重置", export: "导出", close: "关闭",
             search_description: "搜索描述...", all_types: "全部类型",
             from_date: "开始日期", to_date: "结束日期",
-            // 新增固定还款相关翻译
+            
+            // 固定还款相关
             fixed_repayment: "固定还款",
             flexible_repayment: "灵活还款",
             repayment_type: "还款方式",
@@ -173,11 +199,41 @@ const Utils = {
             early_settlement: "提前结清",
             interest_rebate: "利息减免",
             remaining_term: "剩余期数",
-            confirm_early_settlement: "确认提前结清"
+            confirm_early_settlement: "确认提前结清",
+            
+            // 补充缺失的通用翻译
+            store_operation: "门店业务",
+            save_failed: "保存失败",
+            order_not_found: "订单不存在",
+            unauthorized: "无权访问",
+            order_locked: "订单已锁定",
+            loan_already_disbursed: "贷款已发放",
+            backup_complete: "✅ 备份完成！\\n\\n已导出 {orders} 条订单，{customers} 条客户记录。",
+            restore_confirm: "⚠️ 恢复数据将覆盖当前所有数据！\\n\\n此操作不可撤销。\\n\\n建议先导出当前数据作为备份。\\n\\n确定要继续吗？",
+            save_exit_confirm: "💾 确认保存并退出登录？\\n\\n系统将自动保存当前数据，然后退出。",
+            login_required: "请重新登录",
+            invalid_amount: "金额无效",
+            payment_success: "支付成功",
+            order_completed: "订单已结清",
+            customer_has_active_order: "该客户还有未结清的订单。",
+            blacklisted_cannot_order: "❌ 此客户已被拉黑，无法创建新订单。",
+            interest_recorded: "利息 {amount} 已记录",
+            principal_recorded: "还款 {amount} 已记录",
+            fixed_installment_paid: "第{month}期还款成功！\\n利息: {interest}\\n本金: {principal}\\n剩余期数: {remaining}个月",
+            early_settlement_success: "✅ 提前结清成功！\\n结清金额: {amount}",
+            confirm_logout: "确定要退出登录吗？未保存的数据将丢失。"
         }
     },
 
-    t(key) { return this.translations[this.lang][key] || key; },
+    t(key) { 
+        const text = this.translations[this.lang][key];
+        if (text === undefined) {
+            console.warn(`Missing translation key: ${key} for language ${this.lang}`);
+            return key;
+        }
+        return text;
+    },
+    
     setLanguage(lang) {
         if (lang === 'id' || lang === 'zh') {
             this.lang = lang;
@@ -338,7 +394,7 @@ const Utils = {
 
     wrapTableRow(cells, isHeader = false) {
         const tag = isHeader ? 'th' : 'td';
-        return '<tr>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '<tr>';
+        return '<tr>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '</tr>';
     },
 
     getServiceFeeOptionsHtml(selectedPercent = 0) {
