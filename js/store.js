@@ -1,4 +1,4 @@
-// store.js - v1.2（优化：Object.fromEntries 简化初始化）
+// store.js - v1.0
 
 const StoreManager = {
     stores: [],
@@ -461,4 +461,3 @@ const StoreManager = {
 
 window.StoreManager = StoreManager;
 
-console.log('✅ store.js v1.2 已加载 - 优化版');
