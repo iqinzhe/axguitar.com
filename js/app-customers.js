@@ -1,4 +1,4 @@
-// app-customers.js - v2.3（统一表格样式）
+// app-customers.js - v2.4（使用 escapeAttr 防护）
 
 window.APP = window.APP || {};
 
@@ -34,6 +34,9 @@ const CustomersModule = {
                     var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     
+                    // 使用 escapeAttr 保护 onclick 中的 ID
+                    var escapedId = Utils.escapeAttr(c.id);
+                    
                     rows += `<tr>
                         <td class="customer-id">${customerId}</td>
                         <td class="customer-name">${name}</td>
@@ -44,10 +47,10 @@ const CustomersModule = {
                         <td class="text-center">${registeredDate}</td>
                         ${isAdmin ? `<td class="text-center">${storeName}</td>` : ''}
                         <td class="action-cell">
-                            ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
-                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
-                            ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${c.id}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
-                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
                         </td>
                     </tr>`;
                 }
@@ -346,7 +349,7 @@ const CustomersModule = {
                             <textarea id="ec_livingAddr" rows="2" style="margin-top:8px;${livingSame ? 'display:none;' : ''}">${Utils.escapeHtml(c.living_address || '')}</textarea>
                         </div>
                         <div class="form-actions">
-                            <button onclick="APP._saveEditCustomer('${customerId}')" class="success">💾 ${t('save')}</button>
+                            <button onclick="APP._saveEditCustomer('${Utils.escapeAttr(customerId)}')" class="success">💾 ${t('save')}</button>
                             <button onclick="document.getElementById('editCustomerModal').remove()">✖ ${t('cancel')}</button>
                         </div>
                     </div>
@@ -639,7 +642,7 @@ const CustomersModule = {
                         </div>
                         
                         <div class="form-actions">
-                            <button onclick="APP.saveOrderWithCustomer('${customerId}')" class="success">💾 ${t('save')}</button>
+                            <button onclick="APP.saveOrderWithCustomer('${Utils.escapeAttr(customerId)}')" class="success">💾 ${t('save')}</button>
                             <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
                         </div>
                     </div>
@@ -708,7 +711,6 @@ const CustomersModule = {
                 try {
                     await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, 
                         lang === 'id' ? `Pencairan pinjaman dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'}` : `贷款发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'}`);
-                    console.log(`✅ 贷款发放: ${Utils.formatCurrency(amount)} 来源: ${loanSource}`);
                 } catch (loanError) {
                     console.error("贷款发放记录失败:", loanError);
                     alert(lang === 'id' 
@@ -720,7 +722,6 @@ const CustomersModule = {
             if (serviceFeeAmount > 0) {
                 try {
                     await Order.recordServiceFee(newOrder.order_id, 1, serviceFeeMethod);
-                    console.log(`✅ 服务费已收取: ${Utils.formatCurrency(serviceFeeAmount)} 方式: ${serviceFeeMethod}`);
                 } catch (serviceFeeError) {
                     console.error("服务费收取失败:", serviceFeeError);
                     alert(lang === 'id' 
@@ -732,7 +733,6 @@ const CustomersModule = {
             if (adminFeeAmount > 0) {
                 try {
                     await Order.recordAdminFee(newOrder.order_id, adminFeeMethod, adminFeeAmount);
-                    console.log(`✅ 管理费已收取: ${Utils.formatCurrency(adminFeeAmount)} 方式: ${adminFeeMethod}`);
                 } catch (adminFeeError) {
                     console.error("管理费收取失败:", adminFeeError);
                     alert(lang === 'id' 
@@ -778,8 +778,8 @@ const CustomersModule = {
                     <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
                     <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/td>
                     <td class="action-cell">
-                        <button onclick="APP.navigateTo('viewOrder',{orderId:'${o.order_id}'})" class="btn-small">👁️ ${t('view')}<\/button>
-                        ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                        <button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small">👁️ ${t('view')}<\/button>
+                        ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     <\/td>
                 <\/tr>`;
             }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`;
@@ -900,5 +900,3 @@ for (var key in CustomersModule) {
 window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
-
-console.log('✅ app-customers.js v2.3 已加载 - 统一表格样式');
