@@ -1,4 +1,4 @@
-// audit.js - v1.2（优化：抽取 _ts 辅助方法，消除冗余双语字符串）
+// audit.js - v1.0
 
 const Audit = {
 
@@ -352,4 +352,3 @@ const Audit = {
 
 window.Audit = Audit;
 
-console.log('✅ audit.js v1.2 已加载 - 优化版');
