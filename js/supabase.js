@@ -1,4 +1,4 @@
-// supabase.js - v4.3（删除搜索条件版）
+// supabase.js - v4.5（移除冗余的并发冲突处理）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -338,7 +338,6 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
-    // 修复：删除搜索条件
     async getOrders(filters = {}) {
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('orders').select('*');
@@ -350,7 +349,6 @@ const SupabaseAPI = {
         if (filters.status && filters.status !== 'all') {
             query = query.eq('status', filters.status);
         }
-        // 搜索功能已移除，不再支持 search 参数
         
         query = query.order('created_at', { ascending: false });
         
@@ -559,286 +557,177 @@ const SupabaseAPI = {
         return true;
     },
 
+    // 简化版：移除乐观锁重试逻辑
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
+        const currentOrder = await this.getOrder(orderId);
         
-        let retryCount = 0;
-        const maxRetries = 3;
-        let lastError = null;
-        
-        while (retryCount < maxRetries) {
-            try {
-                const currentOrder = await this.getOrder(orderId);
-                
-                if (currentOrder.status === 'completed') {
-                    throw new Error(Utils.lang === 'id' 
-                        ? '❌ 订单已结清，无法支付利息'
-                        : '❌ 订单已结清，无法支付利息');
-                }
-                
-                const loanAmount = currentOrder.loan_amount || 0;
-                const principalPaid = currentOrder.principal_paid || 0;
-                const remainingPrincipal = loanAmount - principalPaid;
-                const monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
-                const totalInterest = monthlyInterest * months;
-                
-                const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
-                const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + totalInterest;
-                
-                const { data: updatedOrder, error: updateError } = await supabaseClient
-                    .from('orders')
-                    .update({
-                        interest_paid_months: newInterestPaidMonths,
-                        interest_paid_total: newInterestPaidTotal,
-                        next_interest_due_date: this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths),
-                        monthly_interest: monthlyInterest,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('order_id', orderId)
-                    .eq('interest_paid_months', currentOrder.interest_paid_months || 0)
-                    .eq('status', 'active')
-                    .select();
-                
-                if (updateError) {
-                    throw new Error(Utils.lang === 'id' 
-                        ? `❌ 保存失败！${updateError.message}`
-                        : `❌ 保存失败！${updateError.message}`);
-                }
-                
-                if (!updatedOrder || updatedOrder.length === 0) {
-                    const checkOrder = await this.getOrder(orderId);
-                    
-                    if (checkOrder && checkOrder.interest_paid_months !== (currentOrder.interest_paid_months || 0)) {
-                        console.warn(`乐观锁冲突（并发）: 订单 ${orderId} 利息支付重试 ${retryCount + 1}/${maxRetries}`);
-                        retryCount++;
-                        if (retryCount >= maxRetries) {
-                            throw new Error(Utils.lang === 'id'
-                                ? `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`
-                                : `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`);
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 600));
-                        continue;
-                    } else {
-                        throw new Error(Utils.lang === 'id'
-                            ? `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`
-                            : `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`);
-                    }
-                }
-                
-                const paymentData = {
-                    order_id: currentOrder.id,
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'interest',
-                    months: months,
-                    amount: totalInterest,
-                    description: `Bunga ${months} bulan / 利息${months}个月`,
-                    recorded_by: profile.id,
-                    payment_method: paymentMethod
-                };
-                
-                const { error: paymentError } = await supabaseClient
-                    .from('payment_history')
-                    .insert(paymentData);
-                
-                if (paymentError) {
-                    throw new Error(Utils.lang === 'id'
-                        ? `❌ 利息记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`
-                        : `❌ 利息记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`);
-                }
-                
-                await this.recordCashFlow({
-                    store_id: currentOrder.store_id,
-                    flow_type: 'interest',
-                    direction: 'inflow',
-                    amount: totalInterest,
-                    source_target: paymentMethod,
-                    order_id: currentOrder.id,
-                    customer_id: currentOrder.customer_id,
-                    description: `Bunga ${months} bulan / 利息 - ${currentOrder.order_id}`,
-                    reference_id: currentOrder.order_id
-                });
-                
-                alert(Utils.lang === 'id' 
-                    ? `✅ 保存成功！利息 ${this.formatCurrency(totalInterest)} 已记录`
-                    : `✅ 保存成功！利息 ${this.formatCurrency(totalInterest)} 已记录`);
-                
-                return true;
-                
-            } catch (error) {
-                lastError = error;
-                const isConcurrencyError = error.message && (
-                    error.message.includes('并发操作冲突') ||
-                    error.message.includes('订单已被其他终端修改')
-                );
-                if (!isConcurrencyError || retryCount >= maxRetries - 1) {
-                    alert(error.message);
-                    throw error;
-                }
-                retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 600));
-            }
+        if (currentOrder.status === 'completed') {
+            throw new Error(Utils.lang === 'id' 
+                ? '❌ 订单已结清，无法支付利息'
+                : '❌ 订单已结清，无法支付利息');
         }
         
-        throw lastError;
+        const loanAmount = currentOrder.loan_amount || 0;
+        const principalPaid = currentOrder.principal_paid || 0;
+        const remainingPrincipal = loanAmount - principalPaid;
+        const monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+        const totalInterest = monthlyInterest * months;
+        
+        const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
+        const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + totalInterest;
+        
+        const { error: updateError } = await supabaseClient
+            .from('orders')
+            .update({
+                interest_paid_months: newInterestPaidMonths,
+                interest_paid_total: newInterestPaidTotal,
+                next_interest_due_date: this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths),
+                monthly_interest: monthlyInterest,
+                updated_at: new Date().toISOString()
+            })
+            .eq('order_id', orderId);
+        
+        if (updateError) throw updateError;
+        
+        const paymentData = {
+            order_id: currentOrder.id,
+            date: new Date().toISOString().split('T')[0],
+            type: 'interest',
+            months: months,
+            amount: totalInterest,
+            description: `Bunga ${months} bulan / 利息${months}个月`,
+            recorded_by: profile.id,
+            payment_method: paymentMethod
+        };
+        
+        const { error: paymentError } = await supabaseClient
+            .from('payment_history')
+            .insert(paymentData);
+        
+        if (paymentError) throw paymentError;
+        
+        await this.recordCashFlow({
+            store_id: currentOrder.store_id,
+            flow_type: 'interest',
+            direction: 'inflow',
+            amount: totalInterest,
+            source_target: paymentMethod,
+            order_id: currentOrder.id,
+            customer_id: currentOrder.customer_id,
+            description: `Bunga ${months} bulan / 利息 - ${currentOrder.order_id}`,
+            reference_id: currentOrder.order_id
+        });
+        
+        alert(Utils.lang === 'id' 
+            ? `✅ 保存成功！利息 ${this.formatCurrency(totalInterest)} 已记录`
+            : `✅ 保存成功！利息 ${this.formatCurrency(totalInterest)} 已记录`);
+        
+        return true;
     },
 
+    // 简化版：移除乐观锁重试逻辑
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
+        const currentOrder = await this.getOrder(orderId);
         
-        let retryCount = 0;
-        const maxRetries = 3;
-        let lastError = null;
-        
-        while (retryCount < maxRetries) {
-            try {
-                const currentOrder = await this.getOrder(orderId);
-                
-                if (currentOrder.status === 'completed') {
-                    throw new Error(Utils.lang === 'id' 
-                        ? '❌ 订单已结清，无法还款'
-                        : '❌ 订单已结清，无法还款');
-                }
-                
-                const loanAmount = currentOrder.loan_amount || 0;
-                const principalPaid = currentOrder.principal_paid || 0;
-                const remainingPrincipal = loanAmount - principalPaid;
-                
-                if (remainingPrincipal <= 0) {
-                    throw new Error(Utils.lang === 'id' 
-                        ? '❌ 本金已结清，无需还款'
-                        : '❌ 本金已结清，无需还款');
-                }
-                
-                let paidAmount = amount;
-                
-                if (amount > remainingPrincipal) {
-                    const confirmMsg = Utils.lang === 'id' 
-                        ? `⚠️ 输入金额超过剩余本金。\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`
-                        : `⚠️ 输入金额超过剩余本金。\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`;
-                    
-                    if (!confirm(confirmMsg)) {
-                        throw new Error(Utils.lang === 'id' ? '付款已取消' : '付款已取消');
-                    }
-                    paidAmount = remainingPrincipal;
-                }
-                
-                const newPrincipalPaid = principalPaid + paidAmount;
-                const newPrincipalRemaining = loanAmount - newPrincipalPaid;
-                
-                let updates = { 
-                    principal_paid: newPrincipalPaid, 
-                    principal_remaining: newPrincipalRemaining,
-                    updated_at: new Date().toISOString()
-                };
-                
-                const isCompleted = newPrincipalRemaining <= 0;
-                if (isCompleted) {
-                    updates.status = 'completed';
-                    updates.monthly_interest = 0;
-                    updates.completed_at = new Date().toISOString();
-                } else {
-                    updates.monthly_interest = newPrincipalRemaining * (Utils.MONTHLY_INTEREST_RATE || 0.10);
-                }
-                
-                const { data: updatedOrder, error: updateError } = await supabaseClient
-                    .from('orders')
-                    .update(updates)
-                    .eq('order_id', orderId)
-                    .eq('principal_paid', principalPaid)
-                    .eq('status', 'active')
-                    .select();
-                
-                if (updateError) {
-                    throw new Error(Utils.lang === 'id' 
-                        ? `❌ 保存失败！${updateError.message}`
-                        : `❌ 保存失败！${updateError.message}`);
-                }
-                
-                if (!updatedOrder || updatedOrder.length === 0) {
-                    const checkOrder = await this.getOrder(orderId);
-                    
-                    if (checkOrder && checkOrder.principal_paid !== principalPaid) {
-                        console.warn(`乐观锁冲突（并发）: 订单 ${orderId} 本金支付重试 ${retryCount + 1}/${maxRetries}`);
-                        retryCount++;
-                        if (retryCount >= maxRetries) {
-                            throw new Error(Utils.lang === 'id'
-                                ? `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`
-                                : `❌ 保存失败！检测到并发操作冲突，订单已被其他终端修改。\n\n订单号: ${orderId}\n请刷新页面后重新操作。`);
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 600));
-                        continue;
-                    } else {
-                        throw new Error(Utils.lang === 'id'
-                            ? `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`
-                            : `❌ 保存失败！数据库拒绝了此次更新，可能是权限不足（RLS策略）。\n\n订单号: ${orderId}\n请刷新页面后重试，或联系管理员检查账号权限。`);
-                    }
-                }
-                
-                const isFullRepayment = paidAmount >= remainingPrincipal;
-                const description = isFullRepayment 
-                    ? (Utils.lang === 'id' ? '✅ 全额还款结清' : '✅ 全额还款结清')
-                    : (Utils.lang === 'id' ? '部分还款' : '部分还款');
-                
-                const paymentData = {
-                    order_id: currentOrder.id,
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'principal',
-                    amount: paidAmount,
-                    description: description,
-                    recorded_by: profile.id,
-                    payment_method: paymentMethod
-                };
-                
-                const { error: paymentError } = await supabaseClient
-                    .from('payment_history')
-                    .insert(paymentData);
-                
-                if (paymentError) {
-                    throw new Error(Utils.lang === 'id'
-                        ? `❌ 还款记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`
-                        : `❌ 还款记录写入失败，请重试。\n\n错误详情: ${paymentError.message}\n\n订单金额已暂存，请立即联系管理员核实账本。`);
-                }
-                
-                await this.recordCashFlow({
-                    store_id: currentOrder.store_id,
-                    flow_type: 'principal',
-                    direction: 'inflow',
-                    amount: paidAmount,
-                    source_target: paymentMethod,
-                    order_id: currentOrder.id,
-                    customer_id: currentOrder.customer_id,
-                    description: isFullRepayment ? '全额还款结清' : '部分还款',
-                    reference_id: currentOrder.order_id
-                });
-                
-                if (isFullRepayment) {
-                    alert(Utils.lang === 'id' 
-                        ? `✅ 保存成功！本金已结清，订单完成。`
-                        : `✅ 保存成功！本金已结清，订单完成。`);
-                } else {
-                    alert(Utils.lang === 'id' 
-                        ? `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录`
-                        : `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录`);
-                }
-                
-                return true;
-                
-            } catch (error) {
-                lastError = error;
-                const isConcurrencyError = error.message && (
-                    error.message.includes('并发操作冲突') ||
-                    error.message.includes('订单已被其他终端修改')
-                );
-                if (!isConcurrencyError || retryCount >= maxRetries - 1) {
-                    alert(error.message);
-                    throw error;
-                }
-                retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 600));
-            }
+        if (currentOrder.status === 'completed') {
+            throw new Error(Utils.lang === 'id' 
+                ? '❌ 订单已结清，无法还款'
+                : '❌ 订单已结清，无法还款');
         }
         
-        throw lastError;
+        const loanAmount = currentOrder.loan_amount || 0;
+        const principalPaid = currentOrder.principal_paid || 0;
+        const remainingPrincipal = loanAmount - principalPaid;
+        
+        if (remainingPrincipal <= 0) {
+            throw new Error(Utils.lang === 'id' 
+                ? '❌ 本金已结清，无需还款'
+                : '❌ 本金已结清，无需还款');
+        }
+        
+        let paidAmount = amount;
+        
+        if (amount > remainingPrincipal) {
+            const confirmMsg = Utils.lang === 'id' 
+                ? `⚠️ 输入金额超过剩余本金。\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`
+                : `⚠️ 输入金额超过剩余本金。\n\n是否支付 ${this.formatCurrency(remainingPrincipal)} 结清本金？`;
+            
+            if (!confirm(confirmMsg)) {
+                throw new Error(Utils.lang === 'id' ? '付款已取消' : '付款已取消');
+            }
+            paidAmount = remainingPrincipal;
+        }
+        
+        const newPrincipalPaid = principalPaid + paidAmount;
+        const newPrincipalRemaining = loanAmount - newPrincipalPaid;
+        
+        let updates = { 
+            principal_paid: newPrincipalPaid, 
+            principal_remaining: newPrincipalRemaining,
+            updated_at: new Date().toISOString()
+        };
+        
+        const isFullRepayment = newPrincipalRemaining <= 0;
+        if (isFullRepayment) {
+            updates.status = 'completed';
+            updates.monthly_interest = 0;
+            updates.completed_at = new Date().toISOString();
+        } else {
+            updates.monthly_interest = newPrincipalRemaining * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+        }
+        
+        const { error: updateError } = await supabaseClient
+            .from('orders')
+            .update(updates)
+            .eq('order_id', orderId);
+        
+        if (updateError) throw updateError;
+        
+        const description = isFullRepayment 
+            ? (Utils.lang === 'id' ? '✅ 全额还款结清' : '✅ 全额还款结清')
+            : (Utils.lang === 'id' ? '部分还款' : '部分还款');
+        
+        const paymentData = {
+            order_id: currentOrder.id,
+            date: new Date().toISOString().split('T')[0],
+            type: 'principal',
+            amount: paidAmount,
+            description: description,
+            recorded_by: profile.id,
+            payment_method: paymentMethod
+        };
+        
+        const { error: paymentError } = await supabaseClient
+            .from('payment_history')
+            .insert(paymentData);
+        
+        if (paymentError) throw paymentError;
+        
+        await this.recordCashFlow({
+            store_id: currentOrder.store_id,
+            flow_type: 'principal',
+            direction: 'inflow',
+            amount: paidAmount,
+            source_target: paymentMethod,
+            order_id: currentOrder.id,
+            customer_id: currentOrder.customer_id,
+            description: isFullRepayment ? '全额还款结清' : '部分还款',
+            reference_id: currentOrder.order_id
+        });
+        
+        if (isFullRepayment) {
+            alert(Utils.lang === 'id' 
+                ? `✅ 保存成功！本金已结清，订单完成。`
+                : `✅ 保存成功！本金已结清，订单完成。`);
+        } else {
+            alert(Utils.lang === 'id' 
+                ? `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录`
+                : `✅ 保存成功！本金还款 ${this.formatCurrency(paidAmount)} 已记录`);
+        }
+        
+        return true;
     },
 
     async updateOrder(orderId, updateData, customerId) {
@@ -1078,6 +967,7 @@ const SupabaseAPI = {
         return data;
     },
 
+    // 修复：移除有歧义的 orders 关联查询
     async getCashFlowRecords(storeId = null, startDate = null, endDate = null) {
         const profile = await this.getCurrentProfile();
         const targetStoreId = storeId || profile?.store_id;
@@ -1086,9 +976,10 @@ const SupabaseAPI = {
             throw new Error('Unauthorized');
         }
         
+        // 移除 .select('*, orders(order_id, customer_name)') 避免多外键歧义
         let query = supabaseClient
             .from('cash_flow_records')
-            .select('*, orders(order_id, customer_name)')
+            .select('*')
             .eq('is_voided', false)
             .order('recorded_at', { ascending: false });
         
@@ -1488,4 +1379,4 @@ const SupabaseAPI = {
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
 
-console.log('✅ supabase.js v4.3 已加载 - 删除搜索条件版');
+console.log('✅ supabase.js v4.5 已加载 - 移除冗余并发冲突处理，简化利息/本金记录');
