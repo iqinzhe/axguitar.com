@@ -1,11 +1,4 @@
-// storage.js - 完整修复版 v3.0
-// 功能：
-// 1. 完整数据备份（导出所有数据）
-// 2. 完整数据恢复（导入备份数据）
-// 3. 选择性恢复（仅恢复订单、客户等）
-// 4. 备份文件格式验证
-// 5. 恢复进度显示
-// 6. 操作日志记录
+// storage.js - 完整修复版 v3.1（修复数据隔离问题）
 
 const Storage = {
 
@@ -20,29 +13,59 @@ const Storage = {
             // 获取当前用户信息
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
+            const currentStoreId = profile?.store_id;
             
-            // 并行获取所有数据
-            const [ordersResult, customersResult, expensesResult, storesResult, paymentsResult, cashFlowsResult, blacklistResult] = await Promise.all([
-                supabaseClient.from('orders').select('*'),
-                supabaseClient.from('customers').select('*'),
-                supabaseClient.from('expenses').select('*'),
-                SUPABASE.getAllStores(),
-                SUPABASE.getAllPayments(),
-                SUPABASE.getCashFlowRecords(),
-                supabaseClient.from('blacklist').select('*')
-            ]);
+            // ========== 使用门店隔离的查询方法 ==========
+            
+            // 1. 订单 - 使用已有的 getOrders()（自动过滤门店）
+            const orders = await SUPABASE.getOrders();
+            
+            // 2. 客户 - 使用已有的 getCustomers()（自动过滤门店）
+            const customers = await SUPABASE.getCustomers();
+            
+            // 3. 支出 - 需要手动过滤（如果非管理员）
+            let expensesQuery = supabaseClient.from('expenses').select('*');
+            if (!isAdmin && currentStoreId) {
+                expensesQuery = expensesQuery.eq('store_id', currentStoreId);
+            }
+            const expensesResult = await expensesQuery;
+            
+            // 4. 门店 - 仅管理员可见全部，非管理员只可见自己的门店
+            let storesResult = [];
+            if (isAdmin) {
+                storesResult = await SUPABASE.getAllStores();
+            } else if (currentStoreId) {
+                const { data: storeData } = await supabaseClient
+                    .from('stores')
+                    .select('*')
+                    .eq('id', currentStoreId);
+                storesResult = storeData || [];
+            }
+            
+            // 5. 缴费记录 - 使用已有的 getAllPayments()（自动过滤门店）
+            const paymentsResult = await SUPABASE.getAllPayments();
+            
+            // 6. 资金流水 - 使用已有的 getCashFlowRecords()（自动过滤门店）
+            const cashFlowsResult = await SUPABASE.getCashFlowRecords();
+            
+            // 7. 黑名单 - 手动过滤（如果非管理员）
+            let blacklistQuery = supabaseClient.from('blacklist').select('*');
+            if (!isAdmin && currentStoreId) {
+                blacklistQuery = blacklistQuery.eq('store_id', currentStoreId);
+            }
+            const blacklistResult = await blacklistQuery;
             
             const backupData = {
-                version: '3.0',
+                version: '3.1',
                 exported_at: new Date().toISOString(),
                 exported_by: profile?.name || 'Unknown',
                 exported_by_id: profile?.id,
-                store_id: profile?.store_id,
+                store_id: currentStoreId,
                 is_admin: isAdmin,
                 data: {
                     stores: storesResult || [],
-                    orders: ordersResult.data || [],
-                    customers: customersResult.data || [],
+                    orders: orders || [],
+                    customers: customers || [],
                     expenses: expensesResult.data || [],
                     payments: paymentsResult || [],
                     cash_flows: cashFlowsResult || [],
@@ -50,8 +73,8 @@ const Storage = {
                 },
                 stats: {
                     stores_count: storesResult?.length || 0,
-                    orders_count: ordersResult.data?.length || 0,
-                    customers_count: customersResult.data?.length || 0,
+                    orders_count: orders?.length || 0,
+                    customers_count: customers?.length || 0,
                     expenses_count: expensesResult.data?.length || 0,
                     payments_count: paymentsResult?.length || 0,
                     cash_flows_count: cashFlowsResult?.length || 0,
@@ -126,7 +149,7 @@ const Storage = {
             }
             
             // 版本兼容性检查
-            if (data.version !== '2.0' && data.version !== '3.0') {
+            if (data.version !== '2.0' && data.version !== '3.0' && data.version !== '3.1') {
                 if (!confirm(lang === 'id'
                     ? `备份文件版本 (${data.version}) 与当前系统不兼容，继续恢复可能导致问题。是否继续？`
                     : `备份文件版本 (${data.version}) 与当前系统不兼容，继续恢复可能导致问题。是否继续？`)) {
@@ -264,7 +287,7 @@ const Storage = {
             }
         }
         
-        // 3. 恢复订单（最复杂，需要处理关联）
+        // 3. 恢复订单
         if (backupData.orders && backupData.orders.length > 0) {
             for (const order of backupData.orders) {
                 // 检查是否已存在
@@ -714,4 +737,4 @@ const Storage = {
 
 window.Storage = Storage;
 
-console.log('✅ storage.js v3.0 已加载 - 备份恢复功能完整');
+console.log('✅ storage.js v3.1 已加载 - 备份恢复功能完整，已修复数据隔离问题');
