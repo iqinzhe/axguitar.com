@@ -1,4 +1,4 @@
-// app-payments.js - v1.1（新增固定还款功能）
+// app-payments.js - v1.2（所有用户可见字符串使用 Utils.t()，支持双语）
 
 window.APP = window.APP || {};
 
@@ -8,19 +8,19 @@ const PaymentsModule = {
         const profile = await SUPABASE.getCurrentProfile();
 
         if (!profile) {
-            alert(Utils.lang === 'id' ? '请重新登录' : '请重新登录');
+            alert(Utils.t('login_required'));
             APP.goBack();
             return;
         }
 
         if (profile.role === 'admin') {
-            alert(Utils.lang === 'id' ? '门店业务' : '门店业务');
+            alert(Utils.t('store_operation'));
             APP.goBack();
             return;
         }
 
         if (!profile.store_id) {
-            alert(Utils.lang === 'id' ? '账号未关联门店' : '账号未关联门店');
+            alert(Utils.lang === 'id' ? 'Akun tidak terhubung ke toko' : '账号未关联门店');
             APP.goBack();
             return;
         }
@@ -31,10 +31,14 @@ const PaymentsModule = {
         
         try {
             var order = await SUPABASE.getOrder(orderId);
-            if (!order) return;
+            if (!order) {
+                alert(Utils.t('order_not_found'));
+                APP.goBack();
+                return;
+            }
             
             if (order.store_id !== profile.store_id) {
-                alert(Utils.lang === 'id' ? '无权访问此订单' : '无权访问此订单');
+                alert(Utils.t('unauthorized'));
                 APP.goBack();
                 return;
             }
@@ -42,7 +46,7 @@ const PaymentsModule = {
             var { payments } = await SUPABASE.getPaymentHistory(orderId);
 
             var lang = Utils.lang;
-            var t = (key) => Utils.t(key);
+            var t = Utils.t;
             
             var loanAmount = order.loan_amount || 0;
             var principalPaid = order.principal_paid || 0;
@@ -67,7 +71,7 @@ const PaymentsModule = {
 
             var interestRows = '';
             if (interestPayments.length === 0) {
-                interestRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? '暂无利息记录' : '暂无利息记录'}</td></tr>`;
+                interestRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td></tr>`;
             } else {
                 for (var i = 0; i < interestPayments.length; i++) {
                     var p = interestPayments[i];
@@ -85,7 +89,7 @@ const PaymentsModule = {
             var principalRows = '';
             var cumulativePaid = 0;
             if (principalPayments.length === 0) {
-                principalRows = `<tr><td colspan="5" class="text-center text-muted">${lang === 'id' ? '暂无本金记录' : '暂无本金记录'}</td></tr>`;
+                principalRows = `<td><td colspan="5" class="text-center text-muted">${t('no_data')}</td></tr>`;
             } else {
                 for (var i = 0; i < principalPayments.length; i++) {
                     var p = principalPayments[i];
@@ -114,11 +118,11 @@ const PaymentsModule = {
             
             var adminFeePaidInfo = order.admin_fee_paid && adminFeePayment
                 ? `${Utils.formatCurrency(order.admin_fee)} (${methodMap[adminFeePayment.payment_method] || '-'} / ${Utils.formatDate(adminFeePayment.date)})`
-                : (order.admin_fee_paid ? `${Utils.formatCurrency(order.admin_fee)}` : '未缴');
+                : (order.admin_fee_paid ? `${Utils.formatCurrency(order.admin_fee)}` : (lang === 'id' ? 'Belum dibayar' : '未缴'));
             
             var serviceFeePaidInfo = isServiceFeePaid && serviceFeePayment
                 ? `${Utils.formatCurrency(serviceFeeAmount)} (${methodMap[serviceFeePayment.payment_method] || '-'} / ${Utils.formatDate(serviceFeePayment.date)})`
-                : (serviceFeePaid > 0 ? `${Utils.formatCurrency(serviceFeePaid)}/${Utils.formatCurrency(serviceFeeAmount)}` : '未缴');
+                : (serviceFeePaid > 0 ? `${Utils.formatCurrency(serviceFeePaid)}/${Utils.formatCurrency(serviceFeeAmount)}` : (lang === 'id' ? 'Belum dibayar' : '未缴'));
 
             // ========== 固定还款板块（仅固定还款模式显示） ==========
             var fixedRepaymentHtml = '';
@@ -141,35 +145,35 @@ const PaymentsModule = {
                 fixedRepaymentHtml = `
                     <div class="card action-card fixed-repayment-card">
                         <div class="card-header">
-                            <h3>📅 ${lang === 'id' ? 'Cicilan Tetap' : '固定还款'}</h3>
-                            <span class="repayment-badge fixed-badge">${lang === 'id' ? 'Angsuran Tetap' : '固定还款'}</span>
+                            <h3>📅 ${t('fixed_repayment')}</h3>
+                            <span class="repayment-badge fixed-badge">${t('fixed_repayment')}</span>
                         </div>
                         <div class="card-body">
                             <div class="info-box success-box">
                                 <div class="info-row">
-                                    <span>📊 ${lang === 'id' ? '进度' : '进度'}:</span>
+                                    <span>📊 ${lang === 'id' ? 'Progress' : '进度'}:</span>
                                     <strong>${paidMonths}/${totalMonths} ${lang === 'id' ? 'bulan' : '个月'}</strong>
                                     <div class="progress-bar">
                                         <div class="progress-fill" style="width: ${(paidMonths/totalMonths)*100}%;"></div>
                                     </div>
                                 </div>
                                 <div class="info-row">
-                                    <span>💰 ${lang === 'id' ? '每月应还' : '每月应还'}:</span>
+                                    <span>💰 ${t('monthly_payment')}:</span>
                                     <strong class="amount-highlight">${Utils.formatCurrency(monthlyFixedPayment)}</strong>
                                 </div>
                                 <div class="info-row">
-                                    <span>📅 ${lang === 'id' ? '下次到期' : '下次到期'}:</span>
+                                    <span>📅 ${t('payment_due_date')}:</span>
                                     <strong>${nextDueDate}</strong>
                                 </div>
                                 <div class="info-row">
-                                    <span>📈 ${lang === 'id' ? '剩余期数' : '剩余期数'}:</span>
+                                    <span>📈 ${t('remaining_term')}:</span>
                                     <strong>${remainingMonths} ${lang === 'id' ? 'bulan' : '个月'}</strong>
                                 </div>
                                 ${overdueWarning}
                             </div>
                             
                             <div class="payment-method-group">
-                                <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
+                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pencatatan' : '入账方式'}:</div>
                                 <div class="payment-method-options">
                                     <label><input type="radio" name="fixedMethod" value="cash" checked> 🏦 ${t('cash')}</label>
                                     <label><input type="radio" name="fixedMethod" value="bank"> 🏧 ${t('bank')}</label>
@@ -182,13 +186,13 @@ const PaymentsModule = {
                                 </button>
                                 ${remainingMonths > 0 ? `
                                     <button onclick="APP.earlySettleFixedOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-action early-settle">
-                                        🎯 ${lang === 'id' ? 'Pelunasan Dipercepat' : '提前结清'}
+                                        🎯 ${t('early_settlement')}
                                     </button>
                                 ` : ''}
                             </div>
                         </div>
                         <div class="card-info">
-                            <small>💡 ${lang === 'id' ? '每期还款包含本金和利息，提前结清可减免剩余利息' : '每期还款包含本金和利息，提前结清可减免剩余利息'}</small>
+                            <small>💡 ${lang === 'id' ? 'Setiap angsuran mencakup bunga dan pokok. Pelunasan dipercepat dapat mengurangi sisa bunga.' : '每期还款包含本金和利息，提前结清可减免剩余利息'}</small>
                         </div>
                     </div>
                 `;
@@ -199,31 +203,31 @@ const PaymentsModule = {
             if (order.repayment_type !== 'fixed') {
                 flexibleRepaymentHtml = `
                     <div class="card action-card">
-                        <div class="card-header"><h3>💰 ${lang === 'id' ? '利息缴费' : '利息缴费'}</h3></div>
+                        <div class="card-header"><h3>💰 ${t('interest')}</h3></div>
                         <div class="card-body">
                             <div class="info-box">
-                                <span>📌 ${lang === 'id' ? '本次是第' : '本次是第'} <strong>${nextInterestNumber}</strong> ${lang === 'id' ? '次利息支付' : '次利息支付'}</span>
-                                <span>💰 ${lang === 'id' ? '应付金额' : '应付金额'}: <strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></span>
-                                <span>📈 ${lang === 'id' ? '月利率' : '月利率'}: <strong>${(monthlyRate*100).toFixed(0)}%</strong></span>
+                                <span>📌 ${lang === 'id' ? 'Ini adalah pembayaran bunga ke-' : '本次是第'} <strong>${nextInterestNumber}</strong> ${lang === 'id' ? 'kali' : '次利息支付'}</span>
+                                <span>💰 ${lang === 'id' ? 'Jumlah yang harus dibayar' : '应付金额'}: <strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></span>
+                                <span>📈 ${t('agreed_rate')}: <strong>${(monthlyRate*100).toFixed(0)}%</strong></span>
                             </div>
                             <div class="action-input-group">
-                                <label class="action-label">${lang === 'id' ? '收取' : '收取'}:</label>
+                                <label class="action-label">${lang === 'id' ? 'Ambil' : '收取'}:</label>
                                 <select id="interestMonths" class="action-select">${interestOptions}</select>
                             </div>
                             <div class="payment-method-group">
-                                <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
+                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pencatatan' : '入账方式'}:</div>
                                 <div class="payment-method-options">
                                     <label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label>
                                     <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
                                 </div>
                             </div>
-                            <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收款' : '确认收款'}</button>
+                            <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'}</button>
                         </div>
                         <div class="card-history">
-                            <div class="history-title">📋 ${lang === 'id' ? '利息缴费历史' : '利息缴费历史'}</div>
+                            <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</div>
                             <div class="table-container">
                                 <table class="history-table">
-                                    <thead><tr><th class="text-center">${lang === 'id' ? '第几次' : '第几次'}</th><th>${lang === 'id' ? '日期' : '日期'}</th><th class="text-center">${lang === 'id' ? '月数' : '月数'}</th><th class="text-right">${lang === 'id' ? '金额' : '金额'}</th><th>${lang === 'id' ? '方式' : '方式'}</th></tr></thead>
+                                    <thead><tr><th class="text-center">${lang === 'id' ? 'Ke-' : '第几次'}</th><th>${t('date')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
                                     <tbody>${interestRows}</tbody>
                                 </table>
                             </div>
@@ -231,30 +235,30 @@ const PaymentsModule = {
                     </div>
                     
                     <div class="card action-card">
-                        <div class="card-header"><h3>🏦 ${lang === 'id' ? '本金还款' : '本金还款'}</h3></div>
+                        <div class="card-header"><h3>🏦 ${t('principal')}</h3></div>
                         <div class="card-body">
                             <div class="info-box warning-box">
-                                <span>📊 ${lang === 'id' ? '已还本金' : '已还本金'}: <strong>${Utils.formatCurrency(principalPaid)}</strong></span>
-                                <span>📊 ${lang === 'id' ? '尚欠本金' : '尚欠本金'}: <strong class="${remainingPrincipal > 0 ? 'text-warning' : 'text-success'}">${Utils.formatCurrency(remainingPrincipal)}</strong></span>
+                                <span>📊 ${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}: <strong>${Utils.formatCurrency(principalPaid)}</strong></span>
+                                <span>📊 ${lang === 'id' ? 'Sisa Pokok' : '尚欠本金'}: <strong class="${remainingPrincipal > 0 ? 'text-warning' : 'text-success'}">${Utils.formatCurrency(remainingPrincipal)}</strong></span>
                             </div>
                             <div class="action-input-group">
-                                <label class="action-label">${lang === 'id' ? '还款金额' : '还款金额'}:</label>
+                                <label class="action-label">${lang === 'id' ? 'Jumlah Pembayaran' : '还款金额'}:</label>
                                 <input type="text" id="principalAmount" class="action-input" placeholder="0">
                             </div>
                             <div class="payment-method-group">
-                                <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
+                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pencatatan' : '入账方式'}:</div>
                                 <div class="payment-method-options">
                                     <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label>
                                     <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
                                 </div>
                             </div>
-                            <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收款' : '确认收款'}</button>
+                            <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'}</button>
                         </div>
                         <div class="card-history">
-                            <div class="history-title">📋 ${lang === 'id' ? '本金还款历史' : '本金还款历史'}</div>
+                            <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</div>
                             <div class="table-container">
                                 <table class="history-table">
-                                    <thead><tr><th>${lang === 'id' ? '日期' : '日期'}</th><th class="text-right">${lang === 'id' ? '还款金额' : '还款金额'}</th><th class="text-right">${lang === 'id' ? '累计已还' : '累计已还'}</th><th class="text-right">${lang === 'id' ? '剩余本金' : '剩余本金'}</th><th>${lang === 'id' ? '方式' : '方式'}</th></tr></thead>
+                                    <thead><tr><th>${t('date')}</th><th class="text-right">${lang === 'id' ? 'Jumlah Dibayar' : '还款金额'}</th><th class="text-right">${lang === 'id' ? 'Total Dibayar' : '累计已还'}</th><th class="text-right">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
                                     <tbody>${principalRows}</tbody>
                                 </table>
                             </div>
@@ -265,10 +269,10 @@ const PaymentsModule = {
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h2>💰 ${lang === 'id' ? '缴纳费用' : '缴纳费用'}</h2>
+                    <h2>💰 ${lang === 'id' ? 'Pembayaran' : '缴纳费用'}</h2>
                     <div class="header-actions">
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                        <button onclick="APP.viewOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-detail">📄 ${lang === 'id' ? '订单详情' : '订单详情'}</button>
+                        <button onclick="APP.viewOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-detail">📄 ${t('order_details')}</button>
                     </div>
                 </div>
                 
@@ -278,39 +282,39 @@ const PaymentsModule = {
                             <td class="label">ID</td><td class="value order-id">${Utils.escapeHtml(order.order_id)}</td>
                             <td class="label">${t('loan_amount')}</td><td class="value">${Utils.formatCurrency(loanAmount)}</td>
                         </tr>
-                        <tr><td class="label">${lang === 'id' ? '剩余本金' : '剩余本金'}</td>
+                        <tr><td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</td>
                             <td class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}</td>
-                            <td class="label">${lang === 'id' ? '月利息' : '月利息'}</td>
+                            <td class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</td>
                             <td class="value">${Utils.formatCurrency(currentMonthlyInterest)}</td>
-                            <td class="label">${lang === 'id' ? '下次到期' : '下次到期'}</td>
+                            <td class="label">${t('payment_due_date')}</td>
                             <td class="value">${nextDueDate}</td>
                         </tr>
-                        <tr><td class="label">${lang === 'id' ? '还款方式' : '还款方式'}</td>
+                        <tr><td class="label">${t('repayment_type')}</td>
                             <td class="value" colspan="5">
                                 ${order.repayment_type === 'fixed' 
-                                    ? (lang === 'id' ? '📅 固定还款' : '📅 固定还款') 
-                                    : (lang === 'id' ? '💰 灵活还款' : '💰 灵活还款')}
+                                    ? `📅 ${t('fixed_repayment')}` 
+                                    : `💰 ${t('flexible_repayment')}`}
                                 ${order.repayment_type === 'fixed' ? ` (${order.repayment_term} ${lang === 'id' ? 'bulan' : '个月'})` : ''}
                             </td>
                         </tr>
                         <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"></td></tr>
                         <tr>
-                            <td class="label">💎 ${lang === 'id' ? '质押物' : '质押物'}</td>
+                            <td class="label">💎 ${t('collateral_name')}</td>
                             <td class="value" colspan="2">${Utils.escapeHtml(order.collateral_name || '-')}</td>
-                            <td class="label">💰 ${lang === 'id' ? '服务费' : '服务费'}</td>
+                            <td class="label">💰 ${t('service_fee')}</td>
                             <td class="value" colspan="2">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)</td>
                         </tr>
                         <tr>
-                            <td class="label">📋 ${lang === 'id' ? '管理费' : '管理费'}</td>
+                            <td class="label">📋 ${t('admin_fee')}</td>
                             <td class="value" colspan="2">${Utils.formatCurrency(order.admin_fee)}</td>
-                            <td class="label">📈 ${lang === 'id' ? '月利率' : '月利率'}</td>
+                            <td class="label">📈 ${t('agreed_rate')}</td>
                             <td class="value" colspan="2">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%</td>
                         </tr>
                         <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"></td></tr>
                         <tr class="paid-row">
-                            <td class="label">✅ ${lang === 'id' ? '管理费已缴' : '管理费已缴'}</td>
+                            <td class="label">✅ ${t('admin_fee')}</td>
                             <td class="value success-text" colspan="2">${adminFeePaidInfo}</td>
-                            <td class="label">✅ ${lang === 'id' ? '服务费已缴' : '服务费已缴'}</td>
+                            <td class="label">✅ ${t('service_fee')}</td>
                             <td class="value success-text" colspan="2">${serviceFeePaidInfo}</td>
                         </tr>
                     </table>
@@ -466,7 +470,7 @@ const PaymentsModule = {
             
         } catch (error) {
             console.error("showPayment error:", error);
-            alert(Utils.lang === 'id' ? '加载失败：' + error.message : '加载失败：' + error.message);
+            alert(lang === 'id' ? 'Gagal memuat data: ' + error.message : '加载失败：' + error.message);
             APP.goBack();
         }
     },
@@ -475,8 +479,9 @@ const PaymentsModule = {
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
-        var methodName = method === 'cash' ? (Utils.lang === 'id' ? '现金' : '现金') : (Utils.lang === 'id' ? '银行BNI' : '银行BNI');
+        var methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
+        var t = Utils.t;
         
         var order = await SUPABASE.getOrder(orderId);
         
@@ -491,16 +496,16 @@ const PaymentsModule = {
         
         var previewMsg = lang === 'id'
             ? [
-                `📋 利息收款确认`,
-                `订单: ${order.order_id}`,
-                `客户: ${order.customer_name}`,
-                `期数: 第${nextInterestNumber}期${months > 1 ? ` 至 第${endNumber}期` : ''}`,
-                `剩余本金: ${Utils.formatCurrency(remainingPrincipal)}`,
-                `月利率: ${(monthlyRate*100).toFixed(0)}%`,
-                `收取月数: ${months} 个月`,
-                `本次收款: ${Utils.formatCurrency(totalInterest)}`,
-                `入账方式: ${methodName}`,
-                `确认收款？`
+                `📋 Konfirmasi Pembayaran Bunga`,
+                `Pesanan: ${order.order_id}`,
+                `Nasabah: ${order.customer_name}`,
+                `Periode: ke-${nextInterestNumber}${months > 1 ? ` sampai ke-${endNumber}` : ''}`,
+                `Sisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}`,
+                `Suku Bunga: ${(monthlyRate*100).toFixed(0)}%`,
+                `Bulan: ${months} bulan`,
+                `Jumlah Dibayar: ${Utils.formatCurrency(totalInterest)}`,
+                `Metode: ${methodName}`,
+                `Lanjutkan?`
               ].join('\n')
             : [
                 `📋 利息收款确认`,
@@ -530,11 +535,12 @@ const PaymentsModule = {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
-        var targetName = target === 'cash' ? (Utils.lang === 'id' ? '现金' : '现金') : (Utils.lang === 'id' ? '银行BNI' : '银行BNI');
+        var targetName = target === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
+        var t = Utils.t;
         
         if (isNaN(amount) || amount <= 0) {
-            alert(lang === 'id' ? '请输入金额' : '请输入金额');
+            alert(t('invalid_amount'));
             return;
         }
         
@@ -549,17 +555,17 @@ const PaymentsModule = {
         
         var previewMsg = lang === 'id'
             ? [
-                `📋 本金还款确认`,
-                `订单: ${order.order_id}`,
-                `客户: ${order.customer_name}`,
-                `贷款总额: ${Utils.formatCurrency(loanAmount)}`,
-                `已还本金: ${Utils.formatCurrency(principalPaid)}`,
-                `还款前剩余: ${Utils.formatCurrency(remainingPrincipal)}`,
-                `本次还款: ${Utils.formatCurrency(actualAmount)}`,
-                `还款后剩余: ${Utils.formatCurrency(remainingAfter)}`,
-                `入账方式: ${targetName}`,
-                isFullSettlement ? `🎉 全额结清` : `部分还款`,
-                `确认收款？`
+                `📋 Konfirmasi Pembayaran Pokok`,
+                `Pesanan: ${order.order_id}`,
+                `Nasabah: ${order.customer_name}`,
+                `Total Pinjaman: ${Utils.formatCurrency(loanAmount)}`,
+                `Pokok Dibayar: ${Utils.formatCurrency(principalPaid)}`,
+                `Sisa Sebelum: ${Utils.formatCurrency(remainingPrincipal)}`,
+                `Dibayar Sekarang: ${Utils.formatCurrency(actualAmount)}`,
+                `Sisa Setelah: ${Utils.formatCurrency(remainingAfter)}`,
+                `Metode: ${targetName}`,
+                isFullSettlement ? `🎉 LUNAS` : `Pembayaran sebagian`,
+                `Lanjutkan?`
               ].join('\n')
             : [
                 `📋 本金还款确认`,
@@ -581,7 +587,7 @@ const PaymentsModule = {
                 
                 if (isFullSettlement) {
                     var printConfirm = lang === 'id'
-                        ? `✅ 结清成功！\n\n是否打印结清凭证？`
+                        ? `✅ LUNAS!\n\nCetak tanda terima pelunasan?`
                         : `✅ 结清成功！\n\n是否打印结清凭证？`;
                     if (confirm(printConfirm)) {
                         APP.printSettlementReceipt(orderId);
@@ -631,8 +637,8 @@ const PaymentsModule = {
             if (!order) return;
             var lang = Utils.lang;
             var methodMap = {
-                cash: lang === 'id' ? '现金' : '现金',
-                bank: lang === 'id' ? '银行BNI' : '银行BNI'
+                cash: lang === 'id' ? 'Tunai' : '现金',
+                bank: lang === 'id' ? 'Bank BNI' : '银行BNI'
             };
 
             var totalInterest = 0, totalPrincipal = 0, totalAdminFee = 0, totalServiceFee = 0;
@@ -656,7 +662,7 @@ const PaymentsModule = {
             var safeStore = Utils.escapeHtml(AUTH.getCurrentStoreName ? AUTH.getCurrentStoreName() : '-');
 
             var html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-            <title>${lang === 'id' ? '结清凭证' : '结清凭证'} - ${safeOrderId}</title>
+            <title>${lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证'} - ${safeOrderId}</title>
             <style>
                 *{box-sizing:border-box;margin:0;padding:0}
                 body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;background:#fff}
@@ -679,48 +685,48 @@ const PaymentsModule = {
             </style></head><body>
             <div class="wrap">
                 <div class="no-print">
-                    <button class="btn-p" onclick="window.print()">🖨️ ${lang === 'id' ? '打印' : '打印'}</button>
-                    <button class="btn-c" onclick="window.close()">${lang === 'id' ? '关闭' : '关闭'}</button>
+                    <button class="btn-p" onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                    <button class="btn-c" onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button>
                 </div>
                 <div class="header">
                     <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">
                         <img src="icons/pagehead-logo.png" alt="JF!" style="height:28px">
                         <h1>JF! by Gadai</h1>
                     </div>
-                    <div><span class="badge">✅ ${lang === 'id' ? '结清凭证' : '结清凭证'}</span></div>
-                    <div style="margin-top:6px;font-size:11px;color:#475569">${lang === 'id' ? '结清日期' : '结清日期'}: <strong>${completedAt}</strong> &nbsp;|&nbsp; ${lang === 'id' ? '订单号' : '订单号'}: <strong>${safeOrderId}</strong></div>
+                    <div><span class="badge">✅ ${lang === 'id' ? 'TANDA TERIMA PELUNASAN' : '结清凭证'}</span></div>
+                    <div style="margin-top:6px;font-size:11px;color:#475569">${lang === 'id' ? 'Tanggal Lunas' : '结清日期'}: <strong>${completedAt}</strong> &nbsp;|&nbsp; ${lang === 'id' ? 'ID Pesanan' : '订单号'}: <strong>${safeOrderId}</strong></div>
                 </div>
                 
                 <div class="section">
-                    <h3>👤 ${lang === 'id' ? '客户信息' : '客户信息'}</h3>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '姓名' : '姓名'}</span><span class="val">${safeCustomer}</span></div>
+                    <h3>👤 ${lang === 'id' ? 'Informasi Nasabah' : '客户信息'}</h3>
+                    <div class="row"><span class="lbl">${lang === 'id' ? 'Nama' : '姓名'}</span><span class="val">${safeCustomer}</span></div>
                     <div class="row"><span class="lbl">KTP</span><span class="val">${safeKtp}</span></div>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '电话' : '电话'}</span><span class="val">${safePhone}</span></div>
+                    <div class="row"><span class="lbl">${lang === 'id' ? 'Telepon' : '电话'}</span><span class="val">${safePhone}</span></div>
                 </div>
                 
                 <div class="section">
-                    <h3>💎 ${lang === 'id' ? '质押物' : '质押物'}</h3>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '物品名称' : '物品名称'}</span><span class="val">${safeCollateral}</span></div>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '原始贷款' : '原始贷款'}</span><span class="val">${Utils.formatCurrency(order.loan_amount)}</span></div>
+                    <h3>💎 ${lang === 'id' ? 'Jaminan' : '质押物'}</h3>
+                    <div class="row"><span class="lbl">${lang === 'id' ? 'Nama Barang' : '物品名称'}</span><span class="val">${safeCollateral}</span></div>
+                    <div class="row"><span class="lbl">${lang === 'id' ? 'Pinjaman Awal' : '原始贷款'}</span><span class="val">${Utils.formatCurrency(order.loan_amount)}</span></div>
                 </div>
                 
                 <div class="section">
-                    <h3>💰 ${lang === 'id' ? '付款汇总' : '付款汇总'}</h3>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '管理费' : '管理费'}</span><span class="val">${Utils.formatCurrency(totalAdminFee)}</span></div>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '服务费' : '服务费'}</span><span class="val">${Utils.formatCurrency(totalServiceFee)}</span></div>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '利息总额' : '利息总额'}</span><span class="val">${Utils.formatCurrency(totalInterest)} (${order.interest_paid_months || 0} ${lang === 'id' ? '个月' : '个月'})</span></div>
-                    <div class="row"><span class="lbl">${lang === 'id' ? '本金总额' : '本金总额'}</span><span class="val">${Utils.formatCurrency(totalPrincipal)}</span></div>
-                    <div class="total-row"><span>${lang === 'id' ? '累计已付总额' : '累计已付总额'}</span><span>${Utils.formatCurrency(grandTotal)}</span></div>
+                    <h3>💰 ${lang === 'id' ? 'Ringkasan Pembayaran' : '付款汇总'}</h3>
+                    <div class="row"><span class="lbl">${t('admin_fee')}</span><span class="val">${Utils.formatCurrency(totalAdminFee)}</span></div>
+                    <div class="row"><span class="lbl">${t('service_fee')}</span><span class="val">${Utils.formatCurrency(totalServiceFee)}</span></div>
+                    <div class="row"><span class="lbl">${t('interest')}</span><span class="val">${Utils.formatCurrency(totalInterest)} (${order.interest_paid_months || 0} ${lang === 'id' ? 'bulan' : '个月'})</span></div>
+                    <div class="row"><span class="lbl">${t('principal')}</span><span class="val">${Utils.formatCurrency(totalPrincipal)}</span></div>
+                    <div class="total-row"><span>${lang === 'id' ? 'Total Dibayar' : '累计已付总额'}</span><span>${Utils.formatCurrency(grandTotal)}</span></div>
                 </div>
                 
                 <div class="stamp">
                     <div style="font-size:18px">✅</div>
-                    <div>${lang === 'id' ? '结清' : '结清'}</div>
+                    <div>${lang === 'id' ? 'LUNAS' : '结清'}</div>
                 </div>
                 
                 <div class="footer">
                     <div>🏪 ${safeStore} &nbsp;|&nbsp; JF! by Gadai</div>
-                    <div style="margin-top:3px">${lang === 'id' ? '感谢您的信任' : '感谢您的信任'}</div>
+                    <div style="margin-top:3px">${lang === 'id' ? 'Terima kasih atas kepercayaan Anda' : '感谢您的信任'}</div>
                 </div>
             </div></body></html>`;
 
@@ -733,7 +739,7 @@ const PaymentsModule = {
             }, 800);
         } catch (error) {
             console.error('printSettlementReceipt error:', error);
-            alert(Utils.lang === 'id' ? '打印失败' : '打印失败');
+            alert(Utils.lang === 'id' ? 'Gagal mencetak' : '打印失败');
             APP.navigateTo('orderTable');
         }
     }
