@@ -1,0 +1,704 @@
+/* === 表格容器 === */
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: var(--spacing-3) 0;
+}
+
+/* === 统一表格样式 === */
+.data-table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+    font-size: var(--font-xs);
+    background: white;
+}
+
+.data-table th {
+    background: var(--gray-100);
+    padding: 10px 12px;
+    font-weight: 600;
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-300);
+    white-space: nowrap;
+}
+
+.data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--gray-200);
+    vertical-align: middle;
+}
+
+.data-table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+.report-table {
+    min-width: 1200px;
+}
+
+.data-table thead tr:first-child th {
+    border-bottom: 1px solid var(--gray-300);
+    background: var(--gray-100);
+}
+
+.data-table thead tr:last-child th {
+    border-top: none;
+    background: var(--gray-50);
+}
+
+.data-table tbody tr.summary-row,
+.data-table tfoot tr {
+    border-top: 2px solid var(--gray-400);
+    background: var(--gray-100);
+    font-weight: 600;
+}
+
+.data-table td.text-right,
+.data-table th.text-right {
+    text-align: right;
+}
+
+.data-table td.text-center,
+.data-table th.text-center {
+    text-align: center;
+}
+
+.data-table td.income,
+.data-table .income {
+    color: var(--success);
+    font-weight: 500;
+}
+
+.data-table td.expense,
+.data-table .expense {
+    color: var(--danger);
+    font-weight: 500;
+}
+
+.data-table .store-name-cell {
+    font-weight: 500;
+    background: var(--gray-50);
+}
+
+.data-table .order-id,
+.data-table .customer-id,
+.data-table .store-code {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+}
+
+.data-table .action-cell {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* === 基础表格（兼容旧代码） === */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-xs);
+}
+
+th, td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--gray-200);
+    text-align: left;
+    vertical-align: middle;
+}
+
+th {
+    font-weight: 600;
+    background: var(--gray-50);
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-300);
+    white-space: nowrap;
+}
+
+tbody tr:hover {
+    background: var(--gray-50);
+}
+
+/* === 状态徽章 === */
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background: var(--success-light);
+    color: var(--success-dark);
+}
+
+.status-completed {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.status-liquidated {
+    background: var(--danger-light);
+    color: var(--danger-dark);
+}
+
+.payment-method-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.method-cash {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.method-bank {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+/* === 信息提示卡片 === */
+.info-card {
+    background: #e0f2fe;
+    border-left: 4px solid #0284c7;
+    margin-bottom: 16px;
+}
+
+.info-card-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.info-icon {
+    font-size: 20px;
+}
+
+.info-text {
+    flex: 1;
+    font-size: 13px;
+    color: #0c4a6e;
+    line-height: 1.4;
+}
+
+.info-text strong {
+    color: #0369a1;
+}
+
+/* === 门店表格特殊样式 === */
+.store-table .store-code {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+}
+
+.store-table .store-name {
+    font-weight: 500;
+}
+
+.store-table .store-address {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.store-table td input {
+    width: 140px;
+    font-size: 12px;
+    padding: 6px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+}
+
+.store-table td input:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
+.store-stats-table .store-name-cell {
+    font-weight: 500;
+    background: var(--gray-50);
+}
+
+.store-stats-table tbody tr:last-child {
+    border-top: 2px solid var(--gray-400);
+    background: var(--gray-100);
+}
+
+/* === 支出表格特殊样式 === */
+.expense-table .date-cell {
+    white-space: nowrap;
+}
+
+.expense-table .expense-category {
+    font-weight: 500;
+}
+
+.expense-table .expense-desc {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* === 客户表格特殊样式 === */
+.customer-table .customer-address {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* === 资金流水表格特殊样式 === */
+.capital-table .date-cell,
+.cashflow-table .date-cell {
+    white-space: nowrap;
+}
+
+.capital-table .flow-desc,
+.cashflow-table .flow-desc {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* === 响应式断点 — 手机端（≤768px）=== */
+@media (max-width: 768px) {
+    #app {
+        padding: 5px 15px;
+    }
+
+    .card {
+        padding: var(--spacing-3);
+        margin-top: 0;
+    }
+    
+    .page-header {
+        margin-bottom: 5px;
+    }
+    
+    .card:first-of-type {
+        margin-top: 0;
+    }
+    
+    .cashflow-summary {
+        margin-top: 0;
+        margin-bottom: 10px;
+        padding: var(--spacing-3);
+    }
+
+    body, .card, button, .stat-value, .stat-label, .toolbar button {
+        font-size: 0.85rem;
+    }
+
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
+    .cashflow-item {
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    .cashflow-item .value {
+        font-size: var(--font-md);
+    }
+
+    .cashflow-detail {
+        font-size: 0.7rem;
+    }
+
+    .stats-grid-optimized {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-2);
+    }
+
+    .stat-card {
+        padding: var(--spacing-2);
+    }
+
+    .stat-value {
+        font-size: var(--font-sm);
+    }
+
+    .stat-label {
+        font-size: 0.7rem;
+    }
+
+    .toolbar {
+        gap: var(--spacing-2);
+        padding: var(--spacing-2);
+    }
+
+    .toolbar.admin-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .toolbar.store-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .toolbar button {
+        font-size: 0.75rem;
+        padding: var(--spacing-2);
+        min-height: 44px;
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .toolbar input,
+    .toolbar select {
+        font-size: 0.8rem;
+        padding: var(--spacing-2);
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid .full-width {
+        grid-column: span 1;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 12px var(--spacing-3);
+        font-size: 0.9rem;
+    }
+
+    button {
+        min-height: 44px;
+    }
+
+    .btn-small {
+        min-height: 36px;
+    }
+
+    .btn-action {
+        min-height: 48px;
+        font-size: var(--font-sm);
+        padding: 14px 20px;
+    }
+
+    .modal-overlay {
+        padding: var(--spacing-3);
+        align-items: flex-start;
+    }
+
+    .modal-content {
+        margin-top: 10vh;
+        padding: var(--spacing-4);
+        max-width: calc(100% - 32px);
+        max-height: 75dvh;
+    }
+
+    .modal-actions {
+        flex-direction: column;
+        gap: var(--spacing-2);
+    }
+
+    .modal-actions button {
+        width: 100%;
+        min-height: 44px;
+        padding: 12px;
+    }
+
+    .transfer-buttons {
+        flex-direction: column;
+    }
+
+    .transfer-btn {
+        width: 100%;
+        text-align: center;
+        min-height: 44px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 6px 8px;
+        font-size: 0.7rem;
+    }
+    
+    .data-table .action-cell {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .data-table .action-cell .btn-small {
+        width: 100%;
+        text-align: center;
+    }
+
+    .expense-table .expense-desc {
+        max-width: 120px;
+    }
+    
+    .expense-table th,
+    .expense-table td {
+        padding: 6px 4px;
+        font-size: 0.7rem;
+    }
+
+    .store-table .store-address {
+        max-width: 120px;
+    }
+    
+    .store-table td input {
+        width: 100px;
+        font-size: 10px;
+    }
+
+    .capital-table .flow-desc,
+    .cashflow-table .flow-desc {
+        max-width: 150px;
+    }
+    
+    .capital-table th,
+    .capital-table td,
+    .cashflow-table th,
+    .cashflow-table td {
+        padding: 6px 4px;
+        font-size: 0.7rem;
+    }
+
+    .order-table .order-collateral {
+        max-width: 100px;
+    }
+}
+
+/* === 响应式断点 — 超小屏（≤390px）=== */
+@media (max-width: 390px) {
+    #app {
+        padding: var(--spacing-2);
+    }
+
+    .card {
+        padding: var(--spacing-2);
+        border-radius: var(--radius-md);
+    }
+
+    .page-header h1,
+    .page-header h2 {
+        font-size: var(--font-md);
+    }
+
+    .stats-grid-optimized {
+        gap: var(--spacing-1);
+    }
+
+    .stat-value {
+        font-size: 0.75rem;
+    }
+
+    .stat-label {
+        font-size: 0.65rem;
+    }
+
+    .btn-action {
+        font-size: 0.8rem;
+    }
+
+    .login-box {
+        padding: var(--spacing-4);
+    }
+
+    .toolbar button {
+        font-size: 0.7rem;
+        padding: var(--spacing-1);
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 4px 6px;
+        font-size: 0.65rem;
+    }
+}
+
+/* === 打印样式 === */
+@media print {
+    @page {
+        size: A4;
+        margin: 15mm 12mm;
+    }
+
+    body {
+        background: white;
+        padding: 0;
+        margin: 0;
+        font-size: 12pt;
+    }
+
+    #app {
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+
+    .no-print,
+    .toolbar button:not(.print-btn),
+    button:not(.print-btn),
+    .btn-back,
+    .btn-export,
+    .btn-balance,
+    .btn-detail,
+    .modal-overlay,
+    .action-cell,
+    td.action-cell,
+    th.action-cell,
+    .form-grid,
+    .form-actions,
+    .address-option,
+    .payment-method-options {
+        display: none !important;
+    }
+
+    .toolbar {
+        display: block !important;
+    }
+
+    .print-btn {
+        display: inline-block !important;
+    }
+
+    .card,
+    .stat-card,
+    .cashflow-summary {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        background: white !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .cashflow-summary {
+        background: white !important;
+        color: black !important;
+    }
+
+    .cashflow-summary h3 {
+        color: black !important;
+        border-bottom-color: #ccc !important;
+    }
+
+    .cashflow-item {
+        background: #f5f5f5 !important;
+        color: black !important;
+    }
+
+    .table-container {
+        overflow: visible !important;
+        margin: 0 !important;
+    }
+    
+    .data-table {
+        width: 100%;
+        min-width: auto !important;
+        border-collapse: collapse;
+        font-size: 10pt;
+        margin: 0;
+    }
+    
+    .data-table th {
+        background: #f5f5f5 !important;
+        padding: 6px 8px;
+        font-weight: 700;
+        color: #000;
+        border: 1px solid #ccc;
+        white-space: normal;
+    }
+    
+    .data-table td {
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        white-space: normal;
+        word-break: break-word;
+    }
+    
+    .data-table th,
+    .data-table td {
+        border: 1px solid #ccc !important;
+    }
+    
+    .data-table .income {
+        color: #2e7d32 !important;
+        font-weight: 600;
+    }
+    
+    .data-table .expense {
+        color: #c62828 !important;
+        font-weight: 600;
+    }
+    
+    .data-table .text-right {
+        text-align: right !important;
+    }
+    
+    .data-table .text-center {
+        text-align: center !important;
+    }
+    
+    .data-table .order-id,
+    .data-table .customer-id,
+    .data-table .store-code {
+        font-family: monospace;
+        font-weight: 600;
+    }
+    
+    .data-table tbody tr.summary-row,
+    .data-table tfoot tr {
+        border-top: 2px solid #000 !important;
+        background: #f0f0f0 !important;
+    }
+    
+    .data-table td,
+    .data-table th {
+        page-break-inside: avoid;
+    }
+    
+    .data-table thead {
+        display: table-header-group;
+    }
+    
+    .data-table tbody tr {
+        page-break-inside: avoid;
+        page-break-after: avoid;
+    }
+
+    .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #333;
+        padding-bottom: 10px;
+    }
+
+    .print-footer {
+        display: block;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 9pt;
+        color: #666;
+        border-top: 1px solid #ccc;
+        padding-top: 8px;
+    }
+}
