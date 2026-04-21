@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.0
+// app-dashboard-core.js - v1.1（修复双语翻译）
 
 window.APP = window.APP || {};
 
@@ -179,7 +179,6 @@ const DashboardCore = {
         this.currentPage = 'login';
         this.clearPageState();
         
-        // 确保语言已初始化
         Utils.initLanguage();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
@@ -211,7 +210,6 @@ const DashboardCore = {
     toggleLanguageOnLogin: function() {
         var newLang = Utils.lang === 'id' ? 'zh' : 'id';
         Utils.setLanguage(newLang);
-        // 重新渲染登录页面
         this.renderLogin();
     },
 
@@ -227,45 +225,38 @@ const DashboardCore = {
             if (btnEl) { btnEl.disabled = false; btnEl.textContent = Utils.t('login'); }
             return;
         }
-        // 登录成功后，语言已经保存在 localStorage 中，直接进入系统
         await this.router();
     },
 
-    // ==================== 保存退出功能（优化版） ====================
+    // ==================== 保存退出功能（修复双语） ====================
     logout: async function() {
-        var lang = Utils.lang;
-        var confirmMsg = lang === 'id' 
-            ? '💾 确认保存并退出登录？\n\n系统将自动保存当前数据，然后退出。'
-            : '💾 确认保存并退出登录？\n\n系统将自动保存当前数据，然后退出。';
+        var confirmMsg = Utils.t('save_exit_confirm');
         
         if (!confirm(confirmMsg)) return;
         
-        // 先检查是否有未保存数据
         var hasUnsavedData = this._checkHasUnsavedData();
         
         if (hasUnsavedData) {
-            var loadingMsg = this._showSavingMessage(lang === 'id' ? '正在保存数据...' : '正在保存数据...');
+            var loadingMsg = this._showSavingMessage(Utils.lang === 'id' ? 'Menyimpan data...' : '正在保存数据...');
             try {
                 await this._saveCurrentPageData();
                 this._hideSavingMessage(loadingMsg);
             } catch (saveError) {
                 console.error("保存数据失败:", saveError);
                 this._hideSavingMessage(loadingMsg);
-                var errorMsg = lang === 'id'
-                    ? '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？'
+                var errorMsg = Utils.lang === 'id'
+                    ? '⚠️ Gagal menyimpan data: ' + saveError.message + '\n\nTetap keluar?'
                     : '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？';
                 if (!confirm(errorMsg)) return;
             }
         }
         
-        // 执行退出
         this.clearPageState();
         sessionStorage.clear();
         await AUTH.logout();
         await this.router();
     },
     
-    // 快速检查是否有未保存数据（不执行保存）
     _checkHasUnsavedData: function() {
         var currentPage = this.currentPage;
         
@@ -446,12 +437,12 @@ const DashboardCore = {
             const completedOrdersCount = updatedOrders.filter(o => o.status === 'completed').length;
             
             var cards = [
-                { label: `${lang === 'id' ? '本月新增' : '本月新增'}/${t('total_orders')}`, value: `${thisMonthOrderCount}/${report.total_orders}`, type: 'text' },
-                { label: lang === 'id' ? '赤字 (流出-收入)' : '赤字 (流出-收入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
+                { label: `${lang === 'id' ? 'Bulan ini' : '本月新增'}/${t('total_orders')}`, value: `${thisMonthOrderCount}/${report.total_orders}`, type: 'text' },
+                { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
                 { label: t('active'), value: activeOrdersCount, type: 'number' },
-                { label: `${lang === 'id' ? '已结清' : '已结清'} / ${lang === 'id' ? '已失效' : '已失效'}`, value: `${completedOrdersCount} / ${expiredOrders.length}`, type: 'text' },
-                { label: lang === 'id' ? 'Admin Fee' : '管理费', value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
-                { label: lang === 'id' ? 'Service Fee' : '服务费', value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
+                { label: `${lang === 'id' ? 'Lunas' : '已结清'} / ${lang === 'id' ? 'Kedaluwarsa' : '已失效'}`, value: `${completedOrdersCount} / ${expiredOrders.length}`, type: 'text' },
+                { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
+                { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' }
             ];
@@ -463,11 +454,10 @@ const DashboardCore = {
                 </div>
             `).join('');
             
-            // 经营指标汇总标题（统一字体样式）
             var cardsTitleHtml = '';
             if (isAdmin) {
                 cardsTitleHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${t('financial_indicators')} (${lang === 'id' ? '全部门店' : '全部门店'})</h3>
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${t('financial_indicators')} (${lang === 'id' ? 'Semua Toko' : '全部门店'})</h3>
                 </div>`;
             } else {
                 cardsTitleHtml = `<div style="margin-bottom:12px;">
@@ -475,22 +465,20 @@ const DashboardCore = {
                 </div>`;
             }
             
-            // 业务操作标题（统一字体样式）
             var toolbarTitleHtml = `
                 <div style="margin: 20px 0 12px 0;">
                     <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ${t('operation')}</h3>
                 </div>
             `;
             
-            // Admin 资金管理区域标题（统一字体样式）
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')} (${lang === 'id' ? '全部门店' : '全部门店'})</h3>
+                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')} (${lang === 'id' ? 'Semua Toko' : '全部门店'})</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
-                            <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
+                            <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
                             <div class="cashflow-detail">
                                 ${t('inflow')}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
@@ -499,7 +487,7 @@ const DashboardCore = {
                         </div>
                         
                         <div class="cashflow-item">
-                            <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
+                            <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
                             <div class="cashflow-detail">
                                 ${t('inflow')}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
@@ -521,7 +509,7 @@ const DashboardCore = {
                                 </button>
                             </div>
                             <div class="cashflow-detail" style="margin-top:8px;">
-                                💡 ${lang === 'id' ? '保险柜现金过多时可存入银行，不足时可从银行提取' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
+                                💡 ${lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
                             </div>
                         </div>
                     </div>
@@ -532,7 +520,7 @@ const DashboardCore = {
                     <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')}</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
-                            <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
+                            <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
                             <div class="cashflow-detail">
                                 ${t('inflow')}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
@@ -541,7 +529,7 @@ const DashboardCore = {
                         </div>
                         
                         <div class="cashflow-item">
-                            <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
+                            <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
                             <div class="cashflow-detail">
                                 ${t('inflow')}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
@@ -560,14 +548,13 @@ const DashboardCore = {
                                 </button>
                             </div>
                             <div class="cashflow-detail" style="margin-top:8px;">
-                                💡 ${lang === 'id' ? '保险柜现金过多时可存入银行，不足时可从银行提取' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
+                                💡 ${lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
                             </div>
                         </div>
                     </div>
                 </div>`;
             }
             
-            // 工具栏（按钮名称使用翻译）
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = `
@@ -628,7 +615,7 @@ const DashboardCore = {
                 ${bottomHtml}
             `;
         } catch (err) {
-            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button></div>`;
+            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.t('save_exit')}</button></div>`;
         }
     },
 
@@ -683,7 +670,7 @@ const DashboardCore = {
     
     deleteStore: async function(storeId) {
         var lang = Utils.lang;
-        if (!confirm(lang === 'id' ? 'Hapus toko ini?' : '删除此门店？')) return;
+        if (!confirm(Utils.t('confirm_delete'))) return;
         try {
             await StoreManager.deleteStore(storeId);
             alert(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
@@ -702,4 +689,3 @@ for (var key in DashboardCore) {
         window.APP[key] = DashboardCore[key];
     }
 }
-
