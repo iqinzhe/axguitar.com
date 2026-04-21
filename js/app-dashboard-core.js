@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.7 优化版（admin账户优化）
+// app-dashboard-core.js - v2.8 优化版（添加汇总标识）
 
 window.APP = window.APP || {};
 
@@ -389,12 +389,12 @@ const DashboardCore = {
                 </div>`;
             }
             
-            // Admin资金管理区域：只显示3个卡片（保险柜、银行BNI、内部互转），移除余额和按钮
+            // Admin资金管理区域：添加"全部门店汇总"标识，只显示3个卡片
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3>💰 ${lang === 'id' ? '资金管理' : '资金管理'}</h3>
+                    <h3>💰 ${lang === 'id' ? '资金管理 (汇总全部门店)' : '资金管理 (汇总全部门店)'}</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
@@ -474,10 +474,22 @@ const DashboardCore = {
                 </div>`;
             }
             
+            // 卡片区域添加汇总标识（仅Admin）
+            var cardsTitleHtml = '';
+            if (isAdmin) {
+                cardsTitleHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0;">📊 ${lang === 'id' ? '经营指标汇总 (全部门店)' : '经营指标汇总 (全部门店)'}</h3>
+                </div>`;
+            } else {
+                cardsTitleHtml = `<div style="margin-bottom:12px;">
+                    <h3 style="margin:0;">📊 ${lang === 'id' ? '经营指标' : '经营指标'}</h3>
+                </div>`;
+            }
+            
             var bottomHtml = `
             <div class="card">
                 <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
-                <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
+                <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}${isAdmin ? ` (${lang === 'id' ? 'Kantor Pusat - Seluruh Toko' : '总部 - 全部门店'})` : ''}</p>
                 <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)'}</p>
                 <p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>
             </div>`;
@@ -492,6 +504,7 @@ const DashboardCore = {
                 
                 ${cashFlowHtml}
                 
+                ${cardsTitleHtml}
                 <div class="stats-grid-optimized">
                     ${cardsHtml}
                 </div>
@@ -576,4 +589,4 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v2.7 已加载 - admin账户优化版');
+console.log('✅ app-dashboard-core.js v2.8 已加载 - 添加汇总标识');
