@@ -447,35 +447,35 @@ const DashboardCore = {
             `;
             
             var toolbarHtml = '';
-            if (isAdmin) {
-                toolbarHtml = `
-                <div class="toolbar admin-grid">
-                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
-                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
-                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                    <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '数据管理'}</button>
-                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        🔔 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
-                    </button>
-                    <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
-                    <button onclick="APP.navigateTo('userManagement')">👤 ${lang === 'id' ? 'Man. Kerja' : '员工管理'}</button>
-                    <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
-                    <button onclick="APP.logout()">🚪 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
-                </div>`;
-            } else {
-                toolbarHtml = `
-                <div class="toolbar store-grid">
-                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
-                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                    <button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
-                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
-                    </button>
-                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button>
-                </div>`;
-            }
+if (isAdmin) {
+    toolbarHtml = `
+    <div class="toolbar admin-grid">
+        <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
+        <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
+        <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
+        <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+        <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '数据管理'}</button>
+        <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
+            🔔 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+        </button>
+        <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
+        <button onclick="APP.navigateTo('userManagement')">👤 ${lang === 'id' ? 'Man. Kerja' : '员工管理'}</button>
+        <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
+        <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
+    </div>`;
+} else {
+    toolbarHtml = `
+    <div class="toolbar store-grid">
+        <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
+        <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
+        <button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
+        <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+        <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
+            🔔 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+        </button>
+        <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
+    </div>`;
+}
             
             var cashFlowHtml = '';
             if (isAdmin) {
