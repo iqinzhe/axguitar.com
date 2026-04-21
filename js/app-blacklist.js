@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.2（优化：精简重复代码）
+// app-blacklist.js - v1.0（优化：精简重复代码）
 
 window.APP = window.APP || {};
 
@@ -170,4 +170,3 @@ const BlacklistModule = {
 
 Object.assign(window.APP, BlacklistModule);
 
-console.log('✅ app-blacklist.js v1.2 已加载 - 优化版');
