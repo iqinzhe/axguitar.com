@@ -1,4 +1,4 @@
-// app-customers.js - v2.2（修复图标重复）
+// app-customers.js - v2.3（统一表格样式）
 
 window.APP = window.APP || {};
 
@@ -22,7 +22,7 @@ const CustomersModule = {
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="2" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var c of customers) {
                     var customerId = Utils.escapeHtml(c.customer_id || '-');
@@ -34,41 +34,22 @@ const CustomersModule = {
                     var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     
-                    rows += `
-                        <tr class="customer-info-row">
-                            <td colspan="2" class="customer-cell">
-                                <div class="customer-info">
-                                    <div class="customer-line1">
-                                        <span class="customer-id">${customerId}</span>
-                                        <span class="customer-date">${registeredDate}</span>
-                                        <span class="customer-name">${name}</span>
-                                        <span class="customer-phone">📞 ${phone}</span>
-                                    </div>
-                                    <div class="customer-line2">
-                                        <span class="customer-ktp">🪪 ${ktpNumber}</span>
-                                        <span class="customer-ktp-addr">🏠 ${ktpAddress}</span>
-                                        <span class="customer-living-addr">📍 ${livingAddress}</span>
-                                        ${isAdmin ? `<span class="customer-store">🏪 ${storeName}</span>` : ''}
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                    
-                    rows += `
-                        <tr class="customer-action-row">
-                            <td colspan="2" class="action-cell">
-                                <span class="action-group-main">
-                                    ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
-                                    ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
-                                </span>
-                                ${(!isAdmin || PERMISSION.canDeleteCustomer()) ? `<span class="action-group-danger">` : ''}
-                                    ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${c.id}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
-                                    ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                                ${(!isAdmin || PERMISSION.canDeleteCustomer()) ? `</span>` : ''}
-                            </td>
-                        </tr>
-                    `;
+                    rows += `<tr>
+                        <td class="customer-id">${customerId}</td>
+                        <td class="customer-name">${name}</td>
+                        <td>${ktpNumber}</td>
+                        <td>${phone}</td>
+                        <td class="customer-address">${ktpAddress}</td>
+                        <td class="customer-address">${livingAddress}</td>
+                        <td class="text-center">${registeredDate}</td>
+                        ${isAdmin ? `<td class="text-center">${storeName}</td>` : ''}
+                        <td class="action-cell">
+                            ${!isAdmin ? `<button onclick="APP.editCustomer('${c.id}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${c.id}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${c.id}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${c.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                        </td>
+                    </tr>`;
                 }
             }
 
@@ -121,10 +102,18 @@ const CustomersModule = {
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
                     <div class="table-container">
-                        <table class="customer-double-row-table">
+                        <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th colspan="2">${lang === 'id' ? 'Data Nasabah' : '客户资料'}</th>
+                                    <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
+                                    <th>${t('customer_name')}</th>
+                                    <th>${t('ktp_number')}</th>
+                                    <th>${t('phone')}</th>
+                                    <th>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
+                                    <th>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}</th>
+                                    ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
+                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -134,7 +123,7 @@ const CustomersModule = {
                 
                 ${addCustomerCardHtml}`;
                 
-            this._addDoubleRowStyles();
+            this._addDataTableStyles();
             
         } catch (error) {
             console.error("showCustomers error:", error);
@@ -142,139 +131,78 @@ const CustomersModule = {
         }
     },
     
-    _addDoubleRowStyles: function() {
-        if (document.getElementById('customer-double-row-styles')) return;
+    _addDataTableStyles: function() {
+        if (document.getElementById('data-table-styles')) return;
         
         var style = document.createElement('style');
-        style.id = 'customer-double-row-styles';
+        style.id = 'data-table-styles';
         style.textContent = `
-            .customer-double-row-table {
+            .data-table {
                 width: 100%;
                 border-collapse: collapse;
+                font-size: 0.8rem;
             }
-            .customer-double-row-table th {
-                padding: 10px 12px;
+            .data-table th {
                 background: var(--gray-100);
+                padding: 10px 12px;
                 font-weight: 600;
-                text-align: left;
+                color: var(--gray-700);
+                border-bottom: 1px solid var(--gray-300);
+                white-space: nowrap;
             }
-            .customer-info-row {
-                border-top: 1px solid var(--gray-200);
-            }
-            .customer-info-row td {
-                padding: 12px 12px 6px 12px;
-                border-bottom: none;
-            }
-            .customer-action-row td {
-                padding: 6px 12px 12px 12px;
+            .data-table td {
+                padding: 8px 12px;
                 border-bottom: 1px solid var(--gray-200);
+                vertical-align: middle;
             }
-            .customer-cell {
-                width: 100%;
+            .data-table tbody tr:hover {
+                background: var(--gray-50);
+            }
+            .data-table .text-center {
+                text-align: center;
+            }
+            .data-table .text-right {
+                text-align: right;
+            }
+            .data-table .customer-id {
+                font-family: monospace;
+                font-weight: 600;
+                color: var(--primary-dark);
+            }
+            .data-table .customer-name {
+                font-weight: 500;
+            }
+            .data-table .customer-address {
+                max-width: 200px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .action-cell {
-                width: 100%;
-            }
-            .action-cell .btn-small {
-                margin-right: 8px;
-                margin-bottom: 4px;
-            }
-            .action-group-main {
-                display: inline-flex;
+                display: flex;
+                gap: 6px;
                 flex-wrap: wrap;
-                gap: 4px;
-                margin-right: 4px;
-            }
-            .action-group-danger {
-                display: inline-flex;
-                flex-wrap: wrap;
-                gap: 4px;
-                margin-left: 8px;
-                padding-left: 12px;
-                border-left: 2px solid var(--gray-300);
             }
             .btn-blacklist {
                 background: #f97316 !important;
                 color: #fff !important;
                 border-color: #ea580c !important;
-                opacity: 0.85;
             }
             .btn-blacklist:hover {
-                opacity: 1;
                 background: #ea580c !important;
             }
-            .customer-info {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-            .customer-line1 {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 12px;
-                row-gap: 4px;
-            }
-            .customer-line2 {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 16px;
-                row-gap: 4px;
-                font-size: 0.75rem;
-                color: var(--gray-500);
-            }
-            .customer-id {
-                font-family: monospace;
-                font-weight: 600;
-                color: var(--primary-dark);
-                background: var(--primary-soft);
-                padding: 2px 8px;
-                border-radius: 4px;
-                font-size: 0.75rem;
-            }
-            .customer-name {
-                font-weight: 600;
-                color: var(--gray-800);
-            }
-            .customer-date {
-                font-size: 0.7rem;
-                color: var(--gray-500);
-            }
-            .customer-phone {
-                margin-left: 2px;
-            }
-            .customer-ktp {
-                margin-left: 2px;
-            }
-            .customer-ktp-addr {
-                margin-left: 2px;
-            }
-            .customer-living-addr {
-                margin-left: 2px;
-            }
-            .customer-store {
-                margin-left: 2px;
-            }
-            .customer-line1 span,
-            .customer-line2 span {
-                max-width: 200px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
-                white-space: normal;
-                word-break: break-word;
-            }
             @media (max-width: 768px) {
-                .customer-line1 { gap: 8px; }
-                .customer-line2 { gap: 8px; flex-direction: column; align-items: flex-start; }
-                .action-cell .btn-small { display: inline-block; margin: 4px 4px 4px 0; }
-                .customer-line1 span, .customer-line2 span { max-width: 150px; }
-            }
-            @media (max-width: 480px) {
-                .customer-line1 span, .customer-line2 span { max-width: 100%; }
+                .data-table th, .data-table td {
+                    padding: 6px 8px;
+                    font-size: 0.7rem;
+                }
+                .data-table .customer-address {
+                    max-width: 120px;
+                }
+                .action-cell .btn-small {
+                    padding: 4px 6px;
+                    font-size: 0.65rem;
+                }
             }
         `;
         document.head.appendChild(style);
@@ -336,7 +264,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         
         if (isAdmin) {
-            alert(lang === 'id' ? 'Administrator tidak dapat menambah nasabah. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能添加客户，请使用店长或员工账号登录。');
+            alert(lang === 'id' ? '门店业务' : '门店业务');
             return;
         }
         
@@ -388,7 +316,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         
         if (isAdmin) {
-            alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
+            alert(lang === 'id' ? '门店业务' : '门店业务');
             return;
         }
         
@@ -425,15 +353,6 @@ const CustomersModule = {
                 </div>`;
             document.body.appendChild(modal);
             
-            if (!document.getElementById('modal-styles')) {
-                var style = document.createElement('style');
-                style.id = 'modal-styles';
-                style.textContent = `
-                    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
-                    .modal-content { background: #ffffff; border-radius: 12px; padding: 24px; width: 100%; max-height: 90vh; overflow-y: auto; }
-                `;
-                document.head.appendChild(style);
-            }
         } catch (e) {
             alert(lang === 'id' ? 'Gagal memuat data: ' + e.message : '加载失败：' + e.message);
         }
@@ -449,7 +368,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         
         if (isAdmin) {
-            alert(lang === 'id' ? 'Administrator tidak dapat mengubah nasabah.' : '管理员不能修改客户信息。');
+            alert(lang === 'id' ? '门店业务' : '门店业务');
             return;
         }
         
@@ -592,7 +511,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         
         if (isAdmin) {
-            alert(lang === 'id' ? 'Administrator tidak dapat membuat order. Silakan login sebagai Manajer Toko atau Staf.' : '管理员不能创建订单，请使用店长或员工账号登录。');
+            alert(lang === 'id' ? '门店业务' : '门店业务');
             return;
         }
         
@@ -863,7 +782,7 @@ const CustomersModule = {
                         ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${o.order_id}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     <\/td>
                 <\/tr>`;
-            }).join('') : `<td><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -883,7 +802,7 @@ const CustomersModule = {
                 <div class="card">
                     <h3>📋 ${t('order_list')}</h3>
                     <div class="table-container">
-                        <table class="order-table">
+                        <table class="data-table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -892,7 +811,7 @@ const CustomersModule = {
                                     <th class="text-right">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
                                     <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
                                     <th class="text-center">${lang === 'id' ? 'Status' : '状态'}</th>
-                                    <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -949,15 +868,15 @@ const CustomersModule = {
                 <div class="card">
                     <h3>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h3>
                     <div class="table-container">
-                        <table class="payment-table">
+                        <table class="data-table">
                             <thead>
                                 <tr>
                                     <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                     <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
                                     <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
-                                    <th>${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
                                     <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
                                 </tr>
                             </thead>
@@ -982,4 +901,4 @@ window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
 
-console.log('✅ app-customers.js v2.2 已加载 - 修复图标重复');
+console.log('✅ app-customers.js v2.3 已加载 - 统一表格样式');
