@@ -193,9 +193,9 @@ const Utils = {
             // 页面标题
             dashboard: "仪表板", 
             create_order: "新建订单", 
-            order_list: "订单列表",
-            financial_report: "财务报表",
-            user_management: "操作员管理",
+            order_list: "订单管理",
+            financial_report: "业务报表",
+            user_management: "员工管理",
             backup_restore: "备份恢复",
             store_management: "门店管理",
             expenses: "运营支出",
@@ -387,7 +387,7 @@ const Utils = {
             principal: this.lang === 'id' ? 'Pokok' : '本金'
         };
         const methodMap = {
-            cash: this.lang === 'id' ? 'Tunai' : '现金',
+            cash: this.lang === 'id' ? 'Brankas' : '保险柜',
             bank: this.lang === 'id' ? 'Bank BNI' : '银行BNI'
         };
         const rows = payments.map(p => [
@@ -425,7 +425,7 @@ const Utils = {
         const rows = flows.map(f => [
             this.formatDate(f.recorded_at),
             typeMap[f.flow_type] || f.flow_type,
-            f.source_target === 'cash' ? (this.lang === 'id' ? 'Tunai' : '现金') : (this.lang === 'id' ? 'Bank' : '银行'),
+            f.source_target === 'cash' ? (this.lang === 'id' ? 'Brankas' : '保险柜') : (this.lang === 'id' ? 'Bank' : '银行'),
             f.direction === 'inflow' ? (this.lang === 'id' ? 'Masuk' : '流入') : (this.lang === 'id' ? 'Keluar' : '流出'),
             this.getRawAmount(f.amount),
             f.description || '-',
