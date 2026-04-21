@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v3.0（删除重复提示）
+// app-dashboard-orders.js - v3.1（统一表格样式）
 
 window.APP = window.APP || {};
 
@@ -22,7 +22,7 @@ const DashboardOrders = {
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="2" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="10" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
@@ -34,38 +34,23 @@ const DashboardOrders = {
                     var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
                     var currentMonthlyInterestForList = remainingPrincipalForList * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                     
-                    rows += `
-                        <tr class="order-info-row">
-                            <td colspan="2" class="order-cell">
-                                <div class="order-info">
-                                    <div class="order-line1">
-                                        <span class="order-id">📋 订单号: ${Utils.escapeHtml(o.order_id)}</span>
-                                        <span class="order-status">状态: <span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></span>
-                                        <span class="order-customer">👤 客户: ${Utils.escapeHtml(o.customer_name)}</span>
-                                    </div>
-                                    <div class="order-line2">
-                                        <span class="order-collateral">💎 质押物: ${Utils.escapeHtml(o.collateral_name)}</span>
-                                        <span class="order-amount">💰 贷款金额: ${Utils.formatCurrency(o.loan_amount)}</span>
-                                        <span class="order-interest">📈 月利息: ${Utils.formatCurrency(currentMonthlyInterestForList)}</span>
-                                        <span class="order-paid">✅ 已付利息: ${o.interest_paid_months} 个月</span>
-                                        <span class="order-due">📅 下次利息到期: ${formattedDueDate}</span>
-                                        ${isAdmin ? `<span class="order-store">🏪 门店: ${Utils.escapeHtml(storeName)}</span>` : ''}
-                                    </div>
-                                </div>
-                            <\/td>
-                        <\/tr>
-                    `;
-                    
-                    rows += `
-                        <tr class="order-action-row">
-                            <td colspan="2" class="action-cell">
-                                <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ 查看详情</button>
-                                ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 缴纳费用</button>` : ''}
-                                ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ 删除订单</button>` : ''}
-                                <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ 打印凭证</button>
-                            <\/td>
-                        <\/tr>
-                    `;
+                    rows += `<tr>
+                        <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
+                        <td class="order-customer">${Utils.escapeHtml(o.customer_name)}</td>
+                        <td class="order-collateral">${Utils.escapeHtml(o.collateral_name)}</td>
+                        <td class="text-right">${Utils.formatCurrency(o.loan_amount)}</td>
+                        <td class="text-right">${Utils.formatCurrency(currentMonthlyInterestForList)}</td>
+                        <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
+                        <td class="text-center">${formattedDueDate}</td>
+                        <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
+                        ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
+                        <td class="action-cell">
+                            <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ 查看详情</button>
+                            ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 缴纳费用</button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ 删除订单</button>` : ''}
+                            <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ 打印凭证</button>
+                        </td>
+                    </tr>`;
                 }
             }
 
@@ -96,17 +81,26 @@ const DashboardOrders = {
                 </div>
                 
                 <div class="table-container">
-                    <table class="data-table order-double-row-table">
+                    <table class="data-table order-table">
                         <thead>
                             <tr>
-                                <th colspan="2">订单信息</th>
+                                <th>订单号</th>
+                                <th>客户姓名</th>
+                                <th>质押物</th>
+                                <th class="text-right">贷款金额</th>
+                                <th class="text-right">月利息</th>
+                                <th class="text-center">已付利息</th>
+                                <th class="text-center">下次到期</th>
+                                <th class="text-center">状态</th>
+                                ${isAdmin ? '<th class="text-center">门店</th>' : ''}
+                                <th class="text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
                 </div>`;
             
-            this._addOrderDoubleRowStyles();
+            this._addOrderTableStyles();
             
         } catch (err) {
             console.error("showOrderTable error:", err);
@@ -114,88 +108,25 @@ const DashboardOrders = {
         }
     },
     
-    payOrder: function(orderId) {
-        console.log('payOrder 被调用，订单ID:', orderId);
-        if (!orderId) {
-            console.error('订单ID为空');
-            return;
-        }
-        window.APP.navigateTo('payment', { orderId: orderId });
-    },
-    
-    _addOrderDoubleRowStyles: function() {
-        if (document.getElementById('order-double-row-styles')) return;
+    _addOrderTableStyles: function() {
+        if (document.getElementById('order-table-styles')) return;
         
         var style = document.createElement('style');
-        style.id = 'order-double-row-styles';
+        style.id = 'order-table-styles';
         style.textContent = `
-            .order-double-row-table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            .order-double-row-table th {
-                padding: 10px 12px;
-                background: var(--gray-100);
-                font-weight: 600;
-                text-align: left;
-                font-size: 14px;
-            }
-            .order-info-row {
-                border-top: 1px solid var(--gray-200);
-                background: #fff;
-            }
-            .order-info-row td {
-                padding: 12px 12px 6px 12px;
-                border-bottom: none;
-            }
-            .order-action-row td {
-                padding: 8px 12px 12px 12px;
-                border-bottom: 1px solid var(--gray-200);
-            }
-            .order-cell {
-                width: 100%;
-            }
-            .action-cell {
-                width: 100%;
-            }
-            .action-cell .btn-small {
-                margin-right: 8px;
-                margin-bottom: 4px;
-            }
-            .order-info {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-            }
-            .order-line1 {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 16px;
-                row-gap: 6px;
-                font-size: 14px;
-            }
-            .order-line2 {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 20px;
-                row-gap: 6px;
-                font-size: 13px;
-                color: var(--gray-600);
-            }
-            /* 已删除重复的 .order-tips 样式 */
-            .order-id {
+            .order-table .order-id {
                 font-family: monospace;
                 font-weight: 600;
                 color: var(--primary-dark);
-                background: var(--primary-soft);
-                padding: 2px 8px;
-                border-radius: 4px;
             }
-            .order-customer {
+            .order-table .order-customer {
                 font-weight: 500;
-                color: var(--gray-800);
+            }
+            .order-table .order-collateral {
+                max-width: 150px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
             .info-card {
                 background: #e0f2fe;
@@ -220,13 +151,21 @@ const DashboardOrders = {
                 color: #0369a1;
             }
             @media (max-width: 768px) {
-                .order-line1 { gap: 10px; font-size: 13px; }
-                .order-line2 { gap: 10px; flex-direction: column; align-items: flex-start; font-size: 12px; }
-                .action-cell .btn-small { display: inline-block; margin: 4px 4px 4px 0; }
-                .info-text { font-size: 12px; }
+                .order-table .order-collateral {
+                    max-width: 100px;
+                }
             }
         `;
         document.head.appendChild(style);
+    },
+    
+    payOrder: function(orderId) {
+        console.log('payOrder 被调用，订单ID:', orderId);
+        if (!orderId) {
+            console.error('订单ID为空');
+            return;
+        }
+        window.APP.navigateTo('payment', { orderId: orderId });
     },
 
     filterOrders: function(status) { 
@@ -257,13 +196,13 @@ const DashboardOrders = {
                 for (var p of payments) {
                     var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'service_fee' ? (lang === 'id' ? 'Service Fee' : '服务费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
                     payRows += `<tr>
-                        <td>${Utils.formatDate(p.date)}<\/td>
-                        <td>${typeText}<\/td>
-                        <td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}<\/td>
-                        <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
-                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}<\/span><\/td>
-                        <td>${Utils.escapeHtml(p.description || '-')}<\/td>
-                    <\/tr>`;
+                        <td class="date-cell">${Utils.formatDate(p.date)}</td>
+                        <td>${typeText}</td>
+                        <td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
+                        <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
+                        <td>${Utils.escapeHtml(p.description || '-')}</td>
+                    </tr>`;
                 }
             } else {
                 payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
@@ -314,8 +253,10 @@ const DashboardOrders = {
                     
                     <h3>📋 缴费记录</h3>
                     <div class="table-container">
-                        <table class="payment-table">
-                            <thead><tr><th>日期</th><th>类型</th><th>月数</th><th>金额</th><th>支付方式</th><th>说明</th></tr></thead>
+                        <table class="data-table payment-table">
+                            <thead>
+                                <tr><th>日期</th><th>类型</th><th class="text-center">月数</th><th class="text-right">金额</th><th class="text-center">支付方式</th><th>说明</th></tr>
+                            </thead>
                             <tbody>${payRows}</tbody>
                         </table>
                     </div>
@@ -338,7 +279,7 @@ const DashboardOrders = {
     deleteOrder: async function(orderId) {
         var lang = Utils.lang;
         
-        if (!confirm(lang === 'id' ? '确定要删除此订单吗？此操作不可恢复！' : '确定要删除此订单吗？此操作不可恢复！')) return;
+        if (!confirm(lang === 'id' ? '确定删除？' : '确定删除？')) return;
         
         try {
             const order = await SUPABASE.getOrder(orderId);
@@ -389,10 +330,10 @@ const DashboardOrders = {
                 var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? '现金' : '银行');
                 
                 paymentRows += `<tr>
-                    <td>${Utils.formatDate(p.date)}<\/td>
-                    <td>${typeText}<\/td>
-                    <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
-                    <td>${methodText}<\/td>
+                    <td>${Utils.formatDate(p.date)}</td>
+                    <td>${typeText}</td>
+                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                    <td>${methodText}</td>
                 <\/tr>`;
             }
             
@@ -493,15 +434,15 @@ const DashboardOrders = {
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="9" class="text-center">暂无数据<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
-                    <td>${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
-                    <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}<\/td>
-                    <td>${Utils.formatDate(p.date)}<\/td>
-                    <td>${typeMap[p.type] || p.type}<\/td>
-                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' 个月' : ' 个月') : '-'}<\/td>
-                    <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
-                    <td>${methodMap[p.payment_method] || '-'}<\/td>
-                    <td>${Utils.escapeHtml(p.description || '-')}<\/td>
-                    <td><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">查看</button><\/td>
+                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                    <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
+                    <td class="date-cell">${Utils.formatDate(p.date)}</td>
+                    <td>${typeMap[p.type] || p.type}</td>
+                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' 个月' : ' 个月') : '-'}</td>
+                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                    <td class="text-center">${methodMap[p.payment_method] || '-'}</td>
+                    <td>${Utils.escapeHtml(p.description || '-')}</td>
+                    <td class="action-cell"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">查看</button></td>
                 <\/tr>`).join('');
 
             document.getElementById("app").innerHTML = `
@@ -522,10 +463,10 @@ const DashboardOrders = {
                 </div>
                 
                 <div class="table-container">
-                    <table class="payment-table">
+                    <table class="data-table payment-table">
                         <thead>
                             <tr>
-                                <th>订单ID</th><th>客户姓名</th><th>日期</th><th>类型</th><th>月数</th><th>金额</th><th>支付方式</th><th>说明</th><th>操作</th>
+                                <th>订单ID</th><th>客户姓名</th><th>日期</th><th>类型</th><th class="text-center">月数</th><th class="text-right">金额</th><th class="text-center">支付方式</th><th>说明</th><th class="text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
@@ -558,4 +499,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v3.0 已加载 - 删除订单列表中的重复提示');
+console.log('✅ app-dashboard-orders.js v3.1 已加载 - 统一表格样式');
