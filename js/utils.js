@@ -1,4 +1,4 @@
-// utils.js - v1.3（优化：CSV 导出抽取公共方法，消除重复代码）
+// utils.js - v1.0
 
 const Utils = {
     lang: 'id',
