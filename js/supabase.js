@@ -1,4 +1,4 @@
-// supabase.js - v1.1（新增固定还款功能）
+// supabase.js - v1.2（所有错误消息使用 Utils.t()，支持双语）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -246,7 +246,7 @@ const SupabaseAPI = {
         const storeId = flowData.store_id || profile?.store_id;
         if (!storeId) {
             console.error("recordCashFlow: store_id 缺失", flowData);
-            throw new Error("门店ID缺失");
+            throw new Error(Utils.lang === 'id' ? 'ID toko tidak ditemukan' : '门店ID缺失');
         }
         
         const record = {
@@ -334,7 +334,7 @@ const SupabaseAPI = {
             .maybeSingle();
         
         if (existingFlow) {
-            throw new Error(Utils.lang === 'id' ? '❌ 贷款已发放' : '❌ 贷款已发放');
+            throw new Error(Utils.t('loan_already_disbursed'));
         }
         
         const flowRecord = await this.recordCashFlow({
@@ -345,7 +345,7 @@ const SupabaseAPI = {
             source_target: source,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: description || `贷款发放 - ${order.order_id}`,
+            description: description || `${Utils.lang === 'id' ? 'Pencairan pinjaman' : '贷款发放'} - ${order.order_id}`,
             reference_id: order.order_id
         });
         
@@ -381,7 +381,7 @@ const SupabaseAPI = {
 
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin' && profile?.store_id && data.store_id !== profile.store_id) {
-            throw new Error(Utils.lang === 'id' ? '无权访问' : '无权访问');
+            throw new Error(Utils.t('unauthorized'));
         }
 
         return data;
@@ -411,11 +411,11 @@ const SupabaseAPI = {
         const targetStoreId = orderData.store_id || profile.store_id;
         
         if (profile.role === 'admin' && !orderData.store_id) {
-            throw new Error(Utils.lang === 'id' ? '门店权限' : '门店权限');
+            throw new Error(Utils.t('store_operation'));
         }
         
         if (!targetStoreId) {
-            throw new Error(Utils.lang === 'id' ? '未找到门店' : '未找到门店');
+            throw new Error(Utils.lang === 'id' ? 'Toko tidak ditemukan' : '未找到门店');
         }
         
         let retryCount = 0;
@@ -495,7 +495,7 @@ const SupabaseAPI = {
                 lastError = err;
             }
         }
-        throw lastError || new Error('创建订单失败');
+        throw lastError || new Error(Utils.lang === 'id' ? 'Gagal membuat pesanan' : '创建订单失败');
     },
 
     calculateNextDueDate(startDate, paidMonths) {
@@ -521,7 +521,7 @@ const SupabaseAPI = {
             date: new Date().toISOString().split('T')[0],
             type: 'admin_fee',
             amount: feeAmount,
-            description: `管理费`,
+            description: Utils.t('admin_fee'),
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -537,7 +537,7 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `管理费 - ${order.order_id}`,
+            description: `${Utils.t('admin_fee')} - ${order.order_id}`,
             reference_id: order.order_id
         });
         
@@ -549,11 +549,11 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         
         if (order.service_fee_percent <= 0) {
-            throw new Error(Utils.lang === 'id' ? '未设置服务费' : '未设置服务费');
+            throw new Error(Utils.lang === 'id' ? 'Service fee belum diatur' : '未设置服务费');
         }
         
         if (order.service_fee_paid > 0) {
-            throw new Error(Utils.lang === 'id' ? '服务费已收取' : '服务费已收取');
+            throw new Error(Utils.lang === 'id' ? 'Service fee sudah dibayar' : '服务费已收取');
         }
         
         const totalServiceFee = order.service_fee_amount;
@@ -569,7 +569,7 @@ const SupabaseAPI = {
             type: 'service_fee',
             months: 1,
             amount: totalServiceFee,
-            description: `服务费`,
+            description: Utils.t('service_fee'),
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -585,7 +585,7 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `服务费 - ${order.order_id}`,
+            description: `${Utils.t('service_fee')} - ${order.order_id}`,
             reference_id: order.order_id
         });
         
@@ -598,7 +598,7 @@ const SupabaseAPI = {
         const currentOrder = await this.getOrder(orderId);
         
         if (currentOrder.status === 'completed') {
-            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+            throw new Error(Utils.t('order_completed'));
         }
         
         const monthlyRate = currentOrder.agreed_interest_rate || 0.08;
@@ -616,7 +616,7 @@ const SupabaseAPI = {
         
         if (newInterestPaidMonths > maxMonths) {
             throw new Error(Utils.lang === 'id' 
-                ? `❌ 已达到最大延期期限 (${maxMonths}个月)，请尽快结清本金` 
+                ? `❌ Mencapai batas maksimum perpanjangan (${maxMonths} bulan), harap lunasi pokok segera`
                 : `❌ 已达到最大延期期限 (${maxMonths}个月)，请尽快结清本金`);
         }
         
@@ -639,7 +639,7 @@ const SupabaseAPI = {
             type: 'interest',
             months: months,
             amount: totalInterest,
-            description: `利息${months}个月 (利率${(monthlyRate*100).toFixed(0)}%)`,
+            description: `${Utils.t('interest')}${months} ${Utils.lang === 'id' ? 'bulan' : '个月'} (${(monthlyRate*100).toFixed(0)}%)`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -658,17 +658,17 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: currentOrder.id,
             customer_id: currentOrder.customer_id,
-            description: `利息 ${months}个月 (利率${(monthlyRate*100).toFixed(0)}%)`,
+            description: `${Utils.t('interest')} ${months} ${Utils.lang === 'id' ? 'bulan' : '个月'} (${(monthlyRate*100).toFixed(0)}%)`,
             reference_id: currentOrder.order_id
         });
         
         const remainingMonths = maxMonths - newInterestPaidMonths;
         const extensionMsg = remainingMonths > 0 
-            ? (Utils.lang === 'id' ? `\n剩余可延期: ${remainingMonths}个月` : `\n剩余可延期: ${remainingMonths}个月`)
-            : (Utils.lang === 'id' ? `\n⚠️ 已达最大期限，请尽快结清本金` : `\n⚠️ 已达最大期限，请尽快结清本金`);
+            ? (Utils.lang === 'id' ? `\nSisa perpanjangan: ${remainingMonths} bulan` : `\n剩余可延期: ${remainingMonths}个月`)
+            : (Utils.lang === 'id' ? `\n⚠️ Mencapai batas maksimum, harap lunasi pokok segera` : `\n⚠️ 已达最大期限，请尽快结清本金`);
         
         alert(Utils.lang === 'id' 
-            ? `✅ 利息 ${this.formatCurrency(totalInterest)} 已记录${extensionMsg}`
+            ? `✅ Bunga ${this.formatCurrency(totalInterest)} telah dicatat${extensionMsg}`
             : `✅ 利息 ${this.formatCurrency(totalInterest)} 已记录${extensionMsg}`);
         
         return true;
@@ -680,7 +680,7 @@ const SupabaseAPI = {
         const currentOrder = await this.getOrder(orderId);
         
         if (currentOrder.status === 'completed') {
-            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+            throw new Error(Utils.t('order_completed'));
         }
         
         const loanAmount = currentOrder.loan_amount || 0;
@@ -688,13 +688,13 @@ const SupabaseAPI = {
         const remainingPrincipal = loanAmount - principalPaid;
         
         if (remainingPrincipal <= 0) {
-            throw new Error(Utils.lang === 'id' ? '❌ 本金已结清' : '❌ 本金已结清');
+            throw new Error(Utils.lang === 'id' ? '❌ Pokok sudah lunas' : '❌ 本金已结清');
         }
         
         let paidAmount = Math.min(amount, remainingPrincipal);
         
         if (paidAmount <= 0) {
-            throw new Error(Utils.lang === 'id' ? '❌ 请输入金额' : '❌ 请输入金额');
+            throw new Error(Utils.t('invalid_amount'));
         }
         
         const newPrincipalPaid = principalPaid + paidAmount;
@@ -728,7 +728,7 @@ const SupabaseAPI = {
             date: new Date().toISOString().split('T')[0],
             type: 'principal',
             amount: paidAmount,
-            description: isFullRepayment ? '结清' : '还款',
+            description: isFullRepayment ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -747,15 +747,15 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: currentOrder.id,
             customer_id: currentOrder.customer_id,
-            description: isFullRepayment ? '结清' : `还款`,
+            description: isFullRepayment ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
             reference_id: currentOrder.order_id
         });
         
         if (isFullRepayment) {
-            alert(Utils.lang === 'id' ? `✅ 订单已结清` : `✅ 订单已结清`);
+            alert(Utils.lang === 'id' ? `✅ Pesanan lunas` : `✅ 订单已结清`);
         } else {
             alert(Utils.lang === 'id' 
-                ? `✅ 还款 ${this.formatCurrency(paidAmount)} 已记录`
+                ? `✅ Pembayaran pokok ${this.formatCurrency(paidAmount)} telah dicatat`
                 : `✅ 还款 ${this.formatCurrency(paidAmount)} 已记录`);
         }
         
@@ -768,11 +768,11 @@ const SupabaseAPI = {
         const order = await this.getOrder(orderId);
         
         if (order.status === 'completed') {
-            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+            throw new Error(Utils.t('order_completed'));
         }
         
         if (order.repayment_type !== 'fixed') {
-            throw new Error(Utils.lang === 'id' ? '❌ 此订单不是固定还款模式' : '❌ 此订单不是固定还款模式');
+            throw new Error(Utils.lang === 'id' ? '❌ Pesanan ini bukan cicilan tetap' : '❌ 此订单不是固定还款模式');
         }
         
         const fixedPayment = order.monthly_fixed_payment;
@@ -780,7 +780,7 @@ const SupabaseAPI = {
         const remainingMonths = order.repayment_term - paidMonths;
         
         if (remainingMonths <= 0) {
-            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+            throw new Error(Utils.lang === 'id' ? '❌ Pesanan sudah lunas' : '❌ 订单已结清');
         }
         
         const monthlyRate = order.agreed_interest_rate || 0.08;
@@ -789,7 +789,7 @@ const SupabaseAPI = {
         const principalAmount = fixedPayment - interestAmount;
         
         if (fixedPayment <= 0) {
-            throw new Error(Utils.lang === 'id' ? '❌ 还款金额无效' : '❌ 还款金额无效');
+            throw new Error(Utils.lang === 'id' ? '❌ Jumlah angsuran tidak valid' : '❌ 还款金额无效');
         }
         
         const newPrincipalPaid = (order.principal_paid || 0) + principalAmount;
@@ -828,7 +828,7 @@ const SupabaseAPI = {
                 type: 'interest',
                 months: 1,
                 amount: interestAmount,
-                description: `固定还款-利息 第${newFixedPaidMonths}期`,
+                description: `${Utils.lang === 'id' ? 'Cicilan tetap - Bunga' : '固定还款-利息'} ${newFixedPaidMonths}`,
                 recorded_by: profile.id,
                 payment_method: paymentMethod
             };
@@ -842,7 +842,7 @@ const SupabaseAPI = {
                 source_target: paymentMethod,
                 order_id: order.id,
                 customer_id: order.customer_id,
-                description: `固定还款利息 - ${order.order_id} 第${newFixedPaidMonths}期`,
+                description: `${Utils.lang === 'id' ? 'Cicilan tetap bunga' : '固定还款利息'} - ${order.order_id} ${Utils.lang === 'id' ? 'ke' : '第'}${newFixedPaidMonths}`,
                 reference_id: order.order_id
             });
         }
@@ -853,7 +853,7 @@ const SupabaseAPI = {
                 date: new Date().toISOString().split('T')[0],
                 type: 'principal',
                 amount: principalAmount,
-                description: `固定还款-本金 第${newFixedPaidMonths}期`,
+                description: `${Utils.lang === 'id' ? 'Cicilan tetap - Pokok' : '固定还款-本金'} ${newFixedPaidMonths}`,
                 recorded_by: profile.id,
                 payment_method: paymentMethod
             };
@@ -867,16 +867,16 @@ const SupabaseAPI = {
                 source_target: paymentMethod,
                 order_id: order.id,
                 customer_id: order.customer_id,
-                description: `固定还款本金 - ${order.order_id} 第${newFixedPaidMonths}期`,
+                description: `${Utils.lang === 'id' ? 'Cicilan tetap pokok' : '固定还款本金'} - ${order.order_id} ${Utils.lang === 'id' ? 'ke' : '第'}${newFixedPaidMonths}`,
                 reference_id: order.order_id
             });
         }
         
         const msg = isCompleted 
-            ? (Utils.lang === 'id' ? `✅ 订单已结清！` : `✅ 订单已结清！`)
+            ? (Utils.lang === 'id' ? `✅ Pesanan lunas!` : `✅ 订单已结清！`)
             : (Utils.lang === 'id' 
-                ? `✅ 第${newFixedPaidMonths}期还款成功！\n利息: ${this.formatCurrency(interestAmount)}\n本金: ${this.formatCurrency(principalAmount)}\n剩余期数: ${order.repayment_term - newFixedPaidMonths}`
-                : `✅ 第${newFixedPaidMonths}期还款成功！\n利息: ${this.formatCurrency(interestAmount)}\n本金: ${this.formatCurrency(principalAmount)}\n剩余期数: ${order.repayment_term - newFixedPaidMonths}`);
+                ? `✅ Angsuran ke-${newFixedPaidMonths} berhasil!\nBunga: ${this.formatCurrency(interestAmount)}\nPokok: ${this.formatCurrency(principalAmount)}\nSisa angsuran: ${order.repayment_term - newFixedPaidMonths} bulan`
+                : `✅ 第${newFixedPaidMonths}期还款成功！\n利息: ${this.formatCurrency(interestAmount)}\n本金: ${this.formatCurrency(principalAmount)}\n剩余期数: ${order.repayment_term - newFixedPaidMonths}个月`);
         
         alert(msg);
         return true;
@@ -888,11 +888,11 @@ const SupabaseAPI = {
         const order = await this.getOrder(orderId);
         
         if (order.status === 'completed') {
-            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+            throw new Error(Utils.t('order_completed'));
         }
         
         if (order.repayment_type !== 'fixed') {
-            throw new Error(Utils.lang === 'id' ? '❌ 此订单不是固定还款模式' : '❌ 此订单不是固定还款模式');
+            throw new Error(Utils.lang === 'id' ? '❌ Pesanan ini bukan cicilan tetap' : '❌ 此订单不是固定还款模式');
         }
         
         const paidMonths = order.fixed_paid_months || 0;
@@ -901,10 +901,11 @@ const SupabaseAPI = {
         const remainingMonths = order.repayment_term - paidMonths;
         
         const settlementAmount = remainingPrincipal;
+        const savedInterest = remainingPrincipal * monthlyRate * remainingMonths;
         
         const confirmMsg = Utils.lang === 'id'
-            ? `⚠️ 提前结清确认\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n已还期数: ${paidMonths}/${order.repayment_term}\n剩余本金: ${this.formatCurrency(remainingPrincipal)}\n减免利息: ${this.formatCurrency(remainingPrincipal * monthlyRate * remainingMonths)}\n结清金额: ${this.formatCurrency(settlementAmount)}\n\n确认结清？`
-            : `⚠️ 提前结清确认\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n已还期数: ${paidMonths}/${order.repayment_term}\n剩余本金: ${this.formatCurrency(remainingPrincipal)}\n减免利息: ${this.formatCurrency(remainingPrincipal * monthlyRate * remainingMonths)}\n结清金额: ${this.formatCurrency(settlementAmount)}\n\n确认结清？`;
+            ? `⚠️ Konfirmasi Pelunasan Dipercepat\n\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nAngsuran terbayar: ${paidMonths}/${order.repayment_term}\nSisa Pokok: ${this.formatCurrency(remainingPrincipal)}\nBunga yang dihemat: ${this.formatCurrency(savedInterest)}\nJumlah Pelunasan: ${this.formatCurrency(settlementAmount)}\n\nLanjutkan?`
+            : `⚠️ 提前结清确认\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n已还期数: ${paidMonths}/${order.repayment_term}\n剩余本金: ${this.formatCurrency(remainingPrincipal)}\n减免利息: ${this.formatCurrency(savedInterest)}\n结清金额: ${this.formatCurrency(settlementAmount)}\n\n确认结清？`;
         
         if (!confirm(confirmMsg)) return false;
         
@@ -913,7 +914,7 @@ const SupabaseAPI = {
             date: new Date().toISOString().split('T')[0],
             type: 'principal',
             amount: settlementAmount,
-            description: `提前结清 - 减免剩余利息`,
+            description: `${Utils.lang === 'id' ? 'Pelunasan dipercepat - hemat bunga' : '提前结清 - 减免剩余利息'}`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -927,7 +928,7 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `提前结清 - ${order.order_id}`,
+            description: `${Utils.lang === 'id' ? 'Pelunasan dipercepat' : '提前结清'} - ${order.order_id}`,
             reference_id: order.order_id
         });
         
@@ -944,7 +945,7 @@ const SupabaseAPI = {
         
         if (error) throw error;
         
-        alert(Utils.lang === 'id' ? `✅ 提前结清成功！\n结清金额: ${this.formatCurrency(settlementAmount)}` : `✅ 提前结清成功！\n结清金额: ${this.formatCurrency(settlementAmount)}`);
+        alert(Utils.lang === 'id' ? `✅ Pelunasan dipercepat berhasil!\nJumlah: ${this.formatCurrency(settlementAmount)}` : `✅ 提前结清成功！\n结清金额: ${this.formatCurrency(settlementAmount)}`);
         return true;
     },
 
@@ -1005,7 +1006,7 @@ const SupabaseAPI = {
         );
         
         if (currentOrder.is_locked && isUpdatingSensitive) {
-            throw new Error(Utils.lang === 'id' ? '❌ 订单已锁定' : '❌ 订单已锁定');
+            throw new Error(Utils.t('order_locked'));
         }
         
         const { data, error } = await supabaseClient
@@ -1032,7 +1033,7 @@ const SupabaseAPI = {
     async unlockOrder(orderId) {
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? '需管理员权限' : '需管理员权限');
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat membuka kunci' : '需管理员权限');
         }
         const { error } = await supabaseClient.from('orders').update({
             is_locked: false, locked_at: null, locked_by: null
@@ -1055,7 +1056,7 @@ const SupabaseAPI = {
     async deleteOrder(orderId) {
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? '需管理员权限' : '需管理员权限');
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus pesanan' : '需管理员权限');
         }
         const order = await this.getOrder(orderId);
         
@@ -1163,7 +1164,7 @@ const SupabaseAPI = {
         
         if (ordersError) throw ordersError;
         if (orders && orders.length > 0) {
-            throw new Error(Utils.lang === 'id' ? '门店有订单，无法删除' : '门店有订单，无法删除');
+            throw new Error(Utils.lang === 'id' ? 'Toko memiliki pesanan, tidak dapat dihapus' : '门店有订单，无法删除');
         }
         
         const { data: users, error: usersError } = await supabaseClient
@@ -1173,7 +1174,7 @@ const SupabaseAPI = {
         
         if (usersError) throw usersError;
         if (users && users.length > 0) {
-            throw new Error(Utils.lang === 'id' ? '门店有用户，无法删除' : '门店有用户，无法删除');
+            throw new Error(Utils.lang === 'id' ? 'Toko memiliki pengguna, tidak dapat dihapus' : '门店有用户，无法删除');
         }
         
         const { error } = await supabaseClient.from('stores').delete().eq('id', id);
@@ -1492,23 +1493,23 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         
         if (transferData.amount <= 0) {
-            throw new Error(Utils.lang === 'id' ? '金额无效' : '金额无效');
+            throw new Error(Utils.t('invalid_amount'));
         }
         
         if (transferData.transfer_type === 'cash_to_bank') {
             const cashFlow = await this.getCashFlowSummary();
             if (cashFlow.cash.balance < transferData.amount) {
-                throw new Error(Utils.lang === 'id' ? '余额不足' : '余额不足');
+                throw new Error(Utils.lang === 'id' ? 'Saldo tidak mencukupi' : '余额不足');
             }
         } else if (transferData.transfer_type === 'bank_to_cash') {
             const cashFlow = await this.getCashFlowSummary();
             if (cashFlow.bank.balance < transferData.amount) {
-                throw new Error(Utils.lang === 'id' ? '余额不足' : '余额不足');
+                throw new Error(Utils.lang === 'id' ? 'Saldo tidak mencukupi' : '余额不足');
             }
         } else if (transferData.transfer_type === 'store_to_hq') {
             const shopAccount = await this.getShopAccount(transferData.store_id || profile?.store_id);
             if (shopAccount.bank_balance < transferData.amount) {
-                throw new Error(Utils.lang === 'id' ? '余额不足' : '余额不足');
+                throw new Error(Utils.lang === 'id' ? 'Saldo tidak mencukupi' : '余额不足');
             }
         }
         
@@ -1535,7 +1536,7 @@ const SupabaseAPI = {
             direction: 'outflow',
             amount: transferData.amount,
             source_target: transferData.from_account === 'hq' ? 'bank' : transferData.from_account,
-            description: `转出`,
+            description: Utils.lang === 'id' ? 'Transfer keluar' : '转出',
             reference_id: data.id
         });
         
@@ -1546,7 +1547,7 @@ const SupabaseAPI = {
                 direction: 'inflow',
                 amount: transferData.amount,
                 source_target: transferData.to_account,
-                description: `转入`,
+                description: Utils.lang === 'id' ? 'Transfer masuk' : '转入',
                 reference_id: data.id
             });
         }
@@ -1589,12 +1590,12 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         
         if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? '需管理员权限' : '需管理员权限');
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menyetor ke pusat' : '需管理员权限');
         }
         
         const shopAccount = await this.getShopAccount(storeId);
         if (shopAccount.bank_balance < amount) {
-            throw new Error(Utils.lang === 'id' ? '余额不足' : '余额不足');
+            throw new Error(Utils.lang === 'id' ? 'Saldo tidak mencukupi' : '余额不足');
         }
         
         const transfer = await this.recordInternalTransfer({
@@ -1602,7 +1603,7 @@ const SupabaseAPI = {
             from_account: 'bank',
             to_account: 'hq',
             amount: amount,
-            description: description || '上缴总部',
+            description: description || (Utils.lang === 'id' ? 'Setoran ke kantor pusat' : '上缴总部'),
             store_id: storeId
         });
         
