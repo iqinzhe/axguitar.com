@@ -467,7 +467,7 @@ const DashboardCore = {
                 </div>
             `).join('');
             
-            // Admin 工具栏：缴费明细改为"资金流水"，财务报表改为"业务报表"，退出改为"保存退出"
+            // Admin "资金流水"，"业务报表"，"保存退出"
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = `
