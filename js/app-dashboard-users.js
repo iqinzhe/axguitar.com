@@ -1,5 +1,4 @@
-// app-dashboard-users.js - v1.1（统一表格样式）
-
+// app-dashboard-users.js - v1.0
 window.APP = window.APP || {};
 
 const DashboardUsers = {
@@ -213,4 +212,3 @@ const DashboardUsers = {
 
 Object.assign(window.APP, DashboardUsers);
 
-console.log('✅ app-dashboard-users.js v1.1 已加载 - 统一表格样式');
