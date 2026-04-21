@@ -484,9 +484,10 @@ button.danger:hover,
     margin: var(--spacing-3) 0;
 }
 
-/* === 统一表格样式（业务报表风格）=== */
+/* === 统一表格样式（所有表格共用）=== */
 .data-table {
     width: 100%;
+    min-width: 680px;          /* 关键：手机端触发水平滚动 */
     border-collapse: collapse;
     font-size: var(--font-xs);
     background: white;
@@ -511,6 +512,11 @@ button.danger:hover,
     background: var(--gray-50);
 }
 
+/* 业务报表需要更宽（覆盖 min-width）*/
+.report-table {
+    min-width: 1200px;
+}
+
 /* 双行表头支持 */
 .data-table thead tr:first-child th {
     border-bottom: 1px solid var(--gray-300);
@@ -528,12 +534,6 @@ button.danger:hover,
     border-top: 2px solid var(--gray-400);
     background: var(--gray-100);
     font-weight: 600;
-}
-
-.data-table tbody tr.summary-row td,
-.data-table tfoot td {
-    font-weight: 600;
-    background: var(--gray-100);
 }
 
 /* 金额列右对齐 */
@@ -1058,20 +1058,11 @@ tbody tr:hover {
         min-height: 44px;
     }
 
-    /* 手机端表格适配 */
+    /* 手机端表格适配 - 仅调整内边距和按钮 */
     .data-table th,
     .data-table td {
         padding: 6px 8px;
         font-size: 0.7rem;
-    }
-    
-    .data-table th {
-        white-space: nowrap;
-    }
-    
-    .data-table td {
-        white-space: normal;
-        word-break: break-word;
     }
     
     .data-table .action-cell {
@@ -1126,7 +1117,6 @@ tbody tr:hover {
         padding: var(--spacing-1);
     }
 
-    /* 超小屏表格进一步缩小 */
     .data-table th,
     .data-table td {
         padding: 4px 6px;
@@ -1216,6 +1206,7 @@ tbody tr:hover {
     /* 打印时表格样式 */
     .data-table {
         width: 100%;
+        min-width: auto !important;  /* 打印时取消最小宽度限制 */
         border-collapse: collapse;
         font-size: 10pt;
         margin: 0;
@@ -1313,254 +1304,5 @@ tbody tr:hover {
         color: #666;
         border-top: 1px solid #ccc;
         padding-top: 8px;
-    }
-}
-
-/* === 统一所有表格手机端样式（与业务报表一致）=== */
-
-/* 所有表格容器统一设置 */
-.card .table-container,
-.table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: var(--spacing-3) 0;
-    width: 100%;
-}
-
-/* 所有表格统一设置最小宽度，确保手机端可水平滚动 */
-.data-table,
-table.data-table,
-table:not(.report-table) {
-    min-width: 700px;  /* 业务报表用的是1200px，其他表格700px足够 */
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--font-xs);
-}
-
-/* 业务报表保持原样（1200px） */
-.report-table {
-    min-width: 1200px !important;
-}
-
-/* 手机端（≤768px）统一表格样式 */
-@media (max-width: 768px) {
-    /* 所有表格统一最小宽度 */
-    .data-table,
-    table.data-table,
-    .report-table {
-        min-width: 700px;
-    }
-    
-    /* 业务报表保持1200px */
-    .report-table {
-        min-width: 1200px !important;
-    }
-    
-    /* 表格单元格样式统一 */
-    .data-table th,
-    .data-table td,
-    table.data-table th,
-    table.data-table td {
-        padding: 8px 10px;
-        font-size: 0.7rem;
-        white-space: nowrap;
-    }
-    
-    /* 文本内容允许换行（避免过长内容撑爆） */
-    .data-table td:not(.action-cell),
-    table.data-table td:not(.action-cell) {
-        white-space: normal;
-        word-break: break-word;
-        min-width: 80px;
-        max-width: 150px;
-    }
-    
-    /* 操作列保持按钮垂直排列 */
-    .data-table .action-cell,
-    table.data-table .action-cell {
-        white-space: normal;
-        min-width: 100px;
-    }
-    
-    /* 操作列按钮样式 */
-    .data-table .action-cell .btn-small,
-    table.data-table .action-cell .btn-small {
-        width: 100%;
-        text-align: center;
-        margin-bottom: 4px;
-        font-size: 0.65rem;
-        padding: 6px 8px;
-    }
-    
-    /* 订单ID、客户ID等标识保持单行 */
-    .data-table .order-id,
-    .data-table .customer-id,
-    .data-table .store-code {
-        white-space: nowrap;
-        font-family: monospace;
-        font-size: 0.7rem;
-    }
-    
-    /* 地址类单元格适当放宽限制 */
-    .data-table .customer-address,
-    .data-table .expense-desc,
-    .data-table .flow-desc {
-        max-width: 120px;
-        white-space: normal;
-        word-break: break-word;
-    }
-}
-
-/* 超小屏（≤480px）进一步优化 */
-@media (max-width: 480px) {
-    .data-table,
-    table.data-table {
-        min-width: 600px;
-    }
-    
-    .report-table {
-        min-width: 1000px !important;
-    }
-    
-    .data-table th,
-    .data-table td,
-    table.data-table th,
-    table.data-table td {
-        padding: 6px 8px;
-        font-size: 0.65rem;
-    }
-    
-    .data-table .customer-address,
-    .data-table .expense-desc,
-    .data-table .flow-desc {
-        max-width: 100px;
-    }
-    
-    .data-table .action-cell .btn-small {
-        font-size: 0.6rem;
-        padding: 4px 6px;
-    }
-}
-
-/* 确保所有表格都使用 .table-container 包裹 */
-/* 如果某些表格没有 .table-container，添加以下样式 */
-.card > table:not(.inside-container),
-.card > div:not(.table-container) > table {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    min-width: 700px;
-}
-
-/* === 统一表格移动端水平滚动（修复手机端显示不良）=== */
-
-/* 所有表格容器强制水平滚动 */
-.table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-}
-
-/* 基础表格样式 - 设置最小宽度确保水平滚动 */
-.data-table,
-table.data-table {
-    min-width: 680px;
-    width: 100%;
-    border-collapse: collapse;
-}
-
-/* 业务报表需要更宽 */
-.report-table {
-    min-width: 1200px !important;
-}
-
-/* 订单列表 */
-.order-table {
-    min-width: 750px;
-}
-
-/* 客户列表 */
-.data-table:not(.report-table):not(.order-table) {
-    min-width: 680px;
-}
-
-/* 手机端适配 */
-@media (max-width: 768px) {
-    /* 所有表格保持水平滚动 */
-    .data-table,
-    table.data-table,
-    .order-table,
-    .report-table {
-        min-width: 680px;
-    }
-    
-    /* 业务报表保持更宽 */
-    .report-table {
-        min-width: 1200px !important;
-    }
-    
-    /* 表格单元格紧凑 */
-    .data-table th,
-    .data-table td,
-    table.data-table th,
-    table.data-table td {
-        padding: 6px 8px;
-        font-size: 0.7rem;
-    }
-    
-    /* 操作列按钮垂直排列 */
-    .data-table .action-cell,
-    table.data-table .action-cell {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        min-width: 70px;
-    }
-    
-    .data-table .action-cell .btn-small,
-    table.data-table .action-cell .btn-small {
-        width: 100%;
-        text-align: center;
-        font-size: 0.65rem;
-        padding: 5px 6px;
-        white-space: nowrap;
-    }
-    
-    /* 地址列允许换行 */
-    .data-table .customer-address,
-    .data-table .expense-desc,
-    .data-table .flow-desc,
-    .data-table .order-collateral {
-        white-space: normal;
-        word-break: break-word;
-        max-width: 120px;
-    }
-    
-    /* 日期列保持单行 */
-    .data-table .date-cell,
-    .data-table .order-id,
-    .data-table .customer-id {
-        white-space: nowrap;
-    }
-}
-
-/* 超小屏 */
-@media (max-width: 480px) {
-    .data-table th,
-    .data-table td,
-    table.data-table th,
-    table.data-table td {
-        padding: 4px 6px;
-        font-size: 0.6rem;
-    }
-    
-    .data-table .action-cell .btn-small {
-        font-size: 0.55rem;
-        padding: 4px 4px;
-    }
-    
-    .data-table .customer-address,
-    .data-table .expense-desc {
-        max-width: 80px;
     }
 }
