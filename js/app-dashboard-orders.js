@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v3.1（统一表格样式）
+// app-dashboard-orders.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -499,4 +499,3 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v3.1 已加载 - 统一表格样式');
