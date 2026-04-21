@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.1（修复运营支出加载失败）
+// app-dashboard-expenses.js - v2.2（统一表格样式）
 
 window.APP = window.APP || {};
 
@@ -13,7 +13,6 @@ const DashboardExpenses = {
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
-            // 修复：使用更稳定的查询方式
             let finalExpenses = [];
             
             try {
@@ -25,7 +24,6 @@ const DashboardExpenses = {
                     `)
                     .order('expense_date', { ascending: false });
                 
-                // 非管理员只能看到自己门店的支出
                 if (!isAdmin && profile?.store_id) {
                     query = query.eq('store_id', profile.store_id);
                 }
@@ -34,7 +32,6 @@ const DashboardExpenses = {
                 
                 if (error) {
                     console.warn("关联查询失败，尝试简化查询:", error);
-                    // 如果关联查询失败，尝试简化查询
                     const simpleQuery = supabaseClient
                         .from('expenses')
                         .select('*')
@@ -49,7 +46,6 @@ const DashboardExpenses = {
                     
                     var expensesData = simpleExpenses || [];
                     
-                    // 手动关联门店信息
                     var storesMap = {};
                     try {
                         const storesData = await SUPABASE.getAllStores();
@@ -69,7 +65,6 @@ const DashboardExpenses = {
                 }
             } catch (queryError) {
                 console.error("查询支出数据失败:", queryError);
-                // 最终备选方案：直接查询不关联
                 const fallbackQuery = supabaseClient
                     .from('expenses')
                     .select('*')
@@ -104,17 +99,18 @@ const DashboardExpenses = {
                     var methodText = e.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     var storeDisplay = e.stores?.name ? `${Utils.escapeHtml(e.stores.name)} (${Utils.escapeHtml(e.stores.code || '-')})` : '-';
                     rows += `<tr>
-                        <td>${Utils.formatDate(e.expense_date)}</td>
-                        <td>${Utils.escapeHtml(e.category)}</td>
+                        <td class="date-cell">${Utils.formatDate(e.expense_date)}</td>
+                        <td class="expense-category">${Utils.escapeHtml(e.category)}</td>
                         <td class="text-right">${Utils.formatCurrency(e.amount)}</td>
-                        <td>${methodText}</td>
-                        <td>${Utils.escapeHtml(e.description || '-')}</td>
-                        <td>${storeDisplay}</td>
+                        <td class="text-center">${methodText}</td>
+                        <td class="expense-desc">${Utils.escapeHtml(e.description || '-')}</td>
+                        ${isAdmin ? `<td class="text-center">${storeDisplay}</td>` : ''}
                         <td class="action-cell">${actionBtns}</td>
                     </tr>`;
                 }
             } else {
-                rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td><\/tr>`;
+                var colSpan = isAdmin ? 7 : 6;
+                rows = `<tr><td colspan="${colSpan}" class="text-center">${t('no_data')}</td><\/tr>`;
             }
 
             const expenseCategories = lang === 'id' 
@@ -137,22 +133,22 @@ const DashboardExpenses = {
                 </div>
                 
                 <div class="card">
-                    <h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: <span class="total-expense">${Utils.formatCurrency(totalAmount)}</span></h3>
+                    <h3>${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}: <span class="total-expense" style="color:var(--danger);">${Utils.formatCurrency(totalAmount)}</span></h3>
                 </div>
                 
                 <div class="card">
                     <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
                     <div class="table-container">
-                        <table class="data-table">
+                        <table class="data-table expense-table">
                             <thead>
                                 <tr>
                                     <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                     <th>${lang === 'id' ? 'Kategori' : '类别'}</th>
-                                    <th>${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th>${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                    <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
                                     <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                    <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                    ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
+                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -185,7 +181,45 @@ const DashboardExpenses = {
                     <p class="info-note" style="margin-top:12px; font-size:12px; color:#64748b;">
                         💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}
                     </p>
-                </div>`;
+                </div>
+                
+                <style>
+                    .expense-table .date-cell {
+                        white-space: nowrap;
+                    }
+                    .expense-table .expense-category {
+                        font-weight: 500;
+                    }
+                    .expense-table .expense-desc {
+                        max-width: 200px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    .reconciled-badge, .locked-badge {
+                        display: inline-block;
+                        padding: 4px 8px;
+                        border-radius: 20px;
+                        font-size: 0.7rem;
+                    }
+                    .reconciled-badge {
+                        background: var(--success-light);
+                        color: var(--success-dark);
+                    }
+                    .locked-badge {
+                        background: var(--gray-100);
+                        color: var(--gray-500);
+                    }
+                    @media (max-width: 768px) {
+                        .expense-table .expense-desc {
+                            max-width: 120px;
+                        }
+                        .expense-table th, .expense-table td {
+                            padding: 6px 4px;
+                            font-size: 0.7rem;
+                        }
+                    }
+                </style>`;
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
@@ -281,8 +315,8 @@ const DashboardExpenses = {
         }
         
         var confirmMsg = lang === 'id' 
-            ? `Hapus pengeluaran ini?\n\nKategori: ${expense?.category || '-'}\nJumlah: ${Utils.formatCurrency(expense?.amount || 0)}\nTanggal: ${expense?.expense_date || '-'}\n\n⚠️ Data ini akan dihapus dari sistem dan tidak dapat dipulihkan.`
-            : `删除此支出记录？\n\n类别: ${expense?.category || '-'}\n金额: ${Utils.formatCurrency(expense?.amount || 0)}\n日期: ${expense?.expense_date || '-'}\n\n⚠️ 此数据将从系统中删除，无法恢复。`;
+            ? `Hapus pengeluaran ini?\n\nKategori: ${expense?.category || '-'}\nJumlah: ${Utils.formatCurrency(expense?.amount || 0)}\nTanggal: ${expense?.expense_date || '-'}`
+            : `删除此支出记录？\n\n类别: ${expense?.category || '-'}\n金额: ${Utils.formatCurrency(expense?.amount || 0)}\n日期: ${expense?.expense_date || '-'}`;
         
         if (!confirm(confirmMsg)) return;
         
@@ -329,7 +363,7 @@ const DashboardExpenses = {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
         if (!isAdmin) {
-            alert(lang === 'id' ? 'Hanya admin yang dapat melakukan rekonsiliasi' : '只有管理员可以执行平账操作');
+            alert(lang === 'id' ? '需管理员权限' : '需管理员权限');
             return;
         }
         var period = prompt(lang === 'id' ? 'Pilih periode rekonsiliasi:\n1 = Bulan ini\n2 = 6 bulan terakhir\n3 = 12 bulan terakhir\n4 = Tahun ini\n5 = Kustom' : '选择平账周期：\n1 = 本月\n2 = 最近6个月\n3 = 最近12个月\n4 = 本年\n5 = 自定义');
@@ -367,4 +401,4 @@ for (var key in DashboardExpenses) {
     }
 }
 
-console.log('✅ app-dashboard-expenses.js v2.1 已加载 - 修复运营支出加载失败');
+console.log('✅ app-dashboard-expenses.js v2.2 已加载 - 统一表格样式');
