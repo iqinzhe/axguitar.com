@@ -1,15 +1,9 @@
-// audit.js - 操作日志模块 v1.0
+// audit.js - v1.1（移除第三方IP接口）
 
 const Audit = {
     
     // ==================== 核心日志记录 ====================
     
-    /**
-     * 记录操作日志
-     * @param {string} action - 操作类型（如：login, order_create, order_delete, user_update）
-     * @param {string} details - 操作详情（JSON字符串）
-     * @param {Object} extra - 额外信息（可选）
-     */
     async log(action, details, extra = {}) {
         try {
             const profile = await SUPABASE.getCurrentProfile();
@@ -26,7 +20,7 @@ const Audit = {
                 store_name: profile.stores?.name || null,
                 action: action,
                 details: details,
-                ip_address: await this._getClientIP(),
+                // ip_address 已移除（不再请求第三方API）
                 user_agent: navigator.userAgent,
                 extra_info: JSON.stringify(extra),
                 created_at: new Date().toISOString()
@@ -46,29 +40,8 @@ const Audit = {
         }
     },
     
-    /**
-     * 获取客户端 IP（通过外部服务）
-     */
-    async _getClientIP() {
-        try {
-            // 使用免费 API 获取 IP
-            const res = await fetch('https://api.ipify.org?format=json', { timeout: 3000 });
-            const data = await res.json();
-            return data.ip;
-        } catch {
-            return 'unknown';
-        }
-    },
-    
     // ==================== 专用日志记录方法 ====================
     
-    /**
-     * 记录订单操作（带前后对比）
-     * @param {string} orderId - 订单号
-     * @param {string} action - 操作类型
-     * @param {Object} beforeData - 操作前的数据
-     * @param {Object} afterData - 操作后的数据
-     */
     async logOrderAction(orderId, action, beforeData, afterData) {
         const details = {
             order_id: orderId,
@@ -80,12 +53,6 @@ const Audit = {
         await this.log(`order_${action}`, JSON.stringify(details));
     },
     
-    /**
-     * 记录登录操作
-     * @param {string} userId - 用户ID
-     * @param {boolean} success - 是否成功
-     * @param {string} errorMsg - 错误信息（可选）
-     */
     async logLogin(userId, success, errorMsg = null) {
         await this.log('login', JSON.stringify({
             user_id: userId,
@@ -95,9 +62,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录登出操作
-     */
     async logLogout(userId, userName) {
         await this.log('logout', JSON.stringify({
             user_id: userId,
@@ -106,9 +70,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录订单创建
-     */
     async logOrderCreate(order) {
         await this.log('order_create', JSON.stringify({
             order_id: order.order_id,
@@ -119,9 +80,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录订单删除
-     */
     async logOrderDelete(order) {
         await this.log('order_delete', JSON.stringify({
             order_id: order.order_id,
@@ -132,9 +90,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录缴费操作
-     */
     async logPayment(orderId, paymentType, amount, method) {
         await this.log('payment', JSON.stringify({
             order_id: orderId,
@@ -145,9 +100,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录用户管理操作
-     */
     async logUserAction(action, targetUserId, targetUserName, changes) {
         await this.log(`user_${action}`, JSON.stringify({
             target_user_id: targetUserId,
@@ -157,9 +109,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录门店管理操作
-     */
     async logStoreAction(action, storeId, storeName, changes) {
         await this.log(`store_${action}`, JSON.stringify({
             store_id: storeId,
@@ -169,9 +118,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录黑名单操作
-     */
     async logBlacklistAction(action, customerId, customerName, reason) {
         await this.log(`blacklist_${action}`, JSON.stringify({
             customer_id: customerId,
@@ -181,9 +127,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录数据导出操作
-     */
     async logExport(exportType, recordCount) {
         await this.log('export', JSON.stringify({
             export_type: exportType,
@@ -192,9 +135,6 @@ const Audit = {
         }));
     },
     
-    /**
-     * 记录数据恢复操作
-     */
     async logRestore(filename, results) {
         await this.log('restore', JSON.stringify({
             filename: filename,
@@ -205,16 +145,11 @@ const Audit = {
     
     // ==================== 数据清理 ====================
     
-    /**
-     * 清理敏感数据（用于日志记录）
-     */
     _sanitizeData(data) {
         if (!data) return null;
         
-        // 深拷贝
         const sanitized = JSON.parse(JSON.stringify(data));
         
-        // 移除敏感字段
         const sensitiveFields = ['password', 'token', 'secret', 'key', 'auth'];
         const removeSensitive = (obj) => {
             if (!obj || typeof obj !== 'object') return;
@@ -233,16 +168,6 @@ const Audit = {
     
     // ==================== 查询审计日志 ====================
     
-    /**
-     * 查看审计日志（仅管理员）
-     * @param {Object} filters - 筛选条件
-     * @param {string} filters.user_id - 用户ID
-     * @param {string} filters.action - 操作类型
-     * @param {string} filters.startDate - 开始日期
-     * @param {string} filters.endDate - 结束日期
-     * @param {number} filters.limit - 返回数量限制
-     * @param {number} filters.offset - 分页偏移
-     */
     async getAuditLogs(filters = {}) {
         const profile = await SUPABASE.getCurrentProfile();
         if (profile?.role !== 'admin') {
@@ -280,9 +205,6 @@ const Audit = {
         return data;
     },
     
-    /**
-     * 获取操作类型列表（用于筛选）
-     */
     async getActionTypes() {
         const profile = await SUPABASE.getCurrentProfile();
         if (profile?.role !== 'admin') {
@@ -296,14 +218,10 @@ const Audit = {
         
         if (error) return [];
         
-        // 去重
         const uniqueActions = [...new Set(data.map(item => item.action))];
         return uniqueActions.sort();
     },
     
-    /**
-     * 获取用户列表（用于筛选）
-     */
     async getAuditUsers() {
         const profile = await SUPABASE.getCurrentProfile();
         if (profile?.role !== 'admin') {
@@ -317,7 +235,6 @@ const Audit = {
         
         if (error) return [];
         
-        // 去重
         const userMap = new Map();
         for (const item of data) {
             if (!userMap.has(item.user_id)) {
@@ -331,10 +248,6 @@ const Audit = {
         return Array.from(userMap.values());
     },
     
-    /**
-     * 清理旧日志（仅管理员，保留指定天数）
-     * @param {number} daysToKeep - 保留天数（默认90天）
-     */
     async cleanupOldLogs(daysToKeep = 90) {
         const profile = await SUPABASE.getCurrentProfile();
         if (profile?.role !== 'admin') {
@@ -365,9 +278,6 @@ const Audit = {
     
     // ==================== 审计日志界面 ====================
     
-    /**
-     * 显示审计日志界面（仅管理员）
-     */
     async showAuditLogs() {
         const lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
@@ -378,28 +288,23 @@ const Audit = {
             return;
         }
         
-        // 保存当前页面状态
         if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
             window.APP.currentPage = 'auditLogs';
             window.APP.saveCurrentPageState();
         }
         
-        // 获取筛选选项
         const [actionTypes, users] = await Promise.all([
             this.getActionTypes(),
             this.getAuditUsers()
         ]);
         
-        // 获取日志数据
         const logs = await this.getAuditLogs({ limit: 100 });
         
-        // 构建表格行
         let rows = '';
         if (logs.length === 0) {
             rows = `<tr><td colspan="6" class="text-center">${lang === 'id' ? '暂无日志记录' : '暂无日志记录'}</td><td/tr>`;
         } else {
             for (const log of logs) {
-                // 解析详情
                 let detailsDisplay = log.details || '-';
                 try {
                     const parsed = JSON.parse(log.details);
@@ -422,13 +327,11 @@ const Audit = {
             }
         }
         
-        // 构建操作类型选项
         let actionOptions = '<option value="">' + (lang === 'id' ? '全部操作' : '全部操作') + '</option>';
         for (const action of actionTypes) {
             actionOptions += `<option value="${Utils.escapeAttr(action)}">${Utils.escapeHtml(action)}</option>`;
         }
         
-        // 构建用户选项
         let userOptions = '<option value="">' + (lang === 'id' ? '全部用户' : '全部用户') + '</option>';
         for (const user of users) {
             userOptions += `<option value="${Utils.escapeAttr(user.id)}">${Utils.escapeHtml(user.name)}</option>`;
@@ -498,13 +401,9 @@ const Audit = {
             </div>
         `;
         
-        // 存储当前日志数据供筛选使用
         window._auditLogsData = logs;
     },
     
-    /**
-     * 筛选审计日志
-     */
     async filterAuditLogs() {
         const userId = document.getElementById('filterUser')?.value;
         const action = document.getElementById('filterAction')?.value;
@@ -526,9 +425,6 @@ const Audit = {
         }
     },
     
-    /**
-     * 重置筛选条件
-     */
     resetAuditFilters() {
         const filterUser = document.getElementById('filterUser');
         const filterAction = document.getElementById('filterAction');
@@ -543,9 +439,6 @@ const Audit = {
         this.filterAuditLogs();
     },
     
-    /**
-     * 渲染审计日志表格
-     */
     _renderAuditLogsTable(logs) {
         const tbody = document.getElementById('auditLogsBody');
         if (!tbody) return;
@@ -582,9 +475,6 @@ const Audit = {
         tbody.innerHTML = rows;
     },
     
-    /**
-     * 导出审计日志为 CSV
-     */
     async exportAuditLogsToCSV() {
         const lang = Utils.lang;
         const logs = window._auditLogsData || await this.getAuditLogs({ limit: 5000 });
@@ -595,8 +485,8 @@ const Audit = {
         }
         
         const headers = lang === 'id'
-            ? ['Waktu', 'Pengguna', 'Peran', 'Aksi', 'Detail', 'Toko', 'IP Address']
-            : ['时间', '用户', '角色', '操作', '详情', '门店', 'IP地址'];
+            ? ['Waktu', 'Pengguna', 'Peran', 'Aksi', 'Detail', 'Toko']
+            : ['时间', '用户', '角色', '操作', '详情', '门店'];
         
         const rows = logs.map(log => [
             log.created_at,
@@ -604,8 +494,7 @@ const Audit = {
             log.user_role || '-',
             log.action,
             (log.details || '-').replace(/\n/g, ' '),
-            log.store_name || '-',
-            log.ip_address || '-'
+            log.store_name || '-'
         ]);
         
         const csvContent = [headers, ...rows].map(row => 
@@ -623,9 +512,6 @@ const Audit = {
         alert(lang === 'id' ? '✅ 导出成功！' : '✅ 导出成功！');
     },
     
-    /**
-     * 从 UI 清理旧日志
-     */
     async cleanupOldLogsFromUI() {
         const lang = Utils.lang;
         const days = parseInt(document.getElementById('cleanupDays')?.value || '90');
@@ -642,7 +528,6 @@ const Audit = {
                 ? `✅ 已删除 ${deletedCount} 条超过 ${days} 天的旧日志。`
                 : `✅ 已删除 ${deletedCount} 条超过 ${days} 天的旧日志。`);
             
-            // 刷新日志列表
             await this.filterAuditLogs();
         } catch (error) {
             alert(lang === 'id' ? '清理失败: ' + error.message : '清理失败：' + error.message);
@@ -651,5 +536,3 @@ const Audit = {
 };
 
 window.Audit = Audit;
-
-console.log('✅ audit.js v1.0 已加载 - 操作日志模块已启用');
