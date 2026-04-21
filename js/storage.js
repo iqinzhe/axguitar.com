@@ -1,4 +1,4 @@
-// storage.js - 完整修复版 v3.1（修复数据隔离问题）
+// storage.js - 完整修复版 v1.0
 
 const Storage = {
 
@@ -737,4 +737,3 @@ const Storage = {
 
 window.Storage = Storage;
 
-console.log('✅ storage.js v3.1 已加载 - 备份恢复功能完整，已修复数据隔离问题');
