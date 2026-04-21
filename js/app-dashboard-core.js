@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.6 升级版（仪表板卡片优化）
+// app-dashboard-core.js - v2.7 优化版（admin账户优化）
 
 window.APP = window.APP || {};
 
@@ -281,7 +281,7 @@ const DashboardCore = {
                 totalExpenses = expenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
             } catch(e) { console.warn("获取支出汇总失败:", e); }
             
-            // ==================== 升级1：计算本月新增订单数 ====================
+            // 计算本月新增订单数
             const allOrders = await SUPABASE.getOrders();
             const today = new Date();
             const currentMonth = today.getMonth();
@@ -293,11 +293,7 @@ const DashboardCore = {
             });
             const thisMonthOrderCount = thisMonthOrders.length;
             
-            // ==================== 升级1：计算赤字（总流出 - 总收入） ====================
-            // 赤字 = (总流出) - (总流入，不含本金)
-            // 流入（不含本金）：admin_fee, service_fee, interest
-            // 流出：loan_disbursement, expense, internal_transfer_out
-            
+            // 计算赤字（总流出 - 总收入）
             let totalInflowExcludingPrincipal = 0;
             let totalOutflow = 0;
             
@@ -312,8 +308,7 @@ const DashboardCore = {
             }
             const deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            // ==================== 升级1：计算已结清且超过2年的订单（自动清理逻辑） ====================
-            // 注意：此逻辑在每次加载仪表板时检查并清理符合条件的订单
+            // 清理过期订单
             const twoYearsAgo = new Date();
             twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
             
@@ -324,16 +319,12 @@ const DashboardCore = {
                 return new Date(completedDate) < twoYearsAgo;
             });
             
-            // 自动删除过期订单（保留客户资料）
             if (expiredOrders.length > 0) {
                 console.log(`检测到 ${expiredOrders.length} 个已结清超过2年的订单，正在自动清理...`);
                 for (const expiredOrder of expiredOrders) {
                     try {
-                        // 删除关联的现金流记录
                         await supabaseClient.from('cash_flow_records').delete().eq('order_id', expiredOrder.id);
-                        // 删除缴费记录
                         await supabaseClient.from('payment_history').delete().eq('order_id', expiredOrder.id);
-                        // 删除订单
                         await supabaseClient.from('orders').delete().eq('id', expiredOrder.id);
                         console.log(`已清理过期订单: ${expiredOrder.order_id}`);
                     } catch (cleanErr) {
@@ -347,12 +338,12 @@ const DashboardCore = {
             const activeOrdersCount = updatedOrders.filter(o => o.status === 'active').length;
             const completedOrdersCount = updatedOrders.filter(o => o.status === 'completed').length;
             
-            // 构建卡片（顺序：总订单数(升级)、贷款总额(升级)、进行中、已结清(升级)）
+            // 构建卡片
             var cards = [
                 { label: `${lang === 'id' ? '本月新增' : '本月新增'}/${t('total_orders')}`, value: `${thisMonthOrderCount}/${report.total_orders}`, type: 'text' },
+                { label: lang === 'id' ? '赤字 (流出-收入)' : '赤字 (流出-收入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
                 { label: t('active'), value: activeOrdersCount, type: 'number' },
                 { label: `${lang === 'id' ? '已结清' : '已结清'} / ${lang === 'id' ? '已失效' : '已失效'}`, value: `${completedOrdersCount} / ${expiredOrders.length}`, type: 'text' },
-                { label: lang === 'id' ? '赤字 (流出-收入)' : '赤字 (流出-收入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
                 { label: lang === 'id' ? 'Admin Fee' : '管理费', value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Service Fee' : '服务费', value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
@@ -366,58 +357,44 @@ const DashboardCore = {
                 </div>
             `).join('');
             
-            var toolbarClass = isAdmin ? 'toolbar admin-grid' : 'toolbar store-grid';
+            // Admin 工具栏：缴费明细改为"资金流水"，财务报表改为"业务报表"
+            var toolbarHtml = '';
+            if (isAdmin) {
+                toolbarHtml = `
+                <div class="toolbar admin-grid">
+                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
+                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
+                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
+                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+                    <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '备份与恢复'}</button>
+                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
+                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                    </button>
+                    <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
+                    <button onclick="APP.navigateTo('userManagement')">👥 ${lang === 'id' ? 'Man. Kerja' : '工作管理'}</button>
+                    <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
+                    <button onclick="APP.logout()">🚪 ${t('logout')}</button>
+                </div>`;
+            } else {
+                toolbarHtml = `
+                <div class="toolbar store-grid">
+                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
+                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
+                    <button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
+                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
+                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                    </button>
+                    <button onclick="APP.logout()">🚪 ${t('logout')}</button>
+                </div>`;
+            }
             
-            var toolbarHtml = `
-            <div class="${toolbarClass}">
-                <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
-                <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                ${isAdmin ? `<button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费明细'}</button>` : `<button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>`}
-                <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                ${isAdmin ? `<button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '备份与恢复'}</button>` : ''}
-                <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                    📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
-                </button>
-                ${isAdmin ? `<button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>` : ''}
-                ${isAdmin ? `<button onclick="APP.navigateTo('userManagement')">👥 ${lang === 'id' ? 'Man. Kerja' : '工作管理'}</button>` : ''}
-                ${isAdmin ? `<button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>` : ''}
-                <button onclick="APP.logout()">🚪 ${t('logout')}</button>
-            </div>`;
-            
-            var bottomHtml = `
-            <div class="card">
-                <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
-                <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
-                <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)'}</p>
-                <p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>
-            </div>`;
-            
-            document.getElementById("app").innerHTML = `
-                <div class="page-header">
-                    <h1><img src="icons/pagehead-logo.png" alt="JF!" class="logo-img"> JF! by Gadai</h1>
-                    <div class="header-actions">
-                        ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
-                    </div>
-                </div>
-                
+            // Admin资金管理区域：只显示3个卡片（保险柜、银行BNI、内部互转），移除余额和按钮
+            var cashFlowHtml = '';
+            if (isAdmin) {
+                cashFlowHtml = `
                 <div class="cashflow-summary">
                     <h3>💰 ${lang === 'id' ? '资金管理' : '资金管理'}</h3>
-                    
-                    ${isAdmin ? `
-                    <div class="capital-summary">
-                        <div class="capital-summary-text">
-                            <span>💰 ${lang === 'id' ? 'Saldo Kas' : '现金余额'}:</span>
-                            <strong>${Utils.formatCurrency(cashFlow.cash.balance)}</strong>
-                            <span>🏧 ${lang === 'id' ? 'Saldo Bank' : '银行余额'}:</span>
-                            <strong>${Utils.formatCurrency(cashFlow.bank.balance)}</strong>
-                        </div>
-                        <div>
-                            <button onclick="APP.showCapitalModal()" class="capital-btn">🏦 ${lang === 'id' ? 'Riwayat Transaksi' : '资金流水'}</button>
-                            <button onclick="APP.showInternalTransferHistory()" class="capital-btn" style="margin-left:8px;">🔄 ${lang === 'id' ? 'Riwayat Transfer' : '转账记录'}</button>
-                        </div>
-                    </div>
-                    ` : ''}
-                    
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
@@ -446,18 +423,74 @@ const DashboardCore = {
                                 <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">
                                     🏧→🏦 ${lang === 'id' ? '银行取出现金' : '银行取出现金'}
                                 </button>
-                                ${isAdmin ? `
                                 <button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq">
                                     🏢 ${lang === 'id' ? '上缴总部' : '上缴总部'}
                                 </button>
-                                ` : ''}
                             </div>
                             <div class="cashflow-detail" style="margin-top:8px;">
                                 💡 ${lang === 'id' ? '保险柜现金过多时可存入银行，不足时可从银行提取' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
                             </div>
                         </div>
                     </div>
+                </div>`;
+            } else {
+                cashFlowHtml = `
+                <div class="cashflow-summary">
+                    <h3>💰 ${lang === 'id' ? '资金管理' : '资金管理'}</h3>
+                    <div class="cashflow-stats">
+                        <div class="cashflow-item">
+                            <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
+                            <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
+                            <div class="cashflow-detail">
+                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
+                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
+                            </div>
+                        </div>
+                        
+                        <div class="cashflow-item">
+                            <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
+                            <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
+                            <div class="cashflow-detail">
+                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
+                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
+                            </div>
+                        </div>
+                        
+                        <div class="cashflow-item internal-transfer-item">
+                            <div class="label">🔄 ${lang === 'id' ? '内部互转' : '内部互转'}</div>
+                            <div class="transfer-buttons">
+                                <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">
+                                    🏦→🏧 ${lang === 'id' ? '现金存入银行' : '现金存入银行'}
+                                </button>
+                                <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">
+                                    🏧→🏦 ${lang === 'id' ? '银行取出现金' : '银行取出现金'}
+                                </button>
+                            </div>
+                            <div class="cashflow-detail" style="margin-top:8px;">
+                                💡 ${lang === 'id' ? '保险柜现金过多时可存入银行，不足时可从银行提取' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            var bottomHtml = `
+            <div class="card">
+                <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
+                <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}</p>
+                <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)'}</p>
+                <p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>
+            </div>`;
+            
+            document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <h1><img src="icons/pagehead-logo.png" alt="JF!" class="logo-img"> JF! by Gadai</h1>
+                    <div class="header-actions">
+                        ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
+                    </div>
                 </div>
+                
+                ${cashFlowHtml}
                 
                 <div class="stats-grid-optimized">
                     ${cardsHtml}
@@ -496,7 +529,7 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 门店管理辅助（调用 StoreManager） ====================
+    // ==================== 门店管理辅助 ====================
     addStore: async function() {
         var lang = Utils.lang;
         var name = document.getElementById("newStoreName")?.value.trim();
@@ -543,4 +576,4 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v2.6 已加载 - 仪表板卡片优化版');
+console.log('✅ app-dashboard-core.js v2.7 已加载 - admin账户优化版');
