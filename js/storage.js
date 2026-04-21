@@ -1,4 +1,4 @@
-// storage.js - 完整修复版 v1.0
+// storage.js - v1.2（修复双语翻译）
 
 const Storage = {
 
@@ -6,31 +6,23 @@ const Storage = {
     
     async backup() {
         const lang = Utils.lang;
+        const t = Utils.t;
         try {
-            // 显示进度提示
-            const loadingMsg = this._showLoading(lang === 'id' ? '正在备份数据...' : '正在备份数据...');
+            const loadingMsg = this._showLoading(lang === 'id' ? 'Mencadangkan data...' : '正在备份数据...');
             
-            // 获取当前用户信息
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             const currentStoreId = profile?.store_id;
             
-            // ========== 使用门店隔离的查询方法 ==========
-            
-            // 1. 订单 - 使用已有的 getOrders()（自动过滤门店）
             const orders = await SUPABASE.getOrders();
-            
-            // 2. 客户 - 使用已有的 getCustomers()（自动过滤门店）
             const customers = await SUPABASE.getCustomers();
             
-            // 3. 支出 - 需要手动过滤（如果非管理员）
             let expensesQuery = supabaseClient.from('expenses').select('*');
             if (!isAdmin && currentStoreId) {
                 expensesQuery = expensesQuery.eq('store_id', currentStoreId);
             }
             const expensesResult = await expensesQuery;
             
-            // 4. 门店 - 仅管理员可见全部，非管理员只可见自己的门店
             let storesResult = [];
             if (isAdmin) {
                 storesResult = await SUPABASE.getAllStores();
@@ -42,13 +34,9 @@ const Storage = {
                 storesResult = storeData || [];
             }
             
-            // 5. 缴费记录 - 使用已有的 getAllPayments()（自动过滤门店）
             const paymentsResult = await SUPABASE.getAllPayments();
-            
-            // 6. 资金流水 - 使用已有的 getCashFlowRecords()（自动过滤门店）
             const cashFlowsResult = await SUPABASE.getCashFlowRecords();
             
-            // 7. 黑名单 - 手动过滤（如果非管理员）
             let blacklistQuery = supabaseClient.from('blacklist').select('*');
             if (!isAdmin && currentStoreId) {
                 blacklistQuery = blacklistQuery.eq('store_id', currentStoreId);
@@ -82,13 +70,11 @@ const Storage = {
                 }
             };
             
-            // 生成文件名
             const filename = `jf_gadai_backup_${new Date().toISOString().split('T')[0]}_${profile?.name || 'backup'}.json`;
             
             Utils.exportToJSON(backupData, filename);
             this._hideLoading(loadingMsg);
             
-            // 记录操作日志
             if (window.Audit) {
                 await window.Audit.log('backup', JSON.stringify({
                     filename: filename,
@@ -97,12 +83,13 @@ const Storage = {
                 }));
             }
             
-            alert(lang === 'id' 
-                ? `✅ 备份完成！\n\n已导出 ${backupData.stats.orders_count} 条订单，${backupData.stats.customers_count} 条客户记录。`
-                : `✅ 备份完成！\n\n已导出 ${backupData.stats.orders_count} 条订单，${backupData.stats.customers_count} 条客户记录。`);
+            const successMsg = t('backup_complete')
+                .replace('{orders}', backupData.stats.orders_count)
+                .replace('{customers}', backupData.stats.customers_count);
+            alert(successMsg);
         } catch (err) {
             console.error("备份失败:", err);
-            alert(lang === 'id' ? '❌ 备份失败: ' + err.message : '❌ 备份失败：' + err.message);
+            alert(lang === 'id' ? '❌ Cadangan gagal: ' + err.message : '❌ 备份失败：' + err.message);
         }
     },
     
@@ -110,48 +97,41 @@ const Storage = {
     
     async restore(file) {
         const lang = Utils.lang;
+        const t = Utils.t;
         
-        // 检查用户权限（只有管理员可以恢复）
         const profile = await SUPABASE.getCurrentProfile();
         if (profile?.role !== 'admin') {
             alert(lang === 'id' 
-                ? '⚠️ 只有管理员可以执行数据恢复操作。'
+                ? '⚠️ Hanya administrator yang dapat melakukan pemulihan data.'
                 : '⚠️ 只有管理员可以执行数据恢复操作。');
             return false;
         }
         
-        // 第一次确认
-        const confirmMsg = lang === 'id'
-            ? '⚠️ 恢复数据将覆盖当前所有数据！\n\n此操作不可撤销。\n\n建议先导出当前数据作为备份。\n\n确定要继续吗？'
-            : '⚠️ 恢复数据将覆盖当前所有数据！\n\n此操作不可撤销。\n\n建议先导出当前数据作为备份。\n\n确定要继续吗？';
-        
+        const confirmMsg = t('restore_confirm');
         if (!confirm(confirmMsg)) return false;
         
-        // 第二次确认（输入确认码）
         const confirmCode = lang === 'id' ? 'KONFIRMASI' : '确认恢复';
         const codeInput = prompt(lang === 'id'
-            ? `请输入 "${confirmCode}" 以确认恢复操作：`
+            ? `Ketik "${confirmCode}" untuk konfirmasi pemulihan data:`
             : `请输入 "${confirmCode}" 以确认恢复操作：`);
         
         if (codeInput !== confirmCode) {
-            alert(lang === 'id' ? '恢复操作已取消。' : '恢复操作已取消。');
+            alert(lang === 'id' ? 'Pemulihan data dibatalkan.' : '恢复操作已取消。');
             return false;
         }
         
-        const loadingMsg = this._showLoading(lang === 'id' ? '正在恢复数据...' : '正在恢复数据...');
+        const loadingMsg = this._showLoading(lang === 'id' ? 'Memulihkan data...' : '正在恢复数据...');
         
         try {
             const data = await Utils.importFromJSON(file);
             
-            // 验证数据格式
             if (!data || !data.data || !data.version) {
-                throw new Error(lang === 'id' ? '备份文件格式无效' : '备份文件格式无效');
+                throw new Error(lang === 'id' ? 'Format file cadangan tidak valid' : '备份文件格式无效');
             }
             
-            // 版本兼容性检查
             if (data.version !== '2.0' && data.version !== '3.0' && data.version !== '3.1') {
                 if (!confirm(lang === 'id'
-                    ? `备份文件版本 (${data.version}) 与当前系统不兼容，继续恢复可能导致问题。是否继续？`
+                    ? `Versi file cadangan (${data.version}) tidak kompatibel dengan sistem saat ini. Lanjutkan?`
                     : `备份文件版本 (${data.version}) 与当前系统不兼容，继续恢复可能导致问题。是否继续？`)) {
                     this._hideLoading(loadingMsg);
                     return false;
@@ -159,16 +139,11 @@ const Storage = {
             }
             
             const backupData = data.data;
-            
-            // 开始事务性恢复
             const results = await this._executeRestore(backupData, profile);
             
-            // 清除缓存
             SUPABASE.clearCache();
-            
             this._hideLoading(loadingMsg);
             
-            // 记录操作日志
             if (window.Audit) {
                 await window.Audit.log('restore', JSON.stringify({
                     filename: file.name,
@@ -177,45 +152,36 @@ const Storage = {
                 }));
             }
             
-            // 显示恢复结果
             const resultMsg = lang === 'id'
-                ? `✅ 恢复完成！\n\n📊 恢复统计：\n• 门店: ${results.stores} 条\n• 客户: ${results.customers} 条\n• 订单: ${results.orders} 条\n• 支出: ${results.expenses} 条\n• 缴费记录: ${results.payments} 条\n• 资金流水: ${results.cashFlows} 条\n• 黑名单: ${results.blacklist} 条\n\n请刷新页面查看数据。`
-                : `✅ 恢复完成！\n\n📊 恢复统计：\n• 门店: ${results.stores} 条\n• 客户: ${results.customers} 条\n• 订单: ${results.orders} 条\n• 支出: ${results.expenses} 条\n• 缴费记录: ${results.payments} 条\n• 资金流水: ${results.cashFlows} 条\n• 黑名单: ${results.blacklist} 条\n\n请刷新页面查看数据。`;
+                ? `✅ Pemulihan selesai!\n\n📊 Statistik pemulihan:\n• Toko: ${results.stores}\n• Nasabah: ${results.customers}\n• Pesanan: ${results.orders}\n• Pengeluaran: ${results.expenses}\n• Pembayaran: ${results.payments}\n• Arus kas: ${results.cashFlows}\n• Daftar hitam: ${results.blacklist}\n\nSegarkan halaman untuk melihat data.`
+                : `✅ 恢复完成！\n\n📊 恢复统计：\n• 门店: ${results.stores}\n• 客户: ${results.customers}\n• 订单: ${results.orders}\n• 支出: ${results.expenses}\n• 缴费记录: ${results.payments}\n• 资金流水: ${results.cashFlows}\n• 黑名单: ${results.blacklist}\n\n请刷新页面查看数据。`;
             
             alert(resultMsg);
-            
-            // 刷新当前页面
             window.location.reload();
-            
             return true;
             
         } catch (err) {
             console.error("恢复失败:", err);
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' ? '❌ 恢复失败: ' + err.message : '❌ 恢复失败：' + err.message);
+            alert(lang === 'id' ? '❌ Pemulihan gagal: ' + err.message : '❌ 恢复失败：' + err.message);
             return false;
         }
     },
     
-    // 执行恢复操作
     async _executeRestore(backupData, profile) {
         const results = {
             stores: 0, customers: 0, orders: 0, 
             expenses: 0, payments: 0, cashFlows: 0, blacklist: 0
         };
         
-        // 1. 恢复门店（先删除现有门店，保留总部门店）
         if (backupData.stores && backupData.stores.length > 0) {
-            // 获取现有门店ID列表
             const existingStores = await SUPABASE.getAllStores();
             const existingIds = new Set(existingStores.map(s => s.id));
             
             for (const store of backupData.stores) {
-                // 跳过总部门店（避免覆盖）
                 if (store.code === 'STORE_000') continue;
                 
                 if (existingIds.has(store.id)) {
-                    // 更新现有门店
                     await supabaseClient
                         .from('stores')
                         .update({
@@ -226,7 +192,6 @@ const Storage = {
                         })
                         .eq('id', store.id);
                 } else {
-                    // 插入新门店（不保留原ID，避免冲突）
                     const { error } = await supabaseClient
                         .from('stores')
                         .insert({
@@ -242,10 +207,8 @@ const Storage = {
             }
         }
         
-        // 2. 恢复客户
         if (backupData.customers && backupData.customers.length > 0) {
             for (const customer of backupData.customers) {
-                // 检查是否已存在（通过 customer_id）
                 const { data: existing } = await supabaseClient
                     .from('customers')
                     .select('id')
@@ -253,7 +216,6 @@ const Storage = {
                     .maybeSingle();
                 
                 if (existing) {
-                    // 更新现有客户
                     await supabaseClient
                         .from('customers')
                         .update({
@@ -267,7 +229,6 @@ const Storage = {
                         })
                         .eq('id', existing.id);
                 } else {
-                    // 插入新客户
                     const { error } = await supabaseClient
                         .from('customers')
                         .insert({
@@ -287,10 +248,8 @@ const Storage = {
             }
         }
         
-        // 3. 恢复订单
         if (backupData.orders && backupData.orders.length > 0) {
             for (const order of backupData.orders) {
-                // 检查是否已存在
                 const { data: existing } = await supabaseClient
                     .from('orders')
                     .select('id')
@@ -298,7 +257,6 @@ const Storage = {
                     .maybeSingle();
                 
                 if (existing) {
-                    // 更新现有订单
                     await supabaseClient
                         .from('orders')
                         .update({
@@ -321,11 +279,17 @@ const Storage = {
                             principal_remaining: order.principal_remaining,
                             status: order.status,
                             notes: order.notes,
+                            repayment_type: order.repayment_type,
+                            repayment_term: order.repayment_term,
+                            monthly_fixed_payment: order.monthly_fixed_payment,
+                            agreed_interest_rate: order.agreed_interest_rate,
+                            fixed_paid_months: order.fixed_paid_months,
+                            overdue_days: order.overdue_days,
+                            liquidation_status: order.liquidation_status,
                             updated_at: new Date().toISOString()
                         })
                         .eq('order_id', order.order_id);
                 } else {
-                    // 查找对应的客户ID
                     let customerId = null;
                     if (order.customer_id) {
                         const { data: customer } = await supabaseClient
@@ -362,17 +326,22 @@ const Storage = {
                             customer_id: customerId,
                             notes: order.notes,
                             created_at: order.created_at,
-                            is_locked: true
+                            is_locked: true,
+                            repayment_type: order.repayment_type,
+                            repayment_term: order.repayment_term,
+                            monthly_fixed_payment: order.monthly_fixed_payment,
+                            agreed_interest_rate: order.agreed_interest_rate,
+                            fixed_paid_months: order.fixed_paid_months,
+                            overdue_days: order.overdue_days,
+                            liquidation_status: order.liquidation_status
                         });
                     if (!error) results.orders++;
                 }
             }
         }
         
-        // 4. 恢复缴费记录
         if (backupData.payments && backupData.payments.length > 0) {
             for (const payment of backupData.payments) {
-                // 查找订单ID
                 const { data: order } = await supabaseClient
                     .from('orders')
                     .select('id')
@@ -380,7 +349,6 @@ const Storage = {
                     .maybeSingle();
                 
                 if (order) {
-                    // 检查是否已存在
                     const { data: existing } = await supabaseClient
                         .from('payment_history')
                         .select('id')
@@ -409,7 +377,6 @@ const Storage = {
             }
         }
         
-        // 5. 恢复支出
         if (backupData.expenses && backupData.expenses.length > 0) {
             for (const expense of backupData.expenses) {
                 const { error } = await supabaseClient
@@ -428,7 +395,6 @@ const Storage = {
             }
         }
         
-        // 6. 恢复资金流水
         if (backupData.cash_flows && backupData.cash_flows.length > 0) {
             for (const flow of backupData.cash_flows) {
                 const { error } = await supabaseClient
@@ -450,7 +416,6 @@ const Storage = {
             }
         }
         
-        // 7. 恢复黑名单
         if (backupData.blacklist && backupData.blacklist.length > 0) {
             for (const blacklist of backupData.blacklist) {
                 const { error } = await supabaseClient
@@ -476,13 +441,13 @@ const Storage = {
         const profile = await SUPABASE.getCurrentProfile();
         
         if (profile?.role !== 'admin') {
-            alert(lang === 'id' ? '只有管理员可以执行此操作' : '只有管理员可以执行此操作');
+            alert(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
             return;
         }
         
-        if (!confirm(lang === 'id' ? '⚠️ 仅恢复订单数据？现有订单将被覆盖。' : '⚠️ 仅恢复订单数据？现有订单将被覆盖。')) return;
+        if (!confirm(lang === 'id' ? '⚠️ Pulihkan hanya data pesanan? Pesanan yang ada akan ditimpa.' : '⚠️ 仅恢复订单数据？现有订单将被覆盖。')) return;
         
-        const loadingMsg = this._showLoading(lang === 'id' ? '正在恢复订单...' : '正在恢复订单...');
+        const loadingMsg = this._showLoading(lang === 'id' ? 'Memulihkan pesanan...' : '正在恢复订单...');
         
         try {
             const data = await Utils.importFromJSON(file);
@@ -490,7 +455,6 @@ const Storage = {
             
             let successCount = 0;
             for (const order of orders) {
-                // 检查是否已存在
                 const { data: existing } = await supabaseClient
                     .from('orders')
                     .select('id')
@@ -509,15 +473,13 @@ const Storage = {
             }
             
             this._hideLoading(loadingMsg);
-            
             alert(lang === 'id' 
-                ? `✅ 恢复完成！成功恢复 ${successCount}/${orders.length} 条订单。`
+                ? `✅ Pemulihan selesai! Berhasil memulihkan ${successCount}/${orders.length} pesanan.`
                 : `✅ 恢复完成！成功恢复 ${successCount}/${orders.length} 条订单。`);
-            
             window.location.reload();
         } catch (err) {
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' ? '恢复失败: ' + err.message : '恢复失败：' + err.message);
+            alert(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
         }
     },
     
@@ -526,13 +488,13 @@ const Storage = {
         const profile = await SUPABASE.getCurrentProfile();
         
         if (profile?.role !== 'admin') {
-            alert(lang === 'id' ? '只有管理员可以执行此操作' : '只有管理员可以执行此操作');
+            alert(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
             return;
         }
         
-        if (!confirm(lang === 'id' ? '⚠️ 仅恢复客户数据？现有客户将被覆盖。' : '⚠️ 仅恢复客户数据？现有客户将被覆盖。')) return;
+        if (!confirm(lang === 'id' ? '⚠️ Pulihkan hanya data nasabah? Nasabah yang ada akan ditimpa.' : '⚠️ 仅恢复客户数据？现有客户将被覆盖。')) return;
         
-        const loadingMsg = this._showLoading(lang === 'id' ? '正在恢复客户...' : '正在恢复客户...');
+        const loadingMsg = this._showLoading(lang === 'id' ? 'Memulihkan nasabah...' : '正在恢复客户...');
         
         try {
             const data = await Utils.importFromJSON(file);
@@ -545,15 +507,13 @@ const Storage = {
             }
             
             this._hideLoading(loadingMsg);
-            
             alert(lang === 'id' 
-                ? `✅ 恢复完成！成功恢复 ${successCount}/${customers.length} 条客户记录。`
+                ? `✅ Pemulihan selesai! Berhasil memulihkan ${successCount}/${customers.length} nasabah.`
                 : `✅ 恢复完成！成功恢复 ${successCount}/${customers.length} 条客户记录。`);
-            
             window.location.reload();
         } catch (err) {
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' ? '恢复失败: ' + err.message : '恢复失败：' + err.message);
+            alert(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
         }
     },
     
@@ -563,7 +523,7 @@ const Storage = {
         try {
             const orders = await SUPABASE.getOrders();
             Utils.exportToCSV(orders, `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`);
-            alert(Utils.lang === 'id' ? '✅ 导出成功！' : '✅ 导出成功！');
+            alert(Utils.t('export_success'));
         } catch (err) {
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
@@ -573,7 +533,7 @@ const Storage = {
         try {
             const payments = await SUPABASE.getAllPayments();
             Utils.exportPaymentsToCSV(payments, `jf_gadai_payments_${new Date().toISOString().split('T')[0]}.csv`);
-            alert(Utils.lang === 'id' ? '✅ 导出成功！' : '✅ 导出成功！');
+            alert(Utils.t('export_success'));
         } catch (err) {
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
@@ -606,7 +566,7 @@ const Storage = {
             a.click();
             URL.revokeObjectURL(url);
             
-            alert(lang === 'id' ? '✅ 导出成功！' : '✅ 导出成功！');
+            alert(Utils.t('export_success'));
         } catch (err) {
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
@@ -624,7 +584,6 @@ const Storage = {
         </div>`;
         document.body.appendChild(div);
         
-        // 添加动画样式
         if (!document.getElementById('loader-style')) {
             const style = document.createElement('style');
             style.id = 'loader-style';
@@ -643,59 +602,60 @@ const Storage = {
     
     renderBackupUI: async function() {
         const lang = Utils.lang;
+        const t = Utils.t;
         const profile = await SUPABASE.getCurrentProfile();
         const isAdmin = profile?.role === 'admin';
         
         if (!isAdmin) {
-            alert(lang === 'id' ? '只有管理员可以访问备份管理' : '只有管理员可以访问备份管理');
+            alert(lang === 'id' ? 'Hanya administrator yang dapat mengakses manajemen cadangan' : '只有管理员可以访问备份管理');
             APP.goBack();
             return;
         }
         
         document.getElementById("app").innerHTML = `
             <div class="page-header">
-                <h2>💾 ${lang === 'id' ? 'Cadangan & Pemulihan Data' : '数据备份与恢复'}</h2>
+                <h2>💾 ${t('backup_restore')}</h2>
                 <div class="header-actions">
-                    <button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button>
+                    <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                 </div>
             </div>
             
             <div class="card">
-                <h3>📤 ${lang === 'id' ? 'Ekspor Data (Backup)' : '导出数据（备份）'}</h3>
+                <h3>📤 ${lang === 'id' ? 'Ekspor Data (Cadangan)' : '导出数据（备份）'}</h3>
                 <p>${lang === 'id' 
-                    ? '导出所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。'
+                    ? 'Ekspor semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
                     : '导出所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。'}</p>
-                <button onclick="Storage.backup()" class="success">💾 ${lang === 'id' ? 'Backup Sekarang' : '立即备份'}</button>
+                <button onclick="Storage.backup()" class="success">💾 ${lang === 'id' ? 'Cadangkan Sekarang' : '立即备份'}</button>
             </div>
             
             <div class="card">
-                <h3>📥 ${lang === 'id' ? 'Impor Data (Restore)' : '导入数据（恢复）'}</h3>
+                <h3>📥 ${lang === 'id' ? 'Impor Data (Pemulihan)' : '导入数据（恢复）'}</h3>
                 <p class="warning-text">⚠️ ${lang === 'id' 
-                    ? '恢复数据将覆盖现有数据！请确保已备份当前数据。'
+                    ? 'Memulihkan data akan menimpa data yang ada! Pastikan Anda telah mencadangkan data saat ini.'
                     : '恢复数据将覆盖现有数据！请确保已备份当前数据。'}</p>
                 <input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px;">
-                <button onclick="Storage.restoreFromFile()" class="warning">🔄 ${lang === 'id' ? 'Restore Data' : '恢复数据'}</button>
+                <button onclick="Storage.restoreFromFile()" class="warning">🔄 ${lang === 'id' ? 'Pulihkan Data' : '恢复数据'}</button>
             </div>
             
             <div class="card">
-                <h3>🎯 ${lang === 'id' ? 'Restore Selektif' : '选择性恢复'}</h3>
+                <h3>🎯 ${lang === 'id' ? 'Pemulihan Selektif' : '选择性恢复'}</h3>
                 <p>${lang === 'id' 
-                    ? '仅恢复特定类型的数据，不影响其他数据。'
+                    ? 'Pulihkan hanya jenis data tertentu, tidak mempengaruhi data lainnya.'
                     : '仅恢复特定类型的数据，不影响其他数据。'}</p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <input type="file" id="selectiveFile" accept=".json" style="margin-bottom:10px; width:100%;">
-                    <button onclick="Storage.restoreOrdersOnlyFromFile()" class="btn-small">📋 ${lang === 'id' ? '恢复订单' : '恢复订单'}</button>
-                    <button onclick="Storage.restoreCustomersOnlyFromFile()" class="btn-small">👥 ${lang === 'id' ? '恢复客户' : '恢复客户'}</button>
+                    <button onclick="Storage.restoreOrdersOnlyFromFile()" class="btn-small">📋 ${lang === 'id' ? 'Pulihkan Pesanan' : '恢复订单'}</button>
+                    <button onclick="Storage.restoreCustomersOnlyFromFile()" class="btn-small">👥 ${lang === 'id' ? 'Pulihkan Nasabah' : '恢复客户'}</button>
                 </div>
             </div>
             
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ekspor CSV' : '导出 CSV'}</h3>
                 <p>${lang === 'id' 
-                    ? '导出为 CSV 格式，可在 Excel 中打开。'
+                    ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
                     : '导出为 CSV 格式，可在 Excel 中打开。'}</p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <button onclick="Storage.exportOrdersToCSV()" class="btn-small">📋 ${lang === 'id' ? 'Ekspor Order' : '导出订单'}</button>
+                    <button onclick="Storage.exportOrdersToCSV()" class="btn-small">📋 ${lang === 'id' ? 'Ekspor Pesanan' : '导出订单'}</button>
                     <button onclick="Storage.exportPaymentsToCSV()" class="btn-small">💰 ${lang === 'id' ? 'Ekspor Pembayaran' : '导出缴费'}</button>
                     <button onclick="Storage.exportCustomersToCSV()" class="btn-small">👥 ${lang === 'id' ? 'Ekspor Nasabah' : '导出客户'}</button>
                 </div>
@@ -710,7 +670,7 @@ const Storage = {
     restoreFromFile: async function() {
         const fileInput = document.getElementById('restoreFile');
         if (!fileInput || !fileInput.files[0]) {
-            alert(Utils.lang === 'id' ? '请选择备份文件' : '请选择备份文件');
+            alert(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
             return;
         }
         await this.restore(fileInput.files[0]);
@@ -719,7 +679,7 @@ const Storage = {
     restoreOrdersOnlyFromFile: async function() {
         const fileInput = document.getElementById('selectiveFile');
         if (!fileInput || !fileInput.files[0]) {
-            alert(Utils.lang === 'id' ? '请选择备份文件' : '请选择备份文件');
+            alert(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
             return;
         }
         await this.restoreOrdersOnly(fileInput.files[0]);
@@ -728,7 +688,7 @@ const Storage = {
     restoreCustomersOnlyFromFile: async function() {
         const fileInput = document.getElementById('selectiveFile');
         if (!fileInput || !fileInput.files[0]) {
-            alert(Utils.lang === 'id' ? '请选择备份文件' : '请选择备份文件');
+            alert(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
             return;
         }
         await this.restoreCustomersOnly(fileInput.files[0]);
@@ -736,4 +696,3 @@ const Storage = {
 };
 
 window.Storage = Storage;
-
