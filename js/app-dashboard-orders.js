@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.9（修复：订单列表与详情页月利息/费用状态不一致）
+// app-dashboard-orders.js - v3.0（删除重复提示）
 
 window.APP = window.APP || {};
 
@@ -28,11 +28,9 @@ const DashboardOrders = {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
                     var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
                     
-                    // 计算下次利息到期日
                     var nextDueDate = o.next_interest_due_date || '-';
                     var formattedDueDate = nextDueDate !== '-' ? Utils.formatDate(nextDueDate) : '-';
                     
-                    // 修复：实时计算月利息（基于剩余本金，而非存储的初始值）
                     var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
                     var currentMonthlyInterestForList = remainingPrincipalForList * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                     
@@ -52,9 +50,6 @@ const DashboardOrders = {
                                         <span class="order-paid">✅ 已付利息: ${o.interest_paid_months} 个月</span>
                                         <span class="order-due">📅 下次利息到期: ${formattedDueDate}</span>
                                         ${isAdmin ? `<span class="order-store">🏪 门店: ${Utils.escapeHtml(storeName)}</span>` : ''}
-                                    </div>
-                                    <div class="order-tips">
-                                        💡 提示：每月到期日支付利息，提前偿还本金可减少利息负担
                                     </div>
                                 </div>
                             <\/td>
@@ -119,7 +114,6 @@ const DashboardOrders = {
         }
     },
     
-    // 独立的缴费入口函数
     payOrder: function(orderId) {
         console.log('payOrder 被调用，订单ID:', orderId);
         if (!orderId) {
@@ -190,14 +184,7 @@ const DashboardOrders = {
                 font-size: 13px;
                 color: var(--gray-600);
             }
-            .order-tips {
-                font-size: 12px;
-                color: var(--warning);
-                background: var(--warning-light);
-                padding: 6px 10px;
-                border-radius: 6px;
-                margin-top: 6px;
-            }
+            /* 已删除重复的 .order-tips 样式 */
             .order-id {
                 font-family: monospace;
                 font-weight: 600;
@@ -235,7 +222,6 @@ const DashboardOrders = {
             @media (max-width: 768px) {
                 .order-line1 { gap: 10px; font-size: 13px; }
                 .order-line2 { gap: 10px; flex-direction: column; align-items: flex-start; font-size: 12px; }
-                .order-tips { font-size: 11px; }
                 .action-cell .btn-small { display: inline-block; margin: 4px 4px 4px 0; }
                 .info-text { font-size: 12px; }
             }
@@ -553,7 +539,6 @@ const DashboardOrders = {
     }
 };
 
-// 辅助函数
 function escapeAttr(str) {
     if (!str) return '';
     return String(str)
@@ -563,7 +548,6 @@ function escapeAttr(str) {
         .replace(/`/g, '&#96;');
 }
 
-// 合并到 window.APP
 for (var key in DashboardOrders) {
     if (typeof DashboardOrders[key] === 'function') {
         window.APP[key] = DashboardOrders[key];
@@ -574,4 +558,4 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-dashboard-orders.js v2.8 已加载 - 使用 onclick 直接绑定');
+console.log('✅ app-dashboard-orders.js v3.0 已加载 - 删除订单列表中的重复提示');
