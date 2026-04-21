@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.2（统一表格样式）
+// app-dashboard-expenses.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -401,4 +401,3 @@ for (var key in DashboardExpenses) {
     }
 }
 
-console.log('✅ app-dashboard-expenses.js v2.2 已加载 - 统一表格样式');
