@@ -1,4 +1,4 @@
-// auth.js - v3.2（优化：消除冗余字符串，精简 loadCurrentUser）
+// auth.js - v1.0
 
 const AUTH = {
     user: null,
@@ -305,4 +305,3 @@ const AUTH = {
 
 window.AUTH = AUTH;
 
-console.log('✅ auth.js v3.2 已加载 - 优化版');
