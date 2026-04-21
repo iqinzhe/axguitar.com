@@ -406,7 +406,7 @@ const SupabaseAPI = {
         const targetStoreId = orderData.store_id || profile.store_id;
         
         if (profile.role === 'admin' && !orderData.store_id) {
-            throw new Error(Utils.lang === 'id' ? '管理员不能创建订单' : '管理员不能创建订单');
+            throw new Error(Utils.lang === 'id' ? '门店权限' : '门店权限');
         }
         
         if (!targetStoreId) {
