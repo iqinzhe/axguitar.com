@@ -1,0 +1,330 @@
+/* === 表单组件 === */
+.form-group {
+    margin-bottom: var(--spacing-4);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-2);
+    font-size: var(--font-sm);
+    font-weight: 500;
+    color: var(--gray-600);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-family: inherit;
+    font-size: var(--font-sm);
+    transition: var(--transition);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-4);
+}
+
+.form-grid .full-width {
+    grid-column: span 2;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-3);
+    margin-top: var(--spacing-4);
+}
+
+/* === 转账按钮 === */
+.transfer-btn {
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-xs);
+    border-radius: var(--radius-md);
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+}
+
+.transfer-btn.cash-to-bank {
+    background: #e0f2fe;
+    color: #0369a1;
+    border-color: #7dd3fc;
+}
+
+.transfer-btn.bank-to-cash {
+    background: #fef3c7;
+    color: #b45309;
+    border-color: #fde68a;
+}
+
+.transfer-btn.store-to-hq {
+    background: #f1f5f9;
+    color: #475569;
+    border-color: #cbd5e1;
+}
+
+.transfer-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* === 小按钮 === */
+.btn-small {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-radius: var(--radius-sm);
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+}
+
+.btn-small:hover {
+    background: var(--gray-200);
+}
+
+/* === 客户信息展示 === */
+.customer-info-display p {
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+}
+
+.store-info-banner {
+    background: var(--primary-soft);
+    padding: 10px;
+    border-radius: var(--radius-md);
+    margin: 15px 0;
+    font-size: 0.9rem;
+}
+
+/* === 费用相关 === */
+.fee-section {
+    border-top: 1px solid var(--gray-200);
+    padding-top: 12px;
+    margin-top: 8px;
+}
+
+.fee-select {
+    width: 100%;
+    padding: 8px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+}
+
+.fee-display {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--primary-dark);
+    font-weight: 500;
+}
+
+.address-option {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.payment-method-options {
+    display: flex;
+    gap: 16px;
+    margin-top: 6px;
+}
+
+.payment-method-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+/* === 缴费页面汇总卡片 === */
+.summary-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.summary-table {
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.summary-table td {
+    padding: 6px 8px;
+}
+
+.summary-table .label {
+    font-weight: 600;
+    color: var(--gray-600);
+    width: 100px;
+}
+
+.summary-table .value {
+    font-weight: 500;
+}
+
+.summary-table .order-id {
+    font-family: monospace;
+    color: var(--primary-dark);
+}
+
+.summary-table .success-text {
+    color: var(--success-dark);
+}
+
+.summary-table .warning {
+    color: var(--warning-dark);
+}
+
+.summary-table .divider td {
+    padding: 0;
+}
+
+.summary-table .paid-row {
+    background: var(--success-light);
+}
+
+.action-card {
+    margin-top: 20px;
+}
+
+.action-card .card-header {
+    border-bottom: 1px solid var(--gray-200);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.action-card .card-body {
+    margin-bottom: 15px;
+}
+
+.action-card .info-box {
+    background: var(--primary-soft);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.action-card .info-box.warning-box {
+    background: var(--warning-light);
+}
+
+.action-input-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.action-label {
+    font-weight: 600;
+    min-width: 60px;
+}
+
+.action-select {
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: 0.9rem;
+    min-width: 150px;
+}
+
+.action-input {
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: 0.9rem;
+    width: 200px;
+}
+
+.payment-method-group {
+    margin-bottom: 15px;
+}
+
+.payment-method-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.card-history {
+    margin-top: 15px;
+    border-top: 1px solid var(--gray-200);
+    padding-top: 15px;
+}
+
+.history-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+.history-table {
+    width: 100%;
+    font-size: 0.75rem;
+    border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.history-table th {
+    background: var(--gray-50);
+    font-weight: 600;
+}
+
+.history-table .date-cell {
+    white-space: nowrap;
+}
+
+/* === 金额输入框 === */
+.amount-input {
+    text-align: right;
+}
+
+/* === 黑名单按钮 === */
+.btn-blacklist {
+    background: #f97316 !important;
+    color: #fff !important;
+    border-color: #ea580c !important;
+}
+
+.btn-blacklist:hover {
+    background: #ea580c !important;
+}
+
+/* === 已平账/锁定徽章 === */
+.reconciled-badge,
+.locked-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+}
+
+.reconciled-badge {
+    background: var(--success-light);
+    color: var(--success-dark);
+}
+
+.locked-badge {
+    background: var(--gray-100);
+    color: var(--gray-500);
+}
