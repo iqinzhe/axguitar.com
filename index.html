@@ -7,11 +7,12 @@
 <meta name="theme-color" content="#ffffff">
 <title>JF! - Sistem Manajemen Gadai</title>
 
-<!-- Favicon（唯一入口） -->
+<!-- Favicon -->
 <link rel="icon" href="icons/favicon-192x192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest?v=1">
 
+<!-- CSS 样式（按操作流程顺序加载）-->
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/dashboard.css">
 <link rel="stylesheet" href="css/forms.css">
@@ -25,10 +26,10 @@
     </div>
 </div>
 
-<!-- 1. 第三方库 -->
+<!-- 第三方库 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ==================== 基础模块（必须先加载） ==================== -->
+<!-- 基础模块 -->
 <script src="js/supabase.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
@@ -39,12 +40,12 @@
 <script src="js/audit.js"></script>
 <script src="js/migration.js"></script>
 
-<!-- ==================== 功能模块 ==================== -->
+<!-- 功能模块 -->
 <script src="js/app-blacklist.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
 
-<!-- ==================== 仪表盘拆分模块（按顺序加载） ==================== -->
+<!-- 仪表盘模块 -->
 <script src="js/app-dashboard-core.js"></script>
 <script src="js/app-dashboard-funds.js"></script>
 <script src="js/app-dashboard-users.js"></script>
@@ -54,30 +55,22 @@
 <script src="js/app-dashboard-expenses.js"></script>
 <script src="js/app-dashboard-report.js"></script>
 
-<!-- ==================== 初始化脚本 ==================== -->
+<!-- 初始化脚本 -->
 <script>
-// ==================== 全局错误捕获 ====================
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
 });
 
-// ==================== Loading 超时机制 ====================
 var initTimeout = setTimeout(function() {
     showError('加载超时，请刷新页面重试');
 }, 10000);
 
-// ==================== 页面初始化 ====================
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         clearTimeout(initTimeout);
         try {
-            if (!window.APP) {
-                throw new Error('APP module not loaded');
-            }
-            if (typeof window.APP.init !== 'function') {
-                throw new Error('APP.init is not a function');
-            }
-            console.log('🚀 JF! by Gadai - 初始化中...');
+            if (!window.APP) throw new Error('APP module not loaded');
+            if (typeof window.APP.init !== 'function') throw new Error('APP.init is not a function');
             window.APP.init();
         } catch (err) {
             console.error('Init error:', err);
@@ -86,7 +79,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 100);
 });
 
-// ==================== 错误显示函数 ====================
 function showError(message) {
     const app = document.getElementById('app');
     if (app) {
@@ -103,7 +95,6 @@ function showError(message) {
     }
 }
 
-// ==================== HTML 转义函数 ====================
 function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -113,19 +104,6 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
-
-// ==================== 调试信息（可选，开发完成后可删除） ====================
-console.log('📋 模块加载顺序检查:');
-console.log('  - supabase.js: ' + (typeof SUPABASE !== 'undefined' ? '✅' : '❌'));
-console.log('  - utils.js: ' + (typeof Utils !== 'undefined' ? '✅' : '❌'));
-console.log('  - auth.js: ' + (typeof AUTH !== 'undefined' ? '✅' : '❌'));
-console.log('  - permission.js: ' + (typeof PERMISSION !== 'undefined' ? '✅' : '❌'));
-console.log('  - order.js: ' + (typeof Order !== 'undefined' ? '✅' : '❌'));
-console.log('  - store.js: ' + (typeof StoreManager !== 'undefined' ? '✅' : '❌'));
-console.log('  - storage.js: ' + (typeof Storage !== 'undefined' ? '✅' : '❌'));
-console.log('  - audit.js: ' + (typeof Audit !== 'undefined' ? '✅' : '❌'));
-console.log('  - migration.js: ' + (typeof Migration !== 'undefined' ? '✅' : '❌'));
-console.log('  - APP 对象: ' + (typeof window.APP !== 'undefined' ? '✅' : '❌'));
 </script>
 </body>
 </html>
