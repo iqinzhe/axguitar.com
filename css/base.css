@@ -1451,3 +1451,116 @@ table:not(.report-table) {
     -webkit-overflow-scrolling: touch;
     min-width: 700px;
 }
+
+/* === 统一表格移动端水平滚动（修复手机端显示不良）=== */
+
+/* 所有表格容器强制水平滚动 */
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+
+/* 基础表格样式 - 设置最小宽度确保水平滚动 */
+.data-table,
+table.data-table {
+    min-width: 680px;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* 业务报表需要更宽 */
+.report-table {
+    min-width: 1200px !important;
+}
+
+/* 订单列表 */
+.order-table {
+    min-width: 750px;
+}
+
+/* 客户列表 */
+.data-table:not(.report-table):not(.order-table) {
+    min-width: 680px;
+}
+
+/* 手机端适配 */
+@media (max-width: 768px) {
+    /* 所有表格保持水平滚动 */
+    .data-table,
+    table.data-table,
+    .order-table,
+    .report-table {
+        min-width: 680px;
+    }
+    
+    /* 业务报表保持更宽 */
+    .report-table {
+        min-width: 1200px !important;
+    }
+    
+    /* 表格单元格紧凑 */
+    .data-table th,
+    .data-table td,
+    table.data-table th,
+    table.data-table td {
+        padding: 6px 8px;
+        font-size: 0.7rem;
+    }
+    
+    /* 操作列按钮垂直排列 */
+    .data-table .action-cell,
+    table.data-table .action-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 70px;
+    }
+    
+    .data-table .action-cell .btn-small,
+    table.data-table .action-cell .btn-small {
+        width: 100%;
+        text-align: center;
+        font-size: 0.65rem;
+        padding: 5px 6px;
+        white-space: nowrap;
+    }
+    
+    /* 地址列允许换行 */
+    .data-table .customer-address,
+    .data-table .expense-desc,
+    .data-table .flow-desc,
+    .data-table .order-collateral {
+        white-space: normal;
+        word-break: break-word;
+        max-width: 120px;
+    }
+    
+    /* 日期列保持单行 */
+    .data-table .date-cell,
+    .data-table .order-id,
+    .data-table .customer-id {
+        white-space: nowrap;
+    }
+}
+
+/* 超小屏 */
+@media (max-width: 480px) {
+    .data-table th,
+    .data-table td,
+    table.data-table th,
+    table.data-table td {
+        padding: 4px 6px;
+        font-size: 0.6rem;
+    }
+    
+    .data-table .action-cell .btn-small {
+        font-size: 0.55rem;
+        padding: 4px 4px;
+    }
+    
+    .data-table .customer-address,
+    .data-table .expense-desc {
+        max-width: 80px;
+    }
+}
