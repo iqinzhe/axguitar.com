@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v3.0 优化版（添加工具栏标题）
+// app-dashboard-core.js - v3.1 优化版（保存退出优化 + 按钮名称更新）
 
 window.APP = window.APP || {};
 
@@ -230,7 +230,7 @@ const DashboardCore = {
         await this.router();
     },
 
-    // ==================== 保存退出功能（带确认提示） ====================
+    // ==================== 保存退出功能（优化版） ====================
     logout: async function() {
         var lang = Utils.lang;
         var confirmMsg = lang === 'id' 
@@ -239,32 +239,55 @@ const DashboardCore = {
         
         if (!confirm(confirmMsg)) return;
         
-        var loadingMsg = this._showSavingMessage(lang === 'id' ? '正在保存数据...' : '正在保存数据...');
+        // 先检查是否有未保存数据
+        var hasUnsavedData = this._checkHasUnsavedData();
         
-        try {
-            await this._saveCurrentPageData();
-            this._hideSavingMessage(loadingMsg);
-            
-            var exitMsg = lang === 'id' 
-                ? '✅ 数据已保存，正在退出...'
-                : '✅ 数据已保存，正在退出...';
-            alert(exitMsg);
-            
-        } catch (saveError) {
-            console.error("保存数据失败:", saveError);
-            this._hideSavingMessage(loadingMsg);
-            
-            var errorMsg = lang === 'id'
-                ? '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？'
-                : '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？';
-            
-            if (!confirm(errorMsg)) return;
+        if (hasUnsavedData) {
+            var loadingMsg = this._showSavingMessage(lang === 'id' ? '正在保存数据...' : '正在保存数据...');
+            try {
+                await this._saveCurrentPageData();
+                this._hideSavingMessage(loadingMsg);
+            } catch (saveError) {
+                console.error("保存数据失败:", saveError);
+                this._hideSavingMessage(loadingMsg);
+                var errorMsg = lang === 'id'
+                    ? '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？'
+                    : '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？';
+                if (!confirm(errorMsg)) return;
+            }
         }
         
+        // 执行退出
         this.clearPageState();
         sessionStorage.clear();
         await AUTH.logout();
         await this.router();
+    },
+    
+    // 快速检查是否有未保存数据（不执行保存）
+    _checkHasUnsavedData: function() {
+        var currentPage = this.currentPage;
+        
+        switch(currentPage) {
+            case 'customers':
+                var customerName = document.getElementById("customerName");
+                if (customerName && customerName.value && customerName.value.trim()) {
+                    return true;
+                }
+                break;
+                
+            case 'expenses':
+                var expenseAmount = document.getElementById("expenseAmount");
+                if (expenseAmount && expenseAmount.value && parseFloat(expenseAmount.value.replace(/[,\s]/g, '')) > 0) {
+                    return true;
+                }
+                break;
+                
+            default:
+                break;
+        }
+        
+        return false;
     },
     
     _showSavingMessage: function(message) {
@@ -293,6 +316,7 @@ const DashboardCore = {
     
     _saveCurrentPageData: async function() {
         var currentPage = this.currentPage;
+        var hasSaved = false;
         
         switch(currentPage) {
             case 'customers':
@@ -301,6 +325,7 @@ const DashboardCore = {
                     console.log("检测到未保存的客户信息，正在自动保存...");
                     if (typeof window.APP.addCustomer === 'function') {
                         await window.APP.addCustomer();
+                        hasSaved = true;
                     }
                 }
                 break;
@@ -311,6 +336,7 @@ const DashboardCore = {
                     console.log("检测到未保存的支出信息，正在自动保存...");
                     if (typeof window.APP.addExpense === 'function') {
                         await window.APP.addExpense();
+                        hasSaved = true;
                     }
                 }
                 break;
@@ -320,7 +346,10 @@ const DashboardCore = {
                 break;
         }
         
-        await new Promise(resolve => setTimeout(resolve, 300));
+        if (hasSaved) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        
         return true;
     },
 
@@ -439,49 +468,31 @@ const DashboardCore = {
                 </div>
             `).join('');
             
-            // ==================== 添加工具栏标题 ====================
+            // 经营指标汇总标题（统一字体样式）
+            var cardsTitleHtml = '';
+            if (isAdmin) {
+                cardsTitleHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${lang === 'id' ? '经营指标汇总 (全部门店)' : '经营指标汇总 (全部门店)'}</h3>
+                </div>`;
+            } else {
+                cardsTitleHtml = `<div style="margin-bottom:12px;">
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${lang === 'id' ? '经营指标' : '经营指标'}</h3>
+                </div>`;
+            }
+            
+            // 业务操作标题（统一字体样式）
             var toolbarTitleHtml = `
                 <div style="margin: 20px 0 12px 0;">
-                    <h3>📋 ${lang === 'id' ? '经营管理中心' : '经营管理'}</h3>
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ${lang === 'id' ? 'Operasi Bisnis' : '业务操作'}</h3>
                 </div>
             `;
             
-            var toolbarHtml = '';
-if (isAdmin) {
-    toolbarHtml = `
-    <div class="toolbar admin-grid">
-        <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
-        <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
-        <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
-        <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-        <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '数据管理'}</button>
-        <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-            🔔 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
-        </button>
-        <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
-        <button onclick="APP.navigateTo('userManagement')">👤 ${lang === 'id' ? 'Man. Kerja' : '员工管理'}</button>
-        <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
-        <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
-    </div>`;
-} else {
-    toolbarHtml = `
-    <div class="toolbar store-grid">
-        <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
-        <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
-        <button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
-        <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-        <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-            🔔 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
-        </button>
-        <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
-    </div>`;
-}
-            
+            // Admin 资金管理区域标题（统一字体样式）
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3>💰 ${lang === 'id' ? '资金管理汇总 (全部门店)' : '资金管理汇总 (全部门店)'}</h3>
+                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${lang === 'id' ? '资金管理 (汇总全部门店)' : '资金管理 (汇总全部门店)'}</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
@@ -523,7 +534,7 @@ if (isAdmin) {
             } else {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3>💰 ${lang === 'id' ? '资金管理' : '资金管理'}</h3>
+                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${lang === 'id' ? '资金管理' : '资金管理'}</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
@@ -561,14 +572,35 @@ if (isAdmin) {
                 </div>`;
             }
             
-            var cardsTitleHtml = '';
+            // 工具栏（按钮名称已更新）
+            var toolbarHtml = '';
             if (isAdmin) {
-                cardsTitleHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="margin:0;">📊 ${lang === 'id' ? '经营指标汇总 (全部门店)' : '经营指标汇总 (全部门店)'}</h3>
+                toolbarHtml = `
+                <div class="toolbar admin-grid">
+                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
+                    <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
+                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
+                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+                    <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '数据管理'}</button>
+                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
+                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                    </button>
+                    <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
+                    <button onclick="APP.navigateTo('userManagement')">👥 ${lang === 'id' ? 'Man. Kerja' : '员工管理'}</button>
+                    <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
+                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
                 </div>`;
             } else {
-                cardsTitleHtml = `<div style="margin-bottom:12px;">
-                    <h3 style="margin:0;">📊 ${lang === 'id' ? '经营指标' : '经营指标'}</h3>
+                toolbarHtml = `
+                <div class="toolbar store-grid">
+                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
+                    <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
+                    <button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
+                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
+                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                    </button>
+                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
                 </div>`;
             }
             
@@ -601,7 +633,7 @@ if (isAdmin) {
                 ${bottomHtml}
             `;
         } catch (err) {
-            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button></div>`;
+            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button></div>`;
         }
     },
 
@@ -676,4 +708,4 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v3.0 已加载 - 添加工具栏标题');
+console.log('✅ app-dashboard-core.js v3.1 已加载 - 保存退出优化 + 按钮名称更新 + 标题字体统一');
