@@ -1,4 +1,4 @@
-// app-payments.js - v8.2（精简拦截提示 + 完整功能）
+// app-payments.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -498,4 +498,3 @@ if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
 
-console.log('✅ app-payments.js v8.2 已加载 - 精简拦截提示为"门店业务"');
