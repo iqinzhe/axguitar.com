@@ -1,0 +1,306 @@
+/* === 卡片组 === */
+.card {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-sm);
+    padding: var(--spacing-5);
+    transition: var(--transition);
+    margin-bottom: var(--spacing-5);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.card h3 {
+    font-size: var(--font-md);
+    margin-bottom: var(--spacing-4);
+    color: var(--gray-800);
+    padding-bottom: var(--spacing-2);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+/* === 统计卡片网格 === */
+.stats-grid-optimized {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-5);
+}
+
+.stat-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    padding: var(--spacing-3) var(--spacing-2);
+    text-align: center;
+    transition: var(--transition);
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.stat-value {
+    font-size: var(--font-md);
+    font-weight: 700;
+    margin-bottom: var(--spacing-1);
+    color: var(--gray-800);
+}
+
+.stat-value.income {
+    color: var(--success);
+}
+
+.stat-value.expense {
+    color: var(--danger);
+}
+
+.stat-label {
+    font-size: var(--font-xs);
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-5);
+}
+
+/* === 资金管理区块 === */
+.cashflow-summary {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-5);
+    margin-bottom: var(--spacing-5);
+    color: white;
+}
+
+.cashflow-summary h3 {
+    color: white;
+    border-bottom-color: rgba(255, 255, 255, 0.2);
+    margin-bottom: var(--spacing-4);
+}
+
+.cashflow-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-4);
+}
+
+.cashflow-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-3) var(--spacing-4);
+    backdrop-filter: blur(4px);
+}
+
+.cashflow-item .label {
+    font-size: var(--font-xs);
+    opacity: 0.8;
+    margin-bottom: var(--spacing-2);
+}
+
+.cashflow-item .value {
+    font-size: var(--font-lg);
+    font-weight: 700;
+}
+
+.cashflow-item .value.negative {
+    color: #f87171;
+}
+
+.cashflow-detail {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: var(--spacing-2);
+    line-height: 1.4;
+}
+
+.internal-transfer-item {
+    grid-column: span 1;
+}
+
+.transfer-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-2);
+}
+
+.cashflow-summary.light {
+    background: white;
+    border: 1px solid var(--gray-200);
+    color: var(--gray-800);
+}
+
+.cashflow-summary.light h3 {
+    color: var(--gray-800);
+    border-bottom-color: var(--gray-200);
+}
+
+.cashflow-summary.light .cashflow-item {
+    background: var(--gray-50);
+}
+
+/* === 工具栏 === */
+.toolbar {
+    display: grid;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-5);
+    padding: var(--spacing-3);
+    background: white;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+}
+
+.toolbar.admin-grid {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.toolbar.store-grid {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.toolbar button {
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.toolbar input,
+.toolbar select {
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-300);
+    font-size: var(--font-sm);
+}
+
+/* === 基础按钮（仪表盘常用） === */
+button {
+    padding: var(--spacing-2) var(--spacing-4);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    font-size: var(--font-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+button:hover {
+    background: var(--gray-200);
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-back {
+    background: var(--gray-100);
+    border: 1px solid var(--gray-200);
+    color: var(--gray-600);
+}
+
+.btn-back:hover {
+    background: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.btn-print {
+    background: var(--gray-600);
+    color: white;
+}
+
+.btn-print:hover {
+    background: var(--gray-700);
+}
+
+.btn-export {
+    background: var(--success);
+    color: white;
+}
+
+.btn-export:hover {
+    background: var(--success-dark);
+}
+
+.btn-balance {
+    background: var(--warning);
+    color: white;
+}
+
+.btn-balance:hover {
+    background: var(--warning-dark);
+}
+
+.btn-detail {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-detail:hover {
+    background: var(--primary-dark);
+}
+
+button.success,
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+button.success:hover,
+.btn-success:hover {
+    background: var(--success-dark);
+}
+
+button.warning,
+.btn-warning {
+    background: var(--warning);
+    color: white;
+}
+
+button.warning:hover,
+.btn-warning:hover {
+    background: var(--warning-dark);
+}
+
+button.danger,
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+button.danger:hover,
+.btn-danger:hover {
+    background: var(--danger-dark);
+}
+
+.capital-btn {
+    background: var(--primary);
+    color: white;
+    padding: var(--spacing-2) var(--spacing-4);
+    font-size: var(--font-xs);
+}
+
+.capital-btn:hover {
+    background: var(--primary-dark);
+}
+
+.btn-action {
+    padding: 12px 20px;
+    font-size: var(--font-sm);
+    width: 100%;
+    margin-top: var(--spacing-3);
+}
