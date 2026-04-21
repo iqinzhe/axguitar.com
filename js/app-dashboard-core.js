@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v3.2（双语支持：登录页面切换语言）
+// app-dashboard-core.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -703,4 +703,3 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v3.2 已加载 - 双语支持（登录页面切换语言）');
