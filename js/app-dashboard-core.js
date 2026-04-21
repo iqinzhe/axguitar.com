@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.9 优化版（保存退出 + 确认提示）
+// app-dashboard-core.js - v3.0 优化版（添加工具栏标题）
 
 window.APP = window.APP || {};
 
@@ -239,17 +239,12 @@ const DashboardCore = {
         
         if (!confirm(confirmMsg)) return;
         
-        // 显示保存中提示
         var loadingMsg = this._showSavingMessage(lang === 'id' ? '正在保存数据...' : '正在保存数据...');
         
         try {
-            // 保存当前页面可能存在的未保存数据
             await this._saveCurrentPageData();
-            
-            // 清除保存提示
             this._hideSavingMessage(loadingMsg);
             
-            // 显示退出提示
             var exitMsg = lang === 'id' 
                 ? '✅ 数据已保存，正在退出...'
                 : '✅ 数据已保存，正在退出...';
@@ -266,14 +261,12 @@ const DashboardCore = {
             if (!confirm(errorMsg)) return;
         }
         
-        // 执行退出
         this.clearPageState();
         sessionStorage.clear();
         await AUTH.logout();
         await this.router();
     },
     
-    // 显示保存中的提示
     _showSavingMessage: function(message) {
         var div = document.createElement('div');
         div.id = 'saving-overlay';
@@ -294,18 +287,15 @@ const DashboardCore = {
         return div;
     },
     
-    // 隐藏保存提示
     _hideSavingMessage: function(element) {
         if (element && element.remove) element.remove();
     },
     
-    // 保存当前页面数据（根据当前页面类型）
     _saveCurrentPageData: async function() {
         var currentPage = this.currentPage;
         
         switch(currentPage) {
             case 'customers':
-                // 客户页面：检查是否有正在编辑的新客户表单
                 var customerName = document.getElementById("customerName");
                 if (customerName && customerName.value && customerName.value.trim()) {
                     console.log("检测到未保存的客户信息，正在自动保存...");
@@ -316,7 +306,6 @@ const DashboardCore = {
                 break;
                 
             case 'expenses':
-                // 支出页面：检查是否有正在填写的支出表单
                 var expenseAmount = document.getElementById("expenseAmount");
                 if (expenseAmount && expenseAmount.value && parseFloat(expenseAmount.value.replace(/[,\s]/g, '')) > 0) {
                     console.log("检测到未保存的支出信息，正在自动保存...");
@@ -326,24 +315,12 @@ const DashboardCore = {
                 }
                 break;
                 
-            case 'orderTable':
-                // 订单列表页面：无需自动保存
-                console.log("订单列表页面，无需保存数据");
-                break;
-                
-            case 'dashboard':
-                // 仪表板页面：无需自动保存
-                console.log("仪表板页面，无需保存数据");
-                break;
-                
             default:
                 console.log(`当前页面 (${currentPage}) 无需自动保存数据`);
                 break;
         }
         
-        // 等待一小段时间确保保存完成
         await new Promise(resolve => setTimeout(resolve, 300));
-        
         return true;
     },
 
@@ -391,7 +368,6 @@ const DashboardCore = {
                 totalExpenses = expenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
             } catch(e) { console.warn("获取支出汇总失败:", e); }
             
-            // 计算本月新增订单数
             const allOrders = await SUPABASE.getOrders();
             const today = new Date();
             const currentMonth = today.getMonth();
@@ -403,7 +379,6 @@ const DashboardCore = {
             });
             const thisMonthOrderCount = thisMonthOrders.length;
             
-            // 计算赤字（总流出 - 总收入）
             let totalInflowExcludingPrincipal = 0;
             let totalOutflow = 0;
             
@@ -418,7 +393,6 @@ const DashboardCore = {
             }
             const deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            // 清理过期订单
             const twoYearsAgo = new Date();
             twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
             
@@ -443,12 +417,10 @@ const DashboardCore = {
                 }
             }
             
-            // 重新获取更新后的订单统计
             const updatedOrders = await SUPABASE.getOrders();
             const activeOrdersCount = updatedOrders.filter(o => o.status === 'active').length;
             const completedOrdersCount = updatedOrders.filter(o => o.status === 'completed').length;
             
-            // 构建卡片
             var cards = [
                 { label: `${lang === 'id' ? '本月新增' : '本月新增'}/${t('total_orders')}`, value: `${thisMonthOrderCount}/${report.total_orders}`, type: 'text' },
                 { label: lang === 'id' ? '赤字 (流出-收入)' : '赤字 (流出-收入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
@@ -467,7 +439,13 @@ const DashboardCore = {
                 </div>
             `).join('');
             
-            // Admin "资金流水"，"业务报表"，"保存退出"
+            // ==================== 添加工具栏标题 ====================
+            var toolbarTitleHtml = `
+                <div style="margin: 20px 0 12px 0;">
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ${lang === 'id' ? 'Operasi Bisnis' : '业务操作'}</h3>
+                </div>
+            `;
+            
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = `
@@ -499,7 +477,6 @@ const DashboardCore = {
                 </div>`;
             }
             
-            // Admin资金管理区域：添加"全部门店汇总"标识
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = `
@@ -584,7 +561,6 @@ const DashboardCore = {
                 </div>`;
             }
             
-            // 卡片区域添加汇总标识（仅Admin）
             var cardsTitleHtml = '';
             if (isAdmin) {
                 cardsTitleHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -619,6 +595,7 @@ const DashboardCore = {
                     ${cardsHtml}
                 </div>
                 
+                ${toolbarTitleHtml}
                 ${toolbarHtml}
                 
                 ${bottomHtml}
@@ -699,4 +676,4 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v2.9 已加载 - 保存退出 + 确认提示 + 汇总标识');
+console.log('✅ app-dashboard-core.js v3.0 已加载 - 添加工具栏标题');
