@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.0
+// app-dashboard-orders.js - v1.1（修复双语翻译）
 
 window.APP = window.APP || {};
 
@@ -32,7 +32,13 @@ const DashboardOrders = {
                     var formattedDueDate = nextDueDate !== '-' ? Utils.formatDate(nextDueDate) : '-';
                     
                     var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
-                    var currentMonthlyInterestForList = remainingPrincipalForList * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+                    var currentMonthlyInterestForList = remainingPrincipalForList * (o.agreed_interest_rate || 0.08);
+                    
+                    // 还款方式标签
+                    var repaymentTypeText = o.repayment_type === 'fixed' 
+                        ? (lang === 'id' ? 'Tetap' : '固定')
+                        : (lang === 'id' ? 'Fleksibel' : '灵活');
+                    var repaymentBadge = `<span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}</span>`;
                     
                     rows += `<tr>
                         <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
@@ -42,13 +48,14 @@ const DashboardOrders = {
                         <td class="text-right">${Utils.formatCurrency(currentMonthlyInterestForList)}</td>
                         <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
                         <td class="text-center">${formattedDueDate}</td>
+                        <td class="text-center">${repaymentBadge}</td>
                         <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
                         ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
                         <td class="action-cell">
-                            <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ 查看详情</button>
-                            ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 缴纳费用</button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ 删除订单</button>` : ''}
-                            <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ 打印凭证</button>
+                            <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ ${t('view')}</button>
+                            ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                            ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                            <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ ${t('print')}</button>
                         </td>
                     </tr>`;
                 }
@@ -58,16 +65,16 @@ const DashboardOrders = {
                 <div class="page-header">
                     <h2>📋 ${t('order_list')}</h2>
                     <div class="header-actions">
-                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ 打印</button>
-                        <button onclick="APP.goBack()" class="btn-back">↩️ 返回</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
                 
                 <div class="toolbar">
                     <select id="statusFilter" onchange="APP.filterOrders(this.value)">
-                        <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>全部订单</option>
-                        <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>进行中</option>
-                        <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>已结清</option>
+                        <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
+                        <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${t('active')}</option>
+                        <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${t('completed')}</option>
                     </select>
                 </div>
                 
@@ -75,7 +82,7 @@ const DashboardOrders = {
                     <div class="info-card-content">
                         <div class="info-icon">📌</div>
                         <div class="info-text">
-                            <strong>重要提示：</strong> 请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。
+                            <strong>${lang === 'id' ? 'Informasi Penting:' : '重要提示：'}</strong> ${lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pembayaran pokok lebih awal dapat mengurangi beban bunga. Setelah lunas, sistem akan membuat tanda terima pelunasan secara otomatis.' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。'}
                         </div>
                     </div>
                 </div>
@@ -84,21 +91,81 @@ const DashboardOrders = {
                     <table class="data-table order-table">
                         <thead>
                             <tr>
-                                <th>订单号</th>
-                                <th>客户姓名</th>
-                                <th>质押物</th>
-                                <th class="text-right">贷款金额</th>
-                                <th class="text-right">月利息</th>
-                                <th class="text-center">已付利息</th>
-                                <th class="text-center">下次到期</th>
-                                <th class="text-center">状态</th>
-                                ${isAdmin ? '<th class="text-center">门店</th>' : ''}
-                                <th class="text-center">操作</th>
+                                <th>${t('order_id')}</th>
+                                <th>${t('customer_name')}</th>
+                                <th>${t('collateral_name')}</th>
+                                <th class="text-right">${t('loan_amount')}</th>
+                                <th class="text-right">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</th>
+                                <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                <th class="text-center">${t('payment_due_date')}</th>
+                                <th class="text-center">${t('repayment_type')}</th>
+                                <th class="text-center">${t('status')}</th>
+                                ${isAdmin ? '<th class="text-center">' + t('store') + '</th>' : ''}
+                                <th class="text-center">${t('action')}</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
-                </div>`;
+                </div>
+                
+                <style>
+                    .order-table .order-id {
+                        font-family: monospace;
+                        font-weight: 600;
+                        color: var(--primary-dark);
+                    }
+                    .order-table .order-customer {
+                        font-weight: 500;
+                    }
+                    .order-table .order-collateral {
+                        max-width: 150px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    .repayment-badge {
+                        display: inline-block;
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }
+                    .badge-fixed {
+                        background: #d1fae5;
+                        color: #065f46;
+                    }
+                    .badge-flexible {
+                        background: #fed7aa;
+                        color: #9a3412;
+                    }
+                    .info-card {
+                        background: #e0f2fe;
+                        border-left: 4px solid #0284c7;
+                        margin-bottom: 16px;
+                    }
+                    .info-card-content {
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 12px;
+                    }
+                    .info-icon {
+                        font-size: 20px;
+                    }
+                    .info-text {
+                        flex: 1;
+                        font-size: 13px;
+                        color: #0c4a6e;
+                        line-height: 1.4;
+                    }
+                    .info-text strong {
+                        color: #0369a1;
+                    }
+                    @media (max-width: 768px) {
+                        .order-table .order-collateral {
+                            max-width: 100px;
+                        }
+                    }
+                </style>`;
             
             this._addOrderTableStyles();
             
@@ -179,7 +246,11 @@ const DashboardOrders = {
         this.saveCurrentPageState();
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
-            if (!order) { alert('Order not found'); this.goBack(); return; }
+            if (!order) { 
+                alert(Utils.t('order_not_found')); 
+                this.goBack(); 
+                return; 
+            }
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
             var profile = await SUPABASE.getCurrentProfile();
@@ -188,13 +259,14 @@ const DashboardOrders = {
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-            var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+            var monthlyRate = order.agreed_interest_rate || 0.08;
+            var currentMonthlyInterest = remainingPrincipal * monthlyRate;
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             
             var payRows = '';
             if (payments && payments.length > 0) {
                 for (var p of payments) {
-                    var typeText = p.type === 'admin_fee' ? (lang === 'id' ? 'Admin Fee' : '管理费') : p.type === 'service_fee' ? (lang === 'id' ? 'Service Fee' : '服务费') : p.type === 'interest' ? (lang === 'id' ? 'Bunga' : '利息') : (lang === 'id' ? 'Pokok' : '本金');
+                    var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     payRows += `<tr>
                         <td class="date-cell">${Utils.formatDate(p.date)}</td>
                         <td>${typeText}</td>
@@ -208,64 +280,78 @@ const DashboardOrders = {
                 payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
 
+            // 还款方式显示
+            var repaymentInfo = '';
+            if (order.repayment_type === 'fixed') {
+                var paidMonths = order.fixed_paid_months || 0;
+                var totalMonths = order.repayment_term;
+                var fixedPayment = order.monthly_fixed_payment || 0;
+                repaymentInfo = `
+                    <p><strong>${t('repayment_type')}:</strong> 📅 ${t('fixed_repayment')} (${totalMonths} ${lang === 'id' ? 'bulan' : '个月'})</p>
+                    <p><strong>${t('monthly_payment')}:</strong> ${Utils.formatCurrency(fixedPayment)}</p>
+                    <p><strong>${lang === 'id' ? 'Progress' : '进度'}:</strong> ${paidMonths}/${totalMonths} ${lang === 'id' ? 'bulan' : '个月'}</p>
+                `;
+            } else {
+                repaymentInfo = `<p><strong>${t('repayment_type')}:</strong> 💰 ${t('flexible_repayment')} (${lang === 'id' ? 'Maksimal perpanjangan 10 bulan' : '最长延期10个月'})</p>`;
+            }
+
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h2>📄 订单详情</h2>
+                    <h2>📄 ${t('order_details')}</h2>
                     <div class="header-actions">    
-                        <button onclick="APP.printOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-print print-btn">🖨️ 打印订单</button>
-                        <button onclick="APP.goBack()" class="btn-back">↩️ 返回</button>
+                        <button onclick="APP.printOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-print print-btn">🖨️ ${t('print')}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
                 
                 <div class="card">
-                    <h3>📋 订单信息</h3>
-                    <p><strong>订单号:</strong> ${Utils.escapeHtml(order.order_id)}</p>
-                    <p><strong>状态:</strong> <span class="status-badge status-${order.status}">${statusMap[order.status] || order.status}</span></p>
-                    <p><strong>创建日期:</strong> ${Utils.formatDate(order.created_at)}</p>
+                    <h3>📋 ${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
+                    <p><strong>${t('order_id')}:</strong> ${Utils.escapeHtml(order.order_id)}</p>
+                    <p><strong>${t('status')}:</strong> <span class="status-badge status-${order.status}">${statusMap[order.status] || order.status}</span></p>
+                    <p><strong>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
+                    ${repaymentInfo}
                     
-                    <h3>👤 客户信息</h3>
-                    <p><strong>客户姓名:</strong> ${Utils.escapeHtml(order.customer_name)}</p>
-                    <p><strong>KTP号码:</strong> ${Utils.escapeHtml(order.customer_ktp)}</p>
-                    <p><strong>联系电话:</strong> ${Utils.escapeHtml(order.customer_phone)}</p>
-                    <p><strong>地址:</strong> ${Utils.escapeHtml(order.customer_address)}</p>
+                    <h3>👤 ${t('customer_info')}</h3>
+                    <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer_name)}</p>
+                    <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(order.customer_ktp)}</p>
+                    <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(order.customer_phone)}</p>
+                    <p><strong>${t('address')}:</strong> ${Utils.escapeHtml(order.customer_address)}</p>
                     
-                    <h3>💎 典当信息</h3>
-                    <p><strong>质押物名称:</strong> ${Utils.escapeHtml(order.collateral_name)}</p>
-                    <p><strong>贷款金额:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
+                    <h3>💎 ${t('collateral_info')}</h3>
+                    <p><strong>${t('collateral_name')}:</strong> ${Utils.escapeHtml(order.collateral_name)}</p>
+                    <p><strong>${t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
                     
-                    <h3>💰 费用明细</h3>
-                    <p><strong>管理费:</strong> ${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅ 已缴' : '❌ 未缴'}</p>
-                    <p><strong>服务费:</strong> ${Utils.formatCurrency(order.service_fee_amount || 0)} (${order.service_fee_percent || 0}%) ${(order.service_fee_paid || 0) >= (order.service_fee_amount || 0) && (order.service_fee_amount || 0) > 0 ? '✅ 已缴' : (order.service_fee_amount || 0) === 0 ? '—' : '❌ 未缴'}</p>
-                    <p><strong>月利息（当前）:</strong> ${Utils.formatCurrency(currentMonthlyInterest)} <small style="color:#64748b">（基于剩余本金 ${Utils.formatCurrency(remainingPrincipal)} × 10%）</small></p>
-                    <p><strong>已付利息:</strong> ${order.interest_paid_months} 个月 (${Utils.formatCurrency(order.interest_paid_total)})</p>
-                    <p><strong>剩余本金:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
-                    <p><strong>下次利息到期日:</strong> ${nextDueDate}</p>
-                    <p><strong>备注:</strong> ${Utils.escapeHtml(order.notes || '-')}</p>
+                    <h3>💰 ${lang === 'id' ? 'Rincian Biaya' : '费用明细'}</h3>
+                    <p><strong>${t('admin_fee')}:</strong> ${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')}</p>
+                    <p><strong>${t('service_fee')}:</strong> ${Utils.formatCurrency(order.service_fee_amount || 0)} (${order.service_fee_percent || 0}%) ${(order.service_fee_paid || 0) >= (order.service_fee_amount || 0) && (order.service_fee_amount || 0) > 0 ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : (order.service_fee_amount || 0) === 0 ? '—' : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')}</p>
+                    <p><strong>${lang === 'id' ? 'Bunga Bulanan (saat ini)' : '月利息（当前）'}:</strong> ${Utils.formatCurrency(currentMonthlyInterest)} <small style="color:#64748b">（${lang === 'id' ? 'berdasarkan sisa pokok' : '基于剩余本金'} ${Utils.formatCurrency(remainingPrincipal)} × ${(monthlyRate*100).toFixed(0)}%）</small></p>
+                    <p><strong>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
+                    <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
+                    <p><strong>${t('payment_due_date')}:</strong> ${nextDueDate}</p>
+                    <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes || '-')}</p>
                     
                     <div class="info-card" style="margin: 16px 0;">
                         <div class="info-card-content">
                             <div class="info-icon">💡</div>
                             <div class="info-text">
-                                <strong>温馨提示：</strong> 请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。
+                                <strong>${lang === 'id' ? 'Tips:' : '温馨提示：'}</strong> ${lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pembayaran pokok lebih awal dapat mengurangi beban bunga. Setelah lunas, sistem akan membuat tanda terima pelunasan secara otomatis.' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。'}
                             </div>
                         </div>
                     </div>
                     
-                    <h3>📋 缴费记录</h3>
+                    <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
                     <div class="table-container">
                         <table class="data-table payment-table">
-                            <thead>
-                                <tr><th>日期</th><th>类型</th><th class="text-center">月数</th><th class="text-right">金额</th><th class="text-center">支付方式</th><th>说明</th></tr>
-                            </thead>
+                            <thead><tr><th>${t('date')}</th><th>${t('type')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${t('description')}</th></tr></thead>
                             <tbody>${payRows}</tbody>
                         </table>
                     </div>
                     
                     <div class="toolbar" style="margin-top: 16px;">
-                        <button onclick="APP.goBack()">↩️ 返回</button>
-                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(order.order_id)}'})" class="success">💰 缴纳费用</button>` : ''}
-                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeAttr(order.order_id)}')" class="success">🧾 打印结清凭证</button>` : ''}
-                        <button onclick="APP.sendWAReminder('${Utils.escapeAttr(order.order_id)}')" class="warning">📱 WA提醒</button>
+                        <button onclick="APP.goBack()">↩️ ${t('back')}</button>
+                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(order.order_id)}'})" class="success">💰 ${lang === 'id' ? 'Bayar' : '缴纳费用'}</button>` : ''}
+                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeAttr(order.order_id)}')" class="success">🧾 ${lang === 'id' ? 'Cetak Tanda Terima Pelunasan' : '打印结清凭证'}</button>` : ''}
+                        <button onclick="APP.sendWAReminder('${Utils.escapeAttr(order.order_id)}')" class="warning">📱 ${lang === 'id' ? 'Pengingat WA' : 'WA提醒'}</button>
                     </div>
                 </div>`;
             
@@ -279,12 +365,12 @@ const DashboardOrders = {
     deleteOrder: async function(orderId) {
         var lang = Utils.lang;
         
-        if (!confirm(lang === 'id' ? '确定删除？' : '确定删除？')) return;
+        if (!confirm(Utils.t('confirm_delete'))) return;
         
         try {
             const order = await SUPABASE.getOrder(orderId);
             if (!order) {
-                alert(lang === 'id' ? '订单不存在' : '订单不存在');
+                alert(Utils.t('order_not_found'));
                 return;
             }
             
@@ -304,30 +390,33 @@ const DashboardOrders = {
             await this.showOrderTable();
         } catch (error) {
             console.error("deleteOrder error:", error);
-            alert(lang === 'id' ? '删除失败：' + error.message : '删除失败：' + error.message);
+            alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
         }
     },
 
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
-            if (!order) { alert('订单不存在'); return; }
+            if (!order) { 
+                alert(Utils.t('order_not_found')); 
+                return; 
+            }
             var lang = Utils.lang;
             var methodMap = { 
-                cash: lang === 'id' ? '现金 (保险柜)' : '现金 (保险柜)', 
-                bank: lang === 'id' ? '银行转账 BNI' : '银行转账 BNI' 
+                cash: lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)', 
+                bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' 
             };
             
             var paymentRows = '';
             for (var p of payments) {
                 var typeText = '';
-                if (p.type === 'admin_fee') typeText = '管理费';
-                else if (p.type === 'service_fee') typeText = '服务费';
-                else if (p.type === 'interest') typeText = '利息';
-                else if (p.type === 'principal') typeText = '本金';
+                if (p.type === 'admin_fee') typeText = t('admin_fee');
+                else if (p.type === 'service_fee') typeText = t('service_fee');
+                else if (p.type === 'interest') typeText = t('interest');
+                else if (p.type === 'principal') typeText = t('principal');
                 else typeText = p.type || '-';
                 
-                var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? '现金' : '银行');
+                var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? 'Tunai' : 'Bank');
                 
                 paymentRows += `<tr>
                     <td>${Utils.formatDate(p.date)}</td>
@@ -338,7 +427,7 @@ const DashboardOrders = {
             }
             
             if (paymentRows === '') {
-                paymentRows = `<tr><td colspan="4" class="text-center">暂无缴费记录<\/td><\/tr>`;
+                paymentRows = `<tr><td colspan="4" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
@@ -371,37 +460,37 @@ const DashboardOrders = {
                 <body>
                     <div class="header">
                         <h1>JF! by Gadai</h1>
-                        <p>典当交易凭证 | <strong>${order.order_id}</strong> | ${Utils.formatDate(order.created_at)}</p>
+                        <p>${lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证'} | <strong>${order.order_id}</strong> | ${Utils.formatDate(order.created_at)}</p>
                     </div>
                     
                     <div class="section">
-                        <h3>客户信息</h3>
-                        <div class="info-row"><div class="info-label">客户姓名：</div><div>${order.customer_name}</div></div>
-                        <div class="info-row"><div class="info-label">KTP：</div><div>${order.customer_ktp || '-'}</div></div>
-                        <div class="info-row"><div class="info-label">电话：</div><div>${order.customer_phone || '-'}</div></div>
-                        <div class="info-row"><div class="info-label">地址：</div><div>${order.customer_address || '-'}</div></div>
+                        <h3>${lang === 'id' ? 'Informasi Nasabah' : '客户信息'}</h3>
+                        <div class="info-row"><div class="info-label">${t('customer_name')}:</div><div>${order.customer_name}</div></div>
+                        <div class="info-row"><div class="info-label">KTP:</div><div>${order.customer_ktp || '-'}</div></div>
+                        <div class="info-row"><div class="info-label">${t('phone')}:</div><div>${order.customer_phone || '-'}</div></div>
+                        <div class="info-row"><div class="info-label">${t('address')}:</div><div>${order.customer_address || '-'}</div></div>
                     </div>
                     
                     <div class="section">
-                        <h3>质押物与贷款</h3>
-                        <div class="info-row"><div class="info-label">质押物：</div><div>${order.collateral_name}</div></div>
-                        <div class="info-row"><div class="info-label">贷款金额：</div><div>${Utils.formatCurrency(order.loan_amount)}</div></div>
-                        <div class="info-row"><div class="info-label">剩余本金：</div><div>${Utils.formatCurrency(remainingPrincipal)}</div></div>
-                        <div class="info-row"><div class="info-label">备注：</div><div>${order.notes || '-'}</div></div>
+                        <h3>${lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款'}</h3>
+                        <div class="info-row"><div class="info-label">${t('collateral_name')}:</div><div>${order.collateral_name}</div></div>
+                        <div class="info-row"><div class="info-label">${t('loan_amount')}:</div><div>${Utils.formatCurrency(order.loan_amount)}</div></div>
+                        <div class="info-row"><div class="info-label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</div><div>${Utils.formatCurrency(remainingPrincipal)}</div></div>
+                        <div class="info-row"><div class="info-label">${t('notes')}:</div><div>${order.notes || '-'}</div></div>
                     </div>
                     
                     <div class="section">
-                        <h3>缴费记录</h3>
+                        <h3>${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
                         <table>
-                            <thead><tr><th>日期</th><th>类型</th><th class="text-right">金额</th><th>支付方式</th></tr></thead>
+                            <thead><tr><th>${t('date')}</th><th>${t('type')}</th><th class="text-right">${t('amount')}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th></tr></thead>
                             <tbody>${paymentRows}</tbody>
                         </table>
                     </div>
                     
                     <div class="footer">
-                        <div>JF! by Gadai - 典当管理系统</div>
-                        <div>门店：${safeStoreName}</div>
-                        <div>本凭证为电子打印，无需签名</div>
+                        <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
+                        <div>${lang === 'id' ? 'Toko' : '门店'}：${safeStoreName}</div>
+                        <div>${lang === 'id' ? 'Bukti ini dicetak secara elektronik, tidak perlu tanda tangan' : '本凭证为电子打印，无需签名'}</div>
                     </div>
                     
                     <script>window.onload=function(){window.print();setTimeout(function(){window.close();},1000)};<\/script>
@@ -411,7 +500,7 @@ const DashboardOrders = {
             printWindow.document.close();
         } catch (error) {
             console.error("printOrder error:", error);
-            alert('打印订单失败');
+            alert(lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
         }
     },
 
@@ -419,6 +508,7 @@ const DashboardOrders = {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
         var lang = Utils.lang;
+        var t = Utils.t;
         try {
             var allPayments = await SUPABASE.getAllPayments();
             var totalAdminFee = 0, totalServiceFee = 0, totalInterest = 0, totalPrincipal = 0;
@@ -428,45 +518,45 @@ const DashboardOrders = {
                 else if (p.type === 'interest') totalInterest += p.amount;
                 else if (p.type === 'principal') totalPrincipal += p.amount;
             }
-            var typeMap = { admin_fee: '管理费', service_fee: '服务费', interest: '利息', principal: '本金' };
-            var methodMap = { cash: '现金', bank: '银行BNI' };
+            var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
+            var methodMap = { cash: t('cash'), bank: t('bank') };
 
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="9" class="text-center">暂无数据<\/td><\/tr>`
+                ? `<tr><td colspan="9" class="text-center">${t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
                     <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
                     <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
                     <td class="date-cell">${Utils.formatDate(p.date)}</td>
                     <td>${typeMap[p.type] || p.type}</td>
-                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' 个月' : ' 个月') : '-'}</td>
+                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
                     <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
                     <td class="text-center">${methodMap[p.payment_method] || '-'}</td>
                     <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    <td class="action-cell"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">查看</button></td>
+                    <td class="action-cell"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">${t('view')}</button></td>
                 <\/tr>`).join('');
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h2>💰 缴费明细</h2>
+                    <h2>💰 ${t('payment_history')}</h2>
                     <div class="header-actions">
-                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ 打印</button>
-                        <button onclick="APP.goBack()" class="btn-back">↩️ 返回</button>                  
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>                  
                     </div>
                 </div>
                 
                 <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>管理费</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalServiceFee)}</div><div>服务费</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>利息</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>本金</div></div>
-                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal)}</div><div>全部总计</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee)}</div><div>${t('admin_fee')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalServiceFee)}</div><div>${t('service_fee')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalInterest)}</div><div>${t('interest')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div>${t('principal')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal)}</div><div>${lang === 'id' ? 'Total Keseluruhan' : '全部总计'}</div></div>
                 </div>
                 
                 <div class="table-container">
                     <table class="data-table payment-table">
                         <thead>
                             <tr>
-                                <th>订单ID</th><th>客户姓名</th><th>日期</th><th>类型</th><th class="text-center">月数</th><th class="text-right">金额</th><th class="text-center">支付方式</th><th>说明</th><th class="text-center">操作</th>
+                                <th>${t('order_id')}</th><th>${t('customer_name')}</th><th>${t('date')}</th><th>${t('type')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${t('description')}</th><th class="text-center">${t('action')}</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
@@ -475,7 +565,7 @@ const DashboardOrders = {
             
         } catch (error) {
             console.error("showPaymentHistory error:", error);
-            alert('加载缴费记录失败');
+            alert(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
         }
     }
 };
@@ -498,4 +588,3 @@ for (var key in DashboardOrders) {
 if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
-
