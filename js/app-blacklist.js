@@ -1,4 +1,4 @@
-// app-blacklist.js - 完整修复版 v1.1
+// app-blacklist.js - v1.2（优化：精简重复代码）
 
 window.APP = window.APP || {};
 
@@ -168,10 +168,6 @@ const BlacklistModule = {
     }
 };
 
-for (var key in BlacklistModule) {
-    if (typeof BlacklistModule[key] === 'function') {
-        window.APP[key] = BlacklistModule[key];
-    }
-}
+Object.assign(window.APP, BlacklistModule);
 
-console.log('✅ app-blacklist.js v1.1 已加载 - 修复正则表达式支持拉丁扩展区字符');
+console.log('✅ app-blacklist.js v1.2 已加载 - 优化版');

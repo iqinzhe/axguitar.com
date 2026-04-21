@@ -1,4 +1,4 @@
-// order.js - v1.0
+// order.js - v1.1（优化：使用可选链）
 
 const Order = {
     async create(data) {
@@ -44,9 +44,8 @@ const Order = {
     
     // ==================== 修复高危1：使用利率常量 ====================
     // 获取当前月利息
-    getCurrentMonthlyInterest(order) { 
-        const remainingPrincipal = order.loan_amount - order.principal_paid;
-        return remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+    getCurrentMonthlyInterest(order) {
+        return (order.loan_amount - order.principal_paid) * Utils.MONTHLY_INTEREST_RATE;
     },
     
     // 获取当前服务费金额
@@ -109,3 +108,5 @@ const Order = {
 };
 
 window.Order = Order;
+
+console.log('✅ order.js v1.1 已加载 - 优化版');

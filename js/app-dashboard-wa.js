@@ -185,10 +185,6 @@ Terima kasih atas kepercayaan Anda.
 };
 
 // 合并到 window.APP
-for (var key in DashboardWA) {
-    if (typeof DashboardWA[key] === 'function') {
-        window.APP[key] = DashboardWA[key];
-    }
-}
+Object.assign(window.APP, DashboardWA);
 
 console.log('✅ app-dashboard-wa.js v1.0 已加载 - WA提醒模块');

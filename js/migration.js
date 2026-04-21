@@ -1,4 +1,4 @@
-// migration.js - 完整修复版 v1.1
+// migration.js - v1.2（优化：精简批量结果统计，使用 optional chaining）
 
 const Migration = {
     isMigrating: false,
@@ -12,7 +12,7 @@ const Migration = {
         this.resetProgress();
 
         const oldDb = this.loadLocalStorage();
-        if (!oldDb || !oldDb.orders || oldDb.orders.length === 0) {
+        if (!oldDb?.orders?.length) {
             alert(Utils.lang === 'id' ? 'Tidak ada data untuk dimigrasi' : '没有需要迁移的数据');
             this.isMigrating = false;
             return;
@@ -38,27 +38,23 @@ const Migration = {
             return;
         }
 
-        const storeMap = {};
-        for (const store of stores) storeMap[store.name] = store.id;
-        const defaultStoreId = stores.length > 0 ? stores[0].id : null;
+        const storeMap = Object.fromEntries(stores.map(s => [s.name, s.id]));
+        const defaultStoreId = stores[0]?.id || null;
 
         let existingIds = new Set();
         try {
-            const existing = await SUPABASE.getOrders();
-            existingIds = new Set(existing.map(o => o.order_id));
-        } catch (e) { }
+            existingIds = new Set((await SUPABASE.getOrders()).map(o => o.order_id));
+        } catch { }
 
         const BATCH_SIZE = 10;
         for (let i = 0; i < orders.length; i += BATCH_SIZE) {
             const batch = orders.slice(i, i + BATCH_SIZE);
-            const batchPromises = batch.map(order =>
-                this._migrateSingleOrder(order, storeMap, defaultStoreId, adminUser.id, existingIds)
+            const results = await Promise.allSettled(
+                batch.map(order => this._migrateSingleOrder(order, storeMap, defaultStoreId, adminUser.id, existingIds))
             );
-            const results = await Promise.allSettled(batchPromises);
             for (const result of results) {
                 if (result.status === 'fulfilled') {
-                    if (result.value === 'skipped') this.progress.skipped++;
-                    else this.progress.success++;
+                    result.value === 'skipped' ? this.progress.skipped++ : this.progress.success++;
                 } else {
                     this.progress.failed++;
                     this.failedOrders.push(result.reason?.orderId || '未知');
@@ -75,31 +71,28 @@ const Migration = {
     async _migrateSingleOrder(oldOrder, storeMap, defaultStoreId, adminUserId, existingIds) {
         if (existingIds.has(oldOrder.order_id)) return 'skipped';
 
-        let storeId = (oldOrder.branch && storeMap[oldOrder.branch])
-            ? storeMap[oldOrder.branch]
-            : defaultStoreId;
-
+        const storeId = (oldOrder.branch && storeMap[oldOrder.branch]) ? storeMap[oldOrder.branch] : defaultStoreId;
         if (!storeId) throw Object.assign(new Error('No store available'), { orderId: oldOrder.order_id });
 
         const orderData = {
             order_id: oldOrder.order_id,
-            customer_name: oldOrder.customer?.name || 'Unknown',
-            customer_ktp: oldOrder.customer?.ktp || '',
-            customer_phone: oldOrder.customer?.phone || '',
+            customer_name:    oldOrder.customer?.name    || 'Unknown',
+            customer_ktp:     oldOrder.customer?.ktp     || '',
+            customer_phone:   oldOrder.customer?.phone   || '',
             customer_address: oldOrder.customer?.address || '',
-            collateral_name: oldOrder.collateral_name || '',
-            loan_amount: oldOrder.loan_amount || 0,
-            admin_fee: oldOrder.admin_fee || 30000,
-            admin_fee_paid: oldOrder.admin_fee_paid || false,
+            collateral_name:  oldOrder.collateral_name   || '',
+            loan_amount:      oldOrder.loan_amount        || 0,
+            admin_fee:        oldOrder.admin_fee          || 30000,
+            admin_fee_paid:      oldOrder.admin_fee_paid      || false,
             admin_fee_paid_date: oldOrder.admin_fee_paid_date || null,
-            monthly_interest: oldOrder.monthly_interest || ((oldOrder.loan_amount || 0) * 0.10),
+            monthly_interest:    oldOrder.monthly_interest    || ((oldOrder.loan_amount || 0) * 0.10),
             interest_paid_months: oldOrder.interest_paid_months || 0,
-            interest_paid_total: oldOrder.interest_paid_total || 0,
+            interest_paid_total:  oldOrder.interest_paid_total  || 0,
             next_interest_due_date: oldOrder.next_interest_due_date || null,
-            principal_paid: oldOrder.principal_paid || 0,
+            principal_paid:      oldOrder.principal_paid      || 0,
             principal_remaining: oldOrder.principal_remaining || oldOrder.loan_amount || 0,
-            status: oldOrder.status || 'active',
-            store_id: storeId,
+            status:     oldOrder.status     || 'active',
+            store_id:   storeId,
             created_by: adminUserId,
             created_at: oldOrder.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -113,18 +106,17 @@ const Migration = {
             .from('orders').insert(orderData).select().single();
         if (orderError) throw Object.assign(orderError, { orderId: oldOrder.order_id });
 
-        if (oldOrder.payment_history && oldOrder.payment_history.length > 0) {
+        if (oldOrder.payment_history?.length) {
             const paymentRows = oldOrder.payment_history.map(payment => ({
-                order_id: newOrder.id,
-                date: payment.date || new Date().toISOString().split('T')[0],
-                type: payment.type,
-                months: payment.months || null,
-                amount: payment.amount,
+                order_id:    newOrder.id,
+                date:        payment.date || new Date().toISOString().split('T')[0],
+                type:        payment.type,
+                months:      payment.months || null,
+                amount:      payment.amount,
                 description: payment.description || '',
                 recorded_by: adminUserId
             }));
-            const { error: paymentError } = await SUPABASE.getClient()
-                .from('payment_history').insert(paymentRows);
+            const { error: paymentError } = await SUPABASE.getClient().from('payment_history').insert(paymentRows);
             if (paymentError) console.warn('付款记录迁移失败:', oldOrder.order_id, paymentError);
         }
 
@@ -132,26 +124,21 @@ const Migration = {
     },
 
     loadLocalStorage() {
-        const data = localStorage.getItem("jf_enterprise_db");
-        try {
-            return data ? JSON.parse(data) : null;
-        } catch (e) {
-            return null;
-        }
+        try { return JSON.parse(localStorage.getItem('jf_enterprise_db')); }
+        catch { return null; }
     },
-    
-    // 清理旧 localStorage 数据
+
     clearOldLocalStorage() {
-        const keysToCheck = ['jf_enterprise_db', 'jf_gadai_backup', 'jf_orders_backup'];
-        let clearedCount = 0;
-        for (const key of keysToCheck) {
+        const keys = ['jf_enterprise_db', 'jf_gadai_backup', 'jf_orders_backup'];
+        let cleared = 0;
+        for (const key of keys) {
             if (localStorage.getItem(key)) {
                 localStorage.removeItem(key);
-                clearedCount++;
+                cleared++;
                 console.log(`✅ 已清理旧数据: ${key}`);
             }
         }
-        return clearedCount;
+        return cleared;
     },
 
     resetProgress() {
@@ -162,8 +149,7 @@ const Migration = {
         const progressDiv = document.getElementById('migrationProgress');
         if (!progressDiv) return;
         const percent = this.progress.total > 0
-            ? ((this.progress.current / this.progress.total) * 100).toFixed(1)
-            : 0;
+            ? ((this.progress.current / this.progress.total) * 100).toFixed(1) : 0;
         const lang = Utils.lang;
         progressDiv.innerHTML = `
             <div class="migration-progress">
@@ -184,25 +170,23 @@ const Migration = {
         let msg = lang === 'id'
             ? `Migrasi selesai!\nBerhasil: ${this.progress.success}\nDilewati (sudah ada): ${this.progress.skipped}\nGagal: ${this.progress.failed}`
             : `迁移完成！\n成功: ${this.progress.success}\n已跳过（已存在）: ${this.progress.skipped}\n失败: ${this.progress.failed}`;
+
         if (this.failedOrders.length > 0) {
             msg += '\n' + (lang === 'id' ? 'ID gagal: ' : '失败ID: ') + this.failedOrders.slice(0, 5).join(', ');
             if (this.failedOrders.length > 5) msg += '...';
         }
         alert(msg);
-        
+
         if (this.progress.success > 0) {
-            // 迁移成功后清理旧 localStorage 数据
             const cleared = this.clearOldLocalStorage();
-            if (cleared > 0) {
-                console.log(`✅ 迁移完成，已清理 ${cleared} 个旧存储键`);
-            }
+            if (cleared > 0) console.log(`✅ 迁移完成，已清理 ${cleared} 个旧存储键`);
             location.reload();
         }
     },
 
     renderMigrationUI() {
         const lang = Utils.lang;
-        const html = `
+        document.getElementById('app').innerHTML = `
             <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                 <h2>📦 ${lang === 'id' ? 'Migrasi Data' : '数据迁移'}</h2>
                 <div>
@@ -233,10 +217,9 @@ const Migration = {
                 .migration-info { color: #94a3b8; margin-bottom: 8px; line-height: 1.5; }
                 .migration-warning { color: #f59e0b; margin-bottom: 15px; }
             </style>`;
-        document.getElementById("app").innerHTML = html;
     }
 };
 
 window.Migration = Migration;
 
-console.log('✅ migration.js v1.1 已加载 - 迁移完成后自动清理旧 localStorage');
+console.log('✅ migration.js v1.2 已加载 - 优化版');

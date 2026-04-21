@@ -211,10 +211,6 @@ const DashboardUsers = {
     }
 };
 
-for (var key in DashboardUsers) {
-    if (typeof DashboardUsers[key] === 'function') {
-        window.APP[key] = DashboardUsers[key];
-    }
-}
+Object.assign(window.APP, DashboardUsers);
 
 console.log('✅ app-dashboard-users.js v1.1 已加载 - 统一表格样式');

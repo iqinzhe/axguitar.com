@@ -1,4 +1,4 @@
-// store.js - v1.1（统一表格样式）
+// store.js - v1.2（优化：Object.fromEntries 简化初始化）
 
 const StoreManager = {
     stores: [],
@@ -192,10 +192,9 @@ const StoreManager = {
             orderStoreMap[order.id] = order.store_id;
         }
         
-        const storeStats = {};
-        for (const store of this.stores) {
-            storeStats[store.id] = { orders: [], expenses: [], payments: [] };
-        }
+        const storeStats = Object.fromEntries(
+            this.stores.map(s => [s.id, { orders: [], expenses: [], payments: [] }])
+        );
         
         for (const order of allOrders) {
             const storeId = order.store_id;
@@ -462,4 +461,4 @@ const StoreManager = {
 
 window.StoreManager = StoreManager;
 
-console.log('✅ store.js v1.1 已加载 - 统一表格样式');
+console.log('✅ store.js v1.2 已加载 - 优化版');
