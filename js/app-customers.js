@@ -1,4 +1,4 @@
-// app-customers.js - v2.4（使用 escapeAttr 防护）
+// app-customers.js - v1.0（使用 escapeAttr 防护）
 
 window.APP = window.APP || {};
 
