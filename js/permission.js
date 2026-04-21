@@ -1,4 +1,4 @@
-// permission.js - v2.1（优化：消除 can/canAsync 重复逻辑）
+// permission.js - v1.0
 
 const PERMISSION = {
 
@@ -112,4 +112,3 @@ const PERMISSION = {
 
 window.PERMISSION = PERMISSION;
 
-console.log('✅ permission.js v2.1 已加载 - 权限规则统一，消除重复逻辑');
