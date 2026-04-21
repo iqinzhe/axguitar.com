@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.2 打印模块（优化版）
+// app-dashboard-print.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -348,4 +348,3 @@ for (var key in DashboardPrint) {
     }
 }
 
-console.log('✅ app-dashboard-print.js v2.2 已加载 - 打印模块优化版（移除多余小字和编辑区域）');
