@@ -442,7 +442,7 @@ const DashboardCore = {
             // ==================== 添加工具栏标题 ====================
             var toolbarTitleHtml = `
                 <div style="margin: 20px 0 12px 0;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ${lang === 'id' ? 'Operasi Bisnis' : '业务操作'}</h3>
+                    <h3>📋 ${lang === 'id' ? '业务操作' : '业务操作'}</h3>
                 </div>
             `;
             
