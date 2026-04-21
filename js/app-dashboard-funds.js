@@ -1,10 +1,9 @@
-// app-dashboard-funds.js - v1.0 资金流水模块（从 core.js 拆分）
+// app-dashboard-funds.js - v1.1（统一表格样式）
 
 window.APP = window.APP || {};
 
 const DashboardFunds = {
 
-    // ==================== 资金流水弹窗 ====================
     showCapitalModal: async function() {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -14,7 +13,7 @@ const DashboardFunds = {
             if (isAdmin) {
                 const { data: allFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*, orders(order_id, customer_name), stores(name)')
+                    .select('*')
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
                 transactions = allFlows || [];
@@ -22,7 +21,7 @@ const DashboardFunds = {
                 const profile = await SUPABASE.getCurrentProfile();
                 const { data: storeFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*, orders(order_id, customer_name)')
+                    .select('*')
                     .eq('store_id', profile?.store_id)
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
@@ -52,24 +51,24 @@ const DashboardFunds = {
             
             var rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
+                rows = `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<\/td><\/tr>`;
             } else {
                 for (var t of transactions) {
                     rows += `<tr>
-                        <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
-                        <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
-                        <td>${directionMap[t.direction] || t.direction}<\/td>
-                        <td>${sourceMap[t.source_target] || t.source_target}<\/td>
-                        <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
-                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                        <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
+                        <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                        <td class="text-center">${directionMap[t.direction] || t.direction}</td>
+                        <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
+                        <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}</td>
+                        <td class="flow-desc">${Utils.escapeHtml(t.description || '-')}</td>
+                        ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
                     <\/tr>`;
                 }
             }
             
             var modalHtml = `
                 <div id="capitalModal" class="modal-overlay">
-                    <div class="modal-content" style="max-width:900px;">
+                    <div class="modal-content" style="max-width:1000px;">
                         <h3>🏦 ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h3>
                         
                         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
@@ -90,16 +89,16 @@ const DashboardFunds = {
                         </div>
                         
                         <div class="table-container" style="max-height:400px; overflow-y:auto;">
-                            <table class="data-table" style="min-width:700px;">
+                            <table class="data-table capital-table" style="min-width:700px;">
                                 <thead>
                                     <tr>
                                         <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                         <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
-                                        <th>${lang === 'id' ? 'Arah' : '方向'}</th>
-                                        <th>${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
+                                        <th class="text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
+                                        <th class="text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
                                         <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                         <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                        ${isAdmin ? '<th>' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
+                                        ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
                                     </tr>
                                 </thead>
                                 <tbody id="capitalTransactionsBody">
@@ -119,10 +118,47 @@ const DashboardFunds = {
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             window._capitalTransactionsData = transactions;
+            
+            // 添加表格样式
+            this._addFundsTableStyles();
         } catch (error) {
             console.error("showCapitalModal error:", error);
             alert(lang === 'id' ? 'Gagal memuat data transaksi' : '加载交易记录失败');
         }
+    },
+    
+    _addFundsTableStyles: function() {
+        if (document.getElementById('funds-table-styles')) return;
+        
+        var style = document.createElement('style');
+        style.id = 'funds-table-styles';
+        style.textContent = `
+            .capital-table .date-cell {
+                white-space: nowrap;
+            }
+            .capital-table .flow-desc {
+                max-width: 250px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .capital-table .income {
+                color: var(--success);
+            }
+            .capital-table .expense {
+                color: var(--danger);
+            }
+            @media (max-width: 768px) {
+                .capital-table .flow-desc {
+                    max-width: 150px;
+                }
+                .capital-table th, .capital-table td {
+                    padding: 6px 4px;
+                    font-size: 0.7rem;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     },
 
     filterCapitalTransactions: function() {
@@ -183,13 +219,13 @@ const DashboardFunds = {
         } else {
             for (var t of transactions) {
                 rows += `<tr>
-                    <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
-                    <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
-                    <td>${directionMap[t.direction] || t.direction}<\/td>
-                    <td>${sourceMap[t.source_target] || t.source_target}<\/td>
-                    <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
-                    <td>${Utils.escapeHtml(t.description || '-')}<\/td>
-                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                    <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
+                    <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                    <td class="text-center">${directionMap[t.direction] || t.direction}</td>
+                    <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
+                    <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}</td>
+                    <td class="flow-desc">${Utils.escapeHtml(t.description || '-')}</td>
+                    ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
                 <\/tr>`;
             }
         }
@@ -222,6 +258,7 @@ const DashboardFunds = {
                     th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;font-size:10px}
                     th{background:#f1f5f9;font-weight:700}
                     .text-right{text-align:right}
+                    .text-center{text-align:center}
                     .income{color:#10b981}
                     .expense{color:#ef4444}
                     .footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:8px}
@@ -244,7 +281,7 @@ const DashboardFunds = {
                 ${printContent.querySelector('.table-container')?.innerHTML || ''}
                 <div class="footer">
                     <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
-                    <div>${lang === 'id' ? 'Laporan ini dicetak secara elektronik dan tidak memerlukan tanda tangan' : '本报告为电子打印，无需签名'}</div>
+                    <div>${lang === 'id' ? 'Terima kasih' : '感谢您的信任'}</div>
                 </div>
             </body>
             </html>
@@ -285,7 +322,6 @@ const DashboardFunds = {
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
-    // ==================== 门店资金流水弹窗（替代缴费明细） ====================
     showCashFlowModal: async function() {
         var lang = Utils.lang;
         var profile = await SUPABASE.getCurrentProfile();
@@ -297,14 +333,14 @@ const DashboardFunds = {
             if (isAdmin) {
                 const { data: allFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*, orders(order_id, customer_name), stores(name)')
+                    .select('*')
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
                 transactions = allFlows || [];
             } else {
                 const { data: storeFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*, orders(order_id, customer_name)')
+                    .select('*')
                     .eq('store_id', profile?.store_id)
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
@@ -338,12 +374,12 @@ const DashboardFunds = {
             } else {
                 for (var t of transactions) {
                     rows += `<tr>
-                        <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
+                        <td class="date-cell">${Utils.formatDate(t.recorded_at)}<\/td>
                         <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
-                        <td>${directionMap[t.direction] || t.direction}<\/td>
-                        <td>${sourceMap[t.source_target] || t.source_target}<\/td>
+                        <td class="text-center">${directionMap[t.direction] || t.direction}<\/td>
+                        <td class="text-center">${sourceMap[t.source_target] || t.source_target}<\/td>
                         <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
-                        <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                        <td class="flow-desc">${Utils.escapeHtml(t.description || '-')}<\/td>
                     <\/tr>`;
                 }
             }
@@ -362,13 +398,13 @@ const DashboardFunds = {
                         </div>
                         
                         <div class="table-container" style="max-height:400px; overflow-y:auto;">
-                            <table class="data-table" style="min-width:600px;">
+                            <table class="data-table cashflow-table" style="min-width:600px;">
                                 <thead>
                                     <tr>
                                         <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                         <th>${lang === 'id' ? 'Tipe' : '类型'}</th>
-                                        <th>${lang === 'id' ? 'Arah' : '方向'}</th>
-                                        <th>${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
+                                        <th class="text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
+                                        <th class="text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
                                         <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                         <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                     </tr>
@@ -443,12 +479,12 @@ const DashboardFunds = {
         } else {
             for (var t of transactions) {
                 rows += `<tr>
-                    <td style="white-space:nowrap;">${Utils.formatDate(t.recorded_at)}<\/td>
+                    <td class="date-cell">${Utils.formatDate(t.recorded_at)}<\/td>
                     <td>${typeMap[t.flow_type] || t.flow_type}<\/td>
-                    <td>${directionMap[t.direction] || t.direction}<\/td>
-                    <td>${sourceMap[t.source_target] || t.source_target}<\/td>
+                    <td class="text-center">${directionMap[t.direction] || t.direction}<\/td>
+                    <td class="text-center">${sourceMap[t.source_target] || t.source_target}<\/td>
                     <td class="text-right ${t.direction === 'inflow' ? 'income' : 'expense'}">${Utils.formatCurrency(t.amount)}<\/td>
-                    <td>${Utils.escapeHtml(t.description || '-')}<\/td>
+                    <td class="flow-desc">${Utils.escapeHtml(t.description || '-')}<\/td>
                 <\/tr>`;
             }
         }
@@ -481,6 +517,7 @@ const DashboardFunds = {
                     th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;font-size:10px}
                     th{background:#f1f5f9;font-weight:700}
                     .text-right{text-align:right}
+                    .text-center{text-align:center}
                     .income{color:#10b981}
                     .expense{color:#ef4444}
                     .footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:8px}
@@ -502,7 +539,7 @@ const DashboardFunds = {
                 ${printContent.querySelector('.table-container')?.innerHTML || ''}
                 <div class="footer">
                     <div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
-                    <div>${lang === 'id' ? 'Laporan ini dicetak secara elektronik dan tidak memerlukan tanda tangan' : '本报告为电子打印，无需签名'}</div>
+                    <div>${lang === 'id' ? 'Terima kasih' : '感谢您的信任'}</div>
                 </div>
             </body>
             </html>
@@ -510,7 +547,6 @@ const DashboardFunds = {
         printWindow.document.close();
     },
 
-    // ==================== 转账功能（简化提示版） ====================
     showTransferModal: async function(transferType) {
         var lang = Utils.lang;
         var title = '';
@@ -612,7 +648,6 @@ const DashboardFunds = {
         }
     },
 
-    // ==================== 内部转账记录 ====================
     showInternalTransferHistory: async function() {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -632,12 +667,12 @@ const DashboardFunds = {
             } else {
                 for (var t of transfers) {
                     rows += `<tr>
-                        <td>${Utils.formatDate(t.transfer_date)}<\/td>
+                        <td class="date-cell">${Utils.formatDate(t.transfer_date)}<\/td>
                         <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
                         <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
                         <td>${Utils.escapeHtml(t.description || '-')}<\/td>
                         <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
-                        ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                        ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
                     <\/tr>`;
                 }
             }
@@ -655,7 +690,7 @@ const DashboardFunds = {
                         </div>
                         
                         <div class="table-container" style="max-height:400px; overflow-y:auto;">
-                            <table class="data-table" style="min-width:600px;">
+                            <table class="data-table transfer-table" style="min-width:600px;">
                                 <thead>
                                     <tr>
                                         <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
@@ -663,7 +698,7 @@ const DashboardFunds = {
                                         <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                         <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                         <th>${lang === 'id' ? 'Oleh' : '操作人'}</th>
-                                        ${isAdmin ? '<th>' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
+                                        ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
                                     </tr>
                                 </thead>
                                 <tbody id="internalTransferBody">
@@ -725,12 +760,12 @@ const DashboardFunds = {
         } else {
             for (var t of transfers) {
                 rows += `<tr>
-                    <td>${Utils.formatDate(t.transfer_date)}<\/td>
+                    <td class="date-cell">${Utils.formatDate(t.transfer_date)}<\/td>
                     <td>${typeMap[t.transfer_type] || t.transfer_type}<\/td>
                     <td class="text-right">${Utils.formatCurrency(t.amount)}<\/td>
                     <td>${Utils.escapeHtml(t.description || '-')}<\/td>
                     <td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}<\/td>
-                    ${isAdmin ? `<td>${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
+                    ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}<\/td>` : ''}
                 <\/tr>`;
             }
         }
@@ -768,11 +803,10 @@ const DashboardFunds = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardFunds) {
     if (typeof DashboardFunds[key] === 'function') {
         window.APP[key] = DashboardFunds[key];
     }
 }
 
-console.log('✅ app-dashboard-funds.js v1.0 已加载 - 资金流水模块');
+console.log('✅ app-dashboard-funds.js v1.1 已加载 - 统一表格样式');
