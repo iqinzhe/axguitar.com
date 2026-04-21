@@ -1,4 +1,4 @@
-// supabase.js - v4.5（移除冗余的并发冲突处理）
+// supabase.js - v4.6（修复资金流水记录问题）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -240,31 +240,49 @@ const SupabaseAPI = {
         return `${prefix}-${dateCode}-${serial}`;
     },
 
+    // ==================== 修复：recordCashFlow 确保正确记录 ====================
     async recordCashFlow(flowData) {
         const profile = await this.getCurrentProfile();
+        
+        // 确保必要字段存在
+        const storeId = flowData.store_id || profile?.store_id;
+        if (!storeId) {
+            console.error("recordCashFlow: store_id 缺失", flowData);
+            throw new Error("门店ID缺失，无法记录资金流水");
+        }
+        
+        const record = {
+            store_id: storeId,
+            flow_type: flowData.flow_type,
+            direction: flowData.direction,
+            amount: flowData.amount,
+            source_target: flowData.source_target,
+            order_id: flowData.order_id || null,
+            customer_id: flowData.customer_id || null,
+            description: flowData.description || '',
+            recorded_by: profile?.id,
+            recorded_at: new Date().toISOString(),
+            reference_id: flowData.reference_id || null,
+            is_voided: false,
+            void_reason: null,
+            voided_at: null,
+            voided_by: null
+        };
+        
+        console.log("📝 记录资金流水:", record);
+        
         const { data, error } = await supabaseClient
             .from('cash_flow_records')
-            .insert({
-                store_id: flowData.store_id || profile?.store_id,
-                flow_type: flowData.flow_type,
-                direction: flowData.direction,
-                amount: flowData.amount,
-                source_target: flowData.source_target,
-                order_id: flowData.order_id || null,
-                customer_id: flowData.customer_id || null,
-                description: flowData.description || '',
-                recorded_by: profile?.id,
-                recorded_at: new Date().toISOString(),
-                reference_id: flowData.reference_id || null,
-                is_voided: false,
-                void_reason: null,
-                voided_at: null,
-                voided_by: null
-            })
+            .insert(record)
             .select()
             .single();
         
-        if (error) throw error;
+        if (error) {
+            console.error("recordCashFlow 失败:", error);
+            throw error;
+        }
+        
+        console.log("✅ 资金流水记录成功:", data);
         return data;
     },
     
@@ -331,7 +349,7 @@ const SupabaseAPI = {
             source_target: source,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: description || `Pencairan pinjaman / 贷款发放 - ${order.order_id}`,
+            description: description || `贷款发放 - ${order.order_id}`,
             reference_id: order.order_id
         });
         
@@ -484,7 +502,7 @@ const SupabaseAPI = {
             date: new Date().toISOString().split('T')[0],
             type: 'admin_fee',
             amount: feeAmount,
-            description: `Administrasi Fee / 管理费 (${this.formatCurrency(feeAmount)})`,
+            description: `管理费 (${this.formatCurrency(feeAmount)})`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -500,7 +518,7 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `Admin Fee / 管理费 - ${order.order_id}`,
+            description: `管理费 - ${order.order_id}`,
             reference_id: order.order_id
         });
         
@@ -534,7 +552,7 @@ const SupabaseAPI = {
             type: 'service_fee',
             months: 1,
             amount: totalServiceFee,
-            description: `Service Fee (${order.service_fee_percent}%) - 一次性收取`,
+            description: `服务费 (${order.service_fee_percent}%) - 一次性收取`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -550,14 +568,14 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `Service Fee (${order.service_fee_percent}%) - ${order.order_id}`,
+            description: `服务费 (${order.service_fee_percent}%) - ${order.order_id}`,
             reference_id: order.order_id
         });
         
         return true;
     },
 
-    // 简化版：移除乐观锁重试逻辑
+    // 简化版利息记录
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -596,7 +614,7 @@ const SupabaseAPI = {
             type: 'interest',
             months: months,
             amount: totalInterest,
-            description: `Bunga ${months} bulan / 利息${months}个月`,
+            description: `利息${months}个月`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -615,7 +633,7 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: currentOrder.id,
             customer_id: currentOrder.customer_id,
-            description: `Bunga ${months} bulan / 利息 - ${currentOrder.order_id}`,
+            description: `利息 ${months}个月 - ${currentOrder.order_id}`,
             reference_id: currentOrder.order_id
         });
         
@@ -626,7 +644,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 简化版：移除乐观锁重试逻辑
+    // 简化版本金记录
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -713,7 +731,7 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: currentOrder.id,
             customer_id: currentOrder.customer_id,
-            description: isFullRepayment ? '全额还款结清' : '部分还款',
+            description: isFullRepayment ? '全额还款结清' : `本金还款 ${this.formatCurrency(paidAmount)}`,
             reference_id: currentOrder.order_id
         });
         
@@ -967,16 +985,17 @@ const SupabaseAPI = {
         return data;
     },
 
-    // 修复：移除有歧义的 orders 关联查询
+    // 修复：移除有歧义的 orders 关联查询，添加调试日志
     async getCashFlowRecords(storeId = null, startDate = null, endDate = null) {
         const profile = await this.getCurrentProfile();
         const targetStoreId = storeId || profile?.store_id;
+        
+        console.log("getCashFlowRecords 调用参数:", { storeId, targetStoreId, isAdmin: profile?.role === 'admin' });
         
         if (!targetStoreId && profile?.role !== 'admin') {
             throw new Error('Unauthorized');
         }
         
-        // 移除 .select('*, orders(order_id, customer_name)') 避免多外键歧义
         let query = supabaseClient
             .from('cash_flow_records')
             .select('*')
@@ -997,7 +1016,12 @@ const SupabaseAPI = {
         }
         
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+            console.error("getCashFlowRecords 查询失败:", error);
+            throw error;
+        }
+        
+        console.log(`getCashFlowRecords 查询成功，返回 ${data?.length || 0} 条记录`);
         return data;
     },
 
@@ -1128,6 +1152,7 @@ const SupabaseAPI = {
         
         if (error) throw error;
         
+        // 记录现金流支出
         await this.recordCashFlow({
             store_id: expenseData.store_id || profile?.store_id,
             flow_type: 'expense',
@@ -1137,6 +1162,8 @@ const SupabaseAPI = {
             description: expenseData.category + (expenseData.description ? ' - ' + expenseData.description : ''),
             reference_id: data.id
         });
+        
+        console.log(`✅ 支出已记录并生成现金流: ${expenseData.category} - ${this.formatCurrency(expenseData.amount)}`);
         
         return data;
     },
@@ -1289,7 +1316,7 @@ const SupabaseAPI = {
             direction: 'outflow',
             amount: transferData.amount,
             source_target: transferData.from_account === 'hq' ? 'bank' : transferData.from_account,
-            description: `内部转账转出: ${transferData.from_account} → ${transferData.to_account} - ${transferData.description || ''}`,
+            description: `内部转账转出: ${transferData.from_account} → ${transferData.to_account}`,
             reference_id: data.id
         });
         
@@ -1300,7 +1327,7 @@ const SupabaseAPI = {
                 direction: 'inflow',
                 amount: transferData.amount,
                 source_target: transferData.to_account,
-                description: `内部转账转入: ${transferData.from_account} → ${transferData.to_account} - ${transferData.description || ''}`,
+                description: `内部转账转入: ${transferData.from_account} → ${transferData.to_account}`,
                 reference_id: data.id
             });
         }
@@ -1379,4 +1406,4 @@ const SupabaseAPI = {
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
 
-console.log('✅ supabase.js v4.5 已加载 - 移除冗余并发冲突处理，简化利息/本金记录');
+console.log('✅ supabase.js v4.6 已加载 - 修复资金流水记录问题，添加调试日志');
