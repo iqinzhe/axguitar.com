@@ -1,4 +1,4 @@
-// app-payments.js - v1.0
+// app-payments.js - v1.1（新增固定还款功能）
 
 window.APP = window.APP || {};
 
@@ -47,7 +47,8 @@ const PaymentsModule = {
             var loanAmount = order.loan_amount || 0;
             var principalPaid = order.principal_paid || 0;
             var remainingPrincipal = loanAmount - principalPaid;
-            var currentMonthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+            var monthlyRate = order.agreed_interest_rate || 0.08;
+            var currentMonthlyInterest = remainingPrincipal * monthlyRate;
 
             var interestPayments = payments.filter(p => p.type === 'interest' && !p.is_voided);
             var principalPayments = payments.filter(p => p.type === 'principal' && !p.is_voided);
@@ -106,7 +107,6 @@ const PaymentsModule = {
                 `<option value="${i}">${i} ${lang === 'id' ? 'bulan' : '个月'} = ${Utils.formatCurrency(currentMonthlyInterest * i)}</option>`
             ).join('');
 
-            var nextInterestAmount = currentMonthlyInterest;
             var nextInterestNumber = interestPayments.length + 1;
 
             var adminFeePayment = payments.find(p => p.type === 'admin_fee' && !p.is_voided);
@@ -120,9 +120,152 @@ const PaymentsModule = {
                 ? `${Utils.formatCurrency(serviceFeeAmount)} (${methodMap[serviceFeePayment.payment_method] || '-'} / ${Utils.formatDate(serviceFeePayment.date)})`
                 : (serviceFeePaid > 0 ? `${Utils.formatCurrency(serviceFeePaid)}/${Utils.formatCurrency(serviceFeeAmount)}` : '未缴');
 
+            // ========== 固定还款板块（仅固定还款模式显示） ==========
+            var fixedRepaymentHtml = '';
+            if (order.repayment_type === 'fixed') {
+                var paidMonths = order.fixed_paid_months || 0;
+                var totalMonths = order.repayment_term;
+                var remainingMonths = totalMonths - paidMonths;
+                var monthlyFixedPayment = order.monthly_fixed_payment || 0;
+                var overdueDays = order.overdue_days || 0;
+                var liquidationStatus = order.liquidation_status || 'normal';
+                
+                var overdueWarning = '';
+                if (overdueDays > 0) {
+                    overdueWarning = `<div class="overdue-warning ${overdueDays >= 30 ? 'critical' : 'warning'}">
+                        ⚠️ ${lang === 'id' ? `Terlambat ${overdueDays} hari` : `逾期 ${overdueDays} 天`}
+                        ${overdueDays >= 30 ? (lang === 'id' ? ' - Akan memasuki proses likuidasi!' : ' - 将进入变卖程序！') : ''}
+                    </div>`;
+                }
+                
+                fixedRepaymentHtml = `
+                    <div class="card action-card fixed-repayment-card">
+                        <div class="card-header">
+                            <h3>📅 ${lang === 'id' ? 'Cicilan Tetap' : '固定还款'}</h3>
+                            <span class="repayment-badge fixed-badge">${lang === 'id' ? 'Angsuran Tetap' : '固定还款'}</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-box success-box">
+                                <div class="info-row">
+                                    <span>📊 ${lang === 'id' ? '进度' : '进度'}:</span>
+                                    <strong>${paidMonths}/${totalMonths} ${lang === 'id' ? 'bulan' : '个月'}</strong>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: ${(paidMonths/totalMonths)*100}%;"></div>
+                                    </div>
+                                </div>
+                                <div class="info-row">
+                                    <span>💰 ${lang === 'id' ? '每月应还' : '每月应还'}:</span>
+                                    <strong class="amount-highlight">${Utils.formatCurrency(monthlyFixedPayment)}</strong>
+                                </div>
+                                <div class="info-row">
+                                    <span>📅 ${lang === 'id' ? '下次到期' : '下次到期'}:</span>
+                                    <strong>${nextDueDate}</strong>
+                                </div>
+                                <div class="info-row">
+                                    <span>📈 ${lang === 'id' ? '剩余期数' : '剩余期数'}:</span>
+                                    <strong>${remainingMonths} ${lang === 'id' ? 'bulan' : '个月'}</strong>
+                                </div>
+                                ${overdueWarning}
+                            </div>
+                            
+                            <div class="payment-method-group">
+                                <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
+                                <div class="payment-method-options">
+                                    <label><input type="radio" name="fixedMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                    <label><input type="radio" name="fixedMethod" value="bank"> 🏧 ${t('bank')}</label>
+                                </div>
+                            </div>
+                            
+                            <div class="action-buttons">
+                                <button onclick="APP.payFixedInstallment('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">
+                                    ✅ ${lang === 'id' ? 'Bayar Angsuran Bulan Ini' : '支付本月还款'}
+                                </button>
+                                ${remainingMonths > 0 ? `
+                                    <button onclick="APP.earlySettleFixedOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-action early-settle">
+                                        🎯 ${lang === 'id' ? 'Pelunasan Dipercepat' : '提前结清'}
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="card-info">
+                            <small>💡 ${lang === 'id' ? '每期还款包含本金和利息，提前结清可减免剩余利息' : '每期还款包含本金和利息，提前结清可减免剩余利息'}</small>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // ========== 灵活还款板块 ==========
+            var flexibleRepaymentHtml = '';
+            if (order.repayment_type !== 'fixed') {
+                flexibleRepaymentHtml = `
+                    <div class="card action-card">
+                        <div class="card-header"><h3>💰 ${lang === 'id' ? '利息缴费' : '利息缴费'}</h3></div>
+                        <div class="card-body">
+                            <div class="info-box">
+                                <span>📌 ${lang === 'id' ? '本次是第' : '本次是第'} <strong>${nextInterestNumber}</strong> ${lang === 'id' ? '次利息支付' : '次利息支付'}</span>
+                                <span>💰 ${lang === 'id' ? '应付金额' : '应付金额'}: <strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></span>
+                                <span>📈 ${lang === 'id' ? '月利率' : '月利率'}: <strong>${(monthlyRate*100).toFixed(0)}%</strong></span>
+                            </div>
+                            <div class="action-input-group">
+                                <label class="action-label">${lang === 'id' ? '收取' : '收取'}:</label>
+                                <select id="interestMonths" class="action-select">${interestOptions}</select>
+                            </div>
+                            <div class="payment-method-group">
+                                <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
+                                <div class="payment-method-options">
+                                    <label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                    <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
+                                </div>
+                            </div>
+                            <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收款' : '确认收款'}</button>
+                        </div>
+                        <div class="card-history">
+                            <div class="history-title">📋 ${lang === 'id' ? '利息缴费历史' : '利息缴费历史'}</div>
+                            <div class="table-container">
+                                <table class="history-table">
+                                    <thead><tr><th class="text-center">${lang === 'id' ? '第几次' : '第几次'}</th><th>${lang === 'id' ? '日期' : '日期'}</th><th class="text-center">${lang === 'id' ? '月数' : '月数'}</th><th class="text-right">${lang === 'id' ? '金额' : '金额'}</th><th>${lang === 'id' ? '方式' : '方式'}</th></tr></thead>
+                                    <tbody>${interestRows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card action-card">
+                        <div class="card-header"><h3>🏦 ${lang === 'id' ? '本金还款' : '本金还款'}</h3></div>
+                        <div class="card-body">
+                            <div class="info-box warning-box">
+                                <span>📊 ${lang === 'id' ? '已还本金' : '已还本金'}: <strong>${Utils.formatCurrency(principalPaid)}</strong></span>
+                                <span>📊 ${lang === 'id' ? '尚欠本金' : '尚欠本金'}: <strong class="${remainingPrincipal > 0 ? 'text-warning' : 'text-success'}">${Utils.formatCurrency(remainingPrincipal)}</strong></span>
+                            </div>
+                            <div class="action-input-group">
+                                <label class="action-label">${lang === 'id' ? '还款金额' : '还款金额'}:</label>
+                                <input type="text" id="principalAmount" class="action-input" placeholder="0">
+                            </div>
+                            <div class="payment-method-group">
+                                <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
+                                <div class="payment-method-options">
+                                    <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label>
+                                    <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
+                                </div>
+                            </div>
+                            <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收款' : '确认收款'}</button>
+                        </div>
+                        <div class="card-history">
+                            <div class="history-title">📋 ${lang === 'id' ? '本金还款历史' : '本金还款历史'}</div>
+                            <div class="table-container">
+                                <table class="history-table">
+                                    <thead><tr><th>${lang === 'id' ? '日期' : '日期'}</th><th class="text-right">${lang === 'id' ? '还款金额' : '还款金额'}</th><th class="text-right">${lang === 'id' ? '累计已还' : '累计已还'}</th><th class="text-right">${lang === 'id' ? '剩余本金' : '剩余本金'}</th><th>${lang === 'id' ? '方式' : '方式'}</th></tr></thead>
+                                    <tbody>${principalRows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
-                    <h2>💰 ${lang === 'id' ? '缴纳利息与本金' : '缴纳利息与本金'}</h2>
+                    <h2>💰 ${lang === 'id' ? '缴纳费用' : '缴纳费用'}</h2>
                     <div class="header-actions">
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                         <button onclick="APP.viewOrder('${Utils.escapeAttr(order.order_id)}')" class="btn-detail">📄 ${lang === 'id' ? '订单详情' : '订单详情'}</button>
@@ -142,8 +285,13 @@ const PaymentsModule = {
                             <td class="label">${lang === 'id' ? '下次到期' : '下次到期'}</td>
                             <td class="value">${nextDueDate}</td>
                         </tr>
-                        <tr><td class="label">${lang === 'id' ? '已付利息' : '已付利息'}</td>
-                            <td class="value" colspan="5">${order.interest_paid_months || 0} ${lang === 'id' ? '个月' : '个月'} (${interestPayments.length} 次)</td>
+                        <tr><td class="label">${lang === 'id' ? '还款方式' : '还款方式'}</td>
+                            <td class="value" colspan="5">
+                                ${order.repayment_type === 'fixed' 
+                                    ? (lang === 'id' ? '📅 固定还款' : '📅 固定还款') 
+                                    : (lang === 'id' ? '💰 灵活还款' : '💰 灵活还款')}
+                                ${order.repayment_type === 'fixed' ? ` (${order.repayment_term} ${lang === 'id' ? 'bulan' : '个月'})` : ''}
+                            </td>
                         </tr>
                         <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"></td></tr>
                         <tr>
@@ -155,8 +303,8 @@ const PaymentsModule = {
                         <tr>
                             <td class="label">📋 ${lang === 'id' ? '管理费' : '管理费'}</td>
                             <td class="value" colspan="2">${Utils.formatCurrency(order.admin_fee)}</td>
-                            <td class="label">💰 ${lang === 'id' ? '贷款发放' : '贷款发放'}</td>
-                            <td class="value success-text" colspan="2">${Utils.formatCurrency(loanAmount)} (${order.created_at ? Utils.formatDate(order.created_at) : '-'})</td>
+                            <td class="label">📈 ${lang === 'id' ? '月利率' : '月利率'}</td>
+                            <td class="value" colspan="2">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%</td>
                         </tr>
                         <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"></td></tr>
                         <tr class="paid-row">
@@ -168,67 +316,150 @@ const PaymentsModule = {
                     </table>
                 </div>
                 
-                <div class="card action-card">
-                    <div class="card-header"><h3>💰 ${lang === 'id' ? '利息缴费' : '利息缴费'}</h3></div>
-                    <div class="card-body">
-                        <div class="info-box">
-                            <span>📌 ${lang === 'id' ? '本次是第' : '本次是第'} <strong>${nextInterestNumber}</strong> ${lang === 'id' ? '次利息支付' : '次利息支付'}</span>
-                            <span>💰 ${lang === 'id' ? '应付金额' : '应付金额'}: <strong>${Utils.formatCurrency(nextInterestAmount)}</strong></span>
-                        </div>
-                        <div class="action-input-group">
-                            <label class="action-label">${lang === 'id' ? '收取' : '收取'}:</label>
-                            <select id="interestMonths" class="action-select">${interestOptions}</select>
-                        </div>
-                        <div class="payment-method-group">
-                            <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
-                            <div class="payment-method-options">
-                                <label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label>
-                                <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
-                            </div>
-                        </div>
-                        <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收款' : '确认收款'}</button>
-                    </div>
-                    <div class="card-history">
-                        <div class="history-title">📋 ${lang === 'id' ? '利息缴费历史' : '利息缴费历史'}</div>
-                        <div class="table-container">
-                            <table class="history-table">
-                                <thead><tr><th class="text-center">${lang === 'id' ? '第几次' : '第几次'}</th><th>${lang === 'id' ? '日期' : '日期'}</th><th class="text-center">${lang === 'id' ? '月数' : '月数'}</th><th class="text-right">${lang === 'id' ? '金额' : '金额'}</th><th>${lang === 'id' ? '方式' : '方式'}</th></tr></thead>
-                                <tbody>${interestRows}</tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                ${fixedRepaymentHtml}
+                ${flexibleRepaymentHtml}
                 
-                <div class="card action-card">
-                    <div class="card-header"><h3>🏦 ${lang === 'id' ? '本金还款' : '本金还款'}</h3></div>
-                    <div class="card-body">
-                        <div class="info-box warning-box">
-                            <span>📊 ${lang === 'id' ? '已还本金' : '已还本金'}: <strong>${Utils.formatCurrency(principalPaid)}</strong></span>
-                            <span>📊 ${lang === 'id' ? '尚欠本金' : '尚欠本金'}: <strong class="${remainingPrincipal > 0 ? 'text-warning' : 'text-success'}">${Utils.formatCurrency(remainingPrincipal)}</strong></span>
-                        </div>
-                        <div class="action-input-group">
-                            <label class="action-label">${lang === 'id' ? '还款金额' : '还款金额'}:</label>
-                            <input type="text" id="principalAmount" class="action-input" placeholder="0">
-                        </div>
-                        <div class="payment-method-group">
-                            <div class="payment-method-title">${lang === 'id' ? '入账方式' : '入账方式'}:</div>
-                            <div class="payment-method-options">
-                                <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label>
-                                <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
-                            </div>
-                        </div>
-                        <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? '确认收款' : '确认收款'}</button>
-                    </div>
-                    <div class="card-history">
-                        <div class="history-title">📋 ${lang === 'id' ? '本金还款历史' : '本金还款历史'}</div>
-                        <div class="table-container">
-                            <table class="history-table">
-                                <thead><tr><th>${lang === 'id' ? '日期' : '日期'}</th><th class="text-right">${lang === 'id' ? '还款金额' : '还款金额'}</th><th class="text-right">${lang === 'id' ? '累计已还' : '累计已还'}</th><th class="text-right">${lang === 'id' ? '剩余本金' : '剩余本金'}</th><th>${lang === 'id' ? '方式' : '方式'}</th></tr></thead>
-                                <tbody>${principalRows}</tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>`;
+                <style>
+                    .fixed-repayment-card {
+                        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                        border-left: 4px solid #10b981;
+                    }
+                    .repayment-badge {
+                        display: inline-block;
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: 600;
+                    }
+                    .fixed-badge {
+                        background: #10b981;
+                        color: white;
+                    }
+                    .info-box .info-row {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 10px;
+                        padding: 6px 0;
+                        border-bottom: 1px solid #e2e8f0;
+                    }
+                    .info-box .info-row:last-child {
+                        border-bottom: none;
+                    }
+                    .progress-bar {
+                        flex: 1;
+                        height: 8px;
+                        background: #e2e8f0;
+                        border-radius: 4px;
+                        overflow: hidden;
+                        margin-left: 10px;
+                    }
+                    .progress-fill {
+                        height: 100%;
+                        background: #10b981;
+                        transition: width 0.3s;
+                    }
+                    .amount-highlight {
+                        font-size: 18px;
+                        color: #10b981;
+                    }
+                    .overdue-warning {
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        margin-top: 10px;
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+                    .overdue-warning.warning {
+                        background: #fef3c7;
+                        color: #d97706;
+                    }
+                    .overdue-warning.critical {
+                        background: #fee2e2;
+                        color: #dc2626;
+                    }
+                    .action-buttons {
+                        display: flex;
+                        gap: 12px;
+                        margin-top: 15px;
+                        flex-wrap: wrap;
+                    }
+                    .btn-action.early-settle {
+                        background: #8b5cf6 !important;
+                        color: white !important;
+                        border-color: #7c3aed !important;
+                    }
+                    .btn-action.early-settle:hover {
+                        background: #7c3aed !important;
+                    }
+                    .card-info {
+                        margin-top: 12px;
+                        padding: 10px;
+                        background: #f8fafc;
+                        border-radius: 8px;
+                        font-size: 11px;
+                        color: #64748b;
+                    }
+                    .summary-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    .summary-table td {
+                        padding: 6px 8px;
+                    }
+                    .summary-table .label {
+                        font-weight: 600;
+                        color: #475569;
+                        width: 90px;
+                    }
+                    .summary-table .value {
+                        color: #1e293b;
+                    }
+                    .summary-table .order-id {
+                        font-family: monospace;
+                        font-weight: 600;
+                    }
+                    .summary-table .warning {
+                        color: #d97706;
+                    }
+                    .summary-table .success-text {
+                        color: #10b981;
+                    }
+                    .history-table {
+                        width: 100%;
+                        font-size: 12px;
+                        border-collapse: collapse;
+                    }
+                    .history-table th, .history-table td {
+                        padding: 6px 8px;
+                        border-bottom: 1px solid #e2e8f0;
+                    }
+                    .history-table th {
+                        background: #f8fafc;
+                        font-weight: 600;
+                    }
+                    .text-center {
+                        text-align: center;
+                    }
+                    .text-right {
+                        text-align: right;
+                    }
+                    @media (max-width: 768px) {
+                        .action-buttons {
+                            flex-direction: column;
+                        }
+                        .btn-action {
+                            width: 100%;
+                        }
+                        .summary-table .label {
+                            width: 70px;
+                            font-size: 11px;
+                        }
+                        .history-table {
+                            font-size: 10px;
+                        }
+                    }
+                </style>`;
 
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
@@ -240,6 +471,7 @@ const PaymentsModule = {
         }
     },
 
+    // ==================== 灵活还款方法 ====================
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
@@ -251,7 +483,7 @@ const PaymentsModule = {
         var loanAmount = order.loan_amount || 0;
         var principalPaid = order.principal_paid || 0;
         var remainingPrincipal = loanAmount - principalPaid;
-        var monthlyRate = Utils.MONTHLY_INTEREST_RATE || 0.10;
+        var monthlyRate = order.agreed_interest_rate || 0.08;
         var currentMonthlyInterest = remainingPrincipal * monthlyRate;
         var totalInterest = currentMonthlyInterest * months;
         var nextInterestNumber = (order.interest_paid_months || 0) + 1;
@@ -365,6 +597,34 @@ const PaymentsModule = {
         }
     },
 
+    // ==================== 固定还款方法 ====================
+    payFixedInstallment: async function(orderId) {
+        var lang = Utils.lang;
+        var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
+        
+        try {
+            await SUPABASE.recordFixedPayment(orderId, method);
+            await this.showPayment(orderId);
+        } catch (error) {
+            console.error('payFixedInstallment error:', error);
+            alert(error.message);
+        }
+    },
+
+    earlySettleFixedOrder: async function(orderId) {
+        var lang = Utils.lang;
+        var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
+        
+        try {
+            await SUPABASE.earlySettleFixedOrder(orderId, method);
+            await this.showPayment(orderId);
+        } catch (error) {
+            console.error('earlySettleFixedOrder error:', error);
+            alert(error.message);
+        }
+    },
+
+    // ==================== 结清凭证打印 ====================
     printSettlementReceipt: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -497,4 +757,3 @@ window.APP.printSettlementReceipt = PaymentsModule.printSettlementReceipt.bind(P
 if (!Utils.escapeAttr) {
     Utils.escapeAttr = escapeAttr;
 }
-
