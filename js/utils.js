@@ -204,7 +204,7 @@ const Utils = {
             blacklist: "黑名单",
             
             // 订单相关
-            total_orders: "总订单数",
+            total_orders: "订单总数",
             active: "进行中", 
             completed: "已结清", 
             liquidated: "已变卖",
