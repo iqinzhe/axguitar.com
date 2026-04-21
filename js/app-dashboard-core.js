@@ -442,7 +442,7 @@ const DashboardCore = {
             // ==================== 添加工具栏标题 ====================
             var toolbarTitleHtml = `
                 <div style="margin: 20px 0 12px 0;">
-                    <h3>📋 ${lang === 'id' ? '经营管理中心' : '经营管理中心'}</h3>
+                    <h3>📋 ${lang === 'id' ? '经营管理中心' : '经营管理'}</h3>
                 </div>
             `;
             
