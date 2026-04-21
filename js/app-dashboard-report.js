@@ -1,4 +1,4 @@
-// app-dashboard-report.js - v2.2 表格版（业务报表）
+// app-dashboard-report.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -481,4 +481,3 @@ for (var key in DashboardReport) {
     }
 }
 
-console.log('✅ app-dashboard-report.js v2.2 已加载 - 业务报表表格版');
