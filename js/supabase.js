@@ -1,4 +1,4 @@
-// supabase.js - v1.0
+// supabase.js - v1.1（新增固定还款功能）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -397,11 +397,16 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
+    // ==================== 创建订单（支持固定还款） ====================
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
+        
         const adminFee = orderData.admin_fee || 30000;
-        const serviceFeePercent = orderData.service_fee_percent || 0;
+        const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 2;
+        const agreedInterestRate = (orderData.agreed_interest_rate || 8) / 100;
+        const repaymentType = orderData.repayment_type || 'flexible';
+        const repaymentTerm = orderData.repayment_term || null;
         
         const targetStoreId = orderData.store_id || profile.store_id;
         
@@ -420,8 +425,18 @@ const SupabaseAPI = {
             try {
                 const orderId = await this._generateOrderId(profile.role, targetStoreId);
                 
-                const monthlyInterest = orderData.loan_amount * (Utils.MONTHLY_INTEREST_RATE || 0.10);
                 const serviceFeeAmount = orderData.loan_amount * (serviceFeePercent / 100);
+                
+                let monthlyFixedPayment = null;
+                if (repaymentType === 'fixed' && repaymentTerm && repaymentTerm > 0) {
+                    monthlyFixedPayment = Utils.calculateFixedMonthlyPayment(
+                        orderData.loan_amount, 
+                        agreedInterestRate, 
+                        repaymentTerm
+                    );
+                }
+                
+                const monthlyInterest = orderData.loan_amount * agreedInterestRate;
                 
                 const newOrder = {
                     order_id: orderId,
@@ -449,7 +464,15 @@ const SupabaseAPI = {
                     customer_id: orderData.customer_id || null,
                     is_locked: true,
                     locked_at: new Date().toISOString(),
-                    locked_by: profile.id
+                    locked_by: profile.id,
+                    repayment_type: repaymentType,
+                    repayment_term: repaymentTerm,
+                    monthly_fixed_payment: monthlyFixedPayment,
+                    agreed_interest_rate: agreedInterestRate,
+                    agreed_service_fee_rate: serviceFeePercent / 100,
+                    fixed_paid_months: 0,
+                    overdue_days: 0,
+                    liquidation_status: 'normal'
                 };
 
                 const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
@@ -463,7 +486,7 @@ const SupabaseAPI = {
                     throw error;
                 }
                 
-                console.log(`✅ 订单创建成功: ${orderId}`);
+                console.log(`✅ 订单创建成功: ${orderId} (还款方式: ${repaymentType})`);
                 return data;
                 
             } catch (err) {
@@ -569,6 +592,7 @@ const SupabaseAPI = {
         return true;
     },
 
+    // ==================== 灵活还款 - 利息记录（使用协商利率） ====================
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -577,14 +601,24 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
         }
         
+        const monthlyRate = currentOrder.agreed_interest_rate || 0.08;
+        
         const loanAmount = currentOrder.loan_amount || 0;
         const principalPaid = currentOrder.principal_paid || 0;
         const remainingPrincipal = loanAmount - principalPaid;
-        const monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+        const monthlyInterest = remainingPrincipal * monthlyRate;
         const totalInterest = monthlyInterest * months;
         
         const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
         const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + totalInterest;
+        
+        const maxMonths = 10;
+        
+        if (newInterestPaidMonths > maxMonths) {
+            throw new Error(Utils.lang === 'id' 
+                ? `❌ 已达到最大延期期限 (${maxMonths}个月)，请尽快结清本金` 
+                : `❌ 已达到最大延期期限 (${maxMonths}个月)，请尽快结清本金`);
+        }
         
         const { error: updateError } = await supabaseClient
             .from('orders')
@@ -605,7 +639,7 @@ const SupabaseAPI = {
             type: 'interest',
             months: months,
             amount: totalInterest,
-            description: `利息${months}个月`,
+            description: `利息${months}个月 (利率${(monthlyRate*100).toFixed(0)}%)`,
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -624,18 +658,23 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: currentOrder.id,
             customer_id: currentOrder.customer_id,
-            description: `利息 ${months}个月`,
+            description: `利息 ${months}个月 (利率${(monthlyRate*100).toFixed(0)}%)`,
             reference_id: currentOrder.order_id
         });
         
+        const remainingMonths = maxMonths - newInterestPaidMonths;
+        const extensionMsg = remainingMonths > 0 
+            ? (Utils.lang === 'id' ? `\n剩余可延期: ${remainingMonths}个月` : `\n剩余可延期: ${remainingMonths}个月`)
+            : (Utils.lang === 'id' ? `\n⚠️ 已达最大期限，请尽快结清本金` : `\n⚠️ 已达最大期限，请尽快结清本金`);
+        
         alert(Utils.lang === 'id' 
-            ? `✅ 利息 ${this.formatCurrency(totalInterest)} 已记录`
-            : `✅ 利息 ${this.formatCurrency(totalInterest)} 已记录`);
+            ? `✅ 利息 ${this.formatCurrency(totalInterest)} 已记录${extensionMsg}`
+            : `✅ 利息 ${this.formatCurrency(totalInterest)} 已记录${extensionMsg}`);
         
         return true;
     },
 
-    // 简化版本金记录 - 直接使用输入金额，超过则自动调整为剩余本金
+    // ==================== 灵活还款 - 本金记录 ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -652,7 +691,6 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? '❌ 本金已结清' : '❌ 本金已结清');
         }
         
-        // 直接使用输入的金额，超过则自动调整为剩余本金
         let paidAmount = Math.min(amount, remainingPrincipal);
         
         if (paidAmount <= 0) {
@@ -661,6 +699,7 @@ const SupabaseAPI = {
         
         const newPrincipalPaid = principalPaid + paidAmount;
         const newPrincipalRemaining = loanAmount - newPrincipalPaid;
+        const monthlyRate = currentOrder.agreed_interest_rate || 0.08;
         
         let updates = { 
             principal_paid: newPrincipalPaid, 
@@ -674,7 +713,7 @@ const SupabaseAPI = {
             updates.monthly_interest = 0;
             updates.completed_at = new Date().toISOString();
         } else {
-            updates.monthly_interest = newPrincipalRemaining * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+            updates.monthly_interest = newPrincipalRemaining * monthlyRate;
         }
         
         const { error: updateError } = await supabaseClient
@@ -718,6 +757,236 @@ const SupabaseAPI = {
             alert(Utils.lang === 'id' 
                 ? `✅ 还款 ${this.formatCurrency(paidAmount)} 已记录`
                 : `✅ 还款 ${this.formatCurrency(paidAmount)} 已记录`);
+        }
+        
+        return true;
+    },
+
+    // ==================== 固定还款 - 按期还款 ====================
+    async recordFixedPayment(orderId, paymentMethod = 'cash') {
+        const profile = await this.getCurrentProfile();
+        const order = await this.getOrder(orderId);
+        
+        if (order.status === 'completed') {
+            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+        }
+        
+        if (order.repayment_type !== 'fixed') {
+            throw new Error(Utils.lang === 'id' ? '❌ 此订单不是固定还款模式' : '❌ 此订单不是固定还款模式');
+        }
+        
+        const fixedPayment = order.monthly_fixed_payment;
+        const paidMonths = order.fixed_paid_months || 0;
+        const remainingMonths = order.repayment_term - paidMonths;
+        
+        if (remainingMonths <= 0) {
+            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+        }
+        
+        const monthlyRate = order.agreed_interest_rate || 0.08;
+        const remainingPrincipal = order.principal_remaining;
+        const interestAmount = remainingPrincipal * monthlyRate;
+        const principalAmount = fixedPayment - interestAmount;
+        
+        if (fixedPayment <= 0) {
+            throw new Error(Utils.lang === 'id' ? '❌ 还款金额无效' : '❌ 还款金额无效');
+        }
+        
+        const newPrincipalPaid = (order.principal_paid || 0) + principalAmount;
+        const newPrincipalRemaining = order.loan_amount - newPrincipalPaid;
+        const newFixedPaidMonths = paidMonths + 1;
+        const isCompleted = newFixedPaidMonths >= order.repayment_term || newPrincipalRemaining <= 0;
+        const newMonthlyInterest = newPrincipalRemaining * monthlyRate;
+        
+        const updates = {
+            principal_paid: newPrincipalPaid,
+            principal_remaining: newPrincipalRemaining,
+            fixed_paid_months: newFixedPaidMonths,
+            monthly_interest: newMonthlyInterest,
+            interest_paid_months: (order.interest_paid_months || 0) + 1,
+            interest_paid_total: (order.interest_paid_total || 0) + interestAmount,
+            next_interest_due_date: this.calculateNextDueDate(order.created_at, newFixedPaidMonths),
+            updated_at: new Date().toISOString()
+        };
+        
+        if (isCompleted) {
+            updates.status = 'completed';
+            updates.completed_at = new Date().toISOString();
+        }
+        
+        const { error: updateError } = await supabaseClient
+            .from('orders')
+            .update(updates)
+            .eq('order_id', orderId);
+        
+        if (updateError) throw updateError;
+        
+        if (interestAmount > 0) {
+            const interestPayment = {
+                order_id: order.id,
+                date: new Date().toISOString().split('T')[0],
+                type: 'interest',
+                months: 1,
+                amount: interestAmount,
+                description: `固定还款-利息 第${newFixedPaidMonths}期`,
+                recorded_by: profile.id,
+                payment_method: paymentMethod
+            };
+            await supabaseClient.from('payment_history').insert(interestPayment);
+            
+            await this.recordCashFlow({
+                store_id: order.store_id,
+                flow_type: 'interest',
+                direction: 'inflow',
+                amount: interestAmount,
+                source_target: paymentMethod,
+                order_id: order.id,
+                customer_id: order.customer_id,
+                description: `固定还款利息 - ${order.order_id} 第${newFixedPaidMonths}期`,
+                reference_id: order.order_id
+            });
+        }
+        
+        if (principalAmount > 0) {
+            const principalPayment = {
+                order_id: order.id,
+                date: new Date().toISOString().split('T')[0],
+                type: 'principal',
+                amount: principalAmount,
+                description: `固定还款-本金 第${newFixedPaidMonths}期`,
+                recorded_by: profile.id,
+                payment_method: paymentMethod
+            };
+            await supabaseClient.from('payment_history').insert(principalPayment);
+            
+            await this.recordCashFlow({
+                store_id: order.store_id,
+                flow_type: 'principal',
+                direction: 'inflow',
+                amount: principalAmount,
+                source_target: paymentMethod,
+                order_id: order.id,
+                customer_id: order.customer_id,
+                description: `固定还款本金 - ${order.order_id} 第${newFixedPaidMonths}期`,
+                reference_id: order.order_id
+            });
+        }
+        
+        const msg = isCompleted 
+            ? (Utils.lang === 'id' ? `✅ 订单已结清！` : `✅ 订单已结清！`)
+            : (Utils.lang === 'id' 
+                ? `✅ 第${newFixedPaidMonths}期还款成功！\n利息: ${this.formatCurrency(interestAmount)}\n本金: ${this.formatCurrency(principalAmount)}\n剩余期数: ${order.repayment_term - newFixedPaidMonths}`
+                : `✅ 第${newFixedPaidMonths}期还款成功！\n利息: ${this.formatCurrency(interestAmount)}\n本金: ${this.formatCurrency(principalAmount)}\n剩余期数: ${order.repayment_term - newFixedPaidMonths}`);
+        
+        alert(msg);
+        return true;
+    },
+
+    // ==================== 固定还款 - 提前结清（减免剩余利息） ====================
+    async earlySettleFixedOrder(orderId, paymentMethod = 'cash') {
+        const profile = await this.getCurrentProfile();
+        const order = await this.getOrder(orderId);
+        
+        if (order.status === 'completed') {
+            throw new Error(Utils.lang === 'id' ? '❌ 订单已结清' : '❌ 订单已结清');
+        }
+        
+        if (order.repayment_type !== 'fixed') {
+            throw new Error(Utils.lang === 'id' ? '❌ 此订单不是固定还款模式' : '❌ 此订单不是固定还款模式');
+        }
+        
+        const paidMonths = order.fixed_paid_months || 0;
+        const remainingPrincipal = order.principal_remaining;
+        const monthlyRate = order.agreed_interest_rate || 0.08;
+        const remainingMonths = order.repayment_term - paidMonths;
+        
+        const settlementAmount = remainingPrincipal;
+        
+        const confirmMsg = Utils.lang === 'id'
+            ? `⚠️ 提前结清确认\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n已还期数: ${paidMonths}/${order.repayment_term}\n剩余本金: ${this.formatCurrency(remainingPrincipal)}\n减免利息: ${this.formatCurrency(remainingPrincipal * monthlyRate * remainingMonths)}\n结清金额: ${this.formatCurrency(settlementAmount)}\n\n确认结清？`
+            : `⚠️ 提前结清确认\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n已还期数: ${paidMonths}/${order.repayment_term}\n剩余本金: ${this.formatCurrency(remainingPrincipal)}\n减免利息: ${this.formatCurrency(remainingPrincipal * monthlyRate * remainingMonths)}\n结清金额: ${this.formatCurrency(settlementAmount)}\n\n确认结清？`;
+        
+        if (!confirm(confirmMsg)) return false;
+        
+        const finalPayment = {
+            order_id: order.id,
+            date: new Date().toISOString().split('T')[0],
+            type: 'principal',
+            amount: settlementAmount,
+            description: `提前结清 - 减免剩余利息`,
+            recorded_by: profile.id,
+            payment_method: paymentMethod
+        };
+        await supabaseClient.from('payment_history').insert(finalPayment);
+        
+        await this.recordCashFlow({
+            store_id: order.store_id,
+            flow_type: 'principal',
+            direction: 'inflow',
+            amount: settlementAmount,
+            source_target: paymentMethod,
+            order_id: order.id,
+            customer_id: order.customer_id,
+            description: `提前结清 - ${order.order_id}`,
+            reference_id: order.order_id
+        });
+        
+        const { error } = await supabaseClient
+            .from('orders')
+            .update({
+                status: 'completed',
+                principal_paid: order.loan_amount,
+                principal_remaining: 0,
+                completed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('order_id', orderId);
+        
+        if (error) throw error;
+        
+        alert(Utils.lang === 'id' ? `✅ 提前结清成功！\n结清金额: ${this.formatCurrency(settlementAmount)}` : `✅ 提前结清成功！\n结清金额: ${this.formatCurrency(settlementAmount)}`);
+        return true;
+    },
+
+    // ==================== 更新逾期天数 ====================
+    async updateOverdueDays() {
+        const { data: activeOrders, error } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('status', 'active');
+        
+        if (error) throw error;
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        for (const order of activeOrders) {
+            const dueDate = order.next_interest_due_date;
+            if (!dueDate) continue;
+            
+            const due = new Date(dueDate);
+            due.setHours(0, 0, 0, 0);
+            
+            let overdueDays = 0;
+            if (today > due) {
+                overdueDays = Math.floor((today - due) / (1000 * 60 * 60 * 24));
+            }
+            
+            let liquidationStatus = order.liquidation_status || 'normal';
+            if (overdueDays >= 30) {
+                liquidationStatus = 'liquidated';
+            } else if (overdueDays >= 15) {
+                liquidationStatus = 'warning';
+            } else {
+                liquidationStatus = 'normal';
+            }
+            
+            if (overdueDays !== order.overdue_days || liquidationStatus !== order.liquidation_status) {
+                await supabaseClient
+                    .from('orders')
+                    .update({ overdue_days: overdueDays, liquidation_status: liquidationStatus })
+                    .eq('id', order.id);
+            }
         }
         
         return true;
@@ -812,7 +1081,7 @@ const SupabaseAPI = {
             total_service_fees: orders.reduce((s, o) => s + (o.service_fee_paid || 0), 0),
             total_interest: orders.reduce((s, o) => s + (o.interest_paid_total || 0), 0),
             total_principal: orders.reduce((s, o) => s + (o.principal_paid || 0), 0),
-            expected_monthly_interest: activeOrders.reduce((s, o) => s + (((o.loan_amount || 0) - (o.principal_paid || 0)) * (Utils.MONTHLY_INTEREST_RATE || 0.10)), 0)
+            expected_monthly_interest: activeOrders.reduce((s, o) => s + (((o.loan_amount || 0) - (o.principal_paid || 0)) * (o.agreed_interest_rate || 0.08)), 0)
         };
     },
 
@@ -1351,4 +1620,3 @@ const SupabaseAPI = {
 
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
-
