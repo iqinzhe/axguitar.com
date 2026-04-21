@@ -1,4 +1,4 @@
-// app-customers.js - v1.0（使用 escapeAttr 防护）
+// app-customers.js - v1.1（新增固定还款功能）
 
 window.APP = window.APP || {};
 
@@ -34,7 +34,6 @@ const CustomersModule = {
                     var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     
-                    // 使用 escapeAttr 保护 onclick 中的 ID
                     var escapedId = Utils.escapeAttr(c.id);
                     
                     rows += `<tr>
@@ -509,6 +508,7 @@ const CustomersModule = {
         }
     },
 
+    // ==================== 创建订单（支持固定还款） ====================
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -540,7 +540,72 @@ const CustomersModule = {
             const profile = await SUPABASE.getCurrentProfile();
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             const userStoreCode = profile?.stores?.code || '-';
-
+            
+            // 还款方式选项
+            const repaymentTypeOptions = `
+                <div class="repayment-type-group">
+                    <label class="repayment-type-label">${lang === 'id' ? '📋 Pilih Jenis Cicilan' : '📋 选择还款方式'}:</label>
+                    <div class="repayment-type-options">
+                        <label class="repayment-option">
+                            <input type="radio" name="repaymentType" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)">
+                            <span class="option-title">💰 ${lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款'}</span>
+                            <span class="option-desc">${lang === 'id' ? 'Bunga 8%/bulan, bayar bunga dulu, pokok bisa kapan saja' : '利息8%/月，先付利息，本金随时可还'}</span>
+                        </label>
+                        <label class="repayment-option">
+                            <input type="radio" name="repaymentType" value="fixed" onchange="APP.toggleRepaymentForm(this.value)">
+                            <span class="option-title">📅 ${lang === 'id' ? 'Cicilan Tetap' : '固定还款'}</span>
+                            <span class="option-desc">${lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok), tenor 3-10 bulan' : '每月固定还款（本金+利息），期限3-10个月'}</span>
+                        </label>
+                    </div>
+                </div>
+            `;
+            
+            // 固定还款表单（初始隐藏）
+            const fixedRepaymentForm = `
+                <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
+                    <div class="form-group">
+                        <label>${lang === 'id' ? '📅 Jangka Waktu (Bulan)' : '📅 还款期限（月）'}</label>
+                        <select id="repaymentTerm" class="repayment-term-select" onchange="APP.calculateFixedPayment()">
+                            <option value="3">3 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                            <option value="4">4 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                            <option value="5" selected>5 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                            <option value="6">6 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                            <option value="7">7 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                            <option value="8">8 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                            <option value="9">9 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                            <option value="10">10 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? '💰 Angsuran per Bulan' : '💰 每月还款额'}</label>
+                        <div id="monthlyPaymentDisplay" class="monthly-payment-display">-</div>
+                        <small>${lang === 'id' ? 'Jumlah tetap yang harus dibayar setiap bulan' : '每月需支付的固定金额'}</small>
+                    </div>
+                </div>
+            `;
+            
+            // 协商利率和服务费表单
+            const negotiationForm = `
+                <div class="negotiation-form">
+                    <div class="form-group">
+                        <label>${lang === 'id' ? '📈 Suku Bunga (per bulan)' : '📈 月利率'}</label>
+                        <div class="rate-input-group">
+                            <input type="number" id="agreedInterestRate" value="8" step="0.5" min="3" max="10" style="width:100px;" onchange="APP.calculateFixedPayment()">
+                            <span>%</span>
+                            <small style="margin-left:10px;">${lang === 'id' ? 'Default 8%, bisa dinegosiasi 3-10%' : '默认8%，可协商3-10%'}</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>${lang === 'id' ? '✨ Biaya Layanan (Service Fee)' : '✨ 服务费'}</label>
+                        <div class="rate-input-group">
+                            <input type="number" id="agreedServiceFee" value="2" step="0.5" min="0" max="5" style="width:100px;">
+                            <span>%</span>
+                            <small style="margin-left:10px;">${lang === 'id' ? 'Default 2%, bisa dinegosiasi 0-5%' : '默认2%，可协商0-5%'}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${t('create_order')}</h2>
@@ -578,61 +643,18 @@ const CustomersModule = {
                         
                         <div class="form-group">
                             <label>${t('loan_amount')} *</label>
-                            <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input" oninput="APP.updateServiceFeeDisplay()">
+                            <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input" oninput="APP.calculateFixedPayment()">
                         </div>
+                        
+                        ${repaymentTypeOptions}
+                        ${fixedRepaymentForm}
+                        ${negotiationForm}
+                        
                         <div class="form-group">
                             <label>💰 ${lang === 'id' ? 'Sumber Dana Pinjaman' : '贷款资金来源'}</label>
                             <div class="payment-method-options">
                                 <label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label>
                                 <label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label>
-                            </div>
-                            <small style="color:#64748b;">${lang === 'id' ? 'Dana pinjaman berasal dari' : '贷款资金从哪里发放'}</small>
-                        </div>
-                        
-                        <div class="form-group fee-section">
-                            <label>💰 ${lang === 'id' ? 'Service Fee' : '服务费'}</label>
-                            <div class="fee-options">
-                                <select id="serviceFeePercent" class="fee-select" onchange="APP.updateServiceFeeDisplay()">
-                                    <option value="0">0% ${lang === 'id' ? '(Tidak Ada)' : '(无)'}</option>
-                                    <option value="1">1%</option>
-                                    <option value="2">2%</option>
-                                    <option value="3">3%</option>
-                                </select>
-                                <div id="serviceFeeDisplay" class="fee-display" style="display:none;"></div>
-                                <input type="hidden" id="serviceFeeAmount" value="0">
-                                <small style="color:#64748b; display:block; margin-top:6px;">${lang === 'id' ? 'Dihitung dari jumlah pinjaman, dibayar sekali' : '按贷款金额计算，一次性支付'}</small>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>📋 ${lang === 'id' ? 'Metode Pemasukan Service Fee' : '服务费入账方式'}</label>
-                            <div class="payment-method-options">
-                                <label><input type="radio" name="serviceFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
-                                <label><input type="radio" name="serviceFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group fee-section">
-                            <label>📋 ${lang === 'id' ? 'Admin Fee' : '管理费'}</label>
-                            <div class="fee-options">
-                                <select id="adminFeeSelect" class="fee-select" onchange="APP.updateAdminFeeSelect()">
-                                    <option value="30000">Rp 30.000</option>
-                                    <option value="40000">Rp 40.000</option>
-                                    <option value="50000">Rp 50.000</option>
-                                    <option value="manual">✏️ ${lang === 'id' ? 'Input Manual' : '手动输入'}</option>
-                                </select>
-                                <div id="adminFeeManualContainer" style="display:none; margin-top:8px;">
-                                    <input type="text" id="adminFeeManual" placeholder="${Utils.formatCurrency(0)}" class="amount-input" style="width:100%;" oninput="APP.updateAdminFeeManual()">
-                                </div>
-                                <div id="adminFeeDisplay" class="fee-display">📋 ${Utils.formatCurrency(30000)} ${lang === 'id' ? '(dibayar sekali)' : '(一次性支付)'}</div>
-                                <input type="hidden" id="adminFeeAmount" value="30000">
-                                <small style="color:#64748b; display:block; margin-top:6px;">${lang === 'id' ? 'Biaya administrasi, dibayar sekali' : '管理费，一次性支付'}</small>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>📋 ${lang === 'id' ? 'Metode Pemasukan Admin Fee' : '管理费入账方式'}</label>
-                            <div class="payment-method-options">
-                                <label><input type="radio" name="adminFeeMethod" value="cash" checked> 🏦 ${t('cash')}</label>
-                                <label><input type="radio" name="adminFeeMethod" value="bank"> 🏧 ${t('bank')}</label>
                             </div>
                         </div>
                         
@@ -646,15 +668,104 @@ const CustomersModule = {
                             <button onclick="APP.goBack()">↩️ ${t('cancel')}</button>
                         </div>
                     </div>
-                </div>`;
+                </div>
+                
+                <style>
+                    .repayment-type-group {
+                        grid-column: span 2;
+                        margin: 12px 0;
+                        padding: 12px;
+                        background: var(--gray-50);
+                        border-radius: 12px;
+                    }
+                    .repayment-type-label {
+                        font-weight: 600;
+                        margin-bottom: 10px;
+                        display: block;
+                        color: var(--gray-700);
+                    }
+                    .repayment-type-options {
+                        display: flex;
+                        gap: 20px;
+                        flex-wrap: wrap;
+                    }
+                    .repayment-option {
+                        flex: 1;
+                        min-width: 200px;
+                        padding: 12px;
+                        border: 2px solid var(--gray-300);
+                        border-radius: 10px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        background: white;
+                    }
+                    .repayment-option:hover {
+                        border-color: var(--primary);
+                        background: var(--primary-light);
+                    }
+                    .repayment-option input {
+                        margin-right: 8px;
+                    }
+                    .repayment-option .option-title {
+                        font-weight: 700;
+                        display: inline-block;
+                        margin-bottom: 4px;
+                    }
+                    .repayment-option .option-desc {
+                        display: block;
+                        font-size: 11px;
+                        color: var(--gray-500);
+                        margin-top: 4px;
+                    }
+                    .fixed-repayment-form {
+                        grid-column: span 2;
+                        padding: 12px;
+                        background: #f0fdf4;
+                        border-radius: 10px;
+                        margin: 8px 0;
+                    }
+                    .monthly-payment-display {
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: var(--success);
+                        background: white;
+                        padding: 8px 12px;
+                        border-radius: 8px;
+                        display: inline-block;
+                    }
+                    .negotiation-form {
+                        grid-column: span 2;
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 12px;
+                        padding: 12px;
+                        background: #fef3c7;
+                        border-radius: 10px;
+                        margin: 8px 0;
+                    }
+                    .rate-input-group {
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        flex-wrap: wrap;
+                    }
+                    .rate-input-group input {
+                        text-align: center;
+                    }
+                    @media (max-width: 768px) {
+                        .repayment-type-options {
+                            flex-direction: column;
+                        }
+                        .negotiation-form {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+                </style>`;
             
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
             
-            var manualInput = document.getElementById("adminFeeManual");
-            if (manualInput && Utils.bindAmountFormat) Utils.bindAmountFormat(manualInput);
-            
-            this.updateServiceFeeDisplay();
+            this.calculateFixedPayment();
             
         } catch (error) {
             console.error("createOrderForCustomer error:", error);
@@ -662,23 +773,62 @@ const CustomersModule = {
         }
     },
 
+    // ==================== 固定还款辅助函数 ====================
+    toggleRepaymentForm: function(value) {
+        var fixedForm = document.getElementById('fixedRepaymentForm');
+        if (value === 'fixed') {
+            if (fixedForm) fixedForm.style.display = 'block';
+            this.calculateFixedPayment();
+        } else {
+            if (fixedForm) fixedForm.style.display = 'none';
+        }
+    },
+
+    calculateFixedPayment: function() {
+        var amountStr = document.getElementById('amount')?.value || '0';
+        var amount = Utils.parseNumberFromCommas(amountStr) || 0;
+        var termSelect = document.getElementById('repaymentTerm');
+        var months = termSelect ? parseInt(termSelect.value) : 5;
+        var rateInput = document.getElementById('agreedInterestRate');
+        var monthlyRate = rateInput ? (parseFloat(rateInput.value) || 8) / 100 : 0.08;
+        
+        if (amount > 0 && months > 0) {
+            var monthlyPayment = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months);
+            var displayEl = document.getElementById('monthlyPaymentDisplay');
+            if (displayEl) {
+                displayEl.innerHTML = Utils.formatCurrency(monthlyPayment);
+                displayEl.style.color = '#10b981';
+            }
+        } else {
+            var displayEl = document.getElementById('monthlyPaymentDisplay');
+            if (displayEl) {
+                displayEl.innerHTML = amount === 0 ? (Utils.lang === 'id' ? 'Masukkan jumlah pinjaman' : '请输入贷款金额') : '-';
+                displayEl.style.color = '#64748b';
+            }
+        }
+    },
+
+    // ==================== 保存订单 ====================
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var collateral = document.getElementById("collateral").value.trim();
         var collateralNote = document.getElementById("collateralNote").value.trim();
         var amountStr = document.getElementById("amount").value;
-        var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
+        var amount = Utils.parseNumberFromCommas(amountStr) || 0;
         var notes = document.getElementById("notes").value;
         
-        var serviceFeePercent = parseInt(document.getElementById("serviceFeePercent").value) || 0;
-        var serviceFeeAmount = amount * (serviceFeePercent / 100);
-        var serviceFeeMethod = document.querySelector('input[name="serviceFeeMethod"]:checked')?.value || 'cash';
+        var agreedInterestRate = parseFloat(document.getElementById("agreedInterestRate")?.value) || 8;
+        var agreedServiceFee = parseFloat(document.getElementById("agreedServiceFee")?.value) || 2;
         
-        var adminFeeAmount = parseInt(document.getElementById("adminFeeAmount").value) || 0;
-        var adminFeeMethod = document.querySelector('input[name="adminFeeMethod"]:checked')?.value || 'cash';
+        var repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked');
+        var repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
+        var repaymentTerm = null;
+        
+        if (repaymentType === 'fixed') {
+            repaymentTerm = parseInt(document.getElementById("repaymentTerm")?.value) || 5;
+        }
         
         var loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash';
-        
         var fullCollateralName = collateralNote ? `${collateral} (${collateralNote})` : collateral;
         
         if (!collateral || !amount || amount <= 0) { alert(Utils.t('fill_all_fields')); return; }
@@ -690,6 +840,12 @@ const CustomersModule = {
                 .eq('id', customerId)
                 .single();
             
+            const blacklistCheck = await window.APP.isBlacklisted(customerId);
+            if (blacklistCheck.isBlacklisted) {
+                alert(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat order baru.' : '❌ 此客户已被拉黑，无法创建新订单。');
+                return;
+            }
+            
             var orderData = {
                 customer: { 
                     name: customer.name, 
@@ -699,13 +855,40 @@ const CustomersModule = {
                 },
                 collateral_name: fullCollateralName,
                 loan_amount: amount,
-                service_fee_percent: serviceFeePercent,
                 notes: notes,
                 customer_id: customerId,
-                store_id: null
+                store_id: null,
+                admin_fee: 30000,
+                service_fee_percent: agreedServiceFee,
+                agreed_interest_rate: agreedInterestRate,
+                repayment_type: repaymentType,
+                repayment_term: repaymentTerm
             };
             
             var newOrder = await Order.create(orderData);
+            
+            if (agreedServiceFee > 0) {
+                var serviceFeeAmount = amount * (agreedServiceFee / 100);
+                if (serviceFeeAmount > 0) {
+                    try {
+                        await Order.recordServiceFee(newOrder.order_id, 1, loanSource);
+                    } catch (serviceFeeError) {
+                        console.error("服务费收取失败:", serviceFeeError);
+                        alert(lang === 'id' 
+                            ? `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`
+                            : `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`);
+                    }
+                }
+            }
+            
+            try {
+                await Order.recordAdminFee(newOrder.order_id, loanSource, 30000);
+            } catch (adminFeeError) {
+                console.error("管理费收取失败:", adminFeeError);
+                alert(lang === 'id' 
+                    ? `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`
+                    : `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`);
+            }
             
             if (amount > 0) {
                 try {
@@ -719,29 +902,19 @@ const CustomersModule = {
                 }
             }
             
-            if (serviceFeeAmount > 0) {
-                try {
-                    await Order.recordServiceFee(newOrder.order_id, 1, serviceFeeMethod);
-                } catch (serviceFeeError) {
-                    console.error("服务费收取失败:", serviceFeeError);
-                    alert(lang === 'id' 
-                        ? `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`
-                        : `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`);
-                }
-            }
+            var monthlyPayment = repaymentType === 'fixed' 
+                ? Utils.calculateFixedMonthlyPayment(amount, agreedInterestRate / 100, repaymentTerm)
+                : null;
             
-            if (adminFeeAmount > 0) {
-                try {
-                    await Order.recordAdminFee(newOrder.order_id, adminFeeMethod, adminFeeAmount);
-                } catch (adminFeeError) {
-                    console.error("管理费收取失败:", adminFeeError);
-                    alert(lang === 'id' 
-                        ? `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`
-                        : `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`);
-                }
-            }
+            var successMsg = repaymentType === 'fixed'
+                ? (lang === 'id' 
+                    ? `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyPayment)}\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%`
+                    : `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyPayment)}\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%`)
+                : (lang === 'id'
+                    ? `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%\n最长可延期至10个月`
+                    : `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%\n最长可延期至10个月`);
             
-            alert(Utils.t('order_created') + "\nID: " + newOrder.order_id);
+            alert(successMsg);
             this.goBack();
         } catch (error) {
             console.error("saveOrderWithCustomer error:", error);
@@ -770,19 +943,23 @@ const CustomersModule = {
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var rows = orders && orders.length > 0 ? orders.map(o => {
                 var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
+                var repaymentTypeText = o.repayment_type === 'fixed' 
+                    ? (lang === 'id' ? '固定' : '固定') 
+                    : (lang === 'id' ? '灵活' : '灵活');
                 return `<tr>
                     <td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
                     <td class="date-cell">${Utils.formatDate(o.created_at)}<\/td>
                     <td class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
                     <td class="text-right">${Utils.formatCurrency(o.principal_paid)}<\/td>
                     <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
+                    <td class="text-center"><span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}<\/span><\/td>
                     <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/td>
                     <td class="action-cell">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small">👁️ ${t('view')}<\/button>
                         ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     <\/td>
                 <\/tr>`;
-            }).join('') : `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            }).join('') : `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -810,6 +987,7 @@ const CustomersModule = {
                                     <th class="text-right">${t('loan_amount')}</th>
                                     <th class="text-right">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
                                     <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Jenis' : '方式'}</th>
                                     <th class="text-center">${lang === 'id' ? 'Status' : '状态'}</th>
                                     <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
@@ -817,7 +995,25 @@ const CustomersModule = {
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
-                </div>`;
+                </div>
+                
+                <style>
+                    .repayment-badge {
+                        display: inline-block;
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }
+                    .badge-fixed {
+                        background: #d1fae5;
+                        color: #065f46;
+                    }
+                    .badge-flexible {
+                        background: #fed7aa;
+                        color: #9a3412;
+                    }
+                </style>`;
         } catch (error) {
             console.error("showCustomerOrders error:", error);
             alert(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
@@ -900,3 +1096,5 @@ for (var key in CustomersModule) {
 window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
+window.APP.toggleRepaymentForm = CustomersModule.toggleRepaymentForm;
+window.APP.calculateFixedPayment = CustomersModule.calculateFixedPayment;
