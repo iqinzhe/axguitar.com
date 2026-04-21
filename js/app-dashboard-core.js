@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v3.1 优化版（保存退出优化 + 按钮名称更新）
+// app-dashboard-core.js - v3.2（双语支持：登录页面切换语言）
 
 window.APP = window.APP || {};
 
@@ -174,29 +174,26 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 登录认证 ====================
+    // ==================== 登录认证（双语支持） ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
+        
+        // 确保语言已初始化
+        Utils.initLanguage();
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
-        
-        var storedLang = localStorage.getItem('jf_language');
-        if (storedLang && (storedLang === 'id' || storedLang === 'zh')) {
-            Utils.lang = storedLang;
-            lang = Utils.lang;
-        }
         
         document.getElementById("app").innerHTML = `
             <div class="login-container">
                 <div class="login-box">
                     <div class="lang-toggle">
-                        <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa'}</button>
+                        <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
                     </div>
                     <h2 class="login-title"><img src="icons/pagehead-logo.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>
                     <h3>${t('login')}</h3>
                     <div class="form-group">
-                        <label>${Utils.lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
+                        <label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
                         <input id="username" placeholder="email@domain.com">
                     </div>
                     <div class="form-group">
@@ -211,6 +208,13 @@ const DashboardCore = {
             </div>`;
     },
 
+    toggleLanguageOnLogin: function() {
+        var newLang = Utils.lang === 'id' ? 'zh' : 'id';
+        Utils.setLanguage(newLang);
+        // 重新渲染登录页面
+        this.renderLogin();
+    },
+
     login: async function() {
         var username = document.getElementById("username").value.trim();
         var password = document.getElementById("password").value;
@@ -223,10 +227,7 @@ const DashboardCore = {
             if (btnEl) { btnEl.disabled = false; btnEl.textContent = Utils.t('login'); }
             return;
         }
-        var savedLang = localStorage.getItem('jf_language');
-        if (savedLang && (savedLang === 'id' || savedLang === 'zh')) {
-            Utils.lang = savedLang;
-        }
+        // 登录成功后，语言已经保存在 localStorage 中，直接进入系统
         await this.router();
     },
 
@@ -360,12 +361,6 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    toggleLanguageOnLogin: function() {
-        var newLang = Utils.lang === 'id' ? 'zh' : 'id';
-        Utils.setLanguage(newLang);
-        this.renderLogin();
-    },
-
     // ==================== 仪表盘 ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
@@ -472,18 +467,18 @@ const DashboardCore = {
             var cardsTitleHtml = '';
             if (isAdmin) {
                 cardsTitleHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${lang === 'id' ? '经营指标汇总 (全部门店)' : '经营指标汇总 (全部门店)'}</h3>
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${t('financial_indicators')} (${lang === 'id' ? '全部门店' : '全部门店'})</h3>
                 </div>`;
             } else {
                 cardsTitleHtml = `<div style="margin-bottom:12px;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${lang === 'id' ? '经营指标' : '经营指标'}</h3>
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${t('financial_indicators')}</h3>
                 </div>`;
             }
             
             // 业务操作标题（统一字体样式）
             var toolbarTitleHtml = `
                 <div style="margin: 20px 0 12px 0;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ${lang === 'id' ? 'Operasi Bisnis' : '业务操作'}</h3>
+                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ${t('operation')}</h3>
                 </div>
             `;
             
@@ -492,14 +487,14 @@ const DashboardCore = {
             if (isAdmin) {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${lang === 'id' ? '资金管理 (汇总全部门店)' : '资金管理 (汇总全部门店)'}</h3>
+                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')} (${lang === 'id' ? '汇总全部门店' : '汇总全部门店'})</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
-                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.cash.expense)}
                             </div>
                         </div>
                         
@@ -507,22 +502,22 @@ const DashboardCore = {
                             <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
-                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.bank.expense)}
                             </div>
                         </div>
                         
                         <div class="cashflow-item internal-transfer-item">
-                            <div class="label">🔄 ${lang === 'id' ? '内部互转' : '内部互转'}</div>
+                            <div class="label">🔄 ${t('internal_transfer')}</div>
                             <div class="transfer-buttons">
                                 <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">
-                                    🏦→🏧 ${lang === 'id' ? '现金存入银行' : '现金存入银行'}
+                                    🏦→🏧 ${t('cash_to_bank')}
                                 </button>
                                 <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">
-                                    🏧→🏦 ${lang === 'id' ? '银行取出现金' : '银行取出现金'}
+                                    🏧→🏦 ${t('bank_to_cash')}
                                 </button>
                                 <button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq">
-                                    🏢 ${lang === 'id' ? '上缴总部' : '上缴总部'}
+                                    🏢 ${t('submit_to_hq')}
                                 </button>
                             </div>
                             <div class="cashflow-detail" style="margin-top:8px;">
@@ -534,14 +529,14 @@ const DashboardCore = {
             } else {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${lang === 'id' ? '资金管理' : '资金管理'}</h3>
+                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')}</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
                             <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
-                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.cash.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.cash.expense)}
                             </div>
                         </div>
                         
@@ -549,19 +544,19 @@ const DashboardCore = {
                             <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
                             <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
                             <div class="cashflow-detail">
-                                ${lang === 'id' ? '收入' : '收入'}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
-                                ${lang === 'id' ? '支出' : '支出'}: -${Utils.formatCurrency(cashFlow.bank.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.bank.expense)}
                             </div>
                         </div>
                         
                         <div class="cashflow-item internal-transfer-item">
-                            <div class="label">🔄 ${lang === 'id' ? '内部互转' : '内部互转'}</div>
+                            <div class="label">🔄 ${t('internal_transfer')}</div>
                             <div class="transfer-buttons">
                                 <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">
-                                    🏦→🏧 ${lang === 'id' ? '现金存入银行' : '现金存入银行'}
+                                    🏦→🏧 ${t('cash_to_bank')}
                                 </button>
                                 <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">
-                                    🏧→🏦 ${lang === 'id' ? '银行取出现金' : '银行取出现金'}
+                                    🏧→🏦 ${t('bank_to_cash')}
                                 </button>
                             </div>
                             <div class="cashflow-detail" style="margin-top:8px;">
@@ -572,42 +567,42 @@ const DashboardCore = {
                 </div>`;
             }
             
-            // 工具栏（按钮名称已更新）
+            // 工具栏（按钮名称使用翻译）
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = `
                 <div class="toolbar admin-grid">
-                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
-                    <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
-                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
-                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                    <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '数据管理'}</button>
+                    <button onclick="APP.navigateTo('customers')">👥 ${t('customers')}</button>
+                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
+                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${t('payment_history')}</button>
+                    <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
+                    <button onclick="APP.navigateTo('backupRestore')">💾 ${t('backup_restore')}</button>
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                        📱 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
-                    <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
-                    <button onclick="APP.navigateTo('userManagement')">👥 ${lang === 'id' ? 'Man. Kerja' : '员工管理'}</button>
-                    <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
-                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
+                    <button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>
+                    <button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>
+                    <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
+                    <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
             } else {
                 toolbarHtml = `
                 <div class="toolbar store-grid">
-                    <button onclick="APP.navigateTo('customers')">👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</button>
-                    <button onclick="APP.navigateTo('orderTable')">📋 ${lang === 'id' ? 'Manajemen Pesanan' : '订单管理'}</button>
-                    <button onclick="APP.showCashFlowModal()">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
-                    <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
+                    <button onclick="APP.navigateTo('customers')">👥 ${t('customers')}</button>
+                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
+                    <button onclick="APP.showCashFlowModal()">💰 ${t('payment_history')}</button>
+                    <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                        📱 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
-                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
+                    <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
             }
             
             var bottomHtml = `
             <div class="card">
                 <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
-                <p>🏪 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeName)}${isAdmin ? ` (${lang === 'id' ? 'Kantor Pusat - Seluruh Toko' : '总部 - 全部门店'})` : ''}</p>
+                <p>🏪 ${t('store')}: ${Utils.escapeHtml(storeName)}${isAdmin ? ` (${lang === 'id' ? 'Kantor Pusat - Seluruh Toko' : '总部 - 全部门店'})` : ''}</p>
                 <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)'}</p>
                 <p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>
             </div>`;
@@ -633,7 +628,7 @@ const DashboardCore = {
                 ${bottomHtml}
             `;
         } catch (err) {
-            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button></div>`;
+            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button></div>`;
         }
     },
 
@@ -708,4 +703,4 @@ for (var key in DashboardCore) {
     }
 }
 
-console.log('✅ app-dashboard-core.js v3.1 已加载 - 保存退出优化 + 按钮名称更新 + 标题字体统一');
+console.log('✅ app-dashboard-core.js v3.2 已加载 - 双语支持（登录页面切换语言）');
