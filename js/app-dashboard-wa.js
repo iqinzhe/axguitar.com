@@ -1,4 +1,4 @@
-// app-dashboard-wa.js - v1.0 WA提醒模块（从 core.js 拆分）
+// app-dashboard-wa.js - v1.0 WA提醒模块
 
 window.APP = window.APP || {};
 
@@ -187,4 +187,3 @@ Terima kasih atas kepercayaan Anda.
 // 合并到 window.APP
 Object.assign(window.APP, DashboardWA);
 
-console.log('✅ app-dashboard-wa.js v1.0 已加载 - WA提醒模块');
