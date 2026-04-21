@@ -1,4 +1,4 @@
-// utils.js - v1.0
+// utils.js - v1.1（新增固定还款计算函数）
 
 const Utils = {
     lang: 'id',
@@ -34,6 +34,24 @@ const Utils = {
         const date = new Date(startDate);
         date.setMonth(date.getMonth() + paidMonths + 1);
         return date.toISOString().split('T')[0];
+    },
+
+    // ==================== 固定还款计算函数 ====================
+    calculateFixedMonthlyPayment: function(loanAmount, monthlyRate, months) {
+        if (monthlyRate === 0) return loanAmount / months;
+        const rate = monthlyRate;
+        const denominator = Math.pow(1 + rate, months) - 1;
+        if (denominator === 0) return loanAmount / months;
+        return loanAmount * rate * Math.pow(1 + rate, months) / denominator;
+    },
+
+    calculateFixedPaymentSplit: function(remainingPrincipal, monthlyRate, fixedPayment) {
+        const interest = remainingPrincipal * monthlyRate;
+        const principal = Math.min(fixedPayment - interest, remainingPrincipal);
+        return {
+            interest: Math.max(0, interest),
+            principal: Math.max(0, principal)
+        };
     },
 
     translations: {
@@ -80,7 +98,22 @@ const Utils = {
             total_cash: "Total Kas", net_profit: "Laba Bersih", filter: "Filter",
             clear_filter: "Bersihkan Filter", export: "Ekspor", close: "Tutup",
             search_description: "Cari deskripsi...", all_types: "Semua tipe",
-            from_date: "Dari tanggal", to_date: "Sampai tanggal"
+            from_date: "Dari tanggal", to_date: "Sampai tanggal",
+            // 新增固定还款相关翻译
+            fixed_repayment: "Cicilan Tetap",
+            flexible_repayment: "Cicilan Fleksibel",
+            repayment_type: "Jenis Cicilan",
+            repayment_term: "Jangka Waktu (Bulan)",
+            monthly_payment: "Angsuran per Bulan",
+            agreed_rate: "Suku Bunga Kesepakatan",
+            agreed_service_fee: "Biaya Layanan Kesepakatan",
+            payment_due_date: "Tanggal Jatuh Tempo",
+            overdue_days: "Hari Terlambat",
+            liquidation_warning: "⚠️ Terlambat 30 hari akan memasuki proses likuidasi",
+            early_settlement: "Pelunasan Dipercepat",
+            interest_rebate: "Diskon Bunga",
+            remaining_term: "Sisa Jangka Waktu",
+            confirm_early_settlement: "Konfirmasi Pelunasan Dipercepat"
         },
         zh: {
             login: "登录", logout: "退出", username: "用户名", password: "密码",
@@ -125,7 +158,22 @@ const Utils = {
             total_cash: "总现金", net_profit: "现金净利", filter: "筛选",
             clear_filter: "重置", export: "导出", close: "关闭",
             search_description: "搜索描述...", all_types: "全部类型",
-            from_date: "开始日期", to_date: "结束日期"
+            from_date: "开始日期", to_date: "结束日期",
+            // 新增固定还款相关翻译
+            fixed_repayment: "固定还款",
+            flexible_repayment: "灵活还款",
+            repayment_type: "还款方式",
+            repayment_term: "还款期限（月）",
+            monthly_payment: "每月还款额",
+            agreed_rate: "协商利率",
+            agreed_service_fee: "协商服务费",
+            payment_due_date: "到期日",
+            overdue_days: "逾期天数",
+            liquidation_warning: "⚠️ 逾期30天将进入变卖程序",
+            early_settlement: "提前结清",
+            interest_rebate: "利息减免",
+            remaining_term: "剩余期数",
+            confirm_early_settlement: "确认提前结清"
         }
     },
 
@@ -170,7 +218,6 @@ const Utils = {
         this._downloadBlob(blob, filename);
     },
 
-    // ==================== 内部：通用下载触发器 ====================
     _downloadBlob(blob, filename) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -180,7 +227,6 @@ const Utils = {
         URL.revokeObjectURL(url);
     },
 
-    // ==================== 内部：CSV 构建与下载（统一方法） ====================
     _buildAndDownloadCSV(headers, rows, filename) {
         const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -292,7 +338,7 @@ const Utils = {
 
     wrapTableRow(cells, isHeader = false) {
         const tag = isHeader ? 'th' : 'td';
-        return '<tr>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '</tr>';
+        return '<tr>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '<tr>';
     },
 
     getServiceFeeOptionsHtml(selectedPercent = 0) {
