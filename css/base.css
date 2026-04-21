@@ -69,7 +69,7 @@ body {
     line-height: 1.5;
 }
 
-/* ==== Logo 图片统一大小 - 修复：使用em相对单位 === */
+/* === Logo 图片统一大小 === */
 h1 img,
 .page-header h1 img {
     height: 2.0em;
@@ -104,7 +104,7 @@ h1 img,
     padding: 0 var(--spacing-4);
 }
 
-/* === 卡片组 ==== */
+/* === 卡片组 === */
 .card {
     background: white;
     border-radius: var(--radius-lg);
@@ -368,7 +368,7 @@ button.danger:hover,
     margin-bottom: var(--spacing-5);
 }
 
-/* ==== 资金管理区块 === */
+/* === 资金管理区块 === */
 .cashflow-summary {
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     border-radius: var(--radius-xl);
@@ -484,6 +484,107 @@ button.danger:hover,
     margin: var(--spacing-3) 0;
 }
 
+/* === 统一表格样式（业务报表风格）=== */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-xs);
+    background: white;
+}
+
+.data-table th {
+    background: var(--gray-100);
+    padding: 10px 12px;
+    font-weight: 600;
+    color: var(--gray-700);
+    border-bottom: 1px solid var(--gray-300);
+    white-space: nowrap;
+}
+
+.data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--gray-200);
+    vertical-align: middle;
+}
+
+.data-table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+/* 双行表头支持 */
+.data-table thead tr:first-child th {
+    border-bottom: 1px solid var(--gray-300);
+    background: var(--gray-100);
+}
+
+.data-table thead tr:last-child th {
+    border-top: none;
+    background: var(--gray-50);
+}
+
+/* 汇总行样式 */
+.data-table tbody tr.summary-row,
+.data-table tfoot tr {
+    border-top: 2px solid var(--gray-400);
+    background: var(--gray-100);
+    font-weight: 600;
+}
+
+.data-table tbody tr.summary-row td,
+.data-table tfoot td {
+    font-weight: 600;
+    background: var(--gray-100);
+}
+
+/* 金额列右对齐 */
+.data-table td.text-right,
+.data-table th.text-right {
+    text-align: right;
+}
+
+/* 数字列居中 */
+.data-table td.text-center,
+.data-table th.text-center {
+    text-align: center;
+}
+
+/* 收入金额颜色 */
+.data-table td.income,
+.data-table .income {
+    color: var(--success);
+    font-weight: 500;
+}
+
+/* 支出金额颜色 */
+.data-table td.expense,
+.data-table .expense {
+    color: var(--danger);
+    font-weight: 500;
+}
+
+/* 门店名称单元格 */
+.data-table .store-name-cell {
+    font-weight: 500;
+    background: var(--gray-50);
+}
+
+/* 订单ID等标识样式 */
+.data-table .order-id,
+.data-table .customer-id,
+.data-table .store-code {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+}
+
+/* 操作列按钮组 */
+.data-table .action-cell {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* 基础表格（兼容旧代码） */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -507,12 +608,6 @@ th {
 
 tbody tr:hover {
     background: var(--gray-50);
-}
-
-.action-cell {
-    display: flex;
-    gap: var(--spacing-2);
-    flex-wrap: wrap;
 }
 
 /* === 状态徽章 === */
@@ -555,12 +650,6 @@ tbody tr:hover {
 .method-bank {
     background: #fef3c7;
     color: #b45309;
-}
-
-.order-id {
-    font-family: monospace;
-    font-weight: 600;
-    color: var(--primary-dark);
 }
 
 /* === 表单组件 === */
@@ -809,10 +898,10 @@ tbody tr:hover {
 .income { color: var(--success); }
 .expense { color: var(--danger); }
 
-/* === 响应式断点 — 手机端（≤768px）==== */
+/* === 响应式断点 — 手机端（≤768px）=== */
 @media (max-width: 768px) {
     #app {
-        padding: 5px 15px;  /* 顶部5px，左右15px */
+        padding: 5px 15px;
     }
 
     .card {
@@ -820,9 +909,8 @@ tbody tr:hover {
         margin-top: 0;
     }
     
-    /* 修复手机端顶部间隙过大的问题 */
     .page-header {
-        margin-bottom: 5px; 
+        margin-bottom: 5px;
     }
     
     .card:first-of-type {
@@ -854,7 +942,6 @@ tbody tr:hover {
 
     .cashflow-detail {
         font-size: 0.7rem;
-        color: #94a3b8;
     }
 
     .stats-grid-optimized {
@@ -971,17 +1058,30 @@ tbody tr:hover {
         min-height: 44px;
     }
 
-    .action-cell {
-        flex-wrap: wrap;
+    /* 手机端表格适配 */
+    .data-table th,
+    .data-table td {
+        padding: 6px 8px;
+        font-size: 0.7rem;
     }
-
-    th {
+    
+    .data-table th {
         white-space: nowrap;
     }
-
-    td {
+    
+    .data-table td {
         white-space: normal;
         word-break: break-word;
+    }
+    
+    .data-table .action-cell {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .data-table .action-cell .btn-small {
+        width: 100%;
+        text-align: center;
     }
 }
 
@@ -1025,9 +1125,16 @@ tbody tr:hover {
         font-size: 0.7rem;
         padding: var(--spacing-1);
     }
+
+    /* 超小屏表格进一步缩小 */
+    .data-table th,
+    .data-table td {
+        padding: 4px 6px;
+        font-size: 0.65rem;
+    }
 }
 
-/* === 打印样式 === */
+/* === 打印样式（完整版）=== */
 @media print {
     @page {
         size: A4;
@@ -1047,6 +1154,7 @@ tbody tr:hover {
         margin: 0;
     }
 
+    /* 隐藏不需要打印的元素 */
     .no-print,
     .toolbar button:not(.print-btn),
     button:not(.print-btn),
@@ -1054,7 +1162,14 @@ tbody tr:hover {
     .btn-export,
     .btn-balance,
     .btn-detail,
-    .modal-overlay {
+    .modal-overlay,
+    .action-cell,
+    td.action-cell,
+    th.action-cell,
+    .form-grid,
+    .form-actions,
+    .address-option,
+    .payment-method-options {
         display: none !important;
     }
 
@@ -1066,6 +1181,7 @@ tbody tr:hover {
         display: inline-block !important;
     }
 
+    /* 卡片打印样式 */
     .card,
     .stat-card,
     .cashflow-summary {
@@ -1091,19 +1207,93 @@ tbody tr:hover {
         color: black !important;
     }
 
-    thead {
-        display: table-header-group;
+    /* 打印时表格容器不设滚动条 */
+    .table-container {
+        overflow: visible !important;
+        margin: 0 !important;
     }
-
-    table {
+    
+    /* 打印时表格样式 */
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10pt;
+        margin: 0;
+    }
+    
+    .data-table th {
+        background: #f5f5f5 !important;
+        padding: 6px 8px;
+        font-weight: 700;
+        color: #000;
+        border: 1px solid #ccc;
+        white-space: normal;
+    }
+    
+    .data-table td {
+        padding: 5px 8px;
+        border: 1px solid #ccc;
+        white-space: normal;
+        word-break: break-word;
+    }
+    
+    .data-table th,
+    .data-table td {
+        border: 1px solid #ccc !important;
+    }
+    
+    /* 打印时金额颜色（灰度打印也能区分） */
+    .data-table .income {
+        color: #2e7d32 !important;
+        font-weight: 600;
+    }
+    
+    .data-table .expense {
+        color: #c62828 !important;
+        font-weight: 600;
+    }
+    
+    /* 打印时对齐保持 */
+    .data-table .text-right {
+        text-align: right !important;
+    }
+    
+    .data-table .text-center {
+        text-align: center !important;
+    }
+    
+    /* 打印时标识样式 */
+    .data-table .order-id,
+    .data-table .customer-id,
+    .data-table .store-code {
+        font-family: monospace;
+        font-weight: 600;
+    }
+    
+    /* 打印时汇总行样式 */
+    .data-table tbody tr.summary-row,
+    .data-table tfoot tr {
+        border-top: 2px solid #000 !important;
+        background: #f0f0f0 !important;
+    }
+    
+    /* 打印时避免行内断裂 */
+    .data-table td,
+    .data-table th {
         page-break-inside: avoid;
     }
-
-    th, td {
-        border: 1px solid #ccc !important;
-        white-space: normal !important;
+    
+    /* 打印时表头重复（多页打印） */
+    .data-table thead {
+        display: table-header-group;
+    }
+    
+    .data-table tbody tr {
+        page-break-inside: avoid;
+        page-break-after: avoid;
     }
 
+    /* 页眉页脚 */
     .print-header {
         display: block;
         text-align: center;
