@@ -1,4 +1,4 @@
-// utils.js - v1.1（双语支持：登录页面切换语言，界面文字翻译，数据内容保持原样）
+// utils.js - v1.2（添加 escapeAttr 方法）
 
 const Utils = {
     lang: 'id',  // 默认印尼语
@@ -323,6 +323,18 @@ const Utils = {
             .replace(/'/g, '&#39;');
     },
 
+    // ==================== 新增：用于 onclick 属性的转义 ====================
+    escapeAttr(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/`/g, '&#96;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    },
+
     formatCurrency(amount) {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency', currency: 'IDR', minimumFractionDigits: 0
@@ -351,7 +363,6 @@ const Utils = {
         URL.revokeObjectURL(url);
     },
 
-    // ==================== 修复中危3：CSV导出使用原始数值 ====================
     exportToCSV(orders, filename) {
         const headers = this.lang === 'id'
             ? ['ID Pesanan', 'Pelanggan', 'Pinjaman', 'Admin Fee', 'Service Fee', 'Bunga Bulanan', 'Status', 'Tanggal Dibuat']
@@ -512,5 +523,3 @@ const Utils = {
 Utils.initLanguage();
 
 window.Utils = Utils;
-
-console.log('✅ utils.js v1.1 已加载 - 双语支持（登录页面切换语言）');
