@@ -245,8 +245,8 @@ const DashboardCore = {
                 console.error("保存数据失败:", saveError);
                 this._hideSavingMessage(loadingMsg);
                 var errorMsg = Utils.lang === 'id'
-                    ? '⚠️ Gagal menyimpan data: ' + saveError.message + '\n\nTetap keluar?'
-                    : '⚠️ 保存数据失败：' + saveError.message + '\n\n是否仍然退出？';
+                    ? '⚠️ Gagal menyimpan data: ' + saveError.message + 'Tetap keluar?'
+                    : '⚠️ 保存数据失败：' + saveError.message + '是否仍然退出？';
                 if (!confirm(errorMsg)) return;
             }
         }
