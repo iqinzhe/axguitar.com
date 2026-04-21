@@ -487,7 +487,7 @@ const DashboardCore = {
             if (isAdmin) {
                 cashFlowHtml = `
                 <div class="cashflow-summary">
-                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')} (${lang === 'id' ? '汇总全部门店' : '汇总全部门店'})</h3>
+                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')} (${lang === 'id' ? '全部门店' : '全部门店'})</h3>
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
@@ -578,10 +578,10 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
                     <button onclick="APP.navigateTo('backupRestore')">💾 ${t('backup_restore')}</button>
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        📱 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                        🔔 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
                     <button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>
-                    <button onclick="APP.navigateTo('userManagement')">👥 ${t('user_management')}</button>
+                    <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
                     <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
@@ -593,7 +593,7 @@ const DashboardCore = {
                     <button onclick="APP.showCashFlowModal()">💰 ${t('payment_history')}</button>
                     <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        📱 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                        🔔 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
