@@ -454,14 +454,14 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                     <button onclick="APP.navigateTo('paymentHistory')">💰 ${lang === 'id' ? 'Arus Kas' : '资金流水'}</button>
                     <button onclick="APP.navigateTo('expenses')">📝 ${lang === 'id' ? 'Pengeluaran' : '运营支出'}</button>
-                    <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '备份与恢复'}</button>
+                    <button onclick="APP.navigateTo('backupRestore')">💾 ${lang === 'id' ? 'Backup & Restore' : '数据管理'}</button>
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        📱 ${lang === 'id' ? 'Kirim Pengingat' : '发送提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
+                        🔔 ${lang === 'id' ? 'Kirim Pengingat' : '催收提醒'} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
                     <button onclick="APP.navigateTo('report')">📊 ${lang === 'id' ? 'Laporan Bisnis' : '业务报表'}</button>
-                    <button onclick="APP.navigateTo('userManagement')">👥 ${lang === 'id' ? 'Man. Kerja' : '工作管理'}</button>
+                    <button onclick="APP.navigateTo('userManagement')">👤 ${lang === 'id' ? 'Man. Kerja' : '员工管理'}</button>
                     <button onclick="APP.navigateTo('storeManagement')">🏪 ${lang === 'id' ? 'Man. Toko' : '门店管理'}</button>
-                    <button onclick="APP.logout()">💾 ${lang === 'id' ? 'Simpan & Keluar' : '保存退出'}</button>
+                    <button onclick="APP.logout()">🚪 ${lang === 'id' ? 'Simpan & Keluar' : '退出系统'}</button>
                 </div>`;
             } else {
                 toolbarHtml = `
