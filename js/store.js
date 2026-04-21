@@ -1,8 +1,4 @@
-// store.js - 完整修复版 v1.0
-// 修复内容：
-// 1. 统一使用 cash_flow_records 计算门店余额（与 getCashFlowSummary 保持一致）
-// 2. 移除手动从 payment_history 累加余额的逻辑
-// 3. 优化门店财务汇总的余额计算
+// store.js - v1.1（统一表格样式）
 
 const StoreManager = {
     stores: [],
@@ -18,13 +14,11 @@ const StoreManager = {
     async _generateStoreCode(name) {
         await this.loadStores(true);
         
-        // 总部固定为 STORE_000
         const nameLower = name.toLowerCase();
         if (nameLower.includes('kantor') || nameLower.includes('pusat') || nameLower.includes('总部')) {
             return 'STORE_000';
         }
         
-        // 获取现有门店的最大序号
         let maxNumber = 0;
         for (const store of this.stores) {
             const match = store.code?.match(/STORE_(\d+)/);
@@ -34,7 +28,6 @@ const StoreManager = {
             }
         }
         
-        // 下一个序号（从1开始，因为0是总部）
         const nextNumber = Math.max(1, maxNumber + 1);
         const serial = String(nextNumber).padStart(3, '0');
         
@@ -136,10 +129,8 @@ const StoreManager = {
         }
     },
 
-    // ==================== 获取门店余额（统一使用 cash_flow_records） ====================
     async _getStoreCashFlowBalance(storeId) {
         try {
-            // 只获取未作废的现金流记录
             const { data: flows, error } = await supabaseClient
                 .from('cash_flow_records')
                 .select('direction, amount, source_target, flow_type')
@@ -183,7 +174,6 @@ const StoreManager = {
         
         console.log('开始加载门店管理数据...');
         
-        // 获取所有门店的基础数据（订单、支出）
         const [allOrdersResult, allExpensesResult, allPaymentsResult, cashFlow] = await Promise.all([
             supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid'),
             supabaseClient.from('expenses').select('id, store_id, amount, payment_method'),
@@ -233,7 +223,6 @@ const StoreManager = {
             const stats = storeStats[store.id] || { orders: [], expenses: [], payments: [] };
             const orders = stats.orders;
             const expenses = stats.expenses;
-            const payments = stats.payments;
             
             const ordsCount = orders.length;
             const activeCount = orders.filter(o => o.status === 'active').length;
@@ -245,7 +234,6 @@ const StoreManager = {
             const totalIncome = totalAdminFee + totalServiceFee + totalInterest;
             const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
             
-            // ==================== 使用统一的 cash_flow_records 计算余额 ====================
             const { cashBalance, bankBalance } = await this._getStoreCashFlowBalance(store.id);
             
             grandTotal.orders += ordsCount;
@@ -261,40 +249,55 @@ const StoreManager = {
             grandTotal.bankBalance += bankBalance;
             
             storeStatsRows += `<tr>
-                <td style="border:1px solid #cbd5e1;padding:8px;"><strong>${Utils.escapeHtml(store.name)}</strong><br><small style="color:#64748b;">${Utils.escapeHtml(store.code)}</small></td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${ordsCount}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${activeCount}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalLoan)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalAdminFee)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalServiceFee)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalInterest)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(totalPrincipal)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:#10b981;">${Utils.formatCurrency(totalIncome)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;color:#ef4444;">${Utils.formatCurrency(totalExpenses)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(cashBalance)}</td>
-                <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.formatCurrency(bankBalance)}</td>
+                <td class="store-name-cell"><strong>${Utils.escapeHtml(store.name)}</strong><br><small>${Utils.escapeHtml(store.code)}</small></td>
+                <td class="text-center">${ordsCount}</td>
+                <td class="text-center">${activeCount}</td>
+                <td class="text-right">${Utils.formatCurrency(totalLoan)}</td>
+                <td class="text-right income">${Utils.formatCurrency(totalAdminFee)}</td>
+                <td class="text-right income">${Utils.formatCurrency(totalServiceFee)}</td>
+                <td class="text-right income">${Utils.formatCurrency(totalInterest)}</td>
+                <td class="text-right">${Utils.formatCurrency(totalPrincipal)}</td>
+                <td class="text-right income">${Utils.formatCurrency(totalIncome)}</td>
+                <td class="text-right expense">${Utils.formatCurrency(totalExpenses)}</td>
+                <td class="text-right">${Utils.formatCurrency(cashBalance)}</td>
+                <td class="text-right">${Utils.formatCurrency(bankBalance)}</td>
             　　　`;
         }
+        
+        // 汇总行
+        var summaryRow = `<tr>
+            <td class="store-name-cell"><strong>${lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计'}</strong></td>
+            <td class="text-center"><strong>${grandTotal.orders}</strong></td>
+            <td class="text-center"><strong>${grandTotal.active}</strong></td>
+            <td class="text-right"><strong>${Utils.formatCurrency(grandTotal.loan)}</strong></td>
+            <td class="text-right income"><strong>${Utils.formatCurrency(grandTotal.adminFee)}</strong></td>
+            <td class="text-right income"><strong>${Utils.formatCurrency(grandTotal.serviceFee)}</strong></td>
+            <td class="text-right income"><strong>${Utils.formatCurrency(grandTotal.interest)}</strong></td>
+            <td class="text-right"><strong>${Utils.formatCurrency(grandTotal.principal)}</strong></td>
+            <td class="text-right income"><strong>${Utils.formatCurrency(grandTotal.income)}</strong></td>
+            <td class="text-right expense"><strong>${Utils.formatCurrency(grandTotal.expenses)}</strong></td>
+            <td class="text-right"><strong>${Utils.formatCurrency(grandTotal.cashBalance)}</strong></td>
+            <td class="text-right"><strong>${Utils.formatCurrency(grandTotal.bankBalance)}</strong></td>
+        </tr>`;
 
         let storeRows = '';
         if (this.stores.length === 0) {
-            storeRows = `<tr><td colspan="6" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
-            storeStatsRows = `<tr><td colspan="12" style="text-align:center;padding:20px;">${t('no_data')}</td></tr>`;
+            storeRows = `<td><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
         } else {
             for (const store of this.stores) {
                 storeRows += `<tr>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.code)}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.name)}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.address || '-')}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">${Utils.escapeHtml(store.phone || '-')}</td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;">
+                    <td class="store-code">${Utils.escapeHtml(store.code)}</td>
+                    <td class="store-name">${Utils.escapeHtml(store.name)}</td>
+                    <td class="store-address">${Utils.escapeHtml(store.address || '-')}</td>
+                    <td>${Utils.escapeHtml(store.phone || '-')}</td>
+                    <td>
                         <input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" 
                                placeholder="628xxxxxxxxxx" style="width:140px; font-size:12px; padding:6px;" 
                                onchange="APP.updateStoreWANumber('${store.id}', this.value)">
                     </td>
-                    <td style="border:1px solid #cbd5e1;padding:8px;white-space:nowrap;">
-                        <button onclick="StoreManager.editStore('${store.id}')" style="padding:4px 8px;font-size:12px;">✏️ ${t('edit')}</button>
-                        <button class="danger" onclick="APP.deleteStore('${store.id}')" style="padding:4px 8px;font-size:12px;">🗑️ ${t('delete')}</button>
+                    <td class="action-cell">
+                        <button onclick="StoreManager.editStore('${store.id}')" class="btn-small">✏️ ${t('edit')}</button>
+                        <button class="btn-small danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>
                     </td>
                 　　　`;
             }
@@ -335,24 +338,27 @@ const StoreManager = {
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                 <div class="table-container" style="overflow-x: auto;">
-                    <table class="data-table" style="min-width:1200px;">
+                    <table class="data-table store-stats-table" style="min-width:1000px;">
                         <thead>
                             <tr>
                                 <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                                <th>${t('total_orders')}</th>
-                                <th>${t('active')}</th>
-                                <th>${t('total_loan')}</th>
-                                <th>${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                                <th>${lang === 'id' ? 'Service Fee' : '服务费'}</th>
-                                <th>${lang === 'id' ? 'Bunga' : '利息'}</th>
-                                <th>${lang === 'id' ? 'Pokok' : '本金'}</th>
-                                <th>${lang === 'id' ? 'Pendapatan' : '收入'}</th>
-                                <th>${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
-                                <th>🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
-                                <th>🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
+                                <th class="text-center">${t('total_orders')}</th>
+                                <th class="text-center">${t('active')}</th>
+                                <th class="text-right">${t('total_loan')}</th>
+                                <th class="text-right">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
+                                <th class="text-right">${lang === 'id' ? 'Service Fee' : '服务费'}</th>
+                                <th class="text-right">${lang === 'id' ? 'Bunga' : '利息'}</th>
+                                <th class="text-right">${lang === 'id' ? 'Pokok' : '本金'}</th>
+                                <th class="text-right">${lang === 'id' ? 'Pendapatan' : '收入'}</th>
+                                <th class="text-right">${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
+                                <th class="text-right">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
+                                <th class="text-right">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
                             </tr>
                         </thead>
-                        <tbody>${storeStatsRows}</tbody>
+                        <tbody>
+                            ${storeStatsRows}
+                            ${summaryRow}
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -360,7 +366,7 @@ const StoreManager = {
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
-                    <table class="data-table">
+                    <table class="data-table store-table">
                         <thead>
                             <tr>
                                 <th>${lang === 'id' ? 'Kode' : '编码'}</th>
@@ -368,7 +374,7 @@ const StoreManager = {
                                 <th>${lang === 'id' ? 'Alamat' : '地址'}</th>
                                 <th>${lang === 'id' ? 'Telepon' : '电话'}</th>
                                 <th>📱 WA</th>
-                                <th>${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                             </tr>
                         </thead>
                         <tbody>${storeRows}</tbody>
@@ -402,12 +408,58 @@ const StoreManager = {
             </div>
             
             <style>
-                .data-table td input { width: 140px; font-size: 12px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; }
-                .data-table td input:focus { outline: none; border-color: #2563eb; }
-                .info-note { font-size: 11px; color: #64748b; margin-top: 8px; }
+                .store-table .store-code {
+                    font-family: monospace;
+                    font-weight: 600;
+                    color: var(--primary-dark);
+                }
+                .store-table .store-name {
+                    font-weight: 500;
+                }
+                .store-table .store-address {
+                    max-width: 200px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+                .store-table td input {
+                    width: 140px;
+                    font-size: 12px;
+                    padding: 6px;
+                    border-radius: 6px;
+                    border: 1px solid #cbd5e1;
+                }
+                .store-table td input:focus {
+                    outline: none;
+                    border-color: #2563eb;
+                }
+                .store-stats-table .store-name-cell {
+                    font-weight: 500;
+                    background: var(--gray-50);
+                }
+                .store-stats-table tbody tr:last-child {
+                    border-top: 2px solid var(--gray-400);
+                    background: var(--gray-100);
+                }
+                .info-note {
+                    font-size: 11px;
+                    color: #64748b;
+                    margin-top: 8px;
+                }
+                @media (max-width: 768px) {
+                    .store-table .store-address {
+                        max-width: 120px;
+                    }
+                    .store-table td input {
+                        width: 100px;
+                        font-size: 10px;
+                    }
+                }
             </style>
         `;
     }
 };
 
 window.StoreManager = StoreManager;
+
+console.log('✅ store.js v1.1 已加载 - 统一表格样式');
