@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.1（统一表格样式）
+// app-dashboard-funds.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -809,4 +809,3 @@ for (var key in DashboardFunds) {
     }
 }
 
-console.log('✅ app-dashboard-funds.js v1.1 已加载 - 统一表格样式');
