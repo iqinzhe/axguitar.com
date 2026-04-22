@@ -1,4 +1,4 @@
-// app-customers.js - v1.3（修复：黑名单检查安全调用 + 表格响应式 data-label）
+// app-customers.js - v1.4（修复：toggleLivingAddress 绑定 + 翻译函数完善）
 
 window.APP = window.APP || {};
 
@@ -36,7 +36,6 @@ const CustomersModule = {
                     
                     var escapedId = Utils.escapeAttr(c.id);
                     
-                    // 添加 data-label 属性用于手机端响应式显示
                     rows += `<tr>
                         <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${customerId}</td>
                         <td data-label="${t('customer_name')}">${name}</td>
@@ -53,7 +52,7 @@ const CustomersModule = {
                             ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
                         </td>
-                    </tr>`;
+                    </table>`;
                 }
             }
 
@@ -82,8 +81,8 @@ const CustomersModule = {
                         <div class="form-group full-width">
                             <label>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</label>
                             <div class="address-option">
-                                <label><input type="radio" name="livingAddrOpt" value="same" checked onchange="APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
-                                <label><input type="radio" name="livingAddrOpt" value="different" onchange="APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）'}</label>
+                                <label><input type="radio" name="livingAddrOpt" value="same" checked onchange="window.APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
+                                <label><input type="radio" name="livingAddrOpt" value="different" onchange="window.APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）'}</label>
                             </div>
                             <textarea id="customerLivingAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址'}" style="display:none;margin-top:8px;"></textarea>
                         </div>
@@ -259,9 +258,12 @@ const CustomersModule = {
         }
     },
 
+    // 修复：确保 toggleLivingAddress 函数正确绑定
     toggleLivingAddress: function(value) {
         var el = document.getElementById('customerLivingAddress');
-        if (el) el.style.display = value === 'different' ? 'block' : 'none';
+        if (el) {
+            el.style.display = value === 'different' ? 'block' : 'none';
+        }
     },
 
     addCustomer: async function() {
@@ -346,8 +348,8 @@ const CustomersModule = {
                         <div class="form-group full-width">
                             <label>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</label>
                             <div class="address-option">
-                                <label><input type="radio" name="ec_livingOpt" value="same" ${livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
-                                <label><input type="radio" name="ec_livingOpt" value="different" ${!livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${lang === 'id' ? 'Berbeda' : '不同'}</label>
+                                <label><input type="radio" name="ec_livingOpt" value="same" ${livingSame ? 'checked' : ''} onchange="window.APP._toggleEditLiving(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
+                                <label><input type="radio" name="ec_livingOpt" value="different" ${!livingSame ? 'checked' : ''} onchange="window.APP._toggleEditLiving(this.value)"> ${lang === 'id' ? 'Berbeda' : '不同'}</label>
                             </div>
                             <textarea id="ec_livingAddr" rows="2" style="margin-top:8px;${livingSame ? 'display:none;' : ''}">${Utils.escapeHtml(c.living_address || '')}</textarea>
                         </div>
@@ -594,12 +596,12 @@ const CustomersModule = {
                     <label class="repayment-type-label">${lang === 'id' ? '📋 Pilih Jenis Cicilan' : '📋 选择还款方式'}:</label>
                     <div class="repayment-type-options">
                         <label class="repayment-option">
-                            <input type="radio" name="repaymentType" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)">
+                            <input type="radio" name="repaymentType" value="flexible" checked onchange="window.APP.toggleRepaymentForm(this.value)">
                             <span class="option-title">💰 ${t('flexible_repayment')}</span>
                             <span class="option-desc">${lang === 'id' ? 'Bunga 8%/bulan, bayar bunga dulu, pokok bisa kapan saja' : '利息8%/月，先付利息，本金随时可还'}</span>
                         </label>
                         <label class="repayment-option">
-                            <input type="radio" name="repaymentType" value="fixed" onchange="APP.toggleRepaymentForm(this.value)">
+                            <input type="radio" name="repaymentType" value="fixed" onchange="window.APP.toggleRepaymentForm(this.value)">
                             <span class="option-title">📅 ${t('fixed_repayment')}</span>
                             <span class="option-desc">${lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok), tenor 3-10 bulan' : '每月固定还款（本金+利息），期限3-10个月'}</span>
                         </label>
@@ -612,7 +614,7 @@ const CustomersModule = {
                 <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
                     <div class="form-group">
                         <label>📅 ${t('repayment_term')}</label>
-                        <select id="repaymentTerm" class="repayment-term-select" onchange="APP.calculateFixedPayment()">
+                        <select id="repaymentTerm" class="repayment-term-select" onchange="window.APP.calculateFixedPayment()">
                             <option value="3">3 ${lang === 'id' ? 'bulan' : '个月'}</option>
                             <option value="4">4 ${lang === 'id' ? 'bulan' : '个月'}</option>
                             <option value="5" selected>5 ${lang === 'id' ? 'bulan' : '个月'}</option>
@@ -637,7 +639,7 @@ const CustomersModule = {
                     <div class="form-group">
                         <label>📈 ${t('agreed_rate')}</label>
                         <div class="rate-input-group">
-                            <input type="number" id="agreedInterestRate" value="8" step="0.5" min="3" max="10" style="width:100px;" onchange="APP.calculateFixedPayment()">
+                            <input type="number" id="agreedInterestRate" value="8" step="0.5" min="3" max="10" style="width:100px;" onchange="window.APP.calculateFixedPayment()">
                             <span>%</span>
                             <small style="margin-left:10px;">${lang === 'id' ? 'Default 8%, bisa dinegosiasi 3-10%' : '默认8%，可协商3-10%'}</small>
                         </div>
@@ -690,7 +692,7 @@ const CustomersModule = {
                         
                         <div class="form-group">
                             <label>${t('loan_amount')} *</label>
-                            <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input" oninput="APP.calculateFixedPayment()">
+                            <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input" oninput="window.APP.calculateFixedPayment()">
                         </div>
                         
                         ${repaymentTypeOptions}
@@ -1147,14 +1149,19 @@ const CustomersModule = {
     }
 };
 
+// 导出所有方法
 for (var key in CustomersModule) {
     if (typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
     }
 }
 
+// 确保辅助函数也被导出
 window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
 window.APP.toggleRepaymentForm = CustomersModule.toggleRepaymentForm;
 window.APP.calculateFixedPayment = CustomersModule.calculateFixedPayment;
+window.APP.toggleLivingAddress = CustomersModule.toggleLivingAddress;
+window.APP._toggleEditLiving = CustomersModule._toggleEditLiving;
+window.APP._saveEditCustomer = CustomersModule._saveEditCustomer;
