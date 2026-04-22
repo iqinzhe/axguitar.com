@@ -309,11 +309,11 @@ const StoreManager = {
                                placeholder="628xxxxxxxxxx" style="width:140px; font-size:12px; padding:6px;" 
                                onchange="APP.updateStoreWANumber('${store.id}', this.value)">
                     </td>
-                    <td class="action-cell">
+                <\/tr>
+                    <tr class="action-row"><td colspan="6">
                         <button onclick="StoreManager.editStore('${store.id}')" class="btn-small">✏️ ${t('edit')}</button>
                         <button class="btn-small danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>
-                    </td>
-                　　　`;
+                    <\/td><\/tr>`;
             }
         }
 

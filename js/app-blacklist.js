@@ -214,8 +214,8 @@ const BlacklistModule = {
                         <td data-label="${t('phone')}">${Utils.escapeHtml(customer.phone || '-')}</td>
                         <td data-label="${lang === 'id' ? 'Alasan' : '原因'}">${Utils.escapeHtml(item.reason)}</td>
                         <td data-label="${lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期'}">${Utils.formatDate(item.blacklisted_at)}</td>
-                        ${isAdmin ? `<td data-label="${t('action')}" class="action-cell">${actionHtml}</td>` : ''}
-                    </tr>`;
+                    </tr>
+                    <tr class="action-row"><td colspan="${isAdmin ? 6 : 5}">${actionHtml}</td></tr>`;
                 }
             }
             
@@ -289,28 +289,7 @@ const BlacklistModule = {
     },
     
     _addBlacklistTableStyles: function() {
-        if (document.getElementById('blacklist-table-styles')) return;
-        
-        var style = document.createElement('style');
-        style.id = 'blacklist-table-styles';
-        style.textContent = `
-            @media (max-width: 768px) {
-                .data-table td.action-cell {
-                    display: block !important;
-                    width: 100% !important;
-                    margin-top: 10px !important;
-                    padding-top: 8px !important;
-                    border-top: 1px solid #e2e8f0 !important;
-                }
-                .data-table td.action-cell::before {
-                    content: attr(data-label) !important;
-                    display: block !important;
-                    margin-bottom: 6px !important;
-                    font-weight: 600 !important;
-                }
-            }
-        `;
-        document.head.appendChild(style);
+        // 已废弃：action-cell 移至 tables.css 的 action-row 统一处理
     }
 };
 

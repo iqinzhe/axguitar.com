@@ -31,7 +31,8 @@ const DashboardUsers = {
                         <td class="text-center">${roleMap[u.role] || u.role}<\/td>
                         <td>${Utils.escapeHtml(storeName)}<\/td>
                         <td class="text-center">${Utils.formatDate(u.created_at)}<\/td>
-                        <td class="action-cell">
+                    <\/tr>
+                    <tr class="action-row"><td colspan="6">
                             ${AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id ? `
                                 <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')" class="role-select">
                                     <option value="store_manager" ${u.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
@@ -40,8 +41,7 @@ const DashboardUsers = {
                                 <button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button>
                                 <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
                             ` : (u.id === AUTH.user?.id ? `<span style="color:var(--primary);font-weight:600;">👤 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}</span>` : '-')}
-                        <\/td>
-                    <\/tr>`;
+                        <\/td><\/tr>`;
                 }
             }
             

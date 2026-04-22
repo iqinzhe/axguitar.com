@@ -50,7 +50,9 @@ const DashboardOrders = {
                         <td data-label="${t('repayment_type')}" class="text-center">${repaymentBadge}<\/td>
                         <td data-label="${t('status')}" class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span><\/td>
                         ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${Utils.escapeHtml(storeName)}<\/td>` : ''}
-                        <td data-label="${t('action')}" class="action-cell">
+                    <\/tr>
+                    <tr class="action-row">
+                        <td colspan="${isAdmin ? 10 : 9}">
                             <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ ${t('view')}</button>
                             ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                             ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
@@ -543,8 +545,8 @@ const DashboardOrders = {
                     <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
                     <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodMap[p.payment_method] || '-'}<\/td>
                     <td data-label="${t('description')}">${Utils.escapeHtml(p.description || '-')}<\/td>
-                    <td data-label="${t('action')}" class="action-cell"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">${t('view')}<\/button><\/td>
-                <\/tr>`).join('');
+                <\/tr>
+                <tr class="action-row"><td colspan="9"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">${t('view')}<\/button><\/td><\/tr>`).join('');
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">

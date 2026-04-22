@@ -45,7 +45,9 @@ const CustomersModule = {
                         <td data-label="${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}">${livingAddress}<\/td>
                         <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}<\/td>
                         ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}<\/td>` : ''}
-                        <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">
+                    <\/tr>
+                    <tr class="action-row">
+                        <td colspan="${isAdmin ? 9 : 8}">
                             <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
                             ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
@@ -136,26 +138,14 @@ const CustomersModule = {
     
     _addDataTableStyles: function() {
         if (document.getElementById('data-table-styles')) return;
-        
         var style = document.createElement('style');
         style.id = 'data-table-styles';
         style.textContent = `
-            .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-            .data-table th { background: var(--gray-100); padding: 10px 12px; font-weight: 600; color: var(--gray-700); border-bottom: 1px solid var(--gray-300); white-space: nowrap; }
-            .data-table td { padding: 8px 12px; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
-            .data-table tbody tr:hover { background: var(--gray-50); }
-            .data-table .text-center { text-align: center; }
-            .data-table .text-right { text-align: right; }
-            .data-table .customer-id { font-family: monospace; font-weight: 600; color: var(--primary-dark); }
-            .data-table .customer-name { font-weight: 500; }
             .data-table .customer-address { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            .action-cell { display: flex; gap: 6px; flex-wrap: wrap; }
             .btn-blacklist { background: #f97316 !important; color: #fff !important; border-color: #ea580c !important; }
             .btn-blacklist:hover { background: #ea580c !important; }
             @media (max-width: 768px) {
-                .data-table th, .data-table td { padding: 6px 8px; font-size: 0.7rem; }
                 .data-table .customer-address { max-width: 120px; }
-                .action-cell .btn-small { padding: 4px 6px; font-size: 0.65rem; }
             }
         `;
         document.head.appendChild(style);
@@ -916,11 +906,11 @@ const CustomersModule = {
                     <td data-label="${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}" class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
                     <td data-label="${lang === 'id' ? 'Jenis' : '方式'}" class="text-center"><span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}<\/span><\/td>
                     <td data-label="${t('status')}" class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/td>
-                    <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">
+                <\/tr>
+                <tr class="action-row"><td colspan="8">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small">👁️ ${t('view')}<\/button>
                         ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                    <\/td>
-                <\/tr>`;
+                    <\/td><\/tr>`;
             }).join('') : `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
 
             document.getElementById("app").innerHTML = `
