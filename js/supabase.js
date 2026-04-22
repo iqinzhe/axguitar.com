@@ -1,4 +1,4 @@
-// supabase.js - v1.2（所有错误消息使用 Utils.t()，支持双语）
+// supabase.js - v1.3（修复：calculateNextDueDate 日期边界问题 + 安全优化）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -240,6 +240,35 @@ const SupabaseAPI = {
         return `${prefix}-${dateCode}-${serial}`;
     },
 
+    // 修复：calculateNextDueDate 日期边界问题
+    calculateNextDueDate: function(startDate, paidMonths) {
+        if (!startDate) {
+            startDate = new Date().toISOString().split('T')[0];
+        }
+        
+        let date = new Date(startDate);
+        
+        // 修复：确保日期有效
+        if (isNaN(date.getTime())) {
+            console.warn("calculateNextDueDate: 无效的日期", startDate);
+            date = new Date();
+        }
+        
+        // 保存原始日期（用于边界处理）
+        const originalDay = date.getDate();
+        
+        // 计算目标月份
+        date.setMonth(date.getMonth() + paidMonths + 1);
+        
+        // 修复：处理月份溢出问题（如1月31日加1个月，应该得到2月28日/29日）
+        // 如果新日期的日数不等于原始日数，说明发生了溢出，调整到月末
+        if (date.getDate() !== originalDay) {
+            date.setDate(0); // 设置为上个月的最后一天
+        }
+        
+        return date.toISOString().split('T')[0];
+    },
+
     async recordCashFlow(flowData) {
         const profile = await this.getCurrentProfile();
         
@@ -397,7 +426,7 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
-    // ==================== 创建订单（支持固定还款） ====================
+    // 创建订单（支持固定还款）
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
@@ -438,6 +467,8 @@ const SupabaseAPI = {
                 
                 const monthlyInterest = orderData.loan_amount * agreedInterestRate;
                 
+                const nextDueDate = this.calculateNextDueDate(nowDate, 0);
+                
                 const newOrder = {
                     order_id: orderId,
                     customer_name: orderData.customer_name,
@@ -454,7 +485,7 @@ const SupabaseAPI = {
                     monthly_interest: monthlyInterest,
                     interest_paid_months: 0,
                     interest_paid_total: 0,
-                    next_interest_due_date: this.calculateNextDueDate(nowDate, 0),
+                    next_interest_due_date: nextDueDate,
                     principal_paid: 0,
                     principal_remaining: orderData.loan_amount,
                     status: 'active',
@@ -498,11 +529,8 @@ const SupabaseAPI = {
         throw lastError || new Error(Utils.lang === 'id' ? 'Gagal membuat pesanan' : '创建订单失败');
     },
 
-    calculateNextDueDate(startDate, paidMonths) {
-        const date = new Date(startDate);
-        date.setMonth(date.getMonth() + paidMonths + 1);
-        return date.toISOString().split('T')[0];
-    },
+    // 使用修复后的 calculateNextDueDate
+    // 注意：上面已经定义了 calculateNextDueDate 方法，这里不再重复
 
     async recordAdminFee(orderId, paymentMethod = 'cash', adminFeeAmount = null) {
         const order = await this.getOrder(orderId);
@@ -592,7 +620,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 灵活还款 - 利息记录（使用协商利率） ====================
+    // 灵活还款 - 利息记录
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -620,12 +648,14 @@ const SupabaseAPI = {
                 : `❌ 已达到最大延期期限 (${maxMonths}个月)，请尽快结清本金`);
         }
         
+        const nextDueDate = this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths);
+        
         const { error: updateError } = await supabaseClient
             .from('orders')
             .update({
                 interest_paid_months: newInterestPaidMonths,
                 interest_paid_total: newInterestPaidTotal,
-                next_interest_due_date: this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths),
+                next_interest_due_date: nextDueDate,
                 monthly_interest: monthlyInterest,
                 updated_at: new Date().toISOString()
             })
@@ -674,7 +704,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 灵活还款 - 本金记录 ====================
+    // 灵活还款 - 本金记录
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -762,7 +792,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 固定还款 - 按期还款 ====================
+    // 固定还款 - 按期还款
     async recordFixedPayment(orderId, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const order = await this.getOrder(orderId);
@@ -798,6 +828,8 @@ const SupabaseAPI = {
         const isCompleted = newFixedPaidMonths >= order.repayment_term || newPrincipalRemaining <= 0;
         const newMonthlyInterest = newPrincipalRemaining * monthlyRate;
         
+        const nextDueDate = this.calculateNextDueDate(order.created_at, newFixedPaidMonths);
+        
         const updates = {
             principal_paid: newPrincipalPaid,
             principal_remaining: newPrincipalRemaining,
@@ -805,7 +837,7 @@ const SupabaseAPI = {
             monthly_interest: newMonthlyInterest,
             interest_paid_months: (order.interest_paid_months || 0) + 1,
             interest_paid_total: (order.interest_paid_total || 0) + interestAmount,
-            next_interest_due_date: this.calculateNextDueDate(order.created_at, newFixedPaidMonths),
+            next_interest_due_date: nextDueDate,
             updated_at: new Date().toISOString()
         };
         
@@ -882,7 +914,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 固定还款 - 提前结清（减免剩余利息） ====================
+    // 固定还款 - 提前结清
     async earlySettleFixedOrder(orderId, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const order = await this.getOrder(orderId);
@@ -949,7 +981,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 更新逾期天数 ====================
+    // 更新逾期天数
     async updateOverdueDays() {
         const { data: activeOrders, error } = await supabaseClient
             .from('orders')
