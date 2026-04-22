@@ -85,18 +85,18 @@ body {
 @media (min-width: 769px) {
     /* 基础字体放大 - 所有常规文字放大 1.5 倍 */
     html {
-        font-size: 24px;  /* 原 16px × 1.5 = 24px */
+        font-size: 22px;  /* 原 16px × 1.5 = 22px */
     }
     
     /* 重新定义字体变量（覆盖原有值，放大 1.5 倍） */
     :root {
-        --font-xxs: 1.05rem;   /* 原 0.7rem × 1.5 = 1.05rem */
-        --font-xs: 1.2rem;     /* 原 0.8rem × 1.5 = 1.2rem */
+        --font-xxs: 1.0rem;   /* 原 0.7rem × 1.5 = 1.05rem */
+        --font-xs: 1.25rem;     /* 原 0.8rem × 1.5 = 1.2rem */
         --font-sm: 1.35rem;    /* 原 0.9rem × 1.5 = 1.35rem */
-        --font-md: 1.5rem;     /* 原 1rem × 1.5 = 1.5rem */
-        --font-lg: 1.6875rem;  /* 原 1.125rem × 1.5 = 1.6875rem */
-        --font-xl: 1.875rem;   /* 原 1.25rem × 1.5 = 1.875rem */
-        --font-2xl: 2.025rem;  /* 原 1.35rem × 1.5 = 2.025rem */
+        --font-md: 1.4rem;     /* 原 1rem × 1.5 = 1.5rem */
+        --font-lg: 1.5rem;  /* 原 1.125rem × 1.5 = 1.6875rem */
+        --font-xl: 1.6rem;   /* 原 1.25rem × 1.5 = 1.875rem */
+        --font-2xl: 1.8rem;  /* 原 1.35rem × 1.5 = 2.025rem */
     }
     
     /* ========== 页面底部卡片（显示当前用户、门店信息等）- 保持原字号不变 ========== */
@@ -192,18 +192,18 @@ body {
 @media (max-width: 768px) {
     /* 手机端基础字体放大 1.2 倍 */
     html {
-        font-size: 19.2px;  /* 原 16px × 1.2 = 19.2px */
+        font-size: 19.0px;  /* 原 16px × 1.2 = 19.2px */
     }
     
     /* 重新定义字体变量（覆盖原有值，放大 1.2 倍） */
     :root {
-        --font-xxs: 0.84rem;   /* 原 0.7rem × 1.2 = 0.84rem */
-        --font-xs: 0.96rem;    /* 原 0.8rem × 1.2 = 0.96rem */
-        --font-sm: 1.08rem;    /* 原 0.9rem × 1.2 = 1.08rem */
+        --font-xxs: 0.8rem;   /* 原 0.7rem × 1.2 = 0.84rem */
+        --font-xs: 0.95rem;    /* 原 0.8rem × 1.2 = 0.96rem */
+        --font-sm: 1.0rem;    /* 原 0.9rem × 1.2 = 1.08rem */
         --font-md: 1.2rem;     /* 原 1rem × 1.2 = 1.2rem */
         --font-lg: 1.35rem;    /* 原 1.125rem × 1.2 = 1.35rem */
-        --font-xl: 1.5rem;     /* 原 1.25rem × 1.2 = 1.5rem */
-        --font-2xl: 1.62rem;   /* 原 1.35rem × 1.2 = 1.62rem */
+        --font-xl: 1.4rem;     /* 原 1.25rem × 1.2 = 1.5rem */
+        --font-2xl: 1.5rem;   /* 原 1.35rem × 1.2 = 1.62rem */
     }
     
     /* ========== 页面底部卡片文字减小 1/4（即缩小到原来的 75%） ========== */
