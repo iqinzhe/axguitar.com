@@ -1,4 +1,4 @@
-// app-customers.js - v1.2（所有用户可见字符串使用 Utils.t()，支持双语）
+// app-customers.js - v1.3（修复：黑名单检查安全调用 + 表格响应式 data-label）
 
 window.APP = window.APP || {};
 
@@ -36,16 +36,17 @@ const CustomersModule = {
                     
                     var escapedId = Utils.escapeAttr(c.id);
                     
+                    // 添加 data-label 属性用于手机端响应式显示
                     rows += `<tr>
-                        <td class="customer-id">${customerId}</td>
-                        <td class="customer-name">${name}</td>
-                        <td>${ktpNumber}</td>
-                        <td>${phone}</td>
-                        <td class="customer-address">${ktpAddress}</td>
-                        <td class="customer-address">${livingAddress}</td>
-                        <td class="text-center">${registeredDate}</td>
-                        ${isAdmin ? `<td class="text-center">${storeName}</td>` : ''}
-                        <td class="action-cell">
+                        <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${customerId}</td>
+                        <td data-label="${t('customer_name')}">${name}</td>
+                        <td data-label="${t('ktp_number')}">${ktpNumber}</td>
+                        <td data-label="${t('phone')}">${phone}</td>
+                        <td data-label="${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}">${ktpAddress}</td>
+                        <td data-label="${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}">${livingAddress}</td>
+                        <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}</td>
+                        ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}</td>` : ''}
+                        <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">
                             ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
@@ -511,7 +512,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（支持固定还款） ====================
+    // ==================== 创建订单（支持固定还款）- 修复黑名单检查 ====================
     createOrderForCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -523,6 +524,25 @@ const CustomersModule = {
         }
         
         try {
+            // 修复：安全检查黑名单（兼容模块未加载的情况）
+            var blacklistCheck = null;
+            if (typeof window.APP.isBlacklisted === 'function') {
+                blacklistCheck = await window.APP.isBlacklisted(customerId);
+            } else {
+                // 直接查询数据库
+                const { data, error } = await supabaseClient
+                    .from('blacklist')
+                    .select('id, reason')
+                    .eq('customer_id', customerId)
+                    .maybeSingle();
+                blacklistCheck = error ? { isBlacklisted: false } : (data ? { isBlacklisted: true, reason: data.reason } : { isBlacklisted: false });
+            }
+            
+            if (blacklistCheck && blacklistCheck.isBlacklisted) {
+                alert(t('blacklisted_cannot_order'));
+                return;
+            }
+            
             const { data: existingOrders } = await supabaseClient
                 .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
             if (existingOrders && existingOrders.length > 0) {
@@ -772,7 +792,7 @@ const CustomersModule = {
             
         } catch (error) {
             console.error("createOrderForCustomer error:", error);
-            alert(lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
+            alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
         }
     },
 
@@ -844,8 +864,20 @@ const CustomersModule = {
                 .eq('id', customerId)
                 .single();
             
-            const blacklistCheck = await window.APP.isBlacklisted(customerId);
-            if (blacklistCheck.isBlacklisted) {
+            // 再次检查黑名单（双重保险）
+            var blacklistCheck = null;
+            if (typeof window.APP.isBlacklisted === 'function') {
+                blacklistCheck = await window.APP.isBlacklisted(customerId);
+            } else {
+                const { data } = await supabaseClient
+                    .from('blacklist')
+                    .select('id')
+                    .eq('customer_id', customerId)
+                    .maybeSingle();
+                blacklistCheck = data ? { isBlacklisted: true } : { isBlacklisted: false };
+            }
+            
+            if (blacklistCheck && blacklistCheck.isBlacklisted) {
                 alert(t('blacklisted_cannot_order'));
                 return;
             }
@@ -951,14 +983,14 @@ const CustomersModule = {
                     ? (lang === 'id' ? 'Tetap' : '固定') 
                     : (lang === 'id' ? 'Fleksibel' : '灵活');
                 return `<tr>
-                    <td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
-                    <td class="date-cell">${Utils.formatDate(o.created_at)}<\/td>
-                    <td class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
-                    <td class="text-right">${Utils.formatCurrency(o.principal_paid)}<\/td>
-                    <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
-                    <td class="text-center"><span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}<\/span><\/td>
-                    <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/td>
-                    <td class="action-cell">
+                    <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
+                    <td data-label="${lang === 'id' ? 'Tanggal' : '日期'}" class="date-cell">${Utils.formatDate(o.created_at)}<\/td>
+                    <td data-label="${t('loan_amount')}" class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
+                    <td data-label="${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}" class="text-right">${Utils.formatCurrency(o.principal_paid)}<\/td>
+                    <td data-label="${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}" class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
+                    <td data-label="${lang === 'id' ? 'Jenis' : '方式'}" class="text-center"><span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}<\/span><\/td>
+                    <td data-label="${t('status')}" class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}<\/span><\/td>
+                    <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">
                         <button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small">👁️ ${t('view')}<\/button>
                         ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     <\/td>
@@ -1044,13 +1076,13 @@ const CustomersModule = {
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
-                    <td class="date-cell">${Utils.formatDate(p.date)}<\/td>
-                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
-                    <td>${typeMap[p.type] || p.type}<\/td>
-                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}<\/td>
-                    <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
-                    <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}<\/span><\/td>
-                    <td>${Utils.escapeHtml(p.description || '-')}<\/td>
+                    <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
+                    <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
+                    <td data-label="${t('type')}">${typeMap[p.type] || p.type}<\/td>
+                    <td data-label="${lang === 'id' ? 'Bulan' : '月数'}" class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}<\/td>
+                    <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                    <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center"><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}<\/span><\/td>
+                    <td data-label="${t('description')}">${Utils.escapeHtml(p.description || '-')}<\/td>
                 <\/tr>`).join('');
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -1071,13 +1103,13 @@ const CustomersModule = {
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th>${lang === 'id' ? 'ID Pesanan' : '订单ID'}</th>
-                                    <th>${lang === 'id' ? 'Jenis' : '类型'}</th>
+                                    <th>${t('date')}</th>
+                                    <th>${t('order_id')}</th>
+                                    <th>${t('type')}</th>
                                     <th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th class="text-right">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th class="text-right">${t('amount')}</th>
                                     <th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                    <th>${lang === 'id' ? 'Keterangan' : '说明'}</th>
+                                    <th>${t('description')}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
