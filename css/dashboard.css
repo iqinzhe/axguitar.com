@@ -1,4 +1,4 @@
-/* dashboard.css - 完整优化版 v2.0 */
+/* dashboard.css - 优化版 v2.0 */
 
 /* === 卡片组件 === */
 .card {
@@ -80,7 +80,7 @@
     margin-bottom: var(--spacing-5);
 }
 
-/* === 资金管理区块 === */
+/* === 资金管理区块 - 优化为浅色高亮 === */
 .cashflow-summary {
     background: var(--bg-highlight);
     border-radius: var(--radius-xl);
