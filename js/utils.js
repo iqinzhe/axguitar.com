@@ -1,4 +1,4 @@
-// utils.js - v1.2（补全所有翻译键，修复印尼语缺失）
+// utils.js - v1.3（修复 t 函数中的 undefined 错误）
 
 const Utils = {
     lang: 'id',
@@ -36,7 +36,7 @@ const Utils = {
         return date.toISOString().split('T')[0];
     },
 
-    // ==================== 固定还款计算函数 ====================
+    // 固定还款计算函数
     calculateFixedMonthlyPayment: function(loanAmount, monthlyRate, months) {
         if (monthlyRate === 0) return loanAmount / months;
         const rate = monthlyRate;
@@ -54,54 +54,115 @@ const Utils = {
         };
     },
 
+    // ========== 修复：安全的翻译函数 ==========
     translations: {
         id: {
             // 基础
-            login: "Masuk", logout: "Keluar", username: "Nama Pengguna", password: "Kata Sandi",
-            save: "Simpan", cancel: "Batal", back: "Kembali", delete: "Hapus", edit: "Edit",
-            view: "Lihat", search: "Cari", reset: "Reset", confirm: "Konfirmasi",
-            dashboard: "Dasbor", create_order: "Buat Pesanan", order_list: "Daftar Pesanan",
-            financial_report: "Laporan Keuangan", user_management: "Manajemen Operator",
-            backup_restore: "Cadangan & Pemulihan", store_management: "Manajemen Toko",
-            expenses: "Pengeluaran Operasional", payment_history: "Arus Kas",
-            customers: "Data Nasabah", blacklist: "Daftar Hitam",
-            total_orders: "Total Pesanan", active: "Berjalan", completed: "Lunas",
-            liquidated: "Dilikuidasi", total_loan: "Total Pinjaman",
-            customer_info: "Informasi Pelanggan", customer_name: "Nama Lengkap",
-            ktp_number: "Nomor KTP", phone: "Nomor Telepon", address: "Alamat",
-            collateral_info: "Informasi Jaminan", collateral_name: "Nama Barang Jaminan",
-            loan_amount: "Jumlah Pinjaman", notes: "Catatan",
-            status_active: "Berjalan", status_completed: "Lunas", status_liquidated: "Dilikuidasi",
-            order_id: "ID Pesanan", order_date: "Tanggal Pesanan",
-            fill_all_fields: "Harap isi semua bidang!", login_failed: "Login gagal!",
-            order_created: "Pesanan berhasil dibuat!", order_updated: "Pesanan diperbarui",
-            order_deleted: "Pesanan dihapus", confirm_delete: "Yakin ingin menghapus?",
-            backup_downloaded: "Cadangan diunduh!", export_success: "Ekspor berhasil!",
-            no_data: "Tidak ada data", current_user: "Pengguna saat ini",
-            print: "Cetak", export_csv: "Ekspor CSV",
-            cash: "Tunai", bank: "Bank BNI",
-            service_fee: "Service Fee", admin_fee: "Admin Fee", interest: "Bunga",
-            principal: "Pokok", expense: "Pengeluaran", profit: "Laba Bersih",
-            cash_flow: "Arus Kas", inflow: "Masuk", outflow: "Keluar",
+            login: "Masuk", 
+            logout: "Keluar", 
+            username: "Nama Pengguna", 
+            password: "Kata Sandi",
+            save: "Simpan", 
+            cancel: "Batal", 
+            back: "Kembali", 
+            delete: "Hapus", 
+            edit: "Edit",
+            view: "Lihat", 
+            search: "Cari", 
+            reset: "Reset", 
+            confirm: "Konfirmasi",
+            dashboard: "Dasbor", 
+            create_order: "Buat Pesanan", 
+            order_list: "Daftar Pesanan",
+            financial_report: "Laporan Keuangan", 
+            user_management: "Manajemen Operator",
+            backup_restore: "Cadangan & Pemulihan", 
+            store_management: "Manajemen Toko",
+            expenses: "Pengeluaran Operasional", 
+            payment_history: "Arus Kas",
+            customers: "Data Nasabah", 
+            blacklist: "Daftar Hitam",
+            total_orders: "Total Pesanan", 
+            active: "Berjalan", 
+            completed: "Lunas",
+            liquidated: "Dilikuidasi", 
+            total_loan: "Total Pinjaman",
+            customer_info: "Informasi Pelanggan", 
+            customer_name: "Nama Lengkap",
+            ktp_number: "Nomor KTP", 
+            phone: "Nomor Telepon", 
+            address: "Alamat",
+            collateral_info: "Informasi Jaminan", 
+            collateral_name: "Nama Barang Jaminan",
+            loan_amount: "Jumlah Pinjaman", 
+            notes: "Catatan",
+            status_active: "Berjalan", 
+            status_completed: "Lunas", 
+            status_liquidated: "Dilikuidasi",
+            order_id: "ID Pesanan", 
+            order_date: "Tanggal Pesanan",
+            fill_all_fields: "Harap isi semua bidang!", 
+            login_failed: "Login gagal!",
+            order_created: "Pesanan berhasil dibuat!", 
+            order_updated: "Pesanan diperbarui",
+            order_deleted: "Pesanan dihapus", 
+            confirm_delete: "Yakin ingin menghapus?",
+            backup_downloaded: "Cadangan diunduh!", 
+            export_success: "Ekspor berhasil!",
+            no_data: "Tidak ada data", 
+            current_user: "Pengguna saat ini",
+            print: "Cetak", 
+            export_csv: "Ekspor CSV",
+            cash: "Tunai", 
+            bank: "Bank BNI",
+            service_fee: "Service Fee", 
+            admin_fee: "Admin Fee", 
+            interest: "Bunga",
+            principal: "Pokok", 
+            expense: "Pengeluaran", 
+            profit: "Laba Bersih",
+            cash_flow: "Arus Kas", 
+            inflow: "Masuk", 
+            outflow: "Keluar",
             loan_disbursement: "Pencairan Pinjaman",
-            action: "Aksi", date: "Tanggal", amount: "Jumlah", description: "Deskripsi",
-            status: "Status", save_exit: "Simpan & Keluar", send_reminder: "Kirim Pengingat",
-            order_details: "Detail Pesanan", collateral_note: "Keterangan Barang",
-            loan_source: "Sumber Dana Pinjaman", service_fee_method: "Metode Pemasukan Service Fee",
-            admin_fee_method: "Metode Pemasukan Admin Fee", store: "Toko",
-            registered_date: "Tanggal Daftar", living_address: "Alamat Tinggal",
-            ktp_address: "Alamat KTP", same_as_ktp: "Sama dengan KTP", different: "Berbeda",
-            add_customer: "Tambah Nasabah Baru", customer_list: "Daftar Nasabah",
-            operation: "Operasi Bisnis", financial_indicators: "Indikator Keuangan",
-            fund_management: "Manajemen Dana", internal_transfer: "Transfer Internal",
-            cash_to_bank: "Tunai ke Bank", bank_to_cash: "Bank ke Tunai",
-            submit_to_hq: "Setoran ke Pusat", cash_flow_summary: "Ringkasan Arus Kas",
-            total_cash: "Total Kas", net_profit: "Laba Bersih", filter: "Filter",
-            clear_filter: "Bersihkan Filter", export: "Ekspor", close: "Tutup",
-            search_description: "Cari deskripsi...", all_types: "Semua tipe",
-            from_date: "Dari tanggal", to_date: "Sampai tanggal",
-            
-            // 固定还款相关
+            action: "Aksi", 
+            date: "Tanggal", 
+            amount: "Jumlah", 
+            description: "Deskripsi",
+            status: "Status", 
+            save_exit: "Simpan & Keluar", 
+            send_reminder: "Kirim Pengingat",
+            order_details: "Detail Pesanan", 
+            collateral_note: "Keterangan Barang",
+            loan_source: "Sumber Dana Pinjaman", 
+            service_fee_method: "Metode Pemasukan Service Fee",
+            admin_fee_method: "Metode Pemasukan Admin Fee", 
+            store: "Toko",
+            registered_date: "Tanggal Daftar", 
+            living_address: "Alamat Tinggal",
+            ktp_address: "Alamat KTP", 
+            same_as_ktp: "Sama dengan KTP", 
+            different: "Berbeda",
+            add_customer: "Tambah Nasabah Baru", 
+            customer_list: "Daftar Nasabah",
+            operation: "Operasi Bisnis", 
+            financial_indicators: "Indikator Keuangan",
+            fund_management: "Manajemen Dana", 
+            internal_transfer: "Transfer Internal",
+            cash_to_bank: "Tunai ke Bank", 
+            bank_to_cash: "Bank ke Tunai",
+            submit_to_hq: "Setoran ke Pusat", 
+            cash_flow_summary: "Ringkasan Arus Kas",
+            total_cash: "Total Kas", 
+            net_profit: "Laba Bersih", 
+            filter: "Filter",
+            clear_filter: "Bersihkan Filter", 
+            export: "Ekspor", 
+            close: "Tutup",
+            search_description: "Cari deskripsi...", 
+            all_types: "Semua tipe",
+            from_date: "Dari tanggal", 
+            to_date: "Sampai tanggal",
             fixed_repayment: "Cicilan Tetap",
             flexible_repayment: "Cicilan Fleksibel",
             repayment_type: "Jenis Cicilan",
@@ -116,17 +177,15 @@ const Utils = {
             interest_rebate: "Diskon Bunga",
             remaining_term: "Sisa Jangka Waktu",
             confirm_early_settlement: "Konfirmasi Pelunasan Dipercepat",
-            
-            // 补充缺失的通用翻译
             store_operation: "Operasi Toko",
             save_failed: "Gagal menyimpan",
             order_not_found: "Pesanan tidak ditemukan",
             unauthorized: "Tidak memiliki akses",
             order_locked: "Pesanan terkunci",
             loan_already_disbursed: "Pinjaman sudah dicairkan",
-            backup_complete: "✅ Cadangan selesai!\\n\\nTelah mengekspor {orders} pesanan, {customers} data nasabah.",
-            restore_confirm: "⚠️ Pemulihan data akan menimpa semua data saat ini!\\n\\nTindakan ini tidak dapat dibatalkan.\\n\\nDisarankan untuk mengekspor data saat ini sebagai cadangan terlebih dahulu.\\n\\nYakin ingin melanjutkan?",
-            save_exit_confirm: "💾 Konfirmasi simpan dan keluar?\\n\\nSistem akan menyimpan data secara otomatis, lalu keluar.",
+            backup_complete: "✅ Cadangan selesai!\n\nTelah mengekspor {orders} pesanan, {customers} data nasabah.",
+            restore_confirm: "⚠️ Pemulihan data akan menimpa semua data saat ini!\n\nTindakan ini tidak dapat dibatalkan.\n\nDisarankan untuk mengekspor data saat ini sebagai cadangan terlebih dahulu.\n\nYakin ingin melanjutkan?",
+            save_exit_confirm: "💾 Konfirmasi simpan dan keluar?\n\nSistem akan menyimpan data secara otomatis, lalu keluar.",
             login_required: "Silakan login kembali",
             invalid_amount: "Jumlah tidak valid",
             payment_success: "Pembayaran berhasil",
@@ -135,57 +194,116 @@ const Utils = {
             blacklisted_cannot_order: "❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.",
             interest_recorded: "Bunga {amount} telah dicatat",
             principal_recorded: "Pembayaran pokok {amount} telah dicatat",
-            fixed_installment_paid: "Angsuran ke-{month} berhasil dibayar!\\nBunga: {interest}\\nPokok: {principal}\\nSisa angsuran: {remaining} bulan",
-            early_settlement_success: "✅ Pelunasan dipercepat berhasil!\\nJumlah pelunasan: {amount}",
+            fixed_installment_paid: "Angsuran ke-{month} berhasil dibayar!\nBunga: {interest}\nPokok: {principal}\nSisa angsuran: {remaining} bulan",
+            early_settlement_success: "✅ Pelunasan dipercepat berhasil!\nJumlah pelunasan: {amount}",
             confirm_logout: "Apakah Anda yakin ingin keluar? Data yang belum disimpan akan hilang."
         },
         zh: {
-            // 基础（保持原有，略作补充）
-            login: "登录", logout: "退出", username: "用户名", password: "密码",
-            save: "保存", cancel: "取消", back: "返回", delete: "删除", edit: "编辑",
-            view: "查看", search: "搜索", reset: "重置", confirm: "确认",
-            dashboard: "仪表板", create_order: "新建订单", order_list: "订单管理",
-            financial_report: "业务报表", user_management: "员工管理",
-            backup_restore: "备份恢复", store_management: "门店管理",
-            expenses: "运营支出", payment_history: "资金流水",
-            customers: "客户信息", blacklist: "黑名单",
-            total_orders: "订单总数", active: "进行中", completed: "已结清",
-            liquidated: "已变卖", total_loan: "贷款总额",
-            customer_info: "客户信息", customer_name: "客户姓名",
-            ktp_number: "KTP号码", phone: "手机号", address: "地址",
-            collateral_info: "典当信息", collateral_name: "质押物名称",
-            loan_amount: "贷款金额", notes: "备注",
-            status_active: "进行中", status_completed: "已结清", status_liquidated: "已变卖",
-            order_id: "订单号", order_date: "订单日期",
-            fill_all_fields: "请填写所有字段！", login_failed: "登录失败！",
-            order_created: "订单创建成功！", order_updated: "订单已更新",
-            order_deleted: "订单已删除", confirm_delete: "确定删除？",
-            backup_downloaded: "备份已下载！", export_success: "导出成功！",
-            no_data: "暂无数据", current_user: "当前用户",
-            print: "打印", export_csv: "导出CSV",
-            cash: "现金", bank: "银行BNI",
-            service_fee: "服务费", admin_fee: "管理费", interest: "利息",
-            principal: "本金", expense: "支出", profit: "净利",
-            cash_flow: "资金流水", inflow: "流入", outflow: "流出",
+            login: "登录", 
+            logout: "退出", 
+            username: "用户名", 
+            password: "密码",
+            save: "保存", 
+            cancel: "取消", 
+            back: "返回", 
+            delete: "删除", 
+            edit: "编辑",
+            view: "查看", 
+            search: "搜索", 
+            reset: "重置", 
+            confirm: "确认",
+            dashboard: "仪表板", 
+            create_order: "新建订单", 
+            order_list: "订单管理",
+            financial_report: "业务报表", 
+            user_management: "员工管理",
+            backup_restore: "备份恢复", 
+            store_management: "门店管理",
+            expenses: "运营支出", 
+            payment_history: "资金流水",
+            customers: "客户信息", 
+            blacklist: "黑名单",
+            total_orders: "订单总数", 
+            active: "进行中", 
+            completed: "已结清",
+            liquidated: "已变卖", 
+            total_loan: "贷款总额",
+            customer_info: "客户信息", 
+            customer_name: "客户姓名",
+            ktp_number: "KTP号码", 
+            phone: "手机号", 
+            address: "地址",
+            collateral_info: "典当信息", 
+            collateral_name: "质押物名称",
+            loan_amount: "贷款金额", 
+            notes: "备注",
+            status_active: "进行中", 
+            status_completed: "已结清", 
+            status_liquidated: "已变卖",
+            order_id: "订单号", 
+            order_date: "订单日期",
+            fill_all_fields: "请填写所有字段！", 
+            login_failed: "登录失败！",
+            order_created: "订单创建成功！", 
+            order_updated: "订单已更新",
+            order_deleted: "订单已删除", 
+            confirm_delete: "确定删除？",
+            backup_downloaded: "备份已下载！", 
+            export_success: "导出成功！",
+            no_data: "暂无数据", 
+            current_user: "当前用户",
+            print: "打印", 
+            export_csv: "导出CSV",
+            cash: "现金", 
+            bank: "银行BNI",
+            service_fee: "服务费", 
+            admin_fee: "管理费", 
+            interest: "利息",
+            principal: "本金", 
+            expense: "支出", 
+            profit: "净利",
+            cash_flow: "资金流水", 
+            inflow: "流入", 
+            outflow: "流出",
             loan_disbursement: "贷款发放",
-            action: "操作", date: "日期", amount: "金额", description: "描述",
-            status: "状态", save_exit: "保存退出", send_reminder: "催收提醒",
-            order_details: "订单详情", collateral_note: "物品备注",
-            loan_source: "贷款资金来源", service_fee_method: "服务费入账方式",
-            admin_fee_method: "管理费入账方式", store: "门店",
-            registered_date: "注册日期", living_address: "居住地址",
-            ktp_address: "KTP地址", same_as_ktp: "同KTP", different: "不同",
-            add_customer: "新增客户", customer_list: "客户列表",
-            operation: "业务操作", financial_indicators: "经营指标",
-            fund_management: "资金管理", internal_transfer: "内部转账",
-            cash_to_bank: "现金存入银行", bank_to_cash: "银行取现",
-            submit_to_hq: "上缴总部", cash_flow_summary: "现金流汇总",
-            total_cash: "总现金", net_profit: "现金净利", filter: "筛选",
-            clear_filter: "重置", export: "导出", close: "关闭",
-            search_description: "搜索描述...", all_types: "全部类型",
-            from_date: "开始日期", to_date: "结束日期",
-            
-            // 固定还款相关
+            action: "操作", 
+            date: "日期", 
+            amount: "金额", 
+            description: "描述",
+            status: "状态", 
+            save_exit: "保存退出", 
+            send_reminder: "催收提醒",
+            order_details: "订单详情", 
+            collateral_note: "物品备注",
+            loan_source: "贷款资金来源", 
+            service_fee_method: "服务费入账方式",
+            admin_fee_method: "管理费入账方式", 
+            store: "门店",
+            registered_date: "注册日期", 
+            living_address: "居住地址",
+            ktp_address: "KTP地址", 
+            same_as_ktp: "同KTP", 
+            different: "不同",
+            add_customer: "新增客户", 
+            customer_list: "客户列表",
+            operation: "业务操作", 
+            financial_indicators: "经营指标",
+            fund_management: "资金管理", 
+            internal_transfer: "内部转账",
+            cash_to_bank: "现金存入银行", 
+            bank_to_cash: "银行取现",
+            submit_to_hq: "上缴总部", 
+            cash_flow_summary: "现金流汇总",
+            total_cash: "总现金", 
+            net_profit: "现金净利", 
+            filter: "筛选",
+            clear_filter: "重置", 
+            export: "导出", 
+            close: "关闭",
+            search_description: "搜索描述...", 
+            all_types: "全部类型",
+            from_date: "开始日期", 
+            to_date: "结束日期",
             fixed_repayment: "固定还款",
             flexible_repayment: "灵活还款",
             repayment_type: "还款方式",
@@ -200,17 +318,15 @@ const Utils = {
             interest_rebate: "利息减免",
             remaining_term: "剩余期数",
             confirm_early_settlement: "确认提前结清",
-            
-            // 补充缺失的通用翻译
             store_operation: "门店业务",
             save_failed: "保存失败",
             order_not_found: "订单不存在",
             unauthorized: "无权访问",
             order_locked: "订单已锁定",
             loan_already_disbursed: "贷款已发放",
-            backup_complete: "✅ 备份完成！\\n\\n已导出 {orders} 条订单，{customers} 条客户记录。",
-            restore_confirm: "⚠️ 恢复数据将覆盖当前所有数据！\\n\\n此操作不可撤销。\\n\\n建议先导出当前数据作为备份。\\n\\n确定要继续吗？",
-            save_exit_confirm: "💾 确认保存并退出登录？\\n\\n系统将自动保存当前数据，然后退出。",
+            backup_complete: "✅ 备份完成！\n\n已导出 {orders} 条订单，{customers} 条客户记录。",
+            restore_confirm: "⚠️ 恢复数据将覆盖当前所有数据！\n\n此操作不可撤销。\n\n建议先导出当前数据作为备份。\n\n确定要继续吗？",
+            save_exit_confirm: "💾 确认保存并退出登录？\n\n系统将自动保存当前数据，然后退出。",
             login_required: "请重新登录",
             invalid_amount: "金额无效",
             payment_success: "支付成功",
@@ -219,62 +335,85 @@ const Utils = {
             blacklisted_cannot_order: "❌ 此客户已被拉黑，无法创建新订单。",
             interest_recorded: "利息 {amount} 已记录",
             principal_recorded: "还款 {amount} 已记录",
-            fixed_installment_paid: "第{month}期还款成功！\\n利息: {interest}\\n本金: {principal}\\n剩余期数: {remaining}个月",
-            early_settlement_success: "✅ 提前结清成功！\\n结清金额: {amount}",
+            fixed_installment_paid: "第{month}期还款成功！\n利息: {interest}\n本金: {principal}\n剩余期数: {remaining}个月",
+            early_settlement_success: "✅ 提前结清成功！\n结清金额: {amount}",
             confirm_logout: "确定要退出登录吗？未保存的数据将丢失。"
         }
     },
 
-    t(key) { 
-        const text = this.translations[this.lang][key];
-        if (text === undefined) {
-            console.warn(`Missing translation key: ${key} for language ${this.lang}`);
+    // ========== 修复：安全的 t 函数 ==========
+    t: function(key) {
+        // 安全检查
+        if (!key || typeof key !== 'string') {
+            console.warn('Utils.t: 无效的 key', key);
+            return '';
+        }
+        
+        // 获取当前语言的翻译对象
+        const langTranslations = this.translations[this.lang];
+        if (!langTranslations) {
+            console.warn(`Utils.t: 语言 ${this.lang} 的翻译对象不存在`);
             return key;
         }
+        
+        // 获取翻译值
+        const text = langTranslations[key];
+        
+        // 如果翻译不存在，返回 key 本身并输出警告
+        if (text === undefined) {
+            console.warn(`Utils.t: 缺少翻译键 "${key}" 用于语言 "${this.lang}"`);
+            return key;
+        }
+        
         return text;
     },
     
-    setLanguage(lang) {
+    setLanguage: function(lang) {
         if (lang === 'id' || lang === 'zh') {
             this.lang = lang;
             localStorage.setItem('jf_language', lang);
         }
     },
-    getLanguage() { return this.lang; },
+    
+    getLanguage: function() { return this.lang; },
 
-    escapeHtml(str) {
+    escapeHtml: function(str) {
         if (!str) return '';
         return String(str)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
 
-    escapeAttr(str) {
+    escapeAttr: function(str) {
         if (!str) return '';
         return String(str)
             .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
             .replace(/`/g, '&#96;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
 
-    formatCurrency(amount) {
+    formatCurrency: function(amount) {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency', currency: 'IDR', minimumFractionDigits: 0
-        }).format(amount);
+        }).format(amount || 0);
     },
 
-    getRawAmount(amount) { return amount || 0; },
+    getRawAmount: function(amount) { return amount || 0; },
 
-    formatDate(dateStr) {
+    formatDate: function(dateStr) {
         if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString(this.lang === 'id' ? 'id-ID' : 'zh-CN');
+        try {
+            return new Date(dateStr).toLocaleDateString(this.lang === 'id' ? 'id-ID' : 'zh-CN');
+        } catch(e) {
+            return '-';
+        }
     },
 
-    exportToJSON(data, filename) {
+    exportToJSON: function(data, filename) {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         this._downloadBlob(blob, filename);
     },
 
-    _downloadBlob(blob, filename) {
+    _downloadBlob: function(blob, filename) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -283,13 +422,13 @@ const Utils = {
         URL.revokeObjectURL(url);
     },
 
-    _buildAndDownloadCSV(headers, rows, filename) {
+    _buildAndDownloadCSV: function(headers, rows, filename) {
         const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         this._downloadBlob(blob, filename);
     },
 
-    exportToCSV(orders, filename) {
+    exportToCSV: function(orders, filename) {
         const isId = this.lang === 'id';
         const headers = isId
             ? ['ID Pesanan', 'Pelanggan', 'Pinjaman', 'Admin Fee', 'Service Fee', 'Bunga Bulanan', 'Status', 'Tanggal Dibuat']
@@ -303,7 +442,7 @@ const Utils = {
         this._buildAndDownloadCSV(headers, rows, filename);
     },
 
-    exportPaymentsToCSV(payments, filename) {
+    exportPaymentsToCSV: function(payments, filename) {
         const isId = this.lang === 'id';
         const headers = isId
             ? ['ID Pesanan', 'Pelanggan', 'Tanggal', 'Jenis', 'Bulan', 'Jumlah', 'Metode', 'Keterangan']
@@ -327,7 +466,7 @@ const Utils = {
         this._buildAndDownloadCSV(headers, rows, filename);
     },
 
-    exportCashFlowToCSV(flows, filename) {
+    exportCashFlowToCSV: function(flows, filename) {
         const isId = this.lang === 'id';
         const headers = isId
             ? ['Tanggal', 'Tipe', 'Metode', 'Arah', 'Jumlah', 'Keterangan', 'ID Pesanan']
@@ -352,7 +491,7 @@ const Utils = {
         this._buildAndDownloadCSV(headers, rows, filename);
     },
 
-    importFromJSON(file) {
+    importFromJSON: function(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -364,19 +503,19 @@ const Utils = {
         });
     },
 
-    formatNumberWithCommas(x) {
+    formatNumberWithCommas: function(x) {
         if (x === null || x === undefined || x === '') return '';
         const num = String(x).replace(/[,\s]/g, '');
         if (isNaN(num) || num === '') return '';
         return Number(num).toLocaleString('en-US');
     },
 
-    parseNumberFromCommas(x) {
+    parseNumberFromCommas: function(x) {
         if (!x) return 0;
         return parseInt(String(x).replace(/[,\s]/g, '')) || 0;
     },
 
-    bindAmountFormat(inputElement) {
+    bindAmountFormat: function(inputElement) {
         if (!inputElement) return;
         inputElement.addEventListener('input', (e) => {
             const num = Utils.parseNumberFromCommas(e.target.value);
@@ -386,23 +525,24 @@ const Utils = {
         });
     },
 
-    renderPageHeader(title, showBackBtn = true) {
+    renderPageHeader: function(title, showBackBtn = true) {
         const backBtnHtml = showBackBtn && window.APP && typeof window.APP.goBack === 'function'
             ? `<button onclick="APP.goBack()">↩️ ${this.t('back')}</button>` : '';
         return `<div class="page-header"><h2>${title}</h2><div>${backBtnHtml}</div></div>`;
     },
 
-    wrapTableRow(cells, isHeader = false) {
+    wrapTableRow: function(cells, isHeader = false) {
         const tag = isHeader ? 'th' : 'td';
         return '<tr>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '</tr>';
     },
 
-    getServiceFeeOptionsHtml(selectedPercent = 0) {
+    getServiceFeeOptionsHtml: function(selectedPercent = 0) {
         return this.serviceFeePercentOptions.map(opt =>
             `<option value="${opt.value}" ${selectedPercent === opt.value ? 'selected' : ''}>${opt.label}</option>`
         ).join('');
     }
 };
 
+// 初始化语言
 Utils.initLanguage();
 window.Utils = Utils;
