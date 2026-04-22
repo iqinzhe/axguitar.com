@@ -328,41 +328,51 @@ tbody tr:hover {
         font-size: 0.7rem !important;
     }
     
-    /* ========== 操作列特殊处理 - 另起一行占满宽度 ========== */
+    /* ========== 操作列特殊处理 - 独立一行，横向排列按钮 ========== */
     .data-table td.action-cell {
         display: block !important;
         width: 100% !important;
         margin-top: 10px !important;
-        padding-top: 10px !important;
-        border-top: 1px solid var(--gray-200) !important;
+        padding: 10px 0 6px 0 !important;
+        border-top: 2px solid var(--gray-200) !important;
+        border-bottom: none !important;
         text-align: left !important;
     }
-    
+
     .data-table td.action-cell::before {
         content: attr(data-label) !important;
         display: block !important;
         margin-bottom: 8px !important;
         font-weight: 600 !important;
         color: var(--gray-600) !important;
+        font-size: 0.7rem !important;
         text-align: left !important;
     }
-    
-    /* 操作按钮改为横向排列，自动换行 */
-    .data-table .action-cell {
-        flex-direction: row !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
+
+    /* 操作按钮横向排列，自动换行 */
+    .data-table td.action-cell > * {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
-    
-    .data-table .action-cell .btn-small {
+
+    .data-table td.action-cell {
+        display: block !important;
+        flex-direction: unset !important;
+    }
+
+    .data-table .action-cell .btn-small,
+    .data-table td.action-cell .btn-small {
         width: auto !important;
-        min-width: 70px !important;
+        min-width: 72px !important;
+        margin: 3px 4px 3px 0 !important;
         text-align: center !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         gap: 4px !important;
         padding: 6px 12px !important;
+        font-size: 0.82rem !important;
     }
     
     /* 其他表格样式适配 */
