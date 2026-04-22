@@ -1,4 +1,4 @@
-// app-payments.js - v1.2（所有用户可见字符串使用 Utils.t()，支持双语）
+// app-payments.js - v1.3（修复：表格响应式 data-label + 双语完善）
 
 window.APP = window.APP || {};
 
@@ -69,19 +69,20 @@ const PaymentsModule = {
             var serviceFeePaid = order.service_fee_paid || 0;
             var isServiceFeePaid = serviceFeePaid >= serviceFeeAmount;
 
+            // 添加 data-label 属性用于手机端响应式
             var interestRows = '';
             if (interestPayments.length === 0) {
-                interestRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td></tr>`;
+                interestRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var i = 0; i < interestPayments.length; i++) {
                     var p = interestPayments[i];
                     var paymentNumber = i + 1;
                     interestRows += `<tr>
-                        <td class="text-center">${paymentNumber}</td>
-                        <td class="date-cell">${Utils.formatDate(p.date)}</td>
-                        <td class="text-center">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}</td>
-                        <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                        <td>${methodMap[p.payment_method] || '-'}</td>
+                        <td data-label="${lang === 'id' ? 'Ke-' : '第几次'}" class="text-center">${paymentNumber}<\/td>
+                        <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Bulan' : '月数'}" class="text-center">${p.months || 1} ${lang === 'id' ? 'bln' : '个月'}<\/td>
+                        <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Metode' : '方式'}">${methodMap[p.payment_method] || '-'}<\/td>
                     </tr>`;
                 }
             }
@@ -89,19 +90,19 @@ const PaymentsModule = {
             var principalRows = '';
             var cumulativePaid = 0;
             if (principalPayments.length === 0) {
-                principalRows = `<td><td colspan="5" class="text-center text-muted">${t('no_data')}</td></tr>`;
+                principalRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var i = 0; i < principalPayments.length; i++) {
                     var p = principalPayments[i];
                     cumulativePaid += p.amount;
                     var remainingAfter = loanAmount - cumulativePaid;
                     principalRows += `<tr>
-                        <td class="date-cell">${Utils.formatDate(p.date)}</td>
-                        <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                        <td class="text-right">${Utils.formatCurrency(cumulativePaid)}</td>
-                        <td class="text-right ${remainingAfter <= 0 ? 'success-text' : 'warning'}">${Utils.formatCurrency(remainingAfter)}</td>
-                        <td>${methodMap[p.payment_method] || '-'}</td>
-                    </tr>`;
+                        <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Jumlah Dibayar' : '还款金额'}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Total Dibayar' : '累计已还'}" class="text-right">${Utils.formatCurrency(cumulativePaid)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}" class="text-right ${remainingAfter <= 0 ? 'success-text' : 'warning'}">${Utils.formatCurrency(remainingAfter)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Metode' : '方式'}">${methodMap[p.payment_method] || '-'}<\/td>
+                    </table>`;
                 }
             }
 
@@ -227,7 +228,15 @@ const PaymentsModule = {
                             <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</div>
                             <div class="table-container">
                                 <table class="history-table">
-                                    <thead><tr><th class="text-center">${lang === 'id' ? 'Ke-' : '第几次'}</th><th>${t('date')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center">${lang === 'id' ? 'Ke-' : '第几次'}</th>
+                                            <th>${t('date')}</th>
+                                            <th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                            <th class="text-right">${t('amount')}</th>
+                                            <th>${lang === 'id' ? 'Metode' : '方式'}</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>${interestRows}</tbody>
                                 </table>
                             </div>
@@ -258,7 +267,15 @@ const PaymentsModule = {
                             <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</div>
                             <div class="table-container">
                                 <table class="history-table">
-                                    <thead><tr><th>${t('date')}</th><th class="text-right">${lang === 'id' ? 'Jumlah Dibayar' : '还款金额'}</th><th class="text-right">${lang === 'id' ? 'Total Dibayar' : '累计已还'}</th><th class="text-right">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
+                                    <thead>
+                                        <tr>
+                                            <th>${t('date')}</th>
+                                            <th class="text-right">${lang === 'id' ? 'Jumlah Dibayar' : '还款金额'}</th>
+                                            <th class="text-right">${lang === 'id' ? 'Total Dibayar' : '累计已还'}</th>
+                                            <th class="text-right">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th>
+                                            <th>${lang === 'id' ? 'Metode' : '方式'}</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>${principalRows}</tbody>
                                 </table>
                             </div>
@@ -278,18 +295,24 @@ const PaymentsModule = {
                 
                 <div class="card summary-card">
                     <table class="summary-table">
-                        <tr><td class="label">${t('customer_name')}</td><td class="value">${Utils.escapeHtml(order.customer_name)}</td>
-                            <td class="label">ID</td><td class="value order-id">${Utils.escapeHtml(order.order_id)}</td>
-                            <td class="label">${t('loan_amount')}</td><td class="value">${Utils.formatCurrency(loanAmount)}</td>
+                        <tr>
+                            <td class="label">${t('customer_name')}</td>
+                            <td class="value">${Utils.escapeHtml(order.customer_name)}</td>
+                            <td class="label">ID</td>
+                            <td class="value order-id">${Utils.escapeHtml(order.order_id)}</td>
+                            <td class="label">${t('loan_amount')}</td>
+                            <td class="value">${Utils.formatCurrency(loanAmount)}</td>
                         </tr>
-                        <tr><td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</td>
+                        <tr>
+                            <td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</td>
                             <td class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}</td>
                             <td class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</td>
                             <td class="value">${Utils.formatCurrency(currentMonthlyInterest)}</td>
                             <td class="label">${t('payment_due_date')}</td>
                             <td class="value">${nextDueDate}</td>
                         </tr>
-                        <tr><td class="label">${t('repayment_type')}</td>
+                        <tr>
+                            <td class="label">${t('repayment_type')}</td>
                             <td class="value" colspan="5">
                                 ${order.repayment_type === 'fixed' 
                                     ? `📅 ${t('fixed_repayment')}` 
@@ -460,6 +483,41 @@ const PaymentsModule = {
                             font-size: 11px;
                         }
                         .history-table {
+                            font-size: 10px;
+                        }
+                        /* 手机端历史表格响应式 */
+                        .history-table,
+                        .history-table thead,
+                        .history-table tbody,
+                        .history-table tr,
+                        .history-table th,
+                        .history-table td {
+                            display: block;
+                        }
+                        .history-table thead {
+                            display: none;
+                        }
+                        .history-table tbody tr {
+                            margin-bottom: 12px;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            padding: 8px;
+                        }
+                        .history-table td {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            padding: 6px 0;
+                            border-bottom: 1px solid #f1f5f9;
+                        }
+                        .history-table td:last-child {
+                            border-bottom: none;
+                        }
+                        .history-table td::before {
+                            content: attr(data-label);
+                            font-weight: 600;
+                            color: #64748b;
+                            flex: 1;
                             font-size: 10px;
                         }
                     }
