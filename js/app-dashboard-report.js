@@ -1,4 +1,4 @@
-// app-dashboard-report.js - v1.0
+// app-dashboard-report.js - v1.1（修复：cashFlow.netProfit 未定义问题 + 表格样式优化）
 
 window.APP = window.APP || {};
 
@@ -31,6 +31,20 @@ const DashboardReport = {
             const cashFlows = cashFlowRecords || [];
             
             console.log(`数据加载完成: 门店 ${stores.length} 家, 订单 ${allOrders.length} 条, 支出 ${allExpenses.length} 条, 付款 ${allPayments.length} 条, 资金流 ${cashFlows.length} 条, 耗时 ${Date.now() - startTime}ms`);
+            
+            // 修复：确保 cashFlow.netProfit 存在
+            if (typeof cashFlow.netProfit === 'undefined') {
+                let totalIncomeInflow = 0, totalOutflowAll = 0;
+                for (const flow of cashFlows) {
+                    const amount = flow.amount || 0;
+                    if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
+                        totalIncomeInflow += amount;
+                    } else if (flow.direction === 'outflow') {
+                        totalOutflowAll += amount;
+                    }
+                }
+                cashFlow.netProfit = { balance: totalIncomeInflow - totalOutflowAll };
+            }
             
             const orderStoreMap = {};
             for (const order of allOrders) {
@@ -74,6 +88,16 @@ const DashboardReport = {
                 }
             }
 
+            // 安全获取 cashFlow 各字段值
+            var cashBalance = cashFlow.cash?.balance ?? 0;
+            var bankBalance = cashFlow.bank?.balance ?? 0;
+            var cashIncome = cashFlow.cash?.income ?? 0;
+            var cashExpense = cashFlow.cash?.expense ?? 0;
+            var bankIncome = cashFlow.bank?.income ?? 0;
+            var bankExpense = cashFlow.bank?.expense ?? 0;
+            var totalBalance = cashFlow.total?.balance ?? (cashBalance + bankBalance);
+            var netProfitBalance = cashFlow.netProfit?.balance ?? 0;
+
             if (isAdmin) {
                 var storeReports = [];
                 var grandTotal = { 
@@ -99,26 +123,26 @@ const DashboardReport = {
                     
                     const grossProfit = totalAdminFee + totalServiceFee + totalInterest;
                     
-                    let cashBalance = 0, bankBalance = 0;
+                    let storeCashBalance = 0, storeBankBalance = 0;
                     let totalIncomeInflow = 0;
                     let totalOutflow = 0;
                     
                     for (const flow of flows) {
                         const amount = flow.amount || 0;
                         if (flow.direction === 'inflow') {
-                            if (flow.source_target === 'cash') cashBalance += amount;
-                            else if (flow.source_target === 'bank') bankBalance += amount;
+                            if (flow.source_target === 'cash') storeCashBalance += amount;
+                            else if (flow.source_target === 'bank') storeBankBalance += amount;
                             if (flow.flow_type !== 'principal') {
                                 totalIncomeInflow += amount;
                             }
                         } else if (flow.direction === 'outflow') {
-                            if (flow.source_target === 'cash') cashBalance -= amount;
-                            else if (flow.source_target === 'bank') bankBalance -= amount;
+                            if (flow.source_target === 'cash') storeCashBalance -= amount;
+                            else if (flow.source_target === 'bank') storeBankBalance -= amount;
                             totalOutflow += amount;
                         }
                     }
                     
-                    const netProfit = totalIncomeInflow - totalOutflow;
+                    const storeNetProfit = totalIncomeInflow - totalOutflow;
 
                     storeReports.push({ 
                         store, 
@@ -131,9 +155,9 @@ const DashboardReport = {
                         totalPrincipal, 
                         totalExpenses, 
                         grossProfit,
-                        netProfit,
-                        cashBalance,
-                        bankBalance
+                        netProfit: storeNetProfit,
+                        cashBalance: storeCashBalance,
+                        bankBalance: storeBankBalance
                     });
 
                     grandTotal.orders += ords.length;
@@ -145,12 +169,12 @@ const DashboardReport = {
                     grandTotal.principal += totalPrincipal;
                     grandTotal.expenses += totalExpenses;
                     grandTotal.grossProfit += grossProfit;
-                    grandTotal.netProfit += netProfit;
-                    grandTotal.cashBalance += cashBalance;
-                    grandTotal.bankBalance += bankBalance;
+                    grandTotal.netProfit += storeNetProfit;
+                    grandTotal.cashBalance += storeCashBalance;
+                    grandTotal.bankBalance += storeBankBalance;
                 }
 
-                // ==================== 表格形式展示业务报表 ====================
+                // 表格形式展示业务报表
                 var tableRows = '';
                 if (storeReports.length === 0) {
                     tableRows = `<tr><td colspan="14" class="text-center">${lang === 'id' ? '暂无门店数据' : '暂无门店数据'}<\/td><\/tr>`;
@@ -207,21 +231,21 @@ const DashboardReport = {
                         <div class="cashflow-stats" style="display:flex; gap:16px; flex-wrap:wrap;">
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">🏦 ${lang === 'id' ? '保险柜 (现金)' : '保险柜 (现金)'}</div>
-                                <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
-                                <div style="font-size:11px; color:#64748b;">+${Utils.formatCurrency(cashFlow.cash.income)} / -${Utils.formatCurrency(cashFlow.cash.expense)}</div>
+                                <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
+                                <div style="font-size:11px; color:#64748b;">+${Utils.formatCurrency(cashIncome)} / -${Utils.formatCurrency(cashExpense)}</div>
                             </div>
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">🏧 ${lang === 'id' ? '银行 BNI' : '银行 BNI'}</div>
-                                <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
-                                <div style="font-size:11px; color:#64748b;">+${Utils.formatCurrency(cashFlow.bank.income)} / -${Utils.formatCurrency(cashFlow.bank.expense)}</div>
+                                <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
+                                <div style="font-size:11px; color:#64748b;">+${Utils.formatCurrency(bankIncome)} / -${Utils.formatCurrency(bankExpense)}</div>
                             </div>
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div>
-                                <div class="value ${cashFlow.netProfit?.balance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(cashFlow.netProfit?.balance || 0)}</div>
+                                <div class="value ${netProfitBalance >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(netProfitBalance)}</div>
                             </div>
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
-                                <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
+                                <div class="value">${Utils.formatCurrency(totalBalance)}</div>
                             </div>
                         </div>
                     </div>
@@ -280,21 +304,21 @@ const DashboardReport = {
                 const storeOrderIds = storeOrders.map(o => o.id);
                 const storePayments = allPayments.filter(p => storeOrderIds.includes(p.order_id));
                 
-                let cashBalance = 0, bankBalance = 0;
+                let storeCashBalance = 0, storeBankBalance = 0;
                 let totalIncomeInflow = 0;
                 let totalOutflow = 0;
                 
                 for (const flow of flows) {
                     const amount = flow.amount || 0;
                     if (flow.direction === 'inflow') {
-                        if (flow.source_target === 'cash') cashBalance += amount;
-                        else if (flow.source_target === 'bank') bankBalance += amount;
+                        if (flow.source_target === 'cash') storeCashBalance += amount;
+                        else if (flow.source_target === 'bank') storeBankBalance += amount;
                         if (flow.flow_type !== 'principal') {
                             totalIncomeInflow += amount;
                         }
                     } else if (flow.direction === 'outflow') {
-                        if (flow.source_target === 'cash') cashBalance -= amount;
-                        else if (flow.source_target === 'bank') bankBalance -= amount;
+                        if (flow.source_target === 'cash') storeCashBalance -= amount;
+                        else if (flow.source_target === 'bank') storeBankBalance -= amount;
                         totalOutflow += amount;
                     }
                 }
@@ -323,11 +347,11 @@ const DashboardReport = {
                         <div class="cashflow-stats" style="display:flex; gap:16px; flex-wrap:wrap;">
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">🏦 ${t('cash')}</div>
-                                <div class="value">${Utils.formatCurrency(cashBalance)}</div>
+                                <div class="value">${Utils.formatCurrency(storeCashBalance)}</div>
                             </div>
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">🏧 ${t('bank')}</div>
-                                <div class="value">${Utils.formatCurrency(bankBalance)}</div>
+                                <div class="value">${Utils.formatCurrency(storeBankBalance)}</div>
                             </div>
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">💰 ${lang === 'id' ? 'Laba Bersih (Kas)' : '现金净利'}</div>
@@ -335,7 +359,7 @@ const DashboardReport = {
                             </div>
                             <div class="cashflow-item" style="flex:1; min-width:150px;">
                                 <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
-                                <div class="value">${Utils.formatCurrency(cashBalance + bankBalance)}</div>
+                                <div class="value">${Utils.formatCurrency(storeCashBalance + storeBankBalance)}</div>
                             </div>
                         </div>
                     </div>
@@ -365,18 +389,6 @@ const DashboardReport = {
                             </table>
                         </div>
                     </div>`;
-            }
-            
-            if (typeof cashFlow.netProfit === 'undefined') {
-                let totalIncomeInflow = 0, totalOutflowAll = 0;
-                for (const flow of cashFlows) {
-                    if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
-                        totalIncomeInflow += flow.amount;
-                    } else if (flow.direction === 'outflow') {
-                        totalOutflowAll += flow.amount;
-                    }
-                }
-                cashFlow.netProfit = { balance: totalIncomeInflow - totalOutflowAll };
             }
             
             // 添加报表表格样式
@@ -480,4 +492,3 @@ for (var key in DashboardReport) {
         window.APP[key] = DashboardReport[key];
     }
 }
-
