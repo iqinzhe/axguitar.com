@@ -194,20 +194,26 @@ const CustomersModule = {
             .btn-blacklist:hover {
                 background: #ea580c !important;
             }
-            @media (max-width: 768px) {
-                .data-table th, .data-table td {
-                    padding: 6px 8px;
-                    font-size: 0.7rem;
-                }
-                .data-table .customer-address {
-                    max-width: 120px;
-                }
-                .action-cell .btn-small {
-                    padding: 4px 6px;
-                    font-size: 0.65rem;
-                }
-            }
-        `;
+           @media (max-width: 768px) {
+    .data-table th, .data-table td {
+        padding: 6px 8px;
+        font-size: 0.7rem;
+    }
+    .data-table .customer-address {
+        max-width: 120px;
+    }
+    .action-cell .btn-small {
+        padding: 4px 6px;
+        font-size: 0.65rem;
+    }
+    /* 添加这个：确保表格行正常显示 */
+    .data-table tbody tr {
+        display: table-row !important;
+    }
+    .data-table td {
+        display: table-cell !important;
+    }
+}
         document.head.appendChild(style);
     },
 
