@@ -1,4 +1,4 @@
-// app-customers.js - v1.4（修复：toggleLivingAddress 绑定 + 翻译函数完善）
+// app-customers.js - v1.5（修复：this.goBack 改为 window.APP.goBack 安全调用）
 
 window.APP = window.APP || {};
 
@@ -52,7 +52,7 @@ const CustomersModule = {
                             ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
                         </td>
-                    </table>`;
+                    </tr>`;
                 }
             }
 
@@ -258,7 +258,6 @@ const CustomersModule = {
         }
     },
 
-    // 修复：确保 toggleLivingAddress 函数正确绑定
     toggleLivingAddress: function(value) {
         var el = document.getElementById('customerLivingAddress');
         if (el) {
@@ -515,12 +514,11 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（支持固定还款）====================
+    // ==================== 创建订单 ====================
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
 
-        // 使用异步方式获取当前用户资料（更可靠）
         var profile = null;
         try {
             profile = await SUPABASE.getCurrentProfile();
@@ -540,7 +538,6 @@ const CustomersModule = {
         }
 
         try {
-            // 检查客户是否存在
             const { data: customer, error: customerError } = await supabaseClient
                 .from('customers')
                 .select('*')
@@ -550,7 +547,6 @@ const CustomersModule = {
                 throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据，请刷新后重试');
             }
 
-            // 安全检查黑名单（兼容模块未加载的情况）
             var blacklistCheck = { isBlacklisted: false };
             try {
                 if (typeof window.APP.isBlacklisted === 'function') {
@@ -572,7 +568,6 @@ const CustomersModule = {
                 return;
             }
 
-            // 检查是否有活跃订单
             try {
                 const { data: existingOrders } = await supabaseClient
                     .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
@@ -590,7 +585,6 @@ const CustomersModule = {
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             const userStoreCode = profile?.stores?.code || '-';
             
-            // 还款方式选项
             const repaymentTypeOptions = `
                 <div class="repayment-type-group">
                     <label class="repayment-type-label">${lang === 'id' ? '📋 Pilih Jenis Cicilan' : '📋 选择还款方式'}:</label>
@@ -609,7 +603,6 @@ const CustomersModule = {
                 </div>
             `;
             
-            // 固定还款表单（初始隐藏）
             const fixedRepaymentForm = `
                 <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
                     <div class="form-group">
@@ -633,7 +626,6 @@ const CustomersModule = {
                 </div>
             `;
             
-            // 协商利率和服务费表单
             const negotiationForm = `
                 <div class="negotiation-form">
                     <div class="form-group">
@@ -822,7 +814,6 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 固定还款辅助函数 ====================
     toggleRepaymentForm: function(value) {
         var fixedForm = document.getElementById('fixedRepaymentForm');
         if (value === 'fixed') {
@@ -857,7 +848,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 保存订单 ====================
+    // ==================== 保存订单（修复：this.goBack 改为 window.APP.goBack） ====================
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
@@ -890,7 +881,6 @@ const CustomersModule = {
                 .eq('id', customerId)
                 .single();
             
-            // 再次检查黑名单（双重保险）
             var blacklistCheck = null;
             if (typeof window.APP.isBlacklisted === 'function') {
                 blacklistCheck = await window.APP.isBlacklisted(customerId);
@@ -977,7 +967,18 @@ const CustomersModule = {
                     : `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n利率: ${agreedInterestRate}%\n服务费: ${agreedServiceFee}%\n最长可延期至10个月`);
             
             alert(successMsg);
-            this.goBack();
+            
+            // 修复：使用 window.APP.goBack() 而不是 this.goBack()
+            if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
+                window.APP.goBack();
+            } else {
+                // 备用方案：刷新页面或跳转到客户列表
+                if (typeof window.APP !== 'undefined' && typeof window.APP.showCustomers === 'function') {
+                    window.APP.showCustomers();
+                } else {
+                    window.location.reload();
+                }
+            }
         } catch (error) {
             console.error("saveOrderWithCustomer error:", error);
             alert(t('save_failed') + ': ' + error.message);
@@ -1021,7 +1022,7 @@ const CustomersModule = {
                         ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     <\/td>
                 <\/tr>`;
-            }).join('') : `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            }).join('') : `<td><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
