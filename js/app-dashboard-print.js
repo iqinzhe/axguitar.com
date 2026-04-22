@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v1.0
+// app-dashboard-print.js - v1.1（修复：styles 变量安全获取 + 打印样式优化）
 
 window.APP = window.APP || {};
 
@@ -43,7 +43,16 @@ const DashboardPrint = {
             }
         }
         
-        var styles = document.querySelector('link[rel="stylesheet"]')?.href || 'main.css';
+        // 修复：安全获取样式链接
+        var styles = '';
+        var styleLink = document.querySelector('link[rel="stylesheet"]');
+        if (styleLink && styleLink.href) {
+            styles = styleLink.href;
+        } else {
+            // 如果没有找到外部样式，使用空字符串，让浏览器使用内联样式
+            styles = '';
+        }
+        
         var lang = Utils.lang;
         
         var isAdmin = AUTH.isAdmin();
@@ -58,7 +67,6 @@ const DashboardPrint = {
         // 移除页面中可能存在的顶部多余小字（在图片logo和标题上面的内容）
         var pageHeaderDiv = printContent.querySelector('.page-header');
         if (pageHeaderDiv) {
-            // 清理 page-header 中可能存在的多余文本节点
             var headerChildren = pageHeaderDiv.childNodes;
             for (var k = 0; k < headerChildren.length; k++) {
                 if (headerChildren[k].nodeType === Node.TEXT_NODE && headerChildren[k].textContent.trim()) {
@@ -74,7 +82,7 @@ const DashboardPrint = {
             <head>
                 <meta charset="UTF-8">
                 <title>JF! by Gadai - Print</title>
-                <link rel="stylesheet" href="${styles}">
+                ${styles ? `<link rel="stylesheet" href="${styles}">` : ''}
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { 
@@ -214,7 +222,6 @@ const DashboardPrint = {
                     .empty-row-placeholder td { 
                         height: 25px; 
                     }
-                    /* 确保打印时不显示编辑区域 */
                     .form-grid, .form-actions, .address-option, .payment-method-options {
                         display: none !important;
                     }
@@ -247,13 +254,11 @@ const DashboardPrint = {
                 
                 <script>
                     window.onload = function() {
-                        // 隐藏打印时不需要的元素
                         var hideElements = document.querySelectorAll('.form-grid, .form-actions, .address-option, .payment-method-options, .action-group-main, .action-group-danger, .header-actions button:not(.print-btn)');
                         hideElements.forEach(function(el) {
                             el.style.display = 'none';
                         });
                         
-                        // 隐藏包含新增客户表单的卡片
                         var cards = document.querySelectorAll('.card');
                         cards.forEach(function(card) {
                             if (card.innerText && (card.innerText.includes('Tambah Nasabah Baru') || 
@@ -263,7 +268,6 @@ const DashboardPrint = {
                             }
                         });
                         
-                        // 补全表格行数（使打印更美观）
                         var tables = document.querySelectorAll('table');
                         tables.forEach(function(table) {
                             var tbody = table.querySelector('tbody');
@@ -347,4 +351,3 @@ for (var key in DashboardPrint) {
         window.APP[key] = DashboardPrint[key];
     }
 }
-
