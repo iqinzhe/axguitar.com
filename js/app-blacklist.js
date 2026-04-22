@@ -1,13 +1,14 @@
-// app-blacklist.js - v1.0（优化：精简重复代码）
+// app-blacklist.js - v1.1（修复：checkDuplicateCustomer 返回值 + sanitizeInput 正则优化）
 
 window.APP = window.APP || {};
 
-// 辅助函数：安全过滤输入（修复：支持拉丁扩展区字符如 é, ñ）
+// 辅助函数：安全过滤输入（修复：支持更多 Unicode 字符，包括印尼语变音字母）
 function sanitizeInput(str) {
     if (!str) return '';
-    // 允许：字母、数字、空格、中文、拉丁扩展区字符（覆盖印尼语/欧洲语言变音字母）
-    // \u00C0-\u024F 覆盖 Latin-1 Supplement + Latin Extended-A/B
-    return String(str).replace(/[^\w\s\u4e00-\u9fa5\u00C0-\u024F]/g, '');
+    // 使用更安全的 Unicode 属性匹配方式
+    // 允许：字母（包括拉丁扩展区）、数字、空格、中文
+    // 保留常用标点：空格、连字符、点号
+    return String(str).replace(/[^\p{L}\p{N}\s\-\.]/gu, '');
 }
 
 const BlacklistModule = {
@@ -105,19 +106,19 @@ const BlacklistModule = {
         return data;
     },
     
-    // 修复：使用安全过滤的查询
+    // 修复：checkDuplicateCustomer 返回格式优化
     checkDuplicateCustomer: async function(name, ktpNumber, phone, excludeCustomerId = null) {
-        // 安全过滤输入（使用修复后的 sanitizeInput）
+        // 安全过滤输入
         const safeName = sanitizeInput(name);
         const safeKtp = sanitizeInput(ktpNumber);
         const safePhone = sanitizeInput(phone);
         
-        // 使用 Supabase 链式查询（安全）
+        // 使用 Supabase 链式查询
         let query = supabaseClient
             .from('customers')
             .select('id, customer_id, name, ktp_number, phone');
         
-        // 构建 OR 条件 - 使用 .or() 但参数化处理
+        // 构建 OR 条件
         const conditions = [];
         if (safeName) conditions.push(`name.eq.${safeName}`);
         if (safeKtp) conditions.push(`ktp_number.eq.${safeKtp}`);
@@ -127,7 +128,7 @@ const BlacklistModule = {
             return null;
         }
         
-        // 使用 .or() 方法（Supabase 会自动转义）
+        // 使用 .or() 方法
         query = query.or(conditions.join(','));
         
         if (excludeCustomerId) {
@@ -139,34 +140,178 @@ const BlacklistModule = {
         
         if (!data || data.length === 0) return null;
         
-        // 检测重复字段
+        // 检测重复字段 - 准确找出哪个字段重复
         const duplicateFields = [];
-        const existingNames = new Set();
-        const existingKtps = new Set();
-        const existingPhones = new Set();
+        const duplicateInfo = {
+            name: null,
+            ktp: null,
+            phone: null
+        };
         
         for (var existing of data) {
-            if (existing.name === name && !existingNames.has(existing.name)) {
+            if (existing.name === name && !duplicateInfo.name) {
                 duplicateFields.push('name');
-                existingNames.add(existing.name);
+                duplicateInfo.name = existing;
             }
-            if (existing.ktp_number === ktpNumber && !existingKtps.has(existing.ktp_number)) {
+            if (existing.ktp_number === ktpNumber && !duplicateInfo.ktp) {
                 duplicateFields.push('ktp');
-                existingKtps.add(existing.ktp_number);
+                duplicateInfo.ktp = existing;
             }
-            if (existing.phone === phone && !existingPhones.has(existing.phone)) {
+            if (existing.phone === phone && !duplicateInfo.phone) {
                 duplicateFields.push('phone');
-                existingPhones.add(existing.phone);
+                duplicateInfo.phone = existing;
+            }
+        }
+        
+        // 去重 duplicateFields
+        const uniqueFields = [...new Set(duplicateFields)];
+        
+        // 返回最匹配的客户（优先返回所有字段都匹配的）
+        let bestMatch = data[0];
+        for (var customer of data) {
+            if (customer.name === name && customer.ktp_number === ktpNumber && customer.phone === phone) {
+                bestMatch = customer;
+                break;
             }
         }
         
         return {
             isDuplicate: true,
-            duplicateFields: duplicateFields,
-            existingCustomer: data[0]
+            duplicateFields: uniqueFields,
+            existingCustomer: bestMatch,
+            duplicateInfo: duplicateInfo
         };
+    },
+    
+    // 显示黑名单列表页面
+    showBlacklist: async function() {
+        const lang = Utils.lang;
+        const t = Utils.t;
+        const profile = await SUPABASE.getCurrentProfile();
+        const isAdmin = profile?.role === 'admin';
+        
+        try {
+            const blacklist = await this.getBlacklist();
+            
+            var rows = '';
+            if (!blacklist || blacklist.length === 0) {
+                rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            } else {
+                for (var item of blacklist) {
+                    var customer = item.customers;
+                    if (!customer) continue;
+                    
+                    var actionHtml = '';
+                    if (isAdmin) {
+                        actionHtml = `<button onclick="APP.removeFromBlacklist('${customer.id}')" class="btn-small danger">🚫 ${lang === 'id' ? 'Hapus' : '解除'}</button>`;
+                    } else {
+                        actionHtml = `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
+                    }
+                    
+                    rows += `<tr>
+                        <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${Utils.escapeHtml(customer.customer_id || '-')}</td>
+                        <td data-label="${t('customer_name')}">${Utils.escapeHtml(customer.name)}</td>
+                        <td data-label="${t('phone')}">${Utils.escapeHtml(customer.phone || '-')}</td>
+                        <td data-label="${lang === 'id' ? 'Alasan' : '原因'}">${Utils.escapeHtml(item.reason)}</td>
+                        <td data-label="${lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期'}">${Utils.formatDate(item.blacklisted_at)}</td>
+                        ${isAdmin ? `<td data-label="${t('action')}" class="action-cell">${actionHtml}</td>` : ''}
+                    </tr>`;
+                }
+            }
+            
+            document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <h2>🚫 ${lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单'}</h2>
+                    <div class="header-actions">
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="info-card" style="margin-bottom:16px;">
+                        <div class="info-card-content">
+                            <div class="info-icon">⚠️</div>
+                            <div class="info-text">
+                                <strong>${lang === 'id' ? 'Informasi:' : '提示：'}</strong> 
+                                ${lang === 'id' 
+                                    ? 'Nasabah yang di-blacklist tidak dapat membuat pesanan baru. Hanya administrator yang dapat menghapus dari daftar hitam.'
+                                    : '被拉黑的客户无法创建新订单。只有管理员可以解除黑名单。'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h3>📋 ${lang === 'id' ? 'Daftar Nasabah Blacklist' : '黑名单客户列表'}</h3>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
+                                    <th>${t('customer_name')}</th>
+                                    <th>${t('phone')}</th>
+                                    <th>${lang === 'id' ? 'Alasan' : '原因'}</th>
+                                    <th>${lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期'}</th>
+                                    ${isAdmin ? '<th>' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <style>
+                    .info-card {
+                        background: #fef3c7;
+                        border-left: 4px solid #f59e0b;
+                    }
+                    .info-card .info-text {
+                        color: #92400e;
+                    }
+                    .info-card .info-text strong {
+                        color: #b45309;
+                    }
+                    .locked-badge {
+                        display: inline-block;
+                        padding: 4px 12px;
+                        background: #e2e8f0;
+                        color: #64748b;
+                        border-radius: 20px;
+                        font-size: 0.7rem;
+                    }
+                </style>`;
+                
+            this._addBlacklistTableStyles();
+            
+        } catch (error) {
+            console.error("showBlacklist error:", error);
+            alert(lang === 'id' ? 'Gagal memuat data blacklist: ' + error.message : '加载黑名单失败：' + error.message);
+        }
+    },
+    
+    _addBlacklistTableStyles: function() {
+        if (document.getElementById('blacklist-table-styles')) return;
+        
+        var style = document.createElement('style');
+        style.id = 'blacklist-table-styles';
+        style.textContent = `
+            @media (max-width: 768px) {
+                .data-table td.action-cell {
+                    display: block !important;
+                    width: 100% !important;
+                    margin-top: 10px !important;
+                    padding-top: 8px !important;
+                    border-top: 1px solid #e2e8f0 !important;
+                }
+                .data-table td.action-cell::before {
+                    content: attr(data-label) !important;
+                    display: block !important;
+                    margin-bottom: 6px !important;
+                    font-weight: 600 !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     }
 };
 
 Object.assign(window.APP, BlacklistModule);
-
