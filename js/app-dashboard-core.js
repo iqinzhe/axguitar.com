@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.2（修复：重复函数定义 + 现金流向负数判断 + showBlacklist调用）
+// app-dashboard-core.js - v1.3（修复：移除与子模块冲突的方法，保留路由功能）
 
 window.APP = window.APP || {};
 
@@ -58,45 +58,46 @@ const DashboardCore = {
         var self = this;
         var handlers = {
             dashboard: async () => await self.renderDashboard(),
-            orderTable: async () => await self.showOrderTable(),
-            createOrder: () => self.showCreateOrder(),
+            // 注意：这些方法由子模块提供，通过 window.APP 调用
+            orderTable: async () => { if (typeof window.APP.showOrderTable === 'function') await window.APP.showOrderTable(); else await self.renderDashboard(); },
+            createOrder: () => { if (typeof window.APP.showCreateOrder === 'function') window.APP.showCreateOrder(); else self.showCreateOrder(); },
             viewOrder: async () => { 
-                if (self.currentOrderId) {
-                    await self.viewOrder(self.currentOrderId);
+                if (self.currentOrderId && typeof window.APP.viewOrder === 'function') {
+                    await window.APP.viewOrder(self.currentOrderId);
                 } else {
-                    await self.showOrderTable();
+                    await self.renderDashboard();
                 }
             },
             payment: async () => { 
-                if (self.currentOrderId) {
-                    await self.showPayment(self.currentOrderId);
+                if (self.currentOrderId && typeof window.APP.showPayment === 'function') {
+                    await window.APP.showPayment(self.currentOrderId);
                 } else {
-                    await self.showOrderTable();
+                    await self.renderDashboard();
                 }
             },
-            report: async () => await self.showReport(),
-            userManagement: async () => await self.showUserManagement(),
-            storeManagement: async () => await StoreManager.renderStoreManagement(),
-            expenses: async () => await self.showExpenses(),
-            customers: async () => await self.showCustomers(),
-            paymentHistory: async () => await self.showPaymentHistory(),
-            backupRestore: async () => await Storage.renderBackupUI(),
+            report: async () => { if (typeof window.APP.showReport === 'function') await window.APP.showReport(); else await self.renderDashboard(); },
+            userManagement: async () => { if (typeof window.APP.showUserManagement === 'function') await window.APP.showUserManagement(); else await self.renderDashboard(); },
+            storeManagement: async () => { if (typeof StoreManager.renderStoreManagement === 'function') await StoreManager.renderStoreManagement(); else await self.renderDashboard(); },
+            expenses: async () => { if (typeof window.APP.showExpenses === 'function') await window.APP.showExpenses(); else await self.renderDashboard(); },
+            customers: async () => { if (typeof window.APP.showCustomers === 'function') await window.APP.showCustomers(); else await self.renderDashboard(); },
+            paymentHistory: async () => { if (typeof window.APP.showPaymentHistory === 'function') await window.APP.showPaymentHistory(); else await self.renderDashboard(); },
+            backupRestore: async () => { if (typeof Storage.renderBackupUI === 'function') await Storage.renderBackupUI(); else await self.renderDashboard(); },
             customerOrders: async () => { 
-                if (self.currentCustomerId) {
-                    await self.showCustomerOrders(self.currentCustomerId);
+                if (self.currentCustomerId && typeof window.APP.showCustomerOrders === 'function') {
+                    await window.APP.showCustomerOrders(self.currentCustomerId);
                 } else {
-                    await self.showCustomers();
+                    await self.renderDashboard();
                 }
             },
             customerPaymentHistory: async () => { 
-                if (self.currentCustomerId) {
-                    await self.showCustomerPaymentHistory(self.currentCustomerId);
+                if (self.currentCustomerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
+                    await window.APP.showCustomerPaymentHistory(self.currentCustomerId);
                 } else {
-                    await self.showCustomers();
+                    await self.renderDashboard();
                 }
             },
-            blacklist: async () => await self.showBlacklist(),
-            auditLogs: async () => await Audit.showAuditLogs()
+            blacklist: async () => { if (typeof window.APP.showBlacklist === 'function') await window.APP.showBlacklist(); else await self.renderDashboard(); },
+            auditLogs: async () => { if (typeof Audit.showAuditLogs === 'function') await Audit.showAuditLogs(); else await self.renderDashboard(); }
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -119,27 +120,87 @@ const DashboardCore = {
         this.saveCurrentPageState();
         
         var self = this;
-        var navHandlers = {
-            orderTable: async () => await self.showOrderTable(),
-            createOrder: () => self.showCreateOrder(),
-            dashboard: async () => await self.renderDashboard(),
-            report: async () => await self.showReport(),
-            userManagement: async () => await self.showUserManagement(),
-            storeManagement: async () => await StoreManager.renderStoreManagement(),
-            expenses: async () => await self.showExpenses(),
-            customers: async () => await self.showCustomers(),
-            paymentHistory: async () => await self.showPaymentHistory(),
-            backupRestore: async () => await Storage.renderBackupUI(),
-            customerOrders: async () => { if (params.customerId) await self.showCustomerOrders(params.customerId); },
-            customerPaymentHistory: async () => { if (params.customerId) await self.showCustomerPaymentHistory(params.customerId); },
-            viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
-            payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
-            blacklist: async () => await self.showBlacklist(),
-            auditLogs: async () => await Audit.showAuditLogs()
-        };
-        var handler = navHandlers[page];
-        if (handler) handler();
-        else this.renderDashboard();
+        
+        // 根据页面类型调用对应的模块方法
+        switch(page) {
+            case 'orderTable':
+                if (typeof window.APP.showOrderTable === 'function') window.APP.showOrderTable();
+                else self.renderDashboard();
+                break;
+            case 'createOrder':
+                if (typeof window.APP.showCreateOrder === 'function') window.APP.showCreateOrder();
+                else self.showCreateOrder();
+                break;
+            case 'dashboard':
+                self.renderDashboard();
+                break;
+            case 'report':
+                if (typeof window.APP.showReport === 'function') window.APP.showReport();
+                else self.renderDashboard();
+                break;
+            case 'userManagement':
+                if (typeof window.APP.showUserManagement === 'function') window.APP.showUserManagement();
+                else self.renderDashboard();
+                break;
+            case 'storeManagement':
+                if (typeof StoreManager.renderStoreManagement === 'function') StoreManager.renderStoreManagement();
+                else self.renderDashboard();
+                break;
+            case 'expenses':
+                if (typeof window.APP.showExpenses === 'function') window.APP.showExpenses();
+                else self.renderDashboard();
+                break;
+            case 'customers':
+                if (typeof window.APP.showCustomers === 'function') window.APP.showCustomers();
+                else self.renderDashboard();
+                break;
+            case 'paymentHistory':
+                if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
+                else self.renderDashboard();
+                break;
+            case 'backupRestore':
+                if (typeof Storage.renderBackupUI === 'function') Storage.renderBackupUI();
+                else self.renderDashboard();
+                break;
+            case 'customerOrders':
+                if (params.customerId && typeof window.APP.showCustomerOrders === 'function') {
+                    window.APP.showCustomerOrders(params.customerId);
+                } else {
+                    self.renderDashboard();
+                }
+                break;
+            case 'customerPaymentHistory':
+                if (params.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
+                    window.APP.showCustomerPaymentHistory(params.customerId);
+                } else {
+                    self.renderDashboard();
+                }
+                break;
+            case 'viewOrder':
+                if (params.orderId && typeof window.APP.viewOrder === 'function') {
+                    window.APP.viewOrder(params.orderId);
+                } else {
+                    self.renderDashboard();
+                }
+                break;
+            case 'payment':
+                if (params.orderId && typeof window.APP.showPayment === 'function') {
+                    window.APP.showPayment(params.orderId);
+                } else {
+                    self.renderDashboard();
+                }
+                break;
+            case 'blacklist':
+                if (typeof window.APP.showBlacklist === 'function') window.APP.showBlacklist();
+                else self.renderDashboard();
+                break;
+            case 'auditLogs':
+                if (typeof Audit.showAuditLogs === 'function') Audit.showAuditLogs();
+                else self.renderDashboard();
+                break;
+            default:
+                self.renderDashboard();
+        }
     },
 
     goBack: function() {
@@ -153,31 +214,81 @@ const DashboardCore = {
             
             this.saveCurrentPageState();
             
-            var backHandlers = {
-                orderTable: async () => await self.showOrderTable(),
-                dashboard: async () => await self.renderDashboard(),
-                viewOrder: async () => { if (prev.orderId) await self.viewOrder(prev.orderId); },
-                report: async () => await self.showReport(),
-                userManagement: async () => await self.showUserManagement(),
-                storeManagement: async () => await StoreManager.renderStoreManagement(),
-                expenses: async () => await self.showExpenses(),
-                customers: async () => await self.showCustomers(),
-                paymentHistory: async () => await self.showPaymentHistory(),
-                backupRestore: async () => await Storage.renderBackupUI(),
-                customerOrders: async () => { if (prev.customerId) await self.showCustomerOrders(prev.customerId); },
-                customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); },
-                blacklist: async () => await self.showBlacklist(),
-                auditLogs: async () => await Audit.showAuditLogs()
-            };
-            var handler = backHandlers[prev.page];
-            if (handler) handler();
-            else this.renderDashboard();
+            // 根据返回的页面类型调用对应方法
+            switch(prev.page) {
+                case 'orderTable':
+                    if (typeof window.APP.showOrderTable === 'function') window.APP.showOrderTable();
+                    else self.renderDashboard();
+                    break;
+                case 'dashboard':
+                    self.renderDashboard();
+                    break;
+                case 'viewOrder':
+                    if (prev.orderId && typeof window.APP.viewOrder === 'function') {
+                        window.APP.viewOrder(prev.orderId);
+                    } else {
+                        self.renderDashboard();
+                    }
+                    break;
+                case 'report':
+                    if (typeof window.APP.showReport === 'function') window.APP.showReport();
+                    else self.renderDashboard();
+                    break;
+                case 'userManagement':
+                    if (typeof window.APP.showUserManagement === 'function') window.APP.showUserManagement();
+                    else self.renderDashboard();
+                    break;
+                case 'storeManagement':
+                    if (typeof StoreManager.renderStoreManagement === 'function') StoreManager.renderStoreManagement();
+                    else self.renderDashboard();
+                    break;
+                case 'expenses':
+                    if (typeof window.APP.showExpenses === 'function') window.APP.showExpenses();
+                    else self.renderDashboard();
+                    break;
+                case 'customers':
+                    if (typeof window.APP.showCustomers === 'function') window.APP.showCustomers();
+                    else self.renderDashboard();
+                    break;
+                case 'paymentHistory':
+                    if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
+                    else self.renderDashboard();
+                    break;
+                case 'backupRestore':
+                    if (typeof Storage.renderBackupUI === 'function') Storage.renderBackupUI();
+                    else self.renderDashboard();
+                    break;
+                case 'customerOrders':
+                    if (prev.customerId && typeof window.APP.showCustomerOrders === 'function') {
+                        window.APP.showCustomerOrders(prev.customerId);
+                    } else {
+                        self.renderDashboard();
+                    }
+                    break;
+                case 'customerPaymentHistory':
+                    if (prev.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
+                        window.APP.showCustomerPaymentHistory(prev.customerId);
+                    } else {
+                        self.renderDashboard();
+                    }
+                    break;
+                case 'blacklist':
+                    if (typeof window.APP.showBlacklist === 'function') window.APP.showBlacklist();
+                    else self.renderDashboard();
+                    break;
+                case 'auditLogs':
+                    if (typeof Audit.showAuditLogs === 'function') Audit.showAuditLogs();
+                    else self.renderDashboard();
+                    break;
+                default:
+                    self.renderDashboard();
+            }
         } else {
             this.renderDashboard();
         }
     },
 
-    // ==================== 登录认证（双语支持） ====================
+    // ==================== 登录认证 ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
@@ -231,7 +342,7 @@ const DashboardCore = {
         await this.router();
     },
 
-    // ==================== 保存退出功能（修复双语） ====================
+    // ==================== 保存退出功能 ====================
     logout: async function() {
         var confirmMsg = Utils.t('save_exit_confirm');
         
@@ -371,7 +482,7 @@ const DashboardCore = {
             
             var needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             var hasReminders = needRemindOrders.length > 0;
-            var hasSentToday = await APP.hasSentRemindersToday();
+            var hasSentToday = await window.APP.hasSentRemindersToday ? await window.APP.hasSentRemindersToday() : false;
             
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
@@ -474,7 +585,7 @@ const DashboardCore = {
                 </div>
             `;
             
-            // 修复：添加安全的数值判断，使用 || 0 防止 undefined
+            // 安全获取 cashFlow 各字段值
             var cashBalance = cashFlow.cash?.balance ?? 0;
             var bankBalance = cashFlow.bank?.balance ?? 0;
             var cashIncome = cashFlow.cash?.income ?? 0;
@@ -582,6 +693,7 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
                     <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
                     <button onclick="APP.navigateTo('blacklist')">🚫 ${t('blacklist')}</button>
+                    <button onclick="APP.navigateTo('auditLogs')">📋 ${lang === 'id' ? 'Log Audit' : '审计日志'}</button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
             } else {
@@ -628,6 +740,7 @@ const DashboardCore = {
                 ${bottomHtml}
             `;
         } catch (err) {
+            console.error("renderDashboard error:", err);
             document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.t('save_exit')}</button></div>`;
         }
     },
@@ -637,8 +750,6 @@ const DashboardCore = {
         alert(Utils.lang === 'id' ? 'Silakan pilih nasabah terlebih dahulu' : '请先选择客户'); 
         this.navigateTo('customers'); 
     },
-    
-    // 注意：已删除重复的 getExpensesTotal 函数定义
     
     showBlacklist: async function() {
         if (typeof window.APP.showBlacklist === 'function') {
@@ -686,11 +797,26 @@ const DashboardCore = {
     }
 };
 
-// 合并到 window.APP
+// 合并到 window.APP（只合并核心方法，不覆盖子模块的同名方法）
 for (var key in DashboardCore) {
-    if (typeof DashboardCore[key] === 'function' || 
-        key === 'currentFilter' || key === 'historyStack' || 
-        key === 'currentPage' || key === 'currentOrderId' || key === 'currentCustomerId') {
+    if (typeof DashboardCore[key] === 'function' && 
+        key !== 'showExpenses' &&      // 避免覆盖子模块
+        key !== 'showOrderTable' &&    // 避免覆盖子模块
+        key !== 'showReport' &&        // 避免覆盖子模块
+        key !== 'showUserManagement' && // 避免覆盖子模块
+        key !== 'showCustomers' &&     // 避免覆盖子模块
+        key !== 'showPaymentHistory' && // 避免覆盖子模块
+        key !== 'viewOrder' &&         // 避免覆盖子模块
+        key !== 'showPayment' &&       // 避免覆盖子模块
+        key !== 'showCustomerOrders' && // 避免覆盖子模块
+        key !== 'showCustomerPaymentHistory') {
         window.APP[key] = DashboardCore[key];
     }
 }
+
+// 确保核心属性也被合并
+window.APP.currentFilter = DashboardCore.currentFilter;
+window.APP.historyStack = DashboardCore.historyStack;
+window.APP.currentPage = DashboardCore.currentPage;
+window.APP.currentOrderId = DashboardCore.currentOrderId;
+window.APP.currentCustomerId = DashboardCore.currentCustomerId;
