@@ -1,3 +1,5 @@
+/* tables.css - v1.1（修复：手机端操作列响应式优化 + data-label 卡片布局） */
+
 /* === 表格容器 === */
 .table-container {
     overflow-x: auto;
@@ -430,56 +432,147 @@ tbody tr:hover {
         min-height: 44px;
     }
 
+    /* ========== 表格响应式优化 - 操作列另起一行 ========== */
+    .data-table,
+    .data-table thead,
+    .data-table tbody,
+    .data-table tr,
     .data-table th,
     .data-table td {
-        padding: 6px 8px;
+        display: block;
+    }
+    
+    /* 隐藏表头，改用 data-label 属性显示标签 */
+    .data-table thead {
+        display: none;
+    }
+    
+    /* 每个表格行变成独立卡片 */
+    .data-table tbody tr {
+        margin-bottom: 16px;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-md);
+        background: white;
+        padding: 12px;
+        position: relative;
+        box-shadow: var(--shadow-sm);
+    }
+    
+    /* 每个单元格变成 flex 行 */
+    .data-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--gray-100);
+        text-align: right;
+        gap: 8px;
+    }
+    
+    .data-table td:last-child {
+        border-bottom: none;
+    }
+    
+    /* 使用 data-label 属性显示标签 */
+    .data-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--gray-600);
+        text-align: left;
+        flex: 1;
         font-size: 0.7rem;
     }
     
+    /* 金额内容右对齐 */
+    .data-table td .amount-value,
+    .data-table td.text-right {
+        text-align: right;
+    }
+    
+    /* ========== 操作列特殊处理 - 另起一行占满宽度 ========== */
+    .data-table td.action-cell {
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--gray-200);
+        text-align: left;
+    }
+    
+    .data-table td.action-cell::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--gray-600);
+        text-align: left;
+    }
+    
+    /* 操作按钮改为横向排列，自动换行 */
     .data-table .action-cell {
-        flex-direction: column;
-        gap: 4px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
     }
     
     .data-table .action-cell .btn-small {
-        width: 100%;
+        width: auto;
+        min-width: 70px;
         text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 6px 12px;
     }
-
+    
+    /* 其他表格样式适配 */
+    .data-table td .text-center,
+    .data-table td .text-right {
+        text-align: right;
+    }
+    
     .expense-table .expense-desc {
-        max-width: 120px;
+        max-width: none;
+        white-space: normal;
+        word-break: break-word;
     }
     
     .expense-table th,
     .expense-table td {
-        padding: 6px 4px;
+        padding: 6px 0;
         font-size: 0.7rem;
     }
 
     .store-table .store-address {
-        max-width: 120px;
+        max-width: none;
+        white-space: normal;
     }
     
     .store-table td input {
-        width: 100px;
+        width: 100%;
         font-size: 10px;
     }
 
     .capital-table .flow-desc,
     .cashflow-table .flow-desc {
-        max-width: 150px;
+        max-width: none;
+        white-space: normal;
+        word-break: break-word;
     }
     
     .capital-table th,
     .capital-table td,
     .cashflow-table th,
     .cashflow-table td {
-        padding: 6px 4px;
+        padding: 6px 0;
         font-size: 0.7rem;
     }
 
     .order-table .order-collateral {
-        max-width: 100px;
+        max-width: none;
+        white-space: normal;
+        word-break: break-word;
     }
 }
 
@@ -526,12 +619,18 @@ tbody tr:hover {
 
     .data-table th,
     .data-table td {
-        padding: 4px 6px;
+        padding: 6px 0;
         font-size: 0.65rem;
+    }
+    
+    .data-table .action-cell .btn-small {
+        font-size: 0.6rem;
+        padding: 4px 8px;
+        min-width: 60px;
     }
 }
 
-/* === 打印样式（方案一：移除 CSS 中的页眉页脚，保留 JS 动态生成） === */
+/* === 打印样式 === */
 @media print {
     @page {
         size: A4;
@@ -619,6 +718,37 @@ tbody tr:hover {
         margin: 0;
     }
     
+    /* 打印时恢复表格布局（不使用 flex） */
+    .data-table,
+    .data-table thead,
+    .data-table tbody,
+    .data-table tr,
+    .data-table th,
+    .data-table td {
+        display: table !important;
+    }
+    
+    .data-table thead {
+        display: table-header-group !important;
+    }
+    
+    .data-table tbody tr {
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .data-table td {
+        display: table-cell !important;
+        padding: 5px 8px !important;
+        border: 1px solid #ccc !important;
+    }
+    
+    .data-table td::before {
+        display: none !important;
+    }
+    
     .data-table th {
         background: #f5f5f5 !important;
         padding: 6px 8px;
@@ -628,14 +758,6 @@ tbody tr:hover {
         white-space: normal;
     }
     
-    .data-table td {
-        padding: 5px 8px;
-        border: 1px solid #ccc;
-        white-space: normal;
-        word-break: break-word;
-    }
-    
-    .data-table th,
     .data-table td {
         border: 1px solid #ccc !important;
     }
@@ -691,7 +813,7 @@ tbody tr:hover {
         page-break-after: avoid;
     }
 
-    /* ===== 方案一：移除 CSS 中定义的页眉页脚，保留 JS 动态生成 ===== */
+    /* 打印页眉页脚由 JS 动态生成 */
     .print-header,
     .print-footer {
         display: none !important;
