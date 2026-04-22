@@ -1,4 +1,4 @@
-// supabase.js - v1.2（所有错误消息使用 Utils.t()，支持双语）
+// supabase.js - v1.3（修复：createOrder 中 store_id 为空的问题）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -397,7 +397,7 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
-    // ==================== 创建订单（支持固定还款） ====================
+    // ==================== 创建订单（支持固定还款）- 修复版 ====================
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
@@ -408,13 +408,25 @@ const SupabaseAPI = {
         const repaymentType = orderData.repayment_type || 'flexible';
         const repaymentTerm = orderData.repayment_term || null;
         
-        const targetStoreId = orderData.store_id || profile.store_id;
+        // 修复：确定目标门店ID
+        let targetStoreId = null;
         
-        if (profile.role === 'admin' && !orderData.store_id) {
+        // 优先使用传入的 store_id
+        if (orderData.store_id) {
+            targetStoreId = orderData.store_id;
+        } 
+        // 其次使用 profile 中的 store_id
+        else if (profile && profile.store_id) {
+            targetStoreId = profile.store_id;
+        }
+        // 如果是管理员但没有指定门店，抛出错误
+        else if (profile && profile.role === 'admin' && !orderData.store_id) {
             throw new Error(Utils.t('store_operation'));
         }
         
+        // 检查 targetStoreId 是否有效
         if (!targetStoreId) {
+            console.error('createOrder: targetStoreId 为空', { orderData, profile });
             throw new Error(Utils.lang === 'id' ? 'Toko tidak ditemukan' : '未找到门店');
         }
         
@@ -423,7 +435,7 @@ const SupabaseAPI = {
         
         while (retryCount < 3) {
             try {
-                const orderId = await this._generateOrderId(profile.role, targetStoreId);
+                const orderId = await this._generateOrderId(profile?.role, targetStoreId);
                 
                 const serviceFeeAmount = orderData.loan_amount * (serviceFeePercent / 100);
                 
@@ -459,12 +471,12 @@ const SupabaseAPI = {
                     principal_remaining: orderData.loan_amount,
                     status: 'active',
                     store_id: targetStoreId,
-                    created_by: profile.id,
+                    created_by: profile?.id,
                     notes: orderData.notes || '',
                     customer_id: orderData.customer_id || null,
                     is_locked: true,
                     locked_at: new Date().toISOString(),
-                    locked_by: profile.id,
+                    locked_by: profile?.id,
                     repayment_type: repaymentType,
                     repayment_term: repaymentTerm,
                     monthly_fixed_payment: monthlyFixedPayment,
@@ -592,7 +604,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 灵活还款 - 利息记录（使用协商利率） ====================
+    // ==================== 灵活还款 - 利息记录 ====================
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -882,7 +894,7 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ==================== 固定还款 - 提前结清（减免剩余利息） ====================
+    // ==================== 固定还款 - 提前结清 ====================
     async earlySettleFixedOrder(orderId, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const order = await this.getOrder(orderId);
