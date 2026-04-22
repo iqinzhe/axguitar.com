@@ -361,12 +361,15 @@ const DashboardExpenses = {
         }
     },
 
-    // ==================== 修复平账功能 ====================
+    // ==================== 平账功能 ====================
     balanceExpenses: async function() {
         var lang = Utils.lang;
-        var isAdmin = AUTH.isAdmin();
+        // 使用异步方式获取用户资料，比同步 AUTH.isAdmin() 更可靠
+        var profile = null;
+        try { profile = await SUPABASE.getCurrentProfile(); } catch(e) { console.warn(e); }
+        var isAdmin = profile?.role === 'admin';
         if (!isAdmin) {
-            alert(lang === 'id' ? '需管理员权限' : '需管理员权限');
+            alert(lang === 'id' ? 'Hanya admin yang dapat melakukan rekonsiliasi' : '仅管理员可执行平账操作');
             return;
         }
         var period = prompt(lang === 'id' 
@@ -428,7 +431,7 @@ const DashboardExpenses = {
                 .update({ 
                     is_reconciled: true, 
                     reconciled_at: new Date().toISOString(), 
-                    reconciled_by: AUTH.user?.id 
+                    reconciled_by: profile?.id || null
                 })
                 .gte('expense_date', startDate)
                 .lte('expense_date', endDate)

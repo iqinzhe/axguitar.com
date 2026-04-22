@@ -37,8 +37,9 @@ const DashboardUsers = {
                                     <option value="store_manager" ${u.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
                                     <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option>
                                 </select>
+                                <button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button>
                                 <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
-                            ` : (u.id === AUTH.user?.id ? (lang === 'id' ? '👤 当前用户' : '👤 当前用户') : '-')}
+                            ` : (u.id === AUTH.user?.id ? `<span style="color:var(--primary);font-weight:600;">👤 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}</span>` : '-')}
                         <\/td>
                     <\/tr>`;
                 }

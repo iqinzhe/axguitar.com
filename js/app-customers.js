@@ -47,6 +47,7 @@ const CustomersModule = {
                         <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}</td>
                         ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}</td>` : ''}
                         <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">
+                            <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
                             ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
@@ -512,55 +513,78 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（支持固定还款）- 修复黑名单检查 ====================
+    // ==================== 创建订单（支持固定还款）====================
     createOrderForCustomer: async function(customerId) {
-        var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
         var t = Utils.t;
-        
+
+        // 使用异步方式获取当前用户资料（更可靠）
+        var profile = null;
+        try {
+            profile = await SUPABASE.getCurrentProfile();
+        } catch(e) {
+            console.warn('获取用户资料失败:', e.message);
+        }
+        var isAdmin = profile?.role === 'admin';
+
         if (isAdmin) {
-            alert(t('store_operation'));
+            alert(lang === 'id' ? 'Operasi ini hanya untuk operator toko' : '此操作仅限门店操作员');
             return;
         }
-        
+
+        if (!customerId) {
+            alert(lang === 'id' ? 'ID nasabah tidak valid' : '客户ID无效');
+            return;
+        }
+
         try {
-            // 修复：安全检查黑名单（兼容模块未加载的情况）
-            var blacklistCheck = null;
-            if (typeof window.APP.isBlacklisted === 'function') {
-                blacklistCheck = await window.APP.isBlacklisted(customerId);
-            } else {
-                // 直接查询数据库
-                const { data, error } = await supabaseClient
-                    .from('blacklist')
-                    .select('id, reason')
-                    .eq('customer_id', customerId)
-                    .maybeSingle();
-                blacklistCheck = error ? { isBlacklisted: false } : (data ? { isBlacklisted: true, reason: data.reason } : { isBlacklisted: false });
-            }
-            
-            if (blacklistCheck && blacklistCheck.isBlacklisted) {
-                alert(t('blacklisted_cannot_order'));
-                return;
-            }
-            
-            const { data: existingOrders } = await supabaseClient
-                .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
-            if (existingOrders && existingOrders.length > 0) {
-                alert(t('customer_has_active_order'));
-                return;
-            }
-            
-            const { data: customer, error } = await supabaseClient
+            // 检查客户是否存在
+            const { data: customer, error: customerError } = await supabaseClient
                 .from('customers')
                 .select('*')
                 .eq('id', customerId)
                 .single();
-            if (error) throw error;
+            if (customerError || !customer) {
+                throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据，请刷新后重试');
+            }
+
+            // 安全检查黑名单（兼容模块未加载的情况）
+            var blacklistCheck = { isBlacklisted: false };
+            try {
+                if (typeof window.APP.isBlacklisted === 'function') {
+                    blacklistCheck = await window.APP.isBlacklisted(customerId);
+                } else {
+                    const { data: blData } = await supabaseClient
+                        .from('blacklist')
+                        .select('id, reason')
+                        .eq('customer_id', customerId)
+                        .maybeSingle();
+                    blacklistCheck = blData ? { isBlacklisted: true, reason: blData.reason } : { isBlacklisted: false };
+                }
+            } catch(blErr) {
+                console.warn('黑名单检查失败，跳过:', blErr.message);
+            }
+
+            if (blacklistCheck && blacklistCheck.isBlacklisted) {
+                alert(t('blacklisted_cannot_order'));
+                return;
+            }
+
+            // 检查是否有活跃订单
+            try {
+                const { data: existingOrders } = await supabaseClient
+                    .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
+                if (existingOrders && existingOrders.length > 0) {
+                    alert(t('customer_has_active_order'));
+                    return;
+                }
+            } catch(ordErr) {
+                console.warn('活跃订单检查失败，继续:', ordErr.message);
+            }
 
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
-            
-            const profile = await SUPABASE.getCurrentProfile();
+
             const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
             const userStoreCode = profile?.stores?.code || '-';
             
