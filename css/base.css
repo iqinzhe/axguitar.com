@@ -1,9 +1,14 @@
-/* === 全局变量 === */
+/* base.css - 完整优化版 v2.0 */
+
+/* === 全局变量 - 统一配色方案 === */
 :root {
+    /* 主色调 - 保持品牌色 */
     --primary: #2563eb;
     --primary-light: #60a5fa;
     --primary-soft: #dbeafe;
     --primary-dark: #1d4ed8;
+    
+    /* 功能色 */
     --success: #10b981;
     --success-dark: #059669;
     --success-light: #ecfdf5;
@@ -13,27 +18,37 @@
     --danger: #ef4444;
     --danger-dark: #dc2626;
     --danger-light: #fef2f2;
-    --gray-50: #f8fafc;
-    --gray-100: #f1f5f9;
-    --gray-200: #e2e8f0;
-    --gray-300: #cbd5e1;
-    --gray-400: #94a3b8;
-    --gray-500: #64748b;
-    --gray-600: #475569;
-    --gray-700: #334155;
-    --gray-800: #1e293b;
-    --gray-900: #0f172a;
     
-    /* ========== 字体大小变量（基础尺寸 - 默认 16px 基准） ========== */
-    --font-xxs: 0.7rem;      /* 最小字号 - 用于徽章等 */
-    --font-xs: 0.8rem;       /* 特小字号 - 用于辅助信息 */
-    --font-sm: 0.9rem;       /* 小字号 - 用于表格内容 */
-    --font-md: 1rem;         /* 中等字号 - 用于正文 */
-    --font-lg: 1.15rem;     /* 大字号 - 用于小标题 */
-    --font-xl: 1.2rem;      /* 特大字号 - 用于页面标题 */
-    --font-2xl: 1.25rem;     /* 超大字号 - 用于强调 */
+    /* 统一背景色系 */
+    --bg-page: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-highlight: #f0f9ff;
+    --bg-hover: #f8fafc;
+    --bg-modal: rgba(0, 0, 0, 0.5);
     
-    /* 间距变量保持不变 */
+    /* 统一文字色系 */
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --text-white: #ffffff;
+    
+    /* 边框色 */
+    --border-light: #e2e8f0;
+    --border-medium: #cbd5e1;
+    
+    /* 阴影 */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    
+    /* 圆角 */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    
+    /* 间距 */
     --spacing-1: 4px;
     --spacing-2: 8px;
     --spacing-3: 12px;
@@ -43,21 +58,17 @@
     --spacing-7: 28px;
     --spacing-8: 32px;
     
-    /* 圆角变量保持不变 */
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
-    --radius-2xl: 20px;
-    
-    /* 阴影变量保持不变 */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    
-    /* 过渡动画保持不变 */
+    /* 过渡 */
     --transition: all 0.2s ease;
+    
+    /* 字体大小（基准16px） */
+    --font-xxs: 0.7rem;
+    --font-xs: 0.8rem;
+    --font-sm: 0.9rem;
+    --font-md: 1rem;
+    --font-lg: 1.125rem;
+    --font-xl: 1.25rem;
+    --font-2xl: 1.35rem;
 }
 
 /* === 重置与基础 === */
@@ -67,7 +78,6 @@
     padding: 0;
 }
 
-/* 基础 html 字体设置（默认 16px） */
 html {
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
@@ -75,94 +85,63 @@ html {
 
 body {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
-    background: var(--gray-50);
-    color: var(--gray-800);
+    background: var(--bg-page);
+    color: var(--text-primary);
     line-height: 1.5;
 }
 
-/* ========== 网页端（PC端）字体放大 1.5 倍 ========== */
-/* 使用 min-width: 769px 确保仅在 PC 端生效，不覆盖手机端样式 */
+/* ========== PC端（≥769px）适度放大 ========== */
 @media (min-width: 769px) {
-    /* 基础字体放大 - 所有常规文字放大 1.5 倍 */
     html {
-        font-size: 20px;  /* 原 16px × 1.5 = 22px */
+        font-size: 17px;
     }
     
-    /* 重新定义字体变量（覆盖原有值，放大 1.5 倍） */
     :root {
-        --font-xxs: 1.0rem;   /* 原 0.7rem × 1.5 = 1.05rem */
-        --font-xs: 1.25rem;     /* 原 0.8rem × 1.5 = 1.2rem */
-        --font-sm: 1.35rem;    /* 原 0.9rem × 1.5 = 1.35rem */
-        --font-md: 1.4rem;     /* 原 1rem × 1.5 = 1.5rem */
-        --font-lg: 1.5rem;  /* 原 1.125rem × 1.5 = 1.6875rem */
-        --font-xl: 1.6rem;   /* 原 1.25rem × 1.5 = 1.875rem */
-        --font-2xl: 1.8rem;  /* 原 1.35rem × 1.5 = 2.025rem */
+        --font-xxs: 0.75rem;
+        --font-xs: 0.85rem;
+        --font-sm: 0.95rem;
+        --font-md: 1.05rem;
+        --font-lg: 1.2rem;
+        --font-xl: 1.35rem;
+        --font-2xl: 1.5rem;
     }
     
-    /* ========== 页面底部卡片（显示当前用户、门店信息等）- 保持原字号不变 ========== */
-    /* 使用 class 组合选择器精确匹配底部信息卡片 */
-    .dashboard-footer-card,
-    .card:last-of-type {
-        font-size: 0.75rem !important;  /* 保持约 12px 的原大小（基于 16px 基准） */
-    }
-    
-    .dashboard-footer-card h3,
-    .card:last-of-type h3,
-    .dashboard-footer-card p,
-    .card:last-of-type p,
-    .dashboard-footer-card .text-muted,
-    .card:last-of-type .text-muted,
-    .dashboard-footer-card small,
-    .card:last-of-type small {
-        font-size: 0.75rem !important;
-    }
-    
-    /* 按钮字体放大但保持合理大小 */
     button, .btn-small, .btn-action {
         font-size: var(--font-xs);
     }
     
-    /* 表格内容字体放大 */
     .data-table td, .data-table th {
         font-size: var(--font-sm);
     }
     
-    /* 统计卡片数值放大 */
     .stat-value {
         font-size: var(--font-xl);
     }
     
-    /* 统计卡片标签放大 */
     .stat-label {
         font-size: var(--font-xs);
     }
     
-    /* 页面标题放大 */
     .page-header h1, .page-header h2 {
         font-size: var(--font-xl);
     }
     
-    /* 卡片标题放大 */
     .card h3 {
         font-size: var(--font-lg);
     }
     
-    /* 工具栏按钮字体 */
     .toolbar button {
         font-size: var(--font-xs);
     }
     
-    /* 模态框内容字体 */
     .modal-content {
         font-size: var(--font-md);
     }
     
-    /* 登录框字体 */
     .login-box {
         font-size: var(--font-md);
     }
     
-    /* 现金流汇总卡片字体 */
     .cashflow-summary .value {
         font-size: var(--font-lg);
     }
@@ -171,7 +150,6 @@ body {
         font-size: var(--font-sm);
     }
     
-    /* 表单标签和输入框字体 */
     .form-group label {
         font-size: var(--font-sm);
     }
@@ -182,59 +160,36 @@ body {
         font-size: var(--font-md);
     }
     
-    /* 金额显示字体 */
     .amount-highlight, .monthly-payment-display {
         font-size: var(--font-xl);
     }
 }
 
-/* ========== 手机端（≤768px）字体调整 ========== */
+/* ========== 手机端（≤768px）适度放大 ========== */
 @media (max-width: 768px) {
-    /* 手机端基础字体放大 1.2 倍 */
     html {
-        font-size: 19.0px;  /* 原 16px × 1.2 = 19.2px */
+        font-size: 15px;
     }
     
-    /* 重新定义字体变量（覆盖原有值，放大 1.2 倍） */
     :root {
-        --font-xxs: 0.8rem;   /* 原 0.7rem × 1.2 = 0.84rem */
-        --font-xs: 0.95rem;    /* 原 0.8rem × 1.2 = 0.96rem */
-        --font-sm: 1.0rem;    /* 原 0.9rem × 1.2 = 1.08rem */
-        --font-md: 1.2rem;     /* 原 1rem × 1.2 = 1.2rem */
-        --font-lg: 1.35rem;    /* 原 1.125rem × 1.2 = 1.35rem */
-        --font-xl: 1.4rem;     /* 原 1.25rem × 1.2 = 1.5rem */
-        --font-2xl: 1.5rem;   /* 原 1.35rem × 1.2 = 1.62rem */
+        --font-xxs: 0.7rem;
+        --font-xs: 0.75rem;
+        --font-sm: 0.85rem;
+        --font-md: 0.95rem;
+        --font-lg: 1.05rem;
+        --font-xl: 1.15rem;
+        --font-2xl: 1.25rem;
     }
     
-    /* ========== 页面底部卡片文字减小 1/4（即缩小到原来的 75%） ========== */
-    /* 底部卡片选择器 - 匹配包含当前用户信息的卡片 */
-    .dashboard-footer-card,
-    .card:last-of-type {
-        font-size: 0.5625rem !important;  /* 原 0.75rem × 0.75 = 0.5625rem，约 10.8px */
-    }
-    
-    .dashboard-footer-card h3,
-    .card:last-of-type h3,
-    .dashboard-footer-card p,
-    .card:last-of-type p,
-    .dashboard-footer-card .text-muted,
-    .card:last-of-type .text-muted,
-    .dashboard-footer-card small,
-    .card:last-of-type small {
-        font-size: 0.5625rem !important;
-        line-height: 1.3;
-    }
-    
-    /* 手机端其他元素字体使用放大后的变量 */
     button, .btn-small, .btn-action {
         font-size: var(--font-xs);
+        padding: 8px 14px;
     }
     
     .data-table td, .data-table th {
         font-size: var(--font-sm);
     }
     
-    /* 统计卡片在手机端适当缩小（避免过于拥挤） */
     .stat-value {
         font-size: var(--font-md);
     }
@@ -273,23 +228,22 @@ body {
         font-size: var(--font-sm);
     }
     
-    /* 表格操作按钮在手机端保持可点击大小 */
     .action-cell .btn-small {
-        font-size: var(--font-xxs);
-        padding: 6px 10px;
+        padding: 6px 12px;
+        min-width: 65px;
     }
 }
 
-/* === Logo 图片统一大小 === */
+/* === Logo 图片统一 === */
 h1 img,
 .page-header h1 img {
-    height: 2.0em;
+    height: 1.8em;
     width: auto;
     vertical-align: middle;
 }
 
 .login-logo {
-    height: 1.8em;
+    height: 1.6em;
     width: auto;
     vertical-align: middle;
 }
@@ -297,7 +251,7 @@ h1 img,
 @media (max-width: 480px) {
     h1 img,
     .page-header h1 img {
-        height: 1.8em;
+        height: 1.6em;
     }
 }
 
@@ -305,8 +259,14 @@ h1 img,
 #app {
     max-width: 1400px;
     margin: 0 auto;
-    padding: var(--spacing-5);
-    background: var(--gray-50);
+    padding: var(--spacing-4);
+    background: var(--bg-page);
+}
+
+@media (min-width: 768px) {
+    #app {
+        padding: var(--spacing-5);
+    }
 }
 
 .container {
@@ -320,7 +280,7 @@ h1 img,
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-3);
+    margin-bottom: var(--spacing-4);
     flex-wrap: wrap;
     gap: var(--spacing-3);
 }
@@ -330,6 +290,7 @@ h1 img,
     margin: 0;
     font-size: var(--font-xl);
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .header-actions {
@@ -346,27 +307,29 @@ h1 img,
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--bg-modal);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-5);
+    padding: var(--spacing-4);
 }
 
 .modal-content {
-    background: white;
+    background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-6);
+    padding: var(--spacing-5);
     width: 100%;
     max-width: 550px;
-    max-height: 85dvh;
+    max-height: 85vh;
     overflow-y: auto;
+    box-shadow: var(--shadow-lg);
 }
 
 .modal-content h3 {
     font-size: var(--font-lg);
     margin-bottom: var(--spacing-4);
+    color: var(--text-primary);
 }
 
 .modal-actions {
@@ -378,45 +341,48 @@ h1 img,
 
 /* === 登录页面 === */
 .login-container {
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--primary-soft), var(--gray-50));
+    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--bg-page) 100%);
+    padding: var(--spacing-4);
 }
 
 .login-box {
-    width: 320px;
-    max-width: 90%;
-    background: white;
-    padding: var(--spacing-6);
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-card);
+    padding: 32px 28px;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-light);
 }
 
 .login-title {
-    font-size: 1.25rem;
-    margin-bottom: var(--spacing-5);
+    font-size: 1.35rem;
+    margin-bottom: 28px;
     text-align: center;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    flex-wrap: nowrap;
+    gap: 8px;
+    color: var(--text-primary);
     white-space: nowrap;
 }
 
 .lang-toggle {
     text-align: right;
-    margin-bottom: var(--spacing-3);
+    margin-bottom: 20px;
 }
 
 .lang-btn {
     background: transparent;
     color: var(--primary);
-    border: 1px solid var(--gray-200);
-    padding: 4px 12px;
-    font-size: var(--font-xs);
+    border: 1px solid var(--border-light);
+    padding: 6px 14px;
+    font-size: var(--font-sm);
+    border-radius: var(--radius-md);
 }
 
 .lang-btn:hover {
@@ -424,10 +390,54 @@ h1 img,
     transform: none;
 }
 
+.login-box .form-group {
+    margin-bottom: 20px;
+}
+
+.login-box .form-group label {
+    font-size: var(--font-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.login-box input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-medium);
+    transition: var(--transition);
+}
+
+.login-box input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.login-box button {
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    margin-top: 8px;
+}
+
+.login-box button:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
 .login-note {
-    margin-top: var(--spacing-4);
+    margin-top: 24px;
     font-size: var(--font-xs);
-    color: var(--gray-400);
+    color: var(--text-muted);
     text-align: center;
 }
 
@@ -444,14 +454,14 @@ h1 img,
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    background: var(--gray-50);
+    min-height: 100vh;
+    background: var(--bg-page);
 }
 
 .loader {
     width: 40px;
     height: 40px;
-    border: 3px solid var(--gray-200);
+    border: 3px solid var(--border-light);
     border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -462,7 +472,7 @@ h1 img,
 }
 
 .loading-text {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-top: var(--spacing-4);
     font-size: var(--font-sm);
 }
@@ -473,18 +483,18 @@ h1 img,
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background: var(--gray-50);
+    background: var(--bg-page);
     padding: var(--spacing-5);
 }
 
 .error-card {
     max-width: 400px;
-    background: white;
+    background: var(--bg-card);
     border-radius: var(--radius-xl);
     padding: var(--spacing-8);
     text-align: center;
     box-shadow: var(--shadow-lg);
-    border: 1px solid var(--gray-200);
+    border: 1px solid var(--border-light);
 }
 
 .error-icon {
@@ -499,7 +509,7 @@ h1 img,
 }
 
 .error-message {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     margin-bottom: var(--spacing-5);
     font-size: var(--font-sm);
 }
@@ -518,7 +528,7 @@ h1 img,
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .text-left { text-align: left; }
-.text-muted { color: var(--gray-400); }
+.text-muted { color: var(--text-muted); }
 .text-warning { color: var(--warning); }
 .text-success { color: var(--success); }
 .text-danger { color: var(--danger); }
