@@ -23,13 +23,17 @@
     --gray-700: #334155;
     --gray-800: #1e293b;
     --gray-900: #0f172a;
-    --font-xxs: 0.7rem;
-    --font-xs: 0.8rem;
-    --font-sm: 0.9rem;
-    --font-md: 1rem;
-    --font-lg: 1.125rem;
-    --font-xl: 1.25rem;
-    --font-2xl: 1.35rem;
+    
+    /* ========== 字体大小变量（基础尺寸 - 默认 16px 基准） ========== */
+    --font-xxs: 0.7rem;      /* 最小字号 - 用于徽章等 */
+    --font-xs: 0.8rem;       /* 特小字号 - 用于辅助信息 */
+    --font-sm: 0.9rem;       /* 小字号 - 用于表格内容 */
+    --font-md: 1rem;         /* 中等字号 - 用于正文 */
+    --font-lg: 1.125rem;     /* 大字号 - 用于小标题 */
+    --font-xl: 1.25rem;      /* 特大字号 - 用于页面标题 */
+    --font-2xl: 1.35rem;     /* 超大字号 - 用于强调 */
+    
+    /* 间距变量保持不变 */
     --spacing-1: 4px;
     --spacing-2: 8px;
     --spacing-3: 12px;
@@ -38,15 +42,21 @@
     --spacing-6: 24px;
     --spacing-7: 28px;
     --spacing-8: 32px;
+    
+    /* 圆角变量保持不变 */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-2xl: 20px;
+    
+    /* 阴影变量保持不变 */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    
+    /* 过渡动画保持不变 */
     --transition: all 0.2s ease;
 }
 
@@ -57,6 +67,7 @@
     padding: 0;
 }
 
+/* 基础 html 字体设置（默认 16px） */
 html {
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
@@ -67,6 +78,206 @@ body {
     background: var(--gray-50);
     color: var(--gray-800);
     line-height: 1.5;
+}
+
+/* ========== 网页端（PC端）字体放大 1.5 倍 ========== */
+/* 使用 min-width: 769px 确保仅在 PC 端生效，不覆盖手机端样式 */
+@media (min-width: 769px) {
+    /* 基础字体放大 - 所有常规文字放大 1.5 倍 */
+    html {
+        font-size: 24px;  /* 原 16px × 1.5 = 24px */
+    }
+    
+    /* 重新定义字体变量（覆盖原有值，放大 1.5 倍） */
+    :root {
+        --font-xxs: 1.05rem;   /* 原 0.7rem × 1.5 = 1.05rem */
+        --font-xs: 1.2rem;     /* 原 0.8rem × 1.5 = 1.2rem */
+        --font-sm: 1.35rem;    /* 原 0.9rem × 1.5 = 1.35rem */
+        --font-md: 1.5rem;     /* 原 1rem × 1.5 = 1.5rem */
+        --font-lg: 1.6875rem;  /* 原 1.125rem × 1.5 = 1.6875rem */
+        --font-xl: 1.875rem;   /* 原 1.25rem × 1.5 = 1.875rem */
+        --font-2xl: 2.025rem;  /* 原 1.35rem × 1.5 = 2.025rem */
+    }
+    
+    /* ========== 页面底部卡片（显示当前用户、门店信息等）- 保持原字号不变 ========== */
+    /* 使用 class 组合选择器精确匹配底部信息卡片 */
+    .dashboard-footer-card,
+    .card:last-of-type {
+        font-size: 0.75rem !important;  /* 保持约 12px 的原大小（基于 16px 基准） */
+    }
+    
+    .dashboard-footer-card h3,
+    .card:last-of-type h3,
+    .dashboard-footer-card p,
+    .card:last-of-type p,
+    .dashboard-footer-card .text-muted,
+    .card:last-of-type .text-muted,
+    .dashboard-footer-card small,
+    .card:last-of-type small {
+        font-size: 0.75rem !important;
+    }
+    
+    /* 按钮字体放大但保持合理大小 */
+    button, .btn-small, .btn-action {
+        font-size: var(--font-xs);
+    }
+    
+    /* 表格内容字体放大 */
+    .data-table td, .data-table th {
+        font-size: var(--font-sm);
+    }
+    
+    /* 统计卡片数值放大 */
+    .stat-value {
+        font-size: var(--font-xl);
+    }
+    
+    /* 统计卡片标签放大 */
+    .stat-label {
+        font-size: var(--font-xs);
+    }
+    
+    /* 页面标题放大 */
+    .page-header h1, .page-header h2 {
+        font-size: var(--font-xl);
+    }
+    
+    /* 卡片标题放大 */
+    .card h3 {
+        font-size: var(--font-lg);
+    }
+    
+    /* 工具栏按钮字体 */
+    .toolbar button {
+        font-size: var(--font-xs);
+    }
+    
+    /* 模态框内容字体 */
+    .modal-content {
+        font-size: var(--font-md);
+    }
+    
+    /* 登录框字体 */
+    .login-box {
+        font-size: var(--font-md);
+    }
+    
+    /* 现金流汇总卡片字体 */
+    .cashflow-summary .value {
+        font-size: var(--font-lg);
+    }
+    
+    .cashflow-summary .label {
+        font-size: var(--font-sm);
+    }
+    
+    /* 表单标签和输入框字体 */
+    .form-group label {
+        font-size: var(--font-sm);
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: var(--font-md);
+    }
+    
+    /* 金额显示字体 */
+    .amount-highlight, .monthly-payment-display {
+        font-size: var(--font-xl);
+    }
+}
+
+/* ========== 手机端（≤768px）字体调整 ========== */
+@media (max-width: 768px) {
+    /* 手机端基础字体放大 1.2 倍 */
+    html {
+        font-size: 19.2px;  /* 原 16px × 1.2 = 19.2px */
+    }
+    
+    /* 重新定义字体变量（覆盖原有值，放大 1.2 倍） */
+    :root {
+        --font-xxs: 0.84rem;   /* 原 0.7rem × 1.2 = 0.84rem */
+        --font-xs: 0.96rem;    /* 原 0.8rem × 1.2 = 0.96rem */
+        --font-sm: 1.08rem;    /* 原 0.9rem × 1.2 = 1.08rem */
+        --font-md: 1.2rem;     /* 原 1rem × 1.2 = 1.2rem */
+        --font-lg: 1.35rem;    /* 原 1.125rem × 1.2 = 1.35rem */
+        --font-xl: 1.5rem;     /* 原 1.25rem × 1.2 = 1.5rem */
+        --font-2xl: 1.62rem;   /* 原 1.35rem × 1.2 = 1.62rem */
+    }
+    
+    /* ========== 页面底部卡片文字减小 1/4（即缩小到原来的 75%） ========== */
+    /* 底部卡片选择器 - 匹配包含当前用户信息的卡片 */
+    .dashboard-footer-card,
+    .card:last-of-type {
+        font-size: 0.5625rem !important;  /* 原 0.75rem × 0.75 = 0.5625rem，约 10.8px */
+    }
+    
+    .dashboard-footer-card h3,
+    .card:last-of-type h3,
+    .dashboard-footer-card p,
+    .card:last-of-type p,
+    .dashboard-footer-card .text-muted,
+    .card:last-of-type .text-muted,
+    .dashboard-footer-card small,
+    .card:last-of-type small {
+        font-size: 0.5625rem !important;
+        line-height: 1.3;
+    }
+    
+    /* 手机端其他元素字体使用放大后的变量 */
+    button, .btn-small, .btn-action {
+        font-size: var(--font-xs);
+    }
+    
+    .data-table td, .data-table th {
+        font-size: var(--font-sm);
+    }
+    
+    /* 统计卡片在手机端适当缩小（避免过于拥挤） */
+    .stat-value {
+        font-size: var(--font-md);
+    }
+    
+    .stat-label {
+        font-size: var(--font-xxs);
+    }
+    
+    .page-header h1, .page-header h2 {
+        font-size: var(--font-lg);
+    }
+    
+    .card h3 {
+        font-size: var(--font-md);
+    }
+    
+    .toolbar button {
+        font-size: var(--font-xxs);
+    }
+    
+    .cashflow-summary .value {
+        font-size: var(--font-md);
+    }
+    
+    .cashflow-summary .label {
+        font-size: var(--font-xs);
+    }
+    
+    .form-group label {
+        font-size: var(--font-xs);
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: var(--font-sm);
+    }
+    
+    /* 表格操作按钮在手机端保持可点击大小 */
+    .action-cell .btn-small {
+        font-size: var(--font-xxs);
+        padding: 6px 10px;
+    }
 }
 
 /* === Logo 图片统一大小 === */
