@@ -692,7 +692,6 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>
                     <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
                     <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
-                    <button onclick="APP.navigateTo('blacklist')">🚫 ${t('blacklist')}</button>
                     <button onclick="APP.navigateTo('auditLogs')">📋 ${lang === 'id' ? 'Log Audit' : '审计日志'}</button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
@@ -706,7 +705,6 @@ const DashboardCore = {
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                         🔔 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
-                    <button onclick="APP.navigateTo('blacklist')">🚫 ${t('blacklist')}</button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
             }
