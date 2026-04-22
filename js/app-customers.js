@@ -1,4 +1,4 @@
-// app-customers.js - v1.5（修复：this.goBack 改为 window.APP.goBack 安全调用）
+// app-customers.js - v1.6（修复：createOrderForCustomer 门店信息获取错误）
 
 window.APP = window.APP || {};
 
@@ -22,7 +22,7 @@ const CustomersModule = {
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<td><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var c of customers) {
                     var customerId = Utils.escapeHtml(c.customer_id || '-');
@@ -51,8 +51,8 @@ const CustomersModule = {
                             ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                        </td>
-                    </tr>`;
+                        <\/td>
+                    <\/tr>`;
                 }
             }
 
@@ -117,10 +117,10 @@ const CustomersModule = {
                                     <th class="text-center">${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}</th>
                                     ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
                                     <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                </tr>
+                                <\/tr>
                             </thead>
                             <tbody>${rows}</tbody>
-                        </table>
+                        <\/table>
                     </div>
                 </div>
                 
@@ -514,7 +514,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单 ====================
+    // ==================== 创建订单（修复版） ====================
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
@@ -582,8 +582,33 @@ const CustomersModule = {
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
 
-            const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
-            const userStoreCode = profile?.stores?.code || '-';
+            // 修复：安全获取门店信息
+            var userStoreName = '-';
+            var userStoreCode = '-';
+            
+            if (profile && profile.stores) {
+                userStoreName = profile.stores.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
+                userStoreCode = profile.stores.code || '-';
+            } else if (profile && profile.store_id) {
+                try {
+                    const { data: storeData } = await supabaseClient
+                        .from('stores')
+                        .select('name, code')
+                        .eq('id', profile.store_id)
+                        .single();
+                    if (storeData) {
+                        userStoreName = storeData.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
+                        userStoreCode = storeData.code || '-';
+                    }
+                } catch(e) {
+                    console.warn('获取门店信息失败:', e);
+                    userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
+                    userStoreCode = '-';
+                }
+            } else {
+                userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
+                userStoreCode = '-';
+            }
             
             const repaymentTypeOptions = `
                 <div class="repayment-type-group">
@@ -848,7 +873,6 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 保存订单（修复：this.goBack 改为 window.APP.goBack） ====================
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
@@ -968,11 +992,9 @@ const CustomersModule = {
             
             alert(successMsg);
             
-            // 修复：使用 window.APP.goBack() 而不是 this.goBack()
             if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
                 window.APP.goBack();
             } else {
-                // 备用方案：刷新页面或跳转到客户列表
                 if (typeof window.APP !== 'undefined' && typeof window.APP.showCustomers === 'function') {
                     window.APP.showCustomers();
                 } else {
@@ -1022,7 +1044,7 @@ const CustomersModule = {
                         ${o.status === 'active' && !AUTH.isAdmin() ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                     <\/td>
                 <\/tr>`;
-            }).join('') : `<td><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            }).join('') : `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
