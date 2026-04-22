@@ -1,4 +1,4 @@
-/* tables.css - v1.2 手机端表格双行布局修复 */
+/* tables.css - 完整优化版 v2.0 */
 
 /* === 表格容器 === */
 .table-container {
@@ -13,26 +13,26 @@
     min-width: 680px;
     border-collapse: collapse;
     font-size: var(--font-xs);
-    background: white;
+    background: var(--bg-card);
 }
 
 .data-table th {
-    background: var(--gray-100);
-    padding: 10px 12px;
+    background: var(--bg-hover);
+    padding: 12px 12px;
     font-weight: 600;
-    color: var(--gray-700);
-    border-bottom: 1px solid var(--gray-300);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-light);
     white-space: nowrap;
 }
 
 .data-table td {
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--gray-200);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-light);
     vertical-align: middle;
 }
 
 .data-table tbody tr:hover {
-    background: var(--gray-50);
+    background: var(--bg-hover);
 }
 
 .report-table {
@@ -40,19 +40,19 @@
 }
 
 .data-table thead tr:first-child th {
-    border-bottom: 1px solid var(--gray-300);
-    background: var(--gray-100);
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-hover);
 }
 
 .data-table thead tr:last-child th {
     border-top: none;
-    background: var(--gray-50);
+    background: var(--bg-hover);
 }
 
 .data-table tbody tr.summary-row,
 .data-table tfoot tr {
-    border-top: 2px solid var(--gray-400);
-    background: var(--gray-100);
+    border-top: 2px solid var(--border-medium);
+    background: var(--bg-hover);
     font-weight: 600;
 }
 
@@ -80,7 +80,7 @@
 
 .data-table .store-name-cell {
     font-weight: 500;
-    background: var(--gray-50);
+    background: var(--bg-hover);
 }
 
 .data-table .order-id,
@@ -93,11 +93,11 @@
 
 .data-table .action-cell {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
-/* === 基础表格（兼容旧代码） === */
+/* 基础表格（兼容旧代码） */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -106,27 +106,27 @@ table {
 
 th, td {
     padding: 10px 10px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-light);
     text-align: left;
     vertical-align: middle;
 }
 
 th {
     font-weight: 600;
-    background: var(--gray-50);
-    color: var(--gray-700);
-    border-bottom: 1px solid var(--gray-300);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-medium);
     white-space: nowrap;
 }
 
 tbody tr:hover {
-    background: var(--gray-50);
+    background: var(--bg-hover);
 }
 
 /* === 状态徽章 === */
 .status-badge {
     display: inline-block;
-    padding: 4px 10px;
+    padding: 4px 12px;
     border-radius: 20px;
     font-size: 0.7rem;
     font-weight: 500;
@@ -138,8 +138,8 @@ tbody tr:hover {
 }
 
 .status-completed {
-    background: var(--gray-100);
-    color: var(--gray-600);
+    background: var(--bg-hover);
+    color: var(--text-secondary);
 }
 
 .status-liquidated {
@@ -147,6 +147,26 @@ tbody tr:hover {
     color: var(--danger-dark);
 }
 
+/* 还款方式徽章 */
+.repayment-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.badge-fixed {
+    background: var(--success-light);
+    color: var(--success-dark);
+}
+
+.badge-flexible {
+    background: var(--warning-light);
+    color: var(--warning-dark);
+}
+
+/* 支付方式徽章 */
 .payment-method-badge {
     display: inline-block;
     padding: 4px 10px;
@@ -167,30 +187,32 @@ tbody tr:hover {
 
 /* === 信息提示卡片 === */
 .info-card {
-    background: #e0f2fe;
-    border-left: 4px solid #0284c7;
+    background: var(--bg-highlight);
+    border-left: 4px solid var(--primary);
     margin-bottom: 16px;
+    border-radius: var(--radius-md);
 }
 
 .info-card-content {
     display: flex;
     align-items: flex-start;
     gap: 12px;
+    padding: 12px 16px;
 }
 
 .info-icon {
-    font-size: 20px;
+    font-size: 1.2rem;
 }
 
 .info-text {
     flex: 1;
-    font-size: 13px;
-    color: #0c4a6e;
+    font-size: 0.8rem;
+    color: var(--text-primary);
     line-height: 1.4;
 }
 
 .info-text strong {
-    color: #0369a1;
+    color: var(--primary-dark);
 }
 
 /* === 门店表格特殊样式 === */
@@ -216,22 +238,22 @@ tbody tr:hover {
     font-size: 12px;
     padding: 6px;
     border-radius: 6px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--border-medium);
 }
 
 .store-table td input:focus {
     outline: none;
-    border-color: #2563eb;
+    border-color: var(--primary);
 }
 
 .store-stats-table .store-name-cell {
     font-weight: 500;
-    background: var(--gray-50);
+    background: var(--bg-hover);
 }
 
 .store-stats-table tbody tr:last-child {
-    border-top: 2px solid var(--gray-400);
-    background: var(--gray-100);
+    border-top: 2px solid var(--border-medium);
+    background: var(--bg-hover);
 }
 
 /* === 支出表格特殊样式 === */
@@ -276,7 +298,7 @@ tbody tr:hover {
    ========== 手机端响应式样式 ==========
    ======================================== */
 @media (max-width: 768px) {
-    /* 强制表格转换为块级布局 - 实现双行效果 */
+    /* 表格转换为块级布局 - 双行效果 */
     .data-table,
     .data-table thead,
     .data-table tbody,
@@ -286,29 +308,28 @@ tbody tr:hover {
         display: block !important;
     }
     
-    /* 隐藏表头行 */
+    /* 隐藏表头 */
     .data-table thead tr {
         display: none !important;
     }
     
-    /* 每个表格行变成独立卡片 */
+    /* 每行变成独立卡片 */
     .data-table tbody tr {
         margin-bottom: 16px !important;
-        border: 1px solid var(--gray-200) !important;
+        border: 1px solid var(--border-light) !important;
         border-radius: var(--radius-md) !important;
-        background: white !important;
+        background: var(--bg-card) !important;
         padding: 12px !important;
-        position: relative !important;
         box-shadow: var(--shadow-sm) !important;
     }
     
-    /* 每个单元格变成 flex 行，占满宽度 */
+    /* 每个单元格 flex 布局 */
     .data-table td {
         display: flex !important;
         justify-content: space-between !important;
         align-items: center !important;
         padding: 8px 0 !important;
-        border-bottom: 1px solid var(--gray-100) !important;
+        border-bottom: 1px solid var(--border-light) !important;
         text-align: right !important;
         gap: 8px !important;
         width: 100% !important;
@@ -318,61 +339,49 @@ tbody tr:hover {
         border-bottom: none !important;
     }
     
-    /* 使用 data-label 属性显示标签 */
+    /* data-label 显示标签 */
     .data-table td::before {
         content: attr(data-label) !important;
         font-weight: 600 !important;
-        color: var(--gray-600) !important;
+        color: var(--text-secondary) !important;
         text-align: left !important;
         flex: 1 !important;
         font-size: 0.7rem !important;
     }
     
-    /* ========== 操作列特殊处理 - 独立一行，横向排列按钮 ========== */
+    /* 操作列特殊处理 - 独立一行 */
     .data-table td.action-cell {
         display: block !important;
         width: 100% !important;
         margin-top: 10px !important;
         padding: 10px 0 6px 0 !important;
-        border-top: 2px solid var(--gray-200) !important;
+        border-top: 1px solid var(--border-light) !important;
         border-bottom: none !important;
         text-align: left !important;
     }
-
+    
     .data-table td.action-cell::before {
-        content: attr(data-label) !important;
         display: block !important;
         margin-bottom: 8px !important;
         font-weight: 600 !important;
-        color: var(--gray-600) !important;
+        color: var(--text-secondary) !important;
         font-size: 0.7rem !important;
         text-align: left !important;
+        content: attr(data-label) !important;
     }
-
-    /* 操作按钮横向排列，自动换行 */
-    .data-table td.action-cell > * {
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-    .data-table td.action-cell {
-        display: block !important;
-        flex-direction: unset !important;
-    }
-
+    
+    /* 操作按钮横向排列 */
     .data-table .action-cell .btn-small,
     .data-table td.action-cell .btn-small {
         width: auto !important;
-        min-width: 72px !important;
-        margin: 3px 4px 3px 0 !important;
-        text-align: center !important;
+        min-width: 65px !important;
+        margin: 3px 6px 3px 0 !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         gap: 4px !important;
-        padding: 6px 12px !important;
-        font-size: 0.82rem !important;
+        padding: 6px 10px !important;
+        font-size: 0.72rem !important;
     }
     
     /* 其他表格样式适配 */
@@ -401,20 +410,20 @@ tbody tr:hover {
         size: A4;
         margin: 15mm 12mm;
     }
-
+    
     body {
         background: white;
         padding: 0;
         margin: 0;
-        font-size: 12pt;
+        font-size: 11pt;
     }
-
+    
     #app {
         max-width: 100%;
         padding: 0;
         margin: 0;
     }
-
+    
     /* 隐藏不需要打印的元素 */
     .no-print,
     .toolbar button:not(.print-btn),
@@ -433,15 +442,15 @@ tbody tr:hover {
     .payment-method-options {
         display: none !important;
     }
-
+    
     .toolbar {
         display: block !important;
     }
-
+    
     .print-btn {
         display: inline-block !important;
     }
-
+    
     /* 卡片打印样式 */
     .card,
     .stat-card,
@@ -452,22 +461,22 @@ tbody tr:hover {
         page-break-inside: avoid;
         break-inside: avoid;
     }
-
+    
     .cashflow-summary {
-        background: white !important;
+        background: #f5f5f5 !important;
         color: black !important;
     }
-
+    
     .cashflow-summary h3 {
         color: black !important;
         border-bottom-color: #ccc !important;
     }
-
+    
     .cashflow-item {
         background: #f5f5f5 !important;
         color: black !important;
     }
-
+    
     /* 表格容器不设滚动条 */
     .table-container {
         overflow: visible !important;
@@ -540,33 +549,6 @@ tbody tr:hover {
         text-align: center !important;
     }
     
-    .data-table .order-id,
-    .data-table .customer-id,
-    .data-table .store-code {
-        font-family: monospace;
-        font-weight: 600;
-    }
-    
-    .data-table tbody tr.summary-row,
-    .data-table tfoot tr {
-        border-top: 2px solid #000 !important;
-        background: #f0f0f0 !important;
-    }
-    
-    .data-table td,
-    .data-table th {
-        page-break-inside: avoid;
-    }
-    
-    .data-table thead {
-        display: table-header-group;
-    }
-    
-    .data-table tbody tr {
-        page-break-inside: avoid;
-        page-break-after: avoid;
-    }
-
     .print-header,
     .print-footer {
         display: none !important;
