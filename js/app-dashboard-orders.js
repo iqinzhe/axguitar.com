@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.1（修复双语翻译）
+// app-dashboard-orders.js - v1.2（修复：表格响应式 data-label）
 
 window.APP = window.APP || {};
 
@@ -22,7 +22,7 @@ const DashboardOrders = {
 
             var rows = '';
             if (orders.length === 0) {
-                rows = `<tr><td colspan="10" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="11" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var o of orders) {
                     var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
@@ -40,24 +40,25 @@ const DashboardOrders = {
                         : (lang === 'id' ? 'Fleksibel' : '灵活');
                     var repaymentBadge = `<span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}</span>`;
                     
+                    // 添加 data-label 属性用于手机端响应式
                     rows += `<tr>
-                        <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
-                        <td class="order-customer">${Utils.escapeHtml(o.customer_name)}</td>
-                        <td class="order-collateral">${Utils.escapeHtml(o.collateral_name)}</td>
-                        <td class="text-right">${Utils.formatCurrency(o.loan_amount)}</td>
-                        <td class="text-right">${Utils.formatCurrency(currentMonthlyInterestForList)}</td>
-                        <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
-                        <td class="text-center">${formattedDueDate}</td>
-                        <td class="text-center">${repaymentBadge}</td>
-                        <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span></td>
-                        ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
-                        <td class="action-cell">
+                        <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
+                        <td data-label="${t('customer_name')}" class="order-customer">${Utils.escapeHtml(o.customer_name)}<\/td>
+                        <td data-label="${t('collateral_name')}" class="order-collateral">${Utils.escapeHtml(o.collateral_name)}<\/td>
+                        <td data-label="${t('loan_amount')}" class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Bunga Bulanan' : '月利息'}" class="text-right">${Utils.formatCurrency(currentMonthlyInterestForList)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}" class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
+                        <td data-label="${t('payment_due_date')}" class="text-center">${formattedDueDate}<\/td>
+                        <td data-label="${t('repayment_type')}" class="text-center">${repaymentBadge}<\/td>
+                        <td data-label="${t('status')}" class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span><\/td>
+                        ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${Utils.escapeHtml(storeName)}<\/td>` : ''}
+                        <td data-label="${t('action')}" class="action-cell">
                             <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ ${t('view')}</button>
                             ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
                             ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
                             <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ ${t('print')}</button>
-                        </td>
-                    </tr>`;
+                        <\/td>
+                    <\/tr>`;
                 }
             }
 
@@ -263,18 +264,19 @@ const DashboardOrders = {
             var currentMonthlyInterest = remainingPrincipal * monthlyRate;
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             
+            // 添加 data-label 属性用于手机端响应式
             var payRows = '';
             if (payments && payments.length > 0) {
                 for (var p of payments) {
                     var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     payRows += `<tr>
-                        <td class="date-cell">${Utils.formatDate(p.date)}</td>
-                        <td>${typeText}</td>
-                        <td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
-                        <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                        <td><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span></td>
-                        <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    </tr>`;
+                        <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
+                        <td data-label="${t('type')}">${typeText}<\/td>
+                        <td data-label="${lang === 'id' ? 'Bulan' : '月数'}" class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}<\/td>
+                        <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center"><span class="payment-method-badge ${p.payment_method === 'cash' ? 'method-cash' : 'method-bank'}">${methodMap[p.payment_method] || '-'}</span><\/td>
+                        <td data-label="${t('description')}">${Utils.escapeHtml(p.description || '-')}<\/td>
+                    <\/tr>`;
                 }
             } else {
                 payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
@@ -342,7 +344,16 @@ const DashboardOrders = {
                     <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
                     <div class="table-container">
                         <table class="data-table payment-table">
-                            <thead><tr><th>${t('date')}</th><th>${t('type')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${t('description')}</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>${t('date')}</th>
+                                    <th>${t('type')}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                    <th class="text-right">${t('amount')}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                    <th>${t('description')}</th>
+                                </tr>
+                            </thead>
                             <tbody>${payRows}</tbody>
                         </table>
                     </div>
@@ -419,10 +430,10 @@ const DashboardOrders = {
                 var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? 'Tunai' : 'Bank');
                 
                 paymentRows += `<tr>
-                    <td>${Utils.formatDate(p.date)}</td>
-                    <td>${typeText}</td>
-                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                    <td>${methodText}</td>
+                    <td>${Utils.formatDate(p.date)}<\/td>
+                    <td>${typeText}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                    <td>${methodText}<\/td>
                 <\/tr>`;
             }
             
@@ -521,18 +532,19 @@ const DashboardOrders = {
             var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
             var methodMap = { cash: t('cash'), bank: t('bank') };
 
+            // 添加 data-label 属性用于手机端响应式
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="9" class="text-center">${t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
-                    <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
-                    <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
-                    <td class="date-cell">${Utils.formatDate(p.date)}</td>
-                    <td>${typeMap[p.type] || p.type}</td>
-                    <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
-                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                    <td class="text-center">${methodMap[p.payment_method] || '-'}</td>
-                    <td>${Utils.escapeHtml(p.description || '-')}</td>
-                    <td class="action-cell"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">${t('view')}</button></td>
+                    <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
+                    <td data-label="${t('customer_name')}">${Utils.escapeHtml(p.orders?.customer_name || '-')}<\/td>
+                    <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
+                    <td data-label="${t('type')}">${typeMap[p.type] || p.type}<\/td>
+                    <td data-label="${lang === 'id' ? 'Bulan' : '月数'}" class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}<\/td>
+                    <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                    <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodMap[p.payment_method] || '-'}<\/td>
+                    <td data-label="${t('description')}">${Utils.escapeHtml(p.description || '-')}<\/td>
+                    <td data-label="${t('action')}" class="action-cell"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">${t('view')}<\/button><\/td>
                 <\/tr>`).join('');
 
             document.getElementById("app").innerHTML = `
