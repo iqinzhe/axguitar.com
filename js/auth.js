@@ -1,4 +1,4 @@
-// auth.js - v1.0
+// auth.js - v1.1（修复：登录锁定提示双语支持 + 优化）
 
 const AUTH = {
     user: null,
@@ -23,15 +23,22 @@ const AUTH = {
         sessionStorage.setItem('jf_locked_until', JSON.stringify(locked));
     },
 
+    // 修复：添加双语支持的锁定提示
     _isLocked(username) {
         const lockedUntil = this._getLockedUntil();
         const until = lockedUntil[username];
         const now = Date.now();
+        
         if (until && until > now) {
             const remainingMinutes = Math.ceil((until - now) / 60000);
-            alert(`⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试`);
+            const lang = Utils.lang;
+            const msg = lang === 'id' 
+                ? `⚠️ Akun telah dikunci. Silakan coba lagi setelah ${remainingMinutes} menit.`
+                : `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试。`;
+            alert(msg);
             return true;
         }
+        
         if (until && until <= now) {
             const attempts = this._getLoginAttempts();
             delete lockedUntil[username];
@@ -59,8 +66,15 @@ const AUTH = {
             delete attempts[username];
             this._setLockedUntil(lockedUntil);
             this._setLoginAttempts(attempts);
+            
+            const lang = Utils.lang;
+            const msg = lang === 'id' 
+                ? `⚠️ Terlalu banyak percobaan login. Akun dikunci selama 15 menit.`
+                : `⚠️ 登录尝试次数过多，账号已锁定15分钟。`;
+            alert(msg);
             return true;
         }
+        
         if (elapsed > 5 * 60 * 1000) {
             attempts[username] = { count: 1, firstAttempt: now };
         }
@@ -131,7 +145,7 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
-    // ==================== 登录逻辑 ====================
+    // ==================== 登录逻辑（修复：错误提示双语） ====================
     async login(usernameOrEmail, password) {
         try {
             if (this._isLocked(usernameOrEmail)) return null;
@@ -147,6 +161,8 @@ const AUTH = {
                 if (profileError || !profileData) {
                     console.error('找不到该用户名:', usernameOrEmail);
                     this._recordLoginFailure(usernameOrEmail);
+                    const lang = Utils.lang;
+                    alert(lang === 'id' ? 'Username atau password salah' : '用户名或密码错误');
                     return null;
                 }
                 emailToUse = profileData.email || profileData.username;
@@ -156,6 +172,8 @@ const AUTH = {
             if (!result || result.error) {
                 console.error('Login error:', result?.error);
                 this._recordLoginFailure(usernameOrEmail);
+                const lang = Utils.lang;
+                alert(lang === 'id' ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
                 return null;
             }
 
@@ -164,6 +182,8 @@ const AUTH = {
 
             if (!this.user) {
                 console.error('Failed to load user profile after login');
+                const lang = Utils.lang;
+                alert(lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败');
                 return null;
             }
 
@@ -172,6 +192,8 @@ const AUTH = {
         } catch (error) {
             console.error('LOGIN ERROR:', error);
             this._recordLoginFailure(usernameOrEmail);
+            const lang = Utils.lang;
+            alert(lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误');
             return null;
         }
     },
@@ -262,7 +284,7 @@ const AUTH = {
         };
 
         const edgeFail = Utils.lang === 'id'
-            ? '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。'
+            ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.'
             : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。';
 
         try {
@@ -304,4 +326,3 @@ const AUTH = {
 };
 
 window.AUTH = AUTH;
-
