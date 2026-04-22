@@ -1,4 +1,4 @@
-// app-customers.js - v1.3（修复：黑名单检查安全调用 + 表格响应式 data-label）
+// app-customers.js - v1.4（修复：createOrderForCustomer 中 profile 为空的错误）
 
 window.APP = window.APP || {};
 
@@ -36,24 +36,23 @@ const CustomersModule = {
                     
                     var escapedId = Utils.escapeAttr(c.id);
                     
-                    // 添加 data-label 属性用于手机端响应式显示
                     rows += `<tr>
-                        <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${customerId}</td>
-                        <td data-label="${t('customer_name')}">${name}</td>
-                        <td data-label="${t('ktp_number')}">${ktpNumber}</td>
-                        <td data-label="${t('phone')}">${phone}</td>
-                        <td data-label="${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}">${ktpAddress}</td>
-                        <td data-label="${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}">${livingAddress}</td>
-                        <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}</td>
-                        ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}</td>` : ''}
+                        <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${customerId}<\/td>
+                        <td data-label="${t('customer_name')}">${name}<\/td>
+                        <td data-label="${t('ktp_number')}">${ktpNumber}<\/td>
+                        <td data-label="${t('phone')}">${phone}<\/td>
+                        <td data-label="${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}">${ktpAddress}<\/td>
+                        <td data-label="${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}">${livingAddress}<\/td>
+                        <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}<\/td>
+                        ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}<\/td>` : ''}
                         <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">
                             <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
                             ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                             ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
                             ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                        </td>
-                    </tr>`;
+                        <\/td>
+                    <\/tr>`;
                 }
             }
 
@@ -513,18 +512,25 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（支持固定还款）====================
+    // ==================== 创建订单（支持固定还款）- 修复版 ====================
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
 
-        // 使用异步方式获取当前用户资料（更可靠）
+        // 获取当前用户资料
         var profile = null;
         try {
             profile = await SUPABASE.getCurrentProfile();
         } catch(e) {
             console.warn('获取用户资料失败:', e.message);
         }
+        
+        // 修复：检查 profile 是否存在
+        if (!profile) {
+            alert(lang === 'id' ? 'Gagal memuat profil pengguna. Silakan login kembali.' : '无法加载用户资料，请重新登录。');
+            return;
+        }
+        
         var isAdmin = profile?.role === 'admin';
 
         if (isAdmin) {
@@ -548,7 +554,7 @@ const CustomersModule = {
                 throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据，请刷新后重试');
             }
 
-            // 安全检查黑名单（兼容模块未加载的情况）
+            // 安全检查黑名单
             var blacklistCheck = { isBlacklisted: false };
             try {
                 if (typeof window.APP.isBlacklisted === 'function') {
@@ -585,8 +591,35 @@ const CustomersModule = {
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
 
-            const userStoreName = profile?.stores?.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
-            const userStoreCode = profile?.stores?.code || '-';
+            // 修复：安全获取门店信息
+            var userStoreName = '';
+            var userStoreCode = '';
+            
+            if (profile.stores) {
+                userStoreName = profile.stores.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
+                userStoreCode = profile.stores.code || '-';
+            } else if (profile.store_id) {
+                try {
+                    const { data: storeData } = await supabaseClient
+                        .from('stores')
+                        .select('name, code')
+                        .eq('id', profile.store_id)
+                        .single();
+                    if (storeData) {
+                        userStoreName = storeData.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
+                        userStoreCode = storeData.code || '-';
+                    } else {
+                        userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
+                        userStoreCode = '-';
+                    }
+                } catch(e) {
+                    userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
+                    userStoreCode = '-';
+                }
+            } else {
+                userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
+                userStoreCode = '-';
+            }
             
             // 还款方式选项
             const repaymentTypeOptions = `
@@ -607,7 +640,7 @@ const CustomersModule = {
                 </div>
             `;
             
-            // 固定还款表单（初始隐藏）
+            // 固定还款表单
             const fixedRepaymentForm = `
                 <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
                     <div class="form-group">
@@ -882,13 +915,19 @@ const CustomersModule = {
         if (!collateral || !amount || amount <= 0) { alert(t('fill_all_fields')); return; }
         
         try {
+            const profile = await SUPABASE.getCurrentProfile();
+            if (!profile) {
+                alert(lang === 'id' ? 'Silakan login kembali' : '请重新登录');
+                return;
+            }
+            
             const { data: customer } = await supabaseClient
                 .from('customers')
                 .select('*')
                 .eq('id', customerId)
                 .single();
             
-            // 再次检查黑名单（双重保险）
+            // 再次检查黑名单
             var blacklistCheck = null;
             if (typeof window.APP.isBlacklisted === 'function') {
                 blacklistCheck = await window.APP.isBlacklisted(customerId);
@@ -917,7 +956,7 @@ const CustomersModule = {
                 loan_amount: amount,
                 notes: notes,
                 customer_id: customerId,
-                store_id: null,
+                store_id: profile.store_id,
                 admin_fee: 30000,
                 service_fee_percent: agreedServiceFee,
                 agreed_interest_rate: agreedInterestRate,
