@@ -1,4 +1,4 @@
-// app-payments.js - v1.3（修复：表格响应式 data-label + 双语完善）
+// app-payments.js - v1.4（修复：printSettlementReceipt 中 t 函数定义 + 其他优化）
 
 window.APP = window.APP || {};
 
@@ -69,7 +69,6 @@ const PaymentsModule = {
             var serviceFeePaid = order.service_fee_paid || 0;
             var isServiceFeePaid = serviceFeePaid >= serviceFeeAmount;
 
-            // 添加 data-label 属性用于手机端响应式
             var interestRows = '';
             if (interestPayments.length === 0) {
                 interestRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}<\/td><\/tr>`;
@@ -102,7 +101,7 @@ const PaymentsModule = {
                         <td data-label="${lang === 'id' ? 'Total Dibayar' : '累计已还'}" class="text-right">${Utils.formatCurrency(cumulativePaid)}<\/td>
                         <td data-label="${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}" class="text-right ${remainingAfter <= 0 ? 'success-text' : 'warning'}">${Utils.formatCurrency(remainingAfter)}<\/td>
                         <td data-label="${lang === 'id' ? 'Metode' : '方式'}">${methodMap[p.payment_method] || '-'}<\/td>
-                    </table>`;
+                    </tr>`;
                 }
             }
 
@@ -125,7 +124,7 @@ const PaymentsModule = {
                 ? `${Utils.formatCurrency(serviceFeeAmount)} (${methodMap[serviceFeePayment.payment_method] || '-'} / ${Utils.formatDate(serviceFeePayment.date)})`
                 : (serviceFeePaid > 0 ? `${Utils.formatCurrency(serviceFeePaid)}/${Utils.formatCurrency(serviceFeeAmount)}` : (lang === 'id' ? 'Belum dibayar' : '未缴'));
 
-            // ========== 固定还款板块（仅固定还款模式显示） ==========
+            // 固定还款板块
             var fixedRepaymentHtml = '';
             if (order.repayment_type === 'fixed') {
                 var paidMonths = order.fixed_paid_months || 0;
@@ -199,7 +198,7 @@ const PaymentsModule = {
                 `;
             }
 
-            // ========== 灵活还款板块 ==========
+            // 灵活还款板块
             var flexibleRepaymentHtml = '';
             if (order.repayment_type !== 'fixed') {
                 flexibleRepaymentHtml = `
@@ -296,49 +295,49 @@ const PaymentsModule = {
                 <div class="card summary-card">
                     <table class="summary-table">
                         <tr>
-                            <td class="label">${t('customer_name')}</td>
-                            <td class="value">${Utils.escapeHtml(order.customer_name)}</td>
-                            <td class="label">ID</td>
-                            <td class="value order-id">${Utils.escapeHtml(order.order_id)}</td>
-                            <td class="label">${t('loan_amount')}</td>
-                            <td class="value">${Utils.formatCurrency(loanAmount)}</td>
+                            <td class="label">${t('customer_name')}<\/td>
+                            <td class="value">${Utils.escapeHtml(order.customer_name)}<\/td>
+                            <td class="label">ID<\/td>
+                            <td class="value order-id">${Utils.escapeHtml(order.order_id)}<\/td>
+                            <td class="label">${t('loan_amount')}<\/td>
+                            <td class="value">${Utils.formatCurrency(loanAmount)}<\/td>
                         </tr>
                         <tr>
-                            <td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</td>
-                            <td class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}</td>
-                            <td class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</td>
-                            <td class="value">${Utils.formatCurrency(currentMonthlyInterest)}</td>
-                            <td class="label">${t('payment_due_date')}</td>
-                            <td class="value">${nextDueDate}</td>
+                            <td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}<\/td>
+                            <td class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}<\/td>
+                            <td class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}<\/td>
+                            <td class="value">${Utils.formatCurrency(currentMonthlyInterest)}<\/td>
+                            <td class="label">${t('payment_due_date')}<\/td>
+                            <td class="value">${nextDueDate}<\/td>
                         </tr>
                         <tr>
-                            <td class="label">${t('repayment_type')}</td>
+                            <td class="label">${t('repayment_type')}<\/td>
                             <td class="value" colspan="5">
                                 ${order.repayment_type === 'fixed' 
                                     ? `📅 ${t('fixed_repayment')}` 
                                     : `💰 ${t('flexible_repayment')}`}
                                 ${order.repayment_type === 'fixed' ? ` (${order.repayment_term} ${lang === 'id' ? 'bulan' : '个月'})` : ''}
-                            </td>
+                             <\/td>
                         </tr>
-                        <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"></td></tr>
+                        <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"><\/td><\/tr>
                         <tr>
-                            <td class="label">💎 ${t('collateral_name')}</td>
-                            <td class="value" colspan="2">${Utils.escapeHtml(order.collateral_name || '-')}</td>
-                            <td class="label">💰 ${t('service_fee')}</td>
-                            <td class="value" colspan="2">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)</td>
+                            <td class="label">💎 ${t('collateral_name')}<\/td>
+                            <td class="value" colspan="2">${Utils.escapeHtml(order.collateral_name || '-')}<\/td>
+                            <td class="label">💰 ${t('service_fee')}<\/td>
+                            <td class="value" colspan="2">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)<\/td>
                         </tr>
                         <tr>
-                            <td class="label">📋 ${t('admin_fee')}</td>
-                            <td class="value" colspan="2">${Utils.formatCurrency(order.admin_fee)}</td>
-                            <td class="label">📈 ${t('agreed_rate')}</td>
-                            <td class="value" colspan="2">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%</td>
+                            <td class="label">📋 ${t('admin_fee')}<\/td>
+                            <td class="value" colspan="2">${Utils.formatCurrency(order.admin_fee)}<\/td>
+                            <td class="label">📈 ${t('agreed_rate')}<\/td>
+                            <td class="value" colspan="2">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%<\/td>
                         </tr>
-                        <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"></td></tr>
+                        <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"><\/td><\/tr>
                         <tr class="paid-row">
-                            <td class="label">✅ ${t('admin_fee')}</td>
-                            <td class="value success-text" colspan="2">${adminFeePaidInfo}</td>
-                            <td class="label">✅ ${t('service_fee')}</td>
-                            <td class="value success-text" colspan="2">${serviceFeePaidInfo}</td>
+                            <td class="label">✅ ${t('admin_fee')}<\/td>
+                            <td class="value success-text" colspan="2">${adminFeePaidInfo}<\/td>
+                            <td class="label">✅ ${t('service_fee')}<\/td>
+                            <td class="value success-text" colspan="2">${serviceFeePaidInfo}<\/td>
                         </tr>
                     </table>
                 </div>
@@ -485,7 +484,6 @@ const PaymentsModule = {
                         .history-table {
                             font-size: 10px;
                         }
-                        /* 手机端历史表格响应式 */
                         .history-table,
                         .history-table thead,
                         .history-table tbody,
@@ -533,7 +531,7 @@ const PaymentsModule = {
         }
     },
 
-    // ==================== 灵活还款方法 ====================
+    // 灵活还款方法
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
@@ -661,7 +659,7 @@ const PaymentsModule = {
         }
     },
 
-    // ==================== 固定还款方法 ====================
+    // 固定还款方法
     payFixedInstallment: async function(orderId) {
         var lang = Utils.lang;
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
@@ -688,12 +686,13 @@ const PaymentsModule = {
         }
     },
 
-    // ==================== 结清凭证打印 ====================
+    // ==================== 结清凭证打印（修复：添加 t 函数定义） ====================
     printSettlementReceipt: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
             if (!order) return;
             var lang = Utils.lang;
+            var t = Utils.t;  // 添加 t 函数定义
             var methodMap = {
                 cash: lang === 'id' ? 'Tunai' : '现金',
                 bank: lang === 'id' ? 'Bank BNI' : '银行BNI'
