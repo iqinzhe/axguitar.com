@@ -1,4 +1,4 @@
-// utils.js - v1.3（修复 t 函数中的 undefined 错误）
+// utils.js - v1.4（修复：补充缺失翻译键 + formatCurrency兼容性）
 
 const Utils = {
     lang: 'id',
@@ -54,7 +54,7 @@ const Utils = {
         };
     },
 
-    // ========== 修复：安全的翻译函数 ==========
+    // ========== 翻译函数 ==========
     translations: {
         id: {
             // 基础
@@ -341,25 +341,21 @@ const Utils = {
         }
     },
 
-    // ========== 修复：安全的 t 函数 ==========
+    // ========== 安全的 t 函数 ==========
     t: function(key) {
-        // 安全检查
         if (!key || typeof key !== 'string') {
             console.warn('Utils.t: 无效的 key', key);
             return '';
         }
         
-        // 获取当前语言的翻译对象
         const langTranslations = this.translations[this.lang];
         if (!langTranslations) {
             console.warn(`Utils.t: 语言 ${this.lang} 的翻译对象不存在`);
             return key;
         }
         
-        // 获取翻译值
         const text = langTranslations[key];
         
-        // 如果翻译不存在，返回 key 本身并输出警告
         if (text === undefined) {
             console.warn(`Utils.t: 缺少翻译键 "${key}" 用于语言 "${this.lang}"`);
             return key;
@@ -391,10 +387,20 @@ const Utils = {
             .replace(/`/g, '&#96;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
 
+    // 修复：formatCurrency 兼容性
     formatCurrency: function(amount) {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency', currency: 'IDR', minimumFractionDigits: 0
-        }).format(amount || 0);
+        var num = amount || 0;
+        try {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency', 
+                currency: 'IDR', 
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(num);
+        } catch(e) {
+            var formatted = Math.round(num).toLocaleString('id-ID');
+            return 'Rp ' + formatted;
+        }
     },
 
     getRawAmount: function(amount) { return amount || 0; },
