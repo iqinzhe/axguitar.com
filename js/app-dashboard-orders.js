@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.2（修复：表格响应式 data-label）
+// app-dashboard-orders.js - v1.3（修复：printOrder 中 t 函数定义 + filterOrders this 绑定）
 
 window.APP = window.APP || {};
 
@@ -34,13 +34,11 @@ const DashboardOrders = {
                     var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
                     var currentMonthlyInterestForList = remainingPrincipalForList * (o.agreed_interest_rate || 0.08);
                     
-                    // 还款方式标签
                     var repaymentTypeText = o.repayment_type === 'fixed' 
                         ? (lang === 'id' ? 'Tetap' : '固定')
                         : (lang === 'id' ? 'Fleksibel' : '灵活');
                     var repaymentBadge = `<span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}</span>`;
                     
-                    // 添加 data-label 属性用于手机端响应式
                     rows += `<tr>
                         <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
                         <td data-label="${t('customer_name')}" class="order-customer">${Utils.escapeHtml(o.customer_name)}<\/td>
@@ -72,7 +70,7 @@ const DashboardOrders = {
                 </div>
                 
                 <div class="toolbar">
-                    <select id="statusFilter" onchange="APP.filterOrders(this.value)">
+                    <select id="statusFilter" onchange="window.APP.filterOrders(this.value)">
                         <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
                         <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${t('active')}</option>
                         <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${t('completed')}</option>
@@ -236,9 +234,11 @@ const DashboardOrders = {
         window.APP.navigateTo('payment', { orderId: orderId });
     },
 
+    // 修复：确保 filterOrders 正确绑定 this
     filterOrders: function(status) { 
-        this.currentFilter = status; 
-        this.showOrderTable(); 
+        var self = this;
+        self.currentFilter = status; 
+        self.showOrderTable(); 
     },
 
     viewOrder: async function(orderId) {
@@ -264,7 +264,6 @@ const DashboardOrders = {
             var currentMonthlyInterest = remainingPrincipal * monthlyRate;
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             
-            // 添加 data-label 属性用于手机端响应式
             var payRows = '';
             if (payments && payments.length > 0) {
                 for (var p of payments) {
@@ -282,7 +281,6 @@ const DashboardOrders = {
                 payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
 
-            // 还款方式显示
             var repaymentInfo = '';
             if (order.repayment_type === 'fixed') {
                 var paidMonths = order.fixed_paid_months || 0;
@@ -405,6 +403,7 @@ const DashboardOrders = {
         }
     },
 
+    // 修复：printOrder 中添加 t 函数定义
     printOrder: async function(orderId) {
         try {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
@@ -413,6 +412,7 @@ const DashboardOrders = {
                 return; 
             }
             var lang = Utils.lang;
+            var t = Utils.t;  // 添加 t 函数定义
             var methodMap = { 
                 cash: lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)', 
                 bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' 
@@ -511,7 +511,7 @@ const DashboardOrders = {
             printWindow.document.close();
         } catch (error) {
             console.error("printOrder error:", error);
-            alert(lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
+            alert(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
         }
     },
 
@@ -532,7 +532,6 @@ const DashboardOrders = {
             var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
             var methodMap = { cash: t('cash'), bank: t('bank') };
 
-            // 添加 data-label 属性用于手机端响应式
             var rows = allPayments.length === 0
                 ? `<tr><td colspan="9" class="text-center">${t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
