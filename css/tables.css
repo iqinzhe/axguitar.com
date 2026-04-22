@@ -1,4 +1,4 @@
-/* tables.css - 优化版 v2.0 */
+/* tables.css - 手机端重构版（方案A） */
 
 /* === 表格容器 === */
 .table-container {
@@ -35,27 +35,61 @@
     background: var(--bg-hover);
 }
 
-.report-table {
-    min-width: 1200px;
+/* ===============================
+   ✅ 核心优化：锁定第一列
+   =============================== */
+.data-table th:first-child,
+.data-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--bg-card);
+    z-index: 2;
 }
 
-.data-table thead tr:first-child th {
+.data-table th:first-child {
+    z-index: 3;
+}
+
+/* ===============================
+   ✅ 操作行（方案A）
+   =============================== */
+.action-row td {
+    padding: 6px 12px 10px;
     border-bottom: 1px solid var(--border-light);
-    background: var(--bg-hover);
 }
 
-.data-table thead tr:last-child th {
-    border-top: none;
-    background: var(--bg-hover);
+.action-row .btn-small {
+    margin-right: 6px;
+    margin-top: 4px;
 }
 
-.data-table tbody tr.summary-row,
-.data-table tfoot tr {
-    border-top: 2px solid var(--border-medium);
-    background: var(--bg-hover);
-    font-weight: 600;
+/* ===============================
+   ✅ 手机端优化（保留表格结构）
+   =============================== */
+@media (max-width: 768px) {
+
+    /* 强制横向滚动 */
+    .data-table {
+        min-width: 900px;
+    }
+
+    /* 字体稍微压缩 */
+    .data-table th,
+    .data-table td {
+        padding: 8px 10px;
+        font-size: 0.75rem;
+    }
+
+    /* 操作按钮更紧凑 */
+    .action-row .btn-small {
+        padding: 6px 10px;
+        font-size: 0.7rem;
+    }
 }
 
+/* ===============================
+   其他原有样式（保留）
+   =============================== */
 .data-table td.text-right,
 .data-table th.text-right {
     text-align: right;
@@ -89,317 +123,4 @@
     font-family: monospace;
     font-weight: 600;
     color: var(--primary-dark);
-}
-
-.data-table .action-cell {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-/* 基础表格（兼容旧代码） */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--font-xs);
-}
-
-th, td {
-    padding: 10px 10px;
-    border-bottom: 1px solid var(--border-light);
-    text-align: left;
-    vertical-align: middle;
-}
-
-th {
-    font-weight: 600;
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-medium);
-    white-space: nowrap;
-}
-
-tbody tr:hover {
-    background: var(--bg-hover);
-}
-
-/* === 状态徽章 === */
-.status-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 500;
-}
-
-.status-active {
-    background: var(--success-light);
-    color: var(--success-dark);
-}
-
-.status-completed {
-    background: var(--bg-hover);
-    color: var(--text-secondary);
-}
-
-.status-liquidated {
-    background: var(--danger-light);
-    color: var(--danger-dark);
-}
-
-/* 还款方式徽章 */
-.repayment-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.badge-fixed {
-    background: var(--success-light);
-    color: var(--success-dark);
-}
-
-.badge-flexible {
-    background: var(--warning-light);
-    color: var(--warning-dark);
-}
-
-/* 支付方式徽章 */
-.payment-method-badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 500;
-}
-
-.method-cash {
-    background: #e0f2fe;
-    color: #0369a1;
-}
-
-.method-bank {
-    background: #fef3c7;
-    color: #b45309;
-}
-
-/* === 信息提示卡片 === */
-.info-card {
-    background: var(--bg-highlight);
-    border-left: 4px solid var(--primary);
-    margin-bottom: 16px;
-    border-radius: var(--radius-md);
-}
-
-.info-card-content {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px 16px;
-}
-
-.info-icon {
-    font-size: 1.2rem;
-}
-
-.info-text {
-    flex: 1;
-    font-size: 0.8rem;
-    color: var(--text-primary);
-    line-height: 1.4;
-}
-
-.info-text strong {
-    color: var(--primary-dark);
-}
-
-/* === 门店表格特殊样式 === */
-.store-table .store-code {
-    font-family: monospace;
-    font-weight: 600;
-    color: var(--primary-dark);
-}
-
-.store-table .store-name {
-    font-weight: 500;
-}
-
-.store-table .store-address {
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.store-table td input {
-    width: 140px;
-    font-size: 12px;
-    padding: 6px;
-    border-radius: 6px;
-    border: 1px solid var(--border-medium);
-}
-
-.store-table td input:focus {
-    outline: none;
-    border-color: var(--primary);
-}
-
-.store-stats-table .store-name-cell {
-    font-weight: 500;
-    background: var(--bg-hover);
-}
-
-.store-stats-table tbody tr:last-child {
-    border-top: 2px solid var(--border-medium);
-    background: var(--bg-hover);
-}
-
-/* === 支出表格特殊样式 === */
-.expense-table .date-cell {
-    white-space: nowrap;
-}
-
-.expense-table .expense-category {
-    font-weight: 500;
-}
-
-.expense-table .expense-desc {
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* === 客户表格特殊样式 === */
-.customer-table .customer-address {
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* === 资金流水表格特殊样式 === */
-.capital-table .date-cell,
-.cashflow-table .date-cell {
-    white-space: nowrap;
-}
-
-.capital-table .flow-desc,
-.cashflow-table .flow-desc {
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* ========================================
-   ========== 手机端响应式样式 ==========
-   ======================================== */
-@media (max-width: 768px) {
-    /* 表格转换为块级布局 - 双行效果 */
-    .data-table,
-    .data-table thead,
-    .data-table tbody,
-    .data-table tr,
-    .data-table th,
-    .data-table td {
-        display: block !important;
-    }
-    
-    /* 隐藏表头 */
-    .data-table thead tr {
-        display: none !important;
-    }
-    
-    /* 每行变成独立卡片 */
-    .data-table tbody tr {
-        margin-bottom: 16px !important;
-        border: 1px solid var(--border-light) !important;
-        border-radius: var(--radius-md) !important;
-        background: var(--bg-card) !important;
-        padding: 12px !important;
-        box-shadow: var(--shadow-sm) !important;
-    }
-    
-    /* 每个单元格 flex 布局 */
-    .data-table td {
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        padding: 8px 0 !important;
-        border-bottom: 1px solid var(--border-light) !important;
-        text-align: right !important;
-        gap: 8px !important;
-        width: 100% !important;
-    }
-    
-    .data-table td:last-child {
-        border-bottom: none !important;
-    }
-    
-    /* data-label 显示标签 */
-    .data-table td::before {
-        content: attr(data-label) !important;
-        font-weight: 600 !important;
-        color: var(--text-secondary) !important;
-        text-align: left !important;
-        flex: 1 !important;
-        font-size: 0.7rem !important;
-    }
-    
-    /* 操作列特殊处理 - 独立一行 */
-    .data-table td.action-cell {
-        display: block !important;
-        width: 100% !important;
-        margin-top: 10px !important;
-        padding: 10px 0 6px 0 !important;
-        border-top: 1px solid var(--border-light) !important;
-        border-bottom: none !important;
-        text-align: left !important;
-    }
-    
-    .data-table td.action-cell::before {
-        display: block !important;
-        margin-bottom: 8px !important;
-        font-weight: 600 !important;
-        color: var(--text-secondary) !important;
-        font-size: 0.7rem !important;
-        text-align: left !important;
-        content: attr(data-label) !important;
-    }
-    
-    /* 操作按钮横向排列 */
-    .data-table .action-cell .btn-small,
-    .data-table td.action-cell .btn-small {
-        width: auto !important;
-        min-width: 65px !important;
-        margin: 3px 6px 3px 0 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 4px !important;
-        padding: 6px 10px !important;
-        font-size: 0.72rem !important;
-    }
-    
-    /* 其他表格样式适配 */
-    .expense-table .expense-desc {
-        max-width: none !important;
-        white-space: normal !important;
-        word-break: break-word !important;
-    }
-    
-    .store-table .store-address {
-        max-width: none !important;
-        white-space: normal !important;
-    }
-    
-    .capital-table .flow-desc,
-    .cashflow-table .flow-desc {
-        max-width: none !important;
-        white-space: normal !important;
-        word-break: break-word !important;
-    }
 }
