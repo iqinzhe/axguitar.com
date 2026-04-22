@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.0
+// app-dashboard-expenses.js - v1.1（修复：平账功能 + 表格响应式 data-label）
 
 window.APP = window.APP || {};
 
@@ -98,19 +98,21 @@ const DashboardExpenses = {
                     }
                     var methodText = e.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     var storeDisplay = e.stores?.name ? `${Utils.escapeHtml(e.stores.name)} (${Utils.escapeHtml(e.stores.code || '-')})` : '-';
+                    
+                    // 添加 data-label 属性用于手机端响应式
                     rows += `<tr>
-                        <td class="date-cell">${Utils.formatDate(e.expense_date)}</td>
-                        <td class="expense-category">${Utils.escapeHtml(e.category)}</td>
-                        <td class="text-right">${Utils.formatCurrency(e.amount)}</td>
-                        <td class="text-center">${methodText}</td>
-                        <td class="expense-desc">${Utils.escapeHtml(e.description || '-')}</td>
-                        ${isAdmin ? `<td class="text-center">${storeDisplay}</td>` : ''}
-                        <td class="action-cell">${actionBtns}</td>
-                    </tr>`;
+                        <td data-label="${lang === 'id' ? 'Tanggal' : '日期'}" class="date-cell">${Utils.formatDate(e.expense_date)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Kategori' : '类别'}" class="expense-category">${Utils.escapeHtml(e.category)}<\/td>
+                        <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(e.amount)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodText}<\/td>
+                        <td data-label="${t('description')}" class="expense-desc">${Utils.escapeHtml(e.description || '-')}<\/td>
+                        ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${storeDisplay}<\/td>` : ''}
+                        <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">${actionBtns}<\/td>
+                    　　　`;
                 }
             } else {
                 var colSpan = isAdmin ? 7 : 6;
-                rows = `<tr><td colspan="${colSpan}" class="text-center">${t('no_data')}</td><\/tr>`;
+                rows = `<tr><td colspan="${colSpan}" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
 
             const expenseCategories = lang === 'id' 
@@ -359,6 +361,7 @@ const DashboardExpenses = {
         }
     },
 
+    // ==================== 修复平账功能 ====================
     balanceExpenses: async function() {
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
@@ -366,28 +369,80 @@ const DashboardExpenses = {
             alert(lang === 'id' ? '需管理员权限' : '需管理员权限');
             return;
         }
-        var period = prompt(lang === 'id' ? 'Pilih periode rekonsiliasi:\n1 = Bulan ini\n2 = 6 bulan terakhir\n3 = 12 bulan terakhir\n4 = Tahun ini\n5 = Kustom' : '选择平账周期：\n1 = 本月\n2 = 最近6个月\n3 = 最近12个月\n4 = 本年\n5 = 自定义');
+        var period = prompt(lang === 'id' 
+            ? 'Pilih periode rekonsiliasi:\n1 = Bulan ini\n2 = 6 bulan terakhir\n3 = 12 bulan terakhir\n4 = Tahun ini\n5 = Kustom' 
+            : '选择平账周期：\n1 = 本月\n2 = 最近6个月\n3 = 最近12个月\n4 = 本年\n5 = 自定义');
         if (!period) return;
+        
         var startDate, endDate, today = new Date(), currentYear = today.getFullYear(), currentMonth = today.getMonth();
         switch(period) {
-            case '1': startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-            case '2': startDate = new Date(currentYear, currentMonth - 5, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-            case '3': startDate = new Date(currentYear - 1, currentMonth, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-            case '4': startDate = new Date(currentYear, 0, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-            case '5': startDate = prompt(lang === 'id' ? 'Masukkan tanggal mulai (YYYY-MM-DD):' : '请输入开始日期 (YYYY-MM-DD):'); endDate = prompt(lang === 'id' ? 'Masukkan tanggal akhir (YYYY-MM-DD):' : '请输入结束日期 (YYYY-MM-DD):'); if (!startDate || !endDate) return; break;
+            case '1': 
+                startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]; 
+                endDate = today.toISOString().split('T')[0]; 
+                break;
+            case '2': 
+                startDate = new Date(currentYear, currentMonth - 5, 1).toISOString().split('T')[0]; 
+                endDate = today.toISOString().split('T')[0]; 
+                break;
+            case '3': 
+                startDate = new Date(currentYear - 1, currentMonth, 1).toISOString().split('T')[0]; 
+                endDate = today.toISOString().split('T')[0]; 
+                break;
+            case '4': 
+                startDate = new Date(currentYear, 0, 1).toISOString().split('T')[0]; 
+                endDate = today.toISOString().split('T')[0]; 
+                break;
+            case '5': 
+                startDate = prompt(lang === 'id' ? 'Masukkan tanggal mulai (YYYY-MM-DD):' : '请输入开始日期 (YYYY-MM-DD):'); 
+                endDate = prompt(lang === 'id' ? 'Masukkan tanggal akhir (YYYY-MM-DD):' : '请输入结束日期 (YYYY-MM-DD):'); 
+                if (!startDate || !endDate) return; 
+                break;
             default: return;
         }
-        if (!confirm(lang === 'id' ? `Rekonsiliasi pengeluaran dari ${startDate} sampai ${endDate}?` : `确认平账 ${startDate} 至 ${endDate} 期间的支出？`)) return;
+        
+        if (!confirm(lang === 'id' 
+            ? `Rekonsiliasi pengeluaran dari ${startDate} sampai ${endDate}?` 
+            : `确认平账 ${startDate} 至 ${endDate} 期间的支出？`)) return;
+        
         try {
-            const { data, error } = await supabaseClient.from('expenses').update({ 
-                is_reconciled: true, 
-                reconciled_at: new Date().toISOString(), 
-                reconciled_by: AUTH.user.id 
-            }).gte('expense_date', startDate).lte('expense_date', endDate).eq('is_reconciled', false);
-            if (error) throw error;
-            var count = data?.length || 0;
-            alert(lang === 'id' ? `Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.` : `平账完成！已平账 ${count} 条支出记录。`);
+            // 修复：先获取需要更新的记录数
+            const { data: expensesToUpdate, error: fetchError } = await supabaseClient
+                .from('expenses')
+                .select('id')
+                .gte('expense_date', startDate)
+                .lte('expense_date', endDate)
+                .eq('is_reconciled', false);
+            
+            if (fetchError) throw fetchError;
+            
+            const count = expensesToUpdate?.length || 0;
+            
+            if (count === 0) {
+                alert(lang === 'id' ? 'Tidak ada pengeluaran yang perlu direkonsiliasi' : '没有需要平账的支出记录');
+                return;
+            }
+            
+            // 执行更新
+            const { error: updateError } = await supabaseClient
+                .from('expenses')
+                .update({ 
+                    is_reconciled: true, 
+                    reconciled_at: new Date().toISOString(), 
+                    reconciled_by: AUTH.user?.id 
+                })
+                .gte('expense_date', startDate)
+                .lte('expense_date', endDate)
+                .eq('is_reconciled', false);
+            
+            if (updateError) throw updateError;
+            
+            alert(lang === 'id' 
+                ? `✅ Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.` 
+                : `✅ 平账完成！已平账 ${count} 条支出记录。`);
+            
+            // 刷新页面显示
             await this.showExpenses();
+            
         } catch (error) {
             console.error("balanceExpenses error:", error);
             alert(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
@@ -400,4 +455,3 @@ for (var key in DashboardExpenses) {
         window.APP[key] = DashboardExpenses[key];
     }
 }
-
