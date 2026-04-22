@@ -1,8 +1,8 @@
-/* base.css - 完整优化版 v2.0 */
+/* base.css - 优化版 v2.0 */
 
 /* === 全局变量 - 统一配色方案 === */
 :root {
-    /* 主色调 - 保持品牌色 */
+    /* 主色调 */
     --primary: #2563eb;
     --primary-light: #60a5fa;
     --primary-soft: #dbeafe;
