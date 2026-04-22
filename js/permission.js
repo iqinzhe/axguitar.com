@@ -1,4 +1,4 @@
-// permission.js - v1.0
+// permission.js - v1.1（修复：权限规则完整，与所有模块兼容）
 
 const PERMISSION = {
 
@@ -6,15 +6,44 @@ const PERMISSION = {
     _rules: {
         admin: true, // admin 拥有所有权限
         'store_manager|staff': {
-            order_create: true, order_view: true, order_payment: true,
-            order_edit: false, order_delete: false,
-            customer_manage: true, customer_create: true, customer_edit: true, customer_delete: false,
-            expense_add: true, expense_edit: false, expense_delete: false,
+            // 订单相关
+            order_create: true, 
+            order_view: true, 
+            order_payment: true,
+            order_edit: false, 
+            order_delete: false,
+            // 客户相关
+            customer_manage: true, 
+            customer_create: true, 
+            customer_edit: true, 
+            customer_delete: false,
+            // 支出相关
+            expense_add: true, 
+            expense_edit: false, 
+            expense_delete: false,
+            // 报表相关
             report_view: false,
-            user_manage: false, user_create: false, user_edit: false, user_delete: false,
-            store_manage: false, store_create: false, store_edit: false, store_delete: false,
-            blacklist_add: true, blacklist_remove: false, blacklist_view: true,
-            cash_flow_view: true, internal_transfer: true
+            // 用户管理（仅管理员）
+            user_manage: false, 
+            user_create: false, 
+            user_edit: false, 
+            user_delete: false,
+            // 门店管理（仅管理员）
+            store_manage: false, 
+            store_create: false, 
+            store_edit: false, 
+            store_delete: false,
+            // 黑名单相关
+            blacklist_add: true, 
+            blacklist_remove: false, 
+            blacklist_view: true,
+            // 资金流水相关
+            cash_flow_view: true, 
+            internal_transfer: true,
+            // 备份恢复（仅管理员）
+            backup_restore: false,
+            // 审计日志（仅管理员）
+            audit_view: false
         }
     },
 
@@ -32,7 +61,7 @@ const PERMISSION = {
         return this._checkByRole(AUTH.user?.role, action);
     },
 
-    // ==================== 异步版本（从数据库获取最新角色，用于敏感操作） ====================
+    // ==================== 异步版本（从数据库获取最新角色） ====================
     async canAsync(action) {
         try {
             const profile = await SUPABASE.getCurrentProfile();
@@ -43,33 +72,56 @@ const PERMISSION = {
         }
     },
 
-    // ==================== 便捷函数 ====================
+    // ==================== 订单相关权限 ====================
     canCreateOrder()        { return this.can('order_create'); },
     canViewOrder()          { return this.can('order_view'); },
     canPayOrder()           { return this.can('order_payment'); },
-    canEditOrder()          { return false; },
+    canEditOrder()          { return false; },  // 订单创建后不可编辑
     canDeleteOrder()        { return this.can('order_delete'); },
+    
+    // ==================== 客户相关权限 ====================
     canManageCustomer()     { return this.can('customer_manage'); },
     canCreateCustomer()     { return this.can('customer_create'); },
     canEditCustomer()       { return this.can('customer_edit'); },
     canDeleteCustomer()     { return this.can('customer_delete'); },
+    
+    // ==================== 支出相关权限 ====================
     canAddExpense()         { return this.can('expense_add'); },
     canEditExpense()        { return this.can('expense_edit'); },
     canDeleteExpense()      { return this.can('expense_delete'); },
+    
+    // ==================== 报表相关权限 ====================
     canViewReport()         { return this.can('report_view'); },
+    
+    // ==================== 用户管理权限 ====================
     canManageUsers()        { return this.can('user_manage'); },
     canCreateUser()         { return this.can('user_create'); },
     canEditUser()           { return this.can('user_edit'); },
     canDeleteUser()         { return this.can('user_delete'); },
+    
+    // ==================== 门店管理权限 ====================
     canManageStores()       { return this.can('store_manage'); },
     canCreateStore()        { return this.can('store_create'); },
     canEditStore()          { return this.can('store_edit'); },
     canDeleteStore()        { return this.can('store_delete'); },
+    
+    // ==================== 黑名单相关权限 ====================
     canAddToBlacklist()     { return this.can('blacklist_add'); },
     canRemoveFromBlacklist(){ return this.can('blacklist_remove'); },
     canViewBlacklist()      { return this.can('blacklist_view'); },
+    
+    // ==================== 资金流水相关权限 ====================
     canViewCashFlow()       { return this.can('cash_flow_view'); },
     canDoInternalTransfer() { return this.can('internal_transfer'); },
+    
+    // ==================== 备份恢复权限 ====================
+    canBackup()             { return this.can('backup_restore'); },
+    canRestore()            { return this.can('backup_restore'); },
+    
+    // ==================== 审计日志权限 ====================
+    canViewAudit()          { return this.can('audit_view'); },
+    
+    // ==================== 平账权限（仅管理员） ====================
     canReconcile()          { return AUTH.user?.role === 'admin'; },
 
     // ==================== 角色判断 ====================
@@ -107,8 +159,20 @@ const PERMISSION = {
 
     canDeleteOrderDetails(order) {
         return !!order && this.isAdmin();
+    },
+    
+    // ==================== 门店操作权限检查 ====================
+    canOperateStore(storeId) {
+        if (this.isAdmin()) return true;
+        return storeId === this.getCurrentStoreId();
+    },
+    
+    // ==================== 客户操作权限检查 ====================
+    canOperateCustomer(customer) {
+        if (this.isAdmin()) return true;
+        if (!customer) return false;
+        return customer.store_id === this.getCurrentStoreId();
     }
 };
 
 window.PERMISSION = PERMISSION;
-
