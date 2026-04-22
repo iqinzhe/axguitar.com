@@ -85,7 +85,7 @@ body {
 @media (min-width: 769px) {
     /* 基础字体放大 - 所有常规文字放大 1.5 倍 */
     html {
-        font-size: 22px;  /* 原 16px × 1.5 = 22px */
+        font-size: 20px;  /* 原 16px × 1.5 = 22px */
     }
     
     /* 重新定义字体变量（覆盖原有值，放大 1.5 倍） */
