@@ -1,4 +1,4 @@
-// app-customers.js - v1.6（修复：createOrderForCustomer 门店信息获取错误）
+// app-customers.js - v1.7（修复：createOrderForCustomer 完整版）
 
 window.APP = window.APP || {};
 
@@ -22,7 +22,7 @@ const CustomersModule = {
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = `<td><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var c of customers) {
                     var customerId = Utils.escapeHtml(c.customer_id || '-');
@@ -37,14 +37,14 @@ const CustomersModule = {
                     var escapedId = Utils.escapeAttr(c.id);
                     
                     rows += `<tr>
-                        <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${customerId}</td>
-                        <td data-label="${t('customer_name')}">${name}</td>
-                        <td data-label="${t('ktp_number')}">${ktpNumber}</td>
-                        <td data-label="${t('phone')}">${phone}</td>
-                        <td data-label="${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}">${ktpAddress}</td>
-                        <td data-label="${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}">${livingAddress}</td>
-                        <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}</td>
-                        ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}</td>` : ''}
+                        <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${customerId}<\/td>
+                        <td data-label="${t('customer_name')}">${name}<\/td>
+                        <td data-label="${t('ktp_number')}">${ktpNumber}<\/td>
+                        <td data-label="${t('phone')}">${phone}<\/td>
+                        <td data-label="${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}">${ktpAddress}<\/td>
+                        <td data-label="${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}">${livingAddress}<\/td>
+                        <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}<\/td>
+                        ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}<\/td>` : ''}
                         <td data-label="${lang === 'id' ? 'Aksi' : '操作'}" class="action-cell">
                             <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
                             ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
@@ -117,10 +117,10 @@ const CustomersModule = {
                                     <th class="text-center">${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}</th>
                                     ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
                                     <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                <\/tr>
+                                </tr>
                             </thead>
                             <tbody>${rows}</tbody>
-                        <\/table>
+                        </table>
                     </div>
                 </div>
                 
@@ -140,72 +140,22 @@ const CustomersModule = {
         var style = document.createElement('style');
         style.id = 'data-table-styles';
         style.textContent = `
-            .data-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 0.8rem;
-            }
-            .data-table th {
-                background: var(--gray-100);
-                padding: 10px 12px;
-                font-weight: 600;
-                color: var(--gray-700);
-                border-bottom: 1px solid var(--gray-300);
-                white-space: nowrap;
-            }
-            .data-table td {
-                padding: 8px 12px;
-                border-bottom: 1px solid var(--gray-200);
-                vertical-align: middle;
-            }
-            .data-table tbody tr:hover {
-                background: var(--gray-50);
-            }
-            .data-table .text-center {
-                text-align: center;
-            }
-            .data-table .text-right {
-                text-align: right;
-            }
-            .data-table .customer-id {
-                font-family: monospace;
-                font-weight: 600;
-                color: var(--primary-dark);
-            }
-            .data-table .customer-name {
-                font-weight: 500;
-            }
-            .data-table .customer-address {
-                max-width: 200px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-            .action-cell {
-                display: flex;
-                gap: 6px;
-                flex-wrap: wrap;
-            }
-            .btn-blacklist {
-                background: #f97316 !important;
-                color: #fff !important;
-                border-color: #ea580c !important;
-            }
-            .btn-blacklist:hover {
-                background: #ea580c !important;
-            }
+            .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+            .data-table th { background: var(--gray-100); padding: 10px 12px; font-weight: 600; color: var(--gray-700); border-bottom: 1px solid var(--gray-300); white-space: nowrap; }
+            .data-table td { padding: 8px 12px; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
+            .data-table tbody tr:hover { background: var(--gray-50); }
+            .data-table .text-center { text-align: center; }
+            .data-table .text-right { text-align: right; }
+            .data-table .customer-id { font-family: monospace; font-weight: 600; color: var(--primary-dark); }
+            .data-table .customer-name { font-weight: 500; }
+            .data-table .customer-address { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .action-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+            .btn-blacklist { background: #f97316 !important; color: #fff !important; border-color: #ea580c !important; }
+            .btn-blacklist:hover { background: #ea580c !important; }
             @media (max-width: 768px) {
-                .data-table th, .data-table td {
-                    padding: 6px 8px;
-                    font-size: 0.7rem;
-                }
-                .data-table .customer-address {
-                    max-width: 120px;
-                }
-                .action-cell .btn-small {
-                    padding: 4px 6px;
-                    font-size: 0.65rem;
-                }
+                .data-table th, .data-table td { padding: 6px 8px; font-size: 0.7rem; }
+                .data-table .customer-address { max-width: 120px; }
+                .action-cell .btn-small { padding: 4px 6px; font-size: 0.65rem; }
             }
         `;
         document.head.appendChild(style);
@@ -260,9 +210,7 @@ const CustomersModule = {
 
     toggleLivingAddress: function(value) {
         var el = document.getElementById('customerLivingAddress');
-        if (el) {
-            el.style.display = value === 'different' ? 'block' : 'none';
-        }
+        if (el) el.style.display = value === 'different' ? 'block' : 'none';
     },
 
     addCustomer: async function() {
@@ -514,17 +462,54 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（修复版） ====================
+    // ==================== 创建订单（完整修复版） ====================
     createOrderForCustomer: async function(customerId) {
-        var lang = Utils.lang;
-        var t = Utils.t;
+        var lang = Utils.lang || 'id';
+        
+        // 安全翻译函数
+        var t = function(key) {
+            if (typeof Utils.t === 'function') {
+                return Utils.t(key);
+            }
+            var fallback = {
+                'customer_has_active_order': lang === 'id' ? 'Nasabah ini masih memiliki pesanan aktif.' : '该客户还有未结清的订单。',
+                'blacklisted_cannot_order': lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。',
+                'fill_all_fields': lang === 'id' ? 'Harap isi semua bidang!' : '请填写所有字段！',
+                'save_failed': lang === 'id' ? 'Gagal menyimpan' : '保存失败',
+                'create_order': lang === 'id' ? 'Buat Pesanan' : '新建订单',
+                'back': lang === 'id' ? 'Kembali' : '返回',
+                'customer_info': lang === 'id' ? 'Informasi Pelanggan' : '客户信息',
+                'customer_name': lang === 'id' ? 'Nama Lengkap' : '客户姓名',
+                'ktp_number': lang === 'id' ? 'Nomor KTP' : 'KTP号码',
+                'phone': lang === 'id' ? 'Nomor Telepon' : '手机号',
+                'collateral_info': lang === 'id' ? 'Informasi Jaminan' : '典当信息',
+                'collateral_name': lang === 'id' ? 'Nama Barang Jaminan' : '质押物名称',
+                'loan_amount': lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
+                'notes': lang === 'id' ? 'Catatan' : '备注',
+                'save': lang === 'id' ? 'Simpan' : '保存',
+                'cancel': lang === 'id' ? 'Batal' : '取消',
+                'flexible_repayment': lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款',
+                'fixed_repayment': lang === 'id' ? 'Cicilan Tetap' : '固定还款',
+                'repayment_term': lang === 'id' ? 'Jangka Waktu (Bulan)' : '还款期限（月）',
+                'monthly_payment': lang === 'id' ? 'Angsuran per Bulan' : '每月还款额',
+                'agreed_rate': lang === 'id' ? 'Suku Bunga Kesepakatan' : '协商利率',
+                'agreed_service_fee': lang === 'id' ? 'Biaya Layanan Kesepakatan' : '协商服务费',
+                'cash': lang === 'id' ? 'Tunai' : '现金',
+                'bank': lang === 'id' ? 'Bank BNI' : '银行BNI'
+            };
+            return fallback[key] || key;
+        };
 
+        // 获取用户资料
         var profile = null;
         try {
             profile = await SUPABASE.getCurrentProfile();
         } catch(e) {
-            console.warn('获取用户资料失败:', e.message);
+            console.error('获取用户资料失败:', e);
+            alert(lang === 'id' ? 'Gagal memuat data user' : '加载用户数据失败');
+            return;
         }
+
         var isAdmin = profile?.role === 'admin';
 
         if (isAdmin) {
@@ -538,29 +523,28 @@ const CustomersModule = {
         }
 
         try {
+            // 检查客户是否存在
             const { data: customer, error: customerError } = await supabaseClient
                 .from('customers')
                 .select('*')
                 .eq('id', customerId)
                 .single();
+            
             if (customerError || !customer) {
-                throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据，请刷新后重试');
+                throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据');
             }
 
+            // 检查黑名单
             var blacklistCheck = { isBlacklisted: false };
             try {
-                if (typeof window.APP.isBlacklisted === 'function') {
-                    blacklistCheck = await window.APP.isBlacklisted(customerId);
-                } else {
-                    const { data: blData } = await supabaseClient
-                        .from('blacklist')
-                        .select('id, reason')
-                        .eq('customer_id', customerId)
-                        .maybeSingle();
-                    blacklistCheck = blData ? { isBlacklisted: true, reason: blData.reason } : { isBlacklisted: false };
-                }
+                const { data: blData } = await supabaseClient
+                    .from('blacklist')
+                    .select('id, reason')
+                    .eq('customer_id', customerId)
+                    .maybeSingle();
+                blacklistCheck = blData ? { isBlacklisted: true, reason: blData.reason } : { isBlacklisted: false };
             } catch(blErr) {
-                console.warn('黑名单检查失败，跳过:', blErr.message);
+                console.warn('黑名单检查失败:', blErr.message);
             }
 
             if (blacklistCheck && blacklistCheck.isBlacklisted) {
@@ -568,21 +552,25 @@ const CustomersModule = {
                 return;
             }
 
+            // 检查活跃订单
             try {
                 const { data: existingOrders } = await supabaseClient
-                    .from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
+                    .from('orders')
+                    .select('status')
+                    .eq('customer_id', customerId)
+                    .eq('status', 'active');
                 if (existingOrders && existingOrders.length > 0) {
                     alert(t('customer_has_active_order'));
                     return;
                 }
             } catch(ordErr) {
-                console.warn('活跃订单检查失败，继续:', ordErr.message);
+                console.warn('活跃订单检查失败:', ordErr.message);
             }
 
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
 
-            // 修复：安全获取门店信息
+            // 获取门店信息
             var userStoreName = '-';
             var userStoreCode = '-';
             
@@ -601,7 +589,6 @@ const CustomersModule = {
                         userStoreCode = storeData.code || '-';
                     }
                 } catch(e) {
-                    console.warn('获取门店信息失败:', e);
                     userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
                     userStoreCode = '-';
                 }
@@ -610,68 +597,7 @@ const CustomersModule = {
                 userStoreCode = '-';
             }
             
-            const repaymentTypeOptions = `
-                <div class="repayment-type-group">
-                    <label class="repayment-type-label">${lang === 'id' ? '📋 Pilih Jenis Cicilan' : '📋 选择还款方式'}:</label>
-                    <div class="repayment-type-options">
-                        <label class="repayment-option">
-                            <input type="radio" name="repaymentType" value="flexible" checked onchange="window.APP.toggleRepaymentForm(this.value)">
-                            <span class="option-title">💰 ${t('flexible_repayment')}</span>
-                            <span class="option-desc">${lang === 'id' ? 'Bunga 8%/bulan, bayar bunga dulu, pokok bisa kapan saja' : '利息8%/月，先付利息，本金随时可还'}</span>
-                        </label>
-                        <label class="repayment-option">
-                            <input type="radio" name="repaymentType" value="fixed" onchange="window.APP.toggleRepaymentForm(this.value)">
-                            <span class="option-title">📅 ${t('fixed_repayment')}</span>
-                            <span class="option-desc">${lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok), tenor 3-10 bulan' : '每月固定还款（本金+利息），期限3-10个月'}</span>
-                        </label>
-                    </div>
-                </div>
-            `;
-            
-            const fixedRepaymentForm = `
-                <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
-                    <div class="form-group">
-                        <label>📅 ${t('repayment_term')}</label>
-                        <select id="repaymentTerm" class="repayment-term-select" onchange="window.APP.calculateFixedPayment()">
-                            <option value="3">3 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                            <option value="4">4 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                            <option value="5" selected>5 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                            <option value="6">6 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                            <option value="7">7 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                            <option value="8">8 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                            <option value="9">9 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                            <option value="10">10 ${lang === 'id' ? 'bulan' : '个月'}</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>💰 ${t('monthly_payment')}</label>
-                        <div id="monthlyPaymentDisplay" class="monthly-payment-display">-</div>
-                        <small>${lang === 'id' ? 'Jumlah tetap yang harus dibayar setiap bulan' : '每月需支付的固定金额'}</small>
-                    </div>
-                </div>
-            `;
-            
-            const negotiationForm = `
-                <div class="negotiation-form">
-                    <div class="form-group">
-                        <label>📈 ${t('agreed_rate')}</label>
-                        <div class="rate-input-group">
-                            <input type="number" id="agreedInterestRate" value="8" step="0.5" min="3" max="10" style="width:100px;" onchange="window.APP.calculateFixedPayment()">
-                            <span>%</span>
-                            <small style="margin-left:10px;">${lang === 'id' ? 'Default 8%, bisa dinegosiasi 3-10%' : '默认8%，可协商3-10%'}</small>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>✨ ${t('agreed_service_fee')}</label>
-                        <div class="rate-input-group">
-                            <input type="number" id="agreedServiceFee" value="2" step="0.5" min="0" max="5" style="width:100px;">
-                            <span>%</span>
-                            <small style="margin-left:10px;">${lang === 'id' ? 'Default 2%, bisa dinegosiasi 0-5%' : '默认2%，可协商0-5%'}</small>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
+            // 渲染订单创建页面
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${t('create_order')}</h2>
@@ -712,9 +638,61 @@ const CustomersModule = {
                             <input type="text" id="amount" placeholder="${t('loan_amount')}" class="amount-input" oninput="window.APP.calculateFixedPayment()">
                         </div>
                         
-                        ${repaymentTypeOptions}
-                        ${fixedRepaymentForm}
-                        ${negotiationForm}
+                        <div class="repayment-type-group">
+                            <label class="repayment-type-label">${lang === 'id' ? '📋 Pilih Jenis Cicilan' : '📋 选择还款方式'}:</label>
+                            <div class="repayment-type-options">
+                                <label class="repayment-option">
+                                    <input type="radio" name="repaymentType" value="flexible" checked onchange="window.APP.toggleRepaymentForm(this.value)">
+                                    <span class="option-title">💰 ${t('flexible_repayment')}</span>
+                                    <span class="option-desc">${lang === 'id' ? 'Bunga 8%/bulan, bayar bunga dulu, pokok bisa kapan saja' : '利息8%/月，先付利息，本金随时可还'}</span>
+                                </label>
+                                <label class="repayment-option">
+                                    <input type="radio" name="repaymentType" value="fixed" onchange="window.APP.toggleRepaymentForm(this.value)">
+                                    <span class="option-title">📅 ${t('fixed_repayment')}</span>
+                                    <span class="option-desc">${lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok), tenor 3-10 bulan' : '每月固定还款（本金+利息），期限3-10个月'}</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
+                            <div class="form-group">
+                                <label>📅 ${t('repayment_term')}</label>
+                                <select id="repaymentTerm" class="repayment-term-select" onchange="window.APP.calculateFixedPayment()">
+                                    <option value="3">3 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                    <option value="4">4 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                    <option value="5" selected>5 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                    <option value="6">6 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                    <option value="7">7 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                    <option value="8">8 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                    <option value="9">9 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                    <option value="10">10 ${lang === 'id' ? 'bulan' : '个月'}</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>💰 ${t('monthly_payment')}</label>
+                                <div id="monthlyPaymentDisplay" class="monthly-payment-display">-</div>
+                                <small>${lang === 'id' ? 'Jumlah tetap yang harus dibayar setiap bulan' : '每月需支付的固定金额'}</small>
+                            </div>
+                        </div>
+                        
+                        <div class="negotiation-form">
+                            <div class="form-group">
+                                <label>📈 ${t('agreed_rate')}</label>
+                                <div class="rate-input-group">
+                                    <input type="number" id="agreedInterestRate" value="8" step="0.5" min="3" max="10" style="width:100px;" onchange="window.APP.calculateFixedPayment()">
+                                    <span>%</span>
+                                    <small style="margin-left:10px;">${lang === 'id' ? 'Default 8%, bisa dinegosiasi 3-10%' : '默认8%，可协商3-10%'}</small>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>✨ ${t('agreed_service_fee')}</label>
+                                <div class="rate-input-group">
+                                    <input type="number" id="agreedServiceFee" value="2" step="0.5" min="0" max="5" style="width:100px;">
+                                    <span>%</span>
+                                    <small style="margin-left:10px;">${lang === 'id' ? 'Default 2%, bisa dinegosiasi 0-5%' : '默认2%，可协商0-5%'}</small>
+                                </div>
+                            </div>
+                        </div>
                         
                         <div class="form-group">
                             <label>💰 ${lang === 'id' ? 'Sumber Dana Pinjaman' : '贷款资金来源'}</label>
@@ -737,95 +715,20 @@ const CustomersModule = {
                 </div>
                 
                 <style>
-                    .repayment-type-group {
-                        grid-column: span 2;
-                        margin: 12px 0;
-                        padding: 12px;
-                        background: var(--gray-50);
-                        border-radius: 12px;
-                    }
-                    .repayment-type-label {
-                        font-weight: 600;
-                        margin-bottom: 10px;
-                        display: block;
-                        color: var(--gray-700);
-                    }
-                    .repayment-type-options {
-                        display: flex;
-                        gap: 20px;
-                        flex-wrap: wrap;
-                    }
-                    .repayment-option {
-                        flex: 1;
-                        min-width: 200px;
-                        padding: 12px;
-                        border: 2px solid var(--gray-300);
-                        border-radius: 10px;
-                        cursor: pointer;
-                        transition: all 0.2s;
-                        background: white;
-                    }
-                    .repayment-option:hover {
-                        border-color: var(--primary);
-                        background: var(--primary-light);
-                    }
-                    .repayment-option input {
-                        margin-right: 8px;
-                    }
-                    .repayment-option .option-title {
-                        font-weight: 700;
-                        display: inline-block;
-                        margin-bottom: 4px;
-                    }
-                    .repayment-option .option-desc {
-                        display: block;
-                        font-size: 11px;
-                        color: var(--gray-500);
-                        margin-top: 4px;
-                    }
-                    .fixed-repayment-form {
-                        grid-column: span 2;
-                        padding: 12px;
-                        background: #f0fdf4;
-                        border-radius: 10px;
-                        margin: 8px 0;
-                    }
-                    .monthly-payment-display {
-                        font-size: 18px;
-                        font-weight: 700;
-                        color: var(--success);
-                        background: white;
-                        padding: 8px 12px;
-                        border-radius: 8px;
-                        display: inline-block;
-                    }
-                    .negotiation-form {
-                        grid-column: span 2;
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 12px;
-                        padding: 12px;
-                        background: #fef3c7;
-                        border-radius: 10px;
-                        margin: 8px 0;
-                    }
-                    .rate-input-group {
-                        display: flex;
-                        align-items: center;
-                        gap: 6px;
-                        flex-wrap: wrap;
-                    }
-                    .rate-input-group input {
-                        text-align: center;
-                    }
-                    @media (max-width: 768px) {
-                        .repayment-type-options {
-                            flex-direction: column;
-                        }
-                        .negotiation-form {
-                            grid-template-columns: 1fr;
-                        }
-                    }
+                    .repayment-type-group { grid-column: span 2; margin: 12px 0; padding: 12px; background: var(--gray-50); border-radius: 12px; }
+                    .repayment-type-label { font-weight: 600; margin-bottom: 10px; display: block; color: var(--gray-700); }
+                    .repayment-type-options { display: flex; gap: 20px; flex-wrap: wrap; }
+                    .repayment-option { flex: 1; min-width: 200px; padding: 12px; border: 2px solid var(--gray-300); border-radius: 10px; cursor: pointer; transition: all 0.2s; background: white; }
+                    .repayment-option:hover { border-color: var(--primary); background: var(--primary-light); }
+                    .repayment-option input { margin-right: 8px; }
+                    .repayment-option .option-title { font-weight: 700; display: inline-block; margin-bottom: 4px; }
+                    .repayment-option .option-desc { display: block; font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+                    .fixed-repayment-form { grid-column: span 2; padding: 12px; background: #f0fdf4; border-radius: 10px; margin: 8px 0; }
+                    .monthly-payment-display { font-size: 18px; font-weight: 700; color: var(--success); background: white; padding: 8px 12px; border-radius: 8px; display: inline-block; }
+                    .negotiation-form { grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; background: #fef3c7; border-radius: 10px; margin: 8px 0; }
+                    .rate-input-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+                    .rate-input-group input { text-align: center; }
+                    @media (max-width: 768px) { .repayment-type-options { flex-direction: column; } .negotiation-form { grid-template-columns: 1fr; } }
                 </style>`;
             
             var amountInput = document.getElementById("amount");
@@ -834,19 +737,15 @@ const CustomersModule = {
             this.calculateFixedPayment();
             
         } catch (error) {
-            console.error("createOrderForCustomer error:", error);
+            console.error("createOrderForCustomer 错误:", error);
             alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
         }
     },
 
     toggleRepaymentForm: function(value) {
         var fixedForm = document.getElementById('fixedRepaymentForm');
-        if (value === 'fixed') {
-            if (fixedForm) fixedForm.style.display = 'block';
-            this.calculateFixedPayment();
-        } else {
-            if (fixedForm) fixedForm.style.display = 'none';
-        }
+        if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none';
+        if (value === 'fixed') this.calculateFixedPayment();
     },
 
     calculateFixedPayment: function() {
@@ -857,16 +756,13 @@ const CustomersModule = {
         var rateInput = document.getElementById('agreedInterestRate');
         var monthlyRate = rateInput ? (parseFloat(rateInput.value) || 8) / 100 : 0.08;
         
-        if (amount > 0 && months > 0) {
-            var monthlyPayment = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months);
-            var displayEl = document.getElementById('monthlyPaymentDisplay');
-            if (displayEl) {
+        var displayEl = document.getElementById('monthlyPaymentDisplay');
+        if (displayEl) {
+            if (amount > 0 && months > 0) {
+                var monthlyPayment = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months);
                 displayEl.innerHTML = Utils.formatCurrency(monthlyPayment);
                 displayEl.style.color = '#10b981';
-            }
-        } else {
-            var displayEl = document.getElementById('monthlyPaymentDisplay');
-            if (displayEl) {
+            } else {
                 displayEl.innerHTML = amount === 0 ? (Utils.lang === 'id' ? 'Masukkan jumlah pinjaman' : '请输入贷款金额') : '-';
                 displayEl.style.color = '#64748b';
             }
@@ -905,17 +801,14 @@ const CustomersModule = {
                 .eq('id', customerId)
                 .single();
             
+            // 再次检查黑名单
             var blacklistCheck = null;
-            if (typeof window.APP.isBlacklisted === 'function') {
-                blacklistCheck = await window.APP.isBlacklisted(customerId);
-            } else {
-                const { data } = await supabaseClient
-                    .from('blacklist')
-                    .select('id')
-                    .eq('customer_id', customerId)
-                    .maybeSingle();
-                blacklistCheck = data ? { isBlacklisted: true } : { isBlacklisted: false };
-            }
+            const { data } = await supabaseClient
+                .from('blacklist')
+                .select('id')
+                .eq('customer_id', customerId)
+                .maybeSingle();
+            blacklistCheck = data ? { isBlacklisted: true } : { isBlacklisted: false };
             
             if (blacklistCheck && blacklistCheck.isBlacklisted) {
                 alert(t('blacklisted_cannot_order'));
@@ -944,16 +837,10 @@ const CustomersModule = {
             var newOrder = await Order.create(orderData);
             
             if (agreedServiceFee > 0) {
-                var serviceFeeAmount = amount * (agreedServiceFee / 100);
-                if (serviceFeeAmount > 0) {
-                    try {
-                        await Order.recordServiceFee(newOrder.order_id, 1, loanSource);
-                    } catch (serviceFeeError) {
-                        console.error("服务费收取失败:", serviceFeeError);
-                        alert(lang === 'id' 
-                            ? `⚠️ Pesanan berhasil dibuat, tetapi biaya layanan gagal dicatat: ${serviceFeeError.message}`
-                            : `⚠️ 订单已创建，但服务费收取失败: ${serviceFeeError.message}`);
-                    }
+                try {
+                    await Order.recordServiceFee(newOrder.order_id, 1, loanSource);
+                } catch (serviceFeeError) {
+                    console.error("服务费收取失败:", serviceFeeError);
                 }
             }
             
@@ -961,9 +848,6 @@ const CustomersModule = {
                 await Order.recordAdminFee(newOrder.order_id, loanSource, 30000);
             } catch (adminFeeError) {
                 console.error("管理费收取失败:", adminFeeError);
-                alert(lang === 'id' 
-                    ? `⚠️ Pesanan berhasil dibuat, tetapi admin fee gagal dicatat: ${adminFeeError.message}`
-                    : `⚠️ 订单已创建，但管理费收取失败: ${adminFeeError.message}`);
             }
             
             if (amount > 0) {
@@ -972,9 +856,6 @@ const CustomersModule = {
                         lang === 'id' ? `Pencairan pinjaman dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'}` : `贷款发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'}`);
                 } catch (loanError) {
                     console.error("贷款发放记录失败:", loanError);
-                    alert(lang === 'id' 
-                        ? `⚠️ Pesanan berhasil dibuat, tetapi pencairan pinjaman gagal dicatat: ${loanError.message}`
-                        : `⚠️ 订单已创建，但贷款发放记录失败: ${loanError.message}`);
                 }
             }
             
@@ -995,11 +876,7 @@ const CustomersModule = {
             if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
                 window.APP.goBack();
             } else {
-                if (typeof window.APP !== 'undefined' && typeof window.APP.showCustomers === 'function') {
-                    window.APP.showCustomers();
-                } else {
-                    window.location.reload();
-                }
+                window.location.reload();
             }
         } catch (error) {
             console.error("saveOrderWithCustomer error:", error);
@@ -1065,40 +942,13 @@ const CustomersModule = {
                     <h3>📋 ${t('order_list')}</h3>
                     <div class="table-container">
                         <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th class="text-right">${t('loan_amount')}</th>
-                                    <th class="text-right">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Jenis' : '方式'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Status' : '状态'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>ID</th><th>${lang === 'id' ? 'Tanggal' : '日期'}</th><th class="text-right">${t('loan_amount')}</th><th class="text-right">${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}</th><th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th><th class="text-center">${lang === 'id' ? 'Jenis' : '方式'}</th><th class="text-center">${lang === 'id' ? 'Status' : '状态'}</th><th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead>
                             <tbody>${rows}</tbody>
-                        </table>
+                        <\/table>
                     </div>
                 </div>
                 
-                <style>
-                    .repayment-badge {
-                        display: inline-block;
-                        padding: 2px 8px;
-                        border-radius: 12px;
-                        font-size: 11px;
-                        font-weight: 600;
-                    }
-                    .badge-fixed {
-                        background: #d1fae5;
-                        color: #065f46;
-                    }
-                    .badge-flexible {
-                        background: #fed7aa;
-                        color: #9a3412;
-                    }
-                </style>`;
+                <style>.repayment-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}.badge-fixed{background:#d1fae5;color:#065f46}.badge-flexible{background:#fed7aa;color:#9a3412}</style>`;
         } catch (error) {
             console.error("showCustomerOrders error:", error);
             alert(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
@@ -1150,19 +1000,9 @@ const CustomersModule = {
                     <h3>💰 ${lang === 'id' ? 'Riwayat Pembayaran' : '付款记录'}</h3>
                     <div class="table-container">
                         <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>${t('date')}</th>
-                                    <th>${t('order_id')}</th>
-                                    <th>${t('type')}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                    <th class="text-right">${t('amount')}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                    <th>${t('description')}</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>${t('date')}</th><th>${t('order_id')}</th><th>${t('type')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${t('description')}</th></tr></thead>
                             <tbody>${rows}</tbody>
-                        </table>
+                        <\/table>
                     </div>
                 </div>`;
         } catch (error) {
@@ -1179,7 +1019,6 @@ for (var key in CustomersModule) {
     }
 }
 
-// 确保辅助函数也被导出
 window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
 window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
 window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
