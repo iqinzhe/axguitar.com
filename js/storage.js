@@ -1,4 +1,4 @@
-// storage.js - v1.2（修复双语翻译）
+// storage.js - v1.3（修复：备份恢复功能完整，双语支持和错误处理）
 
 const Storage = {
 
@@ -174,6 +174,7 @@ const Storage = {
             expenses: 0, payments: 0, cashFlows: 0, blacklist: 0
         };
         
+        // 恢复门店
         if (backupData.stores && backupData.stores.length > 0) {
             const existingStores = await SUPABASE.getAllStores();
             const existingIds = new Set(existingStores.map(s => s.id));
@@ -207,6 +208,7 @@ const Storage = {
             }
         }
         
+        // 恢复客户
         if (backupData.customers && backupData.customers.length > 0) {
             for (const customer of backupData.customers) {
                 const { data: existing } = await supabaseClient
@@ -248,6 +250,7 @@ const Storage = {
             }
         }
         
+        // 恢复订单
         if (backupData.orders && backupData.orders.length > 0) {
             for (const order of backupData.orders) {
                 const { data: existing } = await supabaseClient
@@ -340,6 +343,7 @@ const Storage = {
             }
         }
         
+        // 恢复付款记录
         if (backupData.payments && backupData.payments.length > 0) {
             for (const payment of backupData.payments) {
                 const { data: order } = await supabaseClient
@@ -377,6 +381,7 @@ const Storage = {
             }
         }
         
+        // 恢复支出
         if (backupData.expenses && backupData.expenses.length > 0) {
             for (const expense of backupData.expenses) {
                 const { error } = await supabaseClient
@@ -395,6 +400,7 @@ const Storage = {
             }
         }
         
+        // 恢复资金流水
         if (backupData.cash_flows && backupData.cash_flows.length > 0) {
             for (const flow of backupData.cash_flows) {
                 const { error } = await supabaseClient
@@ -410,12 +416,14 @@ const Storage = {
                         description: flow.description,
                         recorded_by: profile?.id,
                         recorded_at: flow.recorded_at,
-                        reference_id: flow.reference_id
+                        reference_id: flow.reference_id,
+                        is_voided: flow.is_voided || false
                     });
                 if (!error) results.cashFlows++;
             }
         }
         
+        // 恢复黑名单
         if (backupData.blacklist && backupData.blacklist.length > 0) {
             for (const blacklist of backupData.blacklist) {
                 const { error } = await supabaseClient
@@ -425,7 +433,7 @@ const Storage = {
                         reason: blacklist.reason,
                         store_id: blacklist.store_id,
                         blacklisted_by: profile?.id,
-                        blacklisted_at: blacklist.blacklisted_at
+                        blacklisted_at: blacklist.blacklisted_at || new Date().toISOString()
                     });
                 if (!error) results.blacklist++;
             }
@@ -608,7 +616,9 @@ const Storage = {
         
         if (!isAdmin) {
             alert(lang === 'id' ? 'Hanya administrator yang dapat mengakses manajemen cadangan' : '只有管理员可以访问备份管理');
-            APP.goBack();
+            if (typeof APP !== 'undefined' && APP.goBack) {
+                APP.goBack();
+            }
             return;
         }
         
