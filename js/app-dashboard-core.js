@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.1（修复双语翻译）
+// app-dashboard-core.js - v1.2（修复：重复函数定义 + 现金流向负数判断 + showBlacklist调用）
 
 window.APP = window.APP || {};
 
@@ -95,7 +95,8 @@ const DashboardCore = {
                     await self.showCustomers();
                 }
             },
-            blacklist: async () => await self.showBlacklist()
+            blacklist: async () => await self.showBlacklist(),
+            auditLogs: async () => await Audit.showAuditLogs()
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -133,7 +134,8 @@ const DashboardCore = {
             customerPaymentHistory: async () => { if (params.customerId) await self.showCustomerPaymentHistory(params.customerId); },
             viewOrder: async () => { if (params.orderId) await self.viewOrder(params.orderId); },
             payment: async () => { if (params.orderId) await self.showPayment(params.orderId); },
-            blacklist: async () => await self.showBlacklist()
+            blacklist: async () => await self.showBlacklist(),
+            auditLogs: async () => await Audit.showAuditLogs()
         };
         var handler = navHandlers[page];
         if (handler) handler();
@@ -164,7 +166,8 @@ const DashboardCore = {
                 backupRestore: async () => await Storage.renderBackupUI(),
                 customerOrders: async () => { if (prev.customerId) await self.showCustomerOrders(prev.customerId); },
                 customerPaymentHistory: async () => { if (prev.customerId) await self.showCustomerPaymentHistory(prev.customerId); },
-                blacklist: async () => await self.showBlacklist()
+                blacklist: async () => await self.showBlacklist(),
+                auditLogs: async () => await Audit.showAuditLogs()
             };
             var handler = backHandlers[prev.page];
             if (handler) handler();
@@ -471,6 +474,14 @@ const DashboardCore = {
                 </div>
             `;
             
+            // 修复：添加安全的数值判断，使用 || 0 防止 undefined
+            var cashBalance = cashFlow.cash?.balance ?? 0;
+            var bankBalance = cashFlow.bank?.balance ?? 0;
+            var cashIncome = cashFlow.cash?.income ?? 0;
+            var cashExpense = cashFlow.cash?.expense ?? 0;
+            var bankIncome = cashFlow.bank?.income ?? 0;
+            var bankExpense = cashFlow.bank?.expense ?? 0;
+            
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = `
@@ -479,19 +490,19 @@ const DashboardCore = {
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                            <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
+                            <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
                             <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.cash.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(cashIncome)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(cashExpense)}
                             </div>
                         </div>
                         
                         <div class="cashflow-item">
                             <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                            <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
+                            <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
                             <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.bank.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(bankIncome)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(bankExpense)}
                             </div>
                         </div>
                         
@@ -521,19 +532,19 @@ const DashboardCore = {
                     <div class="cashflow-stats">
                         <div class="cashflow-item">
                             <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                            <div class="value ${cashFlow.cash.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
+                            <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
                             <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.cash.income)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.cash.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(cashIncome)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(cashExpense)}
                             </div>
                         </div>
                         
                         <div class="cashflow-item">
                             <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                            <div class="value ${cashFlow.bank.balance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
+                            <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
                             <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(cashFlow.bank.income)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(cashFlow.bank.expense)}
+                                ${t('inflow')}: +${Utils.formatCurrency(bankIncome)}<br>
+                                ${t('outflow')}: -${Utils.formatCurrency(bankExpense)}
                             </div>
                         </div>
                         
@@ -570,6 +581,7 @@ const DashboardCore = {
                     <button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>
                     <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
                     <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
+                    <button onclick="APP.navigateTo('blacklist')">🚫 ${t('blacklist')}</button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
             } else {
@@ -582,11 +594,12 @@ const DashboardCore = {
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                         🔔 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
+                    <button onclick="APP.navigateTo('blacklist')">🚫 ${t('blacklist')}</button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
                 </div>`;
             }
             
-          var bottomHtml = `
+            var bottomHtml = `
 <div class="card dashboard-footer-card">
     <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
     <p>🏪 ${t('store')}: ${Utils.escapeHtml(storeName)}${isAdmin ? ` (${lang === 'id' ? 'Kantor Pusat - Seluruh Toko' : '总部 - 全部门店'})` : ''}</p>
@@ -625,15 +638,7 @@ const DashboardCore = {
         this.navigateTo('customers'); 
     },
     
-    getExpensesTotal: async function() {
-        var profile = await SUPABASE.getCurrentProfile();
-        let query = supabaseClient.from('expenses').select('amount');
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('store_id', profile.store_id);
-        }
-        const { data } = await query;
-        return data?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
-    },
+    // 注意：已删除重复的 getExpensesTotal 函数定义
     
     showBlacklist: async function() {
         if (typeof window.APP.showBlacklist === 'function') {
