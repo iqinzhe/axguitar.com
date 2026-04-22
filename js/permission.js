@@ -1,4 +1,4 @@
-// permission.js - v1.1（修复：权限规则完整，与所有模块兼容）
+// permission.js - v1.2（移除审计日志权限）
 
 const PERMISSION = {
 
@@ -41,9 +41,7 @@ const PERMISSION = {
             cash_flow_view: true, 
             internal_transfer: true,
             // 备份恢复（仅管理员）
-            backup_restore: false,
-            // 审计日志（仅管理员）
-            audit_view: false
+            backup_restore: false
         }
     },
 
@@ -117,9 +115,6 @@ const PERMISSION = {
     // ==================== 备份恢复权限 ====================
     canBackup()             { return this.can('backup_restore'); },
     canRestore()            { return this.can('backup_restore'); },
-    
-    // ==================== 审计日志权限 ====================
-    canViewAudit()          { return this.can('audit_view'); },
     
     // ==================== 平账权限（仅管理员） ====================
     canReconcile()          { return AUTH.user?.role === 'admin'; },
