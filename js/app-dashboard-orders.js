@@ -415,7 +415,7 @@ const DashboardOrders = {
                 return; 
             }
             var lang = Utils.lang;
-            var t = Utils.t;  // 添加 t 函数定义
+            var t = Utils.t.bind(Utils); 
             var methodMap = { 
                 cash: lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)', 
                 bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' 
@@ -522,7 +522,7 @@ const DashboardOrders = {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
         var lang = Utils.lang;
-        var t = Utils.t;
+        var t = Utils.t.bind(Utils);
         try {
             var allPayments = await SUPABASE.getAllPayments();
             var totalAdminFee = 0, totalServiceFee = 0, totalInterest = 0, totalPrincipal = 0;
