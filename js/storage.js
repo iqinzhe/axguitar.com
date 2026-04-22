@@ -1,4 +1,4 @@
-// storage.js - v1.3（修复：备份恢复功能完整，双语支持和错误处理）
+// storage.js - v1.4（修复：APP.goBack 安全调用 + 完整功能）
 
 const Storage = {
 
@@ -616,8 +616,20 @@ const Storage = {
         
         if (!isAdmin) {
             alert(lang === 'id' ? 'Hanya administrator yang dapat mengakses manajemen cadangan' : '只有管理员可以访问备份管理');
-            if (typeof APP !== 'undefined' && APP.goBack) {
-                APP.goBack();
+            // 修复：安全调用 goBack
+            try {
+                if (typeof APP !== 'undefined' && typeof APP.goBack === 'function') {
+                    APP.goBack();
+                } else if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
+                    window.APP.goBack();
+                } else if (typeof window.APP !== 'undefined' && typeof window.APP.renderDashboard === 'function') {
+                    window.APP.renderDashboard();
+                } else {
+                    window.location.reload();
+                }
+            } catch(e) {
+                console.warn("返回失败:", e);
+                window.location.reload();
             }
             return;
         }
