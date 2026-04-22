@@ -46,7 +46,7 @@ const PaymentsModule = {
             var { payments } = await SUPABASE.getPaymentHistory(orderId);
 
             var lang = Utils.lang;
-            var t = Utils.t;
+            var t = Utils.t.bind(Utils);
             
             var loanAmount = order.loan_amount || 0;
             var principalPaid = order.principal_paid || 0;
@@ -537,7 +537,7 @@ const PaymentsModule = {
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
-        var t = Utils.t;
+        var t = Utils.t.bind(Utils);
         
         var order = await SUPABASE.getOrder(orderId);
         
@@ -593,7 +593,7 @@ const PaymentsModule = {
         var target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
         var targetName = target === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
-        var t = Utils.t;
+        var t = Utils.t.bind(Utils);
         
         if (isNaN(amount) || amount <= 0) {
             alert(t('invalid_amount'));
@@ -692,7 +692,7 @@ const PaymentsModule = {
             var { order, payments } = await SUPABASE.getPaymentHistory(orderId);
             if (!order) return;
             var lang = Utils.lang;
-            var t = Utils.t;  // 添加 t 函数定义
+            var t = Utils.t.bind(Utils); // 添加 t 函数定义
             var methodMap = {
                 cash: lang === 'id' ? 'Tunai' : '现金',
                 bank: lang === 'id' ? 'Bank BNI' : '银行BNI'
