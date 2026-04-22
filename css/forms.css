@@ -1,3 +1,5 @@
+/* forms.css - 完整优化版 v2.0 */
+
 /* === 表单组件 === */
 .form-group {
     margin-bottom: var(--spacing-4);
@@ -8,19 +10,20 @@
     margin-bottom: var(--spacing-2);
     font-size: var(--font-sm);
     font-weight: 500;
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: var(--spacing-2) var(--spacing-3);
+    padding: 10px 12px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border-medium);
     font-family: inherit;
     font-size: var(--font-sm);
     transition: var(--transition);
+    background: var(--bg-card);
 }
 
 .form-group input:focus,
@@ -29,6 +32,11 @@
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: var(--text-muted);
 }
 
 .form-grid {
@@ -48,13 +56,24 @@
     margin-top: var(--spacing-4);
 }
 
-/* === 转账按钮 === */
+@media (max-width: 640px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-3);
+    }
+    
+    .form-grid .full-width {
+        grid-column: span 1;
+    }
+}
+
+/* 转账按钮 */
 .transfer-btn {
     padding: var(--spacing-2) var(--spacing-3);
     font-size: var(--font-xs);
     border-radius: var(--radius-md);
-    background: var(--gray-100);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-hover);
+    border: 1px solid var(--border-light);
 }
 
 .transfer-btn.cash-to-bank {
@@ -79,36 +98,47 @@
     transform: translateY(-1px);
 }
 
-/* === 小按钮 === */
+/* 小按钮 */
 .btn-small {
-    padding: 4px 10px;
-    font-size: 0.75rem;
+    padding: 5px 12px;
+    font-size: var(--font-xxs);
     border-radius: var(--radius-sm);
-    background: var(--gray-100);
-    border: 1px solid var(--gray-200);
+    background: var(--bg-hover);
+    border: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: var(--transition);
 }
 
 .btn-small:hover {
-    background: var(--gray-200);
+    background: var(--border-light);
+    transform: translateY(-1px);
 }
 
-/* === 客户信息展示 === */
+/* 客户信息展示 */
+.customer-info-display {
+    background: var(--bg-hover);
+    padding: var(--spacing-3);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-4);
+}
+
 .customer-info-display p {
     margin-bottom: 6px;
-    font-size: 0.9rem;
+    font-size: var(--font-sm);
 }
 
 .store-info-banner {
     background: var(--primary-soft);
-    padding: 10px;
+    padding: 10px 14px;
     border-radius: var(--radius-md);
     margin: 15px 0;
-    font-size: 0.9rem;
+    font-size: var(--font-sm);
+    color: var(--primary-dark);
 }
 
-/* === 费用相关 === */
+/* 费用相关 */
 .fee-section {
-    border-top: 1px solid var(--gray-200);
+    border-top: 1px solid var(--border-light);
     padding-top: 12px;
     margin-top: 8px;
 }
@@ -117,7 +147,7 @@
     width: 100%;
     padding: 8px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border-medium);
 }
 
 .fee-display {
@@ -129,14 +159,24 @@
 
 .address-option {
     display: flex;
-    gap: 16px;
-    margin-bottom: 8px;
+    gap: 20px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.address-option label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+    cursor: pointer;
 }
 
 .payment-method-options {
     display: flex;
-    gap: 16px;
+    gap: 20px;
     margin-top: 6px;
+    flex-wrap: wrap;
 }
 
 .payment-method-options label {
@@ -147,9 +187,115 @@
     cursor: pointer;
 }
 
-/* === 缴费页面汇总卡片 === */
+/* 还款方式表单 */
+.repayment-type-group {
+    grid-column: span 2;
+    margin: 12px 0;
+    padding: 14px;
+    background: var(--bg-hover);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+}
+
+.repayment-type-label {
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: block;
+    color: var(--text-secondary);
+}
+
+.repayment-type-options {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.repayment-option {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px;
+    border: 2px solid var(--border-light);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: var(--transition);
+    background: white;
+}
+
+.repayment-option:hover {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+}
+
+.repayment-option input {
+    margin-right: 8px;
+    width: auto;
+}
+
+.repayment-option .option-title {
+    font-weight: 700;
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.repayment-option .option-desc {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.fixed-repayment-form {
+    grid-column: span 2;
+    padding: 14px;
+    background: var(--success-light);
+    border-radius: var(--radius-lg);
+    margin: 8px 0;
+    border: 1px solid #86efac;
+}
+
+.negotiation-form {
+    grid-column: span 2;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 14px;
+    background: var(--warning-light);
+    border-radius: var(--radius-lg);
+    margin: 8px 0;
+    border: 1px solid #fde68a;
+}
+
+@media (max-width: 640px) {
+    .negotiation-form {
+        grid-template-columns: 1fr;
+    }
+}
+
+.rate-input-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.rate-input-group input {
+    text-align: center;
+    width: 100px;
+}
+
+.monthly-payment-display {
+    font-size: var(--font-lg);
+    font-weight: 700;
+    color: var(--success);
+    background: white;
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    display: inline-block;
+}
+
+/* 缴费页面汇总卡片 */
 .summary-card {
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    background: var(--bg-hover);
 }
 
 .summary-table {
@@ -163,7 +309,7 @@
 
 .summary-table .label {
     font-weight: 600;
-    color: var(--gray-600);
+    color: var(--text-secondary);
     width: 100px;
 }
 
@@ -192,12 +338,13 @@
     background: var(--success-light);
 }
 
+/* 缴费卡片 */
 .action-card {
     margin-top: 20px;
 }
 
 .action-card .card-header {
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-light);
     padding-bottom: 10px;
     margin-bottom: 15px;
 }
@@ -238,7 +385,7 @@
 .action-select {
     padding: 10px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border-medium);
     font-size: 0.9rem;
     min-width: 150px;
 }
@@ -246,7 +393,7 @@
 .action-input {
     padding: 10px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border-medium);
     font-size: 0.9rem;
     width: 200px;
 }
@@ -262,7 +409,7 @@
 
 .card-history {
     margin-top: 15px;
-    border-top: 1px solid var(--gray-200);
+    border-top: 1px solid var(--border-light);
     padding-top: 15px;
 }
 
@@ -270,7 +417,7 @@
     font-weight: 600;
     margin-bottom: 10px;
     font-size: 0.85rem;
-    color: var(--gray-600);
+    color: var(--text-secondary);
 }
 
 .history-table {
@@ -282,11 +429,11 @@
 .history-table th,
 .history-table td {
     padding: 8px 6px;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-light);
 }
 
 .history-table th {
-    background: var(--gray-50);
+    background: var(--bg-hover);
     font-weight: 600;
 }
 
@@ -294,15 +441,112 @@
     white-space: nowrap;
 }
 
-/* === 金额输入框 === */
-.amount-input {
-    text-align: right;
+/* 固定还款卡片 */
+.fixed-repayment-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-left: 4px solid var(--success);
 }
 
-/* === 黑名单按钮 === */
+.repayment-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.fixed-badge {
+    background: var(--success);
+    color: white;
+}
+
+.info-box .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.info-box .info-row:last-child {
+    border-bottom: none;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--border-light);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-left: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--success);
+    transition: width 0.3s;
+}
+
+.amount-highlight {
+    font-size: var(--font-lg);
+    color: var(--success);
+}
+
+.overdue-warning {
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.overdue-warning.warning {
+    background: var(--warning-light);
+    color: var(--warning-dark);
+}
+
+.overdue-warning.critical {
+    background: var(--danger-light);
+    color: var(--danger-dark);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.btn-action.early-settle {
+    background: #8b5cf6 !important;
+    color: white !important;
+    border-color: #7c3aed !important;
+}
+
+.btn-action.early-settle:hover {
+    background: #7c3aed !important;
+}
+
+.card-info {
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--bg-hover);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* 金额输入框 */
+.amount-input {
+    text-align: right;
+    font-weight: 500;
+}
+
+/* 黑名单按钮 */
 .btn-blacklist {
     background: #f97316 !important;
-    color: #fff !important;
+    color: white !important;
     border-color: #ea580c !important;
 }
 
@@ -310,13 +554,14 @@
     background: #ea580c !important;
 }
 
-/* === 已平账/锁定徽章 === */
+/* 已平账/锁定徽章 */
 .reconciled-badge,
 .locked-badge {
     display: inline-block;
-    padding: 4px 8px;
+    padding: 4px 10px;
     border-radius: 20px;
     font-size: 0.7rem;
+    font-weight: 500;
 }
 
 .reconciled-badge {
@@ -325,6 +570,6 @@
 }
 
 .locked-badge {
-    background: var(--gray-100);
-    color: var(--gray-500);
+    background: var(--bg-hover);
+    color: var(--text-muted);
 }
