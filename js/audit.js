@@ -1,4 +1,4 @@
-// audit.js - v1.1（修复：审计日志功能完整，双语支持和错误处理）
+// audit.js - v1.2（修复：APP.goBack 安全调用 + 完整功能）
 
 const Audit = {
 
@@ -22,12 +22,11 @@ const Audit = {
                 store_name: profile.stores?.name || null,
                 action: action,
                 details: typeof details === 'string' ? details : JSON.stringify(details),
-                user_agent: navigator.userAgent.substring(0, 500), // 限制长度
+                user_agent: navigator.userAgent.substring(0, 500),
                 extra_info: JSON.stringify(extra),
                 created_at: new Date().toISOString()
             };
 
-            // 异步写入，不阻塞主流程
             supabaseClient.from('audit_logs').insert(logData).then(result => {
                 if (result.error) console.warn('审计日志写入失败:', result.error.message);
             }).catch(err => console.warn('审计日志写入异常:', err));
@@ -248,13 +247,22 @@ const Audit = {
 
         if (profile?.role !== 'admin') {
             alert(lang === 'id' ? 'Hanya administrator yang dapat melihat log audit' : '只有管理员可以查看审计日志');
-            if (typeof APP !== 'undefined' && APP.goBack) {
-                APP.goBack();
+            // 修复：安全调用 goBack
+            try {
+                if (typeof APP !== 'undefined' && typeof APP.goBack === 'function') {
+                    APP.goBack();
+                } else if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
+                    window.APP.goBack();
+                } else if (typeof window.APP !== 'undefined' && typeof window.APP.renderDashboard === 'function') {
+                    window.APP.renderDashboard();
+                }
+            } catch(e) {
+                console.warn("返回失败:", e);
             }
             return;
         }
 
-        if (window.APP?.saveCurrentPageState) {
+        if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
             window.APP.currentPage = 'auditLogs';
             window.APP.saveCurrentPageState();
         }
@@ -388,19 +396,19 @@ const Audit = {
         if (!tbody) return;
 
         if (!logs || logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">' + (Utils.lang === 'id' ? '暂无日志记录' : '暂无日志记录') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">' + (Utils.lang === 'id' ? '暂无日志记录' : '暂无日志记录') + '<\/td><\/tr>';
             return;
         }
 
         tbody.innerHTML = logs.map(log => `
             <tr>
-                <td style="white-space:nowrap;">${Utils.formatDate(log.created_at)}</td>
-                <td>${Utils.escapeHtml(log.user_name || '-')}</td>
-                <td>${Utils.escapeHtml(log.user_role || '-')}</td>
-                <td>${Utils.escapeHtml(log.action)}</td>
+                <td style="white-space:nowrap;">${Utils.formatDate(log.created_at)}<\/td>
+                <td>${Utils.escapeHtml(log.user_name || '-')}<\/td>
+                <td>${Utils.escapeHtml(log.user_role || '-')}<\/td>
+                <td>${Utils.escapeHtml(log.action)}<\/td>
                 <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                    title="${Utils.escapeHtml(log.details || '')}">${Utils.escapeHtml(this._renderLogDetails(log.details))}</td>
-                <td>${Utils.escapeHtml(log.store_name || '-')}</td>
+                    title="${Utils.escapeHtml(log.details || '')}">${Utils.escapeHtml(this._renderLogDetails(log.details))}<\/td>
+                <td>${Utils.escapeHtml(log.store_name || '-')}<\/td>
             </tr>
         `).join('');
     },
