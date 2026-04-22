@@ -57,11 +57,31 @@
     padding: 6px 12px 10px;
     border-bottom: 2px solid var(--border-light);
     background: var(--bg-hover);
+    vertical-align: middle;
+}
+
+/* 操作标签列（"操作"文字）*/
+.action-row td.action-label {
+    white-space: nowrap;
+    font-size: var(--font-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding-right: 8px;
+    width: 1%;  /* 收缩到最小宽度 */
+}
+
+/* 按钮列：flex横排，不换行 */
+.action-row td.action-btns {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
 }
 
 .action-row .btn-small {
-    margin-right: 6px;
-    margin-top: 4px;
+    margin: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* ===============================
@@ -93,26 +113,43 @@
         white-space: nowrap;
     }
 
-    /* 操作行：独占一行，flex横排按钮 */
+    /* 操作行：action-label + action-btns 两列 */
     .action-row td {
-        display: flex !important;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 5px;
         padding: 6px 10px 8px;
         background: #f8fafc;
         border-top: none;
         border-bottom: 2px solid var(--border-medium);
-        white-space: normal;
+        vertical-align: middle;
     }
 
-    /* 操作行按钮紧凑 */
+    /* 操作标签列 */
+    .action-row td.action-label {
+        white-space: nowrap;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        width: 1%;
+        padding-right: 6px;
+    }
+
+    /* 按钮列：横排不换行 */
+    .action-row td.action-btns {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* 操作行按钮 */
     .action-row td .btn-small,
     .action-row .btn-small {
         padding: 5px 10px;
         font-size: 0.7rem;
         margin: 0;
         flex-shrink: 0;
+        white-space: nowrap;
     }
 
     /* 手机端关闭数据行hover（无实际hover） */
