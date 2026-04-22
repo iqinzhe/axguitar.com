@@ -107,7 +107,7 @@ const DashboardExpenses = {
                         <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodText}<\/td>
                         <td data-label="${t('description')}" class="expense-desc">${Utils.escapeHtml(e.description || '-')}<\/td>
                         ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${storeDisplay}<\/td>` : ''}
-                    <\/tr>\n                    <tr class=\"action-row\"><td colspan=\"${isAdmin ? 7 : 6}\">${actionBtns}<\/td><\/tr>`;
+                    <\/tr>\n                    <tr class=\"action-row\"><td class=\"action-label\">${lang === 'id' ? 'Aksi' : '操作'}</td><td colspan=\"${isAdmin ? 6 : 5}\" class=\"action-btns\">${actionBtns}<\/td><\/tr>`;
                 }
             } else {
                 var colSpan = isAdmin ? 7 : 6;

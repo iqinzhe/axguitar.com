@@ -52,11 +52,12 @@ const DashboardOrders = {
                         ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${Utils.escapeHtml(storeName)}<\/td>` : ''}
                     <\/tr>
                     <tr class="action-row">
-                        <td colspan="${isAdmin ? 10 : 9}">
-                            <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ ${t('view')}</button>
+                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}</td>
+                        <td colspan="${isAdmin ? 9 : 8}" class="action-btns">
                             ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                            <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ ${t('view')}</button>
                             <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ ${t('print')}</button>
+                            ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
                         <\/td>
                     <\/tr>`;
                 }
