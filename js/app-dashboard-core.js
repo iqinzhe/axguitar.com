@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.3（修复：移除与子模块冲突的方法，保留路由功能）
+// app-dashboard-core.js - v1.4（移除审计日志功能）
 
 window.APP = window.APP || {};
 
@@ -58,7 +58,6 @@ const DashboardCore = {
         var self = this;
         var handlers = {
             dashboard: async () => await self.renderDashboard(),
-            // 注意：这些方法由子模块提供，通过 window.APP 调用
             orderTable: async () => { if (typeof window.APP.showOrderTable === 'function') await window.APP.showOrderTable(); else await self.renderDashboard(); },
             createOrder: () => { if (typeof window.APP.showCreateOrder === 'function') window.APP.showCreateOrder(); else self.showCreateOrder(); },
             viewOrder: async () => { 
@@ -96,8 +95,7 @@ const DashboardCore = {
                     await self.renderDashboard();
                 }
             },
-            blacklist: async () => { if (typeof window.APP.showBlacklist === 'function') await window.APP.showBlacklist(); else await self.renderDashboard(); },
-            auditLogs: async () => { if (typeof Audit.showAuditLogs === 'function') await Audit.showAuditLogs(); else await self.renderDashboard(); }
+            blacklist: async () => { if (typeof window.APP.showBlacklist === 'function') await window.APP.showBlacklist(); else await self.renderDashboard(); }
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
@@ -121,7 +119,6 @@ const DashboardCore = {
         
         var self = this;
         
-        // 根据页面类型调用对应的模块方法
         switch(page) {
             case 'orderTable':
                 if (typeof window.APP.showOrderTable === 'function') window.APP.showOrderTable();
@@ -194,10 +191,6 @@ const DashboardCore = {
                 if (typeof window.APP.showBlacklist === 'function') window.APP.showBlacklist();
                 else self.renderDashboard();
                 break;
-            case 'auditLogs':
-                if (typeof Audit.showAuditLogs === 'function') Audit.showAuditLogs();
-                else self.renderDashboard();
-                break;
             default:
                 self.renderDashboard();
         }
@@ -214,7 +207,6 @@ const DashboardCore = {
             
             this.saveCurrentPageState();
             
-            // 根据返回的页面类型调用对应方法
             switch(prev.page) {
                 case 'orderTable':
                     if (typeof window.APP.showOrderTable === 'function') window.APP.showOrderTable();
@@ -274,10 +266,6 @@ const DashboardCore = {
                     break;
                 case 'blacklist':
                     if (typeof window.APP.showBlacklist === 'function') window.APP.showBlacklist();
-                    else self.renderDashboard();
-                    break;
-                case 'auditLogs':
-                    if (typeof Audit.showAuditLogs === 'function') Audit.showAuditLogs();
                     else self.renderDashboard();
                     break;
                 default:
@@ -585,7 +573,6 @@ const DashboardCore = {
                 </div>
             `;
             
-            // 安全获取 cashFlow 各字段值
             var cashBalance = cashFlow.cash?.balance ?? 0;
             var bankBalance = cashFlow.bank?.balance ?? 0;
             var cashIncome = cashFlow.cash?.income ?? 0;
@@ -794,24 +781,17 @@ const DashboardCore = {
     }
 };
 
-// 合并到 window.APP（只合并核心方法，不覆盖子模块的同名方法）
+// 合并到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' && 
-        key !== 'showExpenses' &&      // 避免覆盖子模块
-        key !== 'showOrderTable' &&    // 避免覆盖子模块
-        key !== 'showReport' &&        // 避免覆盖子模块
-        key !== 'showUserManagement' && // 避免覆盖子模块
-        key !== 'showCustomers' &&     // 避免覆盖子模块
-        key !== 'showPaymentHistory' && // 避免覆盖子模块
-        key !== 'viewOrder' &&         // 避免覆盖子模块
-        key !== 'showPayment' &&       // 避免覆盖子模块
-        key !== 'showCustomerOrders' && // 避免覆盖子模块
+        key !== 'showExpenses' && key !== 'showOrderTable' && key !== 'showReport' && 
+        key !== 'showUserManagement' && key !== 'showCustomers' && key !== 'showPaymentHistory' && 
+        key !== 'viewOrder' && key !== 'showPayment' && key !== 'showCustomerOrders' && 
         key !== 'showCustomerPaymentHistory') {
         window.APP[key] = DashboardCore[key];
     }
 }
 
-// 确保核心属性也被合并
 window.APP.currentFilter = DashboardCore.currentFilter;
 window.APP.historyStack = DashboardCore.historyStack;
 window.APP.currentPage = DashboardCore.currentPage;
