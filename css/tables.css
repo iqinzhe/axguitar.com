@@ -1,4 +1,4 @@
-/* tables.css - 手机端重构版（方案A） */
+/* tables.css - 手机端双行布局版 v3.0 */
 
 /* === 表格容器 === */
 .table-container {
@@ -36,7 +36,7 @@
 }
 
 /* ===============================
-   ✅ 核心优化：锁定第一列
+   ✅ 核心优化：锁定第一列（PC端）
    =============================== */
 .data-table th:first-child,
 .data-table td:first-child {
@@ -51,11 +51,12 @@
 }
 
 /* ===============================
-   ✅ 操作行（方案A）
+   ✅ 操作行（PC端默认样式）
    =============================== */
 .action-row td {
     padding: 6px 12px 10px;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 2px solid var(--border-light);
+    background: var(--bg-hover);
 }
 
 .action-row .btn-small {
@@ -64,26 +65,59 @@
 }
 
 /* ===============================
-   ✅ 手机端优化（保留表格结构）
+   ✅ 手机端：数据行 + 操作行 双行布局
+   ─────────────────────────────────
+   每条记录渲染为两行：
+   第1行：[ 数据 | 数据 | 数据 ... ]  ← 表格正常横向滚动
+   第2行：[ 操作 | 按钮 | 按钮 ... ]  ← colspan全列，flex横排
    =============================== */
 @media (max-width: 768px) {
 
-    /* 强制横向滚动 */
+    /* 取消强制超宽，允许正常宽度 */
     .data-table {
-        min-width: 900px;
+        min-width: unset;
+        width: 100%;
     }
 
-    /* 字体稍微压缩 */
-    .data-table th,
-    .data-table td {
-        padding: 8px 10px;
-        font-size: 0.75rem;
+    /* 表头字体紧凑 */
+    .data-table th {
+        padding: 7px 9px;
+        font-size: 0.72rem;
+        white-space: nowrap;
     }
 
-    /* 操作按钮更紧凑 */
+    /* 数据行单元格紧凑 */
+    .data-table tbody tr:not(.action-row) td {
+        padding: 7px 9px;
+        font-size: 0.72rem;
+        white-space: nowrap;
+    }
+
+    /* 操作行：独占一行，flex横排按钮 */
+    .action-row td {
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 10px 8px;
+        background: #f8fafc;
+        border-top: none;
+        border-bottom: 2px solid var(--border-medium);
+        white-space: normal;
+    }
+
+    /* 操作行按钮紧凑 */
+    .action-row td .btn-small,
     .action-row .btn-small {
-        padding: 6px 10px;
+        padding: 5px 10px;
         font-size: 0.7rem;
+        margin: 0;
+        flex-shrink: 0;
+    }
+
+    /* 手机端关闭数据行hover（无实际hover） */
+    .data-table tbody tr:not(.action-row):hover {
+        background: inherit;
     }
 }
 
