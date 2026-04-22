@@ -1,4 +1,4 @@
-/* forms.css - 完整优化版 v2.0 */
+/* forms.css - 优化版 v2.0 */
 
 /* === 表单组件 === */
 .form-group {
@@ -67,37 +67,6 @@
     }
 }
 
-/* 转账按钮 */
-.transfer-btn {
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--font-xs);
-    border-radius: var(--radius-md);
-    background: var(--bg-hover);
-    border: 1px solid var(--border-light);
-}
-
-.transfer-btn.cash-to-bank {
-    background: #e0f2fe;
-    color: #0369a1;
-    border-color: #7dd3fc;
-}
-
-.transfer-btn.bank-to-cash {
-    background: #fef3c7;
-    color: #b45309;
-    border-color: #fde68a;
-}
-
-.transfer-btn.store-to-hq {
-    background: #f1f5f9;
-    color: #475569;
-    border-color: #cbd5e1;
-}
-
-.transfer-btn:hover {
-    transform: translateY(-1px);
-}
-
 /* 小按钮 */
 .btn-small {
     padding: 5px 12px;
@@ -136,27 +105,7 @@
     color: var(--primary-dark);
 }
 
-/* 费用相关 */
-.fee-section {
-    border-top: 1px solid var(--border-light);
-    padding-top: 12px;
-    margin-top: 8px;
-}
-
-.fee-select {
-    width: 100%;
-    padding: 8px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-medium);
-}
-
-.fee-display {
-    margin-top: 8px;
-    font-size: 0.85rem;
-    color: var(--primary-dark);
-    font-weight: 500;
-}
-
+/* 地址选项 */
 .address-option {
     display: flex;
     gap: 20px;
@@ -172,6 +121,7 @@
     cursor: pointer;
 }
 
+/* 支付方式选项 */
 .payment-method-options {
     display: flex;
     gap: 20px;
