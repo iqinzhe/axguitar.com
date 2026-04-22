@@ -1,4 +1,4 @@
-// store.js - v1.0
+// store.js - v1.1（修复：门店管理功能完整，与 APP 模块兼容）
 
 const StoreManager = {
     stores: [],
@@ -90,6 +90,11 @@ const StoreManager = {
                         <label>${lang === 'id' ? 'Telepon' : '电话'}</label>
                         <input id="editStorePhone" value="${Utils.escapeHtml(store.phone || '')}">
                     </div>
+                    <div class="form-group">
+                        <label>📱 ${lang === 'id' ? 'Nomor WhatsApp' : 'WhatsApp 号码'}</label>
+                        <input id="editStoreWA" value="${Utils.escapeHtml(store.wa_number || '')}" placeholder="628xxxxxxxxxx">
+                        <small>${lang === 'id' ? 'Contoh: 6281234567890 (tanpa +)' : '示例: 6281234567890 (不带+)'}</small>
+                    </div>
                     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
                         <button onclick="StoreManager._saveEditStore('${storeId}')" class="success">💾 ${t('save')}</button>
                         <button onclick="document.getElementById('editStoreModal').remove()">✖ ${t('cancel')}</button>
@@ -107,6 +112,7 @@ const StoreManager = {
         var name = document.getElementById('editStoreName').value.trim();
         var address = document.getElementById('editStoreAddress').value.trim();
         var phone = document.getElementById('editStorePhone').value.trim();
+        var waNumber = document.getElementById('editStoreWA').value.trim();
         
         if (!name) {
             alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
@@ -114,9 +120,18 @@ const StoreManager = {
         }
         
         try {
+            const updates = { 
+                name: name, 
+                address: address || null, 
+                phone: phone || null 
+            };
+            if (waNumber) {
+                updates.wa_number = waNumber;
+            }
+            
             const { error } = await supabaseClient
                 .from('stores')
-                .update({ name: name, address: address || null, phone: phone || null })
+                .update(updates)
                 .eq('id', storeId);
             
             if (error) throw error;
@@ -281,7 +296,7 @@ const StoreManager = {
 
         let storeRows = '';
         if (this.stores.length === 0) {
-            storeRows = `<td><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            storeRows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
         } else {
             for (const store of this.stores) {
                 storeRows += `<tr>
@@ -302,6 +317,15 @@ const StoreManager = {
             }
         }
 
+        // 安全获取 cashFlow 各字段值
+        var cashBalance = cashFlow.cash?.balance ?? 0;
+        var bankBalance = cashFlow.bank?.balance ?? 0;
+        var cashIncome = cashFlow.cash?.income ?? 0;
+        var cashExpense = cashFlow.cash?.expense ?? 0;
+        var bankIncome = cashFlow.bank?.income ?? 0;
+        var bankExpense = cashFlow.bank?.expense ?? 0;
+        var totalBalance = cashFlow.total?.balance ?? (cashBalance + bankBalance);
+
         document.getElementById("app").innerHTML = `
             <div class="page-header">
                 <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
@@ -316,17 +340,17 @@ const StoreManager = {
                 <div class="cashflow-stats">
                     <div class="cashflow-item">
                         <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                        <div class="value">${Utils.formatCurrency(cashFlow.cash.balance)}</div>
-                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(cashFlow.cash.income)} / -${Utils.formatCurrency(cashFlow.cash.expense)}</div>
+                        <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
+                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(cashIncome)} / -${Utils.formatCurrency(cashExpense)}</div>
                     </div>
                     <div class="cashflow-item">
                         <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                        <div class="value">${Utils.formatCurrency(cashFlow.bank.balance)}</div>
-                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(cashFlow.bank.income)} / -${Utils.formatCurrency(cashFlow.bank.expense)}</div>
+                        <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
+                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(bankIncome)} / -${Utils.formatCurrency(bankExpense)}</div>
                     </div>
                     <div class="cashflow-item">
                         <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
-                        <div class="value">${Utils.formatCurrency(cashFlow.total.balance)}</div>
+                        <div class="value">${Utils.formatCurrency(totalBalance)}</div>
                     </div>
                 </div>
                 <p class="info-note" style="font-size:11px; color:#64748b; margin-top:8px;">
@@ -460,4 +484,3 @@ const StoreManager = {
 };
 
 window.StoreManager = StoreManager;
-
