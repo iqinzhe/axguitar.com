@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v1.0
+// app-dashboard-users.js - v1.1（修复语法错误）
 
 window.APP = window.APP || {};
 
@@ -11,8 +11,8 @@ const DashboardUsers = {
         var t = (key) => Utils.t(key);
         
         try {
-            const users = await SUPABASE.getAllUsers();
-            const stores = await SUPABASE.getAllStores();
+            var users = await SUPABASE.getAllUsers();
+            var stores = await SUPABASE.getAllStores();
             
             var roleMap = {
                 admin: lang === 'id' ? 'Administrator' : '管理员',
@@ -22,43 +22,50 @@ const DashboardUsers = {
             
             var rows = '';
             if (users.length === 0) {
-                rows = `<tr><td colspan="5" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = '<tr><td colspan="5" class="text-center">' + t('no_data') + '<\/td><\/tr>';
             } else {
-                for (var u of users) {
-                    var storeName = u.stores?.name || (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
-                    rows += `<tr>
-                        <td>${Utils.escapeHtml(u.username)}<\/td>
-                        <td>${Utils.escapeHtml(u.name)}<\/td>
-                        <td class="text-center">${roleMap[u.role] || u.role}<\/td>
-                        <td>${Utils.escapeHtml(storeName)}<\/td>
-                        <td class="text-center">${Utils.formatDate(u.created_at)}<\/td>
-                    </tr>
-                    <tr class="action-row">
-                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
-                        <td colspan="5" class="action-btns">
-                            ${AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id ? `
-                                <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')" class="role-select">
-                                    <option value="store_manager" ${u.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
-                                    <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option>
-                                </select>
-                                <button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button>
-                                <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
-                            ` : (u.id === AUTH.user?.id ? `<span style="color:var(--primary);font-weight:600;">👤 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}</span>` : '-')}
-                        <\/td>
-                    </tr>`;
+                for (var i = 0; i < users.length; i++) {
+                    var u = users[i];
+                    var storeName = u.stores ? u.stores.name : (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
+                    rows += '<tr>' +
+                        '<td>' + Utils.escapeHtml(u.username) + '<\/td>' +
+                        '<td>' + Utils.escapeHtml(u.name) + '<\/td>' +
+                        '<td class="text-center">' + (roleMap[u.role] || u.role) + '<\/td>' +
+                        '<td>' + Utils.escapeHtml(storeName) + '<\/td>' +
+                        '<td class="text-center">' + Utils.formatDate(u.created_at) + '<\/td>' +
+                        '<\/tr>' +
+                        '<tr class="action-row">' +
+                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '<\/td>' +
+                        '<td colspan="5" class="action-btns">';
+                    
+                    if (AUTH.user && AUTH.user.role === 'admin' && u.id !== AUTH.user.id) {
+                        rows += '<select id="role_' + u.id + '" onchange="APP._saveUserRole(\'' + u.id + '\')" class="role-select">' +
+                            '<option value="store_manager"' + (u.role === 'store_manager' ? ' selected' : '') + '>' + (lang === 'id' ? 'Manajer Toko' : '店长') + '<\/option>' +
+                            '<option value="staff"' + (u.role === 'staff' ? ' selected' : '') + '>' + (lang === 'id' ? 'Staf' : '员工') + '<\/option>' +
+                            '<\/select>' +
+                            '<button onclick="APP.editUser(\'' + u.id + '\')" class="btn-small">✏️ ' + t('edit') + '<\/button>' +
+                            '<button onclick="APP.deleteUser(\'' + u.id + '\')" class="btn-small danger">🗑️ ' + t('delete') + '<\/button>';
+                    } else if (AUTH.user && u.id === AUTH.user.id) {
+                        rows += '<span style="color:var(--primary);font-weight:600;">👤 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + '<\/span>';
+                    } else {
+                        rows += '-';
+                    }
+                    
+                    rows += '<\/td><\/tr>';
                 }
             }
             
             var storeOptions = '<option value="">' + (lang === 'id' ? 'Pilih toko' : '选择门店') + '<\/option>';
-            for (var s of stores) {
-                storeOptions += `<option value="${s.id}">${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})<\/option>`;
+            for (var j = 0; j < stores.length; j++) {
+                var s = stores[j];
+                storeOptions += '<option value="' + s.id + '">' + Utils.escapeHtml(s.name) + ' (' + Utils.escapeHtml(s.code) + ')<\/option>';
             }
             
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>👥 ${lang === 'id' ? 'Manajemen Operator' : '操作员管理'}</h2>
                     <div class="header-actions">
-                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
                     </div>
                 </div>
@@ -118,7 +125,7 @@ const DashboardUsers = {
                     .user-table .role-select {
                         padding: 4px 8px;
                         border-radius: 6px;
-                        border: 1px solid var(--gray-300);
+                        border: 1px solid #cbd5e1;
                         font-size: 0.75rem;
                         margin-right: 8px;
                     }
@@ -194,7 +201,7 @@ const DashboardUsers = {
 
     _saveUserRole: async function(userId) {
         var lang = Utils.lang;
-        var selectEl = document.getElementById(`role_${userId}`);
+        var selectEl = document.getElementById("role_" + userId);
         if (!selectEl) return;
         var newRole = selectEl.value;
         
