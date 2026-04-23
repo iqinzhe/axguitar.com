@@ -320,6 +320,59 @@ const AUTH = {
         return true;
     },
 
+    // 在 auth.js 的 updateUser 方法之后添加
+
+async resetUserPassword(userId, newPassword) {
+    if (this.user?.role !== 'admin') {
+        throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
+    }
+    
+    if (!newPassword || newPassword.length < 6) {
+        throw new Error(Utils.lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+    }
+    
+    try {
+        // 调用 Supabase Edge Function 来重置密码
+        const { data, error } = await supabaseClient.functions.invoke('reset-user-password', {
+            body: { 
+                userId: userId,
+                newPassword: newPassword,
+                adminId: this.user?.id
+            }
+        });
+        
+        if (error) {
+            // 如果 Edge Function 不可用，尝试通过更新 auth 来重置
+            console.warn('Edge Function 不可用，尝试直接重置:', error.message);
+            
+            // 备用方案：通过 Admin API 重置密码
+            const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
+                userId,
+                { password: newPassword }
+            );
+            
+            if (updateError) {
+                throw updateError;
+            }
+        }
+        
+        if (window.Audit) {
+            await window.Audit.log('password_reset', JSON.stringify({
+                target_user_id: userId,
+                reset_by: this.user?.id,
+                reset_at: new Date().toISOString()
+            }));
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('重置密码失败:', error);
+        throw new Error(Utils.lang === 'id' 
+            ? 'Gagal mereset password. Pastikan Supabase Admin API telah dikonfigurasi.'
+            : '重置密码失败，请确认 Supabase Admin API 已配置。');
+    }
+},
+
     getCurrentUserId()    { return this.user?.id || null; },
     getCurrentUserName()  { return this.user?.name || null; },
     getCurrentUserEmail() { return this.user?.email || this.user?.username || null; }
