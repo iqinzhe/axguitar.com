@@ -1,4 +1,4 @@
-// storage.js - v1.5（修复：renderBackupUI 翻译键问题）
+// storage.js - v1.6（完全不依赖 Utils.t）
 
 const Storage = {
 
@@ -174,7 +174,6 @@ const Storage = {
             expenses: 0, payments: 0, cashFlows: 0, blacklist: 0
         };
         
-        // 恢复门店
         if (backupData.stores && backupData.stores.length > 0) {
             const existingStores = await SUPABASE.getAllStores();
             const existingIds = new Set(existingStores.map(s => s.id));
@@ -208,7 +207,6 @@ const Storage = {
             }
         }
         
-        // 恢复客户
         if (backupData.customers && backupData.customers.length > 0) {
             for (const customer of backupData.customers) {
                 const { data: existing } = await supabaseClient
@@ -250,7 +248,6 @@ const Storage = {
             }
         }
         
-        // 恢复订单
         if (backupData.orders && backupData.orders.length > 0) {
             for (const order of backupData.orders) {
                 const { data: existing } = await supabaseClient
@@ -343,7 +340,6 @@ const Storage = {
             }
         }
         
-        // 恢复付款记录
         if (backupData.payments && backupData.payments.length > 0) {
             for (const payment of backupData.payments) {
                 const { data: order } = await supabaseClient
@@ -381,7 +377,6 @@ const Storage = {
             }
         }
         
-        // 恢复支出
         if (backupData.expenses && backupData.expenses.length > 0) {
             for (const expense of backupData.expenses) {
                 const { error } = await supabaseClient
@@ -400,7 +395,6 @@ const Storage = {
             }
         }
         
-        // 恢复资金流水
         if (backupData.cash_flows && backupData.cash_flows.length > 0) {
             for (const flow of backupData.cash_flows) {
                 const { error } = await supabaseClient
@@ -423,7 +417,6 @@ const Storage = {
             }
         }
         
-        // 恢复黑名单
         if (backupData.blacklist && backupData.blacklist.length > 0) {
             for (const blacklist of backupData.blacklist) {
                 const { error } = await supabaseClient
@@ -610,7 +603,6 @@ const Storage = {
     
     renderBackupUI: async function() {
         const lang = Utils.lang;
-        const t = Utils.t;
         const profile = await SUPABASE.getCurrentProfile();
         const isAdmin = profile?.role === 'admin';
         
@@ -633,55 +625,70 @@ const Storage = {
             return;
         }
         
-        // 修复：直接使用 lang 判断，避免 t 函数缺少键
         var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
+        var backText = lang === 'id' ? 'Kembali' : '返回';
+        var exportText = lang === 'id' ? 'Ekspor Data (Cadangan)' : '导出数据（备份）';
+        var exportDesc = lang === 'id' 
+            ? 'Ekspor semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
+            : '导出所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
+        var backupBtnText = lang === 'id' ? 'Cadangkan Sekarang' : '立即备份';
+        var importText = lang === 'id' ? 'Impor Data (Pemulihan)' : '导入数据（恢复）';
+        var importWarning = lang === 'id' 
+            ? 'Memulihkan data akan menimpa data yang ada! Pastikan Anda telah mencadangkan data saat ini.'
+            : '恢复数据将覆盖现有数据！请确保已备份当前数据。';
+        var restoreBtnText = lang === 'id' ? 'Pulihkan Data' : '恢复数据';
+        var selectiveText = lang === 'id' ? 'Pemulihan Selektif' : '选择性恢复';
+        var selectiveDesc = lang === 'id' 
+            ? 'Pulihkan hanya jenis data tertentu, tidak mempengaruhi data lainnya.'
+            : '仅恢复特定类型的数据，不影响其他数据。';
+        var restoreOrdersText = lang === 'id' ? 'Pulihkan Pesanan' : '恢复订单';
+        var restoreCustomersText = lang === 'id' ? 'Pulihkan Nasabah' : '恢复客户';
+        var exportCsvText = lang === 'id' ? 'Ekspor CSV' : '导出 CSV';
+        var exportCsvDesc = lang === 'id' 
+            ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
+            : '导出为 CSV 格式，可在 Excel 中打开。';
+        var exportOrdersText = lang === 'id' ? 'Ekspor Pesanan' : '导出订单';
+        var exportPaymentsText = lang === 'id' ? 'Ekspor Pembayaran' : '导出缴费';
+        var exportCustomersText = lang === 'id' ? 'Ekspor Nasabah' : '导出客户';
         
         document.getElementById("app").innerHTML = `
             <div class="page-header">
                 <h2>💾 ${pageTitle}</h2>
                 <div class="header-actions">
-                    <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    <button onclick="APP.goBack()" class="btn-back">↩️ ${backText}</button>
                 </div>
             </div>
             
             <div class="card">
-                <h3>📤 ${lang === 'id' ? 'Ekspor Data (Cadangan)' : '导出数据（备份）'}</h3>
-                <p>${lang === 'id' 
-                    ? 'Ekspor semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
-                    : '导出所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。'}</p>
-                <button onclick="Storage.backup()" class="success">💾 ${lang === 'id' ? 'Cadangkan Sekarang' : '立即备份'}</button>
+                <h3>📤 ${exportText}</h3>
+                <p>${exportDesc}</p>
+                <button onclick="Storage.backup()" class="success">💾 ${backupBtnText}</button>
             </div>
             
             <div class="card">
-                <h3>📥 ${lang === 'id' ? 'Impor Data (Pemulihan)' : '导入数据（恢复）'}</h3>
-                <p class="warning-text">⚠️ ${lang === 'id' 
-                    ? 'Memulihkan data akan menimpa data yang ada! Pastikan Anda telah mencadangkan data saat ini.'
-                    : '恢复数据将覆盖现有数据！请确保已备份当前数据。'}</p>
+                <h3>📥 ${importText}</h3>
+                <p class="warning-text">⚠️ ${importWarning}</p>
                 <input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px;">
-                <button onclick="Storage.restoreFromFile()" class="warning">🔄 ${lang === 'id' ? 'Pulihkan Data' : '恢复数据'}</button>
+                <button onclick="Storage.restoreFromFile()" class="warning">🔄 ${restoreBtnText}</button>
             </div>
             
             <div class="card">
-                <h3>🎯 ${lang === 'id' ? 'Pemulihan Selektif' : '选择性恢复'}</h3>
-                <p>${lang === 'id' 
-                    ? 'Pulihkan hanya jenis data tertentu, tidak mempengaruhi data lainnya.'
-                    : '仅恢复特定类型的数据，不影响其他数据。'}</p>
+                <h3>🎯 ${selectiveText}</h3>
+                <p>${selectiveDesc}</p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
                     <input type="file" id="selectiveFile" accept=".json" style="margin-bottom:10px; width:100%;">
-                    <button onclick="Storage.restoreOrdersOnlyFromFile()" class="btn-small">📋 ${lang === 'id' ? 'Pulihkan Pesanan' : '恢复订单'}</button>
-                    <button onclick="Storage.restoreCustomersOnlyFromFile()" class="btn-small">👥 ${lang === 'id' ? 'Pulihkan Nasabah' : '恢复客户'}</button>
+                    <button onclick="Storage.restoreOrdersOnlyFromFile()" class="btn-small">📋 ${restoreOrdersText}</button>
+                    <button onclick="Storage.restoreCustomersOnlyFromFile()" class="btn-small">👥 ${restoreCustomersText}</button>
                 </div>
             </div>
             
             <div class="card">
-                <h3>📊 ${lang === 'id' ? 'Ekspor CSV' : '导出 CSV'}</h3>
-                <p>${lang === 'id' 
-                    ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
-                    : '导出为 CSV 格式，可在 Excel 中打开。'}</p>
+                <h3>📊 ${exportCsvText}</h3>
+                <p>${exportCsvDesc}</p>
                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <button onclick="Storage.exportOrdersToCSV()" class="btn-small">📋 ${lang === 'id' ? 'Ekspor Pesanan' : '导出订单'}</button>
-                    <button onclick="Storage.exportPaymentsToCSV()" class="btn-small">💰 ${lang === 'id' ? 'Ekspor Pembayaran' : '导出缴费'}</button>
-                    <button onclick="Storage.exportCustomersToCSV()" class="btn-small">👥 ${lang === 'id' ? 'Ekspor Nasabah' : '导出客户'}</button>
+                    <button onclick="Storage.exportOrdersToCSV()" class="btn-small">📋 ${exportOrdersText}</button>
+                    <button onclick="Storage.exportPaymentsToCSV()" class="btn-small">💰 ${exportPaymentsText}</button>
+                    <button onclick="Storage.exportCustomersToCSV()" class="btn-small">👥 ${exportCustomersText}</button>
                 </div>
             </div>
             
