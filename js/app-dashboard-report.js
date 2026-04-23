@@ -504,6 +504,7 @@ _addReportTableStyles: function() {
         }
     `;
     document.head.appendChild(style);
+    }
 },
 
 for (var key in DashboardReport) {
