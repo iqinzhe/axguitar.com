@@ -280,23 +280,86 @@ if (order.repayment_type !== 'fixed') {
                     </div>
                 </div>
                 
-              <div class="card summary-card">
-    <div class="summary-grid">
-        <div class="summary-item"><span class="label">${t('customer_name')}:</span><span class="value">${Utils.escapeHtml(order.customer_name)}</span></div>
-        <div class="summary-item"><span class="label">ID:</span><span class="value order-id">${Utils.escapeHtml(order.order_id)}</span></div>
-        <div class="summary-item"><span class="label">${t('loan_amount')}:</span><span class="value">${Utils.formatCurrency(loanAmount)}</span></div>
-        <div class="summary-item"><span class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</span><span class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}</span></div>
-        <div class="summary-item"><span class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}:</span><span class="value">${Utils.formatCurrency(currentMonthlyInterest)}</span></div>
-        <div class="summary-item"><span class="label">${t('payment_due_date')}:</span><span class="value">${nextDueDate}</span></div>
-        <div class="summary-item"><span class="label">${t('repayment_type')}:</span><span class="value">${order.repayment_type === 'fixed' ? `📅 ${t('fixed_repayment')}` : `💰 ${t('flexible_repayment')}`}${order.repayment_type === 'fixed' ? ` (${order.repayment_term} ${lang === 'id' ? 'bulan' : '个月'})` : ''}</span></div>
-        <div class="summary-item"><span class="label">💎 ${t('collateral_name')}:</span><span class="value">${Utils.escapeHtml(order.collateral_name || '-')}</span></div>
-        <div class="summary-item"><span class="label">💰 ${t('service_fee')}:</span><span class="value">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)</span></div>
-        <div class="summary-item"><span class="label">📋 ${t('admin_fee')}:</span><span class="value">${Utils.formatCurrency(order.admin_fee)}</span></div>
-        <div class="summary-item"><span class="label">📈 ${t('agreed_rate')}:</span><span class="value">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%</span></div>
-        <div class="summary-item"><span class="label">✅ ${t('admin_fee')}:</span><span class="value success-text">${adminFeePaidInfo}</span></div>
-        <div class="summary-item"><span class="label">✅ ${t('service_fee')}:</span><span class="value success-text">${serviceFeePaidInfo}</span></div>
+  <div class="card summary-card">
+
+    <!-- 客户信息 -->
+    <div class="summary-section">
+        <h4>👤 ${lang === 'id' ? 'Informasi Nasabah' : '客户信息'}</h4>
+        <div class="summary-grid-table">
+            <div class="label">${t('customer_name')}</div>
+            <div class="value">${Utils.escapeHtml(order.customer_name)}</div>
+
+            <div class="label">ID</div>
+            <div class="value order-id">${Utils.escapeHtml(order.order_id)}</div>
+
+            <div class="label">${t('repayment_type')}</div>
+            <div class="value">
+                ${order.repayment_type === 'fixed' 
+                    ? `📅 ${t('fixed_repayment')} (${order.repayment_term} ${lang === 'id' ? 'bulan' : '个月'})` 
+                    : `💰 ${t('flexible_repayment')}`}
+            </div>
+
+            <div class="label">${t('payment_due_date')}</div>
+            <div class="value">${nextDueDate}</div>
+        </div>
     </div>
-</div> 
+
+    <!-- 贷款信息 -->
+    <div class="summary-section">
+        <h4>💰 ${lang === 'id' ? 'Informasi Pinjaman' : '贷款信息'}</h4>
+        <div class="summary-grid-table">
+            <div class="label">${t('loan_amount')}</div>
+            <div class="value">${Utils.formatCurrency(loanAmount)}</div>
+
+            <div class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</div>
+            <div class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">
+                ${Utils.formatCurrency(remainingPrincipal)}
+            </div>
+
+            <div class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</div>
+            <div class="value">${Utils.formatCurrency(currentMonthlyInterest)}</div>
+        </div>
+    </div>
+
+    <!-- 费用信息 -->
+    <div class="summary-section">
+        <h4>📊 ${lang === 'id' ? 'Biaya' : '费用信息'}</h4>
+        <div class="summary-grid-table">
+            <div class="label">💰 ${t('service_fee')}</div>
+            <div class="value">
+                ${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)
+            </div>
+
+            <div class="label">📋 ${t('admin_fee')}</div>
+            <div class="value">${Utils.formatCurrency(order.admin_fee)}</div>
+
+            <div class="label">📈 ${t('agreed_rate')}</div>
+            <div class="value">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%</div>
+        </div>
+    </div>
+
+    <!-- 支付状态 -->
+    <div class="summary-section">
+        <h4>✅ ${lang === 'id' ? 'Status Pembayaran' : '支付状态'}</h4>
+        <div class="summary-grid-table">
+            <div class="label">${t('admin_fee')}</div>
+            <div class="value success-text">${adminFeePaidInfo}</div>
+
+            <div class="label">${t('service_fee')}</div>
+            <div class="value success-text">${serviceFeePaidInfo}</div>
+        </div>
+    </div>
+
+    <!-- 抵押物 -->
+    <div class="summary-section">
+        <h4>💎 ${lang === 'id' ? 'Jaminan' : '质押物'}</h4>
+        <div class="summary-grid-table">
+            <div class="label">${t('collateral_name')}</div>
+            <div class="value">${Utils.escapeHtml(order.collateral_name || '-')}</div>
+        </div>
+    </div>
+
+</div>
                 
                 ${fixedRepaymentHtml}
                 ${flexibleRepaymentHtml}
