@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.5（业务报表改为异常状况）
+// app-dashboard-core.js - v1.6（性能优化：合并仪表盘查询 + 并行化）
 
 window.APP = window.APP || {};
 
@@ -454,124 +454,194 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    // ==================== 仪表盘 ====================
+    // ==================== 仪表盘（优化版：并行查询 + 复用数据） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
         this.saveCurrentPageState();
+        
         try {
-            var report = await Order.getReport();
-            var cashFlow = await SUPABASE.getCashFlowSummary();
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
-            var profile = await SUPABASE.getCurrentProfile();
-            var isAdmin = profile?.role === 'admin';
-            var storeName = AUTH.getCurrentStoreName();
             
-            var needRemindOrders = await SUPABASE.getOrdersNeedReminder();
-            var hasReminders = needRemindOrders.length > 0;
-            var hasSentToday = await window.APP.hasSentRemindersToday ? await window.APP.hasSentRemindersToday() : false;
+            // ========== 优化：并行获取所有基础数据 ==========
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
+            const storeId = profile?.store_id;
             
-            var btnDisabled = hasSentToday;
-            var btnHighlight = hasReminders && !hasSentToday;
+            // 构建并行查询列表
+            const queries = [
+                SUPABASE.getOrders(),                     // Q1: 所有订单
+                SUPABASE.getCashFlowRecords(),            // Q2: 所有资金流水
+                SUPABASE.getOrdersNeedReminder(),         // Q3: 需要提醒的订单
+                SUPABASE.getAllStores()                   // Q4: 所有门店
+            ];
             
-            var totalExpenses = 0;
-            try {
-                let expenseQuery = supabaseClient.from('expenses').select('amount');
-                if (!isAdmin && profile?.store_id) {
-                    expenseQuery = expenseQuery.eq('store_id', profile.store_id);
+            // 管理员查询所有支出，店长只查自己门店
+            if (isAdmin) {
+                queries.push(
+                    supabaseClient.from('expenses').select('amount')
+                );
+            } else if (storeId) {
+                queries.push(
+                    supabaseClient.from('expenses').select('amount').eq('store_id', storeId)
+                );
+            } else {
+                queries.push(Promise.resolve({ data: [] }));
+            }
+            
+            // 非管理员时查询特定门店的现金流
+            if (!isAdmin && storeId) {
+                queries.push(
+                    supabaseClient.from('cash_flow_records')
+                        .select('direction, amount, source_target, flow_type')
+                        .eq('store_id', storeId)
+                        .eq('is_voided', false)
+                );
+            } else {
+                queries.push(Promise.resolve(null));
+            }
+            
+            // 并行执行所有查询
+            const [
+                allOrders,
+                allCashFlows,
+                needRemindOrders,
+                stores,
+                expensesResult,
+                storeSpecificCashFlows
+            ] = await Promise.all(queries);
+            
+            // ========== 基于已有数据计算，避免重复查询 ==========
+            
+            // 计算报表（复用 allOrders）
+            var report = this._calculateReport(allOrders);
+            
+            // 构建门店映射
+            var storeMap = {};
+            for (var s of stores) {
+                storeMap[s.id] = s.name;
+            }
+            
+            // 计算本月新增订单数
+            var today = new Date();
+            var currentMonth = today.getMonth();
+            var currentYear = today.getFullYear();
+            var thisMonthOrderCount = 0;
+            for (var o of allOrders) {
+                var orderDate = new Date(o.created_at);
+                if (orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear) {
+                    thisMonthOrderCount++;
                 }
-                const { data: expenses } = await expenseQuery;
-                totalExpenses = expenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
-            } catch(e) { console.warn("获取支出汇总失败:", e); }
+            }
             
-            const allOrders = await SUPABASE.getOrders();
-            const today = new Date();
-            const currentMonth = today.getMonth();
-            const currentYear = today.getFullYear();
+            // 计算总支出
+            var totalExpenses = 0;
+            var expenses = expensesResult?.data || expensesResult || [];
+            if (Array.isArray(expenses)) {
+                for (var e of expenses) {
+                    totalExpenses += (e.amount || 0);
+                }
+            }
             
-            const thisMonthOrders = allOrders.filter(order => {
-                const orderDate = new Date(order.created_at);
-                return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-            });
-            const thisMonthOrderCount = thisMonthOrders.length;
+            // 计算资金流水摘要（复用 allCashFlows）
+            var cashFlow = this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId, storeSpecificCashFlows);
             
-            let totalInflowExcludingPrincipal = 0;
-            let totalOutflow = 0;
-            
-            const allCashFlows = await SUPABASE.getCashFlowRecords();
-            for (const flow of allCashFlows || []) {
-                const amount = flow.amount || 0;
-                if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
+            // 计算非本金流入和总流出
+            var totalInflowExcludingPrincipal = 0;
+            var totalOutflow = 0;
+            var flowsToAnalyze = (!isAdmin && storeSpecificCashFlows) ? storeSpecificCashFlows : allCashFlows;
+            for (var f of (flowsToAnalyze || [])) {
+                var amount = f.amount || 0;
+                if (f.direction === 'inflow' && f.flow_type !== 'principal') {
                     totalInflowExcludingPrincipal += amount;
-                } else if (flow.direction === 'outflow') {
+                } else if (f.direction === 'outflow') {
                     totalOutflow += amount;
                 }
             }
-            const deficit = totalOutflow - totalInflowExcludingPrincipal;
+            var deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            const twoYearsAgo = new Date();
+            // 清理过期订单（超过2年的已完成订单）
+            var twoYearsAgo = new Date();
             twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
             
-            const completedOrders = allOrders.filter(order => order.status === 'completed');
-            const expiredOrders = completedOrders.filter(order => {
-                const completedDate = order.completed_at || order.updated_at;
-                if (!completedDate) return false;
-                return new Date(completedDate) < twoYearsAgo;
-            });
-            
-            if (expiredOrders.length > 0) {
-                console.log(`检测到 ${expiredOrders.length} 个已结清超过2年的订单，正在自动清理...`);
-                for (const expiredOrder of expiredOrders) {
-                    try {
-                        await supabaseClient.from('cash_flow_records').delete().eq('order_id', expiredOrder.id);
-                        await supabaseClient.from('payment_history').delete().eq('order_id', expiredOrder.id);
-                        await supabaseClient.from('orders').delete().eq('id', expiredOrder.id);
-                        console.log(`已清理过期订单: ${expiredOrder.order_id}`);
-                    } catch (cleanErr) {
-                        console.warn(`清理订单 ${expiredOrder.order_id} 失败:`, cleanErr);
+            var expiredOrders = [];
+            for (var o of allOrders) {
+                if (o.status === 'completed') {
+                    var completedDate = o.completed_at || o.updated_at;
+                    if (completedDate && new Date(completedDate) < twoYearsAgo) {
+                        expiredOrders.push(o);
                     }
                 }
             }
             
-            const updatedOrders = await SUPABASE.getOrders();
-            const activeOrdersCount = updatedOrders.filter(o => o.status === 'active').length;
-            const completedOrdersCount = updatedOrders.filter(o => o.status === 'completed').length;
+            if (expiredOrders.length > 0) {
+                console.log('检测到 ' + expiredOrders.length + ' 个已结清超过2年的订单，正在自动清理...');
+                for (var eo of expiredOrders) {
+                    try {
+                        await supabaseClient.from('cash_flow_records').delete().eq('order_id', eo.id);
+                        await supabaseClient.from('payment_history').delete().eq('order_id', eo.id);
+                        await supabaseClient.from('orders').delete().eq('id', eo.id);
+                        console.log('已清理过期订单: ' + eo.order_id);
+                    } catch (cleanErr) {
+                        console.warn('清理订单 ' + eo.order_id + ' 失败:', cleanErr);
+                    }
+                }
+                // 重新获取订单列表
+                var updatedOrders = await SUPABASE.getOrders();
+            } else {
+                var updatedOrders = allOrders;
+            }
             
+            // 计算活跃和已完成订单数
+            var activeOrdersCount = 0;
+            var completedOrdersCount = 0;
+            for (var o of updatedOrders) {
+                if (o.status === 'active') activeOrdersCount++;
+                else if (o.status === 'completed') completedOrdersCount++;
+            }
+            var expiredCount = expiredOrders.length;
+            
+            // ========== 渲染仪表盘 ==========
+            var storeName = AUTH.getCurrentStoreName();
+            var hasReminders = needRemindOrders.length > 0;
+            var hasSentToday = await (window.APP.hasSentRemindersToday ? window.APP.hasSentRemindersToday() : Promise.resolve(false));
+            var btnDisabled = hasSentToday;
+            var btnHighlight = hasReminders && !hasSentToday;
+            
+            // 卡片数据
             var cards = [
-                { label: `${lang === 'id' ? 'Bulan ini' : '本月新增'}/${t('total_orders')}`, value: `${thisMonthOrderCount}/${report.total_orders}`, type: 'text' },
+                { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, type: 'text' },
                 { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
                 { label: t('active'), value: activeOrdersCount, type: 'number' },
-                { label: `${lang === 'id' ? 'Lunas' : '已结清'} / ${lang === 'id' ? 'Kedaluwarsa' : '已失效'}`, value: `${completedOrdersCount} / ${expiredOrders.length}`, type: 'text' },
+                { label: (lang === 'id' ? 'Lunas' : '已结清') + ' / ' + (lang === 'id' ? 'Kedaluwarsa' : '已失效'), value: completedOrdersCount + ' / ' + expiredCount, type: 'text' },
                 { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
                 { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
                 { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' }
             ];
             
-            var cardsHtml = cards.map(card => `
-                <div class="stat-card ${card.class || ''}">
-                    <div class="stat-value ${card.class || ''}">${card.value}</div>
-                    <div class="stat-label">${card.label}</div>
-                </div>
-            `).join('');
+            var cardsHtml = cards.map(function(card) {
+                return '<div class="stat-card ' + (card.class || '') + '">' +
+                    '<div class="stat-value ' + (card.class || '') + '">' + card.value + '</div>' +
+                    '<div class="stat-label">' + card.label + '</div>' +
+                '</div>';
+            }).join('');
             
             var cardsTitleHtml = '';
             if (isAdmin) {
-                cardsTitleHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${t('financial_indicators')} (${lang === 'id' ? 'Semua Toko' : '全部门店'})</h3>
-                </div>`;
+                cardsTitleHtml = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">' +
+                    '<h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ' + t('financial_indicators') + ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')</h3>' +
+                '</div>';
             } else {
-                cardsTitleHtml = `<div style="margin-bottom:12px;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ${t('financial_indicators')}</h3>
-                </div>`;
+                cardsTitleHtml = '<div style="margin-bottom:12px;">' +
+                    '<h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ' + t('financial_indicators') + '</h3>' +
+                '</div>';
             }
             
-            var toolbarTitleHtml = `
-                <div style="margin: 20px 0 12px 0;">
-                    <h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ${t('operation')}</h3>
-                </div>
-            `;
+            var toolbarTitleHtml = '<div style="margin: 20px 0 12px 0;">' +
+                '<h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ' + t('operation') + '</h3>' +
+            '</div>';
             
             var cashBalance = cashFlow.cash?.balance ?? 0;
             var bankBalance = cashFlow.bank?.balance ?? 0;
@@ -582,151 +652,204 @@ const DashboardCore = {
             
             var cashFlowHtml = '';
             if (isAdmin) {
-                cashFlowHtml = `
-                <div class="cashflow-summary">
-                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')} (${lang === 'id' ? 'Semua Toko' : '全部门店'})</h3>
-                    <div class="cashflow-stats">
-                        <div class="cashflow-item">
-                            <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                            <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
-                            <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(cashIncome)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(cashExpense)}
-                            </div>
-                        </div>
-                        
-                        <div class="cashflow-item">
-                            <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                            <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
-                            <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(bankIncome)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(bankExpense)}
-                            </div>
-                        </div>
-                        
-                        <div class="cashflow-item internal-transfer-item">
-                            <div class="label">🔄 ${t('internal_transfer')}</div>
-                            <div class="transfer-buttons">
-                                <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">
-                                    🏦→🏧 ${t('cash_to_bank')}
-                                </button>
-                                <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">
-                                    🏧→🏦 ${t('bank_to_cash')}
-                                </button>
-                                <button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq">
-                                    🏢 ${t('submit_to_hq')}
-                                </button>
-                            </div>
-                            <div class="cashflow-detail" style="margin-top:8px;">
-                                💡 ${lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
+                cashFlowHtml = '' +
+                '<div class="cashflow-summary">' +
+                    '<h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ' + t('fund_management') + ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')</h3>' +
+                    '<div class="cashflow-stats">' +
+                        '<div class="cashflow-item">' +
+                            '<div class="label">🏦 ' + (lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)') + '</div>' +
+                            '<div class="value ' + (cashBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(cashBalance) + '</div>' +
+                            '<div class="cashflow-detail">' +
+                                t('inflow') + ': +' + Utils.formatCurrency(cashIncome) + '<br>' +
+                                t('outflow') + ': -' + Utils.formatCurrency(cashExpense) +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="cashflow-item">' +
+                            '<div class="label">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行 BNI') + '</div>' +
+                            '<div class="value ' + (bankBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(bankBalance) + '</div>' +
+                            '<div class="cashflow-detail">' +
+                                t('inflow') + ': +' + Utils.formatCurrency(bankIncome) + '<br>' +
+                                t('outflow') + ': -' + Utils.formatCurrency(bankExpense) +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="cashflow-item internal-transfer-item">' +
+                            '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
+                            '<div class="transfer-buttons">' +
+                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦→🏧 ' + t('cash_to_bank') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧→🏦 ' + t('bank_to_cash') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'store_to_hq\')" class="transfer-btn store-to-hq">🏢 ' + t('submit_to_hq') + '</button>' +
+                            '</div>' +
+                            '<div class="cashflow-detail" style="margin-top:8px;">' +
+                                '💡 ' + (lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取') +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
             } else {
-                cashFlowHtml = `
-                <div class="cashflow-summary">
-                    <h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ${t('fund_management')}</h3>
-                    <div class="cashflow-stats">
-                        <div class="cashflow-item">
-                            <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                            <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
-                            <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(cashIncome)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(cashExpense)}
-                            </div>
-                        </div>
-                        
-                        <div class="cashflow-item">
-                            <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                            <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
-                            <div class="cashflow-detail">
-                                ${t('inflow')}: +${Utils.formatCurrency(bankIncome)}<br>
-                                ${t('outflow')}: -${Utils.formatCurrency(bankExpense)}
-                            </div>
-                        </div>
-                        
-                        <div class="cashflow-item internal-transfer-item">
-                            <div class="label">🔄 ${t('internal_transfer')}</div>
-                            <div class="transfer-buttons">
-                                <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">
-                                    🏦→🏧 ${t('cash_to_bank')}
-                                </button>
-                                <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">
-                                    🏧→🏦 ${t('bank_to_cash')}
-                                </button>
-                            </div>
-                            <div class="cashflow-detail" style="margin-top:8px;">
-                                💡 ${lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取'}
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
+                cashFlowHtml = '' +
+                '<div class="cashflow-summary">' +
+                    '<h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ' + t('fund_management') + '</h3>' +
+                    '<div class="cashflow-stats">' +
+                        '<div class="cashflow-item">' +
+                            '<div class="label">🏦 ' + (lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)') + '</div>' +
+                            '<div class="value ' + (cashBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(cashBalance) + '</div>' +
+                            '<div class="cashflow-detail">' +
+                                t('inflow') + ': +' + Utils.formatCurrency(cashIncome) + '<br>' +
+                                t('outflow') + ': -' + Utils.formatCurrency(cashExpense) +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="cashflow-item">' +
+                            '<div class="label">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行 BNI') + '</div>' +
+                            '<div class="value ' + (bankBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(bankBalance) + '</div>' +
+                            '<div class="cashflow-detail">' +
+                                t('inflow') + ': +' + Utils.formatCurrency(bankIncome) + '<br>' +
+                                t('outflow') + ': -' + Utils.formatCurrency(bankExpense) +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="cashflow-item internal-transfer-item">' +
+                            '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
+                            '<div class="transfer-buttons">' +
+                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦→🏧 ' + t('cash_to_bank') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧→🏦 ' + t('bank_to_cash') + '</button>' +
+                            '</div>' +
+                            '<div class="cashflow-detail" style="margin-top:8px;">' +
+                                '💡 ' + (lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取') +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
             }
             
             var toolbarHtml = '';
             if (isAdmin) {
-                toolbarHtml = `
-                <div class="toolbar admin-grid">
-                    <button onclick="APP.navigateTo('customers')">👥 ${t('customers')}</button>
-                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                    <button onclick="APP.navigateTo('paymentHistory')">💰 ${t('payment_history')}</button>
-                    <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                    <button onclick="APP.navigateTo('backupRestore')">💾 ${t('backup_restore')}</button>
-                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        🔔 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
-                    </button>
-                    <button onclick="APP.navigateTo('anomaly')">⚠️ ${lang === 'id' ? 'Situasi Abnormal' : '异常状况'}</button>
-                    <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
-                    <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
-                    <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
-                </div>`;
+                toolbarHtml = '' +
+                '<div class="toolbar admin-grid">' +
+                    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'paymentHistory\')">💰 ' + t('payment_history') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'backupRestore\')">💾 ' + t('backup_restore') + '</button>' +
+                    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'userManagement\')">👤 ' + t('user_management') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'storeManagement\')">🏪 ' + t('store_management') + '</button>' +
+                    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
+                '</div>';
             } else {
-                toolbarHtml = `
-                <div class="toolbar store-grid">
-                    <button onclick="APP.navigateTo('customers')">👥 ${t('customers')}</button>
-                    <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                    <button onclick="APP.showCashFlowModal()">💰 ${t('payment_history')}</button>
-                    <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                    <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
-                        🔔 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
-                    </button>
-                    <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
-                </div>`;
+                toolbarHtml = '' +
+                '<div class="toolbar store-grid">' +
+                    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
+                    '<button onclick="APP.showCashFlowModal()">💰 ' + t('payment_history') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
+                    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
+                    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
+                '</div>';
             }
             
-            var bottomHtml = `
-<div class="card dashboard-footer-card">
-    <h3>${t('current_user')}: ${Utils.escapeHtml(AUTH.user.name)} (${AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')})</h3>
-    <p>🏪 ${t('store')}: ${Utils.escapeHtml(storeName)}${isAdmin ? ` (${lang === 'id' ? 'Kantor Pusat - Seluruh Toko' : '总部 - 全部门店'})` : ''}</p>
-    <p>📌 ${lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)'}</p>
-    <p>🔒 ${lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改'}</p>
-</div>`;
+            var bottomHtml = '' +
+'<div class="card dashboard-footer-card">' +
+    '<h3>' + t('current_user') + ': ' + Utils.escapeHtml(AUTH.user.name) + ' (' + (AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')) + ')</h3>' +
+    '<p>🏪 ' + t('store') + ': ' + Utils.escapeHtml(storeName) + (isAdmin ? ' (' + (lang === 'id' ? 'Kantor Pusat - Seluruh Toko' : '总部 - 全部门店') + ')' : '') + '</p>' +
+    '<p>📌 ' + (lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)') + '</p>' +
+    '<p>🔒 ' + (lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改') + '</p>' +
+'</div>';
             
-            document.getElementById("app").innerHTML = `
-                <div class="page-header">
-                    <h1><img src="icons/pagehead-logo.png" alt="JF!" class="logo-img"> JF! by Gadai</h1>
-                    <div class="header-actions">
-                        ${this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>` : ''}
-                    </div>
-                </div>
-                
-                ${cashFlowHtml}
-                
-                ${cardsTitleHtml}
-                <div class="stats-grid-optimized">
-                    ${cardsHtml}
-                </div>
-                
-                ${toolbarTitleHtml}
-                ${toolbarHtml}
-                
-                ${bottomHtml}
-            `;
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header">' +
+                    '<h1><img src="icons/pagehead-logo.png" alt="JF!" class="logo-img"> JF! by Gadai</h1>' +
+                    '<div class="header-actions">' +
+                        (this.historyStack.length > 0 ? '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' : '') +
+                    '</div>' +
+                '</div>' +
+                cashFlowHtml +
+                cardsTitleHtml +
+                '<div class="stats-grid-optimized">' + cardsHtml + '</div>' +
+                toolbarTitleHtml +
+                toolbarHtml +
+                bottomHtml;
+            
         } catch (err) {
             console.error("renderDashboard error:", err);
-            document.getElementById("app").innerHTML = `<div class="card"><p>⚠️ ${err.message}</p><button onclick="APP.logout()">💾 ${Utils.t('save_exit')}</button></div>`;
+            document.getElementById("app").innerHTML = '<div class="card"><p>⚠️ ' + err.message + '</p><button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button></div>';
         }
+    },
+
+    // ==================== 新增辅助方法 ====================
+    
+    // 基于订单数组计算报表（替代 Order.getReport()）
+    _calculateReport: function(orders) {
+        var totalLoanAmount = 0;
+        var totalAdminFees = 0;
+        var totalServiceFees = 0;
+        var totalInterest = 0;
+        var totalPrincipal = 0;
+        var activeCount = 0;
+        var completedCount = 0;
+        var expectedMonthlyInterest = 0;
+        
+        for (var i = 0; i < orders.length; i++) {
+            var o = orders[i];
+            totalLoanAmount += (o.loan_amount || 0);
+            
+            if (o.admin_fee_paid) totalAdminFees += (o.admin_fee || 0);
+            totalServiceFees += (o.service_fee_paid || 0);
+            totalInterest += (o.interest_paid_total || 0);
+            totalPrincipal += (o.principal_paid || 0);
+            
+            if (o.status === 'active') {
+                activeCount++;
+                var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
+                expectedMonthlyInterest += remainingPrincipal * (o.agreed_interest_rate || 0.08);
+            } else if (o.status === 'completed') {
+                completedCount++;
+            }
+        }
+        
+        return {
+            total_orders: orders.length,
+            active_orders: activeCount,
+            completed_orders: completedCount,
+            total_loan_amount: totalLoanAmount,
+            total_admin_fees: totalAdminFees,
+            total_service_fees: totalServiceFees,
+            total_interest: totalInterest,
+            total_principal: totalPrincipal,
+            expected_monthly_interest: expectedMonthlyInterest
+        };
+    },
+    
+    // 基于资金流水计算现金流摘要（替代 SUPABASE.getCashFlowSummary()）
+    _calculateCashFlowSummary: function(allFlows, isAdmin, storeId, storeSpecificFlows) {
+        var cashInflow = 0, cashOutflow = 0;
+        var bankInflow = 0, bankOutflow = 0;
+        
+        var flowsToUse = (!isAdmin && storeSpecificFlows) ? storeSpecificFlows : allFlows;
+        
+        for (var i = 0; i < (flowsToUse || []).length; i++) {
+            var flow = flowsToUse[i];
+            var amount = flow.amount || 0;
+            if (flow.direction === 'inflow') {
+                if (flow.source_target === 'cash') cashInflow += amount;
+                else if (flow.source_target === 'bank') bankInflow += amount;
+            } else if (flow.direction === 'outflow') {
+                if (flow.source_target === 'cash') cashOutflow += amount;
+                else if (flow.source_target === 'bank') bankOutflow += amount;
+            }
+        }
+        
+        return {
+            cash: {
+                income: cashInflow,
+                expense: cashOutflow,
+                balance: cashInflow - cashOutflow
+            },
+            bank: {
+                income: bankInflow,
+                expense: bankOutflow,
+                balance: bankInflow - bankOutflow
+            }
+        };
     },
 
     // ==================== 辅助函数 ====================
