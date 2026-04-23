@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.1（修复：平账功能 + 表格响应式 data-label）
+// app-dashboard-expenses.js - v1.2（修复：表头操作列删除，平账按钮移到操作行）
 
 window.APP = window.APP || {};
 
@@ -83,23 +83,18 @@ const DashboardExpenses = {
             var totalAmount = finalExpenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
             var todayDate = new Date().toISOString().split('T')[0];
 
+            // 计算列数（不包含操作列）
+            // 基础列: 日期, 类别, 金额, 支付方式, 描述 = 5列，管理员额外加门店 = 6列
+            var totalCols = isAdmin ? 6 : 5;
+            
             var rows = '';
             if (finalExpenses && finalExpenses.length > 0) {
                 for (var e of finalExpenses) {
                     var canEdit = isAdmin && !e.is_reconciled;
-                    var actionBtns = '';
-                    if (canEdit) {
-                        actionBtns = `<button onclick="APP.editExpense('${e.id}')" class="btn-small">✏️ ${t('edit')}</button>
-                                     <button class="btn-small danger" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button>`;
-                    } else if (e.is_reconciled) {
-                        actionBtns = `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
-                    } else if (!isAdmin) {
-                        actionBtns = `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
-                    }
                     var methodText = e.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     var storeDisplay = e.stores?.name ? `${Utils.escapeHtml(e.stores.name)} (${Utils.escapeHtml(e.stores.code || '-')})` : '-';
                     
-                    // 添加 data-label 属性用于手机端响应式
+                    // 数据行
                     rows += `<tr>
                         <td data-label="${lang === 'id' ? 'Tanggal' : '日期'}" class="date-cell">${Utils.formatDate(e.expense_date)}<\/td>
                         <td data-label="${lang === 'id' ? 'Kategori' : '类别'}" class="expense-category">${Utils.escapeHtml(e.category)}<\/td>
@@ -107,11 +102,25 @@ const DashboardExpenses = {
                         <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodText}<\/td>
                         <td data-label="${t('description')}" class="expense-desc">${Utils.escapeHtml(e.description || '-')}<\/td>
                         ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${storeDisplay}<\/td>` : ''}
-                    <\/tr>\n                    <tr class=\"action-row\"><td class=\"action-label\">${lang === 'id' ? 'Aksi' : '操作'}</td><td colspan=\"${isAdmin ? 6 : 5}\" class=\"action-btns\">${actionBtns}<\/td><\/tr>`;
+                    </tr>
+                    // 操作行
+                    rows += `<tr class="action-row">
+                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
+                        <td colspan="${totalCols}" class="action-btns">`;
+                    
+                    if (canEdit) {
+                        rows += `<button onclick="APP.editExpense('${e.id}')" class="btn-small">✏️ ${t('edit')}</button>
+                                 <button class="btn-small danger" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button>`;
+                    } else if (e.is_reconciled) {
+                        rows += `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
+                    } else if (!isAdmin) {
+                        rows += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
+                    }
+                    
+                    rows += `<\/td><\/tr>`;
                 }
             } else {
-                var colSpan = isAdmin ? 7 : 6;
-                rows = `<tr><td colspan="${colSpan}" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
 
             const expenseCategories = lang === 'id' 
@@ -129,7 +138,6 @@ const DashboardExpenses = {
                     <div class="header-actions">                      
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                        ${PERMISSION.canReconcile() ? `<button onclick="APP.balanceExpenses()" class="btn-balance warning">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
                     </div>
                 </div>
                 
@@ -149,7 +157,6 @@ const DashboardExpenses = {
                                     <th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
                                     <th>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                     ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
-                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -208,8 +215,8 @@ const DashboardExpenses = {
                         color: var(--success-dark);
                     }
                     .locked-badge {
-                        background: var(--gray-100);
-                        color: var(--gray-500);
+                        background: #f1f5f9;
+                        color: #64748b;
                     }
                     @media (max-width: 768px) {
                         .expense-table .expense-desc {
@@ -363,7 +370,6 @@ const DashboardExpenses = {
     // ==================== 平账功能 ====================
     balanceExpenses: async function() {
         var lang = Utils.lang;
-        // 使用异步方式获取用户资料，比同步 AUTH.isAdmin() 更可靠
         var profile = null;
         try { profile = await SUPABASE.getCurrentProfile(); } catch(e) { console.warn(e); }
         var isAdmin = profile?.role === 'admin';
@@ -407,7 +413,6 @@ const DashboardExpenses = {
             : `确认平账 ${startDate} 至 ${endDate} 期间的支出？`)) return;
         
         try {
-            // 修复：先获取需要更新的记录数
             const { data: expensesToUpdate, error: fetchError } = await supabaseClient
                 .from('expenses')
                 .select('id')
@@ -424,7 +429,6 @@ const DashboardExpenses = {
                 return;
             }
             
-            // 执行更新
             const { error: updateError } = await supabaseClient
                 .from('expenses')
                 .update({ 
@@ -442,7 +446,6 @@ const DashboardExpenses = {
                 ? `✅ Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.` 
                 : `✅ 平账完成！已平账 ${count} 条支出记录。`);
             
-            // 刷新页面显示
             await this.showExpenses();
             
         } catch (error) {
