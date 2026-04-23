@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.0（异常状况页面）
+// app-dashboard-anomaly.js - v1.1（优化卡片视觉平衡）
 
 window.APP = window.APP || {};
 
@@ -93,7 +93,10 @@ const DashboardAnomaly = {
                         </div>
                         <div class="anomaly-card-body">
                             ${overdueOrders.length === 0 ? 
-                                `<p class="text-muted">${lang === 'id' ? 'Tidak ada pesanan yang terlambat 30+ hari' : '暂无逾期30天以上订单'}</p>` :
+                                `<div class="empty-state">
+                                    <div class="empty-state-icon">✅</div>
+                                    <div class="empty-state-text">${lang === 'id' ? 'Semua pesanan dalam keadaan baik' : '所有订单状态良好'}</div>
+                                </div>` :
                                 `<div class="table-container">
                                     <table class="data-table anomaly-table">
                                         <thead>
@@ -134,7 +137,10 @@ const DashboardAnomaly = {
                         </div>
                         <div class="anomaly-card-body">
                             ${blacklist.length === 0 ? 
-                                `<p class="text-muted">${lang === 'id' ? 'Tidak ada nasabah di blacklist' : '暂无黑名单客户'}</p>` :
+                                `<div class="empty-state">
+                                    <div class="empty-state-icon">👍</div>
+                                    <div class="empty-state-text">${lang === 'id' ? 'Tidak ada nasabah di blacklist' : '暂无黑名单客户'}</div>
+                                </div>` :
                                 `<div class="table-container">
                                     <table class="data-table anomaly-table">
                                         <thead>
@@ -172,28 +178,23 @@ const DashboardAnomaly = {
                         </div>
                         <div class="anomaly-card-body">
                             ${lowestStores.length === 0 ? 
-                                `<p class="text-muted">${lang === 'id' ? 'Tidak ada data toko' : '暂无门店数据'}</p>` :
-                                `<div class="table-container">
-                                    <table class="data-table anomaly-table">
-                                        <thead>
-                                            <tr>
-                                                <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                                                <th>${lang === 'id' ? 'Kode' : '编码'}</th>
-                                                <th class="text-center">${lang === 'id' ? 'Total Pesanan' : '订单总数'}</th>
-                                                <th>${lang === 'id' ? 'Status' : '状态'}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${lowestStores.map((s, idx) => `
-                                                <tr>
-                                                    <td><strong>${Utils.escapeHtml(s.name)}</strong><\/td>
-                                                    <td>${Utils.escapeHtml(s.code)}<\/td>
-                                                    <td class="text-center ${idx === 0 ? 'lowest-value' : ''}">${s.count}<\/td>
-                                                    <td>${idx === 0 ? (lang === 'id' ? '🔴 Terendah' : '🔴 最低') : (lang === 'id' ? '🟡 Normal' : '🟡 正常')}<\/td>
-                                                </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
+                                `<div class="empty-state">
+                                    <div class="empty-state-icon">📊</div>
+                                    <div class="empty-state-text">${lang === 'id' ? 'Belum ada data toko' : '暂无门店数据'}</div>
+                                </div>` :
+                                `<div class="store-list">
+                                    ${lowestStores.map((s, idx) => `
+                                        <div class="store-item">
+                                            <div class="store-item-info">
+                                                <span class="store-item-name">${Utils.escapeHtml(s.name)}</span>
+                                                <span class="store-item-code">${Utils.escapeHtml(s.code)}</span>
+                                            </div>
+                                            <div class="store-item-count ${idx === 0 ? 'lowest' : ''}">
+                                                ${s.count} ${lang === 'id' ? 'pesanan' : '订单'}
+                                                ${idx === 0 ? ' 🔴' : ''}
+                                            </div>
+                                        </div>
+                                    `).join('')}
                                 </div>`
                             }
                         </div>
@@ -207,34 +208,45 @@ const DashboardAnomaly = {
                 <style>
                     .anomaly-grid {
                         display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
                         gap: 20px;
+                        align-items: stretch;
                     }
+                    
                     .anomaly-card {
                         background: var(--bg-card);
                         border-radius: 12px;
                         border: 1px solid var(--border-light);
                         overflow: hidden;
                         transition: all 0.2s ease;
+                        display: flex;
+                        flex-direction: column;
+                        min-height: 350px;
                     }
+                    
                     .anomaly-card:hover {
                         box-shadow: var(--shadow-md);
                     }
+                    
                     .anomaly-card-header {
                         display: flex;
                         align-items: center;
                         gap: 12px;
                         padding: 16px 20px;
                         border-bottom: 1px solid var(--border-light);
+                        flex-shrink: 0;
                     }
+                    
                     .anomaly-icon {
                         font-size: 24px;
                     }
+                    
                     .anomaly-card-header h3 {
                         flex: 1;
                         margin: 0;
                         font-size: 1.1rem;
                     }
+                    
                     .anomaly-badge {
                         background: var(--primary-soft);
                         color: var(--primary-dark);
@@ -243,48 +255,142 @@ const DashboardAnomaly = {
                         font-size: 0.85rem;
                         font-weight: 600;
                     }
+                    
                     .anomaly-card-danger .anomaly-badge {
                         background: #fee2e2;
                         color: #dc2626;
                     }
+                    
                     .anomaly-card-warning .anomaly-badge {
                         background: #fef3c7;
                         color: #d97706;
                     }
+                    
                     .anomaly-card-info .anomaly-badge {
                         background: #e0f2fe;
                         color: #0284c7;
                     }
+                    
                     .anomaly-card-body {
                         padding: 16px 20px;
-                        max-height: 400px;
+                        flex: 1;
                         overflow-y: auto;
                     }
+                    
+                    /* 空状态样式 */
+                    .empty-state {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 40px 20px;
+                        text-align: center;
+                        color: var(--text-muted);
+                    }
+                    
+                    .empty-state-icon {
+                        font-size: 48px;
+                        margin-bottom: 12px;
+                        opacity: 0.5;
+                    }
+                    
+                    .empty-state-text {
+                        font-size: 0.85rem;
+                    }
+                    
                     .anomaly-card-footer {
                         padding: 12px 20px;
                         background: var(--bg-hover);
                         border-top: 1px solid var(--border-light);
                         font-size: 0.75rem;
+                        flex-shrink: 0;
                     }
+                    
                     .anomaly-table {
-                        min-width: 500px;
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 0.8rem;
                     }
-                    .anomaly-table td, .anomaly-table th {
-                        padding: 8px 10px;
+                    
+                    .anomaly-table th,
+                    .anomaly-table td {
+                        padding: 8px 6px;
+                        text-align: left;
+                        border-bottom: 1px solid var(--border-light);
                     }
+                    
+                    .anomaly-table th {
+                        font-weight: 600;
+                        color: var(--text-secondary);
+                        background: var(--bg-hover);
+                    }
+                    
+                    .anomaly-table .order-id,
+                    .anomaly-table .customer-id {
+                        font-family: monospace;
+                        font-weight: 600;
+                    }
+                    
                     .lowest-value {
                         color: #dc2626;
                         font-weight: 700;
                     }
+                    
                     .warning-text {
                         color: #dc2626;
                     }
+                    
                     .info-text {
                         color: var(--text-muted);
                     }
+                    
+                    /* 门店最低项 - 列表式布局 */
+                    .store-list {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                    }
+                    
+                    .store-item {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 10px 12px;
+                        background: var(--bg-hover);
+                        border-radius: 8px;
+                    }
+                    
+                    .store-item-info {
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .store-item-name {
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                    }
+                    
+                    .store-item-code {
+                        font-size: 0.7rem;
+                        color: var(--text-muted);
+                    }
+                    
+                    .store-item-count {
+                        font-size: 1.2rem;
+                        font-weight: 700;
+                    }
+                    
+                    .store-item-count.lowest {
+                        color: #dc2626;
+                    }
+                    
                     @media (max-width: 768px) {
                         .anomaly-grid {
                             grid-template-columns: 1fr;
+                        }
+                        
+                        .anomaly-card {
+                            min-height: 300px;
                         }
                     }
                 </style>
