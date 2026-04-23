@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.4（移除审计日志功能）
+// app-dashboard-core.js - v1.5（业务报表改为异常状况）
 
 window.APP = window.APP || {};
 
@@ -74,7 +74,7 @@ const DashboardCore = {
                     await self.renderDashboard();
                 }
             },
-            report: async () => { if (typeof window.APP.showReport === 'function') await window.APP.showReport(); else await self.renderDashboard(); },
+            anomaly: async () => { if (typeof window.APP.showAnomaly === 'function') await window.APP.showAnomaly(); else await self.renderDashboard(); },
             userManagement: async () => { if (typeof window.APP.showUserManagement === 'function') await window.APP.showUserManagement(); else await self.renderDashboard(); },
             storeManagement: async () => { if (typeof StoreManager.renderStoreManagement === 'function') await StoreManager.renderStoreManagement(); else await self.renderDashboard(); },
             expenses: async () => { if (typeof window.APP.showExpenses === 'function') await window.APP.showExpenses(); else await self.renderDashboard(); },
@@ -131,8 +131,8 @@ const DashboardCore = {
             case 'dashboard':
                 self.renderDashboard();
                 break;
-            case 'report':
-                if (typeof window.APP.showReport === 'function') window.APP.showReport();
+            case 'anomaly':
+                if (typeof window.APP.showAnomaly === 'function') window.APP.showAnomaly();
                 else self.renderDashboard();
                 break;
             case 'userManagement':
@@ -222,8 +222,8 @@ const DashboardCore = {
                         self.renderDashboard();
                     }
                     break;
-                case 'report':
-                    if (typeof window.APP.showReport === 'function') window.APP.showReport();
+                case 'anomaly':
+                    if (typeof window.APP.showAnomaly === 'function') window.APP.showAnomaly();
                     else self.renderDashboard();
                     break;
                 case 'userManagement':
@@ -676,7 +676,7 @@ const DashboardCore = {
                     <button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ${btnHighlight ? 'highlight' : ''}" ${btnDisabled ? 'disabled' : ''}>
                         🔔 ${t('send_reminder')} ${hasReminders ? `(${needRemindOrders.length})` : ''}
                     </button>
-                    <button onclick="APP.navigateTo('report')">📊 ${t('financial_report')}</button>
+                    <button onclick="APP.navigateTo('anomaly')">⚠️ ${lang === 'id' ? 'Situasi Abnormal' : '异常状况'}</button>
                     <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
                     <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
                     <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
