@@ -534,3 +534,84 @@ button.warning.highlight {
         width: 100% !important;
     }
 }
+
+/* ========================================
+   缴费页面 - 汇总卡片响应式网格布局
+   ======================================== */
+
+/* 电脑端：3列网格 */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px 20px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border-light);
+}
+
+.summary-item .label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+}
+
+.summary-item .value {
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: right;
+    word-break: break-word;
+}
+
+.summary-item .value.order-id {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.summary-item .value.warning {
+    color: var(--warning-dark);
+}
+
+.summary-item .value.success-text {
+    color: var(--success-dark);
+}
+
+/* 手机端：2列网格 */
+@media (max-width: 768px) {
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px 12px;
+    }
+    
+    .summary-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        border-bottom: none;
+        background: var(--bg-hover);
+        padding: 8px 10px;
+        border-radius: 8px;
+    }
+    
+    .summary-item .label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+    
+    .summary-item .value {
+        font-size: 0.8rem;
+        text-align: left;
+        word-break: break-all;
+    }
+}
+
+/* 超小手机：单列 */
+@media (max-width: 480px) {
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
