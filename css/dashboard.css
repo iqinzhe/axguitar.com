@@ -406,7 +406,7 @@ button.warning.highlight {
 /* 每个项目样式 */
 .summary-item {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: baseline;
     background: var(--bg-hover);
     padding: 8px 12px;
@@ -427,7 +427,7 @@ button.warning.highlight {
 .summary-item .value {
     font-weight: 500;
     color: var(--text-primary);
-    text-align: right;
+    text-align: left;
     word-break: break-word;
     flex: 1;
 }
