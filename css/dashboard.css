@@ -385,12 +385,6 @@ button.warning.highlight {
     margin-top: var(--spacing-3);
 }
 
-/* === 底部卡片 === */
-.dashboard-footer-card {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-light);
-}
-
 /* ========================================
    缴费页面 - 订单详情布局（电脑端3栏，手机端1栏）
    ======================================== */
@@ -622,5 +616,30 @@ button.warning.highlight {
     }
     .cashflow-item-card {
         min-width: auto;
+    }
+}
+
+/* === 底部卡片 === */
+.dashboard-footer-card {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-light);
+}
+
+.dashboard-footer-card h3 {
+    font-size: var(--font-sm);
+    margin-bottom: var(--spacing-2);
+}
+
+.dashboard-footer-card p {
+    font-size: 0.75rem;  /* 12px，比工具按钮小 */
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+/* 手机端进一步缩小 */
+@media (max-width: 768px) {
+    .dashboard-footer-card p {
+        font-size: 0.7rem;
     }
 }
