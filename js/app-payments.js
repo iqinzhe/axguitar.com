@@ -280,55 +280,23 @@ if (order.repayment_type !== 'fixed') {
                     </div>
                 </div>
                 
-                <div class="card summary-card">
-                    <table class="summary-table">
-                        <tr>
-                            <td class="label">${t('customer_name')}<\/td>
-                            <td class="value">${Utils.escapeHtml(order.customer_name)}<\/td>
-                            <td class="label">ID<\/td>
-                            <td class="value order-id">${Utils.escapeHtml(order.order_id)}<\/td>
-                            <td class="label">${t('loan_amount')}<\/td>
-                            <td class="value">${Utils.formatCurrency(loanAmount)}<\/td>
-                        </tr>
-                        <tr>
-                            <td class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}<\/td>
-                            <td class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}<\/td>
-                            <td class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}<\/td>
-                            <td class="value">${Utils.formatCurrency(currentMonthlyInterest)}<\/td>
-                            <td class="label">${t('payment_due_date')}<\/td>
-                            <td class="value">${nextDueDate}<\/td>
-                        </tr>
-                        <tr>
-                            <td class="label">${t('repayment_type')}<\/td>
-                            <td class="value" colspan="5">
-                                ${order.repayment_type === 'fixed' 
-                                    ? `📅 ${t('fixed_repayment')}` 
-                                    : `💰 ${t('flexible_repayment')}`}
-                                ${order.repayment_type === 'fixed' ? ` (${order.repayment_term} ${lang === 'id' ? 'bulan' : '个月'})` : ''}
-                             <\/td>
-                        </tr>
-                        <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"><\/td><\/tr>
-                        <tr>
-                            <td class="label">💎 ${t('collateral_name')}<\/td>
-                            <td class="value" colspan="2">${Utils.escapeHtml(order.collateral_name || '-')}<\/td>
-                            <td class="label">💰 ${t('service_fee')}<\/td>
-                            <td class="value" colspan="2">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)<\/td>
-                        </tr>
-                        <tr>
-                            <td class="label">📋 ${t('admin_fee')}<\/td>
-                            <td class="value" colspan="2">${Utils.formatCurrency(order.admin_fee)}<\/td>
-                            <td class="label">📈 ${t('agreed_rate')}<\/td>
-                            <td class="value" colspan="2">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%<\/td>
-                        </tr>
-                        <tr class="divider"><td colspan="6"><hr style="margin:8px 0;"><\/td><\/tr>
-                        <tr class="paid-row">
-                            <td class="label">✅ ${t('admin_fee')}<\/td>
-                            <td class="value success-text" colspan="2">${adminFeePaidInfo}<\/td>
-                            <td class="label">✅ ${t('service_fee')}<\/td>
-                            <td class="value success-text" colspan="2">${serviceFeePaidInfo}<\/td>
-                        </tr>
-                    </table>
-                </div>
+              <div class="card summary-card">
+    <div class="summary-grid">
+        <div class="summary-item"><span class="label">${t('customer_name')}:</span><span class="value">${Utils.escapeHtml(order.customer_name)}</span></div>
+        <div class="summary-item"><span class="label">ID:</span><span class="value order-id">${Utils.escapeHtml(order.order_id)}</span></div>
+        <div class="summary-item"><span class="label">${t('loan_amount')}:</span><span class="value">${Utils.formatCurrency(loanAmount)}</span></div>
+        <div class="summary-item"><span class="label">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</span><span class="value ${remainingPrincipal > 0 ? 'warning' : 'success'}">${Utils.formatCurrency(remainingPrincipal)}</span></div>
+        <div class="summary-item"><span class="label">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}:</span><span class="value">${Utils.formatCurrency(currentMonthlyInterest)}</span></div>
+        <div class="summary-item"><span class="label">${t('payment_due_date')}:</span><span class="value">${nextDueDate}</span></div>
+        <div class="summary-item"><span class="label">${t('repayment_type')}:</span><span class="value">${order.repayment_type === 'fixed' ? `📅 ${t('fixed_repayment')}` : `💰 ${t('flexible_repayment')}`}${order.repayment_type === 'fixed' ? ` (${order.repayment_term} ${lang === 'id' ? 'bulan' : '个月'})` : ''}</span></div>
+        <div class="summary-item"><span class="label">💎 ${t('collateral_name')}:</span><span class="value">${Utils.escapeHtml(order.collateral_name || '-')}</span></div>
+        <div class="summary-item"><span class="label">💰 ${t('service_fee')}:</span><span class="value">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)</span></div>
+        <div class="summary-item"><span class="label">📋 ${t('admin_fee')}:</span><span class="value">${Utils.formatCurrency(order.admin_fee)}</span></div>
+        <div class="summary-item"><span class="label">📈 ${t('agreed_rate')}:</span><span class="value">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%</span></div>
+        <div class="summary-item"><span class="label">✅ ${t('admin_fee')}:</span><span class="value success-text">${adminFeePaidInfo}</span></div>
+        <div class="summary-item"><span class="label">✅ ${t('service_fee')}:</span><span class="value success-text">${serviceFeePaidInfo}</span></div>
+    </div>
+</div> 
                 
                 ${fixedRepaymentHtml}
                 ${flexibleRepaymentHtml}
