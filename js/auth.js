@@ -1,9 +1,9 @@
-// auth.js - v1.1（修复：登录锁定提示双语支持 + 优化）
+// auth.js - v1.3（新增：重置密码 + 门店暂停检查）
 
 const AUTH = {
     user: null,
 
-    // ==================== 登录锁定机制（sessionStorage 持久化） ====================
+    // ==================== 登录锁定机制 ====================
 
     _getLoginAttempts() {
         const stored = sessionStorage.getItem('jf_login_attempts');
@@ -23,7 +23,6 @@ const AUTH = {
         sessionStorage.setItem('jf_locked_until', JSON.stringify(locked));
     },
 
-    // 修复：添加双语支持的锁定提示
     _isLocked(username) {
         const lockedUntil = this._getLockedUntil();
         const until = lockedUntil[username];
@@ -33,8 +32,8 @@ const AUTH = {
             const remainingMinutes = Math.ceil((until - now) / 60000);
             const lang = Utils.lang;
             const msg = lang === 'id' 
-                ? `⚠️ Akun telah dikunci. Silakan coba lagi setelah ${remainingMinutes} menit.`
-                : `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试。`;
+                ? '⚠️ Akun telah dikunci. Silakan coba lagi setelah ' + remainingMinutes + ' menit.'
+                : '⚠️ 账号已锁定，请 ' + remainingMinutes + ' 分钟后重试。';
             alert(msg);
             return true;
         }
@@ -60,7 +59,6 @@ const AUTH = {
         attempts[username].count++;
 
         const elapsed = now - attempts[username].firstAttempt;
-        // 5分钟内失败5次，锁定15分钟
         if (elapsed <= 5 * 60 * 1000 && attempts[username].count >= 5) {
             lockedUntil[username] = now + 15 * 60 * 1000;
             delete attempts[username];
@@ -69,8 +67,8 @@ const AUTH = {
             
             const lang = Utils.lang;
             const msg = lang === 'id' 
-                ? `⚠️ Terlalu banyak percobaan login. Akun dikunci selama 15 menit.`
-                : `⚠️ 登录尝试次数过多，账号已锁定15分钟。`;
+                ? '⚠️ Terlalu banyak percobaan login. Akun dikunci selama 15 menit.'
+                : '⚠️ 登录尝试次数过多，账号已锁定15分钟。';
             alert(msg);
             return true;
         }
@@ -145,7 +143,7 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
-    // ==================== 登录逻辑（修复：错误提示双语） ====================
+    // ==================== 登录逻辑 ====================
     async login(usernameOrEmail, password) {
         try {
             if (this._isLocked(usernameOrEmail)) return null;
@@ -155,7 +153,7 @@ const AUTH = {
                 const { data: profileData, error: profileError } = await supabaseClient
                     .from('user_profiles')
                     .select('username, email')
-                    .or(`username.eq.${usernameOrEmail},email.eq.${usernameOrEmail}`)
+                    .or('username.eq.' + usernameOrEmail + ',email.eq.' + usernameOrEmail)
                     .maybeSingle();
 
                 if (profileError || !profileData) {
@@ -185,6 +183,29 @@ const AUTH = {
                 const lang = Utils.lang;
                 alert(lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败');
                 return null;
+            }
+
+            // ========== 新增：检查门店是否暂停 ==========
+            if (this.user && this.user.store_id) {
+                try {
+                    const { data: storeData, error: storeError } = await supabaseClient
+                        .from('stores')
+                        .select('is_active, name')
+                        .eq('id', this.user.store_id)
+                        .single();
+                    
+                    if (!storeError && storeData && storeData.is_active === false) {
+                        await this.logout();
+                        var lang = Utils.lang;
+                        alert(lang === 'id' 
+                            ? '⚠️ Toko "' + storeData.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
+                            : '⚠️ 门店 "' + storeData.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。');
+                        return null;
+                    }
+                } catch (e) {
+                    console.warn('检查门店状态失败:', e.message);
+                    // 不阻止登录，避免因查询失败导致无法登录
+                }
             }
 
             await this._logLoginSuccess(this.user.id);
@@ -320,58 +341,57 @@ const AUTH = {
         return true;
     },
 
-    // 在 auth.js 的 updateUser 方法之后添加
-
-async resetUserPassword(userId, newPassword) {
-    if (this.user?.role !== 'admin') {
-        throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
-    }
-    
-    if (!newPassword || newPassword.length < 6) {
-        throw new Error(Utils.lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
-    }
-    
-    try {
-        // 调用 Supabase Edge Function 来重置密码
-        const { data, error } = await supabaseClient.functions.invoke('reset-user-password', {
-            body: { 
-                userId: userId,
-                newPassword: newPassword,
-                adminId: this.user?.id
-            }
-        });
+    // ========== 新增：重置密码 ==========
+    async resetUserPassword(userId, newPassword) {
+        if (this.user?.role !== 'admin') {
+            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
+        }
         
-        if (error) {
-            // 如果 Edge Function 不可用，尝试通过更新 auth 来重置
-            console.warn('Edge Function 不可用，尝试直接重置:', error.message);
+        if (!newPassword || newPassword.length < 6) {
+            throw new Error(Utils.lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+        }
+        
+        try {
+            // 优先使用 Edge Function
+            const { data, error } = await supabaseClient.functions.invoke('reset-user-password', {
+                body: { 
+                    userId: userId,
+                    newPassword: newPassword,
+                    adminId: this.user?.id
+                }
+            });
             
-            // 备用方案：通过 Admin API 重置密码
-            const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
-                userId,
-                { password: newPassword }
+            if (error) {
+                console.warn('Edge Function 不可用，尝试直接重置:', error.message);
+                
+                // 备选：通过 Admin API（需要 supabaseClient 有 service_role key）
+                const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
+                    userId,
+                    { password: newPassword }
+                );
+                
+                if (updateError) {
+                    throw updateError;
+                }
+            }
+            
+            if (window.Audit) {
+                await window.Audit.log('password_reset', JSON.stringify({
+                    target_user_id: userId,
+                    reset_by: this.user?.id,
+                    reset_at: new Date().toISOString()
+                }));
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('重置密码失败:', error);
+            throw new Error(Utils.lang === 'id' 
+                ? 'Gagal mereset password. Fungsi ini memerlukan Service Role Key pada Supabase.'
+                : '重置密码失败，需要配置 Supabase Service Role Key。'
             );
-            
-            if (updateError) {
-                throw updateError;
-            }
         }
-        
-        if (window.Audit) {
-            await window.Audit.log('password_reset', JSON.stringify({
-                target_user_id: userId,
-                reset_by: this.user?.id,
-                reset_at: new Date().toISOString()
-            }));
-        }
-        
-        return true;
-    } catch (error) {
-        console.error('重置密码失败:', error);
-        throw new Error(Utils.lang === 'id' 
-            ? 'Gagal mereset password. Pastikan Supabase Admin API telah dikonfigurasi.'
-            : '重置密码失败，请确认 Supabase Admin API 已配置。');
-    }
-},
+    },
 
     getCurrentUserId()    { return this.user?.id || null; },
     getCurrentUserName()  { return this.user?.name || null; },
