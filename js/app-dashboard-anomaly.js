@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.1（优化卡片视觉平衡）
+// app-dashboard-anomaly.js - v1.2（4卡片对称布局）
 
 window.APP = window.APP || {};
 
@@ -49,8 +49,10 @@ const DashboardAnomaly = {
                 console.warn("获取黑名单失败:", e);
             }
             
-            // ========== 3. 门店经营最低项 ==========
+            // ========== 3. 门店经营最低项（后3名） ==========
             let lowestStores = [];
+            // ========== 4. 门店业绩排行（完整排名） ==========
+            let allStoreRanking = [];
             try {
                 const stores = await SUPABASE.getAllStores();
                 const orders = await SUPABASE.getOrders();
@@ -66,10 +68,15 @@ const DashboardAnomaly = {
                 }
                 
                 const storeArray = Object.values(storeOrderCount);
-                storeArray.sort((a, b) => a.count - b.count);
-                lowestStores = storeArray.slice(0, Math.min(3, storeArray.length));
+                storeArray.sort((a, b) => b.count - a.count);
+                allStoreRanking = storeArray;
+                
+                // 最低3名
+                const lowest = [...storeArray];
+                lowest.sort((a, b) => a.count - b.count);
+                lowestStores = lowest.slice(0, Math.min(3, lowest.length));
             } catch(e) {
-                console.warn("获取门店最低项失败:", e);
+                console.warn("获取门店数据失败:", e);
             }
             
             // 渲染页面
@@ -169,11 +176,11 @@ const DashboardAnomaly = {
                         </div>
                     </div>
                     
-                    <!-- 卡片3：门店经营最低项 -->
+                    <!-- 卡片3：门店经营最低项（后3名） -->
                     <div class="anomaly-card anomaly-card-info">
                         <div class="anomaly-card-header">
                             <span class="anomaly-icon">📉</span>
-                            <h3>${lang === 'id' ? 'Kinerja Terendah per Toko' : '门店经营最低项'}</h3>
+                            <h3>${lang === 'id' ? 'Kinerja Terendah' : '业绩最低门店'}</h3>
                             <span class="anomaly-badge">${lowestStores.length}</span>
                         </div>
                         <div class="anomaly-card-body">
@@ -199,7 +206,44 @@ const DashboardAnomaly = {
                             }
                         </div>
                         <div class="anomaly-card-footer">
-                            <span class="info-text">💡 ${lang === 'id' ? 'Berdasarkan total pesanan per toko' : '基于各门店订单总数统计'}</span>
+                            <span class="info-text">💡 ${lang === 'id' ? 'Paling sedikit pesanan' : '订单数最少'}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 卡片4：门店业绩排行（完整排名） -->
+                    <div class="anomaly-card anomaly-card-info">
+                        <div class="anomaly-card-header">
+                            <span class="anomaly-icon">🏆</span>
+                            <h3>${lang === 'id' ? 'Peringkat Kinerja Toko' : '门店业绩排行'}</h3>
+                            <span class="anomaly-badge">${allStoreRanking.length}</span>
+                        </div>
+                        <div class="anomaly-card-body">
+                            ${allStoreRanking.length === 0 ? 
+                                `<div class="empty-state">
+                                    <div class="empty-state-icon">📊</div>
+                                    <div class="empty-state-text">${lang === 'id' ? 'Belum ada data toko' : '暂无门店数据'}</div>
+                                </div>` :
+                                `<div class="ranking-list">
+                                    ${allStoreRanking.map((s, idx) => `
+                                        <div class="ranking-item ${idx === 0 ? 'first' : idx === allStoreRanking.length - 1 ? 'last' : ''}">
+                                            <div class="ranking-number">
+                                                ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`}
+                                            </div>
+                                            <div class="ranking-info">
+                                                <span class="ranking-name">${Utils.escapeHtml(s.name)}</span>
+                                                <span class="ranking-code">${Utils.escapeHtml(s.code)}</span>
+                                            </div>
+                                            <div class="ranking-count">
+                                                ${s.count} ${lang === 'id' ? 'pesanan' : '订单'}
+                                                ${idx === 0 ? ' ↑' : idx === allStoreRanking.length - 1 ? ' ↓' : ''}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>`
+                            }
+                        </div>
+                        <div class="anomaly-card-footer">
+                            <span class="info-text">💡 ${lang === 'id' ? 'Peringkat berdasarkan total pesanan' : '排名基于订单总数'}</span>
                         </div>
                     </div>
                     
@@ -208,7 +252,7 @@ const DashboardAnomaly = {
                 <style>
                     .anomaly-grid {
                         display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+                        grid-template-columns: repeat(2, 1fr);
                         gap: 20px;
                         align-items: stretch;
                     }
@@ -221,7 +265,7 @@ const DashboardAnomaly = {
                         transition: all 0.2s ease;
                         display: flex;
                         flex-direction: column;
-                        min-height: 350px;
+                        min-height: 380px;
                     }
                     
                     .anomaly-card:hover {
@@ -244,7 +288,7 @@ const DashboardAnomaly = {
                     .anomaly-card-header h3 {
                         flex: 1;
                         margin: 0;
-                        font-size: 1.1rem;
+                        font-size: 1rem;
                     }
                     
                     .anomaly-badge {
@@ -252,7 +296,7 @@ const DashboardAnomaly = {
                         color: var(--primary-dark);
                         padding: 4px 10px;
                         border-radius: 20px;
-                        font-size: 0.85rem;
+                        font-size: 0.8rem;
                         font-weight: 600;
                     }
                     
@@ -302,14 +346,14 @@ const DashboardAnomaly = {
                         padding: 12px 20px;
                         background: var(--bg-hover);
                         border-top: 1px solid var(--border-light);
-                        font-size: 0.75rem;
+                        font-size: 0.7rem;
                         flex-shrink: 0;
                     }
                     
                     .anomaly-table {
                         width: 100%;
                         border-collapse: collapse;
-                        font-size: 0.8rem;
+                        font-size: 0.75rem;
                     }
                     
                     .anomaly-table th,
@@ -331,11 +375,6 @@ const DashboardAnomaly = {
                         font-weight: 600;
                     }
                     
-                    .lowest-value {
-                        color: #dc2626;
-                        font-weight: 700;
-                    }
-                    
                     .warning-text {
                         color: #dc2626;
                     }
@@ -344,18 +383,18 @@ const DashboardAnomaly = {
                         color: var(--text-muted);
                     }
                     
-                    /* 门店最低项 - 列表式布局 */
+                    /* 门店最低项列表 */
                     .store-list {
                         display: flex;
                         flex-direction: column;
-                        gap: 10px;
+                        gap: 8px;
                     }
                     
                     .store-item {
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
-                        padding: 10px 12px;
+                        padding: 8px 12px;
                         background: var(--bg-hover);
                         border-radius: 8px;
                     }
@@ -367,16 +406,16 @@ const DashboardAnomaly = {
                     
                     .store-item-name {
                         font-weight: 600;
-                        font-size: 0.9rem;
+                        font-size: 0.85rem;
                     }
                     
                     .store-item-code {
-                        font-size: 0.7rem;
+                        font-size: 0.65rem;
                         color: var(--text-muted);
                     }
                     
                     .store-item-count {
-                        font-size: 1.2rem;
+                        font-size: 1rem;
                         font-weight: 700;
                     }
                     
@@ -384,13 +423,67 @@ const DashboardAnomaly = {
                         color: #dc2626;
                     }
                     
+                    /* 业绩排行列表 */
+                    .ranking-list {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                    }
+                    
+                    .ranking-item {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 8px 10px;
+                        background: var(--bg-hover);
+                        border-radius: 8px;
+                    }
+                    
+                    .ranking-number {
+                        font-size: 1.1rem;
+                        min-width: 45px;
+                    }
+                    
+                    .ranking-info {
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .ranking-name {
+                        font-weight: 600;
+                        font-size: 0.85rem;
+                    }
+                    
+                    .ranking-code {
+                        font-size: 0.65rem;
+                        color: var(--text-muted);
+                    }
+                    
+                    .ranking-count {
+                        font-size: 0.9rem;
+                        font-weight: 700;
+                        text-align: right;
+                    }
+                    
+                    .ranking-item.first {
+                        background: #fef3c7;
+                        border-left: 3px solid #f59e0b;
+                    }
+                    
+                    .ranking-item.last {
+                        background: #fee2e2;
+                        border-left: 3px solid #ef4444;
+                    }
+                    
                     @media (max-width: 768px) {
                         .anomaly-grid {
                             grid-template-columns: 1fr;
+                            gap: 16px;
                         }
                         
                         .anomaly-card {
-                            min-height: 300px;
+                            min-height: auto;
                         }
                     }
                 </style>
