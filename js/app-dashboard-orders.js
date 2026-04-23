@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.3（修复：printOrder 中 t 函数定义 + filterOrders this 绑定）
+// app-dashboard-orders.js - v1.4（修复：资金流水表操作列移到第二行）
 
 window.APP = window.APP || {};
 
@@ -432,7 +432,7 @@ showOrderTable: async function() {
             }
             
             if (paymentRows === '') {
-                paymentRows = `<tr><td colspan="4" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                paymentRows = `<td><td colspan="4" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
@@ -486,7 +486,7 @@ showOrderTable: async function() {
                     
                     <div class="section">
                         <h3>${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
-                        <table>
+                        </table>
                             <thead><tr><th>${t('date')}</th><th>${t('type')}</th><th class="text-right">${t('amount')}</th><th>${lang === 'id' ? 'Metode' : '支付方式'}</th></tr></thead>
                             <tbody>${paymentRows}</tbody>
                         </table>
@@ -509,6 +509,7 @@ showOrderTable: async function() {
         }
     },
 
+    // ==================== 资金流水表（优化版：操作列移到第二行） ====================
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
@@ -526,19 +527,30 @@ showOrderTable: async function() {
             var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
             var methodMap = { cash: t('cash'), bank: t('bank') };
 
-            var rows = allPayments.length === 0
-                ? `<tr><td colspan="9" class="text-center">${t('no_data')}<\/td><\/tr>`
-                : allPayments.map(p => `<tr>
-                    <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
-                    <td data-label="${t('customer_name')}">${Utils.escapeHtml(p.orders?.customer_name || '-')}<\/td>
-                    <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
-                    <td data-label="${t('type')}">${typeMap[p.type] || p.type}<\/td>
-                    <td data-label="${lang === 'id' ? 'Bulan' : '月数'}" class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}<\/td>
-                    <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
-                    <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodMap[p.payment_method] || '-'}<\/td>
-                    <td data-label="${t('description')}">${Utils.escapeHtml(p.description || '-')}<\/td>
-                <\/tr>
-                <tr class="action-row"><td colspan="9"><button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">${t('view')}<\/button><\/td><\/tr>`).join('');
+            // 表头有8列（删除了操作列）
+            var rows = '';
+            if (allPayments.length === 0) {
+                rows = `<tr><td colspan="8" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            } else {
+                for (var p of allPayments) {
+                    rows += `<tr>
+                        <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
+                        <td data-label="${t('customer_name')}">${Utils.escapeHtml(p.orders?.customer_name || '-')}<\/td>
+                        <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
+                        <td data-label="${t('type')}">${typeMap[p.type] || p.type}<\/td>
+                        <td data-label="${lang === 'id' ? 'Bulan' : '月数'}" class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}<\/td>
+                        <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(p.amount)}<\/td>
+                        <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodMap[p.payment_method] || '-'}<\/td>
+                        <td data-label="${t('description')}">${Utils.escapeHtml(p.description || '-')}<\/td>
+                    </tr>
+                    <tr class="action-row">
+                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
+                        <td colspan="8" class="action-btns">
+                            <button onclick="APP.viewOrder('${p.orders?.order_id}')" class="btn-small">👁️ ${t('view')}<\/button>
+                        <\/td>
+                    <\/tr>`;
+                }
+            }
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
@@ -561,7 +573,14 @@ showOrderTable: async function() {
                     <table class="data-table payment-table">
                         <thead>
                             <tr>
-                                <th>${t('order_id')}</th><th>${t('customer_name')}</th><th>${t('date')}</th><th>${t('type')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th>${t('description')}</th><th class="text-center">${t('action')}</th>
+                                <th>${t('order_id')}</th>
+                                <th>${t('customer_name')}</th>
+                                <th>${t('date')}</th>
+                                <th>${t('type')}</th>
+                                <th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th>
+                                <th class="text-right">${t('amount')}</th>
+                                <th class="text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                <th>${t('description')}</th>
                             </tr>
                         </thead>
                         <tbody>${rows}</tbody>
