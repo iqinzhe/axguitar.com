@@ -392,89 +392,84 @@ button.warning.highlight {
 }
 
 /* ========================================
-   缴费页面 - 汇总卡片流式布局（修复版）
+   缴费页面 - 订单详情多栏布局
    ======================================== */
 
-/* 电脑端：自动多列并排 */
-.summary-grid {
+/* 电脑端：4栏布局 */
+.summary-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px 20px;
-    align-items: flex-start;
+    margin: 0 -4px;
 }
 
-/* 每个项目自动伸缩，允许并排 */
-.summary-item {
+.summary-row {
+    width: 25%;  /* 4栏 = 25% */
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    background: var(--bg-hover);
-    padding: 6px 12px;
-    border-radius: 8px;
-    flex: 1 0 auto;      /* 允许增长，允许收缩，自动基础宽度 */
-    min-width: 180px;    /* 最小宽度，防止太窄 */
-    max-width: calc(33% - 20px);  /* 电脑端最多3列 */
+    padding: 6px 4px;
+    box-sizing: border-box;
 }
 
-.summary-item .label {
+/* 标签样式 */
+.summary-label {
     font-weight: 600;
     color: var(--text-secondary);
     font-size: var(--font-sm);
+    width: 70px;
+    flex-shrink: 0;
     white-space: nowrap;
 }
 
-.summary-item .value {
+/* 内容样式 */
+.summary-value {
     font-weight: 500;
     color: var(--text-primary);
     word-break: break-word;
-    text-align: right;
     flex: 1;
 }
 
-.summary-item .value.order-id {
+.summary-value.order-id {
     font-family: monospace;
     font-weight: 600;
 }
 
-.summary-item .value.warning {
+.summary-value.warning {
     color: var(--warning-dark);
 }
 
-.summary-item .value.success-text {
+.summary-value.success-text {
     color: var(--success-dark);
 }
 
-/* 手机端：2列，标签上内容下 */
+/* 手机端：2栏 */
 @media (max-width: 768px) {
-    .summary-grid {
-        gap: 10px;
+    .summary-row {
+        width: 50%;  /* 2栏 */
     }
     
-    .summary-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
-        padding: 8px 12px;
-        flex: 1 1 auto;
-        min-width: calc(50% - 10px);
-        max-width: none;
-    }
-    
-    .summary-item .label {
+    .summary-label {
+        width: 65px;
         font-size: 0.7rem;
-        white-space: normal;
     }
     
-    .summary-item .value {
-        font-size: 0.8rem;
-        text-align: left;
+    .summary-value {
+        font-size: 0.75rem;
     }
 }
 
-/* 超小手机：单列 */
+/* 超小手机：1栏 */
 @media (max-width: 480px) {
-    .summary-item {
-        min-width: 100%;
+    .summary-row {
+        width: 100%;
+    }
+    
+    .summary-label {
+        width: 70px;
+        font-size: 0.7rem;
+    }
+    
+    .summary-value {
+        font-size: 0.75rem;
     }
 }
 
