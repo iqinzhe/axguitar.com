@@ -3,7 +3,8 @@
 window.APP = window.APP || {};
 
 const CustomersModule = {
-showCustomers: async function() {
+
+    showCustomers: async function() {
     this.currentPage = 'customers';
     this.saveCurrentPageState();
     var lang = Utils.lang;
@@ -19,15 +20,13 @@ showCustomers: async function() {
             storeMap[s.id] = s.name;
         }
         
-        // 定义列数（不包含操作列）
-        // 基础列: ID, 姓名, KTP, 电话, KTP地址, 居住地址, 注册日期 = 7列
-        // 管理员额外加: 门店 = 1列
-        var baseColumns = 7;
-        var totalColumns = isAdmin ? baseColumns + 1 : baseColumns;
+        // 计算列数
+        var baseCols = 7;
+        var totalCols = isAdmin ? baseCols + 1 : baseCols;
         
         var rows = '';
         if (!customers || customers.length === 0) {
-            rows = `<tr><td colspan="${totalColumns}" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}<\/td><\/tr>`;
         } else {
             for (var c of customers) {
                 var customerId = Utils.escapeHtml(c.customer_id || '-');
@@ -40,30 +39,28 @@ showCustomers: async function() {
                 var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                 var escapedId = Utils.escapeAttr(c.id);
                 
-                // 数据行 - 严格按照表头顺序
                 rows += `<tr>
-                    <td>${customerId}</td>
-                    <td>${name}</td>
-                    <td>${ktpNumber}</td>
-                    <td>${phone}</td>
-                    <td>${ktpAddress}</td>
-                    <td>${livingAddress}</td>
-                    <td class="text-center">${registeredDate}</td>
-                    ${isAdmin ? `<td class="text-center">${storeName}</td>` : ''}
+                    <td>${customerId}<\/td>
+                    <td>${name}<\/td>
+                    <td>${ktpNumber}<\/td>
+                    <td>${phone}<\/td>
+                    <td>${ktpAddress}<\/td>
+                    <td>${livingAddress}<\/td>
+                    <td class="text-center">${registeredDate}<\/td>
+                    ${isAdmin ? `<td class="text-center">${storeName}<\/td>` : ''}
                 </tr>
                 <tr class="action-row">
-                    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}</td>
-                    <td colspan="${totalColumns}" class="action-btns">
+                    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
+                    <td colspan="${totalCols}" class="action-btns">
                         ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                         <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
                         ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                         ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                    </td>
+                    <\/td>
                 </tr>`;
             }
         }
 
-        // 新增客户表单（仅非管理员可见）
         var addCustomerCardHtml = '';
         if (!isAdmin) {
             addCustomerCardHtml = `
@@ -101,7 +98,6 @@ showCustomers: async function() {
             </div>`;
         }
 
-        // 渲染页面 - 表头严格按照数据行顺序
         document.getElementById("app").innerHTML = `
             <div class="page-header">
                 <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
@@ -115,6 +111,16 @@ showCustomers: async function() {
                 <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
                 <div class="table-container">
                     <table class="data-table">
+                        <colgroup>
+                            <col style="width: 12%; min-width: 100px;">
+                            <col style="width: 10%; min-width: 80px;">
+                            <col style="width: 12%; min-width: 100px;">
+                            <col style="width: 10%; min-width: 90px;">
+                            <col style="width: 20%; min-width: 150px;">
+                            <col style="width: 20%; min-width: 150px;">
+                            <col style="width: 10%; min-width: 90px;">
+                            ${isAdmin ? '<col style="width: 6%; min-width: 80px;">' : ''}
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
