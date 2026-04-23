@@ -1,4 +1,4 @@
-// app-dashboard-report.js - v1.1（修复：cashFlow.netProfit 未定义问题 + 表格样式优化）
+// app-dashboard-report.js - v1.2（修复语法错误）
 
 window.APP = window.APP || {};
 
@@ -32,7 +32,6 @@ const DashboardReport = {
             
             console.log(`数据加载完成: 门店 ${stores.length} 家, 订单 ${allOrders.length} 条, 支出 ${allExpenses.length} 条, 付款 ${allPayments.length} 条, 资金流 ${cashFlows.length} 条, 耗时 ${Date.now() - startTime}ms`);
             
-            // 修复：确保 cashFlow.netProfit 存在
             if (typeof cashFlow.netProfit === 'undefined') {
                 let totalIncomeInflow = 0, totalOutflowAll = 0;
                 for (const flow of cashFlows) {
@@ -88,7 +87,6 @@ const DashboardReport = {
                 }
             }
 
-            // 安全获取 cashFlow 各字段值
             var cashBalance = cashFlow.cash?.balance ?? 0;
             var bankBalance = cashFlow.bank?.balance ?? 0;
             var cashIncome = cashFlow.cash?.income ?? 0;
@@ -109,7 +107,6 @@ const DashboardReport = {
                 for (var store of stores) {
                     const orders = ordersByStore[store.id] || [];
                     const expenses = expensesByStore[store.id] || [];
-                    const payments = paymentsByStore[store.id] || [];
                     const flows = cashFlowByStore[store.id] || [];
                     
                     const ords = orders;
@@ -174,7 +171,6 @@ const DashboardReport = {
                     grandTotal.bankBalance += storeBankBalance;
                 }
 
-                // 表格形式展示业务报表
                 var tableRows = '';
                 if (storeReports.length === 0) {
                     tableRows = `<tr><td colspan="14" class="text-center">${lang === 'id' ? '暂无门店数据' : '暂无门店数据'}<\/td><\/tr>`;
@@ -199,7 +195,6 @@ const DashboardReport = {
                     }
                 }
 
-                // 汇总行
                 var summaryRow = `<tr>
                     <td class="store-name-cell"><strong>${lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计'}</strong></td>
                     <td class="text-center"><strong>${grandTotal.orders}</strong></td>
@@ -294,7 +289,6 @@ const DashboardReport = {
                         </div>
                     </div>`;
             } else {
-                // 非管理员视图 - 单门店表格形式
                 const profile = await SUPABASE.getCurrentProfile();
                 const storeId = profile?.store_id;
                 const flows = cashFlowByStore[storeId] || [];
@@ -302,7 +296,6 @@ const DashboardReport = {
                 const storeOrders = allOrders.filter(o => o.store_id === storeId);
                 const storeExpenses = allExpenses.filter(e => e.store_id === storeId);
                 const storeOrderIds = storeOrders.map(o => o.id);
-                const storePayments = allPayments.filter(p => storeOrderIds.includes(p.order_id));
                 
                 let storeCashBalance = 0, storeBankBalance = 0;
                 let totalIncomeInflow = 0;
@@ -391,7 +384,6 @@ const DashboardReport = {
                     </div>`;
             }
             
-            // 添加报表表格样式
             this._addReportTableStyles();
             
         } catch (err) {
@@ -400,112 +392,104 @@ const DashboardReport = {
         }
     },
     
-   // 添加报表表格样式
-_addReportTableStyles: function() {
-    if (document.getElementById('report-table-styles')) return;
-    
-    var style = document.createElement('style');
-    style.id = 'report-table-styles';
-    style.textContent = `
-        /* 报表表格 - 统一边框和数字对齐 */
-        .report-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .report-table th,
-        .report-table td {
-            border: 1px solid #cbd5e1;
-            padding: 10px 8px;
-            vertical-align: middle;
-        }
-        .report-table th {
-            background: #f1f5f9;
-            font-weight: 600;
-            text-align: center;
-        }
-        .report-table td {
-            text-align: left;
-        }
-        .report-table .text-right {
-            text-align: right;
-        }
-        .report-table .text-center {
-            text-align: center;
-        }
-        /* 数字列统一右对齐，使用等宽字体辅助对齐 */
-        .report-table td.text-right,
-        .report-table th.text-right {
-            text-align: right;
-            font-family: 'Courier New', 'Segoe UI', monospace;
-            letter-spacing: 0.3px;
-        }
-        /* 门店名称列 */
-        .report-table .store-name-cell {
-            font-weight: 500;
-            background: #f8fafc;
-        }
-        /* 正负数颜色 */
-        .report-table .income {
-            color: #10b981;
-        }
-        .report-table .expense {
-            color: #ef4444;
-        }
-        /* 汇总行高亮 */
-        .report-table tbody tr:last-child {
-            border-top: 2px solid #94a3b8;
-            background: #f1f5f9;
-            font-weight: 600;
-        }
-        /* 现金流卡片样式 */
-        .cashflow-stats {
-            display: flex;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-        .cashflow-item {
-            flex: 1;
-            min-width: 150px;
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 12px 16px;
-            text-align: center;
-            border: 1px solid #e2e8f0;
-        }
-        .cashflow-item .label {
-            font-size: 12px;
-            color: #64748b;
-            margin-bottom: 6px;
-        }
-        .cashflow-item .value {
-            font-size: 18px;
-            font-weight: 700;
-            font-family: 'Courier New', 'Segoe UI', monospace;
-        }
-        .cashflow-item .negative {
-            color: #ef4444;
-        }
-        .cashflow-item .income {
-            color: #10b981;
-        }
-        .cashflow-item .expense {
-            color: #ef4444;
-        }
-        /* 手机端适配 */
-        @media (max-width: 768px) {
-            .cashflow-item .value {
-                font-size: 14px;
+    _addReportTableStyles: function() {
+        if (document.getElementById('report-table-styles')) return;
+        
+        var style = document.createElement('style');
+        style.id = 'report-table-styles';
+        style.textContent = `
+            .report-table {
+                width: 100%;
+                border-collapse: collapse;
             }
-            .report-table th, 
+            .report-table th,
             .report-table td {
-                padding: 6px 4px;
-                font-size: 11px;
+                border: 1px solid #cbd5e1;
+                padding: 10px 8px;
+                vertical-align: middle;
             }
-        }
-    `;
-    document.head.appendChild(style);
+            .report-table th {
+                background: #f1f5f9;
+                font-weight: 600;
+                text-align: center;
+            }
+            .report-table td {
+                text-align: left;
+            }
+            .report-table .text-right {
+                text-align: right;
+            }
+            .report-table .text-center {
+                text-align: center;
+            }
+            .report-table td.text-right,
+            .report-table th.text-right {
+                text-align: right;
+                font-family: 'Courier New', 'Segoe UI', monospace;
+                letter-spacing: 0.3px;
+            }
+            .report-table .store-name-cell {
+                font-weight: 500;
+                background: #f8fafc;
+            }
+            .report-table .income {
+                color: #10b981;
+            }
+            .report-table .expense {
+                color: #ef4444;
+            }
+            .report-table tbody tr:last-child {
+                border-top: 2px solid #94a3b8;
+                background: #f1f5f9;
+                font-weight: 600;
+            }
+            .cashflow-stats {
+                display: flex;
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+            .cashflow-item {
+                flex: 1;
+                min-width: 150px;
+                background: #f8fafc;
+                border-radius: 12px;
+                padding: 12px 16px;
+                text-align: center;
+                border: 1px solid #e2e8f0;
+            }
+            .cashflow-item .label {
+                font-size: 12px;
+                color: #64748b;
+                margin-bottom: 6px;
+            }
+            .cashflow-item .value {
+                font-size: 18px;
+                font-weight: 700;
+                font-family: 'Courier New', 'Segoe UI', monospace;
+            }
+            .cashflow-item .negative {
+                color: #ef4444;
+            }
+            .cashflow-item .income {
+                color: #10b981;
+            }
+            .cashflow-item .expense {
+                color: #ef4444;
+            }
+            @media (max-width: 768px) {
+                .cashflow-item .value {
+                    font-size: 14px;
+                }
+                .report-table th, 
+                .report-table td {
+                    padding: 6px 4px;
+                    font-size: 11px;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     }
-},
+};
 
 for (var key in DashboardReport) {
     if (typeof DashboardReport[key] === 'function') {
