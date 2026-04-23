@@ -1,13 +1,13 @@
-/* forms.css - 优化版 v2.0 */
+/* forms.css - 优化版 v3.0（缩小表单间距） */
 
 /* === 表单组件 === */
 .form-group {
-    margin-bottom: var(--spacing-4);
+    margin-bottom: var(--spacing-2);  /* 从 var(--spacing-4) 缩小为 8px */
 }
 
 .form-group label {
     display: block;
-    margin-bottom: var(--spacing-2);
+    margin-bottom: var(--spacing-1);  /* 从 var(--spacing-2) 缩小为 4px */
     font-size: var(--font-sm);
     font-weight: 500;
     color: var(--text-secondary);
@@ -17,7 +17,7 @@
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: 10px 12px;
+    padding: 6px 10px;  /* 从 10px 12px 缩小 */
     border-radius: var(--radius-md);
     border: 1px solid var(--border-medium);
     font-family: inherit;
@@ -42,7 +42,7 @@
 .form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-4);
+    gap: var(--spacing-2);  /* 从 var(--spacing-4) 缩小为 8px */
 }
 
 .form-grid .full-width {
@@ -53,13 +53,13 @@
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-3);
-    margin-top: var(--spacing-4);
+    margin-top: var(--spacing-2);  /* 从 var(--spacing-4) 缩小 */
 }
 
 @media (max-width: 640px) {
     .form-grid {
         grid-template-columns: 1fr;
-        gap: var(--spacing-3);
+        gap: var(--spacing-2);
     }
     
     .form-grid .full-width {
@@ -88,7 +88,7 @@
     background: var(--bg-hover);
     padding: var(--spacing-3);
     border-radius: var(--radius-md);
-    margin-bottom: var(--spacing-4);
+    margin-bottom: var(--spacing-3);  /* 从 var(--spacing-4) 缩小 */
 }
 
 .customer-info-display p {
@@ -98,9 +98,9 @@
 
 .store-info-banner {
     background: var(--primary-soft);
-    padding: 10px 14px;
+    padding: 8px 12px;  /* 从 10px 14px 缩小 */
     border-radius: var(--radius-md);
-    margin: 15px 0;
+    margin: 12px 0;  /* 从 15px 缩小 */
     font-size: var(--font-sm);
     color: var(--primary-dark);
 }
@@ -109,7 +109,7 @@
 .address-option {
     display: flex;
     gap: 20px;
-    margin-bottom: 10px;
+    margin-bottom: 6px;  /* 从 10px 缩小 */
     flex-wrap: wrap;
 }
 
@@ -140,8 +140,8 @@
 /* 还款方式表单 */
 .repayment-type-group {
     grid-column: span 2;
-    margin: 12px 0;
-    padding: 14px;
+    margin: 8px 0;  /* 从 12px 缩小 */
+    padding: 10px;  /* 从 14px 缩小 */
     background: var(--bg-hover);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
@@ -149,7 +149,7 @@
 
 .repayment-type-label {
     font-weight: 600;
-    margin-bottom: 10px;
+    margin-bottom: 8px;  /* 从 10px 缩小 */
     display: block;
     color: var(--text-secondary);
 }
@@ -163,7 +163,7 @@
 .repayment-option {
     flex: 1;
     min-width: 200px;
-    padding: 12px;
+    padding: 10px;  /* 从 12px 缩小 */
     border: 2px solid var(--border-light);
     border-radius: 10px;
     cursor: pointer;
@@ -196,7 +196,7 @@
 
 .fixed-repayment-form {
     grid-column: span 2;
-    padding: 14px;
+    padding: 10px;  /* 从 14px 缩小 */
     background: var(--success-light);
     border-radius: var(--radius-lg);
     margin: 8px 0;
@@ -207,8 +207,8 @@
     grid-column: span 2;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    padding: 14px;
+    gap: 10px;  /* 从 12px 缩小 */
+    padding: 10px;  /* 从 14px 缩小 */
     background: var(--warning-light);
     border-radius: var(--radius-lg);
     margin: 8px 0;
@@ -238,7 +238,7 @@
     font-weight: 700;
     color: var(--success);
     background: white;
-    padding: 8px 14px;
+    padding: 6px 12px;  /* 从 8px 14px 缩小 */
     border-radius: var(--radius-md);
     display: inline-block;
 }
@@ -295,19 +295,19 @@
 
 .action-card .card-header {
     border-bottom: 1px solid var(--border-light);
-    padding-bottom: 10px;
-    margin-bottom: 15px;
+    padding-bottom: 8px;  /* 从 10px 缩小 */
+    margin-bottom: 12px;  /* 从 15px 缩小 */
 }
 
 .action-card .card-body {
-    margin-bottom: 15px;
+    margin-bottom: 12px;  /* 从 15px 缩小 */
 }
 
 .action-card .info-box {
     background: var(--primary-soft);
-    padding: 12px;
+    padding: 10px;  /* 从 12px 缩小 */
     border-radius: var(--radius-md);
-    margin-bottom: 15px;
+    margin-bottom: 12px;  /* 从 15px 缩小 */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -323,7 +323,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 15px;
+    margin-bottom: 12px;  /* 从 15px 缩小 */
     flex-wrap: wrap;
 }
 
@@ -333,39 +333,39 @@
 }
 
 .action-select {
-    padding: 10px;
+    padding: 8px;  /* 从 10px 缩小 */
     border-radius: var(--radius-md);
     border: 1px solid var(--border-medium);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     min-width: 150px;
 }
 
 .action-input {
-    padding: 10px;
+    padding: 8px;  /* 从 10px 缩小 */
     border-radius: var(--radius-md);
     border: 1px solid var(--border-medium);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     width: 200px;
 }
 
 .payment-method-group {
-    margin-bottom: 15px;
+    margin-bottom: 12px;  /* 从 15px 缩小 */
 }
 
 .payment-method-title {
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 8px;  /* 从 8px 保持 */
 }
 
 .card-history {
-    margin-top: 15px;
+    margin-top: 12px;  /* 从 15px 缩小 */
     border-top: 1px solid var(--border-light);
-    padding-top: 15px;
+    padding-top: 12px;  /* 从 15px 缩小 */
 }
 
 .history-title {
     font-weight: 600;
-    margin-bottom: 10px;
+    margin-bottom: 8px;  /* 从 10px 缩小 */
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
@@ -378,7 +378,7 @@
 
 .history-table th,
 .history-table td {
-    padding: 8px 6px;
+    padding: 6px 6px;  /* 从 8px 6px 缩小 */
     border-bottom: 1px solid var(--border-light);
 }
 
@@ -414,8 +414,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
-    padding: 6px 0;
+    margin-bottom: 8px;  /* 从 10px 缩小 */
+    padding: 4px 0;  /* 从 6px 缩小 */
     border-bottom: 1px solid var(--border-light);
 }
 
@@ -425,7 +425,7 @@
 
 .progress-bar {
     flex: 1;
-    height: 8px;
+    height: 6px;  /* 从 8px 缩小 */
     background: var(--border-light);
     border-radius: 4px;
     overflow: hidden;
@@ -444,10 +444,10 @@
 }
 
 .overdue-warning {
-    padding: 8px 12px;
+    padding: 6px 10px;  /* 从 8px 12px 缩小 */
     border-radius: 8px;
-    margin-top: 10px;
-    font-size: 13px;
+    margin-top: 8px;  /* 从 10px 缩小 */
+    font-size: 12px;  /* 从 13px 缩小 */
     font-weight: 600;
 }
 
@@ -464,7 +464,7 @@
 .action-buttons {
     display: flex;
     gap: 12px;
-    margin-top: 15px;
+    margin-top: 12px;  /* 从 15px 缩小 */
     flex-wrap: wrap;
 }
 
@@ -479,8 +479,8 @@
 }
 
 .card-info {
-    margin-top: 12px;
-    padding: 10px;
+    margin-top: 10px;  /* 从 12px 缩小 */
+    padding: 8px;  /* 从 10px 缩小 */
     background: var(--bg-hover);
     border-radius: 8px;
     font-size: 11px;
