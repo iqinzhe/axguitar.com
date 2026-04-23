@@ -1,4 +1,4 @@
-// supabase.js - v1.4（ID生成规则改为3位数字递增）
+// supabase.js - v1.5（新增批量查询方法）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -122,7 +122,8 @@ const SupabaseAPI = {
         _storesCache = data;
         _storesCacheTime = now;
         
-        for (const store of data) {
+        for (var i = 0; i < data.length; i++) {
+            var store = data[i];
             if (store.prefix) {
                 _storePrefixCache.set(store.id, store.prefix);
                 _storePrefixCache.set(store.code, store.prefix);
@@ -147,7 +148,7 @@ const SupabaseAPI = {
                 .single();
             
             if (error || !data) {
-                console.warn(`获取门店 ${storeId} 前缀失败:`, error);
+                console.warn('获取门店 ' + storeId + ' 前缀失败:', error);
                 return 'AD';
             }
             
@@ -184,13 +185,13 @@ const SupabaseAPI = {
         const { data: orders, error } = await supabaseClient
             .from('orders')
             .select('order_id')
-            .like('order_id', `${prefix}%`)
+            .like('order_id', prefix + '%')
             .order('created_at', { ascending: false })
             .limit(1);
         
         let maxNumber = 0;
         if (orders && orders.length > 0) {
-            const match = orders[0].order_id.match(new RegExp(`${prefix}(\\d{3})$`));
+            const match = orders[0].order_id.match(new RegExp(prefix + '(\\d{3})$'));
             if (match) {
                 maxNumber = parseInt(match[1], 10);
             }
@@ -199,7 +200,7 @@ const SupabaseAPI = {
         const nextNumber = maxNumber + 1;
         const serial = String(nextNumber).padStart(3, '0');
         
-        return `${prefix}${serial}`;
+        return prefix + serial;
     },
 
     // 生成客户ID：前缀 + 3位数字（001-999）
@@ -209,13 +210,13 @@ const SupabaseAPI = {
         const { data: customers, error } = await supabaseClient
             .from('customers')
             .select('customer_id')
-            .like('customer_id', `${prefix}%`)
+            .like('customer_id', prefix + '%')
             .order('registered_date', { ascending: false })
             .limit(1);
         
         let maxNumber = 0;
         if (customers && customers.length > 0) {
-            const match = customers[0].customer_id.match(new RegExp(`${prefix}(\\d{3})$`));
+            const match = customers[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
             if (match) {
                 maxNumber = parseInt(match[1], 10);
             }
@@ -224,7 +225,7 @@ const SupabaseAPI = {
         const nextNumber = maxNumber + 1;
         const serial = String(nextNumber).padStart(3, '0');
         
-        return `${prefix}${serial}`;
+        return prefix + serial;
     },
 
     calculateNextDueDate: function(startDate, paidMonths) {
@@ -322,7 +323,7 @@ const SupabaseAPI = {
                 source_target: originalFlow.source_target,
                 order_id: originalFlow.order_id,
                 customer_id: originalFlow.customer_id,
-                description: `冲销: ${originalFlow.description}`,
+                description: '冲销: ' + originalFlow.description,
                 reference_id: originalFlow.reference_id
             });
         }
@@ -353,7 +354,7 @@ const SupabaseAPI = {
             source_target: source,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: description || `${Utils.lang === 'id' ? 'Pencairan pinjaman' : '贷款发放'} - ${order.order_id}`,
+            description: description || (Utils.lang === 'id' ? 'Pencairan pinjaman' : '贷款发放') + ' - ' + order.order_id,
             reference_id: order.order_id
         });
         
@@ -402,7 +403,7 @@ const SupabaseAPI = {
             .eq('order_id', order.id)
             .order('date', { ascending: false });
         if (error) throw error;
-        return { order, payments: data };
+        return { order: order, payments: data };
     },
 
     async createOrder(orderData) {
@@ -444,7 +445,6 @@ const SupabaseAPI = {
                 }
                 
                 const monthlyInterest = orderData.loan_amount * agreedInterestRate;
-                
                 const nextDueDate = this.calculateNextDueDate(nowDate, 0);
                 
                 const newOrder = {
@@ -488,14 +488,14 @@ const SupabaseAPI = {
                 
                 if (error) {
                     if (error.code === '23505') {
-                        console.warn(`订单ID冲突: ${orderId}, 重试第 ${retryCount + 1} 次`);
+                        console.warn('订单ID冲突: ' + orderId + ', 重试第 ' + (retryCount + 1) + ' 次');
                         retryCount++;
                         continue;
                     }
                     throw error;
                 }
                 
-                console.log(`✅ 订单创建成功: ${orderId} (还款方式: ${repaymentType})`);
+                console.log('✅ 订单创建成功: ' + orderId + ' (还款方式: ' + repaymentType + ')');
                 return data;
                 
             } catch (err) {
@@ -507,7 +507,8 @@ const SupabaseAPI = {
         throw lastError || new Error(Utils.lang === 'id' ? 'Gagal membuat pesanan' : '创建订单失败');
     },
 
-    async recordAdminFee(orderId, paymentMethod = 'cash', adminFeeAmount = null) {
+    async recordAdminFee(orderId, paymentMethod, adminFeeAmount) {
+        if (paymentMethod === undefined) paymentMethod = 'cash';
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
         const feeAmount = adminFeeAmount || order.admin_fee;
@@ -540,14 +541,15 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `${Utils.t('admin_fee')} - ${order.order_id}`,
+            description: Utils.t('admin_fee') + ' - ' + order.order_id,
             reference_id: order.order_id
         });
         
         return true;
     },
 
-    async recordServiceFee(orderId, months, paymentMethod = 'cash') {
+    async recordServiceFee(orderId, months, paymentMethod) {
+        if (paymentMethod === undefined) paymentMethod = 'cash';
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
         
@@ -588,14 +590,15 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `${Utils.t('service_fee')} - ${order.order_id}`,
+            description: Utils.t('service_fee') + ' - ' + order.order_id,
             reference_id: order.order_id
         });
         
         return true;
     },
 
-    async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
+    async recordInterestPayment(orderId, months, paymentMethod) {
+        if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
         
@@ -618,8 +621,8 @@ const SupabaseAPI = {
         
         if (newInterestPaidMonths > maxMonths) {
             throw new Error(Utils.lang === 'id' 
-                ? `❌ Mencapai batas maksimum perpanjangan (${maxMonths} bulan), harap lunasi pokok segera`
-                : `❌ 已达到最大延期期限 (${maxMonths}个月)，请尽快结清本金`);
+                ? '❌ Mencapai batas maksimum perpanjangan (' + maxMonths + ' bulan), harap lunasi pokok segera'
+                : '❌ 已达到最大延期期限 (' + maxMonths + '个月)，请尽快结清本金');
         }
         
         const nextDueDate = this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths);
@@ -643,7 +646,7 @@ const SupabaseAPI = {
             type: 'interest',
             months: months,
             amount: totalInterest,
-            description: `${Utils.t('interest')}${months} ${Utils.lang === 'id' ? 'bulan' : '个月'} (${(monthlyRate*100).toFixed(0)}%)`,
+            description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(0) + '%)',
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -662,23 +665,22 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: currentOrder.id,
             customer_id: currentOrder.customer_id,
-            description: `${Utils.t('interest')} ${months} ${Utils.lang === 'id' ? 'bulan' : '个月'} (${(monthlyRate*100).toFixed(0)}%)`,
+            description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(0) + '%)',
             reference_id: currentOrder.order_id
         });
         
         const remainingMonths = maxMonths - newInterestPaidMonths;
         const extensionMsg = remainingMonths > 0 
-            ? (Utils.lang === 'id' ? `\nSisa perpanjangan: ${remainingMonths} bulan` : `\n剩余可延期: ${remainingMonths}个月`)
-            : (Utils.lang === 'id' ? `\n⚠️ Mencapai batas maksimum, harap lunasi pokok segera` : `\n⚠️ 已达最大期限，请尽快结清本金`);
+            ? '\n' + (Utils.lang === 'id' ? 'Sisa perpanjangan: ' + remainingMonths + ' bulan' : '剩余可延期: ' + remainingMonths + '个月')
+            : '\n' + (Utils.lang === 'id' ? '⚠️ Mencapai batas maksimum, harap lunasi pokok segera' : '⚠️ 已达最大期限，请尽快结清本金');
         
-        alert(Utils.lang === 'id' 
-            ? `✅ Bunga ${this.formatCurrency(totalInterest)} telah dicatat${extensionMsg}`
-            : `✅ 利息 ${this.formatCurrency(totalInterest)} 已记录${extensionMsg}`);
+        alert((Utils.lang === 'id' ? '✅ Bunga ' : '✅ 利息 ') + this.formatCurrency(totalInterest) + (Utils.lang === 'id' ? ' telah dicatat' : ' 已记录') + extensionMsg);
         
         return true;
     },
 
-    async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
+    async recordPrincipalPayment(orderId, amount, paymentMethod) {
+        if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
         
@@ -755,17 +757,16 @@ const SupabaseAPI = {
         });
         
         if (isFullRepayment) {
-            alert(Utils.lang === 'id' ? `✅ Pesanan lunas` : `✅ 订单已结清`);
+            alert(Utils.lang === 'id' ? '✅ Pesanan lunas' : '✅ 订单已结清');
         } else {
-            alert(Utils.lang === 'id' 
-                ? `✅ Pembayaran pokok ${this.formatCurrency(paidAmount)} telah dicatat`
-                : `✅ 还款 ${this.formatCurrency(paidAmount)} 已记录`);
+            alert((Utils.lang === 'id' ? '✅ Pembayaran pokok ' : '✅ 还款 ') + this.formatCurrency(paidAmount) + (Utils.lang === 'id' ? ' telah dicatat' : ' 已记录'));
         }
         
         return true;
     },
 
-    async recordFixedPayment(orderId, paymentMethod = 'cash') {
+    async recordFixedPayment(orderId, paymentMethod) {
+        if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
         const order = await this.getOrder(orderId);
         
@@ -832,7 +833,7 @@ const SupabaseAPI = {
                 type: 'interest',
                 months: 1,
                 amount: interestAmount,
-                description: `${Utils.lang === 'id' ? 'Cicilan tetap - Bunga' : '固定还款-利息'} ${newFixedPaidMonths}`,
+                description: (Utils.lang === 'id' ? 'Cicilan tetap - Bunga' : '固定还款-利息') + ' ' + newFixedPaidMonths,
                 recorded_by: profile.id,
                 payment_method: paymentMethod
             };
@@ -846,7 +847,7 @@ const SupabaseAPI = {
                 source_target: paymentMethod,
                 order_id: order.id,
                 customer_id: order.customer_id,
-                description: `${Utils.lang === 'id' ? 'Cicilan tetap bunga' : '固定还款利息'} - ${order.order_id} ${Utils.lang === 'id' ? 'ke' : '第'}${newFixedPaidMonths}`,
+                description: (Utils.lang === 'id' ? 'Cicilan tetap bunga' : '固定还款利息') + ' - ' + order.order_id + ' ' + (Utils.lang === 'id' ? 'ke' : '第') + newFixedPaidMonths,
                 reference_id: order.order_id
             });
         }
@@ -857,7 +858,7 @@ const SupabaseAPI = {
                 date: new Date().toISOString().split('T')[0],
                 type: 'principal',
                 amount: principalAmount,
-                description: `${Utils.lang === 'id' ? 'Cicilan tetap - Pokok' : '固定还款-本金'} ${newFixedPaidMonths}`,
+                description: (Utils.lang === 'id' ? 'Cicilan tetap - Pokok' : '固定还款-本金') + ' ' + newFixedPaidMonths,
                 recorded_by: profile.id,
                 payment_method: paymentMethod
             };
@@ -871,22 +872,23 @@ const SupabaseAPI = {
                 source_target: paymentMethod,
                 order_id: order.id,
                 customer_id: order.customer_id,
-                description: `${Utils.lang === 'id' ? 'Cicilan tetap pokok' : '固定还款本金'} - ${order.order_id} ${Utils.lang === 'id' ? 'ke' : '第'}${newFixedPaidMonths}`,
+                description: (Utils.lang === 'id' ? 'Cicilan tetap pokok' : '固定还款本金') + ' - ' + order.order_id + ' ' + (Utils.lang === 'id' ? 'ke' : '第') + newFixedPaidMonths,
                 reference_id: order.order_id
             });
         }
         
         const msg = isCompleted 
-            ? (Utils.lang === 'id' ? `✅ Pesanan lunas!` : `✅ 订单已结清！`)
+            ? (Utils.lang === 'id' ? '✅ Pesanan lunas!' : '✅ 订单已结清！')
             : (Utils.lang === 'id' 
-                ? `✅ Angsuran ke-${newFixedPaidMonths} berhasil!\nBunga: ${this.formatCurrency(interestAmount)}\nPokok: ${this.formatCurrency(principalAmount)}\nSisa angsuran: ${order.repayment_term - newFixedPaidMonths} bulan`
-                : `✅ 第${newFixedPaidMonths}期还款成功！\n利息: ${this.formatCurrency(interestAmount)}\n本金: ${this.formatCurrency(principalAmount)}\n剩余期数: ${order.repayment_term - newFixedPaidMonths}个月`);
+                ? '✅ Angsuran ke-' + newFixedPaidMonths + ' berhasil!\nBunga: ' + this.formatCurrency(interestAmount) + '\nPokok: ' + this.formatCurrency(principalAmount) + '\nSisa angsuran: ' + (order.repayment_term - newFixedPaidMonths) + ' bulan'
+                : '✅ 第' + newFixedPaidMonths + '期还款成功！\n利息: ' + this.formatCurrency(interestAmount) + '\n本金: ' + this.formatCurrency(principalAmount) + '\n剩余期数: ' + (order.repayment_term - newFixedPaidMonths) + '个月');
         
         alert(msg);
         return true;
     },
 
-    async earlySettleFixedOrder(orderId, paymentMethod = 'cash') {
+    async earlySettleFixedOrder(orderId, paymentMethod) {
+        if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
         const order = await this.getOrder(orderId);
         
@@ -907,8 +909,8 @@ const SupabaseAPI = {
         const savedInterest = remainingPrincipal * monthlyRate * remainingMonths;
         
         const confirmMsg = Utils.lang === 'id'
-            ? `⚠️ Konfirmasi Pelunasan Dipercepat\n\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nAngsuran terbayar: ${paidMonths}/${order.repayment_term}\nSisa Pokok: ${this.formatCurrency(remainingPrincipal)}\nBunga yang dihemat: ${this.formatCurrency(savedInterest)}\nJumlah Pelunasan: ${this.formatCurrency(settlementAmount)}\n\nLanjutkan?`
-            : `⚠️ 提前结清确认\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n已还期数: ${paidMonths}/${order.repayment_term}\n剩余本金: ${this.formatCurrency(remainingPrincipal)}\n减免利息: ${this.formatCurrency(savedInterest)}\n结清金额: ${this.formatCurrency(settlementAmount)}\n\n确认结清？`;
+            ? '⚠️ Konfirmasi Pelunasan Dipercepat\n\nPesanan: ' + order.order_id + '\nNasabah: ' + order.customer_name + '\nAngsuran terbayar: ' + paidMonths + '/' + order.repayment_term + '\nSisa Pokok: ' + this.formatCurrency(remainingPrincipal) + '\nBunga yang dihemat: ' + this.formatCurrency(savedInterest) + '\nJumlah Pelunasan: ' + this.formatCurrency(settlementAmount) + '\n\nLanjutkan?'
+            : '⚠️ 提前结清确认\n\n订单号: ' + order.order_id + '\n客户: ' + order.customer_name + '\n已还期数: ' + paidMonths + '/' + order.repayment_term + '\n剩余本金: ' + this.formatCurrency(remainingPrincipal) + '\n减免利息: ' + this.formatCurrency(savedInterest) + '\n结清金额: ' + this.formatCurrency(settlementAmount) + '\n\n确认结清？';
         
         if (!confirm(confirmMsg)) return false;
         
@@ -917,7 +919,7 @@ const SupabaseAPI = {
             date: new Date().toISOString().split('T')[0],
             type: 'principal',
             amount: settlementAmount,
-            description: `${Utils.lang === 'id' ? 'Pelunasan dipercepat - hemat bunga' : '提前结清 - 减免剩余利息'}`,
+            description: Utils.lang === 'id' ? 'Pelunasan dipercepat - hemat bunga' : '提前结清 - 减免剩余利息',
             recorded_by: profile.id,
             payment_method: paymentMethod
         };
@@ -931,7 +933,7 @@ const SupabaseAPI = {
             source_target: paymentMethod,
             order_id: order.id,
             customer_id: order.customer_id,
-            description: `${Utils.lang === 'id' ? 'Pelunasan dipercepat' : '提前结清'} - ${order.order_id}`,
+            description: (Utils.lang === 'id' ? 'Pelunasan dipercepat' : '提前结清') + ' - ' + order.order_id,
             reference_id: order.order_id
         });
         
@@ -948,7 +950,7 @@ const SupabaseAPI = {
         
         if (error) throw error;
         
-        alert(Utils.lang === 'id' ? `✅ Pelunasan dipercepat berhasil!\nJumlah: ${this.formatCurrency(settlementAmount)}` : `✅ 提前结清成功！\n结清金额: ${this.formatCurrency(settlementAmount)}`);
+        alert((Utils.lang === 'id' ? '✅ Pelunasan dipercepat berhasil!\nJumlah: ' : '✅ 提前结清成功！\n结清金额: ') + this.formatCurrency(settlementAmount));
         return true;
     },
 
@@ -963,7 +965,8 @@ const SupabaseAPI = {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        for (const order of activeOrders) {
+        for (var i = 0; i < activeOrders.length; i++) {
+            var order = activeOrders[i];
             const dueDate = order.next_interest_due_date;
             if (!dueDate) continue;
             
@@ -1003,9 +1006,13 @@ const SupabaseAPI = {
             'collateral_name', 'loan_amount', 'admin_fee', 'service_fee_percent'
         ];
         
-        const isUpdatingSensitive = sensitiveFields.some(field => 
-            updateData.hasOwnProperty(field)
-        );
+        var isUpdatingSensitive = false;
+        for (var i = 0; i < sensitiveFields.length; i++) {
+            if (updateData.hasOwnProperty(sensitiveFields[i])) {
+                isUpdatingSensitive = true;
+                break;
+            }
+        }
         
         if (currentOrder.is_locked && isUpdatingSensitive) {
             throw new Error(Utils.t('order_locked'));
@@ -1074,17 +1081,41 @@ const SupabaseAPI = {
 
     async getReport() {
         const orders = await this.getOrders();
-        const activeOrders = orders.filter(o => o.status === 'active');
+        var activeOrders = [];
+        for (var i = 0; i < orders.length; i++) {
+            if (orders[i].status === 'active') activeOrders.push(orders[i]);
+        }
+        var totalLoanAmount = 0;
+        var totalAdminFees = 0;
+        var totalServiceFees = 0;
+        var totalInterest = 0;
+        var totalPrincipal = 0;
+        var expectedMonthlyInterest = 0;
+        
+        for (var i = 0; i < orders.length; i++) {
+            var o = orders[i];
+            totalLoanAmount += (o.loan_amount || 0);
+            if (o.admin_fee_paid) totalAdminFees += (o.admin_fee || 0);
+            totalServiceFees += (o.service_fee_paid || 0);
+            totalInterest += (o.interest_paid_total || 0);
+            totalPrincipal += (o.principal_paid || 0);
+        }
+        
+        for (var i = 0; i < activeOrders.length; i++) {
+            var o = activeOrders[i];
+            expectedMonthlyInterest += ((o.loan_amount || 0) - (o.principal_paid || 0)) * (o.agreed_interest_rate || 0.08);
+        }
+        
         return {
             total_orders: orders.length,
             active_orders: activeOrders.length,
-            completed_orders: orders.filter(o => o.status === 'completed').length,
-            total_loan_amount: orders.reduce((s, o) => s + (o.loan_amount || 0), 0),
-            total_admin_fees: orders.reduce((s, o) => s + (o.admin_fee_paid ? o.admin_fee : 0), 0),
-            total_service_fees: orders.reduce((s, o) => s + (o.service_fee_paid || 0), 0),
-            total_interest: orders.reduce((s, o) => s + (o.interest_paid_total || 0), 0),
-            total_principal: orders.reduce((s, o) => s + (o.principal_paid || 0), 0),
-            expected_monthly_interest: activeOrders.reduce((s, o) => s + (((o.loan_amount || 0) - (o.principal_paid || 0)) * (o.agreed_interest_rate || 0.08)), 0)
+            completed_orders: orders.length - activeOrders.length,
+            total_loan_amount: totalLoanAmount,
+            total_admin_fees: totalAdminFees,
+            total_service_fees: totalServiceFees,
+            total_interest: totalInterest,
+            total_principal: totalPrincipal,
+            expected_monthly_interest: expectedMonthlyInterest
         };
     },
 
@@ -1104,7 +1135,7 @@ const SupabaseAPI = {
             return [];
         }
         
-        const accessibleOrderIds = accessibleOrders.map(o => o.id);
+        const accessibleOrderIds = accessibleOrders.map(function(o) { return o.id; });
         
         if (accessibleOrderIds.length === 0) {
             return [];
@@ -1122,16 +1153,15 @@ const SupabaseAPI = {
         }
         
         const orderMap = {};
-        for (const order of accessibleOrders) {
-            orderMap[order.id] = order;
+        for (var i = 0; i < accessibleOrders.length; i++) {
+            orderMap[accessibleOrders[i].id] = accessibleOrders[i];
         }
         
         const result = [];
-        for (const p of payments) {
-            result.push({
-                ...p,
-                orders: orderMap[p.order_id] || null
-            });
+        for (var i = 0; i < payments.length; i++) {
+            result.push(Object.assign({}, payments[i], {
+                orders: orderMap[payments[i].order_id] || null
+            }));
         }
         
         return result;
@@ -1146,7 +1176,7 @@ const SupabaseAPI = {
 
     async createStore(code, name, address, phone) {
         const { data, error } = await supabaseClient
-            .from('stores').insert({ code, name, address, phone }).select().single();
+            .from('stores').insert({ code: code, name: name, address: address, phone: phone }).select().single();
         if (error) throw error;
         return data;
     },
@@ -1184,7 +1214,8 @@ const SupabaseAPI = {
         return true;
     },
 
-    async getCustomers(filters = {}) {
+    async getCustomers(filters) {
+        if (filters === undefined) filters = {};
         const profile = await this.getCurrentProfile();
         let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
         
@@ -1226,7 +1257,7 @@ const SupabaseAPI = {
         return data;
     },
 
-    async getCashFlowRecords(storeId = null, startDate = null, endDate = null) {
+    async getCashFlowRecords(storeId, startDate, endDate) {
         const profile = await this.getCurrentProfile();
         const targetStoreId = storeId || profile?.store_id;
         
@@ -1258,6 +1289,76 @@ const SupabaseAPI = {
         return data;
     },
 
+    // ========== 新增：批量获取所有门店现金流余额 ==========
+    async getAllStoreBalances() {
+        const { data: allFlows, error } = await supabaseClient
+            .from('cash_flow_records')
+            .select('store_id, direction, amount, source_target')
+            .eq('is_voided', false);
+        
+        if (error) {
+            console.warn('批量获取门店现金流失败:', error);
+            return {};
+        }
+        
+        var balances = {};
+        for (var i = 0; i < allFlows.length; i++) {
+            var flow = allFlows[i];
+            var storeId = flow.store_id;
+            var amount = flow.amount || 0;
+            
+            if (!balances[storeId]) {
+                balances[storeId] = { cashBalance: 0, bankBalance: 0 };
+            }
+            
+            if (flow.direction === 'inflow') {
+                if (flow.source_target === 'cash') {
+                    balances[storeId].cashBalance += amount;
+                } else if (flow.source_target === 'bank') {
+                    balances[storeId].bankBalance += amount;
+                }
+            } else if (flow.direction === 'outflow') {
+                if (flow.source_target === 'cash') {
+                    balances[storeId].cashBalance -= amount;
+                } else if (flow.source_target === 'bank') {
+                    balances[storeId].bankBalance -= amount;
+                }
+            }
+        }
+        
+        return balances;
+    },
+
+    // ========== 新增：获取所有订单（精简字段，用于统计） ==========
+    async getAllOrdersSummary() {
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid');
+        
+        if (error) throw error;
+        return data || [];
+    },
+
+    // ========== 新增：获取所有支出（精简字段） ==========
+    async getAllExpensesSummary() {
+        const { data, error } = await supabaseClient
+            .from('expenses')
+            .select('id, store_id, amount, payment_method');
+        
+        if (error) throw error;
+        return data || [];
+    },
+
+    // ========== 新增：获取所有缴费记录（精简字段） ==========
+    async getAllPaymentsSummary() {
+        const { data, error } = await supabaseClient
+            .from('payment_history')
+            .select('id, order_id, type, amount, payment_method');
+        
+        if (error) throw error;
+        return data || [];
+    },
+
     async getShopAccount(storeId) {
         const targetStoreId = storeId || await this.getCurrentStoreId();
         
@@ -1279,7 +1380,8 @@ const SupabaseAPI = {
         let cashBalance = 0;
         let bankBalance = 0;
         
-        for (const flow of flows || []) {
+        for (var i = 0; i < (flows || []).length; i++) {
+            var flow = flows[i];
             const amount = flow.amount || 0;
             if (flow.direction === 'inflow') {
                 if (flow.source_target === 'cash') cashBalance += amount;
@@ -1313,7 +1415,8 @@ const SupabaseAPI = {
         let bankInflow = 0, bankOutflow = 0;
         let totalIncome = 0, totalExpense = 0;
         
-        for (const flow of flows || []) {
+        for (var i = 0; i < (flows || []).length; i++) {
+            var flow = flows[i];
             const amount = flow.amount || 0;
             if (flow.direction === 'inflow') {
                 totalIncome += amount;
@@ -1331,7 +1434,8 @@ const SupabaseAPI = {
         
         let incomeInflowExcludingPrincipal = 0;
         let totalOutflowAll = 0;
-        for (const flow of flows || []) {
+        for (var i = 0; i < (flows || []).length; i++) {
+            var flow = flows[i];
             const amount = flow.amount || 0;
             if (flow.direction === 'inflow' && flow.flow_type !== 'principal') {
                 incomeInflowExcludingPrincipal += amount;
@@ -1463,7 +1567,8 @@ const SupabaseAPI = {
         today.setHours(0, 0, 0, 0);
         
         const needRemind = [];
-        for (const order of orders || []) {
+        for (var i = 0; i < (orders || []).length; i++) {
+            var order = orders[i];
             if (!order.next_interest_due_date) continue;
             
             const dueDate = new Date(order.next_interest_due_date);
@@ -1557,7 +1662,7 @@ const SupabaseAPI = {
         return data;
     },
 
-    async getInternalTransfers(storeId = null, startDate = null, endDate = null) {
+    async getInternalTransfers(storeId, startDate, endDate) {
         const profile = await this.getCurrentProfile();
         
         let query = supabaseClient
