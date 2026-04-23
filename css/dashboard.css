@@ -557,3 +557,70 @@ button.warning.highlight {
         width: 100% !important;
     }
 }
+
+/* ========================================
+   门店管理 - 现金流汇总卡片样式
+   ======================================== */
+
+.cashflow-card {
+    margin-bottom: 20px;
+}
+
+.cashflow-stats {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.cashflow-item-card {
+    flex: 1;
+    min-width: 180px;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s ease;
+}
+
+.cashflow-item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.cashflow-item-card .label {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.cashflow-item-card .value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.cashflow-item-card .value.negative {
+    color: #ef4444;
+}
+
+.cashflow-item-card .sub {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 6px;
+}
+
+.cashflow-note {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
+}
+
+@media (max-width: 640px) {
+    .cashflow-stats {
+        flex-direction: column;
+    }
+    .cashflow-item-card {
+        min-width: auto;
+    }
+}
