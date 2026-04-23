@@ -1,4 +1,4 @@
-/* dashboard.css - 优化版 v2.0 */
+/* dashboard.css - 优化版 v3.0（最终版） */
 
 /* === 卡片组件 === */
 .card {
@@ -80,7 +80,7 @@
     margin-bottom: var(--spacing-5);
 }
 
-/* === 资金管理区块 - 优化为浅色高亮 === */
+/* === 资金管理区块 === */
 .cashflow-summary {
     background: var(--bg-highlight);
     border-radius: var(--radius-xl);
@@ -392,67 +392,88 @@ button.warning.highlight {
 }
 
 /* ========================================
-   缴费页面 - 操作按钮横向排列修复
+   缴费页面 - 汇总卡片流式布局
    ======================================== */
-.action-buttons {
+.summary-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    margin-top: 15px;
+    gap: 12px 24px;
+    align-items: flex-start;
 }
 
-.btn-action {
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 10px 20px;
+.summary-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    background: var(--bg-hover);
+    padding: 6px 12px;
+    border-radius: 8px;
+    flex: 0 0 auto;
+    max-width: 100%;
+}
+
+.summary-item .label {
+    font-weight: 600;
+    color: var(--text-secondary);
     font-size: var(--font-sm);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: var(--transition);
-    border: none;
-    width: auto !important;  /* 覆盖可能的 width: 100% */
-    min-width: 120px;
+    white-space: nowrap;
 }
 
-.btn-action.success {
-    background: var(--success);
-    color: white;
+.summary-item .value {
+    font-weight: 500;
+    color: var(--text-primary);
+    word-break: break-word;
 }
 
-.btn-action.success:hover {
-    background: var(--success-dark);
+.summary-item .value.order-id {
+    font-family: monospace;
+    font-weight: 600;
 }
 
-.btn-action.early-settle {
-    background: #8b5cf6;
-    color: white;
+.summary-item .value.warning {
+    color: var(--warning-dark);
 }
 
-.btn-action.early-settle:hover {
-    background: #7c3aed;
+.summary-item .value.success-text {
+    color: var(--success-dark);
 }
 
-/* 手机端：按钮可能换行 */
-@media (max-width: 640px) {
-    .action-buttons {
-        flex-direction: column;
-        align-items: stretch;
+/* 手机端：标签和内容上下排列 */
+@media (max-width: 768px) {
+    .summary-grid {
+        gap: 10px;
     }
     
-    .btn-action {
-        width: 100% !important;
-        text-align: center;
+    .summary-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 8px 12px;
+        flex: 1 1 auto;
+        min-width: calc(50% - 10px);
+    }
+    
+    .summary-item .label {
+        font-size: 0.7rem;
+        white-space: normal;
+    }
+    
+    .summary-item .value {
+        font-size: 0.8rem;
+        word-break: break-all;
+    }
+}
+
+/* 超小手机：单列 */
+@media (max-width: 480px) {
+    .summary-item {
+        min-width: 100%;
     }
 }
 
 /* ========================================
-   缴费页面 - 双列布局 + 按钮横向
+   缴费页面 - 双列布局（利息/本金卡片）
    ======================================== */
-
-/* 电脑端：利息和本金卡片双列并排 */
 .payment-double-column {
     display: flex;
     flex-wrap: wrap;
@@ -466,7 +487,7 @@ button.warning.highlight {
     margin-bottom: 0;
 }
 
-/* 确认收款按钮 - 强制横向 */
+/* 确认收款按钮 - 横向 */
 .btn-action {
     display: inline-flex !important;
     align-items: center;
@@ -481,6 +502,7 @@ button.warning.highlight {
     border: none;
     width: auto !important;
     min-width: 140px;
+    margin-top: 12px;
 }
 
 .btn-action.success {
@@ -501,7 +523,6 @@ button.warning.highlight {
     background: #7c3aed;
 }
 
-/* 固定还款卡片的按钮组 */
 .action-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -532,86 +553,5 @@ button.warning.highlight {
     
     .action-buttons .btn-action {
         width: 100% !important;
-    }
-}
-
-/* ========================================
-   缴费页面 - 汇总卡片响应式网格布局
-   ======================================== */
-
-/* 电脑端：3列网格 */
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px 20px;
-}
-
-.summary-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 6px 0;
-    border-bottom: 1px dashed var(--border-light);
-}
-
-.summary-item .label {
-    font-weight: 600;
-    color: var(--text-secondary);
-    font-size: var(--font-sm);
-}
-
-.summary-item .value {
-    font-weight: 500;
-    color: var(--text-primary);
-    text-align: right;
-    word-break: break-word;
-}
-
-.summary-item .value.order-id {
-    font-family: monospace;
-    font-weight: 600;
-}
-
-.summary-item .value.warning {
-    color: var(--warning-dark);
-}
-
-.summary-item .value.success-text {
-    color: var(--success-dark);
-}
-
-/* 手机端：2列网格 */
-@media (max-width: 768px) {
-    .summary-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px 12px;
-    }
-    
-    .summary-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
-        border-bottom: none;
-        background: var(--bg-hover);
-        padding: 8px 10px;
-        border-radius: 8px;
-    }
-    
-    .summary-item .label {
-        font-size: 0.7rem;
-        color: var(--text-muted);
-    }
-    
-    .summary-item .value {
-        font-size: 0.8rem;
-        text-align: left;
-        word-break: break-all;
-    }
-}
-
-/* 超小手机：单列 */
-@media (max-width: 480px) {
-    .summary-grid {
-        grid-template-columns: 1fr;
     }
 }
