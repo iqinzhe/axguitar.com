@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.7（修复：flowsToAnalyze 空值处理 + 门店登录兼容）
+// app-dashboard-core.js - v1.7
 
 window.APP = window.APP || {};
 
