@@ -198,90 +198,78 @@ const PaymentsModule = {
                 `;
             }
 
-            // 灵活还款板块
-            var flexibleRepaymentHtml = '';
-            if (order.repayment_type !== 'fixed') {
-                flexibleRepaymentHtml = `
-                    <div class="card action-card">
-                        <div class="card-header"><h3>💰 ${t('interest')}</h3></div>
-                        <div class="card-body">
-                            <div class="info-box">
-                                <span>📌 ${lang === 'id' ? 'Ini adalah pembayaran bunga ke-' : '本次是第'} <strong>${nextInterestNumber}</strong> ${lang === 'id' ? 'kali' : '次利息支付'}</span>
-                                <span>💰 ${lang === 'id' ? 'Jumlah yang harus dibayar' : '应付金额'}: <strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></span>
-                                <span>📈 ${t('agreed_rate')}: <strong>${(monthlyRate*100).toFixed(0)}%</strong></span>
-                            </div>
-                            <div class="action-input-group">
-                                <label class="action-label">${lang === 'id' ? 'Ambil' : '收取'}:</label>
-                                <select id="interestMonths" class="action-select">${interestOptions}</select>
-                            </div>
-                            <div class="payment-method-group">
-                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pencatatan' : '入账方式'}:</div>
-                                <div class="payment-method-options">
-                                    <label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label>
-                                    <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
-                                </div>
-                            </div>
-                            <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'}</button>
-                        </div>
-                        <div class="card-history">
-                            <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</div>
-                            <div class="table-container">
-                                <table class="history-table">
-                                    <thead>
-                                        <tr>
-                                            <th class="text-center">${lang === 'id' ? 'Ke-' : '第几次'}</th>
-                                            <th>${t('date')}</th>
-                                            <th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th>
-                                            <th class="text-right">${t('amount')}</th>
-                                            <th>${lang === 'id' ? 'Metode' : '方式'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>${interestRows}</tbody>
-                                </table>
-                            </div>
+            // 灵活还款板块 - 修改为双列布局（电脑端）
+var flexibleRepaymentHtml = '';
+if (order.repayment_type !== 'fixed') {
+    flexibleRepaymentHtml = `
+        <div class="payment-double-column">
+            <!-- 利息卡片 -->
+            <div class="card action-card">
+                <div class="card-header"><h3>💰 ${t('interest')}</h3></div>
+                <div class="card-body">
+                    <div class="info-box">
+                        <span>📌 ${lang === 'id' ? 'Ini adalah pembayaran bunga ke-' : '本次是第'} <strong>${nextInterestNumber}</strong> ${lang === 'id' ? 'kali' : '次利息支付'}</span>
+                        <span>💰 ${lang === 'id' ? 'Jumlah yang harus dibayar' : '应付金额'}: <strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></span>
+                        <span>📈 ${t('agreed_rate')}: <strong>${(monthlyRate*100).toFixed(0)}%</strong></span>
+                    </div>
+                    <div class="action-input-group">
+                        <label class="action-label">${lang === 'id' ? 'Ambil' : '收取'}:</label>
+                        <select id="interestMonths" class="action-select">${interestOptions}</select>
+                    </div>
+                    <div class="payment-method-group">
+                        <div class="payment-method-title">${lang === 'id' ? 'Metode Pencatatan' : '入账方式'}:</div>
+                        <div class="payment-method-options">
+                            <label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                            <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
                         </div>
                     </div>
-                    
-                    <div class="card action-card">
-                        <div class="card-header"><h3>🏦 ${t('principal')}</h3></div>
-                        <div class="card-body">
-                            <div class="info-box warning-box">
-                                <span>📊 ${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}: <strong>${Utils.formatCurrency(principalPaid)}</strong></span>
-                                <span>📊 ${lang === 'id' ? 'Sisa Pokok' : '尚欠本金'}: <strong class="${remainingPrincipal > 0 ? 'text-warning' : 'text-success'}">${Utils.formatCurrency(remainingPrincipal)}</strong></span>
-                            </div>
-                            <div class="action-input-group">
-                                <label class="action-label">${lang === 'id' ? 'Jumlah Pembayaran' : '还款金额'}:</label>
-                                <input type="text" id="principalAmount" class="action-input" placeholder="0">
-                            </div>
-                            <div class="payment-method-group">
-                                <div class="payment-method-title">${lang === 'id' ? 'Metode Pencatatan' : '入账方式'}:</div>
-                                <div class="payment-method-options">
-                                    <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label>
-                                    <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
-                                </div>
-                            </div>
-                            <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'}</button>
-                        </div>
-                        <div class="card-history">
-                            <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</div>
-                            <div class="table-container">
-                                <table class="history-table">
-                                    <thead>
-                                        <tr>
-                                            <th>${t('date')}</th>
-                                            <th class="text-right">${lang === 'id' ? 'Jumlah Dibayar' : '还款金额'}</th>
-                                            <th class="text-right">${lang === 'id' ? 'Total Dibayar' : '累计已还'}</th>
-                                            <th class="text-right">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th>
-                                            <th>${lang === 'id' ? 'Metode' : '方式'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>${principalRows}</tbody>
-                                </table>
-                            </div>
+                    <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'}</button>
+                </div>
+                <div class="card-history">
+                    <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史'}</div>
+                    <div class="table-container">
+                        <table class="history-table">
+                            <thead><tr><th class="text-center">${lang === 'id' ? 'Ke-' : '第几次'}</th><th>${t('date')}</th><th class="text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="text-right">${t('amount')}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
+                            <tbody>${interestRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 本金卡片 -->
+            <div class="card action-card">
+                <div class="card-header"><h3>🏦 ${t('principal')}</h3></div>
+                <div class="card-body">
+                    <div class="info-box warning-box">
+                        <span>📊 ${lang === 'id' ? 'Pokok Dibayar' : '已还本金'}: <strong>${Utils.formatCurrency(principalPaid)}</strong></span>
+                        <span>📊 ${lang === 'id' ? 'Sisa Pokok' : '尚欠本金'}: <strong class="${remainingPrincipal > 0 ? 'text-warning' : 'text-success'}">${Utils.formatCurrency(remainingPrincipal)}</strong></span>
+                    </div>
+                    <div class="action-input-group">
+                        <label class="action-label">${lang === 'id' ? 'Jumlah Pembayaran' : '还款金额'}:</label>
+                        <input type="text" id="principalAmount" class="action-input" placeholder="0">
+                    </div>
+                    <div class="payment-method-group">
+                        <div class="payment-method-title">${lang === 'id' ? 'Metode Pencatatan' : '入账方式'}:</div>
+                        <div class="payment-method-options">
+                            <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label>
+                            <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
                         </div>
                     </div>
-                `;
-            }
+                    <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn-action success">✅ ${lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'}</button>
+                </div>
+                <div class="card-history">
+                    <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史'}</div>
+                    <div class="table-container">
+                        <table class="history-table">
+                            <thead><tr><th>${t('date')}</th><th class="text-right">${lang === 'id' ? 'Jumlah Dibayar' : '还款金额'}</th><th class="text-right">${lang === 'id' ? 'Total Dibayar' : '累计已还'}</th><th class="text-right">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th><th>${lang === 'id' ? 'Metode' : '方式'}</th></tr></thead>
+                            <tbody>${principalRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
 
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
