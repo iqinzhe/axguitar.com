@@ -161,44 +161,81 @@ button:disabled { opacity: 0.6; }
    ⭐ 订单详情（Grid + Flex 重构核心）
    ======================================== */
 
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px 20px;
-}
-
-.summary-item {
+/* 外层 */
+.summary-card {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 每个区块 */
+.summary-section {
     background: var(--bg-hover);
-    padding: 8px 12px;
-    border-radius: 8px;
-    gap: 12px;
-    min-width: 0;
+    border-radius: 10px;
+    padding: 12px;
 }
 
-.summary-item .label {
+/* 标题 */
+.summary-section h4 {
+    font-size: 13px;
     font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+/* 表格式布局（核心） */
+.summary-grid-table {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 8px 12px;
+}
+
+/* 左侧 label */
+.summary-grid-table .label {
     color: var(--text-secondary);
+    font-weight: 500;
     white-space: nowrap;
-    flex-shrink: 0;
 }
 
-.summary-item .value {
-    flex: 1;
+/* 右侧 value */
+.summary-grid-table .value {
     text-align: right;
-    word-break: break-word;
-    min-width: 0;
-}
-
-.summary-item .value.order-id {
-    font-family: monospace;
     font-weight: 600;
+    word-break: break-word;
 }
 
-.summary-item .value.warning { color: var(--warning-dark); }
-.summary-item .value.success-text { color: var(--success-dark); }
+/* 状态颜色 */
+.value.warning {
+    color: #d97706;
+}
+
+.value.success {
+    color: #10b981;
+}
+
+.value.success-text {
+    color: #10b981;
+}
+
+.order-id {
+    font-family: monospace;
+}
+
+/* 手机优化 */
+@media (max-width: 480px) {
+    .summary-grid-table {
+        grid-template-columns: 90px 1fr;
+    }
+
+    .summary-section h4 {
+        font-size: 12px;
+    }
+
+    .summary-grid-table .label,
+    .summary-grid-table .value {
+        font-size: 0.75rem;
+    }
+}
 
 /* === 双列卡片 === */
 .payment-double-column {
