@@ -1,4 +1,4 @@
-/* tables.css - 手机端双行布局版 v3.1 */
+/* tables.css - 手机端双行布局版 v3.2 */
 
 /* === 表格容器 === */
 .table-container {
@@ -19,24 +19,27 @@
 .data-table th,
 .data-table td {
     vertical-align: middle;
+    padding: 10px 12px;
 }
 
 .data-table th {
     background: var(--bg-hover);
-    padding: 10px 12px;
     font-weight: 600;
     color: var(--text-primary);
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 2px solid var(--border-light);
     white-space: nowrap;
+    text-align: left;
 }
 
-/* ✅ 删除表头最右边的“操作”列 */
-.data-table thead th:last-child {
-    display: none;
+.data-table th.text-center {
+    text-align: center;
+}
+
+.data-table th.text-right {
+    text-align: right;
 }
 
 .data-table td {
-    padding: 8px 12px;
     border-bottom: 1px solid var(--border-light);
 }
 
@@ -44,23 +47,13 @@
     background: var(--bg-hover);
 }
 
-/* ===============================
-   ✅ 核心优化：锁定第一列（PC端）
-   =============================== */
-.data-table th:first-child,
-.data-table td:first-child {
-    position: sticky;
-    left: 0;
-    background: var(--bg-card);
-    z-index: 2;
-}
-
-.data-table th:first-child {
-    z-index: 3;
+/* ✅ 删除表头最右边的“操作”列（如果有） */
+.data-table thead th:last-child.action-column {
+    display: none;
 }
 
 /* ===============================
-   ✅ 操作行（PC端默认样式）
+   ✅ 操作行样式
    =============================== */
 .action-row td {
     padding: 6px 12px 10px;
@@ -69,7 +62,6 @@
     vertical-align: middle;
 }
 
-/* 操作标签列（"操作"文字）*/
 .action-row td.action-label {
     white-space: nowrap;
     font-size: var(--font-xs);
@@ -79,7 +71,6 @@
     width: 1%;
 }
 
-/* 按钮列：flex横排，不换行 */
 .action-row td.action-btns {
     display: flex;
     flex-wrap: nowrap;
@@ -94,7 +85,7 @@
 }
 
 /* ===============================
-   ✅ 手机端：数据行 + 操作行 双行布局
+   ✅ 手机端双行布局
    =============================== */
 @media (max-width: 768px) {
     .data-table {
@@ -105,83 +96,35 @@
     .data-table th {
         padding: 7px 9px;
         font-size: 0.72rem;
-        white-space: nowrap;
     }
 
     .data-table tbody tr:not(.action-row) td {
         padding: 7px 9px;
         font-size: 0.72rem;
-        white-space: nowrap;
     }
 
     .action-row td {
         padding: 6px 10px 8px;
         background: #f8fafc;
-        border-top: none;
-        border-bottom: 2px solid var(--border-medium);
-        vertical-align: middle;
     }
 
     .action-row td.action-label {
-        white-space: nowrap;
         font-size: 0.72rem;
-        font-weight: 600;
-        color: var(--text-secondary);
-        width: 1%;
         padding-right: 6px;
     }
 
     .action-row td.action-btns {
-        display: flex;
-        flex-wrap: nowrap;
-        align-items: center;
         gap: 8px;
         overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
     }
 
-    .action-row td .btn-small,
-    .action-row .btn-small {
+    .action-row td .btn-small {
         padding: 5px 10px;
         font-size: 0.7rem;
-        margin: 0;
-        flex-shrink: 0;
-        white-space: nowrap;
     }
 }
 
-/* === 其他样式 === */
-.data-table td.text-right,
-.data-table th.text-right {
-    text-align: right;
-}
-
-.data-table td.text-center,
-.data-table th.text-center {
-    text-align: center;
-}
-
-.data-table td.income,
-.data-table .income {
-    color: var(--success);
-    font-weight: 500;
-}
-
-.data-table td.expense,
-.data-table .expense {
-    color: var(--danger);
-    font-weight: 500;
-}
-
-.data-table .store-name-cell {
-    font-weight: 500;
-    background: var(--bg-hover);
-}
-
-.data-table .order-id,
-.data-table .customer-id,
-.data-table .store-code {
-    font-family: monospace;
-    font-weight: 600;
-    color: var(--primary-dark);
-}
+/* === 对齐工具类 === */
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
