@@ -390,3 +390,60 @@ button.warning.highlight {
     background: var(--bg-hover);
     border: 1px solid var(--border-light);
 }
+
+/* ========================================
+   缴费页面 - 操作按钮横向排列修复
+   ======================================== */
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.btn-action {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+    font-size: var(--font-sm);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    width: auto !important;  /* 覆盖可能的 width: 100% */
+    min-width: 120px;
+}
+
+.btn-action.success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-action.success:hover {
+    background: var(--success-dark);
+}
+
+.btn-action.early-settle {
+    background: #8b5cf6;
+    color: white;
+}
+
+.btn-action.early-settle:hover {
+    background: #7c3aed;
+}
+
+/* 手机端：按钮可能换行 */
+@media (max-width: 640px) {
+    .action-buttons {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .btn-action {
+        width: 100% !important;
+        text-align: center;
+    }
+}
