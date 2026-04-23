@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.5（修复语法错误）
+// app-dashboard-expenses.js - v1.6（修复门店名称显示）
 
 window.APP = window.APP || {};
 
@@ -12,6 +12,13 @@ const DashboardExpenses = {
         try {
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
+            
+            // 获取所有门店信息（用于显示门店名称）
+            const storesData = await SUPABASE.getAllStores();
+            const storeMap = {};
+            for (var s of storesData) {
+                storeMap[s.id] = s.name;
+            }
             
             let finalExpenses = [];
             
@@ -51,6 +58,9 @@ const DashboardExpenses = {
                     var canEdit = isAdmin && !e.is_reconciled;
                     var methodText = (e.payment_method === 'cash') ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     
+                    // 获取门店名称（使用 storeMap）
+                    var storeName = storeMap[e.store_id] || e.store_id || '-';
+                    
                     // 数据行 - 使用字符串拼接避免模板字符串中的class冲突
                     rows += '<tr>';
                     rows += '<td class="date-cell">' + Utils.formatDate(e.expense_date) + '<\/td>';
@@ -59,7 +69,7 @@ const DashboardExpenses = {
                     rows += '<td class="text-center">' + methodText + '<\/td>';
                     rows += '<td class="expense-desc">' + Utils.escapeHtml(e.description || '-') + '<\/td>';
                     if (isAdmin) {
-                        rows += '<td class="text-center">' + Utils.escapeHtml(e.store_id || '-') + '<\/td>';
+                        rows += '<td class="text-center">' + Utils.escapeHtml(storeName) + '<\/td>';
                     }
                     rows += '<\/tr>';
                     
