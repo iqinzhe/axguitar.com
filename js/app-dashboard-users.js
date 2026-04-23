@@ -1,4 +1,5 @@
-// app-dashboard-users.js - v1.0
+// app-dashboard-users.js - v1.1（操作员管理优化版）
+
 window.APP = window.APP || {};
 
 const DashboardUsers = {
@@ -19,29 +20,47 @@ const DashboardUsers = {
                 staff: lang === 'id' ? 'Staf' : '员工'
             };
             
+            // 计算列数（不包含操作列）
+            // 基础列: 用户名, 姓名, 角色, 门店, 创建日期 = 5列
+            var totalCols = 5;
+            
             var rows = '';
             if (users.length === 0) {
-                rows = `<tr><td colspan="6" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}<\/td><\/tr>`;
             } else {
                 for (var u of users) {
                     var storeName = u.stores?.name || (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
+                    var escapedId = Utils.escapeAttr(u.id);
+                    
+                    // 数据行
                     rows += `<tr>
                         <td>${Utils.escapeHtml(u.username)}<\/td>
                         <td>${Utils.escapeHtml(u.name)}<\/td>
                         <td class="text-center">${roleMap[u.role] || u.role}<\/td>
                         <td>${Utils.escapeHtml(storeName)}<\/td>
                         <td class="text-center">${Utils.formatDate(u.created_at)}<\/td>
-                    <\/tr>
-                    <tr class="action-row"><td colspan="6">
-                            ${AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id ? `
-                                <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')" class="role-select">
-                                    <option value="store_manager" ${u.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
-                                    <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option>
-                                </select>
-                                <button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button>
-                                <button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>
-                            ` : (u.id === AUTH.user?.id ? `<span style="color:var(--primary);font-weight:600;">👤 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}</span>` : '-')}
-                        <\/td><\/tr>`;
+                    </tr>
+                    // 操作行
+                    rows += `<tr class="action-row">
+                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
+                        <td colspan="${totalCols}" class="action-btns">`;
+                    
+                    if (AUTH.user?.role === 'admin' && u.id !== AUTH.user?.id) {
+                        rows += `
+                            <select id="role_${u.id}" onchange="APP._saveUserRole('${u.id}')" class="role-select">
+                                <option value="store_manager" ${u.role === 'store_manager' ? 'selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
+                                <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option>
+                            </select>
+                            <button onclick="APP.editUser('${escapedId}')" class="btn-small">✏️ ${t('edit')}</button>
+                            <button onclick="APP.deleteUser('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>
+                        `;
+                    } else if (u.id === AUTH.user?.id) {
+                        rows += `<span style="color:var(--primary);font-weight:600;">👤 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}</span>`;
+                    } else {
+                        rows += `-`;
+                    }
+                    
+                    rows += `<\/td><\/tr>`;
                 }
             }
             
@@ -70,7 +89,6 @@ const DashboardUsers = {
                                     <th class="text-center">${lang === 'id' ? 'Role' : '角色'}</th>
                                     <th>${lang === 'id' ? 'Toko' : '门店'}</th>
                                     <th class="text-center">${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -127,13 +145,6 @@ const DashboardUsers = {
                         .user-table .role-select {
                             font-size: 0.65rem;
                             padding: 2px 4px;
-                        }
-                        .action-cell {
-                            flex-direction: column;
-                            gap: 4px;
-                        }
-                        .action-cell .btn-small {
-                            width: 100%;
                         }
                     }
                 </style>`;
@@ -212,4 +223,3 @@ const DashboardUsers = {
 };
 
 Object.assign(window.APP, DashboardUsers);
-
