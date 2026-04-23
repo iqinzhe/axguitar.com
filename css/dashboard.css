@@ -392,15 +392,18 @@ button.warning.highlight {
 }
 
 /* ========================================
-   缴费页面 - 汇总卡片流式布局
+   缴费页面 - 汇总卡片流式布局（修复版）
    ======================================== */
+
+/* 电脑端：自动多列并排 */
 .summary-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px 24px;
+    gap: 12px 20px;
     align-items: flex-start;
 }
 
+/* 每个项目自动伸缩，允许并排 */
 .summary-item {
     display: flex;
     align-items: baseline;
@@ -408,8 +411,9 @@ button.warning.highlight {
     background: var(--bg-hover);
     padding: 6px 12px;
     border-radius: 8px;
-    flex: 0 0 auto;
-    max-width: 100%;
+    flex: 1 0 auto;      /* 允许增长，允许收缩，自动基础宽度 */
+    min-width: 180px;    /* 最小宽度，防止太窄 */
+    max-width: calc(33% - 20px);  /* 电脑端最多3列 */
 }
 
 .summary-item .label {
@@ -423,6 +427,8 @@ button.warning.highlight {
     font-weight: 500;
     color: var(--text-primary);
     word-break: break-word;
+    text-align: right;
+    flex: 1;
 }
 
 .summary-item .value.order-id {
@@ -438,7 +444,7 @@ button.warning.highlight {
     color: var(--success-dark);
 }
 
-/* 手机端：标签和内容上下排列 */
+/* 手机端：2列，标签上内容下 */
 @media (max-width: 768px) {
     .summary-grid {
         gap: 10px;
@@ -451,6 +457,7 @@ button.warning.highlight {
         padding: 8px 12px;
         flex: 1 1 auto;
         min-width: calc(50% - 10px);
+        max-width: none;
     }
     
     .summary-item .label {
@@ -460,7 +467,7 @@ button.warning.highlight {
     
     .summary-item .value {
         font-size: 0.8rem;
-        word-break: break-all;
+        text-align: left;
     }
 }
 
