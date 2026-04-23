@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.6（性能优化：合并仪表盘查询 + 并行化）
+// app-dashboard-core.js - v1.7（修复：flowsToAnalyze 空值处理 + 门店登录兼容）
 
 window.APP = window.APP || {};
 
@@ -99,7 +99,7 @@ const DashboardCore = {
         };
         var handler = handlers[this.currentPage];
         if (handler) await handler();
-        else await this.renderDashboard();
+        else await self.renderDashboard();
     },
 
     navigateTo: function(page, params) {
@@ -285,28 +285,28 @@ const DashboardCore = {
         var lang = Utils.lang;
         var t = (key) => Utils.t(key);
         
-        document.getElementById("app").innerHTML = `
-            <div class="login-container">
-                <div class="login-box">
-                    <div class="lang-toggle">
-                        <button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                    </div>
-                    <h2 class="login-title"><img src="icons/pagehead-logo.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>
-                    <h3>${t('login')}</h3>
-                    <div class="form-group">
-                        <label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
-                        <input id="username" placeholder="email@domain.com">
-                    </div>
-                    <div class="form-group">
-                        <label>${t('password')}</label>
-                        <input id="password" type="password" placeholder="${t('password')}">
-                    </div>
-                    <button onclick="APP.login()">${t('login')}</button>
-                    <p class="login-note">
-                        ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}
-                    </p>
-                </div>
-            </div>`;
+        document.getElementById("app").innerHTML = '' +
+            '<div class="login-container">' +
+                '<div class="login-box">' +
+                    '<div class="lang-toggle">' +
+                        '<button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ' + (lang === 'id' ? '中文' : 'Bahasa Indonesia') + '</button>' +
+                    '</div>' +
+                    '<h2 class="login-title"><img src="icons/pagehead-logo.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>' +
+                    '<h3>' + t('login') + '</h3>' +
+                    '<div class="form-group">' +
+                        '<label>' + (lang === 'id' ? 'Email / Username' : '邮箱 / 用户名') + '</label>' +
+                        '<input id="username" placeholder="email@domain.com">' +
+                    '</div>' +
+                    '<div class="form-group">' +
+                        '<label>' + t('password') + '</label>' +
+                        '<input id="password" type="password" placeholder="' + t('password') + '">' +
+                    '</div>' +
+                    '<button onclick="APP.login()">' + t('login') + '</button>' +
+                    '<p class="login-note">' +
+                        'ℹ️ ' + (lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号') +
+                    '</p>' +
+                '</div>' +
+            '</div>';
     },
 
     toggleLanguageOnLogin: function() {
@@ -388,10 +388,10 @@ const DashboardCore = {
         var div = document.createElement('div');
         div.id = 'saving-overlay';
         div.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10001; display:flex; align-items:center; justify-content:center;';
-        div.innerHTML = `<div style="background:white; padding:20px 40px; border-radius:12px; display:flex; flex-direction:column; align-items:center; gap:12px;">
-            <div class="loader" style="width:36px; height:36px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:spin 1s linear infinite;"></div>
-            <p style="margin:0; font-size:14px;">${message}</p>
-        </div>`;
+        div.innerHTML = '<div style="background:white; padding:20px 40px; border-radius:12px; display:flex; flex-direction:column; align-items:center; gap:12px;">' +
+            '<div class="loader" style="width:36px; height:36px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:spin 1s linear infinite;"></div>' +
+            '<p style="margin:0; font-size:14px;">' + message + '</p>' +
+        '</div>';
         document.body.appendChild(div);
         
         if (!document.getElementById('saving-spinner-style')) {
@@ -436,12 +436,12 @@ const DashboardCore = {
                 break;
                 
             default:
-                console.log(`当前页面 (${currentPage}) 无需自动保存数据`);
+                console.log('当前页面 (' + currentPage + ') 无需自动保存数据');
                 break;
         }
         
         if (hasSaved) {
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(function(resolve) { setTimeout(resolve, 300); });
         }
         
         return true;
@@ -454,7 +454,7 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    // ==================== 仪表盘（优化版：并行查询 + 复用数据） ====================
+    // ==================== 仪表盘 ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -464,20 +464,18 @@ const DashboardCore = {
             var lang = Utils.lang;
             var t = (key) => Utils.t(key);
             
-            // ========== 优化：并行获取所有基础数据 ==========
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
             // 构建并行查询列表
             const queries = [
-                SUPABASE.getOrders(),                     // Q1: 所有订单
-                SUPABASE.getCashFlowRecords(),            // Q2: 所有资金流水
-                SUPABASE.getOrdersNeedReminder(),         // Q3: 需要提醒的订单
-                SUPABASE.getAllStores()                   // Q4: 所有门店
+                SUPABASE.getOrders(),
+                SUPABASE.getCashFlowRecords(),
+                SUPABASE.getOrdersNeedReminder(),
+                SUPABASE.getAllStores()
             ];
             
-            // 管理员查询所有支出，店长只查自己门店
             if (isAdmin) {
                 queries.push(
                     supabaseClient.from('expenses').select('amount')
@@ -490,7 +488,6 @@ const DashboardCore = {
                 queries.push(Promise.resolve({ data: [] }));
             }
             
-            // 非管理员时查询特定门店的现金流
             if (!isAdmin && storeId) {
                 queries.push(
                     supabaseClient.from('cash_flow_records')
@@ -499,10 +496,9 @@ const DashboardCore = {
                         .eq('is_voided', false)
                 );
             } else {
-                queries.push(Promise.resolve(null));
+                queries.push(Promise.resolve([]));
             }
             
-            // 并行执行所有查询
             const [
                 allOrders,
                 allCashFlows,
@@ -512,9 +508,7 @@ const DashboardCore = {
                 storeSpecificCashFlows
             ] = await Promise.all(queries);
             
-            // ========== 基于已有数据计算，避免重复查询 ==========
-            
-            // 计算报表（复用 allOrders）
+            // 计算报表
             var report = this._calculateReport(allOrders);
             
             // 构建门店映射
@@ -528,8 +522,8 @@ const DashboardCore = {
             var currentMonth = today.getMonth();
             var currentYear = today.getFullYear();
             var thisMonthOrderCount = 0;
-            for (var o of allOrders) {
-                var orderDate = new Date(o.created_at);
+            for (var i = 0; i < allOrders.length; i++) {
+                var orderDate = new Date(allOrders[i].created_at);
                 if (orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear) {
                     thisMonthOrderCount++;
                 }
@@ -539,19 +533,26 @@ const DashboardCore = {
             var totalExpenses = 0;
             var expenses = expensesResult?.data || expensesResult || [];
             if (Array.isArray(expenses)) {
-                for (var e of expenses) {
-                    totalExpenses += (e.amount || 0);
+                for (var i = 0; i < expenses.length; i++) {
+                    totalExpenses += (expenses[i].amount || 0);
                 }
             }
             
-            // 计算资金流水摘要（复用 allCashFlows）
+            // 计算资金流水摘要
             var cashFlow = this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId, storeSpecificCashFlows);
             
-            // 计算非本金流入和总流出
+            // 修复：安全处理 flowsToAnalyze
+            var flowsToAnalyze = [];
+            if (!isAdmin && storeSpecificCashFlows && Array.isArray(storeSpecificCashFlows)) {
+                flowsToAnalyze = storeSpecificCashFlows;
+            } else if (allCashFlows && Array.isArray(allCashFlows)) {
+                flowsToAnalyze = allCashFlows;
+            }
+            
             var totalInflowExcludingPrincipal = 0;
             var totalOutflow = 0;
-            var flowsToAnalyze = (!isAdmin && storeSpecificCashFlows) ? storeSpecificCashFlows : allCashFlows;
-            for (var f of (flowsToAnalyze || [])) {
+            for (var i = 0; i < flowsToAnalyze.length; i++) {
+                var f = flowsToAnalyze[i];
                 var amount = f.amount || 0;
                 if (f.direction === 'inflow' && f.flow_type !== 'principal') {
                     totalInflowExcludingPrincipal += amount;
@@ -561,12 +562,13 @@ const DashboardCore = {
             }
             var deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            // 清理过期订单（超过2年的已完成订单）
+            // 清理过期订单
             var twoYearsAgo = new Date();
             twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
             
             var expiredOrders = [];
-            for (var o of allOrders) {
+            for (var i = 0; i < allOrders.length; i++) {
+                var o = allOrders[i];
                 if (o.status === 'completed') {
                     var completedDate = o.completed_at || o.updated_at;
                     if (completedDate && new Date(completedDate) < twoYearsAgo) {
@@ -577,17 +579,16 @@ const DashboardCore = {
             
             if (expiredOrders.length > 0) {
                 console.log('检测到 ' + expiredOrders.length + ' 个已结清超过2年的订单，正在自动清理...');
-                for (var eo of expiredOrders) {
+                for (var i = 0; i < expiredOrders.length; i++) {
                     try {
-                        await supabaseClient.from('cash_flow_records').delete().eq('order_id', eo.id);
-                        await supabaseClient.from('payment_history').delete().eq('order_id', eo.id);
-                        await supabaseClient.from('orders').delete().eq('id', eo.id);
-                        console.log('已清理过期订单: ' + eo.order_id);
+                        await supabaseClient.from('cash_flow_records').delete().eq('order_id', expiredOrders[i].id);
+                        await supabaseClient.from('payment_history').delete().eq('order_id', expiredOrders[i].id);
+                        await supabaseClient.from('orders').delete().eq('id', expiredOrders[i].id);
+                        console.log('已清理过期订单: ' + expiredOrders[i].order_id);
                     } catch (cleanErr) {
-                        console.warn('清理订单 ' + eo.order_id + ' 失败:', cleanErr);
+                        console.warn('清理订单 ' + expiredOrders[i].order_id + ' 失败:', cleanErr);
                     }
                 }
-                // 重新获取订单列表
                 var updatedOrders = await SUPABASE.getOrders();
             } else {
                 var updatedOrders = allOrders;
@@ -596,16 +597,21 @@ const DashboardCore = {
             // 计算活跃和已完成订单数
             var activeOrdersCount = 0;
             var completedOrdersCount = 0;
-            for (var o of updatedOrders) {
-                if (o.status === 'active') activeOrdersCount++;
-                else if (o.status === 'completed') completedOrdersCount++;
+            for (var i = 0; i < updatedOrders.length; i++) {
+                if (updatedOrders[i].status === 'active') activeOrdersCount++;
+                else if (updatedOrders[i].status === 'completed') completedOrdersCount++;
             }
             var expiredCount = expiredOrders.length;
             
-            // ========== 渲染仪表盘 ==========
+            // 渲染仪表盘
             var storeName = AUTH.getCurrentStoreName();
             var hasReminders = needRemindOrders.length > 0;
-            var hasSentToday = await (window.APP.hasSentRemindersToday ? window.APP.hasSentRemindersToday() : Promise.resolve(false));
+            var hasSentToday = false;
+            try {
+                hasSentToday = await (window.APP.hasSentRemindersToday ? window.APP.hasSentRemindersToday() : Promise.resolve(false));
+            } catch(e) {
+                hasSentToday = false;
+            }
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
@@ -621,12 +627,13 @@ const DashboardCore = {
                 { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' }
             ];
             
-            var cardsHtml = cards.map(function(card) {
-                return '<div class="stat-card ' + (card.class || '') + '">' +
-                    '<div class="stat-value ' + (card.class || '') + '">' + card.value + '</div>' +
-                    '<div class="stat-label">' + card.label + '</div>' +
+            var cardsHtml = '';
+            for (var i = 0; i < cards.length; i++) {
+                cardsHtml += '<div class="stat-card ' + (cards[i].class || '') + '">' +
+                    '<div class="stat-value ' + (cards[i].class || '') + '">' + cards[i].value + '</div>' +
+                    '<div class="stat-label">' + cards[i].label + '</div>' +
                 '</div>';
-            }).join('');
+            }
             
             var cardsTitleHtml = '';
             if (isAdmin) {
@@ -679,9 +686,6 @@ const DashboardCore = {
                                 '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧→🏦 ' + t('bank_to_cash') + '</button>' +
                                 '<button onclick="APP.showTransferModal(\'store_to_hq\')" class="transfer-btn store-to-hq">🏢 ' + t('submit_to_hq') + '</button>' +
                             '</div>' +
-                            '<div class="cashflow-detail" style="margin-top:8px;">' +
-                                '💡 ' + (lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取') +
-                            '</div>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -711,9 +715,6 @@ const DashboardCore = {
                             '<div class="transfer-buttons">' +
                                 '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦→🏧 ' + t('cash_to_bank') + '</button>' +
                                 '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧→🏦 ' + t('bank_to_cash') + '</button>' +
-                            '</div>' +
-                            '<div class="cashflow-detail" style="margin-top:8px;">' +
-                                '💡 ' + (lang === 'id' ? 'Jika uang tunai di brankas berlebih, dapat disetor ke bank. Jika kurang, dapat ditarik dari bank.' : '保险柜现金过多时可存入银行，不足时可从银行提取') +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -775,9 +776,8 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 新增辅助方法 ====================
+    // ==================== 辅助方法 ====================
     
-    // 基于订单数组计算报表（替代 Order.getReport()）
     _calculateReport: function(orders) {
         var totalLoanAmount = 0;
         var totalAdminFees = 0;
@@ -819,14 +819,18 @@ const DashboardCore = {
         };
     },
     
-    // 基于资金流水计算现金流摘要（替代 SUPABASE.getCashFlowSummary()）
     _calculateCashFlowSummary: function(allFlows, isAdmin, storeId, storeSpecificFlows) {
         var cashInflow = 0, cashOutflow = 0;
         var bankInflow = 0, bankOutflow = 0;
         
-        var flowsToUse = (!isAdmin && storeSpecificFlows) ? storeSpecificFlows : allFlows;
+        var flowsToUse = [];
+        if (!isAdmin && storeSpecificFlows && Array.isArray(storeSpecificFlows)) {
+            flowsToUse = storeSpecificFlows;
+        } else if (allFlows && Array.isArray(allFlows)) {
+            flowsToUse = allFlows;
+        }
         
-        for (var i = 0; i < (flowsToUse || []).length; i++) {
+        for (var i = 0; i < flowsToUse.length; i++) {
             var flow = flowsToUse[i];
             var amount = flow.amount || 0;
             if (flow.direction === 'inflow') {
@@ -839,20 +843,11 @@ const DashboardCore = {
         }
         
         return {
-            cash: {
-                income: cashInflow,
-                expense: cashOutflow,
-                balance: cashInflow - cashOutflow
-            },
-            bank: {
-                income: bankInflow,
-                expense: bankOutflow,
-                balance: bankInflow - bankOutflow
-            }
+            cash: { income: cashInflow, expense: cashOutflow, balance: cashInflow - cashOutflow },
+            bank: { income: bankInflow, expense: bankOutflow, balance: bankInflow - bankOutflow }
         };
     },
 
-    // ==================== 辅助函数 ====================
     showCreateOrder: function() { 
         alert(Utils.lang === 'id' ? 'Silakan pilih nasabah terlebih dahulu' : '请先选择客户'); 
         this.navigateTo('customers'); 
@@ -866,7 +861,6 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 门店管理辅助 ====================
     addStore: async function() {
         var lang = Utils.lang;
         var name = document.getElementById("newStoreName")?.value.trim();
