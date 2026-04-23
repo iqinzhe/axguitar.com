@@ -1,4 +1,4 @@
-/* tables.css - 统一双行布局版 v3.4（操作按钮强制一行） */
+/* tables.css - 统一双行布局版 v3.5（移除滚动条） */
 
 /* === 表格容器 === */
 .table-container {
@@ -53,7 +53,7 @@
 }
 
 /* ===============================
-   ✅ 操作行样式（操作按钮强制一行显示）
+   ✅ 操作行样式（操作按钮一行显示，无滚动条）
    =============================== */
 .action-row td {
     padding: 8px 12px;
@@ -76,7 +76,7 @@
     flex-wrap: nowrap;
     align-items: center;
     gap: 10px;
-    overflow-x: auto;
+    /* 移除 overflow-x: auto，不显示滚动条 */
 }
 
 .action-row .btn-small {
@@ -140,7 +140,7 @@
 }
 
 /* ===============================
-   ✅ 手机端优化（按钮横向滚动）
+   ✅ 手机端优化
    =============================== */
 @media (max-width: 768px) {
     .data-table {
@@ -175,7 +175,7 @@
 
     .action-row td.action-btns {
         gap: 8px;
-        overflow-x: auto;
+        /* 手机端也移除滚动条，如果按钮过多会自然换行 */
     }
 
     .action-row .btn-small {
