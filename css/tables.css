@@ -1,4 +1,4 @@
-/* tables.css - 统一双行布局版 v3.5（移除滚动条） */
+/* tables.css - 统一双行布局版 v3.6 */
 
 /* === 表格容器 === */
 .table-container {
@@ -10,7 +10,6 @@
 /* === 统一表格样式 === */
 .data-table {
     width: 100%;
-    min-width: 680px;
     border-collapse: collapse;
     font-size: var(--font-xs);
     background: var(--bg-card);
@@ -53,7 +52,7 @@
 }
 
 /* ===============================
-   ✅ 操作行样式（操作按钮一行显示，无滚动条）
+   ✅ 操作行样式
    =============================== */
 .action-row td {
     padding: 8px 12px;
@@ -76,7 +75,6 @@
     flex-wrap: nowrap;
     align-items: center;
     gap: 10px;
-    /* 移除 overflow-x: auto，不显示滚动条 */
 }
 
 .action-row .btn-small {
@@ -87,79 +85,16 @@
     font-size: var(--font-xs);
 }
 
-/* ========================================
-   客户信息表格 - 列宽优化
-   ======================================== */
-.data-table th:nth-child(1),
-.data-table td:nth-child(1) {
-    width: 12%;
-    min-width: 100px;
-}
-
-.data-table th:nth-child(2),
-.data-table td:nth-child(2) {
-    width: 10%;
-    min-width: 80px;
-}
-
-.data-table th:nth-child(3),
-.data-table td:nth-child(3) {
-    width: 12%;
-    min-width: 100px;
-}
-
-.data-table th:nth-child(4),
-.data-table td:nth-child(4) {
-    width: 10%;
-    min-width: 90px;
-}
-
-.data-table th:nth-child(5),
-.data-table td:nth-child(5) {
-    width: 20%;
-    min-width: 150px;
-}
-
-.data-table th:nth-child(6),
-.data-table td:nth-child(6) {
-    width: 20%;
-    min-width: 150px;
-}
-
-.data-table th:nth-child(7),
-.data-table td:nth-child(7) {
-    width: 10%;
-    min-width: 90px;
-    white-space: nowrap;
-}
-
-.data-table th:nth-child(8),
-.data-table td:nth-child(8) {
-    width: 6%;
-    min-width: 80px;
-}
-
 /* ===============================
    ✅ 手机端优化
    =============================== */
 @media (max-width: 768px) {
     .data-table {
-        min-width: unset;
         width: 100%;
     }
 
     .data-table th,
     .data-table td {
-        width: auto !important;
-        min-width: auto !important;
-    }
-
-    .data-table th {
-        padding: 7px 9px;
-        font-size: 0.72rem;
-    }
-
-    .data-table tbody tr:not(.action-row) td {
         padding: 7px 9px;
         font-size: 0.72rem;
     }
@@ -175,7 +110,6 @@
 
     .action-row td.action-btns {
         gap: 8px;
-        /* 手机端也移除滚动条，如果按钮过多会自然换行 */
     }
 
     .action-row .btn-small {
