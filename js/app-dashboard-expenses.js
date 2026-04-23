@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.2（修复：表头操作列删除，平账按钮移到操作行）
+// app-dashboard-expenses.js - v1.4（删除表头操作列，平账按钮移到操作行）
 
 window.APP = window.APP || {};
 
@@ -117,6 +117,11 @@ const DashboardExpenses = {
                         rows += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
                     }
                     
+                    // 平账按钮（仅在管理员且未平账时显示）
+                    if (isAdmin && !e.is_reconciled) {
+                        rows += `<button onclick="APP.balanceExpenses()" class="btn-small btn-balance">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
+                    }
+                    
                     rows += `<\/td><\/tr>`;
                 }
             } else {
@@ -217,6 +222,13 @@ const DashboardExpenses = {
                     .locked-badge {
                         background: #f1f5f9;
                         color: #64748b;
+                    }
+                    .btn-balance {
+                        background: #f59e0b !important;
+                        color: white !important;
+                    }
+                    .btn-balance:hover {
+                        background: #d97706 !important;
                     }
                     @media (max-width: 768px) {
                         .expense-table .expense-desc {
