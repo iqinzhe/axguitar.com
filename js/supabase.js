@@ -1,4 +1,4 @@
-// supabase.js - v1.3（修复：calculateNextDueDate 日期边界问题 + 安全优化）
+// supabase.js - v1.4（ID生成规则改为3位数字递增）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -174,96 +174,75 @@ const SupabaseAPI = {
         }
     },
 
+    // 生成订单ID：前缀 + 3位数字（001-999）
     async _generateOrderId(role, storeId) {
         let prefix = 'AD';
         if (role !== 'admin') {
             prefix = await this._getStorePrefix(storeId);
         }
         
-        const now = new Date();
-        const yy = now.getFullYear().toString().slice(-2);
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const dateCode = `${yy}${mm}${dd}`;
-        
         const { data: orders, error } = await supabaseClient
             .from('orders')
             .select('order_id')
-            .like('order_id', `${prefix}-${dateCode}-%`);
+            .like('order_id', `${prefix}%`)
+            .order('created_at', { ascending: false })
+            .limit(1);
         
         let maxNumber = 0;
         if (orders && orders.length > 0) {
-            for (const order of orders) {
-                const match = order.order_id.match(new RegExp(`${prefix}-${dateCode}-(\\d+)$`));
-                if (match) {
-                    const num = parseInt(match[1], 10);
-                    if (num > maxNumber) maxNumber = num;
-                }
-            }
-        }
-        
-        let nextNumber = maxNumber + 1;
-        if (nextNumber > 99) nextNumber = 99;
-        const serial = String(nextNumber).padStart(2, '0');
-        
-        return `${prefix}-${dateCode}-${serial}`;
-    },
-
-    async _generateCustomerId(storeId) {
-        const prefix = await this._getStorePrefix(storeId);
-        
-        const now = new Date();
-        const yy = now.getFullYear().toString().slice(-2);
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const dateCode = `${yy}${mm}${dd}`;
-        
-        const { data: customers, error } = await supabaseClient
-            .from('customers')
-            .select('customer_id')
-            .like('customer_id', `${prefix}-${dateCode}-%`);
-        
-        let maxNumber = 0;
-        if (customers && customers.length > 0) {
-            for (const c of customers) {
-                const match = c.customer_id.match(new RegExp(`${prefix}-${dateCode}-(\\d+)$`));
-                if (match) {
-                    const num = parseInt(match[1], 10);
-                    if (num > maxNumber) maxNumber = num;
-                }
+            const match = orders[0].order_id.match(new RegExp(`${prefix}(\\d{3})$`));
+            if (match) {
+                maxNumber = parseInt(match[1], 10);
             }
         }
         
         const nextNumber = maxNumber + 1;
         const serial = String(nextNumber).padStart(3, '0');
         
-        return `${prefix}-${dateCode}-${serial}`;
+        return `${prefix}${serial}`;
     },
 
-    // 修复：calculateNextDueDate 日期边界问题
+    // 生成客户ID：前缀 + 3位数字（001-999）
+    async _generateCustomerId(storeId) {
+        const prefix = await this._getStorePrefix(storeId);
+        
+        const { data: customers, error } = await supabaseClient
+            .from('customers')
+            .select('customer_id')
+            .like('customer_id', `${prefix}%`)
+            .order('registered_date', { ascending: false })
+            .limit(1);
+        
+        let maxNumber = 0;
+        if (customers && customers.length > 0) {
+            const match = customers[0].customer_id.match(new RegExp(`${prefix}(\\d{3})$`));
+            if (match) {
+                maxNumber = parseInt(match[1], 10);
+            }
+        }
+        
+        const nextNumber = maxNumber + 1;
+        const serial = String(nextNumber).padStart(3, '0');
+        
+        return `${prefix}${serial}`;
+    },
+
     calculateNextDueDate: function(startDate, paidMonths) {
         if (!startDate) {
             startDate = new Date().toISOString().split('T')[0];
         }
         
         let date = new Date(startDate);
-        
-        // 修复：确保日期有效
         if (isNaN(date.getTime())) {
             console.warn("calculateNextDueDate: 无效的日期", startDate);
             date = new Date();
         }
         
-        // 保存原始日期（用于边界处理）
         const originalDay = date.getDate();
-        
-        // 计算目标月份
         date.setMonth(date.getMonth() + paidMonths + 1);
         
-        // 修复：处理月份溢出问题（如1月31日加1个月，应该得到2月28日/29日）
-        // 如果新日期的日数不等于原始日数，说明发生了溢出，调整到月末
         if (date.getDate() !== originalDay) {
-            date.setDate(0); // 设置为上个月的最后一天
+            date.setDate(0);
         }
         
         return date.toISOString().split('T')[0];
@@ -426,7 +405,6 @@ const SupabaseAPI = {
         return { order, payments: data };
     },
 
-    // 创建订单（支持固定还款）
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
@@ -529,9 +507,6 @@ const SupabaseAPI = {
         throw lastError || new Error(Utils.lang === 'id' ? 'Gagal membuat pesanan' : '创建订单失败');
     },
 
-    // 使用修复后的 calculateNextDueDate
-    // 注意：上面已经定义了 calculateNextDueDate 方法，这里不再重复
-
     async recordAdminFee(orderId, paymentMethod = 'cash', adminFeeAmount = null) {
         const order = await this.getOrder(orderId);
         const profile = await this.getCurrentProfile();
@@ -620,7 +595,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 灵活还款 - 利息记录
     async recordInterestPayment(orderId, months, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -704,7 +678,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 灵活还款 - 本金记录
     async recordPrincipalPayment(orderId, amount, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const currentOrder = await this.getOrder(orderId);
@@ -792,7 +765,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 固定还款 - 按期还款
     async recordFixedPayment(orderId, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const order = await this.getOrder(orderId);
@@ -914,7 +886,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 固定还款 - 提前结清
     async earlySettleFixedOrder(orderId, paymentMethod = 'cash') {
         const profile = await this.getCurrentProfile();
         const order = await this.getOrder(orderId);
@@ -981,7 +952,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 更新逾期天数
     async updateOverdueDays() {
         const { data: activeOrders, error } = await supabaseClient
             .from('orders')
