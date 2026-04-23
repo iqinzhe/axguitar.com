@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.2（修复：表头操作列删除，平账按钮移到操作行）
+// app-dashboard-expenses.js - v1.3（修复：showExpenses 函数）
 
 window.APP = window.APP || {};
 
@@ -138,6 +138,7 @@ const DashboardExpenses = {
                     <div class="header-actions">                      
                         <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                        ${isAdmin ? `<button onclick="APP.balanceExpenses()" class="btn-balance warning">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>` : ''}
                     </div>
                 </div>
                 
