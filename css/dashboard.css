@@ -409,7 +409,7 @@ button.warning.highlight {
     justify-content: flex-start;
     align-items: baseline;
     background: var(--bg-hover);
-    padding: 8px 12px;
+    padding: 4px 8px;
     border-radius: 8px;
     gap: 12px;
 }
@@ -449,7 +449,7 @@ button.warning.highlight {
 @media (max-width: 768px) {
     .summary-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
+        gap: 5px;
     }
     
     .summary-item {
