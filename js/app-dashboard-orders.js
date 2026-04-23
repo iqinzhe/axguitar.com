@@ -432,7 +432,7 @@ showOrderTable: async function() {
             }
             
             if (paymentRows === '') {
-                paymentRows = `<td><td colspan="4" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                paymentRows = `<tr><td colspan="4" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
@@ -592,7 +592,7 @@ showOrderTable: async function() {
             alert(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
         }
     }
-};
+};  // ← 注意：这里闭合 DashboardOrders 对象
 
 function escapeAttr(str) {
     if (!str) return '';
