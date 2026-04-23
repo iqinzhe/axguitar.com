@@ -1,0 +1,304 @@
+// app-dashboard-anomaly.js - v1.0（异常状况页面）
+
+window.APP = window.APP || {};
+
+const DashboardAnomaly = {
+
+    showAnomaly: async function() {
+        this.currentPage = 'anomaly';
+        this.saveCurrentPageState();
+        var lang = Utils.lang;
+        
+        try {
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
+            
+            // ========== 1. 逾期30天订单 ==========
+            let overdueOrders = [];
+            try {
+                let query = supabaseClient
+                    .from('orders')
+                    .select('*, customers(name, phone)')
+                    .eq('status', 'active')
+                    .gte('overdue_days', 30);
+                
+                if (!isAdmin && profile?.store_id) {
+                    query = query.eq('store_id', profile.store_id);
+                }
+                
+                const { data, error } = await query;
+                if (!error) overdueOrders = data || [];
+            } catch(e) {
+                console.warn("获取逾期订单失败:", e);
+            }
+            
+            // ========== 2. 黑名单客户 ==========
+            let blacklist = [];
+            try {
+                let query = supabaseClient
+                    .from('blacklist')
+                    .select('*, customers(name, phone, customer_id)');
+                
+                if (!isAdmin && profile?.store_id) {
+                    query = query.eq('store_id', profile.store_id);
+                }
+                
+                const { data, error } = await query;
+                if (!error) blacklist = data || [];
+            } catch(e) {
+                console.warn("获取黑名单失败:", e);
+            }
+            
+            // ========== 3. 门店经营最低项 ==========
+            let lowestStores = [];
+            try {
+                const stores = await SUPABASE.getAllStores();
+                const orders = await SUPABASE.getOrders();
+                
+                const storeOrderCount = {};
+                for (var s of stores) {
+                    storeOrderCount[s.id] = { name: s.name, code: s.code, count: 0 };
+                }
+                for (var o of orders) {
+                    if (storeOrderCount[o.store_id]) {
+                        storeOrderCount[o.store_id].count++;
+                    }
+                }
+                
+                const storeArray = Object.values(storeOrderCount);
+                storeArray.sort((a, b) => a.count - b.count);
+                lowestStores = storeArray.slice(0, Math.min(3, storeArray.length));
+            } catch(e) {
+                console.warn("获取门店最低项失败:", e);
+            }
+            
+            // 渲染页面
+            document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <h2>⚠️ ${lang === 'id' ? 'Situasi Abnormal' : '异常状况'}</h2>
+                    <div class="header-actions">
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
+                    </div>
+                </div>
+                
+                <div class="anomaly-grid">
+                    
+                    <!-- 卡片1：逾期30天订单 -->
+                    <div class="anomaly-card anomaly-card-danger">
+                        <div class="anomaly-card-header">
+                            <span class="anomaly-icon">⚠️</span>
+                            <h3>${lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单'}</h3>
+                            <span class="anomaly-badge">${overdueOrders.length}</span>
+                        </div>
+                        <div class="anomaly-card-body">
+                            ${overdueOrders.length === 0 ? 
+                                `<p class="text-muted">${lang === 'id' ? 'Tidak ada pesanan yang terlambat 30+ hari' : '暂无逾期30天以上订单'}</p>` :
+                                `<div class="table-container">
+                                    <table class="data-table anomaly-table">
+                                        <thead>
+                                            <tr>
+                                                <th>${lang === 'id' ? 'ID Pesanan' : '订单号'}</th>
+                                                <th>${lang === 'id' ? 'Nama Nasabah' : '客户姓名'}</th>
+                                                <th class="text-center">${lang === 'id' ? 'Hari Terlambat' : '逾期天数'}</th>
+                                                <th class="text-right">${lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额'}</th>
+                                                <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${overdueOrders.map(o => `
+                                                <tr>
+                                                    <td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
+                                                    <td>${Utils.escapeHtml(o.customers?.name || o.customer_name)}<\/td>
+                                                    <td class="text-center" style="color:#ef4444; font-weight:600;">${o.overdue_days}<\/td>
+                                                    <td class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
+                                                    <td class="text-center"><button onclick="APP.viewOrder('${o.order_id}')" class="btn-small">${lang === 'id' ? 'Lihat' : '查看'}<\/button><\/td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>`
+                            }
+                        </div>
+                        ${overdueOrders.length > 0 ? `<div class="anomaly-card-footer">
+                            <span class="warning-text">💡 ${lang === 'id' ? 'Pesanan ini akan memasuki proses likuidasi' : '这些订单即将进入变卖程序'}</span>
+                        </div>` : ''}
+                    </div>
+                    
+                    <!-- 卡片2：黑名单客户 -->
+                    <div class="anomaly-card anomaly-card-warning">
+                        <div class="anomaly-card-header">
+                            <span class="anomaly-icon">🚫</span>
+                            <h3>${lang === 'id' ? 'Daftar Hitam Nasabah' : '黑名单客户'}</h3>
+                            <span class="anomaly-badge">${blacklist.length}</span>
+                        </div>
+                        <div class="anomaly-card-body">
+                            ${blacklist.length === 0 ? 
+                                `<p class="text-muted">${lang === 'id' ? 'Tidak ada nasabah di blacklist' : '暂无黑名单客户'}</p>` :
+                                `<div class="table-container">
+                                    <table class="data-table anomaly-table">
+                                        <thead>
+                                            <tr>
+                                                <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
+                                                <th>${lang === 'id' ? 'Nama' : '姓名'}</th>
+                                                <th>${lang === 'id' ? 'Telepon' : '电话'}</th>
+                                                <th>${lang === 'id' ? 'Alasan' : '原因'}</th>
+                                                <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${blacklist.map(b => `
+                                                <tr>
+                                                    <td class="customer-id">${Utils.escapeHtml(b.customers?.customer_id || '-')}<\/td>
+                                                    <td>${Utils.escapeHtml(b.customers?.name || '-')}<\/td>
+                                                    <td>${Utils.escapeHtml(b.customers?.phone || '-')}<\/td>
+                                                    <td>${Utils.escapeHtml(b.reason)}<\/td>
+                                                    <td class="text-center"><button onclick="APP.showCustomerOrders('${b.customer_id}')" class="btn-small">${lang === 'id' ? 'Lihat' : '查看'}<\/button><\/td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>`
+                            }
+                        </div>
+                    </div>
+                    
+                    <!-- 卡片3：门店经营最低项 -->
+                    <div class="anomaly-card anomaly-card-info">
+                        <div class="anomaly-card-header">
+                            <span class="anomaly-icon">📉</span>
+                            <h3>${lang === 'id' ? 'Kinerja Terendah per Toko' : '门店经营最低项'}</h3>
+                            <span class="anomaly-badge">${lowestStores.length}</span>
+                        </div>
+                        <div class="anomaly-card-body">
+                            ${lowestStores.length === 0 ? 
+                                `<p class="text-muted">${lang === 'id' ? 'Tidak ada data toko' : '暂无门店数据'}</p>` :
+                                `<div class="table-container">
+                                    <table class="data-table anomaly-table">
+                                        <thead>
+                                            <tr>
+                                                <th>${lang === 'id' ? 'Toko' : '门店'}</th>
+                                                <th>${lang === 'id' ? 'Kode' : '编码'}</th>
+                                                <th class="text-center">${lang === 'id' ? 'Total Pesanan' : '订单总数'}</th>
+                                                <th>${lang === 'id' ? 'Status' : '状态'}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${lowestStores.map((s, idx) => `
+                                                <tr>
+                                                    <td><strong>${Utils.escapeHtml(s.name)}</strong><\/td>
+                                                    <td>${Utils.escapeHtml(s.code)}<\/td>
+                                                    <td class="text-center ${idx === 0 ? 'lowest-value' : ''}">${s.count}<\/td>
+                                                    <td>${idx === 0 ? (lang === 'id' ? '🔴 Terendah' : '🔴 最低') : (lang === 'id' ? '🟡 Normal' : '🟡 正常')}<\/td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>`
+                            }
+                        </div>
+                        <div class="anomaly-card-footer">
+                            <span class="info-text">💡 ${lang === 'id' ? 'Berdasarkan total pesanan per toko' : '基于各门店订单总数统计'}</span>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+                <style>
+                    .anomaly-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                        gap: 20px;
+                    }
+                    .anomaly-card {
+                        background: var(--bg-card);
+                        border-radius: 12px;
+                        border: 1px solid var(--border-light);
+                        overflow: hidden;
+                        transition: all 0.2s ease;
+                    }
+                    .anomaly-card:hover {
+                        box-shadow: var(--shadow-md);
+                    }
+                    .anomaly-card-header {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 16px 20px;
+                        border-bottom: 1px solid var(--border-light);
+                    }
+                    .anomaly-icon {
+                        font-size: 24px;
+                    }
+                    .anomaly-card-header h3 {
+                        flex: 1;
+                        margin: 0;
+                        font-size: 1.1rem;
+                    }
+                    .anomaly-badge {
+                        background: var(--primary-soft);
+                        color: var(--primary-dark);
+                        padding: 4px 10px;
+                        border-radius: 20px;
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                    }
+                    .anomaly-card-danger .anomaly-badge {
+                        background: #fee2e2;
+                        color: #dc2626;
+                    }
+                    .anomaly-card-warning .anomaly-badge {
+                        background: #fef3c7;
+                        color: #d97706;
+                    }
+                    .anomaly-card-info .anomaly-badge {
+                        background: #e0f2fe;
+                        color: #0284c7;
+                    }
+                    .anomaly-card-body {
+                        padding: 16px 20px;
+                        max-height: 400px;
+                        overflow-y: auto;
+                    }
+                    .anomaly-card-footer {
+                        padding: 12px 20px;
+                        background: var(--bg-hover);
+                        border-top: 1px solid var(--border-light);
+                        font-size: 0.75rem;
+                    }
+                    .anomaly-table {
+                        min-width: 500px;
+                    }
+                    .anomaly-table td, .anomaly-table th {
+                        padding: 8px 10px;
+                    }
+                    .lowest-value {
+                        color: #dc2626;
+                        font-weight: 700;
+                    }
+                    .warning-text {
+                        color: #dc2626;
+                    }
+                    .info-text {
+                        color: var(--text-muted);
+                    }
+                    @media (max-width: 768px) {
+                        .anomaly-grid {
+                            grid-template-columns: 1fr;
+                        }
+                    }
+                </style>
+            `;
+            
+        } catch (error) {
+            console.error("showAnomaly error:", error);
+            alert(lang === 'id' ? 'Gagal memuat data abnormal' : '加载异常数据失败');
+        }
+    }
+};
+
+for (var key in DashboardAnomaly) {
+    if (typeof DashboardAnomaly[key] === 'function') {
+        window.APP[key] = DashboardAnomaly[key];
+    }
+}
