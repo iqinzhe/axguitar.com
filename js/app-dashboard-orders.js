@@ -3,179 +3,170 @@
 window.APP = window.APP || {};
 
 const DashboardOrders = {
+showOrderTable: async function() {
+    this.currentPage = 'orderTable';
+    this.saveCurrentPageState();
+    var lang = Utils.lang;
+    var t = (key) => Utils.t(key);
+    var profile = await SUPABASE.getCurrentProfile();
+    var isAdmin = profile?.role === 'admin';
+    try {
+        var filters = { status: this.currentFilter, search: '' };
+        var orders = await SUPABASE.getOrders(filters);
+        var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+        
+        var stores = await SUPABASE.getAllStores();
+        var storeMap = {};
+        for (var s of stores) storeMap[s.id] = s.name;
 
-    showOrderTable: async function() {
-        this.currentPage = 'orderTable';
-        this.saveCurrentPageState();
-        var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
-        var profile = await SUPABASE.getCurrentProfile();
-        var isAdmin = profile?.role === 'admin';
-        try {
-            var filters = { status: this.currentFilter, search: '' };
-            var orders = await SUPABASE.getOrders(filters);
-            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
-            
-            var stores = await SUPABASE.getAllStores();
-            var storeMap = {};
-            for (var s of stores) storeMap[s.id] = s.name;
-
-            var rows = '';
-            if (orders.length === 0) {
-                rows = `<tr><td colspan="11" class="text-center">${t('no_data')}<\/td><\/tr>`;
-            } else {
-                for (var o of orders) {
-                    var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
-                    var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
-                    
-                    var nextDueDate = o.next_interest_due_date || '-';
-                    var formattedDueDate = nextDueDate !== '-' ? Utils.formatDate(nextDueDate) : '-';
-                    
-                    var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
-                    var currentMonthlyInterestForList = remainingPrincipalForList * (o.agreed_interest_rate || 0.08);
-                    
-                    var repaymentTypeText = o.repayment_type === 'fixed' 
-                        ? (lang === 'id' ? 'Tetap' : '固定')
-                        : (lang === 'id' ? 'Fleksibel' : '灵活');
-                    var repaymentBadge = `<span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}</span>`;
-                    
-                    rows += `<tr>
-                        <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
-                        <td data-label="${t('customer_name')}" class="order-customer">${Utils.escapeHtml(o.customer_name)}<\/td>
-                        <td data-label="${t('collateral_name')}" class="order-collateral">${Utils.escapeHtml(o.collateral_name)}<\/td>
-                        <td data-label="${t('loan_amount')}" class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
-                        <td data-label="${lang === 'id' ? 'Bunga Bulanan' : '月利息'}" class="text-right">${Utils.formatCurrency(currentMonthlyInterestForList)}<\/td>
-                        <td data-label="${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}" class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
-                        <td data-label="${t('payment_due_date')}" class="text-center">${formattedDueDate}<\/td>
-                        <td data-label="${t('repayment_type')}" class="text-center">${repaymentBadge}<\/td>
-                        <td data-label="${t('status')}" class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span><\/td>
-                        ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${Utils.escapeHtml(storeName)}<\/td>` : ''}
-                    <\/tr>
-                    <tr class="action-row">
-                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}</td>
-                        <td colspan="${isAdmin ? 9 : 8}" class="action-btns">
-                            ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
-                            <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ ${t('view')}</button>
-                            <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ ${t('print')}</button>
-                            ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                        <\/td>
-                    <\/tr>`;
-                }
+        // 计算列数（不包含操作列）
+        // 基础列: 订单号, 客户姓名, 质押物, 贷款金额, 月利息, 已付利息, 到期日, 还款方式, 状态 = 9列
+        var baseCols = 9;
+        var totalCols = isAdmin ? baseCols + 1 : baseCols;
+        
+        var rows = '';
+        if (orders.length === 0) {
+            rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}<\/td><\/tr>`;
+        } else {
+            for (var o of orders) {
+                var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
+                var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
+                
+                var nextDueDate = o.next_interest_due_date || '-';
+                var formattedDueDate = nextDueDate !== '-' ? Utils.formatDate(nextDueDate) : '-';
+                
+                var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
+                var currentMonthlyInterestForList = remainingPrincipalForList * (o.agreed_interest_rate || 0.08);
+                
+                var repaymentTypeText = o.repayment_type === 'fixed' 
+                    ? (lang === 'id' ? 'Tetap' : '固定')
+                    : (lang === 'id' ? 'Fleksibel' : '灵活');
+                var repaymentBadge = `<span class="repayment-badge ${o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible'}">${repaymentTypeText}</span>`;
+                
+                rows += `<tr>
+                    <td>${Utils.escapeHtml(o.order_id)}<\/td>
+                    <td>${Utils.escapeHtml(o.customer_name)}<\/td>
+                    <td>${Utils.escapeHtml(o.collateral_name)}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(o.loan_amount)}<\/td>
+                    <td class="text-right">${Utils.formatCurrency(currentMonthlyInterestForList)}<\/td>
+                    <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}<\/td>
+                    <td class="text-center">${formattedDueDate}<\/td>
+                    <td class="text-center">${repaymentBadge}<\/td>
+                    <td class="text-center"><span class="status-badge ${sc}">${statusMap[o.status] || o.status}</span><\/td>
+                    ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}<\/td>` : ''}
+                </tr>
+                <tr class="action-row">
+                    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
+                    <td colspan="${totalCols}" class="action-btns">
+                        ${o.status === 'active' && !isAdmin ? `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small success">💰 ${lang === 'id' ? 'Bayar' : '缴费'}</button>` : ''}
+                        <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">👁️ ${t('view')}</button>
+                        <button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">🖨️ ${t('print')}</button>
+                        ${PERMISSION.canDeleteOrder() ? `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                    <\/td>
+                </tr>`;
             }
-
-            document.getElementById("app").innerHTML = `
-                <div class="page-header">
-                    <h2>📋 ${t('order_list')}</h2>
-                    <div class="header-actions">
-                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                    </div>
-                </div>
-                
-                <div class="toolbar">
-                    <select id="statusFilter" onchange="window.APP.filterOrders(this.value)">
-                        <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
-                        <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${t('active')}</option>
-                        <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${t('completed')}</option>
-                    </select>
-                </div>
-                
-                <div class="card info-card">
-                    <div class="info-card-content">
-                        <div class="info-icon">📌</div>
-                        <div class="info-text">
-                            <strong>${lang === 'id' ? 'Informasi Penting:' : '重要提示：'}</strong> ${lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pembayaran pokok lebih awal dapat mengurangi beban bunga. Setelah lunas, sistem akan membuat tanda terima pelunasan secara otomatis.' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。'}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="table-container">
-                    <table class="data-table order-table">
-                        <thead>
-                            <tr>
-                                <th>${t('order_id')}</th>
-                                <th>${t('customer_name')}</th>
-                                <th>${t('collateral_name')}</th>
-                                <th class="text-right">${t('loan_amount')}</th>
-                                <th class="text-right">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</th>
-                                <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
-                                <th class="text-center">${t('payment_due_date')}</th>
-                                <th class="text-center">${t('repayment_type')}</th>
-                                <th class="text-center">${t('status')}</th>
-                                ${isAdmin ? '<th class="text-center">' + t('store') + '</th>' : ''}
-                                <th class="text-center">${t('action')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                </div>
-                
-                <style>
-                    .order-table .order-id {
-                        font-family: monospace;
-                        font-weight: 600;
-                        color: var(--primary-dark);
-                    }
-                    .order-table .order-customer {
-                        font-weight: 500;
-                    }
-                    .order-table .order-collateral {
-                        max-width: 150px;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                    }
-                    .repayment-badge {
-                        display: inline-block;
-                        padding: 2px 8px;
-                        border-radius: 12px;
-                        font-size: 11px;
-                        font-weight: 600;
-                    }
-                    .badge-fixed {
-                        background: #d1fae5;
-                        color: #065f46;
-                    }
-                    .badge-flexible {
-                        background: #fed7aa;
-                        color: #9a3412;
-                    }
-                    .info-card {
-                        background: #e0f2fe;
-                        border-left: 4px solid #0284c7;
-                        margin-bottom: 16px;
-                    }
-                    .info-card-content {
-                        display: flex;
-                        align-items: flex-start;
-                        gap: 12px;
-                    }
-                    .info-icon {
-                        font-size: 20px;
-                    }
-                    .info-text {
-                        flex: 1;
-                        font-size: 13px;
-                        color: #0c4a6e;
-                        line-height: 1.4;
-                    }
-                    .info-text strong {
-                        color: #0369a1;
-                    }
-                    @media (max-width: 768px) {
-                        .order-table .order-collateral {
-                            max-width: 100px;
-                        }
-                    }
-                </style>`;
-            
-            this._addOrderTableStyles();
-            
-        } catch (err) {
-            console.error("showOrderTable error:", err);
-            alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
         }
-    },
+
+        document.getElementById("app").innerHTML = `
+            <div class="page-header">
+                <h2>📋 ${t('order_list')}</h2>
+                <div class="header-actions">
+                    <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
+                    <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                </div>
+            </div>
+            
+            <div class="toolbar">
+                <select id="statusFilter" onchange="window.APP.filterOrders(this.value)">
+                    <option value="all" ${this.currentFilter === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
+                    <option value="active" ${this.currentFilter === 'active' ? 'selected' : ''}>${t('active')}</option>
+                    <option value="completed" ${this.currentFilter === 'completed' ? 'selected' : ''}>${t('completed')}</option>
+                </select>
+            </div>
+            
+            <div class="card info-card">
+                <div class="info-card-content">
+                    <div class="info-icon">📌</div>
+                    <div class="info-text">
+                        <strong>${lang === 'id' ? 'Informasi Penting:' : '重要提示：'}</strong> ${lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pembayaran pokok lebih awal dapat mengurangi beban bunga. Setelah lunas, sistem akan membuat tanda terima pelunasan secara otomatis.' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。'}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table class="data-table order-table">
+                    <thead>
+                        <tr>
+                            <th>${t('order_id')}</th>
+                            <th>${t('customer_name')}</th>
+                            <th>${t('collateral_name')}</th>
+                            <th class="text-right">${t('loan_amount')}</th>
+                            <th class="text-right">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</th>
+                            <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                            <th class="text-center">${t('payment_due_date')}</th>
+                            <th class="text-center">${t('repayment_type')}</th>
+                            <th class="text-center">${t('status')}</th>
+                            ${isAdmin ? '<th class="text-center">' + t('store') + '</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            
+            <style>
+                .order-table .order-id {
+                    font-family: monospace;
+                    font-weight: 600;
+                    color: var(--primary-dark);
+                }
+                .repayment-badge {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                .badge-fixed {
+                    background: #d1fae5;
+                    color: #065f46;
+                }
+                .badge-flexible {
+                    background: #fed7aa;
+                    color: #9a3412;
+                }
+                .info-card {
+                    background: #e0f2fe;
+                    border-left: 4px solid #0284c7;
+                    margin-bottom: 16px;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                }
+                .info-card-content {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 12px;
+                }
+                .info-icon {
+                    font-size: 18px;
+                }
+                .info-text {
+                    flex: 1;
+                    font-size: 13px;
+                    color: #0c4a6e;
+                    line-height: 1.4;
+                }
+                .info-text strong {
+                    color: #0369a1;
+                }
+            </style>`;
+        
+        this._addOrderTableStyles();
+        
+    } catch (err) {
+        console.error("showOrderTable error:", err);
+        alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
+    }
+},
     
     _addOrderTableStyles: function() {
         if (document.getElementById('order-table-styles')) return;
