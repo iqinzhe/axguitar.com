@@ -392,13 +392,12 @@ button.warning.highlight {
 }
 
 /* ========================================
-   缴费页面 - 订单详情布局（电脑端2栏，手机端1栏）
+   缴费页面 - Grid自适应布局（推荐版）
    ======================================== */
 
-/* 电脑端：2栏网格（充分利用屏幕） */
 .summary-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 12px 20px;
     margin-bottom: 0;
 }
