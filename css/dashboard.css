@@ -447,3 +447,90 @@ button.warning.highlight {
         text-align: center;
     }
 }
+
+/* ========================================
+   缴费页面 - 双列布局 + 按钮横向
+   ======================================== */
+
+/* 电脑端：利息和本金卡片双列并排 */
+.payment-double-column {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.payment-double-column .card {
+    flex: 1;
+    min-width: 300px;
+    margin-bottom: 0;
+}
+
+/* 确认收款按钮 - 强制横向 */
+.btn-action {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: var(--font-sm);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    width: auto !important;
+    min-width: 140px;
+}
+
+.btn-action.success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-action.success:hover {
+    background: var(--success-dark);
+}
+
+.btn-action.early-settle {
+    background: #8b5cf6;
+    color: white;
+}
+
+.btn-action.early-settle:hover {
+    background: #7c3aed;
+}
+
+/* 固定还款卡片的按钮组 */
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-top: 15px;
+}
+
+/* 手机端：单列布局 */
+@media (max-width: 768px) {
+    .payment-double-column {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .payment-double-column .card {
+        min-width: auto;
+    }
+    
+    .btn-action {
+        width: 100% !important;
+        text-align: center;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-buttons .btn-action {
+        width: 100% !important;
+    }
+}
