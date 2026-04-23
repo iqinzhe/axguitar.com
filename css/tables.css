@@ -1,4 +1,4 @@
-/* tables.css - 统一双行布局版 v3.3（电脑端+手机端） */
+/* tables.css - 统一双行布局版 v3.4（操作按钮强制一行） */
 
 /* === 表格容器 === */
 .table-container {
@@ -53,7 +53,7 @@
 }
 
 /* ===============================
-   ✅ 操作行样式（电脑端+手机端统一）
+   ✅ 操作行样式（操作按钮强制一行显示）
    =============================== */
 .action-row td {
     padding: 8px 12px;
@@ -73,9 +73,10 @@
 
 .action-row td.action-btns {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 10px;
+    overflow-x: auto;
 }
 
 .action-row .btn-small {
@@ -139,7 +140,7 @@
 }
 
 /* ===============================
-   ✅ 手机端优化（保持双行布局，仅调整字体和间距）
+   ✅ 手机端优化（按钮横向滚动）
    =============================== */
 @media (max-width: 768px) {
     .data-table {
