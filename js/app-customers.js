@@ -3,7 +3,6 @@
 window.APP = window.APP || {};
 
 const CustomersModule = {
-
 showCustomers: async function() {
     this.currentPage = 'customers';
     this.saveCurrentPageState();
@@ -20,13 +19,15 @@ showCustomers: async function() {
             storeMap[s.id] = s.name;
         }
         
-        // 计算列数：基础7列 + 管理员额外1列（门店）
-        var baseCols = 7;  // ID, 姓名, KTP, 电话, KTP地址, 居住地址, 注册日期
-        var totalCols = isAdmin ? baseCols + 1 : baseCols;
+        // 定义列数（不包含操作列）
+        // 基础列: ID, 姓名, KTP, 电话, KTP地址, 居住地址, 注册日期 = 7列
+        // 管理员额外加: 门店 = 1列
+        var baseColumns = 7;
+        var totalColumns = isAdmin ? baseColumns + 1 : baseColumns;
         
         var rows = '';
         if (!customers || customers.length === 0) {
-            rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}<\/td><\/tr>`;
+            rows = `<tr><td colspan="${totalColumns}" class="text-center">${t('no_data')}<\/td><\/tr>`;
         } else {
             for (var c of customers) {
                 var customerId = Utils.escapeHtml(c.customer_id || '-');
@@ -37,31 +38,32 @@ showCustomers: async function() {
                 var ktpAddress = Utils.escapeHtml(c.ktp_address || c.address || '-');
                 var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                 var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
-                
                 var escapedId = Utils.escapeAttr(c.id);
                 
+                // 数据行 - 严格按照表头顺序
                 rows += `<tr>
-                    <td data-label="${lang === 'id' ? 'ID Nasabah' : '客户ID'}">${customerId}<\/td>
-                    <td data-label="${t('customer_name')}">${name}<\/td>
-                    <td data-label="${t('ktp_number')}">${ktpNumber}<\/td>
-                    <td data-label="${t('phone')}">${phone}<\/td>
-                    <td data-label="${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}">${ktpAddress}<\/td>
-                    <td data-label="${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}">${livingAddress}<\/td>
-                    <td data-label="${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}" class="text-center">${registeredDate}<\/td>
-                    ${isAdmin ? `<td data-label="${lang === 'id' ? 'Toko' : '门店'}" class="text-center">${storeName}<\/td>` : ''}
-                <\/tr>
+                    <td>${customerId}</td>
+                    <td>${name}</td>
+                    <td>${ktpNumber}</td>
+                    <td>${phone}</td>
+                    <td>${ktpAddress}</td>
+                    <td>${livingAddress}</td>
+                    <td class="text-center">${registeredDate}</td>
+                    ${isAdmin ? `<td class="text-center">${storeName}</td>` : ''}
+                </tr>
                 <tr class="action-row">
-                    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
-                    <td colspan="${totalCols}" class="action-btns">
+                    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}</td>
+                    <td colspan="${totalColumns}" class="action-btns">
                         ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
                         <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
                         ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
                         ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                    <\/td>
-                <\/tr>`;
+                    </td>
+                </tr>`;
             }
         }
 
+        // 新增客户表单（仅非管理员可见）
         var addCustomerCardHtml = '';
         if (!isAdmin) {
             addCustomerCardHtml = `
@@ -99,6 +101,7 @@ showCustomers: async function() {
             </div>`;
         }
 
+        // 渲染页面 - 表头严格按照数据行顺序
         document.getElementById("app").innerHTML = `
             <div class="page-header">
                 <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
