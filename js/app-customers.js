@@ -1,153 +1,152 @@
-// app-customers.js - v1.7（修复：createOrderForCustomer 完整版）
+// app-customers.js - v1.8（修复语法错误）
 
 window.APP = window.APP || {};
 
 const CustomersModule = {
 
     showCustomers: async function() {
-    this.currentPage = 'customers';
-    this.saveCurrentPageState();
-    var lang = Utils.lang;
-    var t = (key) => Utils.t(key);
-    var isAdmin = AUTH.isAdmin();
+        this.currentPage = 'customers';
+        this.saveCurrentPageState();
+        var lang = Utils.lang;
+        var t = (key) => Utils.t(key);
+        var isAdmin = AUTH.isAdmin();
 
-    try {
-        const customers = await SUPABASE.getCustomers();
-        
-        const stores = await SUPABASE.getAllStores();
-        const storeMap = {};
-        for (var s of stores) {
-            storeMap[s.id] = s.name;
-        }
-        
-        // 计算列数
-        var baseCols = 7;
-        var totalCols = isAdmin ? baseCols + 1 : baseCols;
-        
-        var rows = '';
-        if (!customers || customers.length === 0) {
-            rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}<\/td><\/tr>`;
-        } else {
-            for (var c of customers) {
-                var customerId = Utils.escapeHtml(c.customer_id || '-');
-                var registeredDate = Utils.formatDate(c.registered_date);
-                var name = Utils.escapeHtml(c.name);
-                var ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
-                var phone = Utils.escapeHtml(c.phone || '-');
-                var ktpAddress = Utils.escapeHtml(c.ktp_address || c.address || '-');
-                var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
-                var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
-                var escapedId = Utils.escapeAttr(c.id);
-                
-                rows += `<tr>
-                    <td>${customerId}<\/td>
-                    <td>${name}<\/td>
-                    <td>${ktpNumber}<\/td>
-                    <td>${phone}<\/td>
-                    <td>${ktpAddress}<\/td>
-                    <td>${livingAddress}<\/td>
-                    <td class="text-center">${registeredDate}<\/td>
-                    ${isAdmin ? `<td class="text-center">${storeName}<\/td>` : ''}
-                </tr>
-                <tr class="action-row">
-    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
-    <td colspan="${totalCols}" class="action-btns">
-        ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
-        <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
-        ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
-        ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-        ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
-    <\/td>
-<\/tr>
+        try {
+            const customers = await SUPABASE.getCustomers();
+            
+            const stores = await SUPABASE.getAllStores();
+            const storeMap = {};
+            for (var s of stores) {
+                storeMap[s.id] = s.name;
             }
-        }
+            
+            var baseCols = 7;
+            var totalCols = isAdmin ? baseCols + 1 : baseCols;
+            
+            var rows = '';
+            if (!customers || customers.length === 0) {
+                rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}</td></tr>`;
+            } else {
+                for (var c of customers) {
+                    var customerId = Utils.escapeHtml(c.customer_id || '-');
+                    var registeredDate = Utils.formatDate(c.registered_date);
+                    var name = Utils.escapeHtml(c.name);
+                    var ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
+                    var phone = Utils.escapeHtml(c.phone || '-');
+                    var ktpAddress = Utils.escapeHtml(c.ktp_address || c.address || '-');
+                    var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
+                    var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
+                    var escapedId = Utils.escapeAttr(c.id);
+                    
+                    rows += `<tr>
+                        <td>${customerId}</td>
+                        <td>${name}</td>
+                        <td>${ktpNumber}</td>
+                        <td>${phone}</td>
+                        <td>${ktpAddress}</td>
+                        <td>${livingAddress}</td>
+                        <td class="text-center">${registeredDate}</td>
+                        ${isAdmin ? `<td class="text-center">${storeName}</td>` : ''}
+                    </tr>
+                    <tr class="action-row">
+                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}</td>
+                        <td colspan="${totalCols}" class="action-btns">
+                            ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
+                            <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
+                            ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
+                            ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+                            ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+                        </td>
+                    </tr>`;
+                }
+            }
 
-        var addCustomerCardHtml = '';
-        if (!isAdmin) {
-            addCustomerCardHtml = `
-            <div class="card">
-                <h3>${lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户'}</h3>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>${t('customer_name')} *</label>
-                        <input type="text" id="customerName" placeholder="${t('customer_name')}">
-                    </div>
-                    <div class="form-group">
-                        <label>${t('phone')} *</label>
-                        <input type="text" id="customerPhone" placeholder="${t('phone')}">
-                    </div>
-                    <div class="form-group">
-                        <label>${t('ktp_number')}</label>
-                        <input type="text" id="customerKtp" placeholder="${t('ktp_number')}">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</label>
-                        <textarea id="customerKtpAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址'}"></textarea>
-                    </div>
-                    <div class="form-group full-width">
-                        <label>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</label>
-                        <div class="address-option">
-                            <label><input type="radio" name="livingAddrOpt" value="same" checked onchange="window.APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
-                            <label><input type="radio" name="livingAddrOpt" value="different" onchange="window.APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）'}</label>
+            var addCustomerCardHtml = '';
+            if (!isAdmin) {
+                addCustomerCardHtml = `
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户'}</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>${t('customer_name')} *</label>
+                            <input type="text" id="customerName" placeholder="${t('customer_name')}">
                         </div>
-                        <textarea id="customerLivingAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址'}" style="display:none;margin-top:8px;"></textarea>
+                        <div class="form-group">
+                            <label>${t('phone')} *</label>
+                            <input type="text" id="customerPhone" placeholder="${t('phone')}">
+                        </div>
+                        <div class="form-group">
+                            <label>${t('ktp_number')}</label>
+                            <input type="text" id="customerKtp" placeholder="${t('ktp_number')}">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</label>
+                            <textarea id="customerKtpAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址'}"></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</label>
+                            <div class="address-option">
+                                <label><input type="radio" name="livingAddrOpt" value="same" checked onchange="window.APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Sama dengan KTP' : '同上KTP'}</label>
+                                <label><input type="radio" name="livingAddrOpt" value="different" onchange="window.APP.toggleLivingAddress(this.value)"> ${lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）'}</label>
+                            </div>
+                            <textarea id="customerLivingAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址'}" style="display:none;margin-top:8px;"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button onclick="APP.addCustomer()" class="success">💾 ${lang === 'id' ? 'Simpan Nasabah' : '保存客户'}</button>
+                        </div>
                     </div>
-                    <div class="form-actions">
-                        <button onclick="APP.addCustomer()" class="success">💾 ${lang === 'id' ? 'Simpan Nasabah' : '保存客户'}</button>
-                    </div>
-                </div>
-            </div>`;
-        }
+                </div>`;
+            }
 
-        document.getElementById("app").innerHTML = `
-            <div class="page-header">
-                <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
-                <div class="header-actions">                        
-                    <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
-                    <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+            document.getElementById("app").innerHTML = `
+                <div class="page-header">
+                    <h2>👥 ${lang === 'id' ? 'Data Nasabah' : '客户信息'}</h2>
+                    <div class="header-actions">                        
+                        <button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ${t('print')}</button>
+                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="card">
-                <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
-                <div class="table-container">
-                    <table class="data-table">
-                        <colgroup>
-                            <col style="width: 12%; min-width: 100px;">
-                            <col style="width: 10%; min-width: 80px;">
-                            <col style="width: 12%; min-width: 100px;">
-                            <col style="width: 10%; min-width: 90px;">
-                            <col style="width: 20%; min-width: 150px;">
-                            <col style="width: 20%; min-width: 150px;">
-                            <col style="width: 10%; min-width: 90px;">
-                            ${isAdmin ? '<col style="width: 6%; min-width: 80px;">' : ''}
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
-                                <th>${t('customer_name')}</th>
-                                <th>${t('ktp_number')}</th>
-                                <th>${t('phone')}</th>
-                                <th>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
-                                <th>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
-                                <th class="text-center">${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}</th>
-                                ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
-                            </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>
+                
+                <div class="card">
+                    <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <colgroup>
+                                <col style="width: 12%; min-width: 100px;">
+                                <col style="width: 10%; min-width: 80px;">
+                                <col style="width: 12%; min-width: 100px;">
+                                <col style="width: 10%; min-width: 90px;">
+                                <col style="width: 20%; min-width: 150px;">
+                                <col style="width: 20%; min-width: 150px;">
+                                <col style="width: 10%; min-width: 90px;">
+                                ${isAdmin ? '<col style="width: 6%; min-width: 80px;">' : ''}
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
+                                    <th>${t('customer_name')}</th>
+                                    <th>${t('ktp_number')}</th>
+                                    <th>${t('phone')}</th>
+                                    <th>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
+                                    <th>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}</th>
+                                    ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+                
+                ${addCustomerCardHtml}`;
             
-            ${addCustomerCardHtml}`;
+            this._addDataTableStyles();
             
-        this._addDataTableStyles();
-        
-    } catch (error) {
-        console.error("showCustomers error:", error);
-        alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
-    }
-},
+        } catch (error) {
+            console.error("showCustomers error:", error);
+            alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
+        }
+    },
     
     _addDataTableStyles: function() {
         if (document.getElementById('data-table-styles')) return;
@@ -465,11 +464,9 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单（完整修复版） ====================
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang || 'id';
         
-        // 安全翻译函数
         var t = function(key) {
             if (typeof Utils.t === 'function') {
                 return Utils.t(key);
@@ -503,7 +500,6 @@ const CustomersModule = {
             return fallback[key] || key;
         };
 
-        // 获取用户资料
         var profile = null;
         try {
             profile = await SUPABASE.getCurrentProfile();
@@ -526,7 +522,6 @@ const CustomersModule = {
         }
 
         try {
-            // 检查客户是否存在
             const { data: customer, error: customerError } = await supabaseClient
                 .from('customers')
                 .select('*')
@@ -537,7 +532,6 @@ const CustomersModule = {
                 throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据');
             }
 
-            // 检查黑名单
             var blacklistCheck = { isBlacklisted: false };
             try {
                 const { data: blData } = await supabaseClient
@@ -555,7 +549,6 @@ const CustomersModule = {
                 return;
             }
 
-            // 检查活跃订单
             try {
                 const { data: existingOrders } = await supabaseClient
                     .from('orders')
@@ -573,7 +566,6 @@ const CustomersModule = {
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
 
-            // 获取门店信息
             var userStoreName = '-';
             var userStoreCode = '-';
             
@@ -600,7 +592,6 @@ const CustomersModule = {
                 userStoreCode = '-';
             }
             
-            // 渲染订单创建页面
             document.getElementById("app").innerHTML = `
                 <div class="page-header">
                     <h2>📝 ${t('create_order')}</h2>
@@ -804,7 +795,6 @@ const CustomersModule = {
                 .eq('id', customerId)
                 .single();
             
-            // 再次检查黑名单
             var blacklistCheck = null;
             const { data } = await supabaseClient
                 .from('blacklist')
@@ -976,7 +966,7 @@ const CustomersModule = {
             }
             var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', service_fee: lang === 'id' ? 'Service Fee' : '服务费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
             var rows = allPayments.length === 0
-                ? `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`
+                ? `<td><td colspan="7" class="text-center">${t('no_data')}<\/td><\/tr>`
                 : allPayments.map(p => `<tr>
                     <td data-label="${t('date')}" class="date-cell">${Utils.formatDate(p.date)}<\/td>
                     <td data-label="${t('order_id')}" class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td>
@@ -1015,7 +1005,6 @@ const CustomersModule = {
     }
 };
 
-// 导出所有方法
 for (var key in CustomersModule) {
     if (typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
