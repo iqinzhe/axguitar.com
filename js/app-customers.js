@@ -109,18 +109,18 @@ const CustomersModule = {
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
-                                <tr>
-                                    <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
-                                    <th>${t('customer_name')}</th>
-                                    <th>${t('ktp_number')}</th>
-                                    <th>${t('phone')}</th>
-                                    <th>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
-                                    <th>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}</th>
-                                    ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
-                                    <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                </tr>
-                            </thead>
+    <tr>
+        <th>${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th>
+        <th>${t('customer_name')}</th>
+        <th>${t('ktp_number')}</th>
+        <th>${t('phone')}</th>
+        <th>${lang === 'id' ? 'Alamat KTP' : 'KTP地址'}</th>
+        <th>${lang === 'id' ? 'Alamat Tinggal' : '居住地址'}</th>
+        <th class="text-center">${lang === 'id' ? 'Tanggal Daftar' : '注册日期'}</th>
+        ${isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : ''}
+        <!-- 注意：删除了最右边的“操作”列，操作按钮放在 action-row 中 -->
+    </tr>
+</thead>
                             <tbody>${rows}</tbody>
                         </table>
                     </div>
