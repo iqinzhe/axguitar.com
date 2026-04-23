@@ -50,19 +50,15 @@ const CustomersModule = {
                     ${isAdmin ? `<td class="text-center">${storeName}<\/td>` : ''}
                 </tr>
                 <tr class="action-row">
-                    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
-                    <td colspan="${totalCols}" class="action-btns">
-                        ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
-                        <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
-                        ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
-                        // 在 action-row 的 action-btns 中添加黑名单按钮
-// 在 ${PERMISSION.canDeleteCustomer() ? ... } 后面添加
-
-${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
-                        ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
-                    <\/td>
-                </tr>`;
+    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
+    <td colspan="${totalCols}" class="action-btns">
+        ${!isAdmin ? `<button onclick="APP.createOrderForCustomer('${escapedId}')" class="btn-small success">➕ ${lang === 'id' ? 'Buat Order' : '建立订单'}</button>` : ''}
+        <button onclick="APP.showCustomerOrders('${escapedId}')" class="btn-small">📋 ${lang === 'id' ? 'Lihat Order' : '查看订单'}</button>
+        ${!isAdmin ? `<button onclick="APP.editCustomer('${escapedId}')" class="btn-small">✏️ ${lang === 'id' ? 'Ubah' : '修改'}</button>` : ''}
+        ${PERMISSION.canDeleteCustomer() ? `<button onclick="APP.deleteCustomer('${escapedId}')" class="btn-small danger">🗑️ ${t('delete')}</button>` : ''}
+        ${!isAdmin ? `<button onclick="APP.blacklistCustomer('${escapedId}')" class="btn-small btn-blacklist">🚫 ${lang === 'id' ? 'Blacklist' : '拉黑'}</button>` : ''}
+    <\/td>
+<\/tr>
             }
         }
 
