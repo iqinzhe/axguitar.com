@@ -400,92 +400,111 @@ const DashboardReport = {
         }
     },
     
-    // 添加报表表格样式
-    _addReportTableStyles: function() {
-        if (document.getElementById('report-table-styles')) return;
-        
-        var style = document.createElement('style');
-        style.id = 'report-table-styles';
-        style.textContent = `
-            .report-table th {
-                background: var(--gray-100);
-                font-weight: 600;
-                text-align: center;
-                vertical-align: middle;
-                padding: 10px 8px;
-            }
-            .report-table td {
-                padding: 10px 8px;
-                vertical-align: middle;
-            }
-            .report-table .store-name-cell {
-                font-weight: 500;
-                background: var(--gray-50);
-            }
-            .report-table .text-right {
-                text-align: right;
-            }
-            .report-table .text-center {
-                text-align: center;
-            }
-            .report-table .income {
-                color: #10b981;
-            }
-            .report-table .expense {
-                color: #ef4444;
-            }
-            .report-table tbody tr:hover {
-                background: var(--gray-50);
-            }
-            .report-table tbody tr:last-child {
-                border-top: 2px solid var(--gray-400);
-                background: var(--gray-100);
-                font-weight: 600;
-            }
-            .cashflow-stats {
-                display: flex;
-                gap: 16px;
-                flex-wrap: wrap;
-            }
-            .cashflow-item {
-                flex: 1;
-                min-width: 150px;
-                background: var(--gray-50);
-                border-radius: 12px;
-                padding: 12px 16px;
-                text-align: center;
-            }
-            .cashflow-item .label {
-                font-size: 12px;
-                color: var(--gray-500);
-                margin-bottom: 6px;
-            }
+   // 添加报表表格样式
+_addReportTableStyles: function() {
+    if (document.getElementById('report-table-styles')) return;
+    
+    var style = document.createElement('style');
+    style.id = 'report-table-styles';
+    style.textContent = `
+        /* 报表表格 - 统一边框和数字对齐 */
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .report-table th,
+        .report-table td {
+            border: 1px solid #cbd5e1;
+            padding: 10px 8px;
+            vertical-align: middle;
+        }
+        .report-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+            text-align: center;
+        }
+        .report-table td {
+            text-align: left;
+        }
+        .report-table .text-right {
+            text-align: right;
+        }
+        .report-table .text-center {
+            text-align: center;
+        }
+        /* 数字列统一右对齐，使用等宽字体辅助对齐 */
+        .report-table td.text-right,
+        .report-table th.text-right {
+            text-align: right;
+            font-family: 'Courier New', 'Segoe UI', monospace;
+            letter-spacing: 0.3px;
+        }
+        /* 门店名称列 */
+        .report-table .store-name-cell {
+            font-weight: 500;
+            background: #f8fafc;
+        }
+        /* 正负数颜色 */
+        .report-table .income {
+            color: #10b981;
+        }
+        .report-table .expense {
+            color: #ef4444;
+        }
+        /* 汇总行高亮 */
+        .report-table tbody tr:last-child {
+            border-top: 2px solid #94a3b8;
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+        /* 现金流卡片样式 */
+        .cashflow-stats {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .cashflow-item {
+            flex: 1;
+            min-width: 150px;
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 12px 16px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .cashflow-item .label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        .cashflow-item .value {
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Courier New', 'Segoe UI', monospace;
+        }
+        .cashflow-item .negative {
+            color: #ef4444;
+        }
+        .cashflow-item .income {
+            color: #10b981;
+        }
+        .cashflow-item .expense {
+            color: #ef4444;
+        }
+        /* 手机端适配 */
+        @media (max-width: 768px) {
             .cashflow-item .value {
-                font-size: 18px;
-                font-weight: 700;
+                font-size: 14px;
             }
-            .cashflow-item .negative {
-                color: #ef4444;
+            .report-table th, 
+            .report-table td {
+                padding: 6px 4px;
+                font-size: 11px;
             }
-            .cashflow-item .income {
-                color: #10b981;
-            }
-            .cashflow-item .expense {
-                color: #ef4444;
-            }
-            @media (max-width: 768px) {
-                .cashflow-item .value {
-                    font-size: 14px;
-                }
-                .report-table th, .report-table td {
-                    padding: 6px 4px;
-                    font-size: 11px;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-};
+        }
+    `;
+    document.head.appendChild(style);
+},
 
 for (var key in DashboardReport) {
     if (typeof DashboardReport[key] === 'function') {
