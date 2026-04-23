@@ -1,4 +1,4 @@
-// store.js - v1.1（修复：门店管理功能完整，与 APP 模块兼容）
+// store.js - v1.2（门店管理优化版）
 
 const StoreManager = {
     stores: [],
@@ -275,7 +275,7 @@ const StoreManager = {
                 <td class="text-right expense">${Utils.formatCurrency(totalExpenses)}</td>
                 <td class="text-right">${Utils.formatCurrency(cashBalance)}</td>
                 <td class="text-right">${Utils.formatCurrency(bankBalance)}</td>
-            　　　`;
+            </tr>`;
         }
         
         // 汇总行
@@ -309,11 +309,14 @@ const StoreManager = {
                                placeholder="628xxxxxxxxxx" style="width:140px; font-size:12px; padding:6px;" 
                                onchange="APP.updateStoreWANumber('${store.id}', this.value)">
                     </td>
-                <\/tr>
-                    <tr class="action-row"><td colspan="6">
+                </tr>
+                <tr class="action-row">
+                    <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}</td>
+                    <td colspan="5" class="action-btns">
                         <button onclick="StoreManager.editStore('${store.id}')" class="btn-small">✏️ ${t('edit')}</button>
                         <button class="btn-small danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>
-                    <\/td><\/tr>`;
+                    </td>
+                </tr>`;
             }
         }
 
@@ -335,33 +338,35 @@ const StoreManager = {
                 </div>
             </div>
 
-            <div class="cashflow-summary" style="margin-bottom:20px;">
+            <!-- 现金流汇总卡片 -->
+            <div class="card cashflow-card">
                 <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
                 <div class="cashflow-stats">
-                    <div class="cashflow-item">
+                    <div class="cashflow-item-card">
                         <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
                         <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
-                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(cashIncome)} / -${Utils.formatCurrency(cashExpense)}</div>
+                        <div class="sub">+${Utils.formatCurrency(cashIncome)} / -${Utils.formatCurrency(cashExpense)}</div>
                     </div>
-                    <div class="cashflow-item">
+                    <div class="cashflow-item-card">
                         <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
                         <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
-                        <div style="font-size:10px; opacity:0.7;">+${Utils.formatCurrency(bankIncome)} / -${Utils.formatCurrency(bankExpense)}</div>
+                        <div class="sub">+${Utils.formatCurrency(bankIncome)} / -${Utils.formatCurrency(bankExpense)}</div>
                     </div>
-                    <div class="cashflow-item">
+                    <div class="cashflow-item-card">
                         <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
                         <div class="value">${Utils.formatCurrency(totalBalance)}</div>
                     </div>
                 </div>
-                <p class="info-note" style="font-size:11px; color:#64748b; margin-top:8px;">
+                <div class="cashflow-note">
                     💡 ${lang === 'id' ? 'Saldo berdasarkan catatan arus kas (cash_flow_records) - mencakup semua transaksi masuk dan keluar.' : '余额基于资金流记录 (cash_flow_records) - 包含所有流入流出交易。'}
-                </p>
+                </div>
             </div>
 
+            <!-- 门店财务汇总表格 -->
             <div class="card">
                 <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                 <div class="table-container" style="overflow-x: auto;">
-                    <table class="data-table store-stats-table" style="min-width:1000px;">
+                    <table class="data-table store-stats-table" style="min-width: 800px;">
                         <thead>
                             <tr>
                                 <th>${lang === 'id' ? 'Toko' : '门店'}</th>
@@ -386,6 +391,7 @@ const StoreManager = {
                 </div>
             </div>
 
+            <!-- 门店列表 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                 <div class="table-container">
@@ -408,6 +414,7 @@ const StoreManager = {
                 </p>
             </div>
 
+            <!-- 新增门店 -->
             <div class="card">
                 <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                 <div class="form-grid">
@@ -458,18 +465,64 @@ const StoreManager = {
                 }
                 .store-stats-table .store-name-cell {
                     font-weight: 500;
-                    background: var(--gray-50);
+                    background: #f8fafc;
                 }
                 .store-stats-table tbody tr:last-child {
-                    border-top: 2px solid var(--gray-400);
-                    background: var(--gray-100);
+                    border-top: 2px solid #cbd5e1;
+                    background: #f1f5f9;
                 }
-                .info-note {
+                .cashflow-card {
+                    margin-bottom: 20px;
+                }
+                .cashflow-stats {
+                    display: flex;
+                    gap: 16px;
+                    flex-wrap: wrap;
+                }
+                .cashflow-item-card {
+                    flex: 1;
+                    min-width: 180px;
+                    background: #f8fafc;
+                    border-radius: 12px;
+                    padding: 16px;
+                    transition: all 0.2s ease;
+                }
+                .cashflow-item-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                }
+                .cashflow-item-card .label {
+                    font-size: 13px;
+                    color: #64748b;
+                    margin-bottom: 8px;
+                }
+                .cashflow-item-card .value {
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #1e293b;
+                }
+                .cashflow-item-card .value.negative {
+                    color: #ef4444;
+                }
+                .cashflow-item-card .sub {
+                    font-size: 11px;
+                    color: #94a3b8;
+                    margin-top: 6px;
+                }
+                .cashflow-note {
                     font-size: 11px;
                     color: #64748b;
-                    margin-top: 8px;
+                    margin-top: 12px;
+                    padding-top: 8px;
+                    border-top: 1px solid #e2e8f0;
                 }
-                @media (max-width: 768px) {
+                @media (max-width: 640px) {
+                    .cashflow-stats {
+                        flex-direction: column;
+                    }
+                    .cashflow-item-card {
+                        min-width: auto;
+                    }
                     .store-table .store-address {
                         max-width: 120px;
                     }
