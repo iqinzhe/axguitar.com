@@ -1,4 +1,4 @@
-// utils.js - v1.5（添加异常状况翻译）
+// utils.js - v1.6（添加 escapeAttr 统一方法）
 
 const Utils = {
     lang: 'id',
@@ -349,14 +349,14 @@ const Utils = {
         
         const langTranslations = this.translations[this.lang];
         if (!langTranslations) {
-            console.warn(`Utils.t: 语言 ${this.lang} 的翻译对象不存在`);
+            console.warn('Utils.t: 语言 ' + this.lang + ' 的翻译对象不存在');
             return key;
         }
         
         const text = langTranslations[key];
         
         if (text === undefined) {
-            console.warn(`Utils.t: 缺少翻译键 "${key}" 用于语言 "${this.lang}"`);
+            console.warn('Utils.t: 缺少翻译键 "' + key + '" 用于语言 "' + this.lang + '"');
             return key;
         }
         
@@ -379,11 +379,16 @@ const Utils = {
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
 
+    // ========== 新增：统一的 escapeAttr 方法 ==========
     escapeAttr: function(str) {
         if (!str) return '';
         return String(str)
-            .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-            .replace(/`/g, '&#96;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/`/g, '&#96;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
     },
 
     formatCurrency: function(amount) {
@@ -529,21 +534,23 @@ const Utils = {
         });
     },
 
-    renderPageHeader: function(title, showBackBtn = true) {
-        const backBtnHtml = showBackBtn && window.APP && typeof window.APP.goBack === 'function'
-            ? `<button onclick="APP.goBack()">↩️ ${this.t('back')}</button>` : '';
-        return `<div class="page-header"><h2>${title}</h2><div>${backBtnHtml}</div></div>`;
+    renderPageHeader: function(title, showBackBtn) {
+        if (showBackBtn === undefined) showBackBtn = true;
+        var backBtnHtml = showBackBtn && window.APP && typeof window.APP.goBack === 'function'
+            ? '<button onclick="APP.goBack()">↩️ ' + this.t('back') + '</button>' : '';
+        return '<div class="page-header"><h2>' + title + '</h2><div>' + backBtnHtml + '</div></div>';
     },
 
-    wrapTableRow: function(cells, isHeader = false) {
-        const tag = isHeader ? 'th' : 'td';
-        return '<table>' + cells.map(cell => `<${tag}>${cell}</${tag}>`).join('') + '</table>';
+    wrapTableRow: function(cells, isHeader) {
+        var tag = isHeader ? 'th' : 'td';
+        return '<table>' + cells.map(cell => '<' + tag + '>' + cell + '</' + tag + '>').join('') + '</table>';
     },
 
-    getServiceFeeOptionsHtml: function(selectedPercent = 0) {
-        return this.serviceFeePercentOptions.map(opt =>
-            `<option value="${opt.value}" ${selectedPercent === opt.value ? 'selected' : ''}>${opt.label}</option>`
-        ).join('');
+    getServiceFeeOptionsHtml: function(selectedPercent) {
+        if (selectedPercent === undefined) selectedPercent = 0;
+        return this.serviceFeePercentOptions.map(function(opt) {
+            return '<option value="' + opt.value + '" ' + (selectedPercent === opt.value ? 'selected' : '') + '>' + opt.label + '</option>';
+        }).join('');
     }
 };
 
