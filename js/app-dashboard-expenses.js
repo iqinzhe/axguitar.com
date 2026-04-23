@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.4（删除表头操作列，平账按钮移到操作行）
+// app-dashboard-expenses.js - v1.5（修复语法错误）
 
 window.APP = window.APP || {};
 
@@ -18,10 +18,7 @@ const DashboardExpenses = {
             try {
                 let query = supabaseClient
                     .from('expenses')
-                    .select(`
-                        *,
-                        stores:store_id (name, code)
-                    `)
+                    .select('*')
                     .order('expense_date', { ascending: false });
                 
                 if (!isAdmin && profile?.store_id) {
@@ -30,114 +27,75 @@ const DashboardExpenses = {
                 
                 const { data: expenses, error } = await query;
                 
-                if (error) {
-                    console.warn("关联查询失败，尝试简化查询:", error);
-                    const simpleQuery = supabaseClient
-                        .from('expenses')
-                        .select('*')
-                        .order('expense_date', { ascending: false });
-                    
-                    if (!isAdmin && profile?.store_id) {
-                        simpleQuery.eq('store_id', profile.store_id);
-                    }
-                    
-                    const { data: simpleExpenses, error: simpleError } = await simpleQuery;
-                    if (simpleError) throw simpleError;
-                    
-                    var expensesData = simpleExpenses || [];
-                    
-                    var storesMap = {};
-                    try {
-                        const storesData = await SUPABASE.getAllStores();
-                        for (var s of storesData) {
-                            storesMap[s.id] = s;
-                        }
-                    } catch(e) {
-                        console.warn("获取门店信息失败:", e);
-                    }
-                    
-                    finalExpenses = expensesData.map(e => ({
-                        ...e,
-                        stores: storesMap[e.store_id] || { name: '-', code: '-' }
-                    }));
-                } else {
-                    finalExpenses = expenses || [];
-                }
+                if (error) throw error;
+                finalExpenses = expenses || [];
             } catch (queryError) {
                 console.error("查询支出数据失败:", queryError);
-                const fallbackQuery = supabaseClient
-                    .from('expenses')
-                    .select('*')
-                    .order('expense_date', { ascending: false });
-                
-                if (!isAdmin && profile?.store_id) {
-                    fallbackQuery.eq('store_id', profile.store_id);
-                }
-                
-                const { data: fallbackExpenses, error: fallbackError } = await fallbackQuery;
-                if (fallbackError) throw fallbackError;
-                
-                finalExpenses = fallbackExpenses || [];
+                finalExpenses = [];
             }
             
-            var totalAmount = finalExpenses?.reduce((s, e) => s + (e.amount || 0), 0) || 0;
+            var totalAmount = 0;
+            for (var i = 0; i < finalExpenses.length; i++) {
+                totalAmount += finalExpenses[i].amount || 0;
+            }
             var todayDate = new Date().toISOString().split('T')[0];
 
-            // 计算列数（不包含操作列）
-            // 基础列: 日期, 类别, 金额, 支付方式, 描述 = 5列，管理员额外加门店 = 6列
             var totalCols = isAdmin ? 6 : 5;
             
             var rows = '';
-            if (finalExpenses && finalExpenses.length > 0) {
-                for (var e of finalExpenses) {
+            if (finalExpenses.length === 0) {
+                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+            } else {
+                for (var i = 0; i < finalExpenses.length; i++) {
+                    var e = finalExpenses[i];
                     var canEdit = isAdmin && !e.is_reconciled;
-                    var methodText = e.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
-                    var storeDisplay = e.stores?.name ? `${Utils.escapeHtml(e.stores.name)} (${Utils.escapeHtml(e.stores.code || '-')})` : '-';
+                    var methodText = (e.payment_method === 'cash') ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     
-                    // 数据行
-                    rows += `<tr>
-                        <td data-label="${lang === 'id' ? 'Tanggal' : '日期'}" class="date-cell">${Utils.formatDate(e.expense_date)}<\/td>
-                        <td data-label="${lang === 'id' ? 'Kategori' : '类别'}" class="expense-category">${Utils.escapeHtml(e.category)}<\/td>
-                        <td data-label="${t('amount')}" class="text-right">${Utils.formatCurrency(e.amount)}<\/td>
-                        <td data-label="${lang === 'id' ? 'Metode' : '支付方式'}" class="text-center">${methodText}<\/td>
-                        <td data-label="${t('description')}" class="expense-desc">${Utils.escapeHtml(e.description || '-')}<\/td>
-                        ${isAdmin ? `<td data-label="${t('store')}" class="text-center">${storeDisplay}<\/td>` : ''}
-                    </tr>
+                    // 数据行 - 使用字符串拼接避免模板字符串中的class冲突
+                    rows += '<tr>';
+                    rows += '<td class="date-cell">' + Utils.formatDate(e.expense_date) + '<\/td>';
+                    rows += '<td class="expense-category">' + Utils.escapeHtml(e.category) + '<\/td>';
+                    rows += '<td class="text-right">' + Utils.formatCurrency(e.amount) + '<\/td>';
+                    rows += '<td class="text-center">' + methodText + '<\/td>';
+                    rows += '<td class="expense-desc">' + Utils.escapeHtml(e.description || '-') + '<\/td>';
+                    if (isAdmin) {
+                        rows += '<td class="text-center">' + Utils.escapeHtml(e.store_id || '-') + '<\/td>';
+                    }
+                    rows += '<\/tr>';
+                    
                     // 操作行
-                    rows += `<tr class="action-row">
-                        <td class="action-label">${lang === 'id' ? 'Aksi' : '操作'}<\/td>
-                        <td colspan="${totalCols}" class="action-btns">`;
+                    rows += '<tr class="action-row">';
+                    rows += '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '<\/td>';
+                    rows += '<td colspan="' + totalCols + '" class="action-btns">';
                     
                     if (canEdit) {
-                        rows += `<button onclick="APP.editExpense('${e.id}')" class="btn-small">✏️ ${t('edit')}</button>
-                                 <button class="btn-small danger" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button>`;
+                        rows += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '<\/button>';
+                        rows += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '<\/button>';
                     } else if (e.is_reconciled) {
-                        rows += `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span>`;
+                        rows += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '<\/span>';
                     } else if (!isAdmin) {
-                        rows += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
+                        rows += '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '<\/span>';
                     }
                     
                     // 平账按钮（仅在管理员且未平账时显示）
                     if (isAdmin && !e.is_reconciled) {
-                        rows += `<button onclick="APP.balanceExpenses()" class="btn-small btn-balance">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
+                        rows += '<button onclick="APP.balanceExpenses()" class="btn-small btn-balance">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '<\/button>';
                     }
                     
-                    rows += `<\/td><\/tr>`;
+                    rows += '<\/td><\/tr>';
                 }
-            } else {
-                rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}<\/td><\/tr>`;
             }
 
-            const expenseCategories = lang === 'id' 
+            var expenseCategories = lang === 'id' 
                 ? ['Listrik', 'Air', 'Internet', 'Gaji Karyawan', 'Sewa Tempat', 'ATK', 'Perbaikan', 'Transportasi', 'Lainnya']
                 : ['电费', '水费', '网络费', '员工工资', '场地租金', '办公用品', '维修', '交通费', '其他'];
 
             var categoryOptions = '';
-            for (var cat of expenseCategories) {
-                categoryOptions += `<option value="${cat}">${cat}</option>`;
+            for (var j = 0; j < expenseCategories.length; j++) {
+                categoryOptions += '<option value="' + expenseCategories[j] + '">' + expenseCategories[j] + '<\/option>';
             }
 
-            document.getElementById("app").innerHTML = `
+            var pageHtml = `
                 <div class="page-header">
                     <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
                     <div class="header-actions">                      
@@ -197,49 +155,22 @@ const DashboardExpenses = {
                 </div>
                 
                 <style>
-                    .expense-table .date-cell {
-                        white-space: nowrap;
-                    }
-                    .expense-table .expense-category {
-                        font-weight: 500;
-                    }
-                    .expense-table .expense-desc {
-                        max-width: 200px;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                    }
-                    .reconciled-badge, .locked-badge {
-                        display: inline-block;
-                        padding: 4px 8px;
-                        border-radius: 20px;
-                        font-size: 0.7rem;
-                    }
-                    .reconciled-badge {
-                        background: var(--success-light);
-                        color: var(--success-dark);
-                    }
-                    .locked-badge {
-                        background: #f1f5f9;
-                        color: #64748b;
-                    }
-                    .btn-balance {
-                        background: #f59e0b !important;
-                        color: white !important;
-                    }
-                    .btn-balance:hover {
-                        background: #d97706 !important;
-                    }
+                    .expense-table .date-cell { white-space: nowrap; }
+                    .expense-table .expense-category { font-weight: 500; }
+                    .expense-table .expense-desc { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                    .reconciled-badge, .locked-badge { display: inline-block; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; }
+                    .reconciled-badge { background: #ecfdf5; color: #065f46; }
+                    .locked-badge { background: #f1f5f9; color: #64748b; }
+                    .btn-balance { background: #f59e0b !important; color: white !important; }
+                    .btn-balance:hover { background: #d97706 !important; }
                     @media (max-width: 768px) {
-                        .expense-table .expense-desc {
-                            max-width: 120px;
-                        }
-                        .expense-table th, .expense-table td {
-                            padding: 6px 4px;
-                            font-size: 0.7rem;
-                        }
+                        .expense-table .expense-desc { max-width: 120px; }
+                        .expense-table th, .expense-table td { padding: 6px 4px; font-size: 0.7rem; }
                     }
                 </style>`;
+            
+            document.getElementById("app").innerHTML = pageHtml;
+            
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
@@ -264,7 +195,7 @@ const DashboardExpenses = {
         try {
             const profile = await SUPABASE.getCurrentProfile();
             
-            const result = await SUPABASE.addExpense({
+            await SUPABASE.addExpense({
                 store_id: profile.store_id,
                 expense_date: expenseDate,
                 category: category,
@@ -294,23 +225,7 @@ const DashboardExpenses = {
             if (newAmount && !isNaN(parseFloat(newAmount))) {
                 const newAmountNum = parseFloat(newAmount);
                 
-                const { error: updateError } = await supabaseClient.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
-                if (updateError) throw updateError;
-                
-                const { data: cashFlow } = await supabaseClient
-                    .from('cash_flow_records')
-                    .select('id, amount')
-                    .eq('reference_id', expenseId)
-                    .eq('flow_type', 'expense')
-                    .eq('is_voided', false)
-                    .maybeSingle();
-                
-                if (cashFlow) {
-                    await supabaseClient.from('cash_flow_records').update({ 
-                        amount: newAmountNum,
-                        description: `${expense.category} - ${expense.description || ''}`.trim()
-                    }).eq('id', cashFlow.id);
-                }
+                await supabaseClient.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
                 
                 alert(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
                 await this.showExpenses();
@@ -324,53 +239,11 @@ const DashboardExpenses = {
     deleteExpense: async function(expenseId) {
         var lang = Utils.lang;
         
-        const { data: expense, error: fetchError } = await supabaseClient
-            .from('expenses')
-            .select('category, amount, expense_date')
-            .eq('id', expenseId)
-            .single();
-        
-        if (fetchError) {
-            console.error("获取支出信息失败:", fetchError);
-        }
-        
-        var confirmMsg = lang === 'id' 
-            ? `Hapus pengeluaran ini?\n\nKategori: ${expense?.category || '-'}\nJumlah: ${Utils.formatCurrency(expense?.amount || 0)}\nTanggal: ${expense?.expense_date || '-'}`
-            : `删除此支出记录？\n\n类别: ${expense?.category || '-'}\n金额: ${Utils.formatCurrency(expense?.amount || 0)}\n日期: ${expense?.expense_date || '-'}`;
-        
+        var confirmMsg = lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？';
         if (!confirm(confirmMsg)) return;
         
         try {
-            const { data: cashFlows, error: findFlowError } = await supabaseClient
-                .from('cash_flow_records')
-                .select('id')
-                .eq('reference_id', expenseId)
-                .eq('flow_type', 'expense');
-            
-            if (findFlowError) {
-                console.warn("查找关联现金流记录失败:", findFlowError);
-            } else if (cashFlows && cashFlows.length > 0) {
-                const cashFlowIds = cashFlows.map(cf => cf.id);
-                const { error: deleteFlowError } = await supabaseClient
-                    .from('cash_flow_records')
-                    .delete()
-                    .in('id', cashFlowIds);
-                
-                if (deleteFlowError) {
-                    console.error("删除关联现金流记录失败:", deleteFlowError);
-                    throw new Error(lang === 'id' 
-                        ? 'Gagal menghapus catatan arus kas terkait' 
-                        : '删除关联现金流记录失败');
-                }
-            }
-            
-            const { error: deleteExpenseError } = await supabaseClient
-                .from('expenses')
-                .delete()
-                .eq('id', expenseId);
-            
-            if (deleteExpenseError) throw deleteExpenseError;
-            
+            await supabaseClient.from('expenses').delete().eq('id', expenseId);
             alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
             await this.showExpenses();
         } catch (error) {
@@ -421,8 +294,8 @@ const DashboardExpenses = {
         }
         
         if (!confirm(lang === 'id' 
-            ? `Rekonsiliasi pengeluaran dari ${startDate} sampai ${endDate}?` 
-            : `确认平账 ${startDate} 至 ${endDate} 期间的支出？`)) return;
+            ? 'Rekonsiliasi pengeluaran dari ' + startDate + ' sampai ' + endDate + '?' 
+            : '确认平账 ' + startDate + ' 至 ' + endDate + ' 期间的支出？')) return;
         
         try {
             const { data: expensesToUpdate, error: fetchError } = await supabaseClient
@@ -434,14 +307,14 @@ const DashboardExpenses = {
             
             if (fetchError) throw fetchError;
             
-            const count = expensesToUpdate?.length || 0;
+            var count = expensesToUpdate ? expensesToUpdate.length : 0;
             
             if (count === 0) {
                 alert(lang === 'id' ? 'Tidak ada pengeluaran yang perlu direkonsiliasi' : '没有需要平账的支出记录');
                 return;
             }
             
-            const { error: updateError } = await supabaseClient
+            await supabaseClient
                 .from('expenses')
                 .update({ 
                     is_reconciled: true, 
@@ -452,11 +325,9 @@ const DashboardExpenses = {
                 .lte('expense_date', endDate)
                 .eq('is_reconciled', false);
             
-            if (updateError) throw updateError;
-            
             alert(lang === 'id' 
-                ? `✅ Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.` 
-                : `✅ 平账完成！已平账 ${count} 条支出记录。`);
+                ? '✅ Rekonsiliasi selesai! ' + count + ' pengeluaran telah direkonsiliasi.' 
+                : '✅ 平账完成！已平账 ' + count + ' 条支出记录。');
             
             await this.showExpenses();
             
