@@ -599,104 +599,221 @@ const Storage = {
         if (element && element.remove) element.remove();
     },
     
-    // ==================== 备份管理界面 ====================
+renderBackupUI: async function() {
+    const lang = Utils.lang;
+    const profile = await SUPABASE.getCurrentProfile();
+    const isAdmin = profile?.role === 'admin';
     
-    renderBackupUI: async function() {
-        const lang = Utils.lang;
-        const profile = await SUPABASE.getCurrentProfile();
-        const isAdmin = profile?.role === 'admin';
-        
-        if (!isAdmin) {
-            alert(lang === 'id' ? 'Hanya administrator yang dapat mengakses manajemen cadangan' : '只有管理员可以访问备份管理');
-            try {
-                if (typeof APP !== 'undefined' && typeof APP.goBack === 'function') {
-                    APP.goBack();
-                } else if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
-                    window.APP.goBack();
-                } else if (typeof window.APP !== 'undefined' && typeof window.APP.renderDashboard === 'function') {
-                    window.APP.renderDashboard();
-                } else {
-                    window.location.reload();
-                }
-            } catch(e) {
-                console.warn("返回失败:", e);
+    if (!isAdmin) {
+        alert(lang === 'id' ? 'Hanya administrator yang dapat mengakses manajemen cadangan' : '只有管理员可以访问备份管理');
+        try {
+            if (typeof APP !== 'undefined' && typeof APP.goBack === 'function') {
+                APP.goBack();
+            } else if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
+                window.APP.goBack();
+            } else if (typeof window.APP !== 'undefined' && typeof window.APP.renderDashboard === 'function') {
+                window.APP.renderDashboard();
+            } else {
                 window.location.reload();
             }
-            return;
+        } catch(e) {
+            console.warn("返回失败:", e);
+            window.location.reload();
         }
+        return;
+    }
+    
+    var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
+    var backText = lang === 'id' ? 'Kembali' : '返回';
+    
+    // 备份功能（主要功能，醒目）
+    var backupTitle = lang === 'id' ? '📤 Cadangkan Data' : '📤 备份数据';
+    var backupDesc = lang === 'id' 
+        ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
+        : '备份所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
+    var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
+    
+    // 恢复功能（次要功能，有警告）
+    var restoreTitle = lang === 'id' ? '📥 Pemulihan Data' : '📥 恢复数据';
+    var restoreDesc = lang === 'id' 
+        ? 'Pulihkan data dari file cadangan.'
+        : '从备份文件恢复数据。';
+    var restoreWarning = lang === 'id' 
+        ? '⚠️ PERINGATAN: Akan menimpa data yang ada!'
+        : '⚠️ 警告：将覆盖现有数据！';
+    var restoreBtnText = lang === 'id' ? '🔄 Pulihkan Data' : '🔄 恢复数据';
+    
+    // 选择性恢复
+    var selectiveTitle = lang === 'id' ? '🎯 Pemulihan Selektif' : '🎯 选择性恢复';
+    var selectiveDesc = lang === 'id' 
+        ? 'Pulihkan hanya jenis data tertentu.'
+        : '仅恢复特定类型的数据。';
+    var restoreOrdersText = lang === 'id' ? '📋 Pulihkan Pesanan' : '📋 恢复订单';
+    var restoreCustomersText = lang === 'id' ? '👥 Pulihkan Nasabah' : '👥 恢复客户';
+    
+    // 导出CSV
+    var exportTitle = lang === 'id' ? '📊 Ekspor CSV' : '📊 导出 CSV';
+    var exportDesc = lang === 'id' 
+        ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
+        : '导出为 CSV 格式，可在 Excel 中打开。';
+    var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
+    var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
+    var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
+    
+    document.getElementById("app").innerHTML = `
+        <div class="page-header">
+            <h2>💾 ${pageTitle}</h2>
+            <div class="header-actions">
+                <button onclick="APP.goBack()" class="btn-back">↩️ ${backText}</button>
+            </div>
+        </div>
         
-        var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
-        var backText = lang === 'id' ? 'Kembali' : '返回';
-        var exportText = lang === 'id' ? 'Ekspor Data (Cadangan)' : '导出数据（备份）';
-        var exportDesc = lang === 'id' 
-            ? 'Ekspor semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
-            : '导出所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
-        var backupBtnText = lang === 'id' ? 'Cadangkan Sekarang' : '立即备份';
-        var importText = lang === 'id' ? 'Impor Data (Pemulihan)' : '导入数据（恢复）';
-        var importWarning = lang === 'id' 
-            ? 'Memulihkan data akan menimpa data yang ada! Pastikan Anda telah mencadangkan data saat ini.'
-            : '恢复数据将覆盖现有数据！请确保已备份当前数据。';
-        var restoreBtnText = lang === 'id' ? 'Pulihkan Data' : '恢复数据';
-        var selectiveText = lang === 'id' ? 'Pemulihan Selektif' : '选择性恢复';
-        var selectiveDesc = lang === 'id' 
-            ? 'Pulihkan hanya jenis data tertentu, tidak mempengaruhi data lainnya.'
-            : '仅恢复特定类型的数据，不影响其他数据。';
-        var restoreOrdersText = lang === 'id' ? 'Pulihkan Pesanan' : '恢复订单';
-        var restoreCustomersText = lang === 'id' ? 'Pulihkan Nasabah' : '恢复客户';
-        var exportCsvText = lang === 'id' ? 'Ekspor CSV' : '导出 CSV';
-        var exportCsvDesc = lang === 'id' 
-            ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
-            : '导出为 CSV 格式，可在 Excel 中打开。';
-        var exportOrdersText = lang === 'id' ? 'Ekspor Pesanan' : '导出订单';
-        var exportPaymentsText = lang === 'id' ? 'Ekspor Pembayaran' : '导出缴费';
-        var exportCustomersText = lang === 'id' ? 'Ekspor Nasabah' : '导出客户';
-        
-        document.getElementById("app").innerHTML = `
-            <div class="page-header">
-                <h2>💾 ${pageTitle}</h2>
-                <div class="header-actions">
-                    <button onclick="APP.goBack()" class="btn-back">↩️ ${backText}</button>
-                </div>
+        <!-- 电脑端：2x2网格，手机端：自动单列 -->
+        <div class="backup-grid">
+            <!-- 左上：备份数据 -->
+            <div class="backup-card backup-card-primary">
+                <h3>${backupTitle}</h3>
+                <p>${backupDesc}</p>
+                <button onclick="Storage.backup()" class="btn-backup-primary">${backupBtnText}</button>
             </div>
             
-            <div class="card">
-                <h3>📤 ${exportText}</h3>
+            <!-- 右上：导出 CSV -->
+            <div class="backup-card backup-card-secondary">
+                <h3>${exportTitle}</h3>
                 <p>${exportDesc}</p>
-                <button onclick="Storage.backup()" class="success">💾 ${backupBtnText}</button>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button onclick="Storage.exportOrdersToCSV()" class="btn-small">${exportOrdersText}</button>
+                    <button onclick="Storage.exportPaymentsToCSV()" class="btn-small">${exportPaymentsText}</button>
+                    <button onclick="Storage.exportCustomersToCSV()" class="btn-small">${exportCustomersText}</button>
+                </div>
             </div>
             
-            <div class="card">
-                <h3>📥 ${importText}</h3>
-                <p class="warning-text">⚠️ ${importWarning}</p>
-                <input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px;">
-                <button onclick="Storage.restoreFromFile()" class="warning">🔄 ${restoreBtnText}</button>
+            <!-- 左下：恢复数据 -->
+            <div class="backup-card backup-card-secondary">
+                <h3>${restoreTitle}</h3>
+                <p>${restoreDesc}</p>
+                <p class="warning-text-small">${restoreWarning}</p>
+                <input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">
+                <button onclick="Storage.restoreFromFile()" class="btn-restore">${restoreBtnText}</button>
             </div>
             
-            <div class="card">
-                <h3>🎯 ${selectiveText}</h3>
+            <!-- 右下：选择性恢复 -->
+            <div class="backup-card backup-card-secondary">
+                <h3>${selectiveTitle}</h3>
                 <p>${selectiveDesc}</p>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <input type="file" id="selectiveFile" accept=".json" style="margin-bottom:10px; width:100%;">
-                    <button onclick="Storage.restoreOrdersOnlyFromFile()" class="btn-small">📋 ${restoreOrdersText}</button>
-                    <button onclick="Storage.restoreCustomersOnlyFromFile()" class="btn-small">👥 ${restoreCustomersText}</button>
+                <input type="file" id="selectiveFile" accept=".json" style="margin-bottom:10px; width:100%;">
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button onclick="Storage.restoreOrdersOnlyFromFile()" class="btn-small">${restoreOrdersText}</button>
+                    <button onclick="Storage.restoreCustomersOnlyFromFile()" class="btn-small">${restoreCustomersText}</button>
                 </div>
             </div>
+        </div>
+        
+        <style>
+            /* 电脑端：2x2网格 */
+            .backup-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
             
-            <div class="card">
-                <h3>📊 ${exportCsvText}</h3>
-                <p>${exportCsvDesc}</p>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <button onclick="Storage.exportOrdersToCSV()" class="btn-small">📋 ${exportOrdersText}</button>
-                    <button onclick="Storage.exportPaymentsToCSV()" class="btn-small">💰 ${exportPaymentsText}</button>
-                    <button onclick="Storage.exportCustomersToCSV()" class="btn-small">👥 ${exportCustomersText}</button>
-                </div>
-            </div>
+            /* 备份卡片通用样式 */
+            .backup-card {
+                background: var(--bg-card);
+                border-radius: 12px;
+                padding: 20px;
+                border: 1px solid var(--border-light);
+                transition: all 0.2s ease;
+            }
             
-            <style>
-                .warning-text { color: #e74c3c; margin-bottom: 15px; }
-            </style>
-        `;
-    },
+            /* 主要功能卡片（备份）- 左上 */
+            .backup-card-primary {
+                background: linear-gradient(135deg, #e8f4e8 0%, #d4ecd4 100%);
+                border-left: 4px solid #10b981;
+            }
+            
+            .backup-card-primary h3 {
+                color: #065f46;
+                font-size: 1.2rem;
+                margin-bottom: 12px;
+            }
+            
+            .backup-card-primary p {
+                color: #065f46;
+                margin-bottom: 16px;
+                line-height: 1.5;
+            }
+            
+            .btn-backup-primary {
+                background: #10b981;
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                width: 100%;
+                transition: all 0.2s ease;
+            }
+            
+            .btn-backup-primary:hover {
+                background: #059669;
+                transform: translateY(-1px);
+            }
+            
+            /* 次要功能卡片 */
+            .backup-card-secondary {
+                background: var(--bg-card);
+            }
+            
+            .backup-card-secondary h3 {
+                font-size: 1rem;
+                margin-bottom: 10px;
+                color: var(--text-primary);
+            }
+            
+            .backup-card-secondary p {
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+                margin-bottom: 12px;
+            }
+            
+            .warning-text-small {
+                font-size: 0.7rem !important;
+                color: #e74c3c !important;
+                background: #fee2e2;
+                padding: 6px 10px;
+                border-radius: 6px;
+                margin-bottom: 12px;
+            }
+            
+            .btn-restore {
+                background: #f59e0b;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-size: 0.85rem;
+                cursor: pointer;
+                width: 100%;
+                transition: all 0.2s ease;
+            }
+            
+            .btn-restore:hover {
+                background: #d97706;
+            }
+            
+            /* 手机端：单列，顺序：备份 → 导出CSV → 恢复 → 选择性恢复 */
+            @media (max-width: 768px) {
+                .backup-grid {
+                    grid-template-columns: 1fr;
+                    gap: 16px;
+                }
+            }
+        </style>
+    `;
+},
     
     restoreFromFile: async function() {
         const fileInput = document.getElementById('restoreFile');
