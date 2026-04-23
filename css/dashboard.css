@@ -392,84 +392,84 @@ button.warning.highlight {
 }
 
 /* ========================================
-   缴费页面 - 订单详情多栏布局
+   缴费页面 - 订单详情多栏布局（电脑端4栏，手机端2栏）
    ======================================== */
 
-/* 电脑端：4栏布局 */
-.summary-list {
-    display: flex;
-    flex-wrap: wrap;
-    margin: 0 -4px;
+/* 电脑端：4栏网格 */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px 16px;
+    margin-bottom: 0;
 }
 
-.summary-row {
-    width: 25%;  /* 4栏 = 25% */
+/* 每个项目样式 */
+.summary-item {
     display: flex;
+    justify-content: space-between;
     align-items: baseline;
-    padding: 6px 4px;
-    box-sizing: border-box;
+    background: var(--bg-hover);
+    padding: 8px 12px;
+    border-radius: 8px;
+    gap: 12px;
 }
 
 /* 标签样式 */
-.summary-label {
+.summary-item .label {
     font-weight: 600;
     color: var(--text-secondary);
     font-size: var(--font-sm);
-    width: 70px;
-    flex-shrink: 0;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* 内容样式 */
-.summary-value {
+.summary-item .value {
     font-weight: 500;
     color: var(--text-primary);
+    text-align: right;
     word-break: break-word;
     flex: 1;
 }
 
-.summary-value.order-id {
+.summary-item .value.order-id {
     font-family: monospace;
     font-weight: 600;
 }
 
-.summary-value.warning {
+.summary-item .value.warning {
     color: var(--warning-dark);
 }
 
-.summary-value.success-text {
+.summary-item .value.success-text {
     color: var(--success-dark);
 }
 
 /* 手机端：2栏 */
 @media (max-width: 768px) {
-    .summary-row {
-        width: 50%;  /* 2栏 */
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
     }
     
-    .summary-label {
-        width: 65px;
+    .summary-item {
+        padding: 6px 10px;
+        gap: 8px;
+    }
+    
+    .summary-item .label {
         font-size: 0.7rem;
     }
     
-    .summary-value {
+    .summary-item .value {
         font-size: 0.75rem;
     }
 }
 
 /* 超小手机：1栏 */
 @media (max-width: 480px) {
-    .summary-row {
-        width: 100%;
-    }
-    
-    .summary-label {
-        width: 70px;
-        font-size: 0.7rem;
-    }
-    
-    .summary-value {
-        font-size: 0.75rem;
+    .summary-grid {
+        grid-template-columns: 1fr;
     }
 }
 
