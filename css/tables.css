@@ -128,3 +128,66 @@
 .text-left { text-align: left; }
 .text-center { text-align: center; }
 .text-right { text-align: right; }
+
+/* ========================================
+   客户信息表格 - 列宽优化
+   ======================================== */
+/* 客户列表表格列宽控制 */
+.data-table th:nth-child(1), /* 客户ID */
+.data-table td:nth-child(1) {
+    width: 12%;
+    min-width: 100px;
+}
+
+.data-table th:nth-child(2), /* 客户姓名 */
+.data-table td:nth-child(2) {
+    width: 10%;
+    min-width: 80px;
+}
+
+.data-table th:nth-child(3), /* KTP号码 */
+.data-table td:nth-child(3) {
+    width: 12%;
+    min-width: 100px;
+}
+
+.data-table th:nth-child(4), /* 手机号 */
+.data-table td:nth-child(4) {
+    width: 10%;
+    min-width: 90px;
+}
+
+.data-table th:nth-child(5), /* KTP地址 */
+.data-table td:nth-child(5) {
+    width: 20%;
+    min-width: 150px;
+}
+
+.data-table th:nth-child(6), /* 居住地址 */
+.data-table td:nth-child(6) {
+    width: 20%;
+    min-width: 150px;
+}
+
+.data-table th:nth-child(7), /* 注册日期 */
+.data-table td:nth-child(7) {
+    width: 10%;
+    min-width: 90px;
+    white-space: nowrap;
+}
+
+/* 管理员额外门店列 */
+.data-table th:nth-child(8),
+.data-table td:nth-child(8) {
+    width: 6%;
+    min-width: 80px;
+}
+
+/* 手机端：取消固定宽度，允许自然流动 */
+@media (max-width: 768px) {
+    .data-table th,
+    .data-table td {
+        width: auto !important;
+        min-width: auto !important;
+    }
+}
