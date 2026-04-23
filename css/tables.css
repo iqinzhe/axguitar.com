@@ -1,4 +1,4 @@
-/* tables.css - 统一双行布局版 v3.6 */
+/* tables.css - 统一双行布局版 v3.9（平衡版） */
 
 /* === 表格容器 === */
 .table-container {
@@ -18,7 +18,7 @@
 .data-table th,
 .data-table td {
     vertical-align: middle;
-    padding: 10px 12px;
+    padding: 10px 8px;
 }
 
 .data-table th {
@@ -26,8 +26,8 @@
     font-weight: 600;
     color: var(--text-primary);
     border-bottom: 2px solid var(--border-light);
-    white-space: nowrap;
     text-align: left;
+    white-space: nowrap;
 }
 
 .data-table th.text-center {
@@ -46,13 +46,78 @@
     background: var(--bg-hover);
 }
 
-/* ✅ 删除表头最右边的“操作”列 */
-.data-table thead th:last-child.action-column {
-    display: none;
+/* ========================================
+   ✅ 列宽设置（平衡方案）
+   ======================================== */
+/* 客户ID列 - 固定120px */
+.data-table th:nth-child(1),
+.data-table td:nth-child(1) {
+    width: 120px;
+    min-width: 100px;
+}
+
+/* 客户姓名列 - 固定150px（印尼名字较长） */
+.data-table th:nth-child(2),
+.data-table td:nth-child(2) {
+    width: 150px;
+    min-width: 120px;
+    word-break: break-word;      /* 允许换行 */
+    white-space: normal;
+}
+
+/* KTP号码列 - 固定140px */
+.data-table th:nth-child(3),
+.data-table td:nth-child(3) {
+    width: 140px;
+    min-width: 120px;
+    word-break: break-word;
+    white-space: normal;
+}
+
+/* 手机号列 - 固定120px */
+.data-table th:nth-child(4),
+.data-table td:nth-child(4) {
+    width: 120px;
+    min-width: 100px;
+    white-space: nowrap;
+}
+
+/* KTP地址列 - 固定200px */
+.data-table th:nth-child(5),
+.data-table td:nth-child(5) {
+    width: 200px;
+    min-width: 150px;
+    word-break: break-word;
+    white-space: normal;
+}
+
+/* 居住地址列 - 固定200px */
+.data-table th:nth-child(6),
+.data-table td:nth-child(6) {
+    width: 200px;
+    min-width: 150px;
+    word-break: break-word;
+    white-space: normal;
+}
+
+/* 注册日期列 - 固定100px */
+.data-table th:nth-child(7),
+.data-table td:nth-child(7) {
+    width: 100px;
+    min-width: 90px;
+    white-space: nowrap;
+}
+
+/* 门店列（管理员） - 固定100px */
+.data-table th:nth-child(8),
+.data-table td:nth-child(8) {
+    width: 100px;
+    min-width: 80px;
+    white-space: nowrap;
 }
 
 /* ===============================
-   ✅ 操作行样式（操作按钮一行显示，无滚动条）
+   ✅ 操作行样式
    =============================== */
 .action-row td {
     padding: 8px 12px;
@@ -89,32 +154,51 @@
    ✅ 手机端优化
    =============================== */
 @media (max-width: 768px) {
-    .data-table {
-        width: 100%;
-    }
-
     .data-table th,
     .data-table td {
-        padding: 7px 9px;
+        padding: 7px 6px;
         font-size: 0.72rem;
     }
-
-    .action-row td {
-        padding: 6px 10px;
+    
+    /* 手机端缩小列宽 */
+    .data-table th:nth-child(1),
+    .data-table td:nth-child(1) {
+        width: 90px;
+        min-width: 80px;
     }
-
-    .action-row td.action-label {
-        font-size: 0.72rem;
-        padding-right: 6px;
+    
+    .data-table th:nth-child(2),
+    .data-table td:nth-child(2) {
+        width: 100px;
+        min-width: 80px;
     }
-
-    .action-row td.action-btns {
-        gap: 8px;
+    
+    .data-table th:nth-child(3),
+    .data-table td:nth-child(3) {
+        width: 100px;
+        min-width: 80px;
     }
-
-    .action-row .btn-small {
-        padding: 5px 10px;
-        font-size: 0.7rem;
+    
+    .data-table th:nth-child(4),
+    .data-table td:nth-child(4) {
+        width: 90px;
+        min-width: 80px;
+    }
+    
+    .data-table th:nth-child(5),
+    .data-table td:nth-child(5),
+    .data-table th:nth-child(6),
+    .data-table td:nth-child(6) {
+        width: 120px;
+        min-width: 100px;
+    }
+    
+    .data-table th:nth-child(7),
+    .data-table td:nth-child(7),
+    .data-table th:nth-child(8),
+    .data-table td:nth-child(8) {
+        width: 80px;
+        min-width: 70px;
     }
 }
 
