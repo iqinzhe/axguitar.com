@@ -1,4 +1,4 @@
-// utils.js - v1.6（添加 escapeAttr 统一方法）
+// utils.js - v1.7（新增 renderActionRow 通用方法）
 
 const Utils = {
     lang: 'id',
@@ -379,7 +379,6 @@ const Utils = {
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
 
-    // ========== 新增：统一的 escapeAttr 方法 ==========
     escapeAttr: function(str) {
         if (!str) return '';
         return String(str)
@@ -389,6 +388,42 @@ const Utils = {
             .replace(/`/g, '&#96;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
+    },
+
+    // ========== 新增：通用操作行渲染方法 ==========
+    // 用法示例：
+    // Utils.renderActionRow({ colspan: 5, buttonsHtml: '<button>编辑</button>' })
+    // Utils.renderActionRow({ colspan: 5, isAdmin: true, isLocked: true, lockedMessage: '已锁定' })
+    // Utils.renderActionRow({ colspan: 5, isAdmin: true, isReconciled: true })
+    // Utils.renderActionRow({ colspan: 5, badgesHtml: '<span class="badge">特殊标记</span>' })
+    renderActionRow: function(options) {
+        var lang = Utils.lang;
+        var colspan = options.colspan || 5;
+        var buttonsHtml = options.buttonsHtml || '';
+        var badgesHtml = options.badgesHtml || '';
+        var isAdmin = options.isAdmin || false;
+        var isLocked = options.isLocked;
+        var isReconciled = options.isReconciled;
+        var lockedMessage = options.lockedMessage;
+        var reconciledMessage = options.reconciledMessage;
+        
+        // 如果没有提供自定义内容，根据状态自动生成
+        if (!buttonsHtml && !badgesHtml) {
+            if (isReconciled) {
+                badgesHtml = '<span class="reconciled-badge">✅ ' + (reconciledMessage || (lang === 'id' ? 'Direkonsiliasi' : '已平账')) + '</span>';
+            } else if (isLocked !== undefined && isLocked) {
+                badgesHtml = '<span class="locked-badge">🔒 ' + (lockedMessage || (lang === 'id' ? 'Terkunci' : '已锁定')) + '</span>';
+            } else if (!isAdmin) {
+                badgesHtml = '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
+            }
+        }
+        
+        var contentHtml = badgesHtml + buttonsHtml;
+        
+        return '<tr class="action-row">' +
+            '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '<\/td>' +
+            '<td colspan="' + colspan + '" class="action-btns">' + contentHtml + '<\/td>' +
+        '<\/tr>';
     },
 
     formatCurrency: function(amount) {
@@ -432,55 +467,62 @@ const Utils = {
     },
 
     _buildAndDownloadCSV: function(headers, rows, filename) {
-        const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+        const csvContent = [headers, ...rows].map(function(row) { return row.join(','); }).join('\n');
         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         this._downloadBlob(blob, filename);
     },
 
     exportToCSV: function(orders, filename) {
-        const isId = this.lang === 'id';
-        const headers = isId
+        var isId = this.lang === 'id';
+        var self = this;
+        var headers = isId
             ? ['ID Pesanan', 'Pelanggan', 'Pinjaman', 'Admin Fee', 'Service Fee', 'Bunga Bulanan', 'Status', 'Tanggal Dibuat']
             : ['订单ID', '客户', '贷款金额', '管理费', '服务费', '月利息', '状态', '创建日期'];
-        const rows = orders.map(o => [
-            o.order_id, o.customer_name,
-            this.getRawAmount(o.loan_amount), this.getRawAmount(o.admin_fee),
-            this.getRawAmount(o.service_fee_amount || 0), this.getRawAmount(o.monthly_interest),
-            o.status, this.formatDate(o.created_at)
-        ]);
+        var rows = orders.map(function(o) {
+            return [
+                o.order_id, o.customer_name,
+                self.getRawAmount(o.loan_amount), self.getRawAmount(o.admin_fee),
+                self.getRawAmount(o.service_fee_amount || 0), self.getRawAmount(o.monthly_interest),
+                o.status, self.formatDate(o.created_at)
+            ];
+        });
         this._buildAndDownloadCSV(headers, rows, filename);
     },
 
     exportPaymentsToCSV: function(payments, filename) {
-        const isId = this.lang === 'id';
-        const headers = isId
+        var isId = this.lang === 'id';
+        var self = this;
+        var headers = isId
             ? ['ID Pesanan', 'Pelanggan', 'Tanggal', 'Jenis', 'Bulan', 'Jumlah', 'Metode', 'Keterangan']
             : ['订单ID', '客户', '日期', '类型', '月数', '金额', '支付方式', '说明'];
-        const typeMap = {
+        var typeMap = {
             admin_fee:   isId ? 'Admin Fee'  : '管理费',
             service_fee: isId ? 'Service Fee': '服务费',
             interest:    isId ? 'Bunga'      : '利息',
             principal:   isId ? 'Pokok'      : '本金'
         };
-        const methodMap = {
+        var methodMap = {
             cash: isId ? 'Brankas'  : '保险柜',
             bank: isId ? 'Bank BNI' : '银行BNI'
         };
-        const rows = payments.map(p => [
-            p.orders?.order_id || '-', p.orders?.customer_name || '-',
-            p.date, typeMap[p.type] || p.type,
-            p.months || '-', this.getRawAmount(p.amount),
-            methodMap[p.payment_method] || '-', p.description || '-'
-        ]);
+        var rows = payments.map(function(p) {
+            return [
+                p.orders?.order_id || '-', p.orders?.customer_name || '-',
+                p.date, typeMap[p.type] || p.type,
+                p.months || '-', self.getRawAmount(p.amount),
+                methodMap[p.payment_method] || '-', p.description || '-'
+            ];
+        });
         this._buildAndDownloadCSV(headers, rows, filename);
     },
 
     exportCashFlowToCSV: function(flows, filename) {
-        const isId = this.lang === 'id';
-        const headers = isId
+        var isId = this.lang === 'id';
+        var self = this;
+        var headers = isId
             ? ['Tanggal', 'Tipe', 'Metode', 'Arah', 'Jumlah', 'Keterangan', 'ID Pesanan']
             : ['日期', '类型', '方式', '方向', '金额', '说明', '订单号'];
-        const typeMap = {
+        var typeMap = {
             loan_disbursement: isId ? 'Pencairan Pinjaman' : '贷款发放',
             admin_fee:         isId ? 'Admin Fee'          : '管理费',
             service_fee:       isId ? 'Service Fee'        : '服务费',
@@ -488,26 +530,28 @@ const Utils = {
             principal:         isId ? 'Pokok'              : '本金',
             expense:           isId ? 'Pengeluaran'        : '运营支出'
         };
-        const rows = flows.map(f => [
-            this.formatDate(f.recorded_at),
-            typeMap[f.flow_type] || f.flow_type,
-            f.source_target === 'cash' ? (isId ? 'Brankas' : '保险柜') : (isId ? 'Bank' : '银行'),
-            f.direction === 'inflow'   ? (isId ? 'Masuk'   : '流入')   : (isId ? 'Keluar' : '流出'),
-            this.getRawAmount(f.amount),
-            f.description || '-',
-            f.orders?.order_id || '-'
-        ]);
+        var rows = flows.map(function(f) {
+            return [
+                self.formatDate(f.recorded_at),
+                typeMap[f.flow_type] || f.flow_type,
+                f.source_target === 'cash' ? (isId ? 'Brankas' : '保险柜') : (isId ? 'Bank' : '银行'),
+                f.direction === 'inflow'   ? (isId ? 'Masuk'   : '流入')   : (isId ? 'Keluar' : '流出'),
+                self.getRawAmount(f.amount),
+                f.description || '-',
+                f.orders?.order_id || '-'
+            ];
+        });
         this._buildAndDownloadCSV(headers, rows, filename);
     },
 
     importFromJSON: function(file) {
-        return new Promise((resolve, reject) => {
+        return new Promise(function(resolve, reject) {
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = function(e) {
                 try { resolve(JSON.parse(e.target.result)); }
                 catch { reject('Invalid JSON file'); }
             };
-            reader.onerror = () => reject('Error reading file');
+            reader.onerror = function() { reject('Error reading file'); };
             reader.readAsText(file);
         });
     },
@@ -526,7 +570,7 @@ const Utils = {
 
     bindAmountFormat: function(inputElement) {
         if (!inputElement) return;
-        inputElement.addEventListener('input', (e) => {
+        inputElement.addEventListener('input', function(e) {
             const num = Utils.parseNumberFromCommas(e.target.value);
             if (!isNaN(num) && num !== '') {
                 e.target.value = Utils.formatNumberWithCommas(num);
@@ -543,11 +587,12 @@ const Utils = {
 
     wrapTableRow: function(cells, isHeader) {
         var tag = isHeader ? 'th' : 'td';
-        return '<table>' + cells.map(cell => '<' + tag + '>' + cell + '</' + tag + '>').join('') + '</table>';
+        return '<table>' + cells.map(function(cell) { return '<' + tag + '>' + cell + '</' + tag + '>'; }).join('') + '</table>';
     },
 
     getServiceFeeOptionsHtml: function(selectedPercent) {
         if (selectedPercent === undefined) selectedPercent = 0;
+        var self = this;
         return this.serviceFeePercentOptions.map(function(opt) {
             return '<option value="' + opt.value + '" ' + (selectedPercent === opt.value ? 'selected' : '') + '>' + opt.label + '</option>';
         }).join('');
