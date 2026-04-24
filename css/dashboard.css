@@ -1,4 +1,4 @@
-/* dashboard.css - 优化版 v3.0（最终版） */
+/* dashboard.css - 优化版 v3.1（修复资金管理卡片按钮显示） */
 
 /* === 卡片组件 === */
 .card {
@@ -140,20 +140,23 @@
 .transfer-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-2);
-    margin-bottom: var(--spacing-2);
+    gap: 8px;
+    margin-top: 12px;
 }
 
 .transfer-btn {
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--font-xs);
-    border-radius: var(--radius-md);
+    flex: 1;
+    padding: 6px 4px;
+    font-size: 0.7rem;
+    border-radius: 6px;
     background: white;
     border: 1px solid var(--border-light);
     cursor: pointer;
     transition: var(--transition);
-    flex: 1;
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .transfer-btn:hover {
@@ -179,11 +182,17 @@
     border-color: #cbd5e1;
 }
 
-/* 手机端单列 */
+/* 手机端单列 + 按钮允许换行 */
 @media (max-width: 768px) {
     .cashflow-stats {
         grid-template-columns: 1fr;
         gap: 12px;
+    }
+    
+    .transfer-btn {
+        white-space: normal;
+        font-size: 0.65rem;
+        padding: 6px 8px;
     }
 }
 
@@ -375,10 +384,10 @@ button.warning.highlight {
 }
 
 /* ========================================
-   缴费页面 - 订单详情布局（电脑端3栏，手机端1栏）
+   缴费页面 - 订单详情布局（电脑端3栏，手机端2栏）
    ======================================== */
 
-/* 电脑端：2栏网格（充分利用屏幕） */
+/* 电脑端：3栏网格 */
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -428,11 +437,11 @@ button.warning.highlight {
     color: var(--success-dark);
 }
 
-/* 手机端：1栏 */
+/* 手机端：2栏 */
 @media (max-width: 768px) {
     .summary-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 5px;
+        gap: 8px;
     }
     
     .summary-item {
@@ -620,7 +629,7 @@ button.warning.highlight {
 }
 
 .dashboard-footer-card p {
-    font-size: 0.75rem;  /* 12px，比工具按钮小 */
+    font-size: 0.75rem;
     color: var(--text-secondary);
     margin-bottom: 4px;
     line-height: 1.4;
