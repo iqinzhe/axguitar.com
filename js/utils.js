@@ -1,4 +1,4 @@
-// utils.js - v1.7（新增 renderActionRow 通用方法）
+// utils.js - v1.8（新增管理费/服务费计算 + 双语翻译补充）
 
 const Utils = {
     lang: 'id',
@@ -28,6 +28,76 @@ const Utils = {
 
     calculateServiceFee(loanAmount, percent) {
         return loanAmount * (percent / 100);
+    },
+
+    // ========== 新增：管理费计算 ==========
+    calculateAdminFee: function(loanAmount) {
+        var amount = loanAmount || 0;
+        if (amount <= 50000) {
+            return 20000;
+        } else if (amount <= 3999999) {
+            return 30000;
+        } else if (amount <= 8999999) {
+            var fee = Math.round(amount * 0.01 / 1000) * 1000;
+            return fee;
+        } else {
+            return 150000;
+        }
+    },
+
+    // ========== 新增：服务费计算（返回百分比和金额） ==========
+    calculateServiceFeeNew: function(loanAmount) {
+        var amount = loanAmount || 0;
+        if (amount <= 3999999) {
+            return { percent: 0, amount: 0 };
+        } else if (amount <= 9999999) {
+            var fee = Math.round(amount * 0.02);
+            return { percent: 2, amount: fee };
+        } else {
+            var fee = Math.round(amount * 0.03);
+            return { percent: 3, amount: fee };
+        }
+    },
+
+    // ========== 新增：固定还款月供取整 ==========
+    roundMonthlyPayment: function(payment) {
+        return Math.round(payment / 10000) * 10000;
+    },
+
+    // ========== 新增：利息选项 ==========
+    getInterestRateOptions: function(selectedRate) {
+        if (selectedRate === undefined) selectedRate = 10;
+        var rates = [10, 9.5, 9.0, 8.5, 8.0];
+        var html = '';
+        for (var i = 0; i < rates.length; i++) {
+            var sel = (rates[i] === selectedRate) ? ' selected' : '';
+            html += '<option value="' + rates[i] + '"' + sel + '>' + rates[i] + '%</option>';
+        }
+        return html;
+    },
+
+    // ========== 新增：服务费百分比选项 ==========
+    getServiceFeePercentOptions: function(selectedPercent) {
+        if (selectedPercent === undefined) selectedPercent = 2;
+        var percents = [0, 1, 2, 3, 4];
+        var html = '';
+        for (var i = 0; i < percents.length; i++) {
+            var sel = (percents[i] === selectedPercent) ? ' selected' : '';
+            html += '<option value="' + percents[i] + '"' + sel + '>' + percents[i] + '%</option>';
+        }
+        return html;
+    },
+
+    // ========== 新增：固定还款档期选项 ==========
+    getRepaymentTermOptions: function(selectedTerm) {
+        if (selectedTerm === undefined) selectedTerm = 5;
+        var lang = this.lang;
+        var html = '';
+        for (var i = 1; i <= 10; i++) {
+            var sel = (i === selectedTerm) ? ' selected' : '';
+            html += '<option value="' + i + '"' + sel + '>' + i + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</option>';
+        }
+        return html;
     },
 
     calculateNextInterestDueDate(startDate, paidMonths) {
@@ -195,7 +265,16 @@ const Utils = {
             fixed_installment_paid: "Angsuran ke-{month} berhasil dibayar!\nBunga: {interest}\nPokok: {principal}\nSisa angsuran: {remaining} bulan",
             early_settlement_success: "✅ Pelunasan dipercepat berhasil!\nJumlah pelunasan: {amount}",
             confirm_logout: "Apakah Anda yakin ingin keluar? Data yang belum disimpan akan hilang.",
-            anomaly: "Situasi Abnormal"
+            anomaly: "Situasi Abnormal",
+            pawn_amount: "Jumlah Gadai",
+            fund_source: "Sumber Dana",
+            admin_fee_auto: "Admin Fee (Otomatis)",
+            service_fee_auto: "Service Fee (Otomatis)",
+            interest_rate_auto: "Suku Bunga (Pilih)",
+            monthly_installment: "Angsuran Bulanan",
+            term_period: "Jangka Waktu",
+            rounded_to: "Dibulatkan ke Rp 10.000",
+            manual_adjust: "Dapat disesuaikan manual"
         },
         zh: {
             login: "登录",
@@ -337,7 +416,16 @@ const Utils = {
             fixed_installment_paid: "第{month}期还款成功！\n利息: {interest}\n本金: {principal}\n剩余期数: {remaining}个月",
             early_settlement_success: "✅ 提前结清成功！\n结清金额: {amount}",
             confirm_logout: "确定要退出登录吗？未保存的数据将丢失。",
-            anomaly: "异常状况"
+            anomaly: "异常状况",
+            pawn_amount: "当金金额",
+            fund_source: "资金来源",
+            admin_fee_auto: "管理费（自动计算）",
+            service_fee_auto: "服务费（自动计算）",
+            interest_rate_auto: "利率（可选）",
+            monthly_installment: "每月还款",
+            term_period: "还款期限",
+            rounded_to: "取整到 Rp 10,000",
+            manual_adjust: "可手动调整"
         }
     },
 
@@ -390,12 +478,6 @@ const Utils = {
             .replace(/>/g, '&gt;');
     },
 
-    // ========== 新增：通用操作行渲染方法 ==========
-    // 用法示例：
-    // Utils.renderActionRow({ colspan: 5, buttonsHtml: '<button>编辑</button>' })
-    // Utils.renderActionRow({ colspan: 5, isAdmin: true, isLocked: true, lockedMessage: '已锁定' })
-    // Utils.renderActionRow({ colspan: 5, isAdmin: true, isReconciled: true })
-    // Utils.renderActionRow({ colspan: 5, badgesHtml: '<span class="badge">特殊标记</span>' })
     renderActionRow: function(options) {
         var lang = Utils.lang;
         var colspan = options.colspan || 5;
@@ -407,7 +489,6 @@ const Utils = {
         var lockedMessage = options.lockedMessage;
         var reconciledMessage = options.reconciledMessage;
         
-        // 如果没有提供自定义内容，根据状态自动生成
         if (!buttonsHtml && !badgesHtml) {
             if (isReconciled) {
                 badgesHtml = '<span class="reconciled-badge">✅ ' + (reconciledMessage || (lang === 'id' ? 'Direkonsiliasi' : '已平账')) + '</span>';
