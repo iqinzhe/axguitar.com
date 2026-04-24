@@ -1,4 +1,4 @@
-// app-customers.js - v2.1（优化新增客户表单布局）
+// app-customers.js - v1.0
 
 window.APP = window.APP || {};
 
@@ -77,8 +77,7 @@ const CustomersModule = {
                 addCustomerCardHtml = '' +
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户') + '</h3>' +
-                    '<div class="form-grid">' +
-                        '<!-- 电脑端三列：姓名、手机、KTP -->' +
+                    '<div class="form-grid form-grid-three-col">' +
                         '<div class="form-group">' +
                             '<label>' + t('customer_name') + ' *</label>' +
                             '<input type="text" id="customerName" placeholder="' + t('customer_name') + '">' +
@@ -91,7 +90,6 @@ const CustomersModule = {
                             '<label>' + t('ktp_number') + '</label>' +
                             '<input type="text" id="customerKtp" placeholder="' + t('ktp_number') + '">' +
                         '</div>' +
-                        '<!-- 地址区域全宽 -->' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</label>' +
                             '<textarea id="customerKtpAddress" rows="2" placeholder="' + (lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址') + '"></textarea>' +
@@ -299,7 +297,7 @@ const CustomersModule = {
             modal.innerHTML = '' +
                 '<div class="modal-content" style="max-width:600px;">' +
                     '<h3>✏️ ' + (lang === 'id' ? 'Ubah Data Nasabah' : '修改客户信息') + '</h3>' +
-                    '<div class="form-grid">' +
+                    '<div class="form-grid form-grid-three-col">' +
                         '<div class="form-group"><label>' + t('customer_name') + ' *</label><input id="ec_name" value="' + Utils.escapeHtml(c.name) + '"></div>' +
                         '<div class="form-group"><label>' + t('phone') + ' *</label><input id="ec_phone" value="' + Utils.escapeHtml(c.phone || '') + '"></div>' +
                         '<div class="form-group"><label>' + t('ktp_number') + '</label><input id="ec_ktp" value="' + Utils.escapeHtml(c.ktp_number || '') + '"></div>' +
