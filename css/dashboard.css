@@ -96,23 +96,17 @@
     padding-bottom: var(--spacing-2);
 }
 
+/* 三列等宽布局 */
 .cashflow-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-4);
-}
-
-@media (max-width: 640px) {
-    .cashflow-stats {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-3);
-    }
+    gap: 16px;
 }
 
 .cashflow-item {
     background: rgba(255, 255, 255, 0.8);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-3) var(--spacing-4);
+    padding: 16px;
     border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -140,7 +134,7 @@
 }
 
 .internal-transfer-item {
-    grid-column: span 1;
+    /* 不需要特殊处理，grid 自动等宽 */
 }
 
 .transfer-buttons {
@@ -158,6 +152,8 @@
     border: 1px solid var(--border-light);
     cursor: pointer;
     transition: var(--transition);
+    flex: 1;
+    text-align: center;
 }
 
 .transfer-btn:hover {
@@ -183,19 +179,12 @@
     border-color: #cbd5e1;
 }
 
-.cashflow-summary.light {
-    background: white;
-    border: 1px solid var(--border-light);
-    color: var(--text-primary);
-}
-
-.cashflow-summary.light h3 {
-    color: var(--text-primary);
-    border-bottom-color: var(--border-light);
-}
-
-.cashflow-summary.light .cashflow-item {
-    background: var(--bg-hover);
+/* 手机端单列 */
+@media (max-width: 768px) {
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
 }
 
 /* === 工具栏 === */
