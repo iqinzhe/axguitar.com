@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.8（经营指标：进行中改为进行中/逾期单）
+// app-dashboard-core.js - v1.0
 
 window.APP = window.APP || {};
 
