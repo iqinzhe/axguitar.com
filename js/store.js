@@ -422,7 +422,7 @@ const StoreManager = {
                 actionButtons += '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
                 
                 storeRows += Utils.renderActionRow({
-                    colspan: 6,
+                    colspan: 5,
                     buttonsHtml: actionButtons
                 });
             }
@@ -500,8 +500,7 @@ const StoreManager = {
                                 '<th>' + (lang === 'id' ? 'Alamat' : '地址') + '</th>' +
                                 '<th>' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
                                 '<th>📱 WA</th>' +
-                                '<th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th>' +
-                                '<th class="text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
+                                '<th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th>' +                                
                             '</tr>' +
                         '</thead>' +
                         '<tbody>' + storeRows + '</tbody>' +
