@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.2（资金流水改为独立页面）
+// app-dashboard-funds.js - v1.3（资金流水改为独立页面，修复变量冲突）
 
 window.APP = window.APP || {};
 
@@ -54,15 +54,15 @@ const DashboardFunds = {
                 rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '<\/td><\/tr>';
             } else {
                 for (var i = 0; i < transactions.length; i++) {
-                    var t = transactions[i];
+                    var transaction = transactions[i];
                     rows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '</td>' +
-                        '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
-                        '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
-                        '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
-                        '<td class="text-right ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '</td>' +
-                        '<td class="flow-desc">' + Utils.escapeHtml(t.description || '-') + '</td>' +
-                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
+                        '<td class="date-cell">' + Utils.formatDate(transaction.recorded_at) + '</td>' +
+                        '<td>' + (typeMap[transaction.flow_type] || transaction.flow_type) + '</td>' +
+                        '<td class="text-center">' + (directionMap[transaction.direction] || transaction.direction) + '</td>' +
+                        '<td class="text-center">' + (sourceMap[transaction.source_target] || transaction.source_target) + '</td>' +
+                        '<td class="text-right ' + (transaction.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(transaction.amount) + '</td>' +
+                        '<td class="flow-desc">' + Utils.escapeHtml(transaction.description || '-') + '</td>' +
+                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(transaction.stores?.name || '-') + '</td>' : '') +
                     '<\/tr>';
                 }
             }
@@ -108,7 +108,7 @@ const DashboardFunds = {
                         '<div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">' +
                             '<button onclick="APP.printCapitalTransactions()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                             '<button onclick="APP.exportCapitalTransactionsToCSV()" class="btn-export">📎 ' + (lang === 'id' ? 'Ekspor CSV' : '导出CSV') + '</button>' +
-                            '<button onclick="document.getElementById(\'capitalModal\').remove()" class="btn-back">✖ ' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
+                            '<button onclick="APP.closeCapitalModal()" class="btn-back">✖ ' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -124,6 +124,11 @@ const DashboardFunds = {
         }
     },
 
+    closeCapitalModal: function() {
+        const modal = document.querySelector('#capitalModal');
+        if (modal) modal.remove();
+    },
+
     // ========== 修改：资金流水改为独立页面（非模态框） ==========
     showCashFlowModal: async function() {
         if (typeof this.showPaymentHistory === 'function' && this !== window.APP) {
@@ -134,7 +139,7 @@ const DashboardFunds = {
 
     showCashFlowPage: async function() {
         var lang = Utils.lang;
-        var t = function(key) { return Utils.t(key); };
+        var translate = function(key) { return Utils.t(key); };
         var profile = await SUPABASE.getCurrentProfile();
         var isAdmin = profile?.role === 'admin';
         
@@ -184,15 +189,15 @@ const DashboardFunds = {
                 rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '<\/td><\/tr>';
             } else {
                 for (var i = 0; i < transactions.length; i++) {
-                    var t = transactions[i];
+                    var transaction = transactions[i];
                     rows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '<\/td>' +
-                        '<td>' + (typeMap[t.flow_type] || t.flow_type) + '<\/td>' +
-                        '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '<\/td>' +
-                        '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '<\/td>' +
-                        '<td class="text-right ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '<\/td>' +
-                        '<td class="flow-desc">' + Utils.escapeHtml(t.description || '-') + '<\/td>' +
-                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '<\/td>' : '') +
+                        '<td class="date-cell">' + Utils.formatDate(transaction.recorded_at) + '<\/td>' +
+                        '<td>' + (typeMap[transaction.flow_type] || transaction.flow_type) + '<\/td>' +
+                        '<td class="text-center">' + (directionMap[transaction.direction] || transaction.direction) + '<\/td>' +
+                        '<td class="text-center">' + (sourceMap[transaction.source_target] || transaction.source_target) + '<\/td>' +
+                        '<td class="text-right ' + (transaction.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(transaction.amount) + '<\/td>' +
+                        '<td class="flow-desc">' + Utils.escapeHtml(transaction.description || '-') + '<\/td>' +
+                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(transaction.stores?.name || '-') + '<\/td>' : '') +
                     '<\/tr>';
                 }
             }
@@ -201,8 +206,8 @@ const DashboardFunds = {
                 '<div class="page-header">' +
                     '<h2>💰 ' + (lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ' + t('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ' + translate('print') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + translate('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card">' +
@@ -251,9 +256,9 @@ const DashboardFunds = {
         var startDate = document.getElementById('cashFlowFilterStart')?.value;
         var endDate = document.getElementById('cashFlowFilterEnd')?.value;
         
-        var filtered = transactions.filter(function(t) {
-            if (startDate && t.recorded_at < startDate) return false;
-            if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+        var filtered = transactions.filter(function(transaction) {
+            if (startDate && transaction.recorded_at < startDate) return false;
+            if (endDate && transaction.recorded_at > endDate + 'T23:59:59') return false;
             return true;
         });
         this._renderCashFlowPageTable(filtered);
@@ -295,15 +300,15 @@ const DashboardFunds = {
             rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '<\/td><\/tr>';
         } else {
             for (var i = 0; i < transactions.length; i++) {
-                var t = transactions[i];
+                var transaction = transactions[i];
                 rows += '<tr>' +
-                    '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '<\/td>' +
-                    '<td>' + (typeMap[t.flow_type] || t.flow_type) + '<\/td>' +
-                    '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '<\/td>' +
-                    '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '<\/td>' +
-                    '<td class="text-right ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '<\/td>' +
-                    '<td class="flow-desc">' + Utils.escapeHtml(t.description || '-') + '<\/td>' +
-                    (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '<\/td>' : '') +
+                    '<td class="date-cell">' + Utils.formatDate(transaction.recorded_at) + '<\/td>' +
+                    '<td>' + (typeMap[transaction.flow_type] || transaction.flow_type) + '<\/td>' +
+                    '<td class="text-center">' + (directionMap[transaction.direction] || transaction.direction) + '<\/td>' +
+                    '<td class="text-center">' + (sourceMap[transaction.source_target] || transaction.source_target) + '<\/td>' +
+                    '<td class="text-right ' + (transaction.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(transaction.amount) + '<\/td>' +
+                    '<td class="flow-desc">' + Utils.escapeHtml(transaction.description || '-') + '<\/td>' +
+                    (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(transaction.stores?.name || '-') + '<\/td>' : '') +
                 '<\/tr>';
             }
         }
@@ -331,11 +336,11 @@ const DashboardFunds = {
         var startDate = document.getElementById('capitalFilterStart')?.value;
         var endDate = document.getElementById('capitalFilterEnd')?.value;
         
-        var filtered = transactions.filter(function(t) {
-            if (filterType && t.flow_type !== filterType) return false;
-            if (searchDesc && !(t.description || '').toLowerCase().includes(searchDesc)) return false;
-            if (startDate && t.recorded_at < startDate) return false;
-            if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+        var filtered = transactions.filter(function(transaction) {
+            if (filterType && transaction.flow_type !== filterType) return false;
+            if (searchDesc && !(transaction.description || '').toLowerCase().includes(searchDesc)) return false;
+            if (startDate && transaction.recorded_at < startDate) return false;
+            if (endDate && transaction.recorded_at > endDate + 'T23:59:59') return false;
             return true;
         });
         this._renderCapitalTransactionsTable(filtered);
@@ -381,15 +386,15 @@ const DashboardFunds = {
             rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '<\/td><\/tr>';
         } else {
             for (var i = 0; i < transactions.length; i++) {
-                var t = transactions[i];
+                var transaction = transactions[i];
                 rows += '<tr>' +
-                    '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '</td>' +
-                    '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
-                    '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
-                    '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
-                    '<td class="text-right ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '</td>' +
-                    '<td class="flow-desc">' + Utils.escapeHtml(t.description || '-') + '</td>' +
-                    (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
+                    '<td class="date-cell">' + Utils.formatDate(transaction.recorded_at) + '</td>' +
+                    '<td>' + (typeMap[transaction.flow_type] || transaction.flow_type) + '</td>' +
+                    '<td class="text-center">' + (directionMap[transaction.direction] || transaction.direction) + '</td>' +
+                    '<td class="text-center">' + (sourceMap[transaction.source_target] || transaction.source_target) + '</td>' +
+                    '<td class="text-right ' + (transaction.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(transaction.amount) + '</td>' +
+                    '<td class="flow-desc">' + Utils.escapeHtml(transaction.description || '-') + '</td>' +
+                    (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(transaction.stores?.name || '-') + '</td>' : '') +
                 '<\/tr>';
             }
         }
@@ -397,8 +402,14 @@ const DashboardFunds = {
     },
     
     printCapitalTransactions: function() {
-        var modalContent = document.querySelector('#capitalModal .modal-content');
-        if (!modalContent) return;
+        var modalContent = document.querySelector('.modal-overlay .modal-content');
+        if (!modalContent) {
+            modalContent = document.querySelector('#capitalModal .modal-content');
+        }
+        if (!modalContent) {
+            console.error("Cannot find modal content for printing");
+            return;
+        }
         var printContent = modalContent.cloneNode(true);
         var lang = Utils.lang;
         var storeName = AUTH.getCurrentStoreName();
@@ -467,14 +478,14 @@ const DashboardFunds = {
             principal: lang === 'id' ? 'Pokok' : '本金',
             expense: lang === 'id' ? 'Pengeluaran' : '运营支出'
         };
-        var rows = transactions.map(function(t) {
+        var rows = transactions.map(function(transaction) {
             return [
-                t.recorded_at.split('T')[0],
-                typeMap[t.flow_type] || t.flow_type,
-                t.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'),
-                t.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'),
-                t.amount,
-                t.description || '-'
+                transaction.recorded_at.split('T')[0],
+                typeMap[transaction.flow_type] || transaction.flow_type,
+                transaction.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'),
+                transaction.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'),
+                transaction.amount,
+                transaction.description || '-'
             ];
         });
         var csvContent = [headers].concat(rows).map(function(row) {
@@ -495,9 +506,9 @@ const DashboardFunds = {
         var startDate = document.getElementById('cashFlowFilterStart')?.value;
         var endDate = document.getElementById('cashFlowFilterEnd')?.value;
         
-        var filtered = transactions.filter(function(t) {
-            if (startDate && t.recorded_at < startDate) return false;
-            if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+        var filtered = transactions.filter(function(transaction) {
+            if (startDate && transaction.recorded_at < startDate) return false;
+            if (endDate && transaction.recorded_at > endDate + 'T23:59:59') return false;
             return true;
         });
         this._renderCashFlowModalTable(filtered);
@@ -538,14 +549,14 @@ const DashboardFunds = {
             rows = '<tr><td colspan="6" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '<\/td><\/tr>';
         } else {
             for (var i = 0; i < transactions.length; i++) {
-                var t = transactions[i];
+                var transaction = transactions[i];
                 rows += '<tr>' +
-                    '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '<\/td>' +
-                    '<td>' + (typeMap[t.flow_type] || t.flow_type) + '<\/td>' +
-                    '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '<\/td>' +
-                    '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '<\/td>' +
-                    '<td class="text-right ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '<\/td>' +
-                    '<td class="flow-desc">' + Utils.escapeHtml(t.description || '-') + '<\/td>' +
+                    '<td class="date-cell">' + Utils.formatDate(transaction.recorded_at) + '<\/td>' +
+                    '<td>' + (typeMap[transaction.flow_type] || transaction.flow_type) + '<\/td>' +
+                    '<td class="text-center">' + (directionMap[transaction.direction] || transaction.direction) + '<\/td>' +
+                    '<td class="text-center">' + (sourceMap[transaction.source_target] || transaction.source_target) + '<\/td>' +
+                    '<td class="text-right ' + (transaction.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(transaction.amount) + '<\/td>' +
+                    '<td class="flow-desc">' + Utils.escapeHtml(transaction.description || '-') + '<\/td>' +
                 '<\/tr>';
             }
         }
@@ -727,14 +738,14 @@ const DashboardFunds = {
                 rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + '<\/td><\/tr>';
             } else {
                 for (var i = 0; i < transfers.length; i++) {
-                    var t = transfers[i];
+                    var transfer = transfers[i];
                     rows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(t.transfer_date) + '<\/td>' +
-                        '<td>' + (typeMap[t.transfer_type] || t.transfer_type) + '<\/td>' +
-                        '<td class="text-right">' + Utils.formatCurrency(t.amount) + '<\/td>' +
-                        '<td>' + Utils.escapeHtml(t.description || '-') + '<\/td>' +
-                        '<td>' + Utils.escapeHtml(t.created_by_profile?.name || '-') + '<\/td>' +
-                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '<\/td>' : '') +
+                        '<td class="date-cell">' + Utils.formatDate(transfer.transfer_date) + '<\/td>' +
+                        '<td>' + (typeMap[transfer.transfer_type] || transfer.transfer_type) + '<\/td>' +
+                        '<td class="text-right">' + Utils.formatCurrency(transfer.amount) + '<\/td>' +
+                        '<td>' + Utils.escapeHtml(transfer.description || '-') + '<\/td>' +
+                        '<td>' + Utils.escapeHtml(transfer.created_by_profile?.name || '-') + '<\/td>' +
+                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(transfer.stores?.name || '-') + '<\/td>' : '') +
                     '<\/tr>';
                 }
             }
@@ -768,7 +779,7 @@ const DashboardFunds = {
                         '</div>' +
                         '<div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">' +
                             '<button onclick="APP.exportInternalTransferToCSV()" class="btn-export">📎 ' + (lang === 'id' ? 'Ekspor CSV' : '导出CSV') + '</button>' +
-                            '<button onclick="document.getElementById(\'internalTransferModal\').remove()" class="btn-back">✖ ' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
+                            '<button onclick="APP.closeInternalTransferModal()" class="btn-back">✖ ' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -781,14 +792,19 @@ const DashboardFunds = {
         }
     },
 
+    closeInternalTransferModal: function() {
+        const modal = document.getElementById('internalTransferModal');
+        if (modal) modal.remove();
+    },
+
     filterInternalTransferHistory: function() {
         var transfers = window._internalTransfersData || [];
         var startDate = document.getElementById('transferFilterStart')?.value;
         var endDate = document.getElementById('transferFilterEnd')?.value;
         
-        var filtered = transfers.filter(function(t) {
-            if (startDate && t.transfer_date < startDate) return false;
-            if (endDate && t.transfer_date > endDate) return false;
+        var filtered = transfers.filter(function(transfer) {
+            if (startDate && transfer.transfer_date < startDate) return false;
+            if (endDate && transfer.transfer_date > endDate) return false;
             return true;
         });
         this._renderInternalTransferHistory(filtered);
@@ -814,17 +830,17 @@ const DashboardFunds = {
         };
         var rows = '';
         if (transfers.length === 0) {
-            rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + '<\/td><\/tr>';
+            rows = '<table><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + '<\/td><\/tr>';
         } else {
             for (var i = 0; i < transfers.length; i++) {
-                var t = transfers[i];
+                var transfer = transfers[i];
                 rows += '<tr>' +
-                    '<td class="date-cell">' + Utils.formatDate(t.transfer_date) + '<\/td>' +
-                    '<td>' + (typeMap[t.transfer_type] || t.transfer_type) + '<\/td>' +
-                    '<td class="text-right">' + Utils.formatCurrency(t.amount) + '<\/td>' +
-                    '<td>' + Utils.escapeHtml(t.description || '-') + '<\/td>' +
-                    '<td>' + Utils.escapeHtml(t.created_by_profile?.name || '-') + '<\/td>' +
-                    (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '<\/td>' : '') +
+                    '<td class="date-cell">' + Utils.formatDate(transfer.transfer_date) + '<\/td>' +
+                    '<td>' + (typeMap[transfer.transfer_type] || transfer.transfer_type) + '<\/td>' +
+                    '<td class="text-right">' + Utils.formatCurrency(transfer.amount) + '<\/td>' +
+                    '<td>' + Utils.escapeHtml(transfer.description || '-') + '<\/td>' +
+                    '<td>' + Utils.escapeHtml(transfer.created_by_profile?.name || '-') + '<\/td>' +
+                    (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(transfer.stores?.name || '-') + '<\/td>' : '') +
                 '<\/tr>';
             }
         }
@@ -842,14 +858,14 @@ const DashboardFunds = {
             bank_to_cash: lang === 'id' ? 'Tarik Tunai' : '银行取现',
             store_to_hq: lang === 'id' ? 'Setoran ke Pusat' : '上缴总部'
         };
-        var rows = transfers.map(function(t) {
+        var rows = transfers.map(function(transfer) {
             return [
-                t.transfer_date,
-                typeMap[t.transfer_type] || t.transfer_type,
-                t.amount,
-                t.description || '-',
-                t.created_by_profile?.name || '-',
-                t.stores?.name || '-'
+                transfer.transfer_date,
+                typeMap[transfer.transfer_type] || transfer.transfer_type,
+                transfer.amount,
+                transfer.description || '-',
+                transfer.created_by_profile?.name || '-',
+                transfer.stores?.name || '-'
             ];
         });
         var csvContent = [headers].concat(rows).map(function(row) {
@@ -866,6 +882,7 @@ const DashboardFunds = {
     }
 };
 
+// 将所有方法挂载到 window.APP
 for (var key in DashboardFunds) {
     if (typeof DashboardFunds[key] === 'function') {
         window.APP[key] = DashboardFunds[key];
