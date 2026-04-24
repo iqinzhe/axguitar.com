@@ -1,4 +1,4 @@
-// app-customers.js - v2.3（权限调整：管理员可修改/解除拉黑，门店不可修改/删除）
+// app-customers.js - v2.4（修复重复提交 + 权限调整）
 
 window.APP = window.APP || {};
 
@@ -50,33 +50,26 @@ const CustomersModule = {
                         (isAdmin ? '<td class="text-center">' + storeName + '<\/td>' : '') +
                     '<\/tr>';
                     
-                    // ========== 权限调整 ==========
                     var actionButtons = '';
                     
-                    // 门店：建立订单
                     if (!isAdmin) {
                         actionButtons += '<button onclick="APP.createOrderForCustomer(\'' + escapedId + '\')" class="btn-small success">➕ ' + (lang === 'id' ? 'Buat Order' : '建立订单') + '</button>';
                     }
                     
-                    // 所有人：查看订单
                     actionButtons += '<button onclick="APP.showCustomerOrders(\'' + escapedId + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Lihat Order' : '查看订单') + '</button>';
                     
-                    // 管理员：修改
                     if (isAdmin) {
                         actionButtons += '<button onclick="APP.editCustomer(\'' + escapedId + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Ubah' : '修改') + '</button>';
                     }
                     
-                    // 管理员：删除
                     if (isAdmin) {
                         actionButtons += '<button onclick="APP.deleteCustomer(\'' + escapedId + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
                     }
                     
-                    // 门店：拉黑
                     if (!isAdmin) {
                         actionButtons += '<button onclick="APP.blacklistCustomer(\'' + escapedId + '\')" class="btn-small btn-blacklist">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
                     }
                     
-                    // 管理员：解除拉黑
                     if (isAdmin) {
                         actionButtons += '<button onclick="APP.removeCustomerFromBlacklist(\'' + escapedId + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
                     }
@@ -187,7 +180,6 @@ const CustomersModule = {
         document.head.appendChild(style);
     },
 
-    // ========== 新增：管理员解除拉黑 ==========
     removeCustomerFromBlacklist: async function(customerId) {
         var lang = Utils.lang;
         
@@ -731,7 +723,7 @@ const CustomersModule = {
                             '<textarea id="notes" rows="2" placeholder="' + t('notes') + '"></textarea>' +
                         '</div>' +
                         '<div class="form-actions">' +
-                            '<button onclick="APP.saveOrderWithCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success">💾 ' + t('save') + '</button>' +
+                            '<button onclick="APP.saveOrderWithCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success" id="saveOrderBtn">💾 ' + t('save') + '</button>' +
                             '<button onclick="APP.goBack()">↩️ ' + t('cancel') + '</button>' +
                         '</div>' +
                     '</div>' +
@@ -791,9 +783,18 @@ const CustomersModule = {
         }
     },
 
+    // ========== 修复：保存按钮防止重复提交 ==========
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
+        
+        // 立即禁用保存按钮
+        var saveBtn = document.getElementById('saveOrderBtn');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
+        }
+        
         var collateral = document.getElementById("collateral").value.trim();
         var collateralNote = document.getElementById("collateralNote").value.trim();
         var amountStr = document.getElementById("amount").value;
@@ -814,7 +815,11 @@ const CustomersModule = {
         var loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash';
         var fullCollateralName = collateralNote ? collateral + ' (' + collateralNote + ')' : collateral;
         
-        if (!collateral || !amount || amount <= 0) { alert(t('fill_all_fields')); return; }
+        if (!collateral || !amount || amount <= 0) {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
+            alert(t('fill_all_fields'));
+            return;
+        }
         
         try {
             const { data: customer } = await supabaseClient
@@ -832,6 +837,7 @@ const CustomersModule = {
             blacklistCheck = data ? { isBlacklisted: true } : { isBlacklisted: false };
             
             if (blacklistCheck && blacklistCheck.isBlacklisted) {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
                 alert(t('blacklisted_cannot_order'));
                 return;
             }
@@ -900,6 +906,7 @@ const CustomersModule = {
                 window.location.reload();
             }
         } catch (error) {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
             console.error("saveOrderWithCustomer error:", error);
             alert(t('save_failed') + ': ' + error.message);
         }
