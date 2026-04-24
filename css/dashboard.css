@@ -1,4 +1,4 @@
-/* dashboard.css - v4.3（修复内部转账按钮居中） */
+/* dashboard.css - v4.4（资金管理按钮全部竖向排列） */
 
 /* === 卡片组件 === */
 .card {
@@ -137,18 +137,16 @@
 
 .transfer-buttons {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: var(--spacing-1);
     margin-top: var(--spacing-2);
-    justify-content: center;
 }
 
 .transfer-btn {
-    flex: 0 0 auto;
-    min-width: 70px;
-    max-width: none;
-    padding: var(--spacing-1) var(--spacing-2);
-    font-size: 0.65rem;
+    width: 100%;
+    min-width: auto;
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-sm);
     border-radius: var(--radius-md);
     background: white;
     border: 1px solid var(--border-medium);
@@ -156,8 +154,6 @@
     transition: var(--transition);
     text-align: center;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .transfer-btn:hover {
@@ -183,24 +179,17 @@
     border-color: #93c5fd;
 }
 
-/* 手机端单列 + 按钮全部显示 */
+/* 手机端保持竖向 */
 @media (max-width: 768px) {
     .cashflow-stats {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
     }
     
-    .transfer-buttons {
-        flex-direction: column;
-    }
-    
     .transfer-btn {
-        width: 100%;
         white-space: normal;
         font-size: var(--font-sm);
         padding: var(--spacing-2) var(--spacing-3);
-        min-width: auto;
-        flex: 1 1 auto;
     }
 }
 
