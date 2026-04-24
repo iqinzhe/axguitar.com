@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.0
+// app-dashboard-orders.js - v1.8（资金流水移除操作行）
 
 window.APP = window.APP || {};
 
@@ -236,7 +236,6 @@ showOrderTable: async function() {
                 '</div>' +
                 '<div class="card">' +
                     '<div class="order-detail-grid">' +
-                        '<!-- 左栏：订单信息 + 客户信息 -->' +
                         '<div class="info-column">' +
                             '<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>' +
                             '<p><strong>' + t('order_id') + ':</strong> ' + Utils.escapeHtml(order.order_id) + '</p>' +
@@ -249,7 +248,6 @@ showOrderTable: async function() {
                             '<p><strong>' + t('phone') + ':</strong> ' + Utils.escapeHtml(order.customer_phone) + '</p>' +
                             '<p><strong>' + t('address') + ':</strong> ' + Utils.escapeHtml(order.customer_address) + '</p>' +
                         '</div>' +
-                        '<!-- 右栏：典当信息 + 费用明细 -->' +
                         '<div class="info-column">' +
                             '<h3>💎 ' + t('collateral_info') + '</h3>' +
                             '<p><strong>' + t('collateral_name') + ':</strong> ' + Utils.escapeHtml(order.collateral_name) + '</p>' +
@@ -444,6 +442,7 @@ showOrderTable: async function() {
         }
     },
 
+    // ========== 资金流水：纯账目记录，无操作行 ==========
     showPaymentHistory: async function() {
         this.currentPage = 'paymentHistory';
         this.saveCurrentPageState();
@@ -478,13 +477,6 @@ showOrderTable: async function() {
                         '<td data-label="' + (lang === 'id' ? 'Metode' : '支付方式') + '" class="text-center">' + (methodMap[p.payment_method] || '-') + '<\/td>' +
                         '<td data-label="' + t('description') + '">' + Utils.escapeHtml(p.description || '-') + '<\/td>' +
                     '<\/tr>';
-                    
-                    var actionButtons = '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(p.orders?.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>';
-                    
-                    rows += Utils.renderActionRow({
-                        colspan: 8,
-                        buttonsHtml: actionButtons
-                    });
                 }
             }
 
