@@ -1,4 +1,4 @@
-// store.js - v1.3（优化：批量获取门店现金流，避免 N+1 查询）
+// store.js - v1.4（新增门店暂停/恢复功能）
 
 const StoreManager = {
     stores: [],
@@ -53,6 +53,58 @@ const StoreManager = {
     async deleteStore(id) {
         await SUPABASE.deleteStore(id);
         this.stores = this.stores.filter(function(s) { return s.id !== id; });
+    },
+
+    // ========== 新增：暂停门店 ==========
+    async suspendStore(storeId) {
+        var lang = Utils.lang;
+        
+        if (!confirm(lang === 'id' 
+            ? '⚠️ Yakin akan menonaktifkan toko ini?\n\nOperator toko tidak akan bisa login.\nData toko tetap tersimpan.'
+            : '⚠️ 确认暂停此门店？\n\n门店操作员将无法登录。\n门店数据将继续保留。')) {
+            return;
+        }
+        
+        try {
+            const { error } = await supabaseClient
+                .from('stores')
+                .update({ is_active: false, updated_at: new Date().toISOString() })
+                .eq('id', storeId);
+            
+            if (error) throw error;
+            
+            var store = this.stores.find(function(s) { return s.id === storeId; });
+            if (store) store.is_active = false;
+            
+            alert(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
+            await this.renderStoreManagement();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
+        }
+    },
+
+    // ========== 新增：恢复门店 ==========
+    async resumeStore(storeId) {
+        var lang = Utils.lang;
+        
+        if (!confirm(lang === 'id' ? 'Aktifkan kembali toko ini?' : '恢复此门店营业？')) return;
+        
+        try {
+            const { error } = await supabaseClient
+                .from('stores')
+                .update({ is_active: true, updated_at: new Date().toISOString() })
+                .eq('id', storeId);
+            
+            if (error) throw error;
+            
+            var store = this.stores.find(function(s) { return s.id === storeId; });
+            if (store) store.is_active = true;
+            
+            alert(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
+            await this.renderStoreManagement();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
+        }
     },
 
     editStore: async function(storeId) {
@@ -144,10 +196,8 @@ const StoreManager = {
         }
     },
 
-    // ========== 优化：批量获取所有门店现金流 ==========
     async _getAllStoreCashFlowBalances() {
         try {
-            // 一次性查询所有门店的现金流记录
             const { data: allFlows, error } = await supabaseClient
                 .from('cash_flow_records')
                 .select('store_id, direction, amount, source_target')
@@ -158,7 +208,6 @@ const StoreManager = {
                 return {};
             }
             
-            // 按门店分组计算余额
             var balances = {};
             for (var i = 0; i < allFlows.length; i++) {
                 var flow = allFlows[i];
@@ -184,7 +233,6 @@ const StoreManager = {
                 }
             }
             
-            // 确保所有门店都有初始值
             for (var j = 0; j < this.stores.length; j++) {
                 var s = this.stores[j];
                 if (!balances[s.id]) {
@@ -206,7 +254,6 @@ const StoreManager = {
         
         console.log('开始加载门店管理数据...');
         
-        // 并行加载所有数据
         const [
             allOrdersResult,
             allExpensesResult,
@@ -216,7 +263,7 @@ const StoreManager = {
             supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid'),
             supabaseClient.from('expenses').select('id, store_id, amount, payment_method'),
             supabaseClient.from('payment_history').select('id, order_id, type, amount, payment_method'),
-            this._getAllStoreCashFlowBalances()  // 优化点：批量获取
+            this._getAllStoreCashFlowBalances()
         ]);
         
         const allOrders = allOrdersResult.data || [];
@@ -225,34 +272,29 @@ const StoreManager = {
         
         console.log('数据加载完成: 订单 ' + allOrders.length + ' 条, 支出 ' + allExpenses.length + ' 条, 付款 ' + allPayments.length + ' 条');
         
-        // 构建订单到门店的映射
         const orderStoreMap = {};
         for (var i = 0; i < allOrders.length; i++) {
             orderStoreMap[allOrders[i].id] = allOrders[i].store_id;
         }
         
-        // 初始化门店统计
         const storeStats = {};
         for (var i = 0; i < this.stores.length; i++) {
             storeStats[this.stores[i].id] = { orders: [], expenses: [], payments: [] };
         }
         
         for (var i = 0; i < allOrders.length; i++) {
-            var order = allOrders[i];
-            var orderStoreId = order.store_id;
-            if (storeStats[orderStoreId]) storeStats[orderStoreId].orders.push(order);
+            var orderStoreId = allOrders[i].store_id;
+            if (storeStats[orderStoreId]) storeStats[orderStoreId].orders.push(allOrders[i]);
         }
         
         for (var i = 0; i < allExpenses.length; i++) {
-            var expense = allExpenses[i];
-            var expenseStoreId = expense.store_id;
-            if (storeStats[expenseStoreId]) storeStats[expenseStoreId].expenses.push(expense);
+            var expenseStoreId = allExpenses[i].store_id;
+            if (storeStats[expenseStoreId]) storeStats[expenseStoreId].expenses.push(allExpenses[i]);
         }
         
         for (var i = 0; i < allPayments.length; i++) {
-            var payment = allPayments[i];
-            var paymentStoreId = orderStoreMap[payment.order_id];
-            if (paymentStoreId && storeStats[paymentStoreId]) storeStats[paymentStoreId].payments.push(payment);
+            var paymentStoreId = orderStoreMap[allPayments[i].order_id];
+            if (paymentStoreId && storeStats[paymentStoreId]) storeStats[paymentStoreId].payments.push(allPayments[i]);
         }
         
         var grandTotal = { 
@@ -292,7 +334,6 @@ const StoreManager = {
                 totalExpenses += (expenses[j].amount || 0);
             }
             
-            // 从批量获取的余额中取值（不再是单独查询）
             var balance = storeBalances[store.id] || { cashBalance: 0, bankBalance: 0 };
             var cashBalance = balance.cashBalance;
             var bankBalance = balance.bankBalance;
@@ -309,8 +350,13 @@ const StoreManager = {
             grandTotal.cashBalance += cashBalance;
             grandTotal.bankBalance += bankBalance;
             
+            var storeStatusBadge = '';
+            if (store.is_active === false) {
+                storeStatusBadge = ' <span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:10px;">' + (lang === 'id' ? 'DITUTUP' : '已暂停') + '</span>';
+            }
+            
             storeStatsRows += '<tr>' +
-                '<td class="store-name-cell"><strong>' + Utils.escapeHtml(store.name) + '</strong><br><small>' + Utils.escapeHtml(store.code) + '</small></td>' +
+                '<td class="store-name-cell"><strong>' + Utils.escapeHtml(store.name) + storeStatusBadge + '</strong><br><small>' + Utils.escapeHtml(store.code) + '</small></td>' +
                 '<td class="text-center">' + ordsCount + '</td>' +
                 '<td class="text-center">' + activeCount + '</td>' +
                 '<td class="text-right">' + Utils.formatCurrency(totalLoan) + '</td>' +
@@ -325,7 +371,6 @@ const StoreManager = {
             '</tr>';
         }
         
-        // 汇总行
         var summaryRow = '<tr>' +
             '<td class="store-name-cell"><strong>' + (lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计') + '</strong></td>' +
             '<td class="text-center"><strong>' + grandTotal.orders + '</strong></td>' +
@@ -343,10 +388,15 @@ const StoreManager = {
 
         var storeRows = '';
         if (this.stores.length === 0) {
-            storeRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+            storeRows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '<\/td><\/tr>';
         } else {
             for (var i = 0; i < this.stores.length; i++) {
                 var store = this.stores[i];
+                var isActive = store.is_active !== false;
+                var statusBadge = isActive 
+                    ? '<span class="status-badge status-active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
+                    : '<span class="status-badge status-liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
+                
                 storeRows += '<tr>' +
                     '<td class="store-code">' + Utils.escapeHtml(store.code) + '</td>' +
                     '<td class="store-name">' + Utils.escapeHtml(store.name) + '</td>' +
@@ -357,14 +407,22 @@ const StoreManager = {
                                'placeholder="628xxxxxxxxxx" style="width:140px; font-size:12px; padding:6px;" ' +
                                'onchange="APP.updateStoreWANumber(\'' + store.id + '\', this.value)">' +
                     '</td>' +
+                    '<td class="text-center">' + statusBadge + '</td>' +
                 '</tr>';
                 
                 var actionButtons = '' +
-                    '<button onclick="StoreManager.editStore(\'' + store.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>' +
-                    '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
+                    '<button onclick="StoreManager.editStore(\'' + store.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
+                
+                if (isActive) {
+                    actionButtons += '<button onclick="StoreManager.suspendStore(\'' + store.id + '\')" class="btn-small warning">⏸️ ' + (lang === 'id' ? 'Tutup Sementara' : '暂停营业') + '</button>';
+                } else {
+                    actionButtons += '<button onclick="StoreManager.resumeStore(\'' + store.id + '\')" class="btn-small success">▶️ ' + (lang === 'id' ? 'Buka Kembali' : '恢复营业') + '</button>';
+                }
+                
+                actionButtons += '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
                 
                 storeRows += Utils.renderActionRow({
-                    colspan: 5,
+                    colspan: 6,
                     buttonsHtml: actionButtons
                 });
             }
@@ -442,6 +500,7 @@ const StoreManager = {
                                 '<th>' + (lang === 'id' ? 'Alamat' : '地址') + '</th>' +
                                 '<th>' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
                                 '<th>📱 WA</th>' +
+                                '<th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th>' +
                                 '<th class="text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
                             '</tr>' +
                         '</thead>' +
@@ -449,7 +508,7 @@ const StoreManager = {
                     '</table>' +
                 '</div>' +
                 '<p style="font-size:12px; color:#64748b; margin-top:8px;">' +
-                    '💡 ' + (lang === 'id' ? 'Kode toko dibuat otomatis. Klik pada kolom WA untuk mengedit nomor. Contoh: 6281234567890' : '门店编码自动生成。点击 WA 列编辑号码。示例: 6281234567890') +
+                    '💡 ' + (lang === 'id' ? 'Kode toko dibuat otomatis. Klik pada kolom WA untuk mengedit nomor. Toko yang ditutup tidak dapat diakses operator.' : '门店编码自动生成。点击 WA 列编辑号码。暂停的门店操作员将无法登录。') +
                 '</p>' +
             '</div>' +
 
@@ -493,6 +552,8 @@ const StoreManager = {
                 '.cashflow-item-card .value.negative { color: #ef4444; }' +
                 '.cashflow-item-card .sub { font-size: 11px; color: #94a3b8; margin-top: 6px; }' +
                 '.cashflow-note { font-size: 11px; color: #64748b; margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; }' +
+                '.status-badge.status-active { background: #dcfce7; color: #16a34a; }' +
+                '.status-badge.status-liquidated { background: #fee2e2; color: #dc2626; }' +
                 '@media (max-width: 640px) { .cashflow-stats { flex-direction: column; } .cashflow-item-card { min-width: auto; } .store-table .store-address { max-width: 120px; } .store-table td input { width: 100px; font-size: 10px; } }' +
             '</style>';
     }
