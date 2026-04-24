@@ -1,4 +1,4 @@
-// app-customers.js - v2.4（修复重复提交 + 权限调整）
+// app-customers.js - v2.5（建立订单核心重构：当金+费用自动计算+手动可调）
 
 window.APP = window.APP || {};
 
@@ -173,9 +173,15 @@ const CustomersModule = {
             '.address-option-inline label { white-space: nowrap; }' +
             '.btn-blacklist { background: #f97316 !important; color: #fff !important; border-color: #ea580c !important; }' +
             '.btn-blacklist:hover { background: #ea580c !important; }' +
+            '.fee-calc-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }' +
+            '.fee-calc-row .fee-label { min-width: 60px; font-weight: 600; font-size: 0.8rem; }' +
+            '.fee-calc-row input { width: 150px; }' +
+            '.fee-calc-row select { width: auto; min-width: 80px; }' +
             '@media (max-width: 768px) { ' +
                 '.customer-table th, .customer-table td { font-size: 0.7rem; padding: 6px 4px; } ' +
                 '.address-option-inline { flex-direction: column; gap: 8px; } ' +
+                '.fee-calc-row { flex-direction: column; align-items: flex-start; } ' +
+                '.fee-calc-row input { width: 100%; } ' +
             '}';
         document.head.appendChild(style);
     },
@@ -417,119 +423,10 @@ const CustomersModule = {
         }
     },
 
-    updateServiceFeeDisplay: function() {
-        var amountStr = document.getElementById("amount")?.value || "0";
-        var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
-        var percent = parseInt(document.getElementById("serviceFeePercent")?.value) || 0;
-        var serviceFee = amount * (percent / 100);
-        var displayEl = document.getElementById("serviceFeeDisplay");
-        var hiddenInput = document.getElementById("serviceFeeAmount");
-        
-        if (displayEl) {
-            if (percent > 0 && amount > 0) {
-                displayEl.innerHTML = '💰 ' + Utils.formatCurrency(serviceFee) + ' ' + (Utils.lang === 'id' ? '(dibayar sekali)' : '(一次性支付)');
-                displayEl.style.display = "block";
-                if (hiddenInput) hiddenInput.value = serviceFee;
-            } else if (percent > 0 && amount === 0) {
-                displayEl.innerHTML = '📝 ' + (Utils.lang === 'id' ? 'Masukkan jumlah pinjaman terlebih dahulu' : '请先输入贷款金额');
-                displayEl.style.display = "block";
-                if (hiddenInput) hiddenInput.value = 0;
-            } else {
-                displayEl.innerHTML = '';
-                displayEl.style.display = "none";
-                if (hiddenInput) hiddenInput.value = 0;
-            }
-        }
-    },
-    
-    updateAdminFeeSelect: function() {
-        var select = document.getElementById("adminFeeSelect");
-        var selectedValue = select?.value;
-        var manualContainer = document.getElementById("adminFeeManualContainer");
-        var manualInput = document.getElementById("adminFeeManual");
-        var hiddenInput = document.getElementById("adminFeeAmount");
-        var displayEl = document.getElementById("adminFeeDisplay");
-        
-        if (selectedValue === "manual") {
-            if (manualContainer) manualContainer.style.display = "block";
-            if (displayEl) displayEl.style.display = "none";
-            if (manualInput) {
-                var manualVal = manualInput.value.replace(/[^0-9]/g, '');
-                var num = parseInt(manualVal) || 0;
-                if (hiddenInput) hiddenInput.value = num;
-                if (displayEl) {
-                    displayEl.innerHTML = '📋 ' + Utils.formatCurrency(num) + ' ' + (Utils.lang === 'id' ? '(dibayar sekali)' : '(一次性支付)');
-                    if (num > 0) displayEl.style.display = "block";
-                }
-            }
-        } else {
-            if (manualContainer) manualContainer.style.display = "none";
-            if (hiddenInput) hiddenInput.value = selectedValue || 30000;
-            if (displayEl) {
-                var fee = parseInt(selectedValue) || 30000;
-                displayEl.innerHTML = '📋 ' + Utils.formatCurrency(fee) + ' ' + (Utils.lang === 'id' ? '(dibayar sekali)' : '(一次性支付)');
-                displayEl.style.display = "block";
-            }
-            if (manualInput) manualInput.value = "";
-        }
-    },
-    
-    updateAdminFeeManual: function() {
-        var manualInput = document.getElementById("adminFeeManual");
-        var hiddenInput = document.getElementById("adminFeeAmount");
-        var select = document.getElementById("adminFeeSelect");
-        var displayEl = document.getElementById("adminFeeDisplay");
-        
-        if (manualInput) {
-            var num = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(manualInput.value) : parseInt(manualInput.value.replace(/[,\s]/g, '')) || 0;
-            if (hiddenInput) hiddenInput.value = num;
-            if (select) select.value = "manual";
-            if (displayEl) {
-                if (num > 0) {
-                    displayEl.innerHTML = '📋 ' + Utils.formatCurrency(num) + ' ' + (Utils.lang === 'id' ? '(dibayar sekali)' : '(一次性支付)');
-                    displayEl.style.display = "block";
-                } else {
-                    displayEl.style.display = "none";
-                }
-            }
-        }
-    },
-
+    // ========== 核心：建立订单 ==========
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang || 'id';
-        
-        var t = function(key) {
-            if (typeof Utils.t === 'function') {
-                return Utils.t(key);
-            }
-            var fallback = {
-                'customer_has_active_order': lang === 'id' ? 'Nasabah ini masih memiliki pesanan aktif.' : '该客户还有未结清的订单。',
-                'blacklisted_cannot_order': lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。',
-                'fill_all_fields': lang === 'id' ? 'Harap isi semua bidang!' : '请填写所有字段！',
-                'save_failed': lang === 'id' ? 'Gagal menyimpan' : '保存失败',
-                'create_order': lang === 'id' ? 'Buat Pesanan' : '新建订单',
-                'back': lang === 'id' ? 'Kembali' : '返回',
-                'customer_info': lang === 'id' ? 'Informasi Pelanggan' : '客户信息',
-                'customer_name': lang === 'id' ? 'Nama Lengkap' : '客户姓名',
-                'ktp_number': lang === 'id' ? 'Nomor KTP' : 'KTP号码',
-                'phone': lang === 'id' ? 'Nomor Telepon' : '手机号',
-                'collateral_info': lang === 'id' ? 'Informasi Jaminan' : '典当信息',
-                'collateral_name': lang === 'id' ? 'Nama Barang Jaminan' : '质押物名称',
-                'loan_amount': lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
-                'notes': lang === 'id' ? 'Catatan' : '备注',
-                'save': lang === 'id' ? 'Simpan' : '保存',
-                'cancel': lang === 'id' ? 'Batal' : '取消',
-                'flexible_repayment': lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款',
-                'fixed_repayment': lang === 'id' ? 'Cicilan Tetap' : '固定还款',
-                'repayment_term': lang === 'id' ? 'Jangka Waktu (Bulan)' : '还款期限（月）',
-                'monthly_payment': lang === 'id' ? 'Angsuran per Bulan' : '每月还款额',
-                'agreed_rate': lang === 'id' ? 'Suku Bunga Kesepakatan' : '协商利率',
-                'agreed_service_fee': lang === 'id' ? 'Biaya Layanan Kesepakatan' : '协商服务费',
-                'cash': lang === 'id' ? 'Tunai' : '现金',
-                'bank': lang === 'id' ? 'Bank BNI' : '银行BNI'
-            };
-            return fallback[key] || key;
-        };
+        var t = function(key) { return Utils.t(key); };
 
         var profile = null;
         try {
@@ -576,7 +473,7 @@ const CustomersModule = {
             }
 
             if (blacklistCheck && blacklistCheck.isBlacklisted) {
-                alert(t('blacklisted_cannot_order'));
+                alert(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。');
                 return;
             }
 
@@ -587,7 +484,7 @@ const CustomersModule = {
                     .eq('customer_id', customerId)
                     .eq('status', 'active');
                 if (existingOrders && existingOrders.length > 0) {
-                    alert(t('customer_has_active_order'));
+                    alert(lang === 'id' ? 'Nasabah ini masih memiliki pesanan aktif.' : '该客户还有未结清的订单。');
                     return;
                 }
             } catch(ordErr) {
@@ -644,7 +541,7 @@ const CustomersModule = {
                         '<span>🏪 ' + (lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店') + ': <strong>' + Utils.escapeHtml(userStoreName) + ' (' + Utils.escapeHtml(userStoreCode) + ')</strong></span>' +
                     '</div>' +
                     '<h3>' + t('collateral_info') + '</h3>' +
-                    '<div class="form-grid two-col-grid">' +
+                    '<div class="form-grid">' +
                         '<div class="form-group">' +
                             '<label>' + t('collateral_name') + ' *</label>' +
                             '<input id="collateral" placeholder="' + t('collateral_name') + '">' +
@@ -652,70 +549,70 @@ const CustomersModule = {
                         '<div class="form-group">' +
                             '<label>' + (lang === 'id' ? 'Keterangan Barang' : '物品备注') + '</label>' +
                             '<input id="collateralNote" placeholder="' + (lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年') + '">' +
-                            '<small style="color:#64748b;">' + (lang === 'id' ? 'Warna, kondisi, tahun, dll.' : '成色、状况、年份等') + '</small>' +
                         '</div>' +
                         '<div class="form-group">' +
-                            '<label>' + t('loan_amount') + ' *</label>' +
-                            '<input type="text" id="amount" placeholder="' + t('loan_amount') + '" class="amount-input" oninput="window.APP.calculateFixedPayment()">' +
+                            '<label>' + (lang === 'id' ? 'Jumlah Gadai' : '当金金额') + ' *</label>' +
+                            '<input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()">' +
                         '</div>' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Sumber Dana' : '资金来源') + '</label>' +
+                            '<div class="payment-method-options">' +
+                                '<label><input type="radio" name="loanSource" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
+                                '<label><input type="radio" name="loanSource" value="bank"> 🏧 ' + t('bank') + '</label>' +
+                            '</div>' +
+                        '</div>' +
+                        '<!-- 管理费 -->' +
+                        '<div class="form-group">' +
+                            '<label>📋 ' + (lang === 'id' ? 'Admin Fee (Otomatis, bisa diubah)' : '管理费（自动计算，可修改）') + '</label>' +
+                            '<input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">' +
+                            '<small style="color:#64748b;">' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
+                        '</div>' +
+                        '<!-- 服务费 -->' +
+                        '<div class="form-group">' +
+                            '<label>✨ ' + (lang === 'id' ? 'Service Fee (Otomatis, bisa diubah)' : '服务费（自动计算，可修改）') + '</label>' +
+                            '<div class="fee-calc-row">' +
+                                '<select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()">' +
+                                    Utils.getServiceFeePercentOptions(2) +
+                                '</select>' +
+                                '<input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()">' +
+                            '</div>' +
+                            '<small style="color:#64748b;">' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
+                        '</div>' +
+                        '<!-- 利率 -->' +
+                        '<div class="form-group">' +
+                            '<label>📈 ' + (lang === 'id' ? 'Suku Bunga (Pilih)' : '利率（可选）') + '</label>' +
+                            '<select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">' +
+                                Utils.getInterestRateOptions(10) +
+                            '</select>' +
+                        '</div>' +
+                        '<!-- 还款方式 -->' +
                         '<div class="repayment-type-group">' +
                             '<label class="repayment-type-label">📋 ' + (lang === 'id' ? 'Pilih Jenis Cicilan' : '选择还款方式') + ':</label>' +
                             '<div class="repayment-type-options">' +
                                 '<label class="repayment-option">' +
-                                    '<input type="radio" name="repaymentType" value="flexible" checked onchange="window.APP.toggleRepaymentForm(this.value)">' +
-                                    '<span class="option-title">💰 ' + t('flexible_repayment') + '</span>' +
-                                    '<span class="option-desc">' + (lang === 'id' ? 'Bunga 8%/bulan, bayar bunga dulu, pokok bisa kapan saja' : '利息8%/月，先付利息，本金随时可还') + '</span>' +
+                                    '<input type="radio" name="repaymentType" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)">' +
+                                    '<span class="option-title">💰 ' + (lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款') + '</span>' +
+                                    '<span class="option-desc">' + (lang === 'id' ? 'Bayar bunga dulu, pokok bisa kapan saja, maksimal 10 bulan' : '先付利息，本金随时可还，最长10个月') + '</span>' +
                                 '</label>' +
                                 '<label class="repayment-option">' +
-                                    '<input type="radio" name="repaymentType" value="fixed" onchange="window.APP.toggleRepaymentForm(this.value)">' +
-                                    '<span class="option-title">📅 ' + t('fixed_repayment') + '</span>' +
-                                    '<span class="option-desc">' + (lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok), tenor 3-10 bulan' : '每月固定还款（本金+利息），期限3-10个月') + '</span>' +
+                                    '<input type="radio" name="repaymentType" value="fixed" onchange="APP.toggleRepaymentForm(this.value)">' +
+                                    '<span class="option-title">📅 ' + (lang === 'id' ? 'Cicilan Tetap' : '固定还款') + '</span>' +
+                                    '<span class="option-desc">' + (lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok)' : '每月固定还款（本金+利息）') + '</span>' +
                                 '</label>' +
                             '</div>' +
                         '</div>' +
+                        '<!-- 固定还款表单 -->' +
                         '<div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">' +
                             '<div class="form-group">' +
-                                '<label>📅 ' + t('repayment_term') + '</label>' +
-                                '<select id="repaymentTerm" class="repayment-term-select" onchange="window.APP.calculateFixedPayment()">' +
-                                    '<option value="3">3 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="4">4 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="5" selected>5 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="6">6 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="7">7 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="8">8 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="9">9 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="10">10 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                '<label>📅 ' + (lang === 'id' ? 'Jangka Waktu' : '还款期限') + '</label>' +
+                                '<select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">' +
+                                    Utils.getRepaymentTermOptions(5) +
                                 '</select>' +
                             '</div>' +
                             '<div class="form-group">' +
-                                '<label>💰 ' + t('monthly_payment') + '</label>' +
-                                '<div id="monthlyPaymentDisplay" class="monthly-payment-display">-</div>' +
-                                '<small>' + (lang === 'id' ? 'Jumlah tetap yang harus dibayar setiap bulan' : '每月需支付的固定金额') + '</small>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="negotiation-form">' +
-                            '<div class="form-group">' +
-                                '<label>📈 ' + t('agreed_rate') + '</label>' +
-                                '<div class="rate-input-group">' +
-                                    '<input type="number" id="agreedInterestRate" value="8" step="0.5" min="3" max="10" style="width:100px;" onchange="window.APP.calculateFixedPayment()">' +
-                                    '<span>%</span>' +
-                                    '<small style="margin-left:10px;">' + (lang === 'id' ? 'Default 8%, bisa dinegosiasi 3-10%' : '默认8%，可协商3-10%') + '</small>' +
-                                '</div>' +
-                            '</div>' +
-                            '<div class="form-group">' +
-                                '<label>✨ ' + t('agreed_service_fee') + '</label>' +
-                                '<div class="rate-input-group">' +
-                                    '<input type="number" id="agreedServiceFee" value="2" step="0.5" min="0" max="5" style="width:100px;">' +
-                                    '<span>%</span>' +
-                                    '<small style="margin-left:10px;">' + (lang === 'id' ? 'Default 2%, bisa dinegosiasi 0-5%' : '默认2%，可协商0-5%') + '</small>' +
-                                '</div>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="form-group">' +
-                            '<label>💰 ' + (lang === 'id' ? 'Sumber Dana Pinjaman' : '贷款资金来源') + '</label>' +
-                            '<div class="payment-method-options">' +
-                                '<label><input type="radio" name="loanSource" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
-                                '<label><input type="radio" name="loanSource" value="bank"> 🏧 ' + t('bank') + '</label>' +
+                                '<label>💰 ' + (lang === 'id' ? 'Angsuran Bulanan (Otomatis, bisa diubah)' : '每月还款（自动计算，可修改）') + '</label>' +
+                                '<input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()">' +
+                                '<small style="color:#64748b;">' + (lang === 'id' ? 'Dibulatkan ke Rp 10.000, bisa disesuaikan' : '取整到Rp 10,000，可手动调整') + '</small>' +
                             '</div>' +
                         '</div>' +
                         '<div class="form-group full-width">' +
@@ -729,26 +626,28 @@ const CustomersModule = {
                     '</div>' +
                 '</div>' +
                 '<style>' +
-                    '.repayment-type-group { grid-column: span 2; margin: 12px 0; padding: 12px; background: var(--gray-50); border-radius: 12px; }' +
-                    '.repayment-type-label { font-weight: 600; margin-bottom: 10px; display: block; color: var(--gray-700); }' +
+                    '.repayment-type-group { grid-column: span 2; margin: 12px 0; padding: 12px; background: var(--bg-hover); border-radius: 12px; }' +
+                    '.repayment-type-label { font-weight: 600; margin-bottom: 10px; display: block; color: var(--text-secondary); }' +
                     '.repayment-type-options { display: flex; gap: 20px; flex-wrap: wrap; }' +
-                    '.repayment-option { flex: 1; min-width: 200px; padding: 12px; border: 2px solid var(--gray-300); border-radius: 10px; cursor: pointer; transition: all 0.2s; background: white; }' +
-                    '.repayment-option:hover { border-color: var(--primary); background: var(--primary-light); }' +
+                    '.repayment-option { flex: 1; min-width: 200px; padding: 12px; border: 2px solid var(--border-light); border-radius: 10px; cursor: pointer; transition: all 0.2s; background: white; }' +
+                    '.repayment-option:hover { border-color: var(--primary); background: var(--primary-soft); }' +
                     '.repayment-option input { margin-right: 8px; }' +
                     '.repayment-option .option-title { font-weight: 700; display: inline-block; margin-bottom: 4px; }' +
-                    '.repayment-option .option-desc { display: block; font-size: 11px; color: var(--gray-500); margin-top: 4px; }' +
+                    '.repayment-option .option-desc { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; }' +
                     '.fixed-repayment-form { grid-column: span 2; padding: 12px; background: #f0fdf4; border-radius: 10px; margin: 8px 0; }' +
-                    '.monthly-payment-display { font-size: 18px; font-weight: 700; color: var(--success); background: white; padding: 8px 12px; border-radius: 8px; display: inline-block; }' +
-                    '.negotiation-form { grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; background: #fef3c7; border-radius: 10px; margin: 8px 0; }' +
-                    '.rate-input-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }' +
-                    '.rate-input-group input { text-align: center; }' +
-                    '@media (max-width: 768px) { .repayment-type-options { flex-direction: column; } .negotiation-form { grid-template-columns: 1fr; } }' +
+                    '@media (max-width: 768px) { .repayment-type-options { flex-direction: column; } }' +
                 '</style>';
             
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
             
-            this.calculateFixedPayment();
+            // 绑定其他金额输入框
+            var adminFeeInput = document.getElementById("adminFeeInput");
+            if (adminFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(adminFeeInput);
+            var serviceFeeInput = document.getElementById("serviceFeeInput");
+            if (serviceFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(serviceFeeInput);
+            var monthlyPaymentInput = document.getElementById("monthlyPaymentInput");
+            if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
             
         } catch (error) {
             console.error("createOrderForCustomer 错误:", error);
@@ -756,39 +655,94 @@ const CustomersModule = {
         }
     },
 
-    toggleRepaymentForm: function(value) {
-        var fixedForm = document.getElementById('fixedRepaymentForm');
-        if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none';
-        if (value === 'fixed') this.calculateFixedPayment();
-    },
-
-    calculateFixedPayment: function() {
+    // ========== 重新计算所有费用 ==========
+    recalculateAllFees: function() {
         var amountStr = document.getElementById('amount')?.value || '0';
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
-        var termSelect = document.getElementById('repaymentTerm');
-        var months = termSelect ? parseInt(termSelect.value) : 5;
-        var rateInput = document.getElementById('agreedInterestRate');
-        var monthlyRate = rateInput ? (parseFloat(rateInput.value) || 8) / 100 : 0.08;
         
-        var displayEl = document.getElementById('monthlyPaymentDisplay');
-        if (displayEl) {
+        // 管理费
+        var adminFee = Utils.calculateAdminFee(amount);
+        var adminFeeInput = document.getElementById('adminFeeInput');
+        if (adminFeeInput && !adminFeeInput.dataset.manual) {
+            adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
+        }
+        
+        // 服务费
+        var serviceFeeData = Utils.calculateServiceFeeNew(amount);
+        var serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
+        var serviceFeeInput = document.getElementById('serviceFeeInput');
+        if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
+            serviceFeeSelect.value = serviceFeeData.percent;
+        }
+        if (serviceFeeInput && !serviceFeeInput.dataset.manual) {
+            serviceFeeInput.value = Utils.formatNumberWithCommas(serviceFeeData.amount);
+        }
+        
+        // 固定还款月供
+        var repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
+        if (repaymentType === 'fixed') {
+            var rateSelect = document.getElementById('agreedInterestRateSelect');
+            var monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 10) / 100 : 0.10;
+            var termSelect = document.getElementById('repaymentTermSelect');
+            var months = termSelect ? parseInt(termSelect.value) : 5;
+            
             if (amount > 0 && months > 0) {
                 var monthlyPayment = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months);
-                displayEl.innerHTML = Utils.formatCurrency(monthlyPayment);
-                displayEl.style.color = '#10b981';
-            } else {
-                displayEl.innerHTML = amount === 0 ? (Utils.lang === 'id' ? 'Masukkan jumlah pinjaman' : '请输入贷款金额') : '-';
-                displayEl.style.color = '#64748b';
+                var rounded = Utils.roundMonthlyPayment(monthlyPayment);
+                var monthlyInput = document.getElementById('monthlyPaymentInput');
+                if (monthlyInput && !monthlyInput.dataset.manual) {
+                    monthlyInput.value = Utils.formatNumberWithCommas(rounded);
+                }
             }
         }
     },
 
-    // ========== 修复：保存按钮防止重复提交 ==========
+    // ========== 手动修改管理费 ==========
+    onAdminFeeManualChange: function() {
+        var input = document.getElementById('adminFeeInput');
+        if (input) input.dataset.manual = 'true';
+    },
+
+    // ========== 手动修改服务费百分比 ==========
+    recalculateServiceFee: function() {
+        var select = document.getElementById('serviceFeePercentSelect');
+        if (select) select.dataset.manual = 'true';
+        
+        var amountStr = document.getElementById('amount')?.value || '0';
+        var amount = Utils.parseNumberFromCommas(amountStr) || 0;
+        var percent = select ? parseFloat(select.value) : 0;
+        var fee = Math.round(amount * percent / 100);
+        
+        var input = document.getElementById('serviceFeeInput');
+        if (input) {
+            input.value = Utils.formatNumberWithCommas(fee);
+            input.dataset.manual = 'true';
+        }
+    },
+
+    // ========== 手动修改服务费金额 ==========
+    onServiceFeeManualChange: function() {
+        var input = document.getElementById('serviceFeeInput');
+        if (input) input.dataset.manual = 'true';
+    },
+
+    // ========== 手动修改月供 ==========
+    onMonthlyPaymentManualChange: function() {
+        var input = document.getElementById('monthlyPaymentInput');
+        if (input) input.dataset.manual = 'true';
+    },
+
+    toggleRepaymentForm: function(value) {
+        var fixedForm = document.getElementById('fixedRepaymentForm');
+        if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none';
+        if (value === 'fixed') APP.recalculateAllFees();
+    },
+
+    // ========== 保存订单 ==========
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
         
-        // 立即禁用保存按钮
         var saveBtn = document.getElementById('saveOrderBtn');
         if (saveBtn) {
             saveBtn.disabled = true;
@@ -801,15 +755,31 @@ const CustomersModule = {
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
         var notes = document.getElementById("notes").value;
         
-        var agreedInterestRate = parseFloat(document.getElementById("agreedInterestRate")?.value) || 8;
-        var agreedServiceFee = parseFloat(document.getElementById("agreedServiceFee")?.value) || 2;
+        var adminFeeStr = document.getElementById("adminFeeInput").value;
+        var adminFee = Utils.parseNumberFromCommas(adminFeeStr) || Utils.calculateAdminFee(amount);
+        
+        var serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 0;
+        var serviceFeeStr = document.getElementById("serviceFeeInput").value;
+        var serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
+        if (serviceFee === 0 && serviceFeePercent > 0) {
+            serviceFee = Math.round(amount * serviceFeePercent / 100);
+        }
+        
+        var agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 10;
         
         var repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked');
         var repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
         var repaymentTerm = null;
+        var monthlyFixedPayment = null;
         
         if (repaymentType === 'fixed') {
-            repaymentTerm = parseInt(document.getElementById("repaymentTerm")?.value) || 5;
+            repaymentTerm = parseInt(document.getElementById("repaymentTermSelect")?.value) || 5;
+            var monthlyStr = document.getElementById("monthlyPaymentInput").value;
+            monthlyFixedPayment = Utils.parseNumberFromCommas(monthlyStr) || 0;
+            if (monthlyFixedPayment === 0 && amount > 0) {
+                var monthlyRate = agreedInterestRate / 100;
+                monthlyFixedPayment = Utils.roundMonthlyPayment(Utils.calculateFixedMonthlyPayment(amount, monthlyRate, repaymentTerm));
+            }
         }
         
         var loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash';
@@ -838,7 +808,7 @@ const CustomersModule = {
             
             if (blacklistCheck && blacklistCheck.isBlacklisted) {
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
-                alert(t('blacklisted_cannot_order'));
+                alert(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。');
                 return;
             }
             
@@ -854,16 +824,26 @@ const CustomersModule = {
                 notes: notes,
                 customer_id: customerId,
                 store_id: null,
-                admin_fee: 30000,
-                service_fee_percent: agreedServiceFee,
+                admin_fee: adminFee,
+                service_fee_percent: serviceFeePercent,
+                service_fee_amount: serviceFee,
                 agreed_interest_rate: agreedInterestRate,
                 repayment_type: repaymentType,
-                repayment_term: repaymentTerm
+                repayment_term: repaymentTerm,
+                monthly_fixed_payment: monthlyFixedPayment
             };
             
             var newOrder = await Order.create(orderData);
             
-            if (agreedServiceFee > 0) {
+            if (adminFee > 0) {
+                try {
+                    await Order.recordAdminFee(newOrder.order_id, loanSource, adminFee);
+                } catch (adminFeeError) {
+                    console.error("管理费收取失败:", adminFeeError);
+                }
+            }
+            
+            if (serviceFee > 0) {
                 try {
                     await Order.recordServiceFee(newOrder.order_id, 1, loanSource);
                 } catch (serviceFeeError) {
@@ -871,32 +851,24 @@ const CustomersModule = {
                 }
             }
             
-            try {
-                await Order.recordAdminFee(newOrder.order_id, loanSource, 30000);
-            } catch (adminFeeError) {
-                console.error("管理费收取失败:", adminFeeError);
-            }
-            
             if (amount > 0) {
                 try {
-                    await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, 
-                        lang === 'id' ? 'Pencairan pinjaman dari ' + (loanSource === 'cash' ? 'Brankas' : 'Bank BNI') : '贷款发放自 ' + (loanSource === 'cash' ? '保险柜' : '银行BNI'));
+                    var disbursementDesc = lang === 'id' 
+                        ? 'Pencairan gadai dari ' + (loanSource === 'cash' ? 'Brankas' : 'Bank BNI')
+                        : '当金发放自 ' + (loanSource === 'cash' ? '保险柜' : '银行BNI');
+                    await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, disbursementDesc);
                 } catch (loanError) {
-                    console.error("贷款发放记录失败:", loanError);
+                    console.error("当金发放记录失败:", loanError);
                 }
             }
             
-            var monthlyPayment = repaymentType === 'fixed' 
-                ? Utils.calculateFixedMonthlyPayment(amount, agreedInterestRate / 100, repaymentTerm)
-                : null;
-            
             var successMsg = repaymentType === 'fixed'
                 ? (lang === 'id' 
-                    ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Tetap\nTenor: ' + repaymentTerm + ' bulan\nAngsuran per bulan: ' + Utils.formatCurrency(monthlyPayment) + '\nBunga: ' + agreedInterestRate + '%\nService Fee: ' + agreedServiceFee + '%'
-                    : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 固定还款\n期限: ' + repaymentTerm + '个月\n每月还款: ' + Utils.formatCurrency(monthlyPayment) + '\n利率: ' + agreedInterestRate + '%\n服务费: ' + agreedServiceFee + '%')
+                    ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Tetap\nJangka: ' + repaymentTerm + ' bulan\nAngsuran per bulan: ' + Utils.formatCurrency(monthlyFixedPayment) + '\nBunga: ' + agreedInterestRate + '%\nAdmin Fee: ' + Utils.formatCurrency(adminFee) + '\nService Fee: ' + Utils.formatCurrency(serviceFee)
+                    : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 固定还款\n期限: ' + repaymentTerm + '个月\n每月还款: ' + Utils.formatCurrency(monthlyFixedPayment) + '\n利率: ' + agreedInterestRate + '%\n管理费: ' + Utils.formatCurrency(adminFee) + '\n服务费: ' + Utils.formatCurrency(serviceFee))
                 : (lang === 'id'
-                    ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Fleksibel\nBunga: ' + agreedInterestRate + '%\nService Fee: ' + agreedServiceFee + '%\nMaksimal perpanjangan hingga 10 bulan'
-                    : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 灵活还款\n利率: ' + agreedInterestRate + '%\n服务费: ' + agreedServiceFee + '%\n最长可延期至10个月');
+                    ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Fleksibel\nBunga: ' + agreedInterestRate + '%\nAdmin Fee: ' + Utils.formatCurrency(adminFee) + '\nService Fee: ' + Utils.formatCurrency(serviceFee) + '\nMaksimal perpanjangan hingga 10 bulan'
+                    : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 灵活还款\n利率: ' + agreedInterestRate + '%\n管理费: ' + Utils.formatCurrency(adminFee) + '\n服务费: ' + Utils.formatCurrency(serviceFee) + '\n最长可延期至10个月');
             
             alert(successMsg);
             
@@ -1069,11 +1041,13 @@ for (var key in CustomersModule) {
     }
 }
 
-window.APP.updateServiceFeeDisplay = CustomersModule.updateServiceFeeDisplay;
-window.APP.updateAdminFeeSelect = CustomersModule.updateAdminFeeSelect;
-window.APP.updateAdminFeeManual = CustomersModule.updateAdminFeeManual;
+// 导出新函数到全局
+window.APP.recalculateAllFees = CustomersModule.recalculateAllFees;
+window.APP.onAdminFeeManualChange = CustomersModule.onAdminFeeManualChange;
+window.APP.recalculateServiceFee = CustomersModule.recalculateServiceFee;
+window.APP.onServiceFeeManualChange = CustomersModule.onServiceFeeManualChange;
+window.APP.onMonthlyPaymentManualChange = CustomersModule.onMonthlyPaymentManualChange;
 window.APP.toggleRepaymentForm = CustomersModule.toggleRepaymentForm;
-window.APP.calculateFixedPayment = CustomersModule.calculateFixedPayment;
 window.APP.toggleLivingAddress = CustomersModule.toggleLivingAddress;
 window.APP._toggleEditLiving = CustomersModule._toggleEditLiving;
 window.APP._saveEditCustomer = CustomersModule._saveEditCustomer;
