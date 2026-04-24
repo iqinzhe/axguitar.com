@@ -1,4 +1,4 @@
-// auth.js - v1.3（新增：重置密码 + 门店暂停检查）
+// auth.js - v1.0
 
 const AUTH = {
     user: null,
