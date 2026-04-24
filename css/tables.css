@@ -1,4 +1,4 @@
-/* tables.css - 统一双行布局版 v4.0（优化电脑端显示） */
+/* tables.css - v4.1（列宽与打印统一 + 表格左对齐） */
 
 /* === 表格容器 === */
 .table-container {
@@ -10,7 +10,6 @@
 /* === 统一表格样式 === */
 .data-table {
     width: 100%;
-    min-width: 600px;
     border-collapse: collapse;
     font-size: 0.8rem;
     background: var(--bg-card);
@@ -20,6 +19,7 @@
 .data-table td {
     vertical-align: middle;
     padding: 8px 6px;
+    text-align: left;
 }
 
 .data-table th {
@@ -28,15 +28,6 @@
     color: var(--text-primary);
     border-bottom: 2px solid var(--border-light);
     white-space: nowrap;
-    text-align: left;
-}
-
-.data-table th.text-center {
-    text-align: center;
-}
-
-.data-table th.text-right {
-    text-align: right;
 }
 
 .data-table td {
@@ -47,13 +38,20 @@
     background: var(--bg-hover);
 }
 
-/* ✅ 删除表头最右边的“操作”列 */
-.data-table thead th:last-child.action-column {
-    display: none;
+/* 金额列保持右对齐 */
+.data-table td.text-right,
+.data-table th.text-right {
+    text-align: right;
+}
+
+/* 居中列（状态、日期等短文本） */
+.data-table td.text-center,
+.data-table th.text-center {
+    text-align: center;
 }
 
 /* ===============================
-   ✅ 操作行样式（操作按钮一行显示）
+   操作行样式
    =============================== */
 .action-row td {
     padding: 6px 12px;
@@ -87,58 +85,128 @@
 }
 
 /* ========================================
-   客户信息表格 - 列宽优化
+   客户表格列宽（A4纸打印原则）
    ======================================== */
-.data-table th:nth-child(1),
-.data-table td:nth-child(1) {
-    width: auto;
-    min-width: 80px;
-}
+.customer-table th:nth-child(1),
+.customer-table td:nth-child(1) { width: 80px; min-width: 70px; }
 
-.data-table th:nth-child(2),
-.data-table td:nth-child(2) {
-    width: auto;
-    min-width: 80px;
-}
+.customer-table th:nth-child(2),
+.customer-table td:nth-child(2) { width: 110px; min-width: 90px; }
 
-.data-table th:nth-child(3),
-.data-table td:nth-child(3) {
-    width: auto;
-    min-width: 100px;
-}
+.customer-table th:nth-child(3),
+.customer-table td:nth-child(3) { width: 120px; min-width: 100px; }
 
-.data-table th:nth-child(4),
-.data-table td:nth-child(4) {
-    width: auto;
-    min-width: 90px;
-}
+.customer-table th:nth-child(4),
+.customer-table td:nth-child(4) { width: 100px; min-width: 85px; }
 
-.data-table th:nth-child(5),
-.data-table td:nth-child(5) {
-    width: auto;
-    min-width: 120px;
-    max-width: 200px;
-    word-break: break-word;
-    white-space: normal;
-}
+.customer-table th:nth-child(5),
+.customer-table td:nth-child(5) { width: auto; min-width: 130px; max-width: 200px; word-break: break-word; white-space: normal; }
 
-.data-table th:nth-child(6),
-.data-table td:nth-child(6) {
-    width: auto;
-    min-width: 120px;
-    max-width: 200px;
-    word-break: break-word;
-    white-space: normal;
-}
+.customer-table th:nth-child(6),
+.customer-table td:nth-child(6) { width: auto; min-width: 120px; max-width: 180px; word-break: break-word; white-space: normal; }
 
-.data-table th:nth-child(7),
-.data-table td:nth-child(7) {
-    width: auto;
-    min-width: 90px;
-    white-space: nowrap;
-}
+.customer-table th:nth-child(7),
+.customer-table td:nth-child(7) { width: 85px; min-width: 75px; white-space: nowrap; }
 
-/* 手机端优化 */
+.customer-table th:nth-child(8),
+.customer-table td:nth-child(8) { width: 75px; min-width: 65px; white-space: nowrap; }
+
+/* ========================================
+   订单表格列宽
+   ======================================== */
+.order-table th:nth-child(1),
+.order-table td:nth-child(1) { width: 75px; min-width: 65px; }
+
+.order-table th:nth-child(2),
+.order-table td:nth-child(2) { width: 100px; min-width: 80px; }
+
+.order-table th:nth-child(3),
+.order-table td:nth-child(3) { width: auto; min-width: 100px; max-width: 160px; word-break: break-word; white-space: normal; }
+
+.order-table th:nth-child(4),
+.order-table td:nth-child(4) { width: 90px; min-width: 80px; }
+
+.order-table th:nth-child(5),
+.order-table td:nth-child(5) { width: 85px; min-width: 75px; }
+
+.order-table th:nth-child(6),
+.order-table td:nth-child(6) { width: 70px; min-width: 60px; }
+
+.order-table th:nth-child(7),
+.order-table td:nth-child(7) { width: 80px; min-width: 70px; white-space: nowrap; }
+
+.order-table th:nth-child(8),
+.order-table td:nth-child(8) { width: 65px; min-width: 55px; }
+
+.order-table th:nth-child(9),
+.order-table td:nth-child(9) { width: 65px; min-width: 55px; }
+
+.order-table th:nth-child(10),
+.order-table td:nth-child(10) { width: 70px; min-width: 60px; }
+
+/* ========================================
+   支出表格列宽
+   ======================================== */
+.expense-table th:nth-child(1),
+.expense-table td:nth-child(1) { width: 80px; min-width: 70px; white-space: nowrap; }
+
+.expense-table th:nth-child(2),
+.expense-table td:nth-child(2) { width: 90px; min-width: 75px; }
+
+.expense-table th:nth-child(3),
+.expense-table td:nth-child(3) { width: 90px; min-width: 80px; }
+
+.expense-table th:nth-child(4),
+.expense-table td:nth-child(4) { width: 70px; min-width: 60px; }
+
+.expense-table th:nth-child(5),
+.expense-table td:nth-child(5) { width: auto; min-width: 120px; max-width: 200px; word-break: break-word; white-space: normal; }
+
+.expense-table th:nth-child(6),
+.expense-table td:nth-child(6) { width: 75px; min-width: 65px; }
+
+/* ========================================
+   门店表格列宽
+   ======================================== */
+.store-table th:nth-child(1),
+.store-table td:nth-child(1) { width: 85px; min-width: 75px; }
+
+.store-table th:nth-child(2),
+.store-table td:nth-child(2) { width: 120px; min-width: 100px; }
+
+.store-table th:nth-child(3),
+.store-table td:nth-child(3) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }
+
+.store-table th:nth-child(4),
+.store-table td:nth-child(4) { width: 100px; min-width: 85px; }
+
+.store-table th:nth-child(5),
+.store-table td:nth-child(5) { width: 130px; min-width: 110px; }
+
+.store-table th:nth-child(6),
+.store-table td:nth-child(6) { width: 65px; min-width: 55px; }
+
+/* ========================================
+   用户表格列宽
+   ======================================== */
+.user-table th:nth-child(1),
+.user-table td:nth-child(1) { width: 150px; min-width: 130px; }
+
+.user-table th:nth-child(2),
+.user-table td:nth-child(2) { width: 120px; min-width: 100px; }
+
+.user-table th:nth-child(3),
+.user-table td:nth-child(3) { width: 80px; min-width: 65px; }
+
+.user-table th:nth-child(4),
+.user-table td:nth-child(4) { width: 130px; min-width: 110px; }
+
+.user-table th:nth-child(5),
+.user-table td:nth-child(5) { width: 90px; min-width: 80px; white-space: nowrap; }
+
+/* ===============================
+   手机端优化
+   =============================== */
 @media (max-width: 768px) {
     .data-table {
         min-width: unset;
