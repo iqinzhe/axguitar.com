@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.5（移除重复的 escapeAttr 定义）
+// app-dashboard-orders.js - v1.6（操作行改用 Utils.renderActionRow 统一方法）
 
 window.APP = window.APP || {};
 
@@ -7,7 +7,7 @@ showOrderTable: async function() {
     this.currentPage = 'orderTable';
     this.saveCurrentPageState();
     var lang = Utils.lang;
-    var t = (key) => Utils.t(key);
+    var t = function(key) { return Utils.t(key); };
     var profile = await SUPABASE.getCurrentProfile();
     var isAdmin = profile?.role === 'admin';
     try {
@@ -17,9 +17,10 @@ showOrderTable: async function() {
         
         var stores = await SUPABASE.getAllStores();
         var storeMap = {};
-        for (var s of stores) storeMap[s.id] = s.name;
+        for (var i = 0; i < stores.length; i++) {
+            storeMap[stores[i].id] = stores[i].name;
+        }
 
-        // 基础列: 订单号, 客户姓名, 质押物, 贷款金额, 月利息, 已付利息, 到期日, 还款方式, 状态 = 9列
         var baseCols = 9;
         var totalCols = isAdmin ? baseCols + 1 : baseCols;
         
@@ -54,16 +55,23 @@ showOrderTable: async function() {
                     '<td class="text-center">' + repaymentBadge + '<\/td>' +
                     '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span><\/td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '<\/td>' : '') +
-                '</tr>' +
-                '<tr class="action-row">' +
-                    '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '<\/td>' +
-                    '<td colspan="' + totalCols + '" class="action-btns">' +
-                        (o.status === 'active' && !isAdmin ? '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💰 ' + (lang === 'id' ? 'Bayar' : '缴费') + '</button>' : '') +
-                        '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>' +
-                        '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">🖨️ ' + t('print') + '</button>' +
-                        (PERMISSION.canDeleteOrder() ? '<button onclick="APP.deleteOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>' : '') +
-                    '<\/td>' +
-                '</tr>';
+                '<\/tr>';
+                
+                // 使用统一方法渲染操作行
+                var actionButtons = '';
+                if (o.status === 'active' && !isAdmin) {
+                    actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💰 ' + (lang === 'id' ? 'Bayar' : '缴费') + '</button>';
+                }
+                actionButtons += '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>';
+                actionButtons += '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">🖨️ ' + t('print') + '</button>';
+                if (PERMISSION.canDeleteOrder()) {
+                    actionButtons += '<button onclick="APP.deleteOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
+                }
+                
+                rows += Utils.renderActionRow({
+                    colspan: totalCols,
+                    buttonsHtml: actionButtons
+                });
             }
         }
 
@@ -176,7 +184,7 @@ showOrderTable: async function() {
                 return; 
             }
             var lang = Utils.lang;
-            var t = (key) => Utils.t(key);
+            var t = function(key) { return Utils.t(key); };
             var profile = await SUPABASE.getCurrentProfile();
             var isAdmin = profile?.role === 'admin';
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
@@ -461,13 +469,15 @@ showOrderTable: async function() {
                         '<td data-label="' + t('amount') + '" class="text-right">' + Utils.formatCurrency(p.amount) + '<\/td>' +
                         '<td data-label="' + (lang === 'id' ? 'Metode' : '支付方式') + '" class="text-center">' + (methodMap[p.payment_method] || '-') + '<\/td>' +
                         '<td data-label="' + t('description') + '">' + Utils.escapeHtml(p.description || '-') + '<\/td>' +
-                    '</tr>' +
-                    '<tr class="action-row">' +
-                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '<\/td>' +
-                        '<td colspan="8" class="action-btns">' +
-                            '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(p.orders?.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>' +
-                        '<\/td>' +
                     '<\/tr>';
+                    
+                    // 使用统一方法渲染操作行
+                    var actionButtons = '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(p.orders?.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>';
+                    
+                    rows += Utils.renderActionRow({
+                        colspan: 8,
+                        buttonsHtml: actionButtons
+                    });
                 }
             }
 
@@ -511,7 +521,7 @@ showOrderTable: async function() {
     }
 };
 
-// 只保留合并到 window.APP 的代码，不再重复定义 escapeAttr
+// 合并到 window.APP
 for (var key in DashboardOrders) {
     if (typeof DashboardOrders[key] === 'function') {
         window.APP[key] = DashboardOrders[key];
