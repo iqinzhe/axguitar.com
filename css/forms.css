@@ -1,4 +1,4 @@
-/* forms.css - 优化版 v3.0（缩小表单间距） */
+/* forms.css - v3.1（新增地址选项内联布局 + 三列表单支持） */
 
 /* === 表单组件 === */
 .form-group {
@@ -45,8 +45,20 @@
     gap: var(--spacing-2);
 }
 
+/* 电脑端三列布局（新增客户表单使用） */
+@media (min-width: 769px) {
+    .form-grid-three-col {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
 .form-grid .full-width {
     grid-column: span 2;
+}
+
+/* 三列布局中的全宽列 */
+.form-grid-three-col .full-width {
+    grid-column: span 3;
 }
 
 .form-actions {
@@ -63,6 +75,14 @@
     }
     
     .form-grid .full-width {
+        grid-column: span 1;
+    }
+
+    .form-grid-three-col {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid-three-col .full-width {
         grid-column: span 1;
     }
 }
@@ -119,6 +139,24 @@
     gap: 6px;
     font-weight: normal;
     cursor: pointer;
+}
+
+/* ========== 新增：地址选项内联（电脑端不换行） ========== */
+.address-option-inline {
+    display: flex;
+    gap: 24px;
+    flex-wrap: nowrap;
+}
+
+.address-option-inline label {
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .address-option-inline {
+        flex-direction: column;
+        gap: 8px;
+    }
 }
 
 /* 支付方式选项 */
