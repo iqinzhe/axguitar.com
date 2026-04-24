@@ -1,4 +1,4 @@
-// storage.js - v1.6（完全不依赖 Utils.t）
+// storage.js - v1.0（完全不依赖 Utils.t）
 
 const Storage = {
 
