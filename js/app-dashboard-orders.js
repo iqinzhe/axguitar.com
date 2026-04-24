@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.7（订单详情双栏布局 + 移除订单列表打印按钮）
+// app-dashboard-orders.js - v1.0
 
 window.APP = window.APP || {};
 
