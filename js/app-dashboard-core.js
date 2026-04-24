@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.7
+// app-dashboard-core.js - v1.8（经营指标：进行中改为进行中/逾期单）
 
 window.APP = window.APP || {};
 
@@ -9,7 +9,6 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ==================== 页面状态管理 ====================
     saveCurrentPageState: function() {
         sessionStorage.setItem('jf_current_page', this.currentPage);
         sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
@@ -29,7 +28,6 @@ const DashboardCore = {
         this.currentCustomerId = null;
     },
 
-    // ==================== 初始化与路由 ====================
     init: async function() {
         document.getElementById("app").innerHTML = '<div class="loading-container"><div class="loader"></div><p class="loading-text">🔄 Loading system...</p></div>';
         await AUTH.init();
@@ -276,14 +274,13 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 登录认证 ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
         
         Utils.initLanguage();
         var lang = Utils.lang;
-        var t = (key) => Utils.t(key);
+        var t = function(key) { return Utils.t(key); };
         
         document.getElementById("app").innerHTML = '' +
             '<div class="login-container">' +
@@ -330,7 +327,6 @@ const DashboardCore = {
         await this.router();
     },
 
-    // ==================== 保存退出功能 ====================
     logout: async function() {
         var confirmMsg = Utils.t('save_exit_confirm');
         
@@ -454,7 +450,6 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    // ==================== 仪表盘 ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -462,13 +457,12 @@ const DashboardCore = {
         
         try {
             var lang = Utils.lang;
-            var t = (key) => Utils.t(key);
+            var t = function(key) { return Utils.t(key); };
             
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 构建并行查询列表
             const queries = [
                 SUPABASE.getOrders(),
                 SUPABASE.getCashFlowRecords(),
@@ -508,16 +502,13 @@ const DashboardCore = {
                 storeSpecificCashFlows
             ] = await Promise.all(queries);
             
-            // 计算报表
             var report = this._calculateReport(allOrders);
             
-            // 构建门店映射
             var storeMap = {};
-            for (var s of stores) {
-                storeMap[s.id] = s.name;
+            for (var i = 0; i < stores.length; i++) {
+                storeMap[stores[i].id] = stores[i].name;
             }
             
-            // 计算本月新增订单数
             var today = new Date();
             var currentMonth = today.getMonth();
             var currentYear = today.getFullYear();
@@ -529,7 +520,6 @@ const DashboardCore = {
                 }
             }
             
-            // 计算总支出
             var totalExpenses = 0;
             var expenses = expensesResult?.data || expensesResult || [];
             if (Array.isArray(expenses)) {
@@ -538,10 +528,8 @@ const DashboardCore = {
                 }
             }
             
-            // 计算资金流水摘要
             var cashFlow = this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId, storeSpecificCashFlows);
             
-            // 修复：安全处理 flowsToAnalyze
             var flowsToAnalyze = [];
             if (!isAdmin && storeSpecificCashFlows && Array.isArray(storeSpecificCashFlows)) {
                 flowsToAnalyze = storeSpecificCashFlows;
@@ -562,7 +550,6 @@ const DashboardCore = {
             }
             var deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            // 清理过期订单
             var twoYearsAgo = new Date();
             twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
             
@@ -594,16 +581,22 @@ const DashboardCore = {
                 var updatedOrders = allOrders;
             }
             
-            // 计算活跃和已完成订单数
+            // ========== 计算进行中/逾期单数 ==========
             var activeOrdersCount = 0;
+            var overdueOrdersCount = 0;
             var completedOrdersCount = 0;
             for (var i = 0; i < updatedOrders.length; i++) {
-                if (updatedOrders[i].status === 'active') activeOrdersCount++;
-                else if (updatedOrders[i].status === 'completed') completedOrdersCount++;
+                if (updatedOrders[i].status === 'active') {
+                    activeOrdersCount++;
+                    if ((updatedOrders[i].overdue_days || 0) > 0) {
+                        overdueOrdersCount++;
+                    }
+                } else if (updatedOrders[i].status === 'completed') {
+                    completedOrdersCount++;
+                }
             }
             var expiredCount = expiredOrders.length;
             
-            // 渲染仪表盘
             var storeName = AUTH.getCurrentStoreName();
             var hasReminders = needRemindOrders.length > 0;
             var hasSentToday = false;
@@ -616,10 +609,15 @@ const DashboardCore = {
             var btnHighlight = hasReminders && !hasSentToday;
             
             // 卡片数据
+            var activeDisplay = activeOrdersCount;
+            if (overdueOrdersCount > 0) {
+                activeDisplay = activeOrdersCount + ' / ' + (lang === 'id' ? '⚠️ ' : '⚠️ ') + overdueOrdersCount;
+            }
+            
             var cards = [
                 { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, type: 'text' },
                 { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
-                { label: t('active'), value: activeOrdersCount, type: 'number' },
+                { label: lang === 'id' ? 'Berjalan / Jatuh Tempo' : '进行中 / 逾期单', value: activeDisplay, type: 'text' },
                 { label: (lang === 'id' ? 'Lunas' : '已结清') + ' / ' + (lang === 'id' ? 'Kedaluwarsa' : '已失效'), value: completedOrdersCount + ' / ' + expiredCount, type: 'text' },
                 { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
                 { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
@@ -776,8 +774,6 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 辅助方法 ====================
-    
     _calculateReport: function(orders) {
         var totalLoanAmount = 0;
         var totalAdminFees = 0;
@@ -898,7 +894,6 @@ const DashboardCore = {
     }
 };
 
-// 合并到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' && 
         key !== 'showExpenses' && key !== 'showOrderTable' && key !== 'showReport' && 
