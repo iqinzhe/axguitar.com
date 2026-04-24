@@ -1,4 +1,4 @@
-// utils.js - v1.8（新增管理费/服务费计算 + 双语翻译补充）
+// utils.js - v1.9（底部提示文字双语翻译）
 
 const Utils = {
     lang: 'id',
@@ -30,7 +30,6 @@ const Utils = {
         return loanAmount * (percent / 100);
     },
 
-    // ========== 新增：管理费计算 ==========
     calculateAdminFee: function(loanAmount) {
         var amount = loanAmount || 0;
         if (amount <= 50000) {
@@ -45,7 +44,6 @@ const Utils = {
         }
     },
 
-    // ========== 新增：服务费计算（返回百分比和金额） ==========
     calculateServiceFeeNew: function(loanAmount) {
         var amount = loanAmount || 0;
         if (amount <= 3999999) {
@@ -59,12 +57,10 @@ const Utils = {
         }
     },
 
-    // ========== 新增：固定还款月供取整 ==========
     roundMonthlyPayment: function(payment) {
         return Math.round(payment / 10000) * 10000;
     },
 
-    // ========== 新增：利息选项 ==========
     getInterestRateOptions: function(selectedRate) {
         if (selectedRate === undefined) selectedRate = 10;
         var rates = [10, 9.5, 9.0, 8.5, 8.0];
@@ -76,7 +72,6 @@ const Utils = {
         return html;
     },
 
-    // ========== 新增：服务费百分比选项 ==========
     getServiceFeePercentOptions: function(selectedPercent) {
         if (selectedPercent === undefined) selectedPercent = 2;
         var percents = [0, 1, 2, 3, 4];
@@ -88,7 +83,6 @@ const Utils = {
         return html;
     },
 
-    // ========== 新增：固定还款档期选项 ==========
     getRepaymentTermOptions: function(selectedTerm) {
         if (selectedTerm === undefined) selectedTerm = 5;
         var lang = this.lang;
@@ -274,7 +268,12 @@ const Utils = {
             monthly_installment: "Angsuran Bulanan",
             term_period: "Jangka Waktu",
             rounded_to: "Dibulatkan ke Rp 10.000",
-            manual_adjust: "Dapat disesuaikan manual"
+            manual_adjust: "Dapat disesuaikan manual",
+            more_pawn_higher_fee: "Semakin besar gadai, semakin tinggi biaya. Semakin lama jangka, semakin tinggi biaya.",
+            contract_pay_info: "Tanda tangan kontrak: Admin Fee & Service Fee. Bunga dibayar sesuai kesepakatan.",
+            order_saved_locked: "Pesanan yang sudah disimpan tidak dapat diubah.",
+            store_manager_title: "Manajer Toko",
+            headquarter: "Kantor Pusat"
         },
         zh: {
             login: "登录",
@@ -425,7 +424,12 @@ const Utils = {
             monthly_installment: "每月还款",
             term_period: "还款期限",
             rounded_to: "取整到 Rp 10,000",
-            manual_adjust: "可手动调整"
+            manual_adjust: "可手动调整",
+            more_pawn_higher_fee: "当金越多，费用越贵，当期越长，费用越贵",
+            contract_pay_info: "签合同支付：管理费和服务费。利息按约定支付。",
+            order_saved_locked: "已保存的订单不可修改。",
+            store_manager_title: "店长",
+            headquarter: "总部"
         }
     },
 
