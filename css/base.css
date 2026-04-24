@@ -1,4 +1,4 @@
-/* base.css - 完整优化版 v2.0 */
+/* base.css - 完整优化版 v3.0（优化打印样式） */
 
 /* === 全局变量 - 统一配色方案 === */
 :root {
@@ -63,12 +63,12 @@
     
     /* 字体大小（基准16px） */
     --font-xxs: 0.7rem;
-    --font-xs: 0.8rem;
-    --font-sm: 0.9rem;
-    --font-md: 1rem;
-    --font-lg: 1.125rem;
-    --font-xl: 1.25rem;
-    --font-2xl: 1.35rem;
+    --font-xs: 0.75rem;
+    --font-sm: 0.85rem;
+    --font-md: 0.95rem;
+    --font-lg: 1.05rem;
+    --font-xl: 1.15rem;
+    --font-2xl: 1.25rem;
 }
 
 /* === 重置与基础 === */
@@ -93,17 +93,7 @@ body {
 /* ========== PC端（≥769px）适度放大 ========== */
 @media (min-width: 769px) {
     html {
-        font-size: 17px;
-    }
-    
-    :root {
-        --font-xxs: 0.75rem;
-        --font-xs: 0.85rem;
-        --font-sm: 0.95rem;
-        --font-md: 1.05rem;
-        --font-lg: 1.2rem;
-        --font-xl: 1.35rem;
-        --font-2xl: 1.5rem;
+        font-size: 16px;
     }
     
     button, .btn-small, .btn-action {
@@ -115,31 +105,23 @@ body {
     }
     
     .stat-value {
-        font-size: var(--font-xl);
+        font-size: var(--font-lg);
     }
     
     .stat-label {
-        font-size: var(--font-xs);
+        font-size: var(--font-xxs);
     }
     
     .page-header h1, .page-header h2 {
-        font-size: var(--font-xl);
+        font-size: var(--font-lg);
     }
     
     .card h3 {
-        font-size: var(--font-lg);
+        font-size: var(--font-md);
     }
     
     .toolbar button {
         font-size: var(--font-xs);
-    }
-    
-    .modal-content {
-        font-size: var(--font-md);
-    }
-    
-    .login-box {
-        font-size: var(--font-md);
     }
     
     .cashflow-summary .value {
@@ -157,53 +139,35 @@ body {
     .form-group input,
     .form-group select,
     .form-group textarea {
-        font-size: var(--font-md);
-    }
-    
-    .amount-highlight, .monthly-payment-display {
-        font-size: var(--font-xl);
+        font-size: var(--font-sm);
     }
 }
 
-/* ========== 手机端（≤768px）适度放大 ========== */
+/* ========== 手机端（≤768px） ========== */
 @media (max-width: 768px) {
     html {
-        font-size: 15px;
-    }
-    
-    :root {
-        --font-xxs: 0.7rem;
-        --font-xs: 0.75rem;
-        --font-sm: 0.85rem;
-        --font-md: 0.95rem;
-        --font-lg: 1.05rem;
-        --font-xl: 1.15rem;
-        --font-2xl: 1.25rem;
+        font-size: 14px;
     }
     
     button, .btn-small, .btn-action {
-        font-size: var(--font-xs);
-        padding: 8px 14px;
+        font-size: var(--font-xxs);
+        padding: 6px 10px;
     }
     
     .data-table td, .data-table th {
-        font-size: var(--font-sm);
+        font-size: 0.7rem;
     }
     
     .stat-value {
-        font-size: var(--font-md);
-    }
-    
-    .stat-label {
-        font-size: var(--font-xxs);
+        font-size: var(--font-sm);
     }
     
     .page-header h1, .page-header h2 {
-        font-size: var(--font-lg);
+        font-size: var(--font-md);
     }
     
     .card h3 {
-        font-size: var(--font-md);
+        font-size: var(--font-sm);
     }
     
     .toolbar button {
@@ -214,23 +178,14 @@ body {
         font-size: var(--font-md);
     }
     
-    .cashflow-summary .label {
-        font-size: var(--font-xs);
-    }
-    
     .form-group label {
-        font-size: var(--font-xs);
+        font-size: var(--font-xxs);
     }
     
     .form-group input,
     .form-group select,
     .form-group textarea {
-        font-size: var(--font-sm);
-    }
-    
-    .action-cell .btn-small {
-        padding: 6px 12px;
-        min-width: 65px;
+        font-size: var(--font-xs);
     }
 }
 
@@ -248,22 +203,9 @@ h1 img,
     vertical-align: middle;
 }
 
-@media (max-width: 480px) {
-    h1 img,
-    .page-header h1 img {
-        height: 1.6em;
-    }
-}
-
 /* === 布局容器 === */
-/*
- * A4横向纸：297mm × 210mm
- * 96dpi下：297mm = 1122px，210mm = 793px
- * 扣除浏览器左右滚动条及系统边距，内容区约 1122px
- * 打印缩放100%时完全1:1对应A4横向纸张
- */
 #app {
-    max-width: 1122px; /* A4横向宽度 297mm @ 96dpi */
+    max-width: 1400px;
     margin: 0 auto;
     padding: var(--spacing-4);
     background: var(--bg-page);
@@ -271,12 +213,12 @@ h1 img,
 
 @media (min-width: 769px) {
     #app {
-        padding: 10mm 12mm; /* 接近打印边距，屏幕与打印一致 */
+        padding: 12px 16px;
     }
 }
 
 .container {
-    max-width: 1098px; /* A4横向内容宽度（扣除边距）*/
+    max-width: 1200px;
     margin: 0 auto;
     padding: 0 var(--spacing-4);
 }
@@ -294,7 +236,7 @@ h1 img,
 .page-header h1,
 .page-header h2 {
     margin: 0;
-    font-size: var(--font-xl);
+    font-size: var(--font-lg);
     font-weight: 600;
     color: var(--text-primary);
 }
@@ -333,7 +275,7 @@ h1 img,
 }
 
 .modal-content h3 {
-    font-size: var(--font-lg);
+    font-size: var(--font-md);
     margin-bottom: var(--spacing-4);
     color: var(--text-primary);
 }
@@ -447,13 +389,6 @@ h1 img,
     text-align: center;
 }
 
-@media (max-width: 400px) {
-    .login-title {
-        font-size: 1.1rem;
-        gap: 4px;
-    }
-}
-
 /* === 加载动画 === */
 .loading-container {
     display: flex;
@@ -552,63 +487,111 @@ h1 img,
 .expense { color: var(--danger); }
 
 /* ========================================
-   打印样式 - A4横向 所见即所得
+   打印样式 - 优化版
    ======================================== */
 @media print {
     @page {
         size: A4 landscape;
-        margin: 10mm 12mm;
+        margin: 6mm 8mm;
     }
 
     body {
         background: #fff !important;
         color: #000 !important;
-        font-size: 10pt !important;
-    }
-
-    #app {
-        max-width: 100% !important;
-        padding: 0 !important;
-        background: #fff !important;
+        font-size: 9pt !important;
     }
 
     /* 隐藏不需要打印的元素 */
+    .page-header .header-actions,
     .toolbar,
     .btn-print,
     .btn-back,
     .btn-export,
-    .header-actions,
-    .lang-btn,
+    .btn-balance,
+    .btn-detail,
+    .lang-toggle,
+    .transfer-buttons,
+    .action-row,
     .modal-overlay,
-    button:not(.print-visible) {
+    button:not(.print-visible),
+    .no-print {
         display: none !important;
     }
 
-    /* 卡片在打印时去掉阴影 */
+    /* 保留页面标题但移除装饰线 */
+    .page-header h1,
+    .page-header h2,
+    .card h3 {
+        border-bottom: none !important;
+        text-decoration: none !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* 移除所有分割线和边框装饰 */
+    hr, .divider, .border-bottom {
+        display: none !important;
+    }
+
+    /* 主内容区域 */
+    #app {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #fff !important;
+    }
+
+    /* 卡片打印优化 */
     .card,
     .cashflow-summary,
     .stat-card {
         box-shadow: none !important;
         border: 1px solid #ccc !important;
         break-inside: avoid;
+        margin-bottom: 6px !important;
+        padding: 6px 8px !important;
     }
 
     /* 表格打印优化 */
     .data-table {
-        min-width: unset !important;
         width: 100% !important;
-        font-size: 9pt !important;
+        font-size: 8pt !important;
+        border-collapse: collapse !important;
+    }
+
+    .data-table th,
+    .data-table td {
+        border: 1px solid #999 !important;
+        padding: 3px 4px !important;
     }
 
     .data-table th {
         background: #f0f0f0 !important;
-        color: #000 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
 
-    .table-container {
-        overflow: visible !important;
+    /* 统计卡片 */
+    .stats-grid-optimized,
+    .stats-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .stat-card {
+        border: 1px solid #ccc !important;
+        padding: 6px !important;
+        min-width: 100px;
+    }
+
+    /* 底部边距优化 */
+    .footer,
+    .print-footer,
+    .dashboard-footer-card {
+        margin-top: 4px !important;
+        padding-top: 4px !important;
+        font-size: 7pt !important;
+        border-top: none !important;
     }
 
     /* 分页控制 */
