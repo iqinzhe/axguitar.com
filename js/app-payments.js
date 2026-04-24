@@ -1,10 +1,12 @@
-// app-payments.js - v1.5（移除重复的 escapeAttr 定义）
+// app-payments.js - v1.6（修复：lang 变量作用域提升到 try 块外部）
 
 window.APP = window.APP || {};
 
 const PaymentsModule = {
 
     showPayment: async function(orderId) {
+        var lang = Utils.lang;
+
         const profile = await SUPABASE.getCurrentProfile();
 
         if (!profile) {
@@ -46,7 +48,6 @@ const PaymentsModule = {
             var result = await SUPABASE.getPaymentHistory(orderId);
             var payments = result.payments;
 
-            var lang = Utils.lang;
             var t = Utils.t.bind(Utils);
             
             var loanAmount = order.loan_amount || 0;
@@ -585,7 +586,7 @@ const PaymentsModule = {
     }
 };
 
-// 只保留合并到 window.APP 的代码，不再重复定义 escapeAttr
+// 合并到 window.APP
 for (var key in PaymentsModule) {
     if (typeof PaymentsModule[key] === 'function') window.APP[key] = PaymentsModule[key];
 }
