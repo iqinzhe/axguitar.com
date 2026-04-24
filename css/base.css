@@ -487,12 +487,12 @@ h1 img,
 .expense { color: var(--danger); }
 
 /* ========================================
-   打印样式 - 优化版
+   打印样式 - 优化版 v2.0
    ======================================== */
 @media print {
     @page {
         size: A4 landscape;
-        margin: 6mm 8mm;
+        margin: 5mm 8mm;
     }
 
     body {
@@ -518,7 +518,117 @@ h1 img,
         display: none !important;
     }
 
-    /* 保留页面标题但移除装饰线 */
+    /* 强制避免不必要的分页 */
+    .card, 
+    .cashflow-summary, 
+    .anomaly-card,
+    .anomaly-grid,
+    .payment-double-column,
+    .action-card,
+    .dashboard-footer-card {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    /* 订单列表允许分页（正常） */
+    .order-table,
+    .data-table {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    /* 统计卡片 - 多列横向排列 */
+    .stats-grid-optimized,
+    .stats-grid {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        justify-content: flex-start !important;
+    }
+
+    .stat-card {
+        flex: 1 1 auto !important;
+        min-width: 110px !important;
+        border: 1px solid #ccc !important;
+        padding: 4px 6px !important;
+        text-align: left !important;
+        break-inside: avoid !important;
+    }
+
+    .stat-card .stat-value {
+        font-size: 10pt !important;
+        font-weight: 600 !important;
+        text-align: left !important;
+    }
+
+    .stat-card .stat-label {
+        font-size: 7pt !important;
+        text-align: left !important;
+    }
+
+    /* 异常状况页面 - 2列布局，不分页 */
+    .anomaly-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+
+    .anomaly-card {
+        break-inside: avoid !important;
+    }
+
+    /* 现金流卡片 - 3列等宽 */
+    .cashflow-stats {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+
+    .cashflow-item {
+        flex: 1 !important;
+        min-width: 130px !important;
+        text-align: left !important;
+        padding: 6px !important;
+    }
+
+    /* 统一所有列为左对齐 */
+    .data-table th,
+    .data-table td,
+    table th,
+    table td,
+    .stat-card .stat-value,
+    .stat-card .stat-label,
+    .cashflow-item .label,
+    .cashflow-item .value,
+    .summary-item .label,
+    .summary-item .value,
+    .anomaly-card-header h3,
+    .anomaly-card-body,
+    .anomaly-table th,
+    .anomaly-table td,
+    .store-item,
+    .ranking-item {
+        text-align: left !important;
+    }
+
+    /* 金额数字保持右对齐（符合财务习惯） */
+    .text-right,
+    .data-table td.text-right,
+    .anomaly-table td.text-right,
+    .cashflow-item .value {
+        text-align: right !important;
+    }
+
+    /* 强制移除所有居中 */
+    .text-center,
+    .data-table th.text-center,
+    .data-table td.text-center,
+    .anomaly-table th.text-center,
+    .anomaly-table td.text-center {
+        text-align: left !important;
+    }
+
+    /* 页面标题去除装饰 */
     .page-header h1,
     .page-header h2,
     .card h3 {
@@ -527,61 +637,41 @@ h1 img,
         margin-bottom: 4px !important;
     }
 
-    /* 移除所有分割线和边框装饰 */
-    hr, .divider, .border-bottom {
-        display: none !important;
-    }
-
     /* 主内容区域 */
     #app {
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
-        background: #fff !important;
     }
 
-    /* 卡片打印优化 */
+    /* 卡片样式 */
     .card,
-    .cashflow-summary,
-    .stat-card {
+    .cashflow-summary {
         box-shadow: none !important;
         border: 1px solid #ccc !important;
-        break-inside: avoid;
         margin-bottom: 6px !important;
         padding: 6px 8px !important;
     }
 
-    /* 表格打印优化 */
+    /* 表格列宽优化 */
     .data-table {
         width: 100% !important;
         font-size: 8pt !important;
         border-collapse: collapse !important;
+        table-layout: auto !important;
     }
 
     .data-table th,
     .data-table td {
         border: 1px solid #999 !important;
-        padding: 3px 4px !important;
+        padding: 4px 6px !important;
+        white-space: normal !important;
+        word-break: break-word !important;
     }
 
     .data-table th {
         background: #f0f0f0 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-
-    /* 统计卡片 */
-    .stats-grid-optimized,
-    .stats-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .stat-card {
-        border: 1px solid #ccc !important;
-        padding: 6px !important;
-        min-width: 100px;
+        font-weight: 600 !important;
     }
 
     /* 底部边距优化 */
