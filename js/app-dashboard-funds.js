@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.1（模板字符串改为字符串拼接，统一风格）
+// app-dashboard-funds.js - v1.0
 
 window.APP = window.APP || {};
 
