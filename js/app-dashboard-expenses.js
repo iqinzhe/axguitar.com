@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.0
+// app-dashboard-expenses.js - v1.8（操作按钮移入数据行，取消操作行）
 
 window.APP = window.APP || {};
 
@@ -13,17 +13,16 @@ const DashboardExpenses = {
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
-            // 获取所有门店信息
             const storesData = await SUPABASE.getAllStores();
             const storeMap = {};
             for (var i = 0; i < storesData.length; i++) {
                 storeMap[storesData[i].id] = storesData[i].name;
             }
             
-            let finalExpenses = [];
+            var finalExpenses = [];
             
             try {
-                let query = supabaseClient
+                var query = supabaseClient
                     .from('expenses')
                     .select('*')
                     .order('expense_date', { ascending: false });
@@ -47,7 +46,8 @@ const DashboardExpenses = {
             }
             var todayDate = new Date().toISOString().split('T')[0];
 
-            var totalCols = isAdmin ? 6 : 5;
+            // 总列数：日期、类别、金额、支付方式、描述、(门店)、(操作)
+            var totalCols = isAdmin ? 7 : 6;
             
             var rows = '';
             if (finalExpenses.length === 0) {
@@ -57,10 +57,24 @@ const DashboardExpenses = {
                     var e = finalExpenses[i];
                     var canEdit = isAdmin && !e.is_reconciled;
                     var methodText = (e.payment_method === 'cash') ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
-                    
                     var storeName = storeMap[e.store_id] || e.store_id || '-';
                     
-                    // 数据行
+                    // 构建操作按钮
+                    var actionHtml = '';
+                    if (canEdit) {
+                        actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button> ';
+                        actionHtml += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button>';
+                    } else if (e.is_reconciled) {
+                        actionHtml += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '</span>';
+                    } else if (!isAdmin) {
+                        actionHtml += '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
+                    }
+                    
+                    // 平账按钮
+                    if (isAdmin && !e.is_reconciled) {
+                        actionHtml += ' <button onclick="APP.balanceExpenses()" class="btn-small btn-balance">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
+                    }
+                    
                     rows += '<tr>' +
                         '<td class="date-cell">' + Utils.formatDate(e.expense_date) + '<\/td>' +
                         '<td class="expense-category">' + Utils.escapeHtml(e.category) + '<\/td>' +
@@ -68,29 +82,8 @@ const DashboardExpenses = {
                         '<td class="text-center">' + methodText + '<\/td>' +
                         '<td class="expense-desc">' + Utils.escapeHtml(e.description || '-') + '<\/td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '<\/td>' : '') +
+                        '<td class="text-center action-cell">' + actionHtml + '<\/td>' +
                     '<\/tr>';
-                    
-                    // 构建操作按钮
-                    var actionButtons = '';
-                    
-                    if (canEdit) {
-                        actionButtons += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
-                        actionButtons += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button>';
-                    }
-                    
-                    // 平账按钮（仅在管理员且未平账时显示）
-                    if (isAdmin && !e.is_reconciled) {
-                        actionButtons += '<button onclick="APP.balanceExpenses()" class="btn-small btn-balance">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
-                    }
-                    
-                    // 使用通用操作行渲染
-                    rows += Utils.renderActionRow({
-                        colspan: totalCols,
-                        buttonsHtml: actionButtons,
-                        isAdmin: isAdmin,
-                        isReconciled: e.is_reconciled,
-                        isLocked: !isAdmin && !e.is_reconciled
-                    });
                 }
             }
 
@@ -126,6 +119,7 @@ const DashboardExpenses = {
                                     '<th class="text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th>' + (lang === 'id' ? 'Deskripsi' : '描述') + '</th>' +
                                     (isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
+                                    '<th class="text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
@@ -161,13 +155,15 @@ const DashboardExpenses = {
                 '<style>' +
                     '.expense-table .date-cell { white-space: nowrap; }' +
                     '.expense-table .expense-category { font-weight: 500; }' +
-                    '.expense-table .expense-desc { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }' +
+                    '.expense-table .expense-desc { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }' +
+                    '.expense-table .action-cell { white-space: nowrap; }' +
+                    '.expense-table .action-cell .btn-small { margin: 1px 2px; }' +
                     '.reconciled-badge, .locked-badge { display: inline-block; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; }' +
                     '.reconciled-badge { background: #ecfdf5; color: #065f46; }' +
                     '.locked-badge { background: #f1f5f9; color: #64748b; }' +
                     '.btn-balance { background: #f59e0b !important; color: white !important; }' +
                     '.btn-balance:hover { background: #d97706 !important; }' +
-                    '@media (max-width: 768px) { .expense-table .expense-desc { max-width: 120px; } .expense-table th, .expense-table td { padding: 6px 4px; font-size: 0.7rem; } }' +
+                    '@media (max-width: 768px) { .expense-table .expense-desc { max-width: 100px; } .expense-table th, .expense-table td { padding: 6px 4px; font-size: 0.7rem; } }' +
                 '</style>';
             
             document.getElementById("app").innerHTML = pageHtml;
@@ -253,7 +249,6 @@ const DashboardExpenses = {
         }
     },
 
-    // ==================== 平账功能 ====================
     balanceExpenses: async function() {
         var lang = Utils.lang;
         var profile = null;
