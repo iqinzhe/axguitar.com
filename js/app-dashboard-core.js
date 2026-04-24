@@ -725,7 +725,7 @@ const DashboardCore = {
                 '<div class="toolbar admin-grid">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
                     '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'paymentHistory\')">💰 ' + t('payment_history') + '</button>' +
+                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
                     '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
                     '<button onclick="APP.navigateTo(\'backupRestore\')">💾 ' + t('backup_restore') + '</button>' +
                     '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
