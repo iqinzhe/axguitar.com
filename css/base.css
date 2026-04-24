@@ -1,8 +1,8 @@
-/* base.css - 完整优化版 v1.0（优化打印样式） */
+/* base.css - v4.0（字体加大 + 配色优化） */
 
 /* === 全局变量 - 统一配色方案 === */
 :root {
-    /* 主色调 - 保持品牌色 */
+    /* 主色调 */
     --primary: #2563eb;
     --primary-light: #60a5fa;
     --primary-soft: #dbeafe;
@@ -19,17 +19,17 @@
     --danger-dark: #dc2626;
     --danger-light: #fef2f2;
     
-    /* 统一背景色系 */
-    --bg-page: #f1f5f9;
+    /* 背景色系 */
+    --bg-page: #f8fafc;
     --bg-card: #ffffff;
     --bg-highlight: #f0f9ff;
-    --bg-hover: #f8fafc;
-    --bg-modal: rgba(0, 0, 0, 0.5);
+    --bg-hover: #f1f5f9;
+    --bg-modal: rgba(15, 23, 42, 0.5);
     
-    /* 统一文字色系 */
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
+    /* 文字色系 */
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
     --text-white: #ffffff;
     
     /* 边框色 */
@@ -38,8 +38,8 @@
     
     /* 阴影 */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.08);
+    --shadow-lg: 0 4px 8px -1px rgb(0 0 0 / 0.1);
     
     /* 圆角 */
     --radius-sm: 6px;
@@ -61,14 +61,14 @@
     /* 过渡 */
     --transition: all 0.2s ease;
     
-    /* 字体大小（基准16px） */
-    --font-xxs: 0.7rem;
-    --font-xs: 0.75rem;
-    --font-sm: 0.85rem;
-    --font-md: 0.95rem;
-    --font-lg: 1.05rem;
-    --font-xl: 1.15rem;
-    --font-2xl: 1.25rem;
+    /* 字体大小（整体加大） */
+    --font-xxs: 0.75rem;
+    --font-xs: 0.8rem;
+    --font-sm: 0.9rem;
+    --font-md: 1rem;
+    --font-lg: 1.1rem;
+    --font-xl: 1.25rem;
+    --font-2xl: 1.35rem;
 }
 
 /* === 重置与基础 === */
@@ -87,17 +87,17 @@ body {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
     background: var(--bg-page);
     color: var(--text-primary);
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
-/* ========== PC端（≥769px）适度放大 ========== */
+/* ========== PC端（≥769px）======= */
 @media (min-width: 769px) {
     html {
-        font-size: 16px;
+        font-size: 17px;
     }
     
     button, .btn-small, .btn-action {
-        font-size: var(--font-xs);
+        font-size: var(--font-sm);
     }
     
     .data-table td, .data-table th {
@@ -109,11 +109,11 @@ body {
     }
     
     .stat-label {
-        font-size: var(--font-xxs);
+        font-size: var(--font-xs);
     }
     
     .page-header h1, .page-header h2 {
-        font-size: var(--font-lg);
+        font-size: var(--font-xl);
     }
     
     .card h3 {
@@ -121,11 +121,11 @@ body {
     }
     
     .toolbar button {
-        font-size: var(--font-xs);
+        font-size: var(--font-sm);
     }
     
     .cashflow-summary .value {
-        font-size: var(--font-lg);
+        font-size: var(--font-xl);
     }
     
     .cashflow-summary .label {
@@ -139,53 +139,53 @@ body {
     .form-group input,
     .form-group select,
     .form-group textarea {
-        font-size: var(--font-sm);
+        font-size: var(--font-md);
     }
 }
 
-/* ========== 手机端（≤768px） ========== */
+/* ========== 手机端（≤768px）======= */
 @media (max-width: 768px) {
     html {
-        font-size: 14px;
+        font-size: 15px;
     }
     
     button, .btn-small, .btn-action {
-        font-size: var(--font-xxs);
-        padding: 6px 10px;
+        font-size: var(--font-xs);
+        padding: 8px 14px;
     }
     
     .data-table td, .data-table th {
-        font-size: 0.7rem;
+        font-size: var(--font-xs);
     }
     
     .stat-value {
-        font-size: var(--font-sm);
+        font-size: var(--font-md);
     }
     
     .page-header h1, .page-header h2 {
-        font-size: var(--font-md);
+        font-size: var(--font-lg);
     }
     
     .card h3 {
-        font-size: var(--font-sm);
-    }
-    
-    .toolbar button {
-        font-size: var(--font-xxs);
-    }
-    
-    .cashflow-summary .value {
         font-size: var(--font-md);
     }
     
+    .toolbar button {
+        font-size: var(--font-xs);
+    }
+    
+    .cashflow-summary .value {
+        font-size: var(--font-lg);
+    }
+    
     .form-group label {
-        font-size: var(--font-xxs);
+        font-size: var(--font-xs);
     }
     
     .form-group input,
     .form-group select,
     .form-group textarea {
-        font-size: var(--font-xs);
+        font-size: var(--font-sm);
     }
 }
 
@@ -213,7 +213,7 @@ h1 img,
 
 @media (min-width: 769px) {
     #app {
-        padding: 12px 16px;
+        padding: var(--spacing-3) var(--spacing-4);
     }
 }
 
@@ -228,15 +228,15 @@ h1 img,
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-4);
+    margin-bottom: var(--spacing-3);
     flex-wrap: wrap;
-    gap: var(--spacing-3);
+    gap: var(--spacing-2);
 }
 
 .page-header h1,
 .page-header h2 {
     margin: 0;
-    font-size: var(--font-lg);
+    font-size: var(--font-xl);
     font-weight: 600;
     color: var(--text-primary);
 }
@@ -266,17 +266,18 @@ h1 img,
 .modal-content {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-5);
+    padding: var(--spacing-4);
     width: 100%;
     max-width: 550px;
     max-height: 85vh;
     overflow-y: auto;
     box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-medium);
 }
 
 .modal-content h3 {
-    font-size: var(--font-md);
-    margin-bottom: var(--spacing-4);
+    font-size: var(--font-lg);
+    margin-bottom: var(--spacing-3);
     color: var(--text-primary);
 }
 
@@ -284,7 +285,7 @@ h1 img,
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-3);
-    margin-top: var(--spacing-5);
+    margin-top: var(--spacing-4);
 }
 
 /* === 登录页面 === */
@@ -304,11 +305,11 @@ h1 img,
     padding: 32px 28px;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border-medium);
 }
 
 .login-title {
-    font-size: 1.35rem;
+    font-size: 1.5rem;
     margin-bottom: 28px;
     text-align: center;
     display: flex;
@@ -326,8 +327,8 @@ h1 img,
 
 .lang-btn {
     background: transparent;
-    color: var(--primary);
-    border: 1px solid var(--border-light);
+    color: var(--primary-dark);
+    border: 1px solid var(--border-medium);
     padding: 6px 14px;
     font-size: var(--font-sm);
     border-radius: var(--radius-md);
@@ -353,24 +354,26 @@ h1 img,
 .login-box input {
     width: 100%;
     padding: 12px 14px;
-    font-size: 1rem;
+    font-size: var(--font-md);
     border-radius: var(--radius-md);
     border: 1px solid var(--border-medium);
     transition: var(--transition);
+    color: var(--text-primary);
+    background: var(--bg-card);
 }
 
 .login-box input:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .login-box button {
     width: 100%;
     padding: 12px;
-    font-size: 1rem;
+    font-size: var(--font-md);
     font-weight: 600;
-    background: var(--primary);
+    background: var(--primary-dark);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -378,7 +381,7 @@ h1 img,
 }
 
 .login-box button:hover {
-    background: var(--primary-dark);
+    background: var(--primary);
     transform: translateY(-1px);
 }
 
@@ -432,33 +435,33 @@ h1 img,
     max-width: 400px;
     background: var(--bg-card);
     border-radius: var(--radius-xl);
-    padding: var(--spacing-8);
+    padding: var(--spacing-6);
     text-align: center;
     box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border-medium);
 }
 
 .error-icon {
     font-size: var(--font-2xl);
-    margin-bottom: var(--spacing-4);
+    margin-bottom: var(--spacing-3);
 }
 
 .error-title {
-    color: var(--danger);
+    color: var(--danger-dark);
     margin-bottom: var(--spacing-2);
     font-size: var(--font-lg);
 }
 
 .error-message {
     color: var(--text-secondary);
-    margin-bottom: var(--spacing-5);
+    margin-bottom: var(--spacing-4);
     font-size: var(--font-sm);
 }
 
 .error-btn {
-    background: var(--primary);
+    background: var(--primary-dark);
     color: white;
-    padding: var(--spacing-2) var(--spacing-6);
+    padding: var(--spacing-2) var(--spacing-4);
     border-radius: var(--radius-md);
     cursor: pointer;
     font-size: var(--font-sm);
@@ -470,9 +473,9 @@ h1 img,
 .text-right { text-align: right; }
 .text-left { text-align: left; }
 .text-muted { color: var(--text-muted); }
-.text-warning { color: var(--warning); }
-.text-success { color: var(--success); }
-.text-danger { color: var(--danger); }
+.text-warning { color: var(--warning-dark); }
+.text-success { color: var(--success-dark); }
+.text-danger { color: var(--danger-dark); }
 
 .mt-1 { margin-top: var(--spacing-1); }
 .mt-2 { margin-top: var(--spacing-2); }
@@ -483,11 +486,11 @@ h1 img,
 .mb-3 { margin-bottom: var(--spacing-3); }
 .mb-4 { margin-bottom: var(--spacing-4); }
 
-.income { color: var(--success); }
-.expense { color: var(--danger); }
+.income { color: var(--success-dark); }
+.expense { color: var(--danger-dark); }
 
 /* ========================================
-   打印样式 - 优化版 v2.0
+   打印样式
    ======================================== */
 @media print {
     @page {
@@ -501,7 +504,6 @@ h1 img,
         font-size: 9pt !important;
     }
 
-    /* 隐藏不需要打印的元素 */
     .page-header .header-actions,
     .toolbar,
     .btn-print,
@@ -518,7 +520,6 @@ h1 img,
         display: none !important;
     }
 
-    /* 强制避免不必要的分页 */
     .card, 
     .cashflow-summary, 
     .anomaly-card,
@@ -530,14 +531,12 @@ h1 img,
         page-break-inside: avoid !important;
     }
 
-    /* 订单列表允许分页（正常） */
     .order-table,
     .data-table {
         break-inside: auto !important;
         page-break-inside: auto !important;
     }
 
-    /* 统计卡片 - 多列横向排列 */
     .stats-grid-optimized,
     .stats-grid {
         display: flex !important;
@@ -566,7 +565,6 @@ h1 img,
         text-align: left !important;
     }
 
-    /* 异常状况页面 - 2列布局，不分页 */
     .anomaly-grid {
         display: grid !important;
         grid-template-columns: repeat(2, 1fr) !important;
@@ -577,7 +575,6 @@ h1 img,
         break-inside: avoid !important;
     }
 
-    /* 现金流卡片 - 3列等宽 */
     .cashflow-stats {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -591,7 +588,6 @@ h1 img,
         padding: 6px !important;
     }
 
-    /* 统一所有列为左对齐 */
     .data-table th,
     .data-table td,
     table th,
@@ -611,7 +607,6 @@ h1 img,
         text-align: left !important;
     }
 
-    /* 金额数字保持右对齐（符合财务习惯） */
     .text-right,
     .data-table td.text-right,
     .anomaly-table td.text-right,
@@ -619,7 +614,6 @@ h1 img,
         text-align: right !important;
     }
 
-    /* 强制移除所有居中 */
     .text-center,
     .data-table th.text-center,
     .data-table td.text-center,
@@ -628,7 +622,6 @@ h1 img,
         text-align: left !important;
     }
 
-    /* 页面标题去除装饰 */
     .page-header h1,
     .page-header h2,
     .card h3 {
@@ -637,14 +630,12 @@ h1 img,
         margin-bottom: 4px !important;
     }
 
-    /* 主内容区域 */
     #app {
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
     }
 
-    /* 卡片样式 */
     .card,
     .cashflow-summary {
         box-shadow: none !important;
@@ -653,7 +644,6 @@ h1 img,
         padding: 6px 8px !important;
     }
 
-    /* 表格列宽优化 */
     .data-table {
         width: 100% !important;
         font-size: 8pt !important;
@@ -674,7 +664,6 @@ h1 img,
         font-weight: 600 !important;
     }
 
-    /* 底部边距优化 */
     .footer,
     .print-footer,
     .dashboard-footer-card {
@@ -684,7 +673,6 @@ h1 img,
         border-top: none !important;
     }
 
-    /* 分页控制 */
     .page-break-before { page-break-before: always; }
     .page-break-after  { page-break-after:  always; }
     .no-page-break     { page-break-inside: avoid; }
