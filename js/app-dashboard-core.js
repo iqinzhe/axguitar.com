@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.1（修复管理员资金流水入口）
+// app-dashboard-core.js - v2.2（底部提示文字优化：管理员/门店区分 + 删除门店横幅）
 
 window.APP = window.APP || {};
 
@@ -750,13 +750,29 @@ const DashboardCore = {
                 '</div>';
             }
             
-            var bottomHtml = '' +
+            // ========== 底部卡片：区分管理员和门店 ==========
+            var userRoleText = AUTH.user.role === 'admin' 
+                ? (lang === 'id' ? 'Administrator' : '管理员') 
+                : (lang === 'id' ? 'Manajer Toko' : '店长');
+            
+            var bottomHtml = '';
+            if (isAdmin) {
+                bottomHtml = '' +
 '<div class="card dashboard-footer-card">' +
-    '<h3>' + t('current_user') + ': ' + Utils.escapeHtml(AUTH.user.name) + ' (' + (AUTH.user.role === 'admin' ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长')) + ')</h3>' +
-    '<p>🏪 ' + t('store') + ': ' + Utils.escapeHtml(storeName) + (isAdmin ? ' (' + (lang === 'id' ? 'Kantor Pusat - Seluruh Toko' : '总部 - 全部门店') + ')' : '') + '</p>' +
-    '<p>📌 ' + (lang === 'id' ? 'Admin Fee: (dibayar saat kontrak) | Bunga: 10% per bulan | Service Fee: (diskon, dibayar sekali)' : '管理费: (签合同支付) | 利息: 10%/月 | 服务费: (优惠，仅收一次)') + '</p>' +
-    '<p>🔒 ' + (lang === 'id' ? 'Order yang sudah disimpan tidak dapat diubah' : '已保存的订单不可修改') + '</p>' +
+    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(AUTH.user.name) + ' (' + userRoleText + ')</h3>' +
+    '<p>📍 ' + t('store') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
+    '<p>📌 ' + t('more_pawn_higher_fee') + '</p>' +
+    '<p>🔒 ' + t('order_saved_locked') + '</p>' +
 '</div>';
+            } else {
+                bottomHtml = '' +
+'<div class="card dashboard-footer-card">' +
+    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(storeName) + ' (' + userRoleText + ')</h3>' +
+    '<p>📍 ' + t('store') + ': ' + Utils.escapeHtml(storeName) + '</p>' +
+    '<p>📌 ' + t('contract_pay_info') + '</p>' +
+    '<p>🔒 ' + t('order_saved_locked') + ' ' + t('more_pawn_higher_fee') + '</p>' +
+'</div>';
+            }
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -800,7 +816,7 @@ const DashboardCore = {
             if (o.status === 'active') {
                 activeCount++;
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                expectedMonthlyInterest += remainingPrincipal * (o.agreed_interest_rate || 0.08);
+                expectedMonthlyInterest += remainingPrincipal * (o.agreed_interest_rate || 0.10);
             } else if (o.status === 'completed') {
                 completedCount++;
             }
