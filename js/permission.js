@@ -1,4 +1,4 @@
-// permission.js - v1.2（移除审计日志权限）
+// permission.js - v1.0
 
 const PERMISSION = {
 
