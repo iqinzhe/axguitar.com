@@ -1,4 +1,4 @@
-// app-customers.js - v2.5（建立订单核心重构：当金+费用自动计算+手动可调）
+// app-customers.js - v2.6（删除门店横幅 + 修复新增客户保存按钮）
 
 window.APP = window.APP || {};
 
@@ -112,7 +112,7 @@ const CustomersModule = {
                             '<textarea id="customerLivingAddress" rows="2" placeholder="' + (lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址') + '" style="display:none;margin-top:8px;"></textarea>' +
                         '</div>' +
                         '<div class="form-actions">' +
-                            '<button onclick="APP.addCustomer()" class="success">💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户') + '</button>' +
+                            '<button onclick="APP.addCustomer()" class="success" id="addCustomerBtn">💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户') + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -194,7 +194,7 @@ const CustomersModule = {
         try {
             await window.APP.removeFromBlacklist(customerId);
             alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
-            await this.showCustomers();
+            await APP.showCustomers();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal membuka blacklist: ' + error.message : '解除拉黑失败：' + error.message);
         }
@@ -236,7 +236,7 @@ const CustomersModule = {
                 alert(lang === 'id' 
                     ? '✅ Nasabah "' + customer.name + '" telah ditambahkan ke blacklist.'
                     : '✅ 客户 "' + customer.name + '" 已加入黑名单。');
-                await this.showCustomers();
+                await APP.showCustomers();
             } else {
                 throw new Error(lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
             }
@@ -262,6 +262,12 @@ const CustomersModule = {
             return;
         }
         
+        var addBtn = document.getElementById('addCustomerBtn');
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
+        }
+        
         var name = document.getElementById("customerName").value.trim();
         var ktp = document.getElementById("customerKtp").value.trim();
         var phone = document.getElementById("customerPhone").value.trim();
@@ -270,14 +276,23 @@ const CustomersModule = {
         var livingSameAsKtp = livingOpt === 'same';
         var livingAddress = livingSameAsKtp ? null : document.getElementById("customerLivingAddress").value.trim();
 
-        if (!name) { alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写'); return; }
-        if (!phone) { alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写'); return; }
+        if (!name) {
+            if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
+            alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写');
+            return;
+        }
+        if (!phone) {
+            if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
+            alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写');
+            return;
+        }
 
         try {
             const profile = await SUPABASE.getCurrentProfile();
             const storeId = profile?.store_id;
             
             if (!storeId) {
+                if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
                 alert(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
                 return;
             }
@@ -298,8 +313,9 @@ const CustomersModule = {
             const newCustomer = await SUPABASE.createCustomer(customerData);
             
             alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
-            await this.showCustomers();
+            await APP.showCustomers();
         } catch (error) {
+            if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
             console.error("addCustomer error:", error);
             alert(t('save_failed') + ': ' + error.message);
         }
@@ -391,7 +407,7 @@ const CustomersModule = {
             if (error) throw error;
             document.getElementById('editCustomerModal')?.remove();
             alert(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
-            await this.showCustomers();
+            await APP.showCustomers();
         } catch (e) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
         }
@@ -416,14 +432,13 @@ const CustomersModule = {
             if (customerError) throw customerError;
             
             alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
-            await this.showCustomers();
+            await APP.showCustomers();
         } catch (e) {
             console.error('删除客户异常:', e);
             alert(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
         }
     },
 
-    // ========== 核心：建立订单 ==========
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang || 'id';
         var t = function(key) { return Utils.t(key); };
@@ -493,32 +508,6 @@ const CustomersModule = {
 
             this.currentPage = 'createOrder';
             this.currentCustomerId = customerId;
-
-            var userStoreName = '-';
-            var userStoreCode = '-';
-            
-            if (profile && profile.stores) {
-                userStoreName = profile.stores.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
-                userStoreCode = profile.stores.code || '-';
-            } else if (profile && profile.store_id) {
-                try {
-                    const { data: storeData } = await supabaseClient
-                        .from('stores')
-                        .select('name, code')
-                        .eq('id', profile.store_id)
-                        .single();
-                    if (storeData) {
-                        userStoreName = storeData.name || (lang === 'id' ? 'Toko tidak diketahui' : '未知门店');
-                        userStoreCode = storeData.code || '-';
-                    }
-                } catch(e) {
-                    userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
-                    userStoreCode = '-';
-                }
-            } else {
-                userStoreName = lang === 'id' ? 'Toko tidak diketahui' : '未知门店';
-                userStoreCode = '-';
-            }
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -536,9 +525,6 @@ const CustomersModule = {
                         '<p><strong>' + t('phone') + ':</strong> ' + Utils.escapeHtml(customer.phone) + '</p>' +
                         '<p><strong>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + ':</strong> ' + Utils.escapeHtml(customer.ktp_address || customer.address || '-') + '</p>' +
                         '<p><strong>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</strong> ' + (customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')) + '</p>' +
-                    '</div>' +
-                    '<div class="store-info-banner">' +
-                        '<span>🏪 ' + (lang === 'id' ? 'Order akan dibuat untuk toko' : '订单将创建在门店') + ': <strong>' + Utils.escapeHtml(userStoreName) + ' (' + Utils.escapeHtml(userStoreCode) + ')</strong></span>' +
                     '</div>' +
                     '<h3>' + t('collateral_info') + '</h3>' +
                     '<div class="form-grid">' +
@@ -561,13 +547,11 @@ const CustomersModule = {
                                 '<label><input type="radio" name="loanSource" value="bank"> 🏧 ' + t('bank') + '</label>' +
                             '</div>' +
                         '</div>' +
-                        '<!-- 管理费 -->' +
                         '<div class="form-group">' +
                             '<label>📋 ' + (lang === 'id' ? 'Admin Fee (Otomatis, bisa diubah)' : '管理费（自动计算，可修改）') + '</label>' +
                             '<input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">' +
                             '<small style="color:#64748b;">' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
                         '</div>' +
-                        '<!-- 服务费 -->' +
                         '<div class="form-group">' +
                             '<label>✨ ' + (lang === 'id' ? 'Service Fee (Otomatis, bisa diubah)' : '服务费（自动计算，可修改）') + '</label>' +
                             '<div class="fee-calc-row">' +
@@ -578,14 +562,12 @@ const CustomersModule = {
                             '</div>' +
                             '<small style="color:#64748b;">' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
                         '</div>' +
-                        '<!-- 利率 -->' +
                         '<div class="form-group">' +
                             '<label>📈 ' + (lang === 'id' ? 'Suku Bunga (Pilih)' : '利率（可选）') + '</label>' +
                             '<select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">' +
                                 Utils.getInterestRateOptions(10) +
                             '</select>' +
                         '</div>' +
-                        '<!-- 还款方式 -->' +
                         '<div class="repayment-type-group">' +
                             '<label class="repayment-type-label">📋 ' + (lang === 'id' ? 'Pilih Jenis Cicilan' : '选择还款方式') + ':</label>' +
                             '<div class="repayment-type-options">' +
@@ -601,7 +583,6 @@ const CustomersModule = {
                                 '</label>' +
                             '</div>' +
                         '</div>' +
-                        '<!-- 固定还款表单 -->' +
                         '<div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">' +
                             '<div class="form-group">' +
                                 '<label>📅 ' + (lang === 'id' ? 'Jangka Waktu' : '还款期限') + '</label>' +
@@ -641,7 +622,6 @@ const CustomersModule = {
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
             
-            // 绑定其他金额输入框
             var adminFeeInput = document.getElementById("adminFeeInput");
             if (adminFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(adminFeeInput);
             var serviceFeeInput = document.getElementById("serviceFeeInput");
@@ -655,19 +635,16 @@ const CustomersModule = {
         }
     },
 
-    // ========== 重新计算所有费用 ==========
     recalculateAllFees: function() {
         var amountStr = document.getElementById('amount')?.value || '0';
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
         
-        // 管理费
         var adminFee = Utils.calculateAdminFee(amount);
         var adminFeeInput = document.getElementById('adminFeeInput');
         if (adminFeeInput && !adminFeeInput.dataset.manual) {
             adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
         }
         
-        // 服务费
         var serviceFeeData = Utils.calculateServiceFeeNew(amount);
         var serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
         var serviceFeeInput = document.getElementById('serviceFeeInput');
@@ -678,7 +655,6 @@ const CustomersModule = {
             serviceFeeInput.value = Utils.formatNumberWithCommas(serviceFeeData.amount);
         }
         
-        // 固定还款月供
         var repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
         if (repaymentType === 'fixed') {
             var rateSelect = document.getElementById('agreedInterestRateSelect');
@@ -697,13 +673,11 @@ const CustomersModule = {
         }
     },
 
-    // ========== 手动修改管理费 ==========
     onAdminFeeManualChange: function() {
         var input = document.getElementById('adminFeeInput');
         if (input) input.dataset.manual = 'true';
     },
 
-    // ========== 手动修改服务费百分比 ==========
     recalculateServiceFee: function() {
         var select = document.getElementById('serviceFeePercentSelect');
         if (select) select.dataset.manual = 'true';
@@ -720,13 +694,11 @@ const CustomersModule = {
         }
     },
 
-    // ========== 手动修改服务费金额 ==========
     onServiceFeeManualChange: function() {
         var input = document.getElementById('serviceFeeInput');
         if (input) input.dataset.manual = 'true';
     },
 
-    // ========== 手动修改月供 ==========
     onMonthlyPaymentManualChange: function() {
         var input = document.getElementById('monthlyPaymentInput');
         if (input) input.dataset.manual = 'true';
@@ -738,7 +710,6 @@ const CustomersModule = {
         if (value === 'fixed') APP.recalculateAllFees();
     },
 
-    // ========== 保存订单 ==========
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
@@ -1041,7 +1012,6 @@ for (var key in CustomersModule) {
     }
 }
 
-// 导出新函数到全局
 window.APP.recalculateAllFees = CustomersModule.recalculateAllFees;
 window.APP.onAdminFeeManualChange = CustomersModule.onAdminFeeManualChange;
 window.APP.recalculateServiceFee = CustomersModule.recalculateServiceFee;
