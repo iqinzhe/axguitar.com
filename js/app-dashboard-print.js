@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v1.0
+// app-dashboard-print.js - v1.6（打印标题居中 + 表格左对齐）
 
 window.APP = window.APP || {};
 
@@ -11,7 +11,6 @@ const DashboardPrint = {
     _doPrint: function() {
         var printContent = document.getElementById("app").cloneNode(true);
         
-        // 移除页面头部操作按钮
         var pageHeader = printContent.querySelector('.page-header');
         if (pageHeader) {
             var headerActions = pageHeader.querySelector('.header-actions');
@@ -22,25 +21,21 @@ const DashboardPrint = {
             }
         }
         
-        // 移除所有工具栏
         var toolbars = printContent.querySelectorAll('.toolbar');
         for (var i = 0; i < toolbars.length; i++) {
             toolbars[i].remove();
         }
         
-        // 移除操作行（按钮行）
         var actionRows = printContent.querySelectorAll('.action-row');
         for (var i = 0; i < actionRows.length; i++) {
             actionRows[i].remove();
         }
         
-        // 移除所有按钮
         var allButtons = printContent.querySelectorAll('button');
         for (var i = 0; i < allButtons.length; i++) {
             allButtons[i].remove();
         }
         
-        // 移除编辑区域（新增客户、新增操作员、新增门店、新增支出）
         var formCards = printContent.querySelectorAll('.card');
         for (var i = formCards.length - 1; i >= 0; i--) {
             var card = formCards[i];
@@ -57,13 +52,11 @@ const DashboardPrint = {
             }
         }
         
-        // 移除所有 form-actions（保存按钮区域）
         var formActions = printContent.querySelectorAll('.form-actions');
         for (var i = 0; i < formActions.length; i++) {
             formActions[i].remove();
         }
         
-        // 移除 form-grid（表单区域）
         var formGrids = printContent.querySelectorAll('.form-grid');
         for (var i = 0; i < formGrids.length; i++) {
             var parentCard = formGrids[i].closest('.card');
@@ -100,12 +93,12 @@ const DashboardPrint = {
                         'margin: 0;' +
                     '}' +
                     '.print-container { padding: 3mm; }' +
-                    '.print-header { text-align: left; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #ccc; }' +
-                    '.print-header .logo { font-size: 12pt; font-weight: bold; color: #2563eb; text-align: left; }' +
+                    '.print-header { text-align: center; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #ccc; }' +
+                    '.print-header .logo { font-size: 12pt; font-weight: bold; color: #2563eb; text-align: center; }' +
                     '.print-header .logo img { height: 20px; vertical-align: middle; }' +
-                    '.print-store-info { font-size: 8pt; color: #475569; margin: 2px 0; text-align: left; }' +
-                    '.print-user-info { font-size: 7pt; color: #64748b; margin-bottom: 3px; text-align: left; }' +
-                    '.print-footer { text-align: left; font-size: 6pt; color: #94a3b8; margin-top: 4px; padding-top: 3px; border-top: 1px solid #e2e8f0; }' +
+                    '.print-store-info { font-size: 8pt; color: #475569; margin: 2px 0; text-align: center; }' +
+                    '.print-user-info { font-size: 7pt; color: #64748b; margin-bottom: 3px; text-align: center; }' +
+                    '.print-footer { text-align: center; font-size: 6pt; color: #94a3b8; margin-top: 4px; padding-top: 3px; border-top: 1px solid #e2e8f0; }' +
                     'table { width: 100%; border-collapse: collapse; margin: 4px 0; }' +
                     'th { background: #f1f5f9; font-weight: 600; text-align: left; }' +
                     'th, td { border: 1px solid #cbd5e1; padding: 3px 5px; text-align: left; font-size: 7.5pt; vertical-align: top; }' +
@@ -182,10 +175,10 @@ const DashboardPrint = {
         return '' +
             '*{box-sizing:border-box;margin:0;padding:0}' +
             'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:9pt;line-height:1.3;color:#1e293b;padding:3mm}' +
-            '.header{text-align:left;margin-bottom:6px;border-bottom:1px solid #ccc;padding-bottom:3px}' +
-            '.header h1{font-size:12pt;margin:2px 0;text-align:left}' +
-            '.store-info{text-align:left;font-size:8pt;color:#475569;margin:2px 0}' +
-            '.user-info{text-align:left;font-size:7pt;color:#64748b;margin-bottom:3px}' +
+            '.header{text-align:center;margin-bottom:6px;border-bottom:1px solid #ccc;padding-bottom:3px}' +
+            '.header h1{font-size:12pt;margin:2px 0;text-align:center}' +
+            '.store-info{text-align:center;font-size:8pt;color:#475569;margin:2px 0}' +
+            '.user-info{text-align:center;font-size:7pt;color:#64748b;margin-bottom:3px}' +
             'table{width:100%;border-collapse:collapse;margin-top:4px}' +
             'th,td{border:1px solid #cbd5e1;padding:3px 5px;text-align:left;font-size:7.5pt}' +
             'th{background:#f1f5f9;font-weight:600}' +
