@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.0
+// app-dashboard-core.js - v2.1（修复管理员资金流水入口）
 
 window.APP = window.APP || {};
 
@@ -77,7 +77,11 @@ const DashboardCore = {
             storeManagement: async () => { if (typeof StoreManager.renderStoreManagement === 'function') await StoreManager.renderStoreManagement(); else await self.renderDashboard(); },
             expenses: async () => { if (typeof window.APP.showExpenses === 'function') await window.APP.showExpenses(); else await self.renderDashboard(); },
             customers: async () => { if (typeof window.APP.showCustomers === 'function') await window.APP.showCustomers(); else await self.renderDashboard(); },
-            paymentHistory: async () => { if (typeof window.APP.showPaymentHistory === 'function') await window.APP.showPaymentHistory(); else await self.renderDashboard(); },
+            paymentHistory: async () => { 
+                if (typeof window.APP.showCashFlowPage === 'function') await window.APP.showCashFlowPage();
+                else if (typeof window.APP.showPaymentHistory === 'function') await window.APP.showPaymentHistory();
+                else await self.renderDashboard();
+            },
             backupRestore: async () => { if (typeof Storage.renderBackupUI === 'function') await Storage.renderBackupUI(); else await self.renderDashboard(); },
             customerOrders: async () => { 
                 if (self.currentCustomerId && typeof window.APP.showCustomerOrders === 'function') {
@@ -150,7 +154,8 @@ const DashboardCore = {
                 else self.renderDashboard();
                 break;
             case 'paymentHistory':
-                if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
+                if (typeof window.APP.showCashFlowPage === 'function') window.APP.showCashFlowPage();
+                else if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
                 else self.renderDashboard();
                 break;
             case 'backupRestore':
@@ -241,7 +246,8 @@ const DashboardCore = {
                     else self.renderDashboard();
                     break;
                 case 'paymentHistory':
-                    if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
+                    if (typeof window.APP.showCashFlowPage === 'function') window.APP.showCashFlowPage();
+                    else if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
                     else self.renderDashboard();
                     break;
                 case 'backupRestore':
@@ -581,7 +587,6 @@ const DashboardCore = {
                 var updatedOrders = allOrders;
             }
             
-            // ========== 计算进行中/逾期单数 ==========
             var activeOrdersCount = 0;
             var overdueOrdersCount = 0;
             var completedOrdersCount = 0;
@@ -608,7 +613,6 @@ const DashboardCore = {
             var btnDisabled = hasSentToday;
             var btnHighlight = hasReminders && !hasSentToday;
             
-            // 卡片数据
             var activeDisplay = activeOrdersCount;
             if (overdueOrdersCount > 0) {
                 activeDisplay = activeOrdersCount + ' / ' + (lang === 'id' ? '⚠️ ' : '⚠️ ') + overdueOrdersCount;
@@ -739,7 +743,7 @@ const DashboardCore = {
                 '<div class="toolbar store-grid">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
                     '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
-                    '<button onclick="APP.showCashFlowModal()">💰 ' + t('payment_history') + '</button>' +
+                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
                     '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
                     '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
                     '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
