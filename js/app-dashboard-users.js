@@ -1,5 +1,4 @@
-// app-dashboard-users.js - v1.3（新增重置密码功能）
-
+// app-dashboard-users.js - v1.0
 window.APP = window.APP || {};
 
 const DashboardUsers = {
