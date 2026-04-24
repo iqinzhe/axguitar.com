@@ -1,4 +1,4 @@
-// app-customers.js - v2.7（修复 this 指向问题：内部调用使用 CustomersModule）
+// app-customers.js - v2.8（修复 addCustomer 错误显示）
 
 window.APP = window.APP || {};
 
@@ -196,7 +196,8 @@ const CustomersModule = {
             alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
             await CustomersModule.showCustomers();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal membuka blacklist: ' + error.message : '解除拉黑失败：' + error.message);
+            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
+            alert(lang === 'id' ? 'Gagal membuka blacklist: ' + errMsg : '解除拉黑失败：' + errMsg);
         }
     },
 
@@ -242,8 +243,9 @@ const CustomersModule = {
             }
             
         } catch (error) {
+            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
             console.error("blacklistCustomer error:", error);
-            alert(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + error.message : '拉黑失败：' + error.message);
+            alert(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + errMsg : '拉黑失败：' + errMsg);
         }
     },
 
@@ -317,7 +319,8 @@ const CustomersModule = {
         } catch (error) {
             if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
             console.error("addCustomer error:", error);
-            alert(t('save_failed') + ': ' + error.message);
+            var errMsg = error.message || error.details || error.code || (lang === 'id' ? 'Gagal menyimpan' : '保存失败');
+            alert(lang === 'id' ? 'Gagal menyimpan: ' + errMsg : '保存失败：' + errMsg);
         }
     },
 
@@ -851,7 +854,8 @@ const CustomersModule = {
         } catch (error) {
             if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
             console.error("saveOrderWithCustomer error:", error);
-            alert(t('save_failed') + ': ' + error.message);
+            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
+            alert(t('save_failed') + ': ' + errMsg);
         }
     },
 
