@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.3（并行化查询 + 使用通用操作行）
+// app-dashboard-anomaly.js - v1.0
 
 window.APP = window.APP || {};
 
