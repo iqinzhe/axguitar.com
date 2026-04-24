@@ -1,4 +1,4 @@
-// app-customers.js - v2.0（修复 showCustomerOrders 报错 + 优化布局）
+// app-customers.js - v2.1（优化新增客户表单布局）
 
 window.APP = window.APP || {};
 
@@ -78,6 +78,7 @@ const CustomersModule = {
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户') + '</h3>' +
                     '<div class="form-grid">' +
+                        '<!-- 电脑端三列：姓名、手机、KTP -->' +
                         '<div class="form-group">' +
                             '<label>' + t('customer_name') + ' *</label>' +
                             '<input type="text" id="customerName" placeholder="' + t('customer_name') + '">' +
@@ -90,13 +91,14 @@ const CustomersModule = {
                             '<label>' + t('ktp_number') + '</label>' +
                             '<input type="text" id="customerKtp" placeholder="' + t('ktp_number') + '">' +
                         '</div>' +
+                        '<!-- 地址区域全宽 -->' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</label>' +
                             '<textarea id="customerKtpAddress" rows="2" placeholder="' + (lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址') + '"></textarea>' +
                         '</div>' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</label>' +
-                            '<div class="address-option">' +
+                            '<div class="address-option address-option-inline">' +
                                 '<label><input type="radio" name="livingAddrOpt" value="same" checked onchange="window.APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
                                 '<label><input type="radio" name="livingAddrOpt" value="different" onchange="window.APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）') + '</label>' +
                             '</div>' +
@@ -160,9 +162,14 @@ const CustomersModule = {
             '.customer-table th:nth-child(5), .customer-table td:nth-child(5) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }' +
             '.customer-table th:nth-child(6), .customer-table td:nth-child(6) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }' +
             '.customer-table th:nth-child(7), .customer-table td:nth-child(7) { width: 90px; min-width: 80px; white-space: nowrap; }' +
+            '.address-option-inline { display: flex; gap: 24px; flex-wrap: nowrap; }' +
+            '.address-option-inline label { white-space: nowrap; }' +
             '.btn-blacklist { background: #f97316 !important; color: #fff !important; border-color: #ea580c !important; }' +
             '.btn-blacklist:hover { background: #ea580c !important; }' +
-            '@media (max-width: 768px) { .customer-table th, .customer-table td { font-size: 0.7rem; padding: 6px 4px; } }';
+            '@media (max-width: 768px) { ' +
+                '.customer-table th, .customer-table td { font-size: 0.7rem; padding: 6px 4px; } ' +
+                '.address-option-inline { flex-direction: column; gap: 8px; } ' +
+            '}';
         document.head.appendChild(style);
     },
 
@@ -299,7 +306,7 @@ const CustomersModule = {
                         '<div class="form-group full-width"><label>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</label><textarea id="ec_ktpAddr" rows="2">' + Utils.escapeHtml(c.ktp_address || c.address || '') + '</textarea></div>' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</label>' +
-                            '<div class="address-option">' +
+                            '<div class="address-option address-option-inline">' +
                                 '<label><input type="radio" name="ec_livingOpt" value="same" ' + (livingSame ? 'checked' : '') + ' onchange="window.APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
                                 '<label><input type="radio" name="ec_livingOpt" value="different" ' + (!livingSame ? 'checked' : '') + ' onchange="window.APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Berbeda' : '不同') + '</label>' +
                             '</div>' +
@@ -869,7 +876,6 @@ const CustomersModule = {
         }
     },
 
-    // ========== 修复：showCustomerOrders 改用 for 循环 ==========
     showCustomerOrders: async function(customerId) {
         this.currentPage = 'customerOrders';
         this.currentCustomerId = customerId;
@@ -912,7 +918,6 @@ const CustomersModule = {
                         '<td data-label="' + t('status') + '" class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '<\/span><\/td>' +
                     '<\/tr>';
                     
-                    // 操作行
                     var actionButtons = '';
                     if (o.status === 'active' && !AUTH.isAdmin()) {
                         actionButtons += '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small success">💰 ' + (lang === 'id' ? 'Bayar' : '缴费') + '</button>';
