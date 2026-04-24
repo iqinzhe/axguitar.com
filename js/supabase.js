@@ -1,4 +1,4 @@
-// supabase.js - v1.6（支持实际费用字段：管理费/服务费/月供/利率默认10%）
+// supabase.js - v1.7（修复客户ID重复问题，添加重试机制）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -202,19 +202,21 @@ const SupabaseAPI = {
         return prefix + serial;
     },
 
+    // ========== 修复：_generateCustomerId 添加重试机制 ==========
     async _generateCustomerId(storeId) {
         const prefix = await this._getStorePrefix(storeId);
         
-        const { data: customers, error } = await supabaseClient
+        // 使用 MAX 查询获取最大序号
+        const { data, error } = await supabaseClient
             .from('customers')
             .select('customer_id')
             .like('customer_id', prefix + '%')
-            .order('registered_date', { ascending: false })
+            .order('customer_id', { ascending: false })
             .limit(1);
         
         let maxNumber = 0;
-        if (customers && customers.length > 0) {
-            const match = customers[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
+        if (data && data.length > 0) {
+            const match = data[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
             if (match) {
                 maxNumber = parseInt(match[1], 10);
             }
@@ -224,6 +226,63 @@ const SupabaseAPI = {
         const serial = String(nextNumber).padStart(3, '0');
         
         return prefix + serial;
+    },
+
+    // ========== 修复：createCustomer 添加重试机制，避免客户ID重复 ==========
+    async createCustomer(customerData) {
+        const profile = await this.getCurrentProfile();
+        const storeId = customerData.store_id || profile.store_id;
+        
+        let retryCount = 0;
+        let maxRetries = 5;
+        let lastError = null;
+        
+        while (retryCount < maxRetries) {
+            try {
+                const customerId = await this._generateCustomerId(storeId);
+                
+                const { data, error } = await supabaseClient
+                    .from('customers')
+                    .insert({
+                        customer_id: customerId,
+                        store_id: storeId,
+                        name: customerData.name,
+                        ktp_number: customerData.ktp_number || null,
+                        phone: customerData.phone,
+                        ktp_address: customerData.ktp_address || null,
+                        address: customerData.address || null,
+                        living_same_as_ktp: customerData.living_same_as_ktp,
+                        living_address: customerData.living_address || null,
+                        registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
+                        created_by: profile.id,
+                        updated_at: new Date().toISOString()
+                    })
+                    .select()
+                    .single();
+                
+                if (error) {
+                    if (error.code === '23505') {
+                        // 唯一约束冲突，重试
+                        console.warn(`客户ID ${customerId} 已存在，重试第 ${retryCount + 1} 次`);
+                        retryCount++;
+                        lastError = error;
+                        continue;
+                    }
+                    throw error;
+                }
+                
+                return data;
+                
+            } catch (err) {
+                if (err.code === '23505' && retryCount < maxRetries - 1) {
+                    retryCount++;
+                    continue;
+                }
+                throw err;
+            }
+        }
+        
+        throw lastError || new Error('无法创建客户，请重试');
     },
 
     calculateNextDueDate: function(startDate, paidMonths) {
@@ -1216,34 +1275,8 @@ const SupabaseAPI = {
         return data;
     },
 
-    async createCustomer(customerData) {
-        const profile = await this.getCurrentProfile();
-        const storeId = customerData.store_id || profile.store_id;
-        
-        const customerId = await this._generateCustomerId(storeId);
-        
-        const { data, error } = await supabaseClient
-            .from('customers')
-            .insert({
-                customer_id: customerId,
-                store_id: storeId,
-                name: customerData.name,
-                ktp_number: customerData.ktp_number || null,
-                phone: customerData.phone,
-                ktp_address: customerData.ktp_address || null,
-                address: customerData.address || null,
-                living_same_as_ktp: customerData.living_same_as_ktp,
-                living_address: customerData.living_address || null,
-                registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
-                created_by: profile.id,
-                updated_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-        
-        if (error) throw error;
-        return data;
-    },
+    // 注意：createCustomer 已在上方修复，这里保留引用
+    // 但为了确保修复生效，上面的 createCustomer 函数已完整替换
 
     async getCashFlowRecords(storeId, startDate, endDate) {
         const profile = await this.getCurrentProfile();
