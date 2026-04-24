@@ -1,4 +1,4 @@
-// app-customers.js - v1.9（使用 Utils.renderActionRow 统一操作行）
+// app-customers.js - v2.0（修复 showCustomerOrders 报错 + 优化布局）
 
 window.APP = window.APP || {};
 
@@ -50,7 +50,6 @@ const CustomersModule = {
                         (isAdmin ? '<td class="text-center">' + storeName + '<\/td>' : '') +
                     '<\/tr>';
                     
-                    // 使用通用操作行渲染
                     var actionButtons = '';
                     if (!isAdmin) {
                         actionButtons += '<button onclick="APP.createOrderForCustomer(\'' + escapedId + '\')" class="btn-small success">➕ ' + (lang === 'id' ? 'Buat Order' : '建立订单') + '</button>';
@@ -121,17 +120,7 @@ const CustomersModule = {
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Daftar Nasabah' : '客户列表') + '</h3>' +
                     '<div class="table-container">' +
-                        '<table class="data-table">' +
-                            '<colgroup>' +
-                                '<col style="width: 12%; min-width: 100px;">' +
-                                '<col style="width: 10%; min-width: 80px;">' +
-                                '<col style="width: 12%; min-width: 100px;">' +
-                                '<col style="width: 10%; min-width: 90px;">' +
-                                '<col style="width: 20%; min-width: 150px;">' +
-                                '<col style="width: 20%; min-width: 150px;">' +
-                                '<col style="width: 10%; min-width: 90px;">' +
-                                (isAdmin ? '<col style="width: 6%; min-width: 80px;">' : '') +
-                            '</colgroup>' +
+                        '<table class="data-table customer-table">' +
                             '<thead>' +
                                 '<tr>' +
                                     '<th>' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
@@ -163,10 +152,17 @@ const CustomersModule = {
         var style = document.createElement('style');
         style.id = 'data-table-styles';
         style.textContent = '' +
-            '.data-table .customer-address { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }' +
+            '.customer-table th, .customer-table td { padding: 8px 6px; font-size: 0.75rem; }' +
+            '.customer-table th:nth-child(1), .customer-table td:nth-child(1) { width: 90px; min-width: 80px; }' +
+            '.customer-table th:nth-child(2), .customer-table td:nth-child(2) { width: 120px; min-width: 100px; }' +
+            '.customer-table th:nth-child(3), .customer-table td:nth-child(3) { width: 130px; min-width: 110px; }' +
+            '.customer-table th:nth-child(4), .customer-table td:nth-child(4) { width: 110px; min-width: 90px; }' +
+            '.customer-table th:nth-child(5), .customer-table td:nth-child(5) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }' +
+            '.customer-table th:nth-child(6), .customer-table td:nth-child(6) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }' +
+            '.customer-table th:nth-child(7), .customer-table td:nth-child(7) { width: 90px; min-width: 80px; white-space: nowrap; }' +
             '.btn-blacklist { background: #f97316 !important; color: #fff !important; border-color: #ea580c !important; }' +
             '.btn-blacklist:hover { background: #ea580c !important; }' +
-            '@media (max-width: 768px) { .data-table .customer-address { max-width: 120px; } }';
+            '@media (max-width: 768px) { .customer-table th, .customer-table td { font-size: 0.7rem; padding: 6px 4px; } }';
         document.head.appendChild(style);
     },
 
@@ -873,12 +869,13 @@ const CustomersModule = {
         }
     },
 
+    // ========== 修复：showCustomerOrders 改用 for 循环 ==========
     showCustomerOrders: async function(customerId) {
         this.currentPage = 'customerOrders';
         this.currentCustomerId = customerId;
         this.saveCurrentPageState();
         var lang = Utils.lang;
-        var t = Utils.t;
+        var t = function(key) { return Utils.t(key); };
         try {
             const { data: customer } = await supabaseClient
                 .from('customers')
@@ -891,29 +888,43 @@ const CustomersModule = {
                 .eq('customer_id', customerId)
                 .order('created_at', { ascending: false });
             if (error) throw error;
+            
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
-            var rows = orders && orders.length > 0 ? orders.map(function(o) {
-                var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
-                var repaymentTypeText = o.repayment_type === 'fixed' 
-                    ? (lang === 'id' ? 'Tetap' : '固定') 
-                    : (lang === 'id' ? 'Fleksibel' : '灵活');
-                return '<tr>' +
-                    '<td data-label="' + t('order_id') + '" class="order-id">' + Utils.escapeHtml(o.order_id) + '<\/td>' +
-                    '<td data-label="' + (lang === 'id' ? 'Tanggal' : '日期') + '" class="date-cell">' + Utils.formatDate(o.created_at) + '<\/td>' +
-                    '<td data-label="' + t('loan_amount') + '" class="text-right">' + Utils.formatCurrency(o.loan_amount) + '<\/td>' +
-                    '<td data-label="' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '" class="text-right">' + Utils.formatCurrency(o.principal_paid) + '<\/td>' +
-                    '<td data-label="' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '" class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '<\/td>' +
-                    '<td data-label="' + (lang === 'id' ? 'Jenis' : '方式') + '" class="text-center"><span class="repayment-badge ' + (o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible') + '">' + repaymentTypeText + '<\/span><\/td>' +
-                    '<td data-label="' + t('status') + '" class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '<\/span><\/td>' +
-                '<\/tr>' +
-                '<tr class="action-row">' +
-                    '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '<\/td>' +
-                    '<td colspan="7" class="action-btns">' +
-                        (o.status === 'active' && !AUTH.isAdmin() ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small success">💰 ' + (lang === 'id' ? 'Bayar' : '缴费') + '</button>' : '') +
-                        '<button onclick="APP.navigateTo(\'viewOrder\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small">👁️ ' + t('view') + '<\/button>' +
-                    '<\/td>' +
-                '<\/tr>';
-            }).join('') : '<tr><td colspan="8" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+            
+            var rows = '';
+            if (!orders || orders.length === 0) {
+                rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+            } else {
+                for (var i = 0; i < orders.length; i++) {
+                    var o = orders[i];
+                    var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
+                    var repaymentTypeText = o.repayment_type === 'fixed' 
+                        ? (lang === 'id' ? 'Tetap' : '固定') 
+                        : (lang === 'id' ? 'Fleksibel' : '灵活');
+                    
+                    rows += '<tr>' +
+                        '<td data-label="' + t('order_id') + '" class="order-id">' + Utils.escapeHtml(o.order_id) + '<\/td>' +
+                        '<td data-label="' + (lang === 'id' ? 'Tanggal' : '日期') + '" class="date-cell">' + Utils.formatDate(o.created_at) + '<\/td>' +
+                        '<td data-label="' + t('loan_amount') + '" class="text-right">' + Utils.formatCurrency(o.loan_amount) + '<\/td>' +
+                        '<td data-label="' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '" class="text-right">' + Utils.formatCurrency(o.principal_paid) + '<\/td>' +
+                        '<td data-label="' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '" class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '<\/td>' +
+                        '<td data-label="' + (lang === 'id' ? 'Jenis' : '方式') + '" class="text-center"><span class="repayment-badge ' + (o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible') + '">' + repaymentTypeText + '<\/span><\/td>' +
+                        '<td data-label="' + t('status') + '" class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '<\/span><\/td>' +
+                    '<\/tr>';
+                    
+                    // 操作行
+                    var actionButtons = '';
+                    if (o.status === 'active' && !AUTH.isAdmin()) {
+                        actionButtons += '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small success">💰 ' + (lang === 'id' ? 'Bayar' : '缴费') + '</button>';
+                    }
+                    actionButtons += '<button onclick="APP.navigateTo(\'viewOrder\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small">👁️ ' + t('view') + '<\/button>';
+                    
+                    rows += Utils.renderActionRow({
+                        colspan: 7,
+                        buttonsHtml: actionButtons
+                    });
+                }
+            }
 
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -932,7 +943,7 @@ const CustomersModule = {
                     '<h3>📋 ' + t('order_list') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th>ID</th><th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="text-right">' + t('loan_amount') + '</th><th class="text-right">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th><th class="text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th></tr></thead>' +
+                            '<thead><tr><th>ID</th><th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="text-right">' + t('loan_amount') + '</th><th class="text-right">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '<\/table>' +
                     '</div>' +
@@ -949,22 +960,31 @@ const CustomersModule = {
         this.currentCustomerId = customerId;
         this.saveCurrentPageState();
         var lang = Utils.lang;
-        var t = Utils.t;
+        var t = function(key) { return Utils.t(key); };
         var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
         try {
             const { data: customer } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
             const { data: orders } = await supabaseClient.from('orders').select('id, order_id').eq('customer_id', customerId);
-            var orderIds = orders?.map(function(o) { return o.id; }) || [];
+            var orderIds = [];
+            if (orders) {
+                for (var i = 0; i < orders.length; i++) {
+                    orderIds.push(orders[i].id);
+                }
+            }
             var allPayments = [];
             if (orderIds.length > 0) {
                 const { data } = await supabaseClient.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false });
                 allPayments = data || [];
             }
             var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', service_fee: lang === 'id' ? 'Service Fee' : '服务费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
-            var rows = allPayments.length === 0
-                ? '<td><td colspan="7" class="text-center">' + t('no_data') + '<\/td><\/tr>'
-                : allPayments.map(function(p) {
-                    return '<tr>' +
+            
+            var rows = '';
+            if (allPayments.length === 0) {
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+            } else {
+                for (var i = 0; i < allPayments.length; i++) {
+                    var p = allPayments[i];
+                    rows += '<tr>' +
                         '<td data-label="' + t('date') + '" class="date-cell">' + Utils.formatDate(p.date) + '<\/td>' +
                         '<td data-label="' + t('order_id') + '" class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '<\/td>' +
                         '<td data-label="' + t('type') + '">' + (typeMap[p.type] || p.type) + '<\/td>' +
@@ -973,7 +993,8 @@ const CustomersModule = {
                         '<td data-label="' + (lang === 'id' ? 'Metode' : '支付方式') + '" class="text-center"><span class="payment-method-badge ' + (p.payment_method === 'cash' ? 'method-cash' : 'method-bank') + '">' + (methodMap[p.payment_method] || '-') + '<\/span><\/td>' +
                         '<td data-label="' + t('description') + '">' + Utils.escapeHtml(p.description || '-') + '<\/td>' +
                     '<\/tr>';
-                }).join('');
+                }
+            }
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
@@ -1001,7 +1022,6 @@ const CustomersModule = {
     }
 };
 
-// 合并到 window.APP
 for (var key in CustomersModule) {
     if (typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
