@@ -1,4 +1,4 @@
-// order.js - v1.0
+// order.js - v1.3（支持实际费用字段：管理费/服务费/月供）
 
 const Order = {
     // ==================== 创建订单 ====================
@@ -12,11 +12,13 @@ const Order = {
             loan_amount: data.loan_amount,
             admin_fee: data.admin_fee || 30000,
             service_fee_percent: data.service_fee_percent !== undefined ? data.service_fee_percent : 2,
+            service_fee_amount: data.service_fee_amount || 0,
             notes: data.notes,
             customer_id: data.customer_id || null,
-            agreed_interest_rate: data.agreed_interest_rate || 8,
+            agreed_interest_rate: data.agreed_interest_rate || 10,
             repayment_type: data.repayment_type || 'flexible',
-            repayment_term: data.repayment_term || null
+            repayment_term: data.repayment_term || null,
+            monthly_fixed_payment: data.monthly_fixed_payment || null
         };
         return await SUPABASE.createOrder(orderData);
     },
