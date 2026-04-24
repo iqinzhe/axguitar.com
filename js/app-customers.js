@@ -1,4 +1,4 @@
-// app-customers.js - v1.0
+// app-customers.js - v2.3（权限调整：管理员可修改/解除拉黑，门店不可修改/删除）
 
 window.APP = window.APP || {};
 
@@ -50,19 +50,35 @@ const CustomersModule = {
                         (isAdmin ? '<td class="text-center">' + storeName + '<\/td>' : '') +
                     '<\/tr>';
                     
+                    // ========== 权限调整 ==========
                     var actionButtons = '';
+                    
+                    // 门店：建立订单
                     if (!isAdmin) {
                         actionButtons += '<button onclick="APP.createOrderForCustomer(\'' + escapedId + '\')" class="btn-small success">➕ ' + (lang === 'id' ? 'Buat Order' : '建立订单') + '</button>';
                     }
+                    
+                    // 所有人：查看订单
                     actionButtons += '<button onclick="APP.showCustomerOrders(\'' + escapedId + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Lihat Order' : '查看订单') + '</button>';
-                    if (!isAdmin) {
+                    
+                    // 管理员：修改
+                    if (isAdmin) {
                         actionButtons += '<button onclick="APP.editCustomer(\'' + escapedId + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Ubah' : '修改') + '</button>';
                     }
-                    if (PERMISSION.canDeleteCustomer()) {
+                    
+                    // 管理员：删除
+                    if (isAdmin) {
                         actionButtons += '<button onclick="APP.deleteCustomer(\'' + escapedId + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
                     }
+                    
+                    // 门店：拉黑
                     if (!isAdmin) {
                         actionButtons += '<button onclick="APP.blacklistCustomer(\'' + escapedId + '\')" class="btn-small btn-blacklist">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
+                    }
+                    
+                    // 管理员：解除拉黑
+                    if (isAdmin) {
+                        actionButtons += '<button onclick="APP.removeCustomerFromBlacklist(\'' + escapedId + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
                     }
                     
                     rows += Utils.renderActionRow({
@@ -169,6 +185,21 @@ const CustomersModule = {
                 '.address-option-inline { flex-direction: column; gap: 8px; } ' +
             '}';
         document.head.appendChild(style);
+    },
+
+    // ========== 新增：管理员解除拉黑 ==========
+    removeCustomerFromBlacklist: async function(customerId) {
+        var lang = Utils.lang;
+        
+        if (!confirm(lang === 'id' ? 'Yakin ingin membuka blacklist nasabah ini?' : '确认解除此客户的拉黑？')) return;
+        
+        try {
+            await window.APP.removeFromBlacklist(customerId);
+            alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
+            await this.showCustomers();
+        } catch (error) {
+            alert(lang === 'id' ? 'Gagal membuka blacklist: ' + error.message : '解除拉黑失败：' + error.message);
+        }
     },
 
     blacklistCustomer: async function(customerId) {
@@ -281,7 +312,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         var t = Utils.t;
         
-        if (isAdmin) {
+        if (!isAdmin) {
             alert(t('store_operation'));
             return;
         }
@@ -333,7 +364,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         var t = Utils.t;
         
-        if (isAdmin) {
+        if (!isAdmin) {
             alert(t('store_operation'));
             return;
         }
