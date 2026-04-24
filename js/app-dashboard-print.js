@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v1.5（打印：统一左对齐 + 隐藏编辑区域）
+// app-dashboard-print.js - v1.0
 
 window.APP = window.APP || {};
 
