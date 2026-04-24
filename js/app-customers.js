@@ -1,4 +1,4 @@
-// app-customers.js - v2.8（修复 addCustomer 错误显示）
+// app-customers.js - v2.9（修复 addCustomer 客户ID重复问题）
 
 window.APP = window.APP || {};
 
@@ -254,6 +254,7 @@ const CustomersModule = {
         if (el) el.style.display = value === 'different' ? 'block' : 'none';
     },
 
+    // ========== 修复：addCustomer 添加重试机制，避免客户ID重复 ==========
     addCustomer: async function() {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -299,25 +300,95 @@ const CustomersModule = {
                 return;
             }
             
-            const customerData = {
-                store_id: storeId,
-                name: name,
-                ktp_number: ktp || null,
-                phone: phone,
-                ktp_address: ktpAddress || null,
-                address: ktpAddress || null,
-                living_same_as_ktp: livingSameAsKtp,
-                living_address: livingAddress || null,
-                registered_date: new Date().toISOString().split('T')[0],
-                created_by: profile.id
-            };
+            // ========== 修复：循环生成唯一客户ID，避免重复 ==========
+            let maxRetries = 5;
+            let lastError = null;
             
-            const newCustomer = await SUPABASE.createCustomer(customerData);
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    // 生成客户ID
+                    const prefix = await SUPABASE._getStorePrefix(storeId);
+                    
+                    // 查询当前门店的最大客户ID序号
+                    const { data: customers, error: queryError } = await supabaseClient
+                        .from('customers')
+                        .select('customer_id')
+                        .like('customer_id', prefix + '%')
+                        .order('customer_id', { ascending: false })
+                        .limit(1);
+                    
+                    if (queryError) {
+                        console.warn("查询最大客户ID失败:", queryError);
+                    }
+                    
+                    let maxNumber = 0;
+                    if (customers && customers.length > 0) {
+                        const match = customers[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
+                        if (match) {
+                            maxNumber = parseInt(match[1], 10);
+                        }
+                    }
+                    
+                    const nextNumber = maxNumber + 1;
+                    const serial = String(nextNumber).padStart(3, '0');
+                    const customerId = prefix + serial;
+                    
+                    // 尝试插入
+                    const customerData = {
+                        customer_id: customerId,
+                        store_id: storeId,
+                        name: name,
+                        ktp_number: ktp || null,
+                        phone: phone,
+                        ktp_address: ktpAddress || null,
+                        address: ktpAddress || null,
+                        living_same_as_ktp: livingSameAsKtp,
+                        living_address: livingAddress || null,
+                        registered_date: new Date().toISOString().split('T')[0],
+                        created_by: profile.id
+                    };
+                    
+                    const { data, error } = await supabaseClient
+                        .from('customers')
+                        .insert(customerData)
+                        .select()
+                        .single();
+                    
+                    if (error) {
+                        if (error.code === '23505') {
+                            // 唯一约束冲突，重试
+                            console.warn(`客户ID ${customerId} 已存在，重试第 ${attempt + 1} 次`);
+                            lastError = error;
+                            continue;
+                        }
+                        throw error;
+                    }
+                    
+                    // 成功
+                    if (addBtn) {
+                        addBtn.disabled = false;
+                        addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
+                    }
+                    alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + customerId : '客户添加成功！ID: ' + customerId);
+                    await CustomersModule.showCustomers();
+                    return;
+                    
+                } catch (err) {
+                    if (err.code === '23505' && attempt < maxRetries - 1) {
+                        continue; // 重试
+                    }
+                    throw err;
+                }
+            }
             
-            alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
-            await CustomersModule.showCustomers();
+            // 所有重试都失败
+            throw lastError || new Error(lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '无法生成唯一的客户ID');
+            
         } catch (error) {
-            if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
+            if (addBtn) { 
+                addBtn.disabled = false; 
+                addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); 
+            }
             console.error("addCustomer error:", error);
             var errMsg = error.message || error.details || error.code || (lang === 'id' ? 'Gagal menyimpan' : '保存失败');
             alert(lang === 'id' ? 'Gagal menyimpan: ' + errMsg : '保存失败：' + errMsg);
@@ -931,7 +1002,7 @@ const CustomersModule = {
                     '<h3>📋 ' + t('order_list') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th>ID</th><th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="text-right">' + t('loan_amount') + '</th><th class="text-right">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></tr></thead>' +
+                            '<thead><tr><th>ID</th><th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="text-right">' + t('loan_amount') + '</th><th class="text-right">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th><tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '<\/table>' +
                     '</div>' +
