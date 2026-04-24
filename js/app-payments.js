@@ -1,4 +1,4 @@
-// app-payments.js - v1.6（修复：lang 变量作用域提升到 try 块外部）
+// app-payments.js - v1.0
 
 window.APP = window.APP || {};
 
