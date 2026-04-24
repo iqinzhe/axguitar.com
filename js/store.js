@@ -1,4 +1,4 @@
-// store.js - v1.4（新增门店暂停/恢复功能）
+// store.js - v1.0（门店暂停/恢复功能）
 
 const StoreManager = {
     stores: [],
