@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.7（使用 Utils.renderActionRow 统一操作行）
+// app-dashboard-expenses.js - v1.0
 
 window.APP = window.APP || {};
 
