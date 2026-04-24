@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.1（修复：checkDuplicateCustomer 返回值 + sanitizeInput 正则优化）
+// app-blacklist.js - v1.0
 
 window.APP = window.APP || {};
 
