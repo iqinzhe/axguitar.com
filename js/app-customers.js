@@ -1,4 +1,4 @@
-// app-customers.js - v2.6（删除门店横幅 + 修复新增客户保存按钮）
+// app-customers.js - v2.7（修复 this 指向问题：内部调用使用 CustomersModule）
 
 window.APP = window.APP || {};
 
@@ -194,7 +194,7 @@ const CustomersModule = {
         try {
             await window.APP.removeFromBlacklist(customerId);
             alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
-            await APP.showCustomers();
+            await CustomersModule.showCustomers();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal membuka blacklist: ' + error.message : '解除拉黑失败：' + error.message);
         }
@@ -236,7 +236,7 @@ const CustomersModule = {
                 alert(lang === 'id' 
                     ? '✅ Nasabah "' + customer.name + '" telah ditambahkan ke blacklist.'
                     : '✅ 客户 "' + customer.name + '" 已加入黑名单。');
-                await APP.showCustomers();
+                await CustomersModule.showCustomers();
             } else {
                 throw new Error(lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
             }
@@ -313,7 +313,7 @@ const CustomersModule = {
             const newCustomer = await SUPABASE.createCustomer(customerData);
             
             alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
-            await APP.showCustomers();
+            await CustomersModule.showCustomers();
         } catch (error) {
             if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
             console.error("addCustomer error:", error);
@@ -407,7 +407,7 @@ const CustomersModule = {
             if (error) throw error;
             document.getElementById('editCustomerModal')?.remove();
             alert(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
-            await APP.showCustomers();
+            await CustomersModule.showCustomers();
         } catch (e) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
         }
@@ -432,7 +432,7 @@ const CustomersModule = {
             if (customerError) throw customerError;
             
             alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
-            await APP.showCustomers();
+            await CustomersModule.showCustomers();
         } catch (e) {
             console.error('删除客户异常:', e);
             alert(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
