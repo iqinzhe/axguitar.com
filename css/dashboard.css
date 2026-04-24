@@ -1,4 +1,4 @@
-/* dashboard.css - v4.2（资金管理卡片内容居中 + 按钮居中） */
+/* dashboard.css - v4.3（修复内部转账按钮居中） */
 
 /* === 卡片组件 === */
 .card {
@@ -144,8 +144,8 @@
 }
 
 .transfer-btn {
-    flex: 1 1 auto;
-    min-width: 60px;
+    flex: 0 0 auto;
+    min-width: 70px;
     max-width: none;
     padding: var(--spacing-1) var(--spacing-2);
     font-size: 0.65rem;
@@ -200,6 +200,7 @@
         font-size: var(--font-sm);
         padding: var(--spacing-2) var(--spacing-3);
         min-width: auto;
+        flex: 1 1 auto;
     }
 }
 
