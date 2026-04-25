@@ -1,12 +1,12 @@
-// app-dashboard-expenses.js - v1.8（操作按钮移入数据行，取消操作行）
+// app-dashboard-expenses.js - v1.9（修复 this.saveCurrentPageState 上下文错误、统一使用 APP 调用）
 
 window.APP = window.APP || {};
 
 const DashboardExpenses = {
 
     showExpenses: async function() {
-        this.currentPage = 'expenses';
-        this.saveCurrentPageState();
+        APP.currentPage = 'expenses';
+        APP.saveCurrentPageState();
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         try {
@@ -46,7 +46,6 @@ const DashboardExpenses = {
             }
             var todayDate = new Date().toISOString().split('T')[0];
 
-            // 总列数：日期、类别、金额、支付方式、描述、(门店)、(操作)
             var totalCols = isAdmin ? 7 : 6;
             
             var rows = '';
@@ -59,7 +58,6 @@ const DashboardExpenses = {
                     var methodText = (e.payment_method === 'cash') ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     var storeName = storeMap[e.store_id] || e.store_id || '-';
                     
-                    // 构建操作按钮
                     var actionHtml = '';
                     if (canEdit) {
                         actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button> ';
@@ -70,7 +68,6 @@ const DashboardExpenses = {
                         actionHtml += '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
                     }
                     
-                    // 平账按钮
                     if (isAdmin && !e.is_reconciled) {
                         actionHtml += ' <button onclick="APP.balanceExpenses()" class="btn-small btn-balance">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
                     }
@@ -202,7 +199,7 @@ const DashboardExpenses = {
             });
             
             alert(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
-            await this.showExpenses();
+            await APP.showExpenses();
         } catch (error) {
             console.error("addExpense error:", error);
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
@@ -225,7 +222,7 @@ const DashboardExpenses = {
                 await supabaseClient.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
                 
                 alert(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
-                await this.showExpenses();
+                await APP.showExpenses();
             }
         } catch (error) {
             console.error("editExpense error:", error);
@@ -242,7 +239,7 @@ const DashboardExpenses = {
         try {
             await supabaseClient.from('expenses').delete().eq('id', expenseId);
             alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
-            await this.showExpenses();
+            await APP.showExpenses();
         } catch (error) {
             console.error("deleteExpense error:", error);
             alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
@@ -325,7 +322,7 @@ const DashboardExpenses = {
                 ? '✅ Rekonsiliasi selesai! ' + count + ' pengeluaran telah direkonsiliasi.' 
                 : '✅ 平账完成！已平账 ' + count + ' 条支出记录。');
             
-            await this.showExpenses();
+            await APP.showExpenses();
             
         } catch (error) {
             console.error("balanceExpenses error:", error);
