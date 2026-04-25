@@ -1,4 +1,4 @@
-// app-payments.js - v1.2（修复表格头部HTML错误、管理员提示优化、打印Logo路径）
+// app-payments.js - v1.3（修复saveCurrentPageState调用）
 
 window.APP = window.APP || {};
 
@@ -54,9 +54,9 @@ const PaymentsModule = {
             return;
         }
 
-        this.currentPage = 'payment';
-        this.currentOrderId = orderId;
-        this.saveCurrentPageState();
+        APP.currentPage = 'payment';
+        APP.currentOrderId = orderId;
+        APP.saveCurrentPageState();  // 修复：this → APP
         
         try {
             var order = await SUPABASE.getOrder(orderId);
@@ -250,9 +250,9 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史') + '</div>' +
                                 '<div class="table-container">' +
                                     '<table class="history-table">' +
-                                        '<thead><tr><th class="text-center">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th>' + t('date') + '</th><th class="text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
-                                        '<tbody>' + interestRows + '</tbody>' +
-                                    '</table>' +
+                                        '<thead></tr><th class="text-center">' + (lang === 'id' ? 'Ke-' : '第几次') + '<\/th><th>' + t('date') + '<\/th><th class="text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '<\/th><th class="text-right">' + t('amount') + '<\/th><th>' + (lang === 'id' ? 'Metode' : '方式') + '<\/th><\/thead>' +
+                                        '<tbody>' + interestRows + '<\/tbody>' +
+                                    '<\/table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -281,10 +281,9 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史') + '</div>' +
                                 '<div class="table-container">' +
                                     '<table class="history-table">' +
-                                        // 修复1b：修正 </th> 与 </thead> 顺序
-                                        '<thead><tr><th>' + t('date') + '</th><th class="text-right">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="text-right">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="text-right">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
-                                        '<tbody>' + principalRows + '</tbody>' +
-                                    '</table>' +
+                                        '<thead><tr><th>' + t('date') + '<\/th><th class="text-right">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '<\/th><th class="text-right">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '<\/th><th class="text-right">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '<\/th><th>' + (lang === 'id' ? 'Metode' : '方式') + '<\/th><\/thead>' +
+                                        '<tbody>' + principalRows + '<\/tbody>' +
+                                    '<\/table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -293,29 +292,29 @@ const PaymentsModule = {
 
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '<\/h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-detail">📄 ' + t('order_details') + '</button>' +
-                    '</div>' +
-                '</div>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '<\/button>' +
+                        '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-detail">📄 ' + t('order_details') + '<\/button>' +
+                    '<\/div>' +
+                '<\/div>' +
                 '<div class="card summary-card">' +
                     '<div class="summary-grid">' +
-                        '<div class="summary-item"><span class="label">' + t('customer_name') + ':</span><span class="value">' + Utils.escapeHtml(order.customer_name) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">ID:</span><span class="value order-id">' + Utils.escapeHtml(order.order_id) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + t('loan_amount') + ':</span><span class="value">' + Utils.formatCurrency(loanAmount) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</span><span class="value ' + (remainingPrincipal > 0 ? 'warning' : 'success') + '">' + Utils.formatCurrency(remainingPrincipal) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + (lang === 'id' ? 'Bunga Bulanan' : '月利息') + ':</span><span class="value">' + Utils.formatCurrency(currentMonthlyInterest) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + t('payment_due_date') + ':</span><span class="value">' + nextDueDate + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + t('repayment_type') + ':</span><span class="value">' + (order.repayment_type === 'fixed' ? '📅 ' + t('fixed_repayment') : '💰 ' + t('flexible_repayment')) + (order.repayment_type === 'fixed' ? ' (' + order.repayment_term + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')' : '') + '</span></div>' +
-                        '<div class="summary-item"><span class="label">💎 ' + t('collateral_name') + ':</span><span class="value">' + Utils.escapeHtml(order.collateral_name || '-') + '</span></div>' +
-                        '<div class="summary-item"><span class="label">💰 ' + t('service_fee') + ':</span><span class="value">' + Utils.formatCurrency(serviceFeeAmount) + ' (' + (order.service_fee_percent || 0) + '%)</span></div>' +
-                        '<div class="summary-item"><span class="label">📋 ' + t('admin_fee') + ':</span><span class="value">' + Utils.formatCurrency(order.admin_fee) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">📈 ' + t('agreed_rate') + ':</span><span class="value">' + ((order.agreed_interest_rate || 0.08)*100).toFixed(0) + '%</span></div>' +
-                        '<div class="summary-item"><span class="label">✅ ' + t('admin_fee') + ':</span><span class="value success-text">' + adminFeePaidInfo + '</span></div>' +
-                        '<div class="summary-item"><span class="label">✅ ' + t('service_fee') + ':</span><span class="value success-text">' + serviceFeePaidInfo + '</span></div>' +
-                    '</div>' +
-                '</div>' +
+                        '<div class="summary-item"><span class="label">' + t('customer_name') + ':<\/span><span class="value">' + Utils.escapeHtml(order.customer_name) + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">ID:<\/span><span class="value order-id">' + Utils.escapeHtml(order.order_id) + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">' + t('loan_amount') + ':<\/span><span class="value">' + Utils.formatCurrency(loanAmount) + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':<\/span><span class="value ' + (remainingPrincipal > 0 ? 'warning' : 'success') + '">' + Utils.formatCurrency(remainingPrincipal) + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">' + (lang === 'id' ? 'Bunga Bulanan' : '月利息') + ':<\/span><span class="value">' + Utils.formatCurrency(currentMonthlyInterest) + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">' + t('payment_due_date') + ':<\/span><span class="value">' + nextDueDate + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">' + t('repayment_type') + ':<\/span><span class="value">' + (order.repayment_type === 'fixed' ? '📅 ' + t('fixed_repayment') : '💰 ' + t('flexible_repayment')) + (order.repayment_type === 'fixed' ? ' (' + order.repayment_term + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')' : '') + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">💎 ' + t('collateral_name') + ':<\/span><span class="value">' + Utils.escapeHtml(order.collateral_name || '-') + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">💰 ' + t('service_fee') + ':<\/span><span class="value">' + Utils.formatCurrency(serviceFeeAmount) + ' (' + (order.service_fee_percent || 0) + '%)<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">📋 ' + t('admin_fee') + ':<\/span><span class="value">' + Utils.formatCurrency(order.admin_fee) + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">📈 ' + t('agreed_rate') + ':<\/span><span class="value">' + ((order.agreed_interest_rate || 0.08)*100).toFixed(0) + '%<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">✅ ' + t('admin_fee') + ':<\/span><span class="value success-text">' + adminFeePaidInfo + '<\/span><\/div>' +
+                        '<div class="summary-item"><span class="label">✅ ' + t('service_fee') + ':<\/span><span class="value success-text">' + serviceFeePaidInfo + '<\/span><\/div>' +
+                    '<\/div>' +
+                '<\/div>' +
                 fixedRepaymentHtml +
                 flexibleRepaymentHtml +
                 '<style>' +
@@ -348,7 +347,7 @@ const PaymentsModule = {
                     '.text-right { text-align: right; }' +
                     '.text-success { color: #10b981; }' +
                     '@media (max-width: 768px) { .action-buttons { flex-direction: column; } .btn-action { width: 100%; } .summary-table .label { width: 70px; font-size: 11px; } .history-table { font-size: 10px; } }' +
-                '</style>';
+                '<\/style>';
 
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
@@ -539,7 +538,7 @@ const PaymentsModule = {
             // 修复9：Logo 使用绝对路径 /icons/pagehead-logo.png
             var html = '' +
             '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-            '<title>' + (lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证') + ' - ' + safeOrderId + '</title>' +
+            '<title>' + (lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证') + ' - ' + safeOrderId + '<\/title>' +
             '<style>' +
                 '*{box-sizing:border-box;margin:0;padding:0}' +
                 'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:12px;color:#1e293b;background:#fff}' +
@@ -561,48 +560,48 @@ const PaymentsModule = {
                 '.stamp{text-align:center;border:3px solid #16a34a;border-radius:50%;width:80px;height:80px;display:flex;align-items:center;justify-content:center;flex-direction:column;margin:10px auto;color:#16a34a;font-weight:700;font-size:11px}' +
                 '.footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:12px;border-top:1px solid #e2e8f0;padding-top:8px}' +
                 '@media print{@page{size:A5;margin:8mm}body{margin:0}.no-print{display:none}}' +
-            '</style></head><body>' +
+            '<\/style><\/head><body>' +
             '<div class="wrap">' +
                 '<div class="no-print">' +
-                    '<button class="btn-p" onclick="window.print()">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                    '<button class="btn-c" onclick="window.close()">' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
-                '</div>' +
+                    '<button class="btn-p" onclick="window.print()">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '<\/button>' +
+                    '<button class="btn-c" onclick="window.close()">' + (lang === 'id' ? 'Tutup' : '关闭') + '<\/button>' +
+                '<\/div>' +
                 '<div class="header">' +
                     '<div class="header-logo">' +
-                        '<img src="/icons/pagehead-logo.png" alt="JF!">' +
-                        '<h1>JF! by Gadai</h1>' +
-                    '</div>' +
-                    '<div><span class="badge">✅ ' + (lang === 'id' ? 'TANDA TERIMA PELUNASAN' : '结清凭证') + '</span></div>' +
-                    '<div style="margin-top:6px;font-size:11px;color:#475569">' + (lang === 'id' ? 'Tanggal Lunas' : '结清日期') + ': <strong>' + completedAt + '</strong> &nbsp;|&nbsp; ' + (lang === 'id' ? 'ID Pesanan' : '订单号') + ': <strong>' + safeOrderId + '</strong></div>' +
-                '</div>' +
+                        '<img src="\/icons\/pagehead-logo.png" alt="JF!">' +
+                        '<h1>JF! by Gadai<\/h1>' +
+                    '<\/div>' +
+                    '<div><span class="badge">✅ ' + (lang === 'id' ? 'TANDA TERIMA PELUNASAN' : '结清凭证') + '<\/span><\/div>' +
+                    '<div style="margin-top:6px;font-size:11px;color:#475569">' + (lang === 'id' ? 'Tanggal Lunas' : '结清日期') + ': <strong>' + completedAt + '<\/strong> &nbsp;|&nbsp; ' + (lang === 'id' ? 'ID Pesanan' : '订单号') + ': <strong>' + safeOrderId + '<\/strong><\/div>' +
+                '<\/div>' +
                 '<div class="section">' +
-                    '<h3>👤 ' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '</h3>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Nama' : '姓名') + '</span><span class="val">' + safeCustomer + '</span></div>' +
-                    '<div class="row"><span class="lbl">KTP</span><span class="val">' + safeKtp + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Telepon' : '电话') + '</span><span class="val">' + safePhone + '</span></div>' +
-                '</div>' +
+                    '<h3>👤 ' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '<\/h3>' +
+                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Nama' : '姓名') + '<\/span><span class="val">' + safeCustomer + '<\/span><\/div>' +
+                    '<div class="row"><span class="lbl">KTP<\/span><span class="val">' + safeKtp + '<\/span><\/div>' +
+                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Telepon' : '电话') + '<\/span><span class="val">' + safePhone + '<\/span><\/div>' +
+                '<\/div>' +
                 '<div class="section">' +
-                    '<h3>💎 ' + (lang === 'id' ? 'Jaminan' : '质押物') + '</h3>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Nama Barang' : '物品名称') + '</span><span class="val">' + safeCollateral + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Pinjaman Awal' : '原始贷款') + '</span><span class="val">' + Utils.formatCurrency(order.loan_amount) + '</span></div>' +
-                '</div>' +
+                    '<h3>💎 ' + (lang === 'id' ? 'Jaminan' : '质押物') + '<\/h3>' +
+                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Nama Barang' : '物品名称') + '<\/span><span class="val">' + safeCollateral + '<\/span><\/div>' +
+                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Pinjaman Awal' : '原始贷款') + '<\/span><span class="val">' + Utils.formatCurrency(order.loan_amount) + '<\/span><\/div>' +
+                '<\/div>' +
                 '<div class="section">' +
-                    '<h3>💰 ' + (lang === 'id' ? 'Ringkasan Pembayaran' : '付款汇总') + '</h3>' +
-                    '<div class="row"><span class="lbl">' + t('admin_fee') + '</span><span class="val">' + Utils.formatCurrency(totalAdminFee) + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + t('service_fee') + '</span><span class="val">' + Utils.formatCurrency(totalServiceFee) + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + t('interest') + '</span><span class="val">' + Utils.formatCurrency(totalInterest) + ' (' + (order.interest_paid_months || 0) + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</span></div>' +
-                    '<div class="row"><span class="lbl">' + t('principal') + '</span><span class="val">' + Utils.formatCurrency(totalPrincipal) + '</span></div>' +
-                    '<div class="total-row"><span>' + (lang === 'id' ? 'Total Dibayar' : '累计已付总额') + '</span><span>' + Utils.formatCurrency(grandTotal) + '</span></div>' +
-                '</div>' +
+                    '<h3>💰 ' + (lang === 'id' ? 'Ringkasan Pembayaran' : '付款汇总') + '<\/h3>' +
+                    '<div class="row"><span class="lbl">' + t('admin_fee') + '<\/span><span class="val">' + Utils.formatCurrency(totalAdminFee) + '<\/span><\/div>' +
+                    '<div class="row"><span class="lbl">' + t('service_fee') + '<\/span><span class="val">' + Utils.formatCurrency(totalServiceFee) + '<\/span><\/div>' +
+                    '<div class="row"><span class="lbl">' + t('interest') + '<\/span><span class="val">' + Utils.formatCurrency(totalInterest) + ' (' + (order.interest_paid_months || 0) + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')<\/span><\/div>' +
+                    '<div class="row"><span class="lbl">' + t('principal') + '<\/span><span class="val">' + Utils.formatCurrency(totalPrincipal) + '<\/span><\/div>' +
+                    '<div class="total-row"><span>' + (lang === 'id' ? 'Total Dibayar' : '累计已付总额') + '<\/span><span>' + Utils.formatCurrency(grandTotal) + '<\/span><\/div>' +
+                '<\/div>' +
                 '<div class="stamp">' +
-                    '<div style="font-size:18px">✅</div>' +
-                    '<div>' + (lang === 'id' ? 'LUNAS' : '结清') + '</div>' +
-                '</div>' +
+                    '<div style="font-size:18px">✅<\/div>' +
+                    '<div>' + (lang === 'id' ? 'LUNAS' : '结清') + '<\/div>' +
+                '<\/div>' +
                 '<div class="footer">' +
-                    '<div>🏪 ' + safeStore + ' &nbsp;|&nbsp; JF! by Gadai</div>' +
-                    '<div style="margin-top:3px">' + (lang === 'id' ? 'Terima kasih atas kepercayaan Anda' : '感谢您的信任') + '</div>' +
-                '</div>' +
-            '</div></body></html>';
+                    '<div>🏪 ' + safeStore + ' &nbsp;|&nbsp; JF! by Gadai<\/div>' +
+                    '<div style="margin-top:3px">' + (lang === 'id' ? 'Terima kasih atas kepercayaan Anda' : '感谢您的信任') + '<\/div>' +
+                '<\/div>' +
+            '<\/div><\/body><\/html>';
 
             var pw = window.open('', '_blank');
             pw.document.write(html);
