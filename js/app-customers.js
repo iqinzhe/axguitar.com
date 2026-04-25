@@ -1,4 +1,4 @@
-// app-customers.js - v2.9（修复 addCustomer 客户ID重复问题）
+// app-customers.js - v2.10（修复订单页面布局、保存刷新、黑名单功能）
 
 window.APP = window.APP || {};
 
@@ -39,7 +39,7 @@ const CustomersModule = {
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     var escapedId = Utils.escapeAttr(c.id);
                     
-                    rows += '<tr>' +
+                    rows += '<td>' +
                         '<td>' + customerId + '<\/td>' +
                         '<td>' + name + '<\/td>' +
                         '<td>' + ktpNumber + '<\/td>' +
@@ -201,18 +201,24 @@ const CustomersModule = {
         }
     },
 
+    // 修复黑名单功能
     blacklistCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
         
         try {
+            // 获取客户信息（使用 UUID）
             const { data: customer, error: customerError } = await supabaseClient
                 .from('customers')
-                .select('name, customer_id')
+                .select('id, name, customer_id, store_id')
                 .eq('id', customerId)
                 .single();
             
-            if (customerError) throw customerError;
+            if (customerError) {
+                console.error("获取客户信息失败:", customerError);
+                alert(lang === 'id' ? 'Gagal mendapatkan data nasabah' : '获取客户信息失败');
+                return;
+            }
             
             var reason = prompt(
                 lang === 'id' 
@@ -233,7 +239,7 @@ const CustomersModule = {
             }
             
             if (typeof window.APP.addToBlacklist === 'function') {
-                await window.APP.addToBlacklist(customerId, reason);
+                await window.APP.addToBlacklist(customer.id, reason);
                 alert(lang === 'id' 
                     ? '✅ Nasabah "' + customer.name + '" telah ditambahkan ke blacklist.'
                     : '✅ 客户 "' + customer.name + '" 已加入黑名单。');
@@ -254,7 +260,6 @@ const CustomersModule = {
         if (el) el.style.display = value === 'different' ? 'block' : 'none';
     },
 
-    // ========== 修复：addCustomer 添加重试机制，避免客户ID重复 ==========
     addCustomer: async function() {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -300,16 +305,13 @@ const CustomersModule = {
                 return;
             }
             
-            // ========== 修复：循环生成唯一客户ID，避免重复 ==========
             let maxRetries = 5;
             let lastError = null;
             
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    // 生成客户ID
                     const prefix = await SUPABASE._getStorePrefix(storeId);
                     
-                    // 查询当前门店的最大客户ID序号
                     const { data: customers, error: queryError } = await supabaseClient
                         .from('customers')
                         .select('customer_id')
@@ -333,7 +335,6 @@ const CustomersModule = {
                     const serial = String(nextNumber).padStart(3, '0');
                     const customerId = prefix + serial;
                     
-                    // 尝试插入
                     const customerData = {
                         customer_id: customerId,
                         store_id: storeId,
@@ -356,7 +357,6 @@ const CustomersModule = {
                     
                     if (error) {
                         if (error.code === '23505') {
-                            // 唯一约束冲突，重试
                             console.warn(`客户ID ${customerId} 已存在，重试第 ${attempt + 1} 次`);
                             lastError = error;
                             continue;
@@ -364,7 +364,6 @@ const CustomersModule = {
                         throw error;
                     }
                     
-                    // 成功
                     if (addBtn) {
                         addBtn.disabled = false;
                         addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
@@ -375,13 +374,12 @@ const CustomersModule = {
                     
                 } catch (err) {
                     if (err.code === '23505' && attempt < maxRetries - 1) {
-                        continue; // 重试
+                        continue;
                     }
                     throw err;
                 }
             }
             
-            // 所有重试都失败
             throw lastError || new Error(lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '无法生成唯一的客户ID');
             
         } catch (error) {
@@ -601,7 +599,7 @@ const CustomersModule = {
                         '<p><strong>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</strong> ' + (customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')) + '</p>' +
                     '</div>' +
                     '<h3>' + t('collateral_info') + '</h3>' +
-                    '<div class="form-grid">' +
+                    '<div class="form-grid order-form-grid">' +
                         '<div class="form-group">' +
                             '<label>' + t('collateral_name') + ' *</label>' +
                             '<input id="collateral" placeholder="' + t('collateral_name') + '">' +
@@ -614,29 +612,29 @@ const CustomersModule = {
                             '<label>' + (lang === 'id' ? 'Jumlah Gadai' : '当金金额') + ' *</label>' +
                             '<input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()">' +
                         '</div>' +
-                        '<div class="form-group">' +
+                        '<div class="form-group fund-source-group">' +
                             '<label>' + (lang === 'id' ? 'Sumber Dana' : '资金来源') + '</label>' +
-                            '<div class="payment-method-options">' +
+                            '<div class="payment-method-options fund-source-options">' +
                                 '<label><input type="radio" name="loanSource" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
                                 '<label><input type="radio" name="loanSource" value="bank"> 🏧 ' + t('bank') + '</label>' +
                             '</div>' +
                         '</div>' +
-                        '<div class="form-group">' +
+                        '<div class="form-group admin-fee-group">' +
                             '<label>📋 ' + (lang === 'id' ? 'Admin Fee (Otomatis, bisa diubah)' : '管理费（自动计算，可修改）') + '</label>' +
                             '<input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">' +
                             '<small style="color:#64748b;">' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
                         '</div>' +
-                        '<div class="form-group">' +
+                        '<div class="form-group service-fee-group">' +
                             '<label>✨ ' + (lang === 'id' ? 'Service Fee (Otomatis, bisa diubah)' : '服务费（自动计算，可修改）') + '</label>' +
                             '<div class="fee-calc-row">' +
-                                '<select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()">' +
+                                '<select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" class="fee-percent-select">' +
                                     Utils.getServiceFeePercentOptions(2) +
                                 '</select>' +
-                                '<input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()">' +
+                                '<input type="text" id="serviceFeeInput" value="0" class="amount-input fee-amount-input" oninput="APP.onServiceFeeManualChange()">' +
                             '</div>' +
                             '<small style="color:#64748b;">' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
                         '</div>' +
-                        '<div class="form-group">' +
+                        '<div class="form-group interest-rate-group">' +
                             '<label>📈 ' + (lang === 'id' ? 'Suku Bunga (Pilih)' : '利率（可选）') + '</label>' +
                             '<select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">' +
                                 Utils.getInterestRateOptions(10) +
@@ -675,22 +673,51 @@ const CustomersModule = {
                             '<textarea id="notes" rows="2" placeholder="' + t('notes') + '"></textarea>' +
                         '</div>' +
                         '<div class="form-actions">' +
-                            '<button onclick="APP.saveOrderWithCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success" id="saveOrderBtn">💾 ' + t('save') + '</button>' +
+                            '<button onclick="APP.saveOrderWithCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success" id="saveOrderBtn">💾 ' + (lang === 'id' ? 'Simpan & Segarkan' : '保存刷新') + '</button>' +
                             '<button onclick="APP.goBack()">↩️ ' + t('cancel') + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
                 '<style>' +
-                    '.repayment-type-group { grid-column: span 2; margin: 12px 0; padding: 12px; background: var(--bg-hover); border-radius: 12px; }' +
-                    '.repayment-type-label { font-weight: 600; margin-bottom: 10px; display: block; color: var(--text-secondary); }' +
+                    '.order-form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }' +
+                    '.order-form-grid .full-width { grid-column: span 2; }' +
+                    '.order-form-grid .repayment-type-group { grid-column: span 2; }' +
+                    '.order-form-grid .fixed-repayment-form { grid-column: span 2; }' +
+                    '.form-group { display: flex; flex-direction: column; gap: 6px; }' +
+                    '.form-group label { font-weight: 600; font-size: 0.85rem; color: #475569; }' +
+                    '.form-group input, .form-group select, .form-group textarea { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; }' +
+                    '.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }' +
+                    '.fund-source-group .fund-source-options { display: flex; gap: 24px; align-items: center; margin-top: 6px; }' +
+                    '.fund-source-options label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal; }' +
+                    '.fund-source-options input[type="radio"] { width: 16px; height: 16px; margin: 0; }' +
+                    '.service-fee-group .fee-calc-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }' +
+                    '.service-fee-group .fee-percent-select { width: 100px; padding: 10px; }' +
+                    '.service-fee-group .fee-amount-input { flex: 2; min-width: 150px; }' +
+                    '.repayment-type-group { margin: 12px 0; padding: 16px; background: #f8fafc; border-radius: 12px; }' +
+                    '.repayment-type-label { font-weight: 600; margin-bottom: 12px; display: block; color: #475569; }' +
                     '.repayment-type-options { display: flex; gap: 20px; flex-wrap: wrap; }' +
-                    '.repayment-option { flex: 1; min-width: 200px; padding: 12px; border: 2px solid var(--border-light); border-radius: 10px; cursor: pointer; transition: all 0.2s; background: white; }' +
-                    '.repayment-option:hover { border-color: var(--primary); background: var(--primary-soft); }' +
+                    '.repayment-option { flex: 1; min-width: 200px; padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: all 0.2s; background: white; }' +
+                    '.repayment-option:hover { border-color: #2563eb; background: #eff6ff; }' +
                     '.repayment-option input { margin-right: 8px; }' +
                     '.repayment-option .option-title { font-weight: 700; display: inline-block; margin-bottom: 4px; }' +
-                    '.repayment-option .option-desc { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; }' +
-                    '.fixed-repayment-form { grid-column: span 2; padding: 12px; background: #f0fdf4; border-radius: 10px; margin: 8px 0; }' +
-                    '@media (max-width: 768px) { .repayment-type-options { flex-direction: column; } }' +
+                    '.repayment-option .option-desc { display: block; font-size: 11px; color: #64748b; margin-top: 4px; }' +
+                    '.fixed-repayment-form { padding: 16px; background: #f0fdf4; border-radius: 10px; margin: 8px 0; }' +
+                    '.form-actions { grid-column: span 2; display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; }' +
+                    '.form-actions button { padding: 12px 24px; font-size: 1rem; }' +
+                    '@media (max-width: 768px) { ' +
+                        '.order-form-grid { grid-template-columns: 1fr; gap: 16px; }' +
+                        '.order-form-grid .full-width { grid-column: span 1; }' +
+                        '.order-form-grid .repayment-type-group { grid-column: span 1; }' +
+                        '.order-form-grid .fixed-repayment-form { grid-column: span 1; }' +
+                        '.fund-source-group .fund-source-options { flex-direction: column; align-items: flex-start; gap: 8px; }' +
+                        '.service-fee-group .fee-calc-row { flex-direction: column; align-items: flex-start; }' +
+                        '.service-fee-group .fee-percent-select { width: 100%; }' +
+                        '.service-fee-group .fee-amount-input { width: 100%; }' +
+                        '.repayment-type-options { flex-direction: column; }' +
+                        '.repayment-option { min-width: auto; }' +
+                        '.form-actions { grid-column: span 1; flex-direction: column; }' +
+                        '.form-actions button { width: 100%; }' +
+                    '}' +
                 '</style>';
             
             var amountInput = document.getElementById("amount");
@@ -917,11 +944,11 @@ const CustomersModule = {
             
             alert(successMsg);
             
-            if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
-                window.APP.goBack();
-            } else {
+            // 保存后刷新页面
+            setTimeout(function() {
                 window.location.reload();
-            }
+            }, 1500);
+            
         } catch (error) {
             if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
             console.error("saveOrderWithCustomer error:", error);
@@ -1002,7 +1029,7 @@ const CustomersModule = {
                     '<h3>📋 ' + t('order_list') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th>ID</th><th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="text-right">' + t('loan_amount') + '</th><th class="text-right">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th><tr></thead>' +
+                            '<thead><tr><th>ID</th><th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="text-right">' + t('loan_amount') + '</th><th class="text-right">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '<\/table>' +
                     '</div>' +
