@@ -1,4 +1,4 @@
-// supabase.js - v1.7（修复客户ID重复问题，添加重试机制）
+// supabase.js - v1.8（统一默认利率8%、最大展期月数可配置）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -202,11 +202,9 @@ const SupabaseAPI = {
         return prefix + serial;
     },
 
-    // ========== 修复：_generateCustomerId 添加重试机制 ==========
     async _generateCustomerId(storeId) {
         const prefix = await this._getStorePrefix(storeId);
         
-        // 使用 MAX 查询获取最大序号
         const { data, error } = await supabaseClient
             .from('customers')
             .select('customer_id')
@@ -228,7 +226,6 @@ const SupabaseAPI = {
         return prefix + serial;
     },
 
-    // ========== 修复：createCustomer 添加重试机制，避免客户ID重复 ==========
     async createCustomer(customerData) {
         const profile = await this.getCurrentProfile();
         const storeId = customerData.store_id || profile.store_id;
@@ -262,7 +259,6 @@ const SupabaseAPI = {
                 
                 if (error) {
                     if (error.code === '23505') {
-                        // 唯一约束冲突，重试
                         console.warn(`客户ID ${customerId} 已存在，重试第 ${retryCount + 1} 次`);
                         retryCount++;
                         lastError = error;
@@ -464,7 +460,6 @@ const SupabaseAPI = {
         return { order: order, payments: data };
     },
 
-    // ========== 创建订单（支持实际费用） ==========
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
@@ -472,7 +467,8 @@ const SupabaseAPI = {
         const adminFee = orderData.admin_fee || Utils.calculateAdminFee(orderData.loan_amount);
         const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
         const serviceFeeAmount = orderData.service_fee_amount || 0;
-        const agreedInterestRate = (orderData.agreed_interest_rate || 10) / 100;
+        // 修复2：默认利率统一为 8%（即 0.08）
+        const agreedInterestRate = (orderData.agreed_interest_rate || 8) / 100;
         const repaymentType = orderData.repayment_type || 'flexible';
         const repaymentTerm = orderData.repayment_term || null;
         
@@ -540,7 +536,9 @@ const SupabaseAPI = {
                     agreed_service_fee_rate: serviceFeePercent / 100,
                     fixed_paid_months: 0,
                     overdue_days: 0,
-                    liquidation_status: 'normal'
+                    liquidation_status: 'normal',
+                    // 修复5：最大展期月数，支持配置（默认10个月）
+                    max_extension_months: orderData.max_extension_months || 10
                 };
 
                 const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
@@ -658,6 +656,7 @@ const SupabaseAPI = {
         return true;
     },
 
+    // 修复2 + 修复5：默认利率 0.08，最大展期月数从订单读取
     async recordInterestPayment(orderId, months, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -667,7 +666,8 @@ const SupabaseAPI = {
             throw new Error(Utils.t('order_completed'));
         }
         
-        const monthlyRate = currentOrder.agreed_interest_rate || 0.10;
+        // 修复2：默认利率 0.08（8%）
+        const monthlyRate = currentOrder.agreed_interest_rate || 0.08;
         
         const loanAmount = currentOrder.loan_amount || 0;
         const principalPaid = currentOrder.principal_paid || 0;
@@ -678,7 +678,8 @@ const SupabaseAPI = {
         const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
         const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + totalInterest;
         
-        const maxMonths = 10;
+        // 修复5：最大月数从订单配置读取（默认10个月）
+        const maxMonths = currentOrder.max_extension_months || 10;
         
         if (newInterestPaidMonths > maxMonths) {
             throw new Error(Utils.lang === 'id' 
@@ -733,6 +734,7 @@ const SupabaseAPI = {
         return true;
     },
 
+    // 修复2：默认利率 0.08
     async recordPrincipalPayment(orderId, amount, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -758,7 +760,8 @@ const SupabaseAPI = {
         
         const newPrincipalPaid = principalPaid + paidAmount;
         const newPrincipalRemaining = loanAmount - newPrincipalPaid;
-        const monthlyRate = currentOrder.agreed_interest_rate || 0.10;
+        // 修复2：默认利率 0.08
+        const monthlyRate = currentOrder.agreed_interest_rate || 0.08;
         
         let updates = { 
             principal_paid: newPrincipalPaid, 
@@ -819,6 +822,7 @@ const SupabaseAPI = {
         return true;
     },
 
+    // 修复2：默认利率 0.08
     async recordFixedPayment(orderId, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -840,7 +844,8 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? '❌ Pesanan sudah lunas' : '❌ 订单已结清');
         }
         
-        const monthlyRate = order.agreed_interest_rate || 0.10;
+        // 修复2：默认利率 0.08
+        const monthlyRate = order.agreed_interest_rate || 0.08;
         const remainingPrincipal = order.principal_remaining;
         const interestAmount = remainingPrincipal * monthlyRate;
         const principalAmount = fixedPayment - interestAmount;
@@ -934,6 +939,7 @@ const SupabaseAPI = {
         return true;
     },
 
+    // 修复2：默认利率 0.08
     async earlySettleFixedOrder(orderId, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -949,7 +955,8 @@ const SupabaseAPI = {
         
         const paidMonths = order.fixed_paid_months || 0;
         const remainingPrincipal = order.principal_remaining;
-        const monthlyRate = order.agreed_interest_rate || 0.10;
+        // 修复2：默认利率 0.08
+        const monthlyRate = order.agreed_interest_rate || 0.08;
         const remainingMonths = order.repayment_term - paidMonths;
         
         const settlementAmount = remainingPrincipal;
@@ -1274,9 +1281,6 @@ const SupabaseAPI = {
         if (error) throw error;
         return data;
     },
-
-    // 注意：createCustomer 已在上方修复，这里保留引用
-    // 但为了确保修复生效，上面的 createCustomer 函数已完整替换
 
     async getCashFlowRecords(storeId, startDate, endDate) {
         const profile = await this.getCurrentProfile();
