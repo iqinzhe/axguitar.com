@@ -1,4 +1,4 @@
-// app-payments.js - v1.0
+// app-payments.js - v1.1（修复打印页面Logo显示）
 
 window.APP = window.APP || {};
 
@@ -254,7 +254,7 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史') + '</div>' +
                                 '<div class="table-container">' +
                                     '<table class="history-table">' +
-                                        '<thead><tr><th>' + t('date') + '</th><th class="text-right">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="text-right">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="text-right">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
+                                        '<thead><tr><th>' + t('date') + '</th><th class="text-right">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="text-right">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="text-right">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></td></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -472,6 +472,7 @@ const PaymentsModule = {
         }
     },
 
+    // 修复：结清凭证打印页面添加Logo
     printSettlementReceipt: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -506,6 +507,7 @@ const PaymentsModule = {
             var safeCollateral = Utils.escapeHtml(order.collateral_name || '-');
             var safeStore = Utils.escapeHtml(AUTH.getCurrentStoreName ? AUTH.getCurrentStoreName() : '-');
 
+            // 修复：添加Logo并调整尺寸（Logo大于标题文字）
             var html = '' +
             '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
             '<title>' + (lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证') + ' - ' + safeOrderId + '</title>' +
@@ -517,7 +519,9 @@ const PaymentsModule = {
                 '.no-print button{margin:0 5px;padding:7px 18px;cursor:pointer;border:none;border-radius:4px;font-size:13px}' +
                 '.btn-p{background:#16a34a;color:#fff}.btn-c{background:#64748b;color:#fff}' +
                 '.header{text-align:center;border-bottom:2px solid #16a34a;padding-bottom:10px;margin-bottom:14px}' +
-                '.header h1{font-size:20px;color:#16a34a;margin:6px 0 2px}' +
+                '.header-logo{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px}' +
+                '.header-logo img{height:32px;width:auto}' +
+                '.header-logo h1{font-size:22px;margin:0;color:#16a34a}' +
                 '.badge{display:inline-block;background:#dcfce7;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 14px;font-weight:700;font-size:13px;margin-top:4px}' +
                 '.section{border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;margin-bottom:10px}' +
                 '.section h3{font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;border-bottom:1px solid #f1f5f9;padding-bottom:4px}' +
@@ -535,8 +539,8 @@ const PaymentsModule = {
                     '<button class="btn-c" onclick="window.close()">' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
                 '</div>' +
                 '<div class="header">' +
-                    '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">' +
-                        '<img src="icons/pagehead-logo.png" alt="JF!" style="height:28px">' +
+                    '<div class="header-logo">' +
+                        '<img src="icons/pagehead-logo.png" alt="JF!">' +
                         '<h1>JF! by Gadai</h1>' +
                     '</div>' +
                     '<div><span class="badge">✅ ' + (lang === 'id' ? 'TANDA TERIMA PELUNASAN' : '结清凭证') + '</span></div>' +
