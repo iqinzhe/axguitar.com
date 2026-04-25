@@ -1,4 +1,4 @@
-// app-customers.js - v3.0（重构创建订单页面：三卡片布局、费用卡片统合、保存后清空表单）
+// app-customers.js - v3.1（新建订单页面美化：两卡片并排、统一提示、四列网格）
 
 window.APP = window.APP || {};
 
@@ -173,19 +173,9 @@ const CustomersModule = {
             '.address-option-inline label { white-space: nowrap; }' +
             '.btn-blacklist { background: #f97316 !important; color: #fff !important; border-color: #ea580c !important; }' +
             '.btn-blacklist:hover { background: #ea580c !important; }' +
-            '.fee-calc-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }' +
-            '.fee-calc-row .fee-label { min-width: 60px; font-weight: 600; font-size: 0.8rem; }' +
-            '.fee-calc-row input { width: 150px; }' +
-            '.fee-calc-row select { width: auto; min-width: 80px; }' +
-            '.max-extension-config { margin-top: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }' +
-            '.max-extension-config label { font-size: 0.8rem; font-weight: 600; color: #475569; white-space: nowrap; }' +
-            '.max-extension-config select { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; }' +
             '@media (max-width: 768px) { ' +
                 '.customer-table th, .customer-table td { font-size: 0.7rem; padding: 6px 4px; } ' +
                 '.address-option-inline { flex-direction: column; gap: 8px; } ' +
-                '.fee-calc-row { flex-direction: column; align-items: flex-start; } ' +
-                '.fee-calc-row input { width: 100%; } ' +
-                '.max-extension-config { flex-direction: column; align-items: flex-start; } ' +
             '}';
         document.head.appendChild(style);
     },
@@ -513,7 +503,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 核心：创建订单页面（重构版） ====================
+    // ==================== 核心：创建订单页面（美化版：两卡片并排 + 统一提示 + 四列网格） ====================
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang || 'id';
         var t = function(key) { return Utils.t(key); };
@@ -584,10 +574,7 @@ const CustomersModule = {
             APP.currentPage = 'createOrder';
             APP.currentCustomerId = customerId;
             
-            // 获取当前选中的还款方式（用于页面初始化）
-            var currentRepaymentType = 'flexible';
-            
-            // ========== 重构后的页面布局 ==========
+            // ========== 美化后的页面布局 ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>📝 ' + t('create_order') + '</h2>' +
@@ -597,7 +584,7 @@ const CustomersModule = {
                 '</div>' +
                 
                 '<div class="card">' +
-                    '<h3>' + t('customer_info') + '</h3>' +
+                    '<h3>👤 ' + t('customer_info') + '</h3>' +
                     '<div class="customer-info-display">' +
                         '<p><strong>' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + ':</strong> ' + Utils.escapeHtml(customer.customer_id || '-') + '</p>' +
                         '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(customer.name) + '</p>' +
@@ -608,7 +595,9 @@ const CustomersModule = {
                     '</div>' +
                     
                     '<h3>💎 ' + t('collateral_info') + '</h3>' +
-                    '<div class="form-grid order-form-grid">' +
+                    
+                    '<!-- 第一行表单：四列网格 -->' +
+                    '<div class="order-first-row">' +
                         '<div class="form-group">' +
                             '<label>' + t('collateral_name') + ' *</label>' +
                             '<input id="collateral" placeholder="' + t('collateral_name') + '">' +
@@ -630,38 +619,47 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    '<!-- 费用卡片：管理费 + 服务费（统一入账方式） -->' +
-                    '<div class="fee-card">' +
-                        '<h3>💰 ' + (lang === 'id' ? 'Biaya Administrasi & Layanan' : '管理费与服务费') + '</h3>' +
-                        
-                        '<div class="fee-row">' +
-                            '<div class="fee-label">📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</div>' +
-                            '<div class="fee-value">' +
-                                '<input type="text" id="adminFeeInput" value="0" class="amount-input fee-amount" oninput="APP.onAdminFeeManualChange()">' +
-                                '<small>' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
+                    '<!-- 费用区域：两卡片并排 -->' +
+                    '<div class="fees-two-columns">' +
+                        '<!-- 左：管理费卡片 -->' +
+                        '<div class="fee-card-item">' +
+                            '<div class="fee-card-title">' +
+                                '<span>📋</span> ' + (lang === 'id' ? 'Admin Fee' : '管理费') +
+                            '</div>' +
+                            '<div class="fee-card-value">' +
+                                '<input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">' +
                             '</div>' +
                         '</div>' +
-                        
-                        '<div class="fee-row">' +
-                            '<div class="fee-label">✨ ' + (lang === 'id' ? 'Service Fee' : '服务费') + '</div>' +
-                            '<div class="fee-value fee-value-row">' +
-                                '<select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" class="fee-percent-select">' +
+                        '<!-- 右：服务费卡片 -->' +
+                        '<div class="fee-card-item">' +
+                            '<div class="fee-card-title">' +
+                                '<span>✨</span> ' + (lang === 'id' ? 'Service Fee' : '服务费') +
+                            '</div>' +
+                            '<div class="service-fee-controls">' +
+                                '<select id="serviceFeePercentSelect" class="fee-percent-select" onchange="APP.recalculateServiceFee()">' +
                                     Utils.getServiceFeePercentOptions(2) +
                                 '</select>' +
-                                '<input type="text" id="serviceFeeInput" value="0" class="amount-input fee-amount" oninput="APP.onServiceFeeManualChange()">' +
-                                '<small>' + (lang === 'id' ? 'Otomatis dihitung dari jumlah gadai' : '根据当金自动计算') + '</small>' +
+                                '<input type="text" id="serviceFeeInput" value="0" class="fee-amount-input amount-input" oninput="APP.onServiceFeeManualChange()">' +
                             '</div>' +
                         '</div>' +
-                        
-                        '<div class="fee-row payment-method-row">' +
-                            '<div class="fee-label">📥 ' + (lang === 'id' ? 'Metode Pemasukan' : '入账方式') + '</div>' +
-                            '<div class="fee-value">' +
-                                '<div class="payment-method-options fee-payment-options">' +
-                                    '<label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
-                                    '<label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ' + t('bank') + '</label>' +
-                                '</div>' +
-                                '<small style="color:#64748b;">' + (lang === 'id' ? 'Admin Fee & Service Fee akan dicatat bersama' : '管理费和服务费将一起入账') + '</small>' +
-                            '</div>' +
+                    '</div>' +
+                    
+                    '<!-- 统一提示（只显示一次） -->' +
+                    '<div class="hint-container">' +
+                        '<span class="auto-calc-hint">💡 ' + (lang === 'id' ? 'Dihitung otomatis berdasarkan jumlah gadai' : '根据当金金额自动计算') + '</span>' +
+                    '</div>' +
+                    
+                    '<!-- 入账方式（独立一行） -->' +
+                    '<div class="payment-method-row">' +
+                        '<div class="payment-method-title">' +
+                            '<span>📥</span> ' + (lang === 'id' ? 'Metode Pemasukan' : '入账方式') +
+                        '</div>' +
+                        '<div class="payment-options">' +
+                            '<label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
+                            '<label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ' + t('bank') + '</label>' +
+                        '</div>' +
+                        '<div class="payment-hint">' +
+                            '💡 ' + (lang === 'id' ? 'Admin Fee & Service Fee akan dicatat bersama' : '管理费和服务费将一起入账') +
                         '</div>' +
                     '</div>' +
                     
@@ -734,22 +732,42 @@ const CustomersModule = {
                 '</div>' +
                 
                 '<style>' +
-                    '.order-form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }' +
-                    '.order-form-grid .form-group { margin-bottom: 0; }' +
+                    '/* 第一行表单：四列网格 */' +
+                    '.order-first-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }' +
                     
-                    '.fee-card { background: #f8fafc; border-radius: 12px; padding: 16px; margin: 12px 0; border: 1px solid #e2e8f0; }' +
-                    '.fee-card h3 { margin: 0 0 12px 0; font-size: 1rem; color: #1e293b; }' +
-                    '.fee-row { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }' +
-                    '.fee-row .fee-label { min-width: 100px; font-weight: 600; font-size: 0.85rem; color: #475569; padding-top: 8px; }' +
-                    '.fee-row .fee-value { flex: 1; min-width: 200px; }' +
-                    '.fee-value-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }' +
-                    '.fee-amount { width: 180px; }' +
-                    '.fee-percent-select { width: 80px; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; }' +
-                    '.fee-payment-options { display: flex; gap: 20px; align-items: center; }' +
-                    '.fee-payment-options label { display: inline-flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; }' +
-                    '.fee-payment-options input[type="radio"] { width: 16px; height: 16px; margin: 0; }' +
-                    '.fee-row small { display: block; font-size: 11px; color: #64748b; margin-top: 4px; }' +
+                    '/* 费用区域：两卡片并排 */' +
+                    '.fees-two-columns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0 8px 0; }' +
                     
+                    '/* 费用卡片通用样式 */' +
+                    '.fee-card-item { background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 16px; transition: all 0.2s ease; }' +
+                    '.fee-card-item:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-color: #cbd5e1; }' +
+                    '.fee-card-title { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: #1e293b; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }' +
+                    '.fee-card-value input { width: 100%; padding: 10px 12px; font-size: 1rem; text-align: right; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; }' +
+                    '.fee-card-value input:focus { outline: none; border-color: #2563eb; background: #ffffff; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }' +
+                    
+                    '/* 服务费控件：一行两列 */' +
+                    '.service-fee-controls { display: flex; gap: 12px; align-items: center; }' +
+                    '.service-fee-controls .fee-percent-select { flex: 1; min-width: 80px; padding: 10px 8px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 0.9rem; cursor: pointer; }' +
+                    '.service-fee-controls .fee-amount-input { flex: 2; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; text-align: right; background: #f8fafc; font-size: 1rem; }' +
+                    '.service-fee-controls .fee-percent-select:focus, .service-fee-controls .fee-amount-input:focus { outline: none; border-color: #2563eb; background: #ffffff; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }' +
+                    
+                    '/* 统一提示 */' +
+                    '.hint-container { text-align: center; margin: 4px 0 16px 0; }' +
+                    '.auto-calc-hint { font-size: 11px; color: #64748b; padding: 6px 16px; background: #f1f5f9; border-radius: 20px; display: inline-block; }' +
+                    
+                    '/* 入账方式行 */' +
+                    '.payment-method-row { background: #f0fdf4; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #bbf7d0; }' +
+                    '.payment-method-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #166534; margin-bottom: 12px; font-size: 0.9rem; }' +
+                    '.payment-options { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }' +
+                    '.payment-options label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal; color: #1e293b; }' +
+                    '.payment-options input[type="radio"] { width: 16px; height: 16px; margin: 0; cursor: pointer; }' +
+                    '.payment-hint { font-size: 11px; color: #64748b; margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; }' +
+                    
+                    '/* 利率选择 */' +
+                    '.interest-rate-group { margin: 12px 0; }' +
+                    '.interest-rate-group select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; }' +
+                    
+                    '/* 三卡片布局 */' +
                     '.repayment-cards-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 16px 0; }' +
                     '.repayment-card { background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; }' +
                     '.repayment-card:hover { border-color: #2563eb; background: #eff6ff; }' +
@@ -762,25 +780,40 @@ const CustomersModule = {
                     '.extension-select select { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: white; margin-bottom: 8px; }' +
                     '.extension-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0; color: #d97706; }' +
                     
-                    '.interest-rate-group { margin: 12px 0; }' +
-                    '.interest-rate-group select { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #cbd5e1; }' +
+                    '/* 固定还款额外表单 */' +
+                    '.fixed-repayment-form { padding: 16px; background: #f0fdf4; border-radius: 12px; margin: 16px 0; border: 1px solid #bbf7d0; }' +
+                    '.fixed-repayment-form .form-group { margin-bottom: 12px; }' +
+                    '.fixed-repayment-form .form-group:last-child { margin-bottom: 0; }' +
+                    '.fixed-repayment-form label { font-weight: 600; font-size: 0.85rem; color: #166534; margin-bottom: 6px; display: block; }' +
                     
-                    '.fixed-repayment-form { padding: 16px; background: #f0fdf4; border-radius: 10px; margin: 8px 0; border: 1px solid #bbf7d0; }' +
-                    
+                    '/* 响应式 */' +
+                    '@media (max-width: 1024px) { .order-first-row { grid-template-columns: repeat(2, 1fr); gap: 12px; } }' +
                     '@media (max-width: 768px) { ' +
-                        '.order-form-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }' +
+                        '.fees-two-columns { grid-template-columns: 1fr; gap: 12px; }' +
                         '.repayment-cards-row { grid-template-columns: 1fr; gap: 12px; }' +
-                        '.fee-row { flex-direction: column; gap: 8px; }' +
-                        '.fee-row .fee-label { padding-top: 0; }' +
-                        '.fee-value-row { flex-direction: column; align-items: stretch; }' +
-                        '.fee-percent-select { width: 100%; }' +
-                        '.fee-amount { width: 100%; }' +
-                        '.fund-source-options .payment-method-options { flex-direction: row; flex-wrap: wrap; }' +
-                        '.fee-payment-options { flex-direction: row; flex-wrap: wrap; }' +
+                        '.payment-options { gap: 16px; }' +
                     '}' +
+                    '@media (max-width: 640px) { .order-first-row { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; } }' +
+                    '@media (max-width: 480px) { .service-fee-controls { flex-direction: column; gap: 8px; } .service-fee-controls .fee-percent-select, .service-fee-controls .fee-amount-input { width: 100%; flex: auto; } }' +
                     
-                    '@media (min-width: 769px) and (max-width: 1024px) { ' +
-                        '.order-form-grid { grid-template-columns: repeat(2, 1fr); }' +
+                    '/* 打印样式 */' +
+                    '@media print { ' +
+                        '.fees-two-columns { display: block; }' +
+                        '.fee-card-item { border: 1px solid #ccc; margin-bottom: 12px; page-break-inside: avoid; background: white; box-shadow: none; }' +
+                        '.fee-card-value input, .service-fee-controls select, .service-fee-controls input { border: none; padding: 0; background: transparent; display: inline; width: auto; font-size: 11pt; }' +
+                        '.service-fee-controls { display: block; }' +
+                        '.auto-calc-hint { background: none; padding: 0; border: none; color: #333; }' +
+                        '.hint-container { margin: 8px 0; }' +
+                        '.payment-method-row { border: 1px solid #ccc; background: white; page-break-inside: avoid; }' +
+                        '.payment-options label { display: inline-block; margin-right: 15px; }' +
+                        '.order-first-row { display: block; }' +
+                        '.order-first-row .form-group { margin-bottom: 6px; }' +
+                        '.repayment-cards-row { display: block; margin: 16px 0; }' +
+                        '.repayment-card { border: 1px solid #ccc; margin-bottom: 12px; page-break-inside: avoid; background: white; box-shadow: none; }' +
+                        '.repayment-card:hover { transform: none; border-color: #ccc; }' +
+                        '.repayment-card-header input[type="radio"] { display: inline-block; border: 1px solid #000; }' +
+                        '.extension-select select { border: none; padding: 0; background: transparent; font-size: 10pt; }' +
+                        '.fixed-repayment-form { border: 1px solid #ccc; background: white; page-break-inside: avoid; }' +
                     '}' +
                 '</style>';
             
@@ -806,7 +839,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 保存订单（重构版：保存后清空表单，停留当前页） ====================
+    // ==================== 保存订单（保存后清空表单，停留当前页） ====================
     saveOrderForCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t.bind(Utils);
