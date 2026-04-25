@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.2（修复saveCurrentPageState调用，改用APP.navigateTo统一管理）
+// app-blacklist.js - v1.3（返回键统一位置 + 页面优化）
 
 window.APP = window.APP || {};
 
@@ -261,7 +261,7 @@ const BlacklistModule = {
         };
     },
     
-    // 显示黑名单列表页面 - 修复：改用 APP.navigateTo 统一管理
+    // 显示黑名单列表页面 - 统一返回键位置
     showBlacklist: async function() {
         // 修复：设置页面状态，通过 APP.navigateTo 统一管理
         APP.currentPage = 'blacklist';
@@ -296,7 +296,7 @@ const BlacklistModule = {
                         <td data-label="${t('phone')}">${Utils.escapeHtml(customer.phone || '-')}</td>
                         <td data-label="${lang === 'id' ? 'Alasan' : '原因'}">${Utils.escapeHtml(item.reason)}</td>
                         <td data-label="${lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期'}">${Utils.formatDate(item.blacklisted_at)}</td>
-                     </tr>
+                      </tr>
                     <tr class="action-row"><td colspan="${isAdmin ? 6 : 5}">${actionHtml}</td></tr>`;
                 }
             }
