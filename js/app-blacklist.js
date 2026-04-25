@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.1（修复黑名单功能，使用UUID正确关联）
+// app-blacklist.js - v1.2（修复saveCurrentPageState调用，改用APP.navigateTo统一管理）
 
 window.APP = window.APP || {};
 
@@ -261,8 +261,12 @@ const BlacklistModule = {
         };
     },
     
-    // 显示黑名单列表页面
+    // 显示黑名单列表页面 - 修复：改用 APP.navigateTo 统一管理
     showBlacklist: async function() {
+        // 修复：设置页面状态，通过 APP.navigateTo 统一管理
+        APP.currentPage = 'blacklist';
+        APP.saveCurrentPageState();
+        
         const lang = Utils.lang;
         const t = Utils.t;
         const profile = await SUPABASE.getCurrentProfile();
@@ -292,7 +296,7 @@ const BlacklistModule = {
                         <td data-label="${t('phone')}">${Utils.escapeHtml(customer.phone || '-')}</td>
                         <td data-label="${lang === 'id' ? 'Alasan' : '原因'}">${Utils.escapeHtml(item.reason)}</td>
                         <td data-label="${lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期'}">${Utils.formatDate(item.blacklisted_at)}</td>
-                    </tr>
+                     </tr>
                     <tr class="action-row"><td colspan="${isAdmin ? 6 : 5}">${actionHtml}</td></tr>`;
                 }
             }
