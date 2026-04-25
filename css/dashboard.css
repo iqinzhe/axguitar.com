@@ -1,6 +1,8 @@
-/* dashboard.css - v4.4（资金管理按钮全部竖向排列） */
+/* dashboard.css - v2.0（只保留页面布局特有样式） */
 
-/* === 卡片组件 === */
+/* ============================================================
+   D1. 卡片组件（全页面统一容器）
+   ============================================================ */
 .card {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
@@ -24,63 +26,38 @@
     font-weight: 600;
 }
 
-/* === 统计卡片网格 === */
-.stats-grid-optimized {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+
+/* ============================================================
+   D2. 页面头部（标题 + 操作按钮）
+   ============================================================ */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-3);
+    flex-wrap: wrap;
     gap: var(--spacing-2);
-    margin-bottom: var(--spacing-4);
 }
 
-@media (max-width: 640px) {
-    .stats-grid-optimized {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-.stat-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-medium);
-    padding: var(--spacing-2) var(--spacing-3);
-    text-align: center;
-    transition: var(--transition);
-}
-
-.stat-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
-
-.stat-value {
-    font-size: var(--font-lg);
-    font-weight: 700;
-    margin-bottom: var(--spacing-1);
+.page-header h1,
+.page-header h2 {
+    margin: 0;
+    font-size: var(--font-xl);
+    font-weight: 600;
     color: var(--text-primary);
 }
 
-.stat-value.income {
-    color: var(--success-dark);
-}
-
-.stat-value.expense {
-    color: var(--danger-dark);
-}
-
-.stat-label {
-    font-size: var(--font-xs);
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+.header-actions {
+    display: flex;
     gap: var(--spacing-2);
-    margin-bottom: var(--spacing-4);
+    flex-wrap: wrap;
+    align-items: center;
 }
 
-/* === 资金管理区块 === */
+
+/* ============================================================
+   D3. 资金管理区块（仪表盘专属）
+   ============================================================ */
 .cashflow-summary {
     background: var(--bg-card);
     border-radius: var(--radius-xl);
@@ -122,19 +99,21 @@
     font-size: var(--font-xl);
     font-weight: 700;
     color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
 }
 
 .cashflow-item .value.negative {
     color: var(--danger-dark);
 }
 
-.cashflow-detail {
+.cashflow-item .cashflow-detail {
     font-size: var(--font-xs);
     color: var(--text-muted);
     margin-top: var(--spacing-1);
     line-height: 1.4;
 }
 
+/* 转账按钮区域 */
 .transfer-buttons {
     display: flex;
     flex-direction: column;
@@ -179,21 +158,10 @@
     border-color: #93c5fd;
 }
 
-/* 手机端保持竖向 */
-@media (max-width: 768px) {
-    .cashflow-stats {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-2);
-    }
-    
-    .transfer-btn {
-        white-space: normal;
-        font-size: var(--font-sm);
-        padding: var(--spacing-2) var(--spacing-3);
-    }
-}
 
-/* === 工具栏 === */
+/* ============================================================
+   D4. 工具栏（仪表盘功能入口网格）
+   ============================================================ */
 .toolbar {
     display: grid;
     gap: var(--spacing-2);
@@ -204,19 +172,14 @@
     border: 1px solid var(--border-medium);
 }
 
+/* 管理员：5列 */
 .toolbar.admin-grid {
     grid-template-columns: repeat(5, 1fr);
 }
 
+/* 门店：6列 */
 .toolbar.store-grid {
     grid-template-columns: repeat(6, 1fr);
-}
-
-@media (max-width: 768px) {
-    .toolbar.admin-grid,
-    .toolbar.store-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
 }
 
 .toolbar button {
@@ -235,155 +198,32 @@
     font-size: var(--font-sm);
 }
 
-/* === 基础按钮 === */
-button {
-    padding: var(--spacing-2) var(--spacing-3);
-    border-radius: var(--radius-md);
-    border: 1px solid transparent;
-    font-size: var(--font-sm);
-    font-weight: 500;
-    cursor: pointer;
-    transition: var(--transition);
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--border-medium);
-}
 
-button:hover {
-    background: var(--border-light);
-    transform: translateY(-1px);
-}
-
-button:active {
-    transform: translateY(0);
-}
-
-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.btn-back {
+/* ============================================================
+   D5. 底部信息卡片（仪表盘专属）
+   ============================================================ */
+.dashboard-footer-card {
     background: var(--bg-hover);
     border: 1px solid var(--border-medium);
+}
+
+.dashboard-footer-card h3 {
+    font-size: var(--font-md);
+    margin-bottom: var(--spacing-1);
+    border-bottom: none;
+}
+
+.dashboard-footer-card p {
+    font-size: var(--font-sm);
     color: var(--text-secondary);
+    margin-bottom: var(--spacing-1);
+    line-height: 1.5;
 }
 
-.btn-back:hover {
-    background: var(--border-light);
-    color: var(--text-primary);
-}
 
-.btn-print {
-    background: var(--text-secondary);
-    color: white;
-    border: none;
-}
-
-.btn-print:hover {
-    background: var(--text-primary);
-}
-
-.btn-export {
-    background: var(--success-dark);
-    color: white;
-    border: none;
-}
-
-.btn-export:hover {
-    background: var(--success);
-}
-
-.btn-balance {
-    background: var(--warning-dark);
-    color: white;
-    border: none;
-}
-
-.btn-balance:hover {
-    background: var(--warning);
-}
-
-.btn-detail {
-    background: var(--primary-dark);
-    color: white;
-    border: none;
-}
-
-.btn-detail:hover {
-    background: var(--primary);
-}
-
-button.success,
-.btn-success {
-    background: var(--success-dark);
-    color: white;
-    border: none;
-}
-
-button.success:hover,
-.btn-success:hover {
-    background: var(--success);
-}
-
-button.warning,
-.btn-warning {
-    background: var(--warning-dark);
-    color: white;
-    border: none;
-}
-
-button.warning:hover,
-.btn-warning:hover {
-    background: var(--warning);
-}
-
-button.danger,
-.btn-danger {
-    background: var(--danger-dark);
-    color: white;
-    border: none;
-}
-
-button.danger:hover,
-.btn-danger:hover {
-    background: var(--danger);
-}
-
-button.warning.highlight {
-    background: var(--warning-dark);
-    animation: pulse 1.5s infinite;
-    font-weight: 600;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3); }
-}
-
-.capital-btn {
-    background: var(--primary-dark);
-    color: white;
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--font-sm);
-    border: none;
-}
-
-.capital-btn:hover {
-    background: var(--primary);
-}
-
-.btn-action {
-    padding: var(--spacing-2) var(--spacing-4);
-    font-size: var(--font-sm);
-    width: 100%;
-    margin-top: var(--spacing-2);
-}
-
-/* ========================================
-   缴费页面 - 订单详情布局
-   ======================================== */
+/* ============================================================
+   D6. 缴费页面 - 订单摘要网格
+   ============================================================ */
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -432,35 +272,10 @@ button.warning.highlight {
     color: var(--success-dark);
 }
 
-@media (max-width: 768px) {
-    .summary-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-1);
-    }
-    
-    .summary-item {
-        padding: var(--spacing-1);
-        gap: var(--spacing-1);
-    }
-    
-    .summary-item .label {
-        font-size: var(--font-xs);
-    }
-    
-    .summary-item .value {
-        font-size: var(--font-xs);
-    }
-}
 
-@media (max-width: 480px) {
-    .summary-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* ========================================
-   缴费页面 - 双列布局
-   ======================================== */
+/* ============================================================
+   D7. 缴费页面 - 双列操作卡片
+   ============================================================ */
 .payment-double-column {
     display: flex;
     flex-wrap: wrap;
@@ -474,6 +289,274 @@ button.warning.highlight {
     margin-bottom: 0;
 }
 
+
+/* ============================================================
+   D8. 缴费页面 - 操作卡片特有样式
+   ============================================================ */
+.action-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-3);
+}
+
+.action-card .card-header h3 {
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.action-card .card-body {
+    margin-bottom: var(--spacing-3);
+}
+
+.action-card .card-history {
+    margin-top: var(--spacing-3);
+    padding-top: var(--spacing-3);
+    border-top: 1px solid var(--border-light);
+}
+
+.card-history .history-title {
+    font-size: var(--font-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-2);
+}
+
+
+/* ============================================================
+   D9. 缴费页面 - 操作输入组
+   ============================================================ */
+.action-input-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin: var(--spacing-3) 0;
+}
+
+.action-input-group .action-label {
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.action-input-group .action-select,
+.action-input-group .action-input {
+    flex: 1;
+    padding: var(--spacing-2);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    font-size: var(--font-sm);
+}
+
+
+/* ============================================================
+   D10. 缴费页面 - 信息盒子
+   ============================================================ */
+.info-box {
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-3);
+}
+
+.info-box .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-2);
+    padding-bottom: var(--spacing-2);
+    border-bottom: 1px solid var(--border-light);
+    font-size: var(--font-sm);
+}
+
+.info-box .info-row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.info-box.success-box {
+    border-left: 4px solid #10b981;
+    background: #f0fdf4;
+}
+
+.info-box.warning-box {
+    border-left: 4px solid var(--warning);
+    background: var(--warning-light);
+}
+
+.info-box .amount-highlight {
+    font-size: var(--font-lg);
+    color: #10b981;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   D11. 缴费页面 - 提示卡片
+   ============================================================ */
+.card-info {
+    margin-top: var(--spacing-3);
+    padding: var(--spacing-2) var(--spacing-3);
+    background: var(--bg-hover);
+    border-radius: var(--radius-md);
+    font-size: var(--font-xxs);
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+
+/* ============================================================
+   D12. 按钮变体（页面操作按钮）
+   ============================================================ */
+button {
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    font-size: var(--font-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-medium);
+}
+
+button:hover {
+    background: var(--border-light);
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 返回按钮 */
+.btn-back {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-medium);
+    color: var(--text-secondary);
+}
+
+.btn-back:hover {
+    background: var(--border-light);
+    color: var(--text-primary);
+}
+
+/* 打印按钮 */
+.btn-print {
+    background: var(--text-secondary);
+    color: white;
+    border: none;
+}
+
+.btn-print:hover {
+    background: var(--text-primary);
+}
+
+/* 导出按钮 */
+.btn-export {
+    background: var(--success-dark);
+    color: white;
+    border: none;
+}
+
+.btn-export:hover {
+    background: var(--success);
+}
+
+/* 平账按钮 */
+.btn-balance {
+    background: var(--warning-dark);
+    color: white;
+    border: none;
+}
+
+.btn-balance:hover {
+    background: var(--warning);
+}
+
+/* 详情按钮 */
+.btn-detail {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+}
+
+.btn-detail:hover {
+    background: var(--primary);
+}
+
+/* 语义化按钮 */
+button.success,
+.btn-success {
+    background: var(--success-dark);
+    color: white;
+    border: none;
+}
+
+button.success:hover,
+.btn-success:hover {
+    background: var(--success);
+}
+
+button.warning,
+.btn-warning {
+    background: var(--warning-dark);
+    color: white;
+    border: none;
+}
+
+button.warning:hover,
+.btn-warning:hover {
+    background: var(--warning);
+}
+
+button.danger,
+.btn-danger {
+    background: var(--danger-dark);
+    color: white;
+    border: none;
+}
+
+button.danger:hover,
+.btn-danger:hover {
+    background: var(--danger);
+}
+
+/* 提醒按钮高亮动画 */
+button.warning.highlight {
+    background: var(--warning-dark);
+    animation: pulse 1.5s infinite;
+    font-weight: 600;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3); }
+}
+
+/* 资金按钮 */
+.capital-btn {
+    background: var(--primary-dark);
+    color: white;
+    padding: var(--spacing-2) var(--spacing-3);
+    font-size: var(--font-sm);
+    border: none;
+}
+
+.capital-btn:hover {
+    background: var(--primary);
+}
+
+/* 全宽操作按钮 */
 .btn-action {
     display: inline-flex !important;
     align-items: center;
@@ -500,6 +583,7 @@ button.warning.highlight {
     background: var(--success);
 }
 
+/* 提前结清按钮 */
 .btn-action.early-settle {
     background: #7c3aed;
     color: white;
@@ -509,6 +593,7 @@ button.warning.highlight {
     background: #6d28d9;
 }
 
+/* 操作按钮容器 */
 .action-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -517,308 +602,408 @@ button.warning.highlight {
     margin-top: var(--spacing-2);
 }
 
+
+/* ============================================================
+   D13. 模态框
+   ============================================================ */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-modal);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-4);
+}
+
+.modal-content {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-4);
+    width: 100%;
+    max-width: 550px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-medium);
+}
+
+.modal-content h3 {
+    font-size: var(--font-lg);
+    margin-bottom: var(--spacing-3);
+    color: var(--text-primary);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-3);
+    margin-top: var(--spacing-4);
+}
+
+
+/* ============================================================
+   D14. 登录页面
+   ============================================================ */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--bg-page) 100%);
+    padding: var(--spacing-4);
+}
+
+.login-box {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-card);
+    padding: 32px 28px;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-medium);
+}
+
+.login-box .login-title {
+    font-size: 1.5rem;
+    margin-bottom: 28px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.login-box .lang-toggle {
+    text-align: right;
+    margin-bottom: 20px;
+}
+
+.login-box .lang-btn {
+    background: transparent;
+    color: var(--primary-dark);
+    border: 1px solid var(--border-medium);
+    padding: 6px 14px;
+    font-size: var(--font-sm);
+    border-radius: var(--radius-md);
+}
+
+.login-box .lang-btn:hover {
+    background: var(--primary-soft);
+    transform: none;
+}
+
+.login-box .form-group {
+    margin-bottom: 20px;
+}
+
+.login-box .form-group label {
+    font-size: var(--font-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.login-box input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: var(--font-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-medium);
+    transition: var(--transition);
+    color: var(--text-primary);
+    background: var(--bg-card);
+}
+
+.login-box input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.login-box button {
+    width: 100%;
+    padding: 12px;
+    font-size: var(--font-md);
+    font-weight: 600;
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    margin-top: 8px;
+}
+
+.login-box button:hover {
+    background: var(--primary);
+    transform: translateY(-1px);
+}
+
+.login-box .login-note {
+    margin-top: 24px;
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+    text-align: center;
+}
+
+
+/* ============================================================
+   D15. 加载动画
+   ============================================================ */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: var(--bg-page);
+}
+
+.loader {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-light);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: var(--text-secondary);
+    margin-top: var(--spacing-4);
+    font-size: var(--font-sm);
+}
+
+
+/* ============================================================
+   D16. 报错信息
+   ============================================================ */
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: var(--bg-page);
+    padding: var(--spacing-5);
+}
+
+.error-card {
+    max-width: 400px;
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-6);
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-medium);
+}
+
+.error-icon {
+    font-size: var(--font-2xl);
+    margin-bottom: var(--spacing-3);
+}
+
+.error-title {
+    color: var(--danger-dark);
+    margin-bottom: var(--spacing-2);
+    font-size: var(--font-lg);
+}
+
+.error-message {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-4);
+    font-size: var(--font-sm);
+}
+
+.error-btn {
+    background: var(--primary-dark);
+    color: white;
+    padding: var(--spacing-2) var(--spacing-4);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-sm);
+    border: none;
+}
+
+
+/* ============================================================
+   D17. 手机端
+   ============================================================ */
 @media (max-width: 768px) {
+    /* 资金管理：单列 */
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
+    /* 转账按钮 */
+    .transfer-btn {
+        white-space: normal;
+        font-size: var(--font-sm);
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    /* 工具栏：2列 */
+    .toolbar.admin-grid,
+    .toolbar.store-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* 摘要网格：2列 */
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-1);
+    }
+
+    .summary-item {
+        padding: var(--spacing-1);
+        gap: var(--spacing-1);
+    }
+
+    .summary-item .label {
+        font-size: var(--font-xs);
+    }
+
+    .summary-item .value {
+        font-size: var(--font-xs);
+    }
+
+    /* 缴费双列：单列 */
     .payment-double-column {
         flex-direction: column;
         gap: var(--spacing-2);
     }
-    
+
     .payment-double-column .card {
         min-width: auto;
     }
-    
+
+    /* 底部卡片文字缩小 */
+    .dashboard-footer-card p {
+        font-size: var(--font-xs);
+    }
+
+    /* 按钮全宽 */
     .btn-action {
         width: 100% !important;
         text-align: center;
     }
-    
+
     .action-buttons {
         flex-direction: column;
     }
-    
+
     .action-buttons .btn-action {
         width: 100% !important;
     }
 }
 
-/* ========================================
-   门店管理 - 现金流汇总卡片样式
-   ======================================== */
-.cashflow-card {
-    margin-bottom: var(--spacing-4);
-}
-
-.cashflow-card .cashflow-stats {
-    display: flex;
-    gap: var(--spacing-3);
-    flex-wrap: wrap;
-}
-
-.cashflow-item-card {
-    flex: 1;
-    min-width: 160px;
-    background: var(--bg-hover);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-2) var(--spacing-3);
-    transition: all 0.2s ease;
-    border: 1px solid var(--border-light);
-    text-align: center;
-}
-
-.cashflow-item-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.cashflow-item-card .label {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-1);
-}
-
-.cashflow-item-card .value {
-    font-size: var(--font-xl);
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.cashflow-item-card .value.negative {
-    color: var(--danger-dark);
-}
-
-.cashflow-item-card .sub {
-    font-size: var(--font-xs);
-    color: var(--text-muted);
-    margin-top: var(--spacing-1);
-}
-
-.cashflow-note {
-    font-size: var(--font-xs);
-    color: var(--text-secondary);
-    margin-top: var(--spacing-2);
-    padding-top: var(--spacing-1);
-    border-top: 1px solid var(--border-light);
-}
-
-@media (max-width: 640px) {
-    .cashflow-card .cashflow-stats {
-        flex-direction: column;
-    }
-    .cashflow-item-card {
-        min-width: auto;
-    }
-}
-
-/* === 底部卡片 === */
-.dashboard-footer-card {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-medium);
-}
-
-.dashboard-footer-card h3 {
-    font-size: var(--font-md);
-    margin-bottom: var(--spacing-1);
-    border-bottom: none;
-}
-
-.dashboard-footer-card p {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-1);
-    line-height: 1.5;
-}
-
-@media (max-width: 768px) {
-    .dashboard-footer-card p {
-        font-size: var(--font-xs);
-    }
-}
-
-/* ============================================
-   新建订单页面 - 三卡片一行布局
-   ============================================ */
-
-/* 三卡片容器 */
-.repayment-cards-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin: 24px 0;
-}
-
-/* 卡片通用样式 */
-.repayment-card {
-    background: white;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 16px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.repayment-card:hover {
-    border-color: #2563eb;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-/* 卡片选中状态 */
-.repayment-card-active {
-    border-color: #2563eb;
-    background: #eff6ff;
-}
-
-/* 卡片头部 */
-.repayment-card-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-.repayment-card-header input[type="radio"] {
-    width: 18px;
-    height: 18px;
-    margin: 0;
-    cursor: pointer;
-    accent-color: #2563eb;
-}
-
-.repayment-card-title {
-    font-weight: 700;
-    font-size: 0.95rem;
-    color: #1e293b;
-}
-
-/* 卡片描述 */
-.repayment-card-desc {
-    font-size: 0.75rem;
-    color: #64748b;
-    margin-bottom: 8px;
-    line-height: 1.4;
-}
-
-.repayment-card-note {
-    font-size: 0.7rem;
-    color: #94a3b8;
-}
-
-/* 最大展期卡片（第三张） */
-.extension-card .repayment-card-header {
-    margin-bottom: 16px;
-}
-
-.extension-card .repayment-card-title {
-    margin-left: 28px;  /* 与前面卡片对齐（无单选框） */
-}
-
-.extension-select select {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #cbd5e1;
-    font-size: 0.9rem;
-    background: white;
-    margin-bottom: 12px;
-    cursor: pointer;
-}
-
-.extension-select select:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.extension-note {
-    font-size: 0.7rem;
-    color: #d97706;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid #e2e8f0;
-}
-
-/* 固定还款额外表单 */
-.fixed-repayment-form {
-    padding: 16px;
-    background: #f0fdf4;
-    border-radius: 12px;
-    margin: 16px 0;
-    border: 1px solid #bbf7d0;
-}
-
-.fixed-repayment-form .form-group {
-    margin-bottom: 12px;
-}
-
-.fixed-repayment-form .form-group:last-child {
-    margin-bottom: 0;
-}
-
-.fixed-repayment-form label {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #166534;
-    margin-bottom: 6px;
-    display: block;
-}
-
-/* ============================================
-   响应式调整
-   ============================================ */
-@media (max-width: 768px) {
-    .repayment-cards-row {
+@media (max-width: 480px) {
+    .summary-grid {
         grid-template-columns: 1fr;
-        gap: 12px;
-        margin: 16px 0;
-    }
-    
-    .extension-card .repayment-card-title {
-        margin-left: 0;
     }
 }
 
-/* ============================================
-   打印样式
-   ============================================ */
+
+/* ============================================================
+   D18. 打印样式
+   ============================================================ */
 @media print {
-    .repayment-cards-row {
-        display: block;
-        margin: 16px 0;
+    @page {
+        size: A4 landscape;
+        margin: 5mm 8mm;
     }
-    
-    .repayment-card {
-        border: 1px solid #ccc;
-        margin-bottom: 12px;
-        page-break-inside: avoid;
-        background: white;
-        box-shadow: none;
+
+    body {
+        background: #fff !important;
+        color: #000 !important;
+        font-size: 9pt !important;
     }
-    
-    .repayment-card:hover {
-        transform: none;
-        border-color: #ccc;
+
+    /* 隐藏所有交互元素 */
+    .page-header .header-actions,
+    .toolbar,
+    .btn-print,
+    .btn-back,
+    .btn-export,
+    .btn-balance,
+    .btn-detail,
+    .lang-toggle,
+    .transfer-buttons,
+    .action-buttons,
+    .action-row,
+    .modal-overlay,
+    button:not(.print-visible),
+    .no-print {
+        display: none !important;
     }
-    
-    .repayment-card-active {
-        border-color: #999;
-        background: white;
+
+    /* 避免分页截断 */
+    .card,
+    .cashflow-summary,
+    .payment-double-column,
+    .action-card,
+    .dashboard-footer-card {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
     }
-    
-    .repayment-card-header input[type="radio"] {
-        display: inline-block;
-        border: 1px solid #000;
+
+    /* 资金管理 */
+    .cashflow-stats {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
     }
-    
-    .extension-select select {
-        border: none;
-        padding: 0;
-        background: transparent;
-        font-size: 10pt;
+
+    .cashflow-item {
+        flex: 1 !important;
+        min-width: 130px !important;
+        text-align: left !important;
+        padding: 6px !important;
     }
-    
-    .fixed-repayment-form {
-        border: 1px solid #ccc;
-        background: white;
-        page-break-inside: avoid;
+
+    /* 卡片 */
+    .card,
+    .cashflow-summary {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        margin-bottom: 6px !important;
+        padding: 6px 8px !important;
+    }
+
+    .card h3 {
+        border-bottom: none !important;
+        text-decoration: none !important;
+        margin-bottom: 4px !important;
+    }
+
+    .dashboard-footer-card {
+        margin-top: 4px !important;
+        padding-top: 4px !important;
+        font-size: 7pt !important;
+        border-top: none !important;
+    }
+
+    #app {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* 打印时文字左对齐 */
+    .cashflow-item .label,
+    .cashflow-item .value,
+    .summary-item .label,
+    .summary-item .value {
+        text-align: left !important;
     }
 }
