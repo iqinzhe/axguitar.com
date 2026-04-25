@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.9（修复 this.saveCurrentPageState 上下文错误、统一使用 APP 调用）
+// app-dashboard-expenses.js - v2.0（返回键统一位置 + 支出页面优化）
 
 window.APP = window.APP || {};
 
