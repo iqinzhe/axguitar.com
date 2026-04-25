@@ -1,17 +1,17 @@
-// app-dashboard-orders.js - v1.8（资金流水移除操作行）
+// app-dashboard-orders.js - v1.9（修复 this.saveCurrentPageState 上下文错误、统一使用 APP 调用）
 
 window.APP = window.APP || {};
 
 const DashboardOrders = {
 showOrderTable: async function() {
-    this.currentPage = 'orderTable';
-    this.saveCurrentPageState();
+    APP.currentPage = 'orderTable';
+    APP.saveCurrentPageState();
     var lang = Utils.lang;
     var t = function(key) { return Utils.t(key); };
     var profile = await SUPABASE.getCurrentProfile();
     var isAdmin = profile?.role === 'admin';
     try {
-        var filters = { status: this.currentFilter, search: '' };
+        var filters = { status: APP.currentFilter, search: '' };
         var orders = await SUPABASE.getOrders(filters);
         var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
         
@@ -82,10 +82,10 @@ showOrderTable: async function() {
                 '</div>' +
             '</div>' +
             '<div class="toolbar">' +
-                '<select id="statusFilter" onchange="window.APP.filterOrders(this.value)">' +
-                    '<option value="all" ' + (this.currentFilter === 'all' ? 'selected' : '') + '>' + (lang === 'id' ? 'Semua Pesanan' : '全部订单') + '</option>' +
-                    '<option value="active" ' + (this.currentFilter === 'active' ? 'selected' : '') + '>' + t('active') + '</option>' +
-                    '<option value="completed" ' + (this.currentFilter === 'completed' ? 'selected' : '') + '>' + t('completed') + '</option>' +
+                '<select id="statusFilter" onchange="APP.filterOrders(this.value)">' +
+                    '<option value="all" ' + (APP.currentFilter === 'all' ? 'selected' : '') + '>' + (lang === 'id' ? 'Semua Pesanan' : '全部订单') + '</option>' +
+                    '<option value="active" ' + (APP.currentFilter === 'active' ? 'selected' : '') + '>' + t('active') + '</option>' +
+                    '<option value="completed" ' + (APP.currentFilter === 'completed' ? 'selected' : '') + '>' + t('completed') + '</option>' +
                 '</select>' +
             '</div>' +
             '<div class="card info-card">' +
@@ -161,26 +161,25 @@ showOrderTable: async function() {
             console.error('订单ID为空');
             return;
         }
-        window.APP.navigateTo('payment', { orderId: orderId });
+        APP.navigateTo('payment', { orderId: orderId });
     },
 
     filterOrders: function(status) { 
-        var self = this;
-        self.currentFilter = status; 
-        self.showOrderTable(); 
+        APP.currentFilter = status; 
+        APP.showOrderTable(); 
     },
 
     viewOrder: async function(orderId) {
-        this.currentPage = 'viewOrder';
-        this.currentOrderId = orderId;
-        this.saveCurrentPageState();
+        APP.currentPage = 'viewOrder';
+        APP.currentOrderId = orderId;
+        APP.saveCurrentPageState();
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
             var order = result.order;
             var payments = result.payments;
             if (!order) { 
                 alert(Utils.t('order_not_found')); 
-                this.goBack(); 
+                APP.goBack(); 
                 return; 
             }
             var lang = Utils.lang;
@@ -297,7 +296,7 @@ showOrderTable: async function() {
         } catch (error) {
             console.error("viewOrder error:", error);
             alert(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
-            this.goBack();
+            APP.goBack();
         }
     },
 
@@ -326,7 +325,7 @@ showOrderTable: async function() {
             }
             
             alert(Utils.t('order_deleted'));
-            await this.showOrderTable();
+            await APP.showOrderTable();
         } catch (error) {
             console.error("deleteOrder error:", error);
             alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
@@ -442,10 +441,9 @@ showOrderTable: async function() {
         }
     },
 
-    // ========== 资金流水：纯账目记录，无操作行 ==========
     showPaymentHistory: async function() {
-        this.currentPage = 'paymentHistory';
-        this.saveCurrentPageState();
+        APP.currentPage = 'paymentHistory';
+        APP.saveCurrentPageState();
         var lang = Utils.lang;
         var t = Utils.t.bind(Utils);
         try {
