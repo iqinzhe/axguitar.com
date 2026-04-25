@@ -1,14 +1,16 @@
-/* base.css - v4.0（字体加大 + 配色优化） */
+/* base.css - v5.0（全局基础：变量、重置、排版、工具类） */
 
-/* === 全局变量 - 统一配色方案 === */
+/* ============================================================
+   G1. CSS 变量 - 统一设计令牌
+   ============================================================ */
 :root {
-    /* 主色调 */
+    /* --- 主色调 --- */
     --primary: #2563eb;
     --primary-light: #60a5fa;
     --primary-soft: #dbeafe;
     --primary-dark: #1d4ed8;
-    
-    /* 功能色 */
+
+    /* --- 功能色 --- */
     --success: #10b981;
     --success-dark: #059669;
     --success-light: #ecfdf5;
@@ -18,37 +20,37 @@
     --danger: #ef4444;
     --danger-dark: #dc2626;
     --danger-light: #fef2f2;
-    
-    /* 背景色系 */
+
+    /* --- 背景色系 --- */
     --bg-page: #f8fafc;
     --bg-card: #ffffff;
     --bg-highlight: #f0f9ff;
     --bg-hover: #f1f5f9;
     --bg-modal: rgba(15, 23, 42, 0.5);
-    
-    /* 文字色系 */
+
+    /* --- 文字色系 --- */
     --text-primary: #0f172a;
     --text-secondary: #475569;
     --text-muted: #64748b;
     --text-white: #ffffff;
-    
-    /* 边框色 */
+
+    /* --- 边框色 --- */
     --border-light: #e2e8f0;
     --border-medium: #cbd5e1;
-    
-    /* 阴影 */
+
+    /* --- 阴影 --- */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.08);
     --shadow-lg: 0 4px 8px -1px rgb(0 0 0 / 0.1);
-    
-    /* 圆角 */
+
+    /* --- 圆角 --- */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-2xl: 20px;
-    
-    /* 间距 */
+
+    /* --- 间距 --- */
     --spacing-1: 4px;
     --spacing-2: 8px;
     --spacing-3: 12px;
@@ -57,11 +59,11 @@
     --spacing-6: 24px;
     --spacing-7: 28px;
     --spacing-8: 32px;
-    
-    /* 过渡 */
+
+    /* --- 过渡 --- */
     --transition: all 0.2s ease;
-    
-    /* 字体大小（整体加大） */
+
+    /* --- 字体大小 --- */
     --font-xxs: 0.75rem;
     --font-xs: 0.8rem;
     --font-sm: 0.9rem;
@@ -71,8 +73,13 @@
     --font-2xl: 1.35rem;
 }
 
-/* === 重置与基础 === */
-* {
+
+/* ============================================================
+   G2. 重置
+   ============================================================ */
+*,
+*::before,
+*::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -81,6 +88,7 @@
 html {
     font-size: 16px;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -88,108 +96,67 @@ body {
     background: var(--bg-page);
     color: var(--text-primary);
     line-height: 1.6;
+    min-height: 100vh;
 }
 
-/* ========== PC端（≥769px）======= */
-@media (min-width: 769px) {
-    html {
-        font-size: 17px;
-    }
-    
-    button, .btn-small, .btn-action {
-        font-size: var(--font-sm);
-    }
-    
-    .data-table td, .data-table th {
-        font-size: var(--font-sm);
-    }
-    
-    .stat-value {
-        font-size: var(--font-lg);
-    }
-    
-    .stat-label {
-        font-size: var(--font-xs);
-    }
-    
-    .page-header h1, .page-header h2 {
-        font-size: var(--font-xl);
-    }
-    
-    .card h3 {
-        font-size: var(--font-md);
-    }
-    
-    .toolbar button {
-        font-size: var(--font-sm);
-    }
-    
-    .cashflow-summary .value {
-        font-size: var(--font-xl);
-    }
-    
-    .cashflow-summary .label {
-        font-size: var(--font-sm);
-    }
-    
-    .form-group label {
-        font-size: var(--font-sm);
-    }
-    
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        font-size: var(--font-md);
-    }
+img {
+    max-width: 100%;
+    height: auto;
 }
 
-/* ========== 手机端（≤768px）======= */
-@media (max-width: 768px) {
-    html {
-        font-size: 15px;
-    }
-    
-    button, .btn-small, .btn-action {
-        font-size: var(--font-xs);
-        padding: 8px 14px;
-    }
-    
-    .data-table td, .data-table th {
-        font-size: var(--font-xs);
-    }
-    
-    .stat-value {
-        font-size: var(--font-md);
-    }
-    
-    .page-header h1, .page-header h2 {
-        font-size: var(--font-lg);
-    }
-    
-    .card h3 {
-        font-size: var(--font-md);
-    }
-    
-    .toolbar button {
-        font-size: var(--font-xs);
-    }
-    
-    .cashflow-summary .value {
-        font-size: var(--font-lg);
-    }
-    
-    .form-group label {
-        font-size: var(--font-xs);
-    }
-    
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        font-size: var(--font-sm);
-    }
+
+/* ============================================================
+   G3. 排版基础
+   ============================================================ */
+h1, h2, h3, h4, h5, h6 {
+    line-height: 1.3;
+    color: var(--text-primary);
 }
 
-/* === Logo 图片统一 === */
+p {
+    margin-bottom: var(--spacing-2);
+}
+
+a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+small {
+    font-size: var(--font-xxs);
+    color: var(--text-muted);
+}
+
+strong {
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   G4. 布局容器
+   ============================================================ */
+#app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--spacing-4);
+    background: var(--bg-page);
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-4);
+}
+
+
+/* ============================================================
+   G5. Logo 图片
+   ============================================================ */
 h1 img,
 .page-header h1 img {
     height: 1.8em;
@@ -203,295 +170,174 @@ h1 img,
     vertical-align: middle;
 }
 
-/* === 布局容器 === */
-#app {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: var(--spacing-4);
-    background: var(--bg-page);
-}
 
-@media (min-width: 769px) {
-    #app {
-        padding: var(--spacing-3) var(--spacing-4);
-    }
-}
+/* ============================================================
+   G6. 工具类
+   ============================================================ */
+.text-center   { text-align: center !important; }
+.text-right    { text-align: right !important; }
+.text-left     { text-align: left !important; }
+.text-muted    { color: var(--text-muted) !important; }
+.text-warning  { color: var(--warning-dark) !important; }
+.text-success  { color: var(--success-dark) !important; }
+.text-danger   { color: var(--danger-dark) !important; }
+.text-primary  { color: var(--primary-dark) !important; }
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 var(--spacing-4);
-}
+.income  { color: var(--success-dark) !important; }
+.expense { color: var(--danger-dark) !important; }
 
-/* === 页面头部 === */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-3);
-    flex-wrap: wrap;
-    gap: var(--spacing-2);
-}
-
-.page-header h1,
-.page-header h2 {
-    margin: 0;
-    font-size: var(--font-xl);
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.header-actions {
-    display: flex;
-    gap: var(--spacing-2);
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-/* === 模态框 === */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg-modal);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-4);
-}
-
-.modal-content {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-4);
-    width: 100%;
-    max-width: 550px;
-    max-height: 85vh;
-    overflow-y: auto;
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-medium);
-}
-
-.modal-content h3 {
-    font-size: var(--font-lg);
-    margin-bottom: var(--spacing-3);
-    color: var(--text-primary);
-}
-
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-3);
-    margin-top: var(--spacing-4);
-}
-
-/* === 登录页面 === */
-.login-container {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--bg-page) 100%);
-    padding: var(--spacing-4);
-}
-
-.login-box {
-    width: 100%;
-    max-width: 400px;
-    background: var(--bg-card);
-    padding: 32px 28px;
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-medium);
-}
-
-.login-title {
-    font-size: 1.5rem;
-    margin-bottom: 28px;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: var(--text-primary);
-    white-space: nowrap;
-}
-
-.lang-toggle {
-    text-align: right;
-    margin-bottom: 20px;
-}
-
-.lang-btn {
-    background: transparent;
-    color: var(--primary-dark);
-    border: 1px solid var(--border-medium);
-    padding: 6px 14px;
-    font-size: var(--font-sm);
-    border-radius: var(--radius-md);
-}
-
-.lang-btn:hover {
-    background: var(--primary-soft);
-    transform: none;
-}
-
-.login-box .form-group {
-    margin-bottom: 20px;
-}
-
-.login-box .form-group label {
-    font-size: var(--font-sm);
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin-bottom: 8px;
-    display: block;
-}
-
-.login-box input {
-    width: 100%;
-    padding: 12px 14px;
-    font-size: var(--font-md);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-medium);
-    transition: var(--transition);
-    color: var(--text-primary);
-    background: var(--bg-card);
-}
-
-.login-box input:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.login-box button {
-    width: 100%;
-    padding: 12px;
-    font-size: var(--font-md);
-    font-weight: 600;
-    background: var(--primary-dark);
-    color: white;
-    border: none;
-    border-radius: var(--radius-md);
-    margin-top: 8px;
-}
-
-.login-box button:hover {
-    background: var(--primary);
-    transform: translateY(-1px);
-}
-
-.login-note {
-    margin-top: 24px;
-    font-size: var(--font-xs);
-    color: var(--text-muted);
-    text-align: center;
-}
-
-/* === 加载动画 === */
-.loading-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background: var(--bg-page);
-}
-
-.loader {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--border-light);
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.loading-text {
-    color: var(--text-secondary);
-    margin-top: var(--spacing-4);
-    font-size: var(--font-sm);
-}
-
-/* === 报错信息 === */
-.error-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background: var(--bg-page);
-    padding: var(--spacing-5);
-}
-
-.error-card {
-    max-width: 400px;
-    background: var(--bg-card);
-    border-radius: var(--radius-xl);
-    padding: var(--spacing-6);
-    text-align: center;
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border-medium);
-}
-
-.error-icon {
-    font-size: var(--font-2xl);
-    margin-bottom: var(--spacing-3);
-}
-
-.error-title {
-    color: var(--danger-dark);
-    margin-bottom: var(--spacing-2);
-    font-size: var(--font-lg);
-}
-
-.error-message {
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-4);
-    font-size: var(--font-sm);
-}
-
-.error-btn {
-    background: var(--primary-dark);
-    color: white;
-    padding: var(--spacing-2) var(--spacing-4);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    font-size: var(--font-sm);
-    border: none;
-}
-
-/* === 工具类 === */
-.text-center { text-align: center; }
-.text-right { text-align: right; }
-.text-left { text-align: left; }
-.text-muted { color: var(--text-muted); }
-.text-warning { color: var(--warning-dark); }
-.text-success { color: var(--success-dark); }
-.text-danger { color: var(--danger-dark); }
-
+/* 间距 */
 .mt-1 { margin-top: var(--spacing-1); }
 .mt-2 { margin-top: var(--spacing-2); }
 .mt-3 { margin-top: var(--spacing-3); }
 .mt-4 { margin-top: var(--spacing-4); }
+.mt-5 { margin-top: var(--spacing-5); }
 .mb-1 { margin-bottom: var(--spacing-1); }
 .mb-2 { margin-bottom: var(--spacing-2); }
 .mb-3 { margin-bottom: var(--spacing-3); }
 .mb-4 { margin-bottom: var(--spacing-4); }
+.mb-5 { margin-bottom: var(--spacing-5); }
 
-.income { color: var(--success-dark); }
-.expense { color: var(--danger-dark); }
+/* 隐藏 */
+.hidden      { display: none !important; }
+.no-print    { }
+.print-only  { display: none; }
 
-/* ========================================
-   打印样式
-   ======================================== */
+/* 宽度 */
+.w-full { width: 100%; }
+
+
+/* ============================================================
+   G7. 响应式字体
+   ============================================================ */
+
+/* 桌面端（≥769px） */
+@media (min-width: 769px) {
+    html {
+        font-size: 17px;
+    }
+
+    #app {
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .page-header h1,
+    .page-header h2 {
+        font-size: var(--font-xl);
+    }
+
+    .card h3 {
+        font-size: var(--font-md);
+    }
+
+    .stat-card .stat-value {
+        font-size: var(--font-lg);
+    }
+
+    .stat-card .stat-label {
+        font-size: var(--font-xs);
+    }
+
+    .data-table thead th,
+    .data-table tbody td {
+        font-size: var(--font-sm);
+    }
+
+    button,
+    .btn-small {
+        font-size: var(--font-sm);
+    }
+
+    .toolbar button {
+        font-size: var(--font-sm);
+    }
+
+    .cashflow-item .value {
+        font-size: var(--font-xl);
+    }
+
+    .cashflow-item .label {
+        font-size: var(--font-sm);
+    }
+
+    .form-group label {
+        font-size: var(--font-sm);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: var(--font-md);
+    }
+}
+
+/* 手机端（≤768px） */
+@media (max-width: 768px) {
+    html {
+        font-size: 15px;
+    }
+
+    #app {
+        padding: var(--spacing-2);
+    }
+
+    .page-header h1,
+    .page-header h2 {
+        font-size: var(--font-lg);
+    }
+
+    .card h3 {
+        font-size: var(--font-md);
+    }
+
+    .stat-card .stat-value {
+        font-size: var(--font-md);
+    }
+
+    .stat-card .stat-label {
+        font-size: var(--font-xxs);
+    }
+
+    .data-table thead th,
+    .data-table tbody td {
+        font-size: var(--font-xs);
+    }
+
+    button,
+    .btn-small {
+        font-size: var(--font-xs);
+        padding: 8px 14px;
+    }
+
+    .toolbar button {
+        font-size: var(--font-xs);
+    }
+
+    .cashflow-item .value {
+        font-size: var(--font-lg);
+    }
+
+    .cashflow-item .label {
+        font-size: var(--font-xs);
+    }
+
+    .form-group label {
+        font-size: var(--font-xs);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: var(--font-sm);
+    }
+}
+
+
+/* ============================================================
+   G8. 打印基础样式
+   所有表格/表单/组件的打印样式在各模块文件中
+   此文件只包含最基础的打印设置
+   ============================================================ */
 @media print {
     @page {
         size: A4 landscape;
@@ -504,176 +350,33 @@ h1 img,
         font-size: 9pt !important;
     }
 
-    .page-header .header-actions,
-    .toolbar,
-    .btn-print,
-    .btn-back,
-    .btn-export,
-    .btn-balance,
-    .btn-detail,
-    .lang-toggle,
-    .transfer-buttons,
-    .action-row,
-    .modal-overlay,
-    button:not(.print-visible),
-    .no-print {
-        display: none !important;
-    }
-
-    .card, 
-    .cashflow-summary, 
-    .anomaly-card,
-    .anomaly-grid,
-    .payment-double-column,
-    .action-card,
-    .dashboard-footer-card {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-    }
-
-    .order-table,
-    .data-table {
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-    }
-
-    .stats-grid-optimized,
-    .stats-grid {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 6px !important;
-        justify-content: flex-start !important;
-    }
-
-    .stat-card {
-        flex: 1 1 auto !important;
-        min-width: 110px !important;
-        border: 1px solid #ccc !important;
-        padding: 4px 6px !important;
-        text-align: left !important;
-        break-inside: avoid !important;
-    }
-
-    .stat-card .stat-value {
-        font-size: 10pt !important;
-        font-weight: 600 !important;
-        text-align: left !important;
-    }
-
-    .stat-card .stat-label {
-        font-size: 7pt !important;
-        text-align: left !important;
-    }
-
-    .anomaly-grid {
-        display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 8px !important;
-    }
-
-    .anomaly-card {
-        break-inside: avoid !important;
-    }
-
-    .cashflow-stats {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-    }
-
-    .cashflow-item {
-        flex: 1 !important;
-        min-width: 130px !important;
-        text-align: left !important;
-        padding: 6px !important;
-    }
-
-    .data-table th,
-    .data-table td,
-    table th,
-    table td,
-    .stat-card .stat-value,
-    .stat-card .stat-label,
-    .cashflow-item .label,
-    .cashflow-item .value,
-    .summary-item .label,
-    .summary-item .value,
-    .anomaly-card-header h3,
-    .anomaly-card-body,
-    .anomaly-table th,
-    .anomaly-table td,
-    .store-item,
-    .ranking-item {
-        text-align: left !important;
-    }
-
-    .text-right,
-    .data-table td.text-right,
-    .anomaly-table td.text-right,
-    .cashflow-item .value {
-        text-align: right !important;
-    }
-
-    .text-center,
-    .data-table th.text-center,
-    .data-table td.text-center,
-    .anomaly-table th.text-center,
-    .anomaly-table td.text-center {
-        text-align: left !important;
-    }
-
-    .page-header h1,
-    .page-header h2,
-    .card h3 {
-        border-bottom: none !important;
-        text-decoration: none !important;
-        margin-bottom: 4px !important;
-    }
-
     #app {
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
     }
 
+    /* 隐藏所有交互元素 */
+    .no-print {
+        display: none !important;
+    }
+
+    /* 显示仅打印元素 */
+    .print-only {
+        display: block !important;
+    }
+
+    /* 避免分页截断 */
     .card,
-    .cashflow-summary {
-        box-shadow: none !important;
-        border: 1px solid #ccc !important;
-        margin-bottom: 6px !important;
-        padding: 6px 8px !important;
-    }
-
-    .data-table {
-        width: 100% !important;
-        font-size: 8pt !important;
-        border-collapse: collapse !important;
-        table-layout: auto !important;
-    }
-
-    .data-table th,
-    .data-table td {
-        border: 1px solid #999 !important;
-        padding: 4px 6px !important;
-        white-space: normal !important;
-        word-break: break-word !important;
-    }
-
-    .data-table th {
-        background: #f0f0f0 !important;
-        font-weight: 600 !important;
-    }
-
-    .footer,
-    .print-footer,
+    .cashflow-summary,
     .dashboard-footer-card {
-        margin-top: 4px !important;
-        padding-top: 4px !important;
-        font-size: 7pt !important;
-        border-top: none !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
     }
 
-    .page-break-before { page-break-before: always; }
-    .page-break-after  { page-break-after:  always; }
-    .no-page-break     { page-break-inside: avoid; }
+    /* 链接去掉颜色 */
+    a {
+        color: #000 !important;
+        text-decoration: none !important;
+    }
 }
