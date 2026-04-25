@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.5（返回键统一位置 + 保存退出优化）
+// app-dashboard-core.js - v2.6（移除内联样式，使用组件库）
 
 window.APP = window.APP || {};
 
@@ -346,8 +346,6 @@ const DashboardCore = {
         await AUTH.logout();
         await this.router();
     },
-    
-    // 移除自动保存相关函数（不再需要）
 
     toggleLanguage: function() {
         var newLang = Utils.lang === 'id' ? 'zh' : 'id';
@@ -515,42 +513,28 @@ const DashboardCore = {
             
             var activeDisplay = activeOrdersCount;
             if (overdueOrdersCount > 0) {
-                activeDisplay = activeOrdersCount + ' / ' + (lang === 'id' ? '⚠️ ' : '⚠️ ') + overdueOrdersCount;
+                activeDisplay = activeOrdersCount + ' / ⚠️ ' + overdueOrdersCount;
             }
             
+            // ========== 统计卡片数据 ==========
             var cards = [
-                { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, type: 'text' },
-                { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), type: 'currency', class: deficit >= 0 ? 'expense' : 'income' },
-                { label: lang === 'id' ? 'Berjalan / Jatuh Tempo' : '进行中 / 逾期单', value: activeDisplay, type: 'text' },
-                { label: (lang === 'id' ? 'Lunas' : '已结清') + ' / ' + (lang === 'id' ? 'Kedaluwarsa' : '已失效'), value: completedOrdersCount + ' / ' + expiredCount, type: 'text' },
-                { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), type: 'currency', class: 'income' },
-                { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), type: 'currency', class: 'income' },
-                { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), type: 'currency', class: 'income' },
-                { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), type: 'currency', class: 'expense' }
+                { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, class: '' },
+                { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), class: deficit >= 0 ? 'expense' : 'income' },
+                { label: lang === 'id' ? 'Berjalan / Jatuh Tempo' : '进行中 / 逾期单', value: activeDisplay, class: '' },
+                { label: (lang === 'id' ? 'Lunas' : '已结清') + ' / ' + (lang === 'id' ? 'Kedaluwarsa' : '已失效'), value: completedOrdersCount + ' / ' + expiredCount, class: '' },
+                { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), class: 'income' },
+                { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), class: 'income' },
+                { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), class: 'income' },
+                { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), class: 'expense' }
             ];
             
             var cardsHtml = '';
             for (var i = 0; i < cards.length; i++) {
-                cardsHtml += '<div class="stat-card ' + (cards[i].class || '') + '">' +
-                    '<div class="stat-value ' + (cards[i].class || '') + '">' + cards[i].value + '</div>' +
+                cardsHtml += '<div class="stat-card">' +
+                    '<div class="stat-value ' + cards[i].class + '">' + cards[i].value + '</div>' +
                     '<div class="stat-label">' + cards[i].label + '</div>' +
                 '</div>';
             }
-            
-            var cardsTitleHtml = '';
-            if (isAdmin) {
-                cardsTitleHtml = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">' +
-                    '<h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ' + t('financial_indicators') + ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')</h3>' +
-                '</div>';
-            } else {
-                cardsTitleHtml = '<div style="margin-bottom:12px;">' +
-                    '<h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📊 ' + t('financial_indicators') + '</h3>' +
-                '</div>';
-            }
-            
-            var toolbarTitleHtml = '<div style="margin: 20px 0 12px 0;">' +
-                '<h3 style="margin:0; font-size:16px; font-weight:600; color: var(--gray-700);">📋 ' + t('operation') + '</h3>' +
-            '</div>';
             
             var cashBalance = cashFlow.cash?.balance ?? 0;
             var bankBalance = cashFlow.bank?.balance ?? 0;
@@ -559,11 +543,12 @@ const DashboardCore = {
             var bankIncome = cashFlow.bank?.income ?? 0;
             var bankExpense = cashFlow.bank?.expense ?? 0;
             
+            // ========== 资金管理区块 ==========
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = '' +
                 '<div class="cashflow-summary">' +
-                    '<h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ' + t('fund_management') + ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')</h3>' +
+                    '<h3>💰 ' + t('fund_management') + ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')</h3>' +
                     '<div class="cashflow-stats">' +
                         '<div class="cashflow-item">' +
                             '<div class="label">🏦 ' + (lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)') + '</div>' +
@@ -581,7 +566,7 @@ const DashboardCore = {
                                 t('outflow') + ': -' + Utils.formatCurrency(bankExpense) +
                             '</div>' +
                         '</div>' +
-                        '<div class="cashflow-item internal-transfer-item">' +
+                        '<div class="cashflow-item">' +
                             '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
                             '<div class="transfer-buttons">' +
                                 '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦→🏧 ' + t('cash_to_bank') + '</button>' +
@@ -594,7 +579,7 @@ const DashboardCore = {
             } else {
                 cashFlowHtml = '' +
                 '<div class="cashflow-summary">' +
-                    '<h3 style="margin:0 0 16px 0; font-size:16px; font-weight:600;">💰 ' + t('fund_management') + '</h3>' +
+                    '<h3>💰 ' + t('fund_management') + '</h3>' +
                     '<div class="cashflow-stats">' +
                         '<div class="cashflow-item">' +
                             '<div class="label">🏦 ' + (lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)') + '</div>' +
@@ -612,7 +597,7 @@ const DashboardCore = {
                                 t('outflow') + ': -' + Utils.formatCurrency(bankExpense) +
                             '</div>' +
                         '</div>' +
-                        '<div class="cashflow-item internal-transfer-item">' +
+                        '<div class="cashflow-item">' +
                             '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
                             '<div class="transfer-buttons">' +
                                 '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦→🏧 ' + t('cash_to_bank') + '</button>' +
@@ -623,10 +608,11 @@ const DashboardCore = {
                 '</div>';
             }
             
+            // ========== 工具栏 ==========
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = '' +
-                '<div class="toolbar admin-grid">' +
+                '<div class="toolbar admin-grid no-print">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
                     '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
                     '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
@@ -640,7 +626,7 @@ const DashboardCore = {
                 '</div>';
             } else {
                 toolbarHtml = '' +
-                '<div class="toolbar store-grid">' +
+                '<div class="toolbar store-grid no-print">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
                     '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
                     '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
@@ -650,6 +636,7 @@ const DashboardCore = {
                 '</div>';
             }
             
+            // ========== 底部信息 ==========
             var userRoleText = AUTH.user.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
@@ -657,24 +644,24 @@ const DashboardCore = {
             var bottomHtml = '';
             if (isAdmin) {
                 bottomHtml = '' +
-'<div class="card dashboard-footer-card">' +
-    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(AUTH.user.name) + ' (' + userRoleText + ')</h3>' +
-    '<p>📍 ' + t('store') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
-    '<p>📌 ' + t('more_pawn_higher_fee') + '</p>' +
-    '<p>🔒 ' + t('order_saved_locked') + '</p>' +
-'</div>';
+                '<div class="card dashboard-footer-card">' +
+                    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(AUTH.user.name) + ' (' + userRoleText + ')</h3>' +
+                    '<p>📍 ' + t('store') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
+                    '<p>📌 ' + t('more_pawn_higher_fee') + '</p>' +
+                    '<p>🔒 ' + t('order_saved_locked') + '</p>' +
+                '</div>';
             } else {
                 bottomHtml = '' +
-'<div class="card dashboard-footer-card">' +
-    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(storeName) + ' (' + userRoleText + ')</h3>' +
-    '<p>📍 ' + t('store') + ': ' + Utils.escapeHtml(storeName) + '</p>' +
-    '<p>📌 ' + t('contract_pay_info') + '</p>' +
-    '<p>🔒 ' + t('order_saved_locked') + ' ' + t('more_pawn_higher_fee') + '</p>' +
-'</div>';
+                '<div class="card dashboard-footer-card">' +
+                    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(storeName) + ' (' + userRoleText + ')</h3>' +
+                    '<p>📍 ' + t('store') + ': ' + Utils.escapeHtml(storeName) + '</p>' +
+                    '<p>📌 ' + t('contract_pay_info') + '</p>' +
+                    '<p>🔒 ' + t('order_saved_locked') + ' ' + t('more_pawn_higher_fee') + '</p>' +
+                '</div>';
             }
             
-            // 统一返回键位置：右上角第一个
-            var backButtonHtml = (this.historyStack.length > 0) ? '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' : '';
+            // ========== 组装页面 ==========
+            var backButtonHtml = (this.historyStack.length > 0) ? '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' : '';
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -687,9 +674,13 @@ const DashboardCore = {
                     '</div>' +
                 '</div>' +
                 cashFlowHtml +
-                cardsTitleHtml +
-                '<div class="stats-grid-optimized">' + cardsHtml + '</div>' +
-                toolbarTitleHtml +
+                '<div style="margin-bottom:12px;">' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + t('financial_indicators') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
+                '</div>' +
+                '<div class="stats-grid">' + cardsHtml + '</div>' +
+                '<div style="margin:20px 0 12px 0;">' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + t('operation') + '</h3>' +
+                '</div>' +
                 toolbarHtml +
                 bottomHtml;
             
@@ -699,7 +690,6 @@ const DashboardCore = {
         }
     },
 
-    // 修复2：_calculateReport 中预期收益计算默认利率 0.08
     _calculateReport: function(orders) {
         var totalLoanAmount = 0;
         var totalAdminFees = 0;
