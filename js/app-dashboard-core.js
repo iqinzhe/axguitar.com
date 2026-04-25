@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.4（统一默认利率8%）
+// app-dashboard-core.js - v2.5（返回键统一位置 + 保存退出优化）
 
 window.APP = window.APP || {};
 
@@ -341,116 +341,13 @@ const DashboardCore = {
         
         if (!confirm(confirmMsg)) return;
         
-        var hasUnsavedData = this._checkHasUnsavedData();
-        
-        if (hasUnsavedData) {
-            var loadingMsg = this._showSavingMessage(Utils.lang === 'id' ? 'Menyimpan data...' : '正在保存数据...');
-            try {
-                await this._saveCurrentPageData();
-                this._hideSavingMessage(loadingMsg);
-            } catch (saveError) {
-                console.error("保存数据失败:", saveError);
-                this._hideSavingMessage(loadingMsg);
-                var errorMsg = Utils.lang === 'id'
-                    ? '⚠️ Gagal menyimpan data: ' + saveError.message + 'Tetap keluar?'
-                    : '⚠️ 保存数据失败：' + saveError.message + '是否仍然退出？';
-                if (!confirm(errorMsg)) return;
-            }
-        }
-        
         this.clearPageState();
         sessionStorage.clear();
         await AUTH.logout();
         await this.router();
     },
     
-    _checkHasUnsavedData: function() {
-        var currentPage = this.currentPage;
-        
-        switch(currentPage) {
-            case 'customers':
-                var customerName = document.getElementById("customerName");
-                if (customerName && customerName.value && customerName.value.trim()) {
-                    return true;
-                }
-                break;
-                
-            case 'expenses':
-                var expenseAmount = document.getElementById("expenseAmount");
-                if (expenseAmount && expenseAmount.value && parseFloat(expenseAmount.value.replace(/[,\s]/g, '')) > 0) {
-                    return true;
-                }
-                break;
-                
-            default:
-                break;
-        }
-        
-        return false;
-    },
-    
-    _showSavingMessage: function(message) {
-        var div = document.createElement('div');
-        div.id = 'saving-overlay';
-        div.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:10001; display:flex; align-items:center; justify-content:center;';
-        div.innerHTML = '<div style="background:white; padding:20px 40px; border-radius:12px; display:flex; flex-direction:column; align-items:center; gap:12px;">' +
-            '<div class="loader" style="width:36px; height:36px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:spin 1s linear infinite;"></div>' +
-            '<p style="margin:0; font-size:14px;">' + message + '</p>' +
-        '</div>';
-        document.body.appendChild(div);
-        
-        if (!document.getElementById('saving-spinner-style')) {
-            var style = document.createElement('style');
-            style.id = 'saving-spinner-style';
-            style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
-            document.head.appendChild(style);
-        }
-        
-        return div;
-    },
-    
-    _hideSavingMessage: function(element) {
-        if (element && element.remove) element.remove();
-    },
-    
-    _saveCurrentPageData: async function() {
-        var currentPage = this.currentPage;
-        var hasSaved = false;
-        
-        switch(currentPage) {
-            case 'customers':
-                var customerName = document.getElementById("customerName");
-                if (customerName && customerName.value && customerName.value.trim()) {
-                    console.log("检测到未保存的客户信息，正在自动保存...");
-                    if (typeof window.APP.addCustomer === 'function') {
-                        await window.APP.addCustomer();
-                        hasSaved = true;
-                    }
-                }
-                break;
-                
-            case 'expenses':
-                var expenseAmount = document.getElementById("expenseAmount");
-                if (expenseAmount && expenseAmount.value && parseFloat(expenseAmount.value.replace(/[,\s]/g, '')) > 0) {
-                    console.log("检测到未保存的支出信息，正在自动保存...");
-                    if (typeof window.APP.addExpense === 'function') {
-                        await window.APP.addExpense();
-                        hasSaved = true;
-                    }
-                }
-                break;
-                
-            default:
-                console.log('当前页面 (' + currentPage + ') 无需自动保存数据');
-                break;
-        }
-        
-        if (hasSaved) {
-            await new Promise(function(resolve) { setTimeout(resolve, 300); });
-        }
-        
-        return true;
-    },
+    // 移除自动保存相关函数（不再需要）
 
     toggleLanguage: function() {
         var newLang = Utils.lang === 'id' ? 'zh' : 'id';
@@ -776,6 +673,9 @@ const DashboardCore = {
 '</div>';
             }
             
+            // 统一返回键位置：右上角第一个
+            var backButtonHtml = (this.historyStack.length > 0) ? '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' : '';
+            
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<div style="display:flex;align-items:center;gap:12px;">' +
@@ -783,7 +683,7 @@ const DashboardCore = {
                         '<h1 style="margin:0;">JF! by Gadai</h1>' +
                     '</div>' +
                     '<div class="header-actions">' +
-                        (this.historyStack.length > 0 ? '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' : '') +
+                        backButtonHtml +
                     '</div>' +
                 '</div>' +
                 cashFlowHtml +
@@ -799,7 +699,7 @@ const DashboardCore = {
         }
     },
 
-    // 修复2：_calculateReport 中预期收益计算默认利率 0.10 → 0.08
+    // 修复2：_calculateReport 中预期收益计算默认利率 0.08
     _calculateReport: function(orders) {
         var totalLoanAmount = 0;
         var totalAdminFees = 0;
@@ -822,7 +722,6 @@ const DashboardCore = {
             if (o.status === 'active') {
                 activeCount++;
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                // 修复2：默认利率从 0.10 改为 0.08
                 expectedMonthlyInterest += remainingPrincipal * (o.agreed_interest_rate || 0.08);
             } else if (o.status === 'completed') {
                 completedCount++;
