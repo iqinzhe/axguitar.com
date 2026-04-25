@@ -537,6 +537,16 @@
     }
 }
 
+    /* 异常表格允许滚动 */
+    .anomaly-table {
+        min-width: 500px;
+    }
+
+    /* 转账筛选保持单行 */
+    .modal-content > div:first-of-type {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
 
 /* ============================================================
    A17. 打印样式
