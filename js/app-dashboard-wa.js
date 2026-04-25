@@ -1,4 +1,4 @@
-// app-dashboard-wa.js - v1.0 WA提醒模块
+// app-dashboard-wa.js - v1.1（统一默认利率8%）
 
 window.APP = window.APP || {};
 
@@ -9,10 +9,11 @@ const DashboardWA = {
         return await SUPABASE.getStoreWANumber(storeId);
     },
 
+    // 修复2：默认利率从 0.10 改为 0.08
     generateWAText: function(order, senderNumber) {
         var lang = Utils.lang;
         var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-        var monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.10);
+        var monthlyInterest = remainingPrincipal * (Utils.MONTHLY_INTEREST_RATE || 0.08);
         var dueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
         
         if (lang === 'id') {
@@ -23,7 +24,7 @@ Kepada Yth. Bapak/Ibu ${order.customer_name}
 Kami ingatkan bahwa pembayaran bunga untuk pesanan dengan detail berikut:
 📋 *ID Pesanan:* ${order.order_id}
 💰 *Sisa Pokok:* ${Utils.formatCurrency(remainingPrincipal)}
-📈 *Bunga per Bulan (10%):* ${Utils.formatCurrency(monthlyInterest)}
+📈 *Bunga per Bulan (${((Utils.MONTHLY_INTEREST_RATE || 0.08)*100).toFixed(0)}%):* ${Utils.formatCurrency(monthlyInterest)}
 📅 *Jatuh Tempo:* ${dueDate}
 
 Harap melakukan pembayaran tepat waktu.
@@ -39,7 +40,7 @@ Terima kasih atas kepercayaan Anda.
 提醒您以下订单的利息缴费：
 📋 *订单号:* ${order.order_id}
 💰 *剩余本金:* ${Utils.formatCurrency(remainingPrincipal)}
-📈 *月利息 (10%):* ${Utils.formatCurrency(monthlyInterest)}
+📈 *月利息 (${((Utils.MONTHLY_INTEREST_RATE || 0.08)*100).toFixed(0)}%):* ${Utils.formatCurrency(monthlyInterest)}
 📅 *到期日:* ${dueDate}
 
 请按时缴费。
@@ -186,4 +187,3 @@ Terima kasih atas kepercayaan Anda.
 
 // 合并到 window.APP
 Object.assign(window.APP, DashboardWA);
-
