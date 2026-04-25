@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.3（支持打印Logo样式）
+// app-dashboard-core.js - v2.4（统一默认利率8%）
 
 window.APP = window.APP || {};
 
@@ -753,7 +753,6 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // 底部卡片：区分管理员和门店
             var userRoleText = AUTH.user.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
@@ -800,6 +799,7 @@ const DashboardCore = {
         }
     },
 
+    // 修复2：_calculateReport 中预期收益计算默认利率 0.10 → 0.08
     _calculateReport: function(orders) {
         var totalLoanAmount = 0;
         var totalAdminFees = 0;
@@ -822,7 +822,8 @@ const DashboardCore = {
             if (o.status === 'active') {
                 activeCount++;
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                expectedMonthlyInterest += remainingPrincipal * (o.agreed_interest_rate || 0.10);
+                // 修复2：默认利率从 0.10 改为 0.08
+                expectedMonthlyInterest += remainingPrincipal * (o.agreed_interest_rate || 0.08);
             } else if (o.status === 'completed') {
                 completedCount++;
             }
