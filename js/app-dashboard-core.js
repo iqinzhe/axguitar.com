@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.2（底部提示文字优化：管理员/门店区分 + 删除门店横幅）
+// app-dashboard-core.js - v2.3（支持打印Logo样式）
 
 window.APP = window.APP || {};
 
@@ -294,7 +294,10 @@ const DashboardCore = {
                     '<div class="lang-toggle">' +
                         '<button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ' + (lang === 'id' ? '中文' : 'Bahasa Indonesia') + '</button>' +
                     '</div>' +
-                    '<h2 class="login-title"><img src="icons/pagehead-logo.png" alt="JF!" class="login-logo"> JF! by Gadai</h2>' +
+                    '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;">' +
+                        '<img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;">' +
+                        '<h2 class="login-title" style="margin:0;">JF! by Gadai</h2>' +
+                    '</div>' +
                     '<h3>' + t('login') + '</h3>' +
                     '<div class="form-group">' +
                         '<label>' + (lang === 'id' ? 'Email / Username' : '邮箱 / 用户名') + '</label>' +
@@ -750,7 +753,7 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // ========== 底部卡片：区分管理员和门店 ==========
+            // 底部卡片：区分管理员和门店
             var userRoleText = AUTH.user.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
@@ -776,7 +779,10 @@ const DashboardCore = {
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h1><img src="icons/pagehead-logo.png" alt="JF!" class="logo-img"> JF! by Gadai</h1>' +
+                    '<div style="display:flex;align-items:center;gap:12px;">' +
+                        '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
+                        '<h1 style="margin:0;">JF! by Gadai</h1>' +
+                    '</div>' +
                     '<div class="header-actions">' +
                         (this.historyStack.length > 0 ? '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' : '') +
                     '</div>' +
@@ -835,13 +841,13 @@ const DashboardCore = {
         };
     },
     
-    _calculateCashFlowSummary: function(allFlows, isAdmin, storeId, storeSpecificFlows) {
+    _calculateCashFlowSummary: function(allFlows, isAdmin, storeId, storeSpecificCashFlows) {
         var cashInflow = 0, cashOutflow = 0;
         var bankInflow = 0, bankOutflow = 0;
         
         var flowsToUse = [];
-        if (!isAdmin && storeSpecificFlows && Array.isArray(storeSpecificFlows)) {
-            flowsToUse = storeSpecificFlows;
+        if (!isAdmin && storeSpecificCashFlows && Array.isArray(storeSpecificCashFlows)) {
+            flowsToUse = storeSpecificCashFlows;
         } else if (allFlows && Array.isArray(allFlows)) {
             flowsToUse = allFlows;
         }
