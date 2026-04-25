@@ -1,10 +1,11 @@
-// utils.js - v1.9（底部提示文字双语翻译）
+// utils.js - v2.0（统一默认利率8%、常量修正）
 
 const Utils = {
     lang: 'id',
     db: null,
 
-    MONTHLY_INTEREST_RATE: 0.10,
+    // 修复2：MONTHLY_INTEREST_RATE 从 0.10 改为 0.08
+    MONTHLY_INTEREST_RATE: 0.08,
 
     serviceFeePercentOptions: [
         { value: 0, label: '0% (Tidak Ada)' },
@@ -61,8 +62,9 @@ const Utils = {
         return Math.round(payment / 10000) * 10000;
     },
 
+    // 修复2：默认选中利率从 10 改为 8
     getInterestRateOptions: function(selectedRate) {
-        if (selectedRate === undefined) selectedRate = 10;
+        if (selectedRate === undefined) selectedRate = 8;
         var rates = [10, 9.5, 9.0, 8.5, 8.0];
         var html = '';
         for (var i = 0; i < rates.length; i++) {
