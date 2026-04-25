@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v1.6（打印标题居中 + 表格左对齐）
+// app-dashboard-print.js - v1.7（打印标题添加Logo，Logo尺寸大于标题文字）
 
 window.APP = window.APP || {};
 
@@ -94,8 +94,8 @@ const DashboardPrint = {
                     '}' +
                     '.print-container { padding: 3mm; }' +
                     '.print-header { text-align: center; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #ccc; }' +
-                    '.print-header .logo { font-size: 12pt; font-weight: bold; color: #2563eb; text-align: center; }' +
-                    '.print-header .logo img { height: 20px; vertical-align: middle; }' +
+                    '.print-header .logo { font-size: 12pt; font-weight: bold; color: #2563eb; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }' +
+                    '.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }' +
                     '.print-store-info { font-size: 8pt; color: #475569; margin: 2px 0; text-align: center; }' +
                     '.print-user-info { font-size: 7pt; color: #64748b; margin-bottom: 3px; text-align: center; }' +
                     '.print-footer { text-align: center; font-size: 6pt; color: #94a3b8; margin-top: 4px; padding-top: 3px; border-top: 1px solid #e2e8f0; }' +
@@ -145,7 +145,7 @@ const DashboardPrint = {
                 '<div class="print-container">' +
                     '<div class="print-header">' +
                         '<div class="logo">' +
-                            '<img src="icons/pagehead-logo.png" alt="JF!" style="height:20px;"> JF! by Gadai' +
+                            '<img src="icons/pagehead-logo.png" alt="JF!"> JF! by Gadai' +
                         '</div>' +
                         '<div class="print-store-info">' +
                             '🏪 ' + Utils.escapeHtml(storeName) + ' ' + (isAdmin ? '(' + (lang === 'id' ? 'Kantor Pusat' : '总部') + ')' : '') +
@@ -177,6 +177,7 @@ const DashboardPrint = {
             'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:9pt;line-height:1.3;color:#1e293b;padding:3mm}' +
             '.header{text-align:center;margin-bottom:6px;border-bottom:1px solid #ccc;padding-bottom:3px}' +
             '.header h1{font-size:12pt;margin:2px 0;text-align:center}' +
+            '.header .logo-img{height:28px;width:auto;vertical-align:middle}' +
             '.store-info{text-align:center;font-size:8pt;color:#475569;margin:2px 0}' +
             '.user-info{text-align:center;font-size:7pt;color:#64748b;margin-bottom:3px}' +
             'table{width:100%;border-collapse:collapse;margin-top:4px}' +
@@ -198,7 +199,10 @@ const DashboardPrint = {
     _generatePrintHeader: function(title, lang, storeName, userName, printDateTime) {
         return '' +
             '<div class="header">' +
-                '<h1>JF! by Gadai</h1>' +
+                '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:5px;">' +
+                    '<img src="icons/pagehead-logo.png" alt="JF!" class="logo-img" style="height:28px;">' +
+                    '<h1 style="margin:0;">JF! by Gadai</h1>' +
+                '</div>' +
                 '<div class="store-info">🏪 ' + Utils.escapeHtml(storeName) + '</div>' +
                 '<div class="user-info">👤 ' + Utils.escapeHtml(userName) + ' | 📅 ' + printDateTime + '</div>' +
                 '<h3>' + title + '</h3>' +
