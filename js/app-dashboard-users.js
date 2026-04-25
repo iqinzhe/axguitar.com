@@ -1,11 +1,12 @@
-// app-dashboard-users.js - v1.0
+// app-dashboard-users.js - v1.1（修复saveCurrentPageState调用）
+
 window.APP = window.APP || {};
 
 const DashboardUsers = {
 
     showUserManagement: async function() {
-        this.currentPage = 'userManagement';
-        this.saveCurrentPageState();
+        APP.currentPage = 'userManagement';
+        APP.saveCurrentPageState();  // 修复：this → APP
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         
@@ -86,10 +87,10 @@ const DashboardUsers = {
                                     '<th class="text-center">' + (lang === 'id' ? 'Role' : '角色') + '</th>' +
                                     '<th>' + (lang === 'id' ? 'Toko' : '门店') + '</th>' +
                                     '<th class="text-center">' + (lang === 'id' ? 'Tanggal Dibuat' : '创建日期') + '</th>' +
-                                '</tr>' +
+                                '<\/tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
-                        '</table>' +
+                        '<\/table>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card">' +
