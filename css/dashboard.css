@@ -913,6 +913,22 @@ button.warning.highlight {
     }
 }
 
+    /* 操作按钮容器（缴费页面等） */
+    .action-buttons {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 6px;
+        overflow-x: auto;
+    }
+
+    .action-buttons .btn-action {
+        flex-shrink: 0;
+        width: auto !important;
+        min-width: 100px;
+        max-width: 140px;
+        font-size: var(--font-xs);
+        padding: 6px 12px;
+    }
 
 /* ============================================================
    D18. 打印样式
