@@ -1,4 +1,4 @@
-// app-payments.js - v1.3（修复saveCurrentPageState调用）
+// app-payments.js - v1.4（返回键统一位置 + 缴费页面优化）
 
 window.APP = window.APP || {};
 
@@ -15,7 +15,7 @@ const PaymentsModule = {
             return;
         }
 
-        // 修复6：管理员禁止操作订单的提示方式优化 - 改为友好页面而非弹窗
+        // 管理员禁止操作订单的提示方式优化 - 改为友好页面而非弹窗
         if (profile.role === 'admin') {
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -56,7 +56,7 @@ const PaymentsModule = {
 
         APP.currentPage = 'payment';
         APP.currentOrderId = orderId;
-        APP.saveCurrentPageState();  // 修复：this → APP
+        APP.saveCurrentPageState();
         
         try {
             var order = await SUPABASE.getOrder(orderId);
@@ -250,7 +250,7 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史') + '</div>' +
                                 '<div class="table-container">' +
                                     '<table class="history-table">' +
-                                        '<thead></tr><th class="text-center">' + (lang === 'id' ? 'Ke-' : '第几次') + '<\/th><th>' + t('date') + '<\/th><th class="text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '<\/th><th class="text-right">' + t('amount') + '<\/th><th>' + (lang === 'id' ? 'Metode' : '方式') + '<\/th><\/thead>' +
+                                        '<thead><tr><th class="text-center">' + (lang === 'id' ? 'Ke-' : '第几次') + '<\/th><th>' + t('date') + '<\/th><th class="text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '<\/th><th class="text-right">' + t('amount') + '<\/th><th>' + (lang === 'id' ? 'Metode' : '方式') + '<\/th><\/thead>' +
                                         '<tbody>' + interestRows + '<\/tbody>' +
                                     '<\/table>' +
                                 '</div>' +
@@ -500,7 +500,7 @@ const PaymentsModule = {
         }
     },
 
-    // 修复9：打印结清凭证 Logo 使用绝对路径
+    // 打印结清凭证 Logo 使用绝对路径
     printSettlementReceipt: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -535,7 +535,7 @@ const PaymentsModule = {
             var safeCollateral = Utils.escapeHtml(order.collateral_name || '-');
             var safeStore = Utils.escapeHtml(AUTH.getCurrentStoreName ? AUTH.getCurrentStoreName() : '-');
 
-            // 修复9：Logo 使用绝对路径 /icons/pagehead-logo.png
+            // Logo 使用绝对路径 /icons/pagehead-logo.png
             var html = '' +
             '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
             '<title>' + (lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证') + ' - ' + safeOrderId + '<\/title>' +
