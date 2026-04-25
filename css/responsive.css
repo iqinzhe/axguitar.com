@@ -1,0 +1,762 @@
+/* ============================================================
+   responsive.css - 第6层：响应式与打印中心
+   职责：全系统所有 @media 查询集中管理
+        桌面端字体 / 手机端适配 / 打印样式
+   ============================================================ */
+
+/* ============================================================
+   R1. 桌面端字体响应式（≥769px）
+   ============================================================ */
+@media (min-width: 769px) {
+    html {
+        font-size: 17px;
+    }
+
+    #app {
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .page-header h1,
+    .page-header h2 {
+        font-size: var(--font-xl);
+    }
+
+    .card h3 {
+        font-size: var(--font-md);
+    }
+
+    .stat-card .stat-value {
+        font-size: var(--font-lg);
+    }
+
+    .stat-card .stat-label {
+        font-size: var(--font-xs);
+    }
+
+    .data-table thead th,
+    .data-table tbody td {
+        font-size: var(--font-sm);
+    }
+
+    button,
+    .btn-small {
+        font-size: var(--font-sm);
+    }
+
+    .toolbar button {
+        font-size: var(--font-sm);
+    }
+
+    .cashflow-item .value {
+        font-size: var(--font-xl);
+    }
+
+    .cashflow-item .label {
+        font-size: var(--font-sm);
+    }
+
+    .form-group label {
+        font-size: var(--font-sm);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: var(--font-md);
+    }
+
+    .dashboard-footer-card p {
+        font-size: var(--font-sm);
+    }
+}
+
+
+/* ============================================================
+   R2. 手机端响应式（≤768px）
+   ============================================================ */
+@media (max-width: 768px) {
+    /* --- 根字体 --- */
+    html {
+        font-size: 15px;
+    }
+
+    #app {
+        padding: var(--spacing-2);
+    }
+
+    /* --- 页面头部 --- */
+    .page-header h1,
+    .page-header h2 {
+        font-size: var(--font-lg);
+    }
+
+    .card h3 {
+        font-size: var(--font-md);
+    }
+
+    /* --- 统计卡片：保持 2 列 --- */
+    .stats-grid,
+    .stats-grid.stats-grid-2,
+    .stats-grid.stats-grid-3,
+    .stats-grid.stats-grid-auto {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: var(--spacing-2);
+    }
+
+    .stat-card {
+        min-height: 64px;
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    .stat-card .stat-value {
+        font-size: var(--font-md);
+    }
+
+    .stat-card .stat-label {
+        font-size: var(--font-xxs);
+    }
+
+    /* --- 信息卡片：堆叠 --- */
+    .info-cards-row {
+        flex-direction: column;
+    }
+
+    .info-cards-row .info-item-card {
+        min-width: auto;
+    }
+
+    /* --- 费用卡片：堆叠 --- */
+    .fee-cards-row {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-3);
+    }
+
+    /* --- 按钮 --- */
+    button,
+    .btn-small {
+        font-size: var(--font-xs);
+        padding: 8px 14px;
+    }
+
+    .toolbar button {
+        font-size: var(--font-xs);
+    }
+
+    .btn-action {
+        width: 100% !important;
+        text-align: center;
+    }
+
+    /* --- 表格：水平滚动，不换行 --- */
+    .table-container {
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
+        margin: var(--spacing-2) 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+        mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    }
+
+    .data-table {
+        font-size: var(--font-xxs);
+        table-layout: fixed;
+        min-width: 700px;
+        width: max-content;
+    }
+
+    .data-table thead th,
+    .data-table tbody td {
+        padding: 6px 5px;
+        font-size: var(--font-xxs);
+        line-height: 1.3;
+        height: auto;
+        min-height: 32px;
+        white-space: nowrap;
+    }
+
+    /* 长文本列允许有限换行 */
+    .data-table .col-address,
+    .data-table .col-desc,
+    .data-table .desc-cell {
+        white-space: normal;
+        word-break: break-word;
+        min-width: 120px;
+        max-width: 160px;
+    }
+
+    /* 异常表格 */
+    .anomaly-table {
+        min-width: 500px;
+    }
+
+    /* --- 操作行按钮：单行显示 --- */
+    .action-row td {
+        padding: 6px 5px !important;
+    }
+
+    .action-row .action-label {
+        font-size: var(--font-xxs);
+        width: 40px;
+        min-width: 40px;
+        padding-right: var(--spacing-1);
+    }
+
+    .action-row .action-buttons {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 10px;
+        align-items: center;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 2px 0;
+    }
+
+    .action-row .action-buttons .btn-small {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 8px 14px;
+        font-size: 11px;
+        border-radius: var(--radius-sm);
+        line-height: 1.3;
+        min-width: auto;
+        width: auto;
+        max-width: 120px;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 缴费页面按钮 */
+    .action-buttons {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 10px;
+        overflow-x: auto;
+    }
+
+    .action-buttons .btn-action {
+        flex-shrink: 0;
+        width: auto !important;
+        min-width: 100px;
+        max-width: 140px;
+        font-size: var(--font-xs);
+        padding: 8px 16px;
+    }
+
+    /* --- 徽章缩小 --- */
+    .status-badge,
+    .repayment-badge,
+    .payment-method-badge,
+    .locked-badge,
+    .reconciled-badge {
+        font-size: 10px;
+        padding: 1px 6px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    /* --- 资金管理：单列 --- */
+    .cashflow-stats {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
+    .cashflow-item .value {
+        font-size: var(--font-lg);
+    }
+
+    .cashflow-item .label {
+        font-size: var(--font-xs);
+    }
+
+    .transfer-btn {
+        white-space: normal;
+        font-size: var(--font-sm);
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    /* --- 工具栏：2列 --- */
+    .toolbar.admin-grid,
+    .toolbar.store-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* --- 摘要网格：2列 --- */
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-1);
+    }
+
+    .summary-item {
+        padding: var(--spacing-1);
+        gap: var(--spacing-1);
+    }
+
+    .summary-item .label {
+        font-size: var(--font-xs);
+    }
+
+    .summary-item .value {
+        font-size: var(--font-xs);
+    }
+
+    /* --- 缴费双列：单列 --- */
+    .payment-double-column {
+        flex-direction: column;
+        gap: var(--spacing-2);
+    }
+
+    .payment-double-column .card {
+        min-width: auto;
+    }
+
+    /* --- 底部卡片 --- */
+    .dashboard-footer-card p {
+        font-size: var(--font-xs);
+    }
+
+    /* --- 表单：单列 --- */
+    .form-grid,
+    .form-grid.form-grid-3,
+    .form-grid.form-grid-4 {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
+    .form-grid-mobile-2 {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .order-first-row {
+        grid-template-columns: 1fr;
+    }
+
+    .repayment-cards-row {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+
+    .info-display {
+        grid-template-columns: 1fr;
+    }
+
+    .info-display-item .info-label {
+        min-width: 70px;
+    }
+
+    .payment-method-selector {
+        flex-direction: column;
+        gap: var(--spacing-1);
+    }
+
+    .payment-method-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-2);
+    }
+
+    .address-option {
+        flex-direction: column;
+        gap: var(--spacing-1);
+    }
+
+    .interest-rate-group {
+        max-width: none;
+    }
+
+    .form-group label {
+        font-size: var(--font-xs);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: var(--font-sm);
+    }
+
+    /* --- 订单详情 --- */
+    .order-detail-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    /* --- 异常页面 --- */
+    .anomaly-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-4);
+    }
+
+    .anomaly-card {
+        min-height: auto;
+    }
+
+    /* --- 备份页面 --- */
+    .backup-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-4);
+    }
+
+    /* --- 门店现金流 --- */
+    .cashflow-card .cashflow-stats {
+        flex-direction: column;
+    }
+
+    .cashflow-card .cashflow-item-card {
+        min-width: auto;
+    }
+
+    /* --- 资金流水 --- */
+    .cashflow-table .flow-desc,
+    .capital-table .flow-desc {
+        max-width: 150px;
+    }
+
+    .expense-table .expense-desc {
+        max-width: 100px;
+    }
+
+    /* --- 隐藏次要列 --- */
+    .mobile-hide {
+        display: none;
+    }
+
+    /* --- 模态框筛选 --- */
+    .modal-content > div:first-of-type {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+}
+
+
+/* ============================================================
+   R3. 打印样式（全系统统一）
+   ============================================================ */
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 5mm 8mm;
+    }
+
+    body {
+        background: #fff !important;
+        color: #000 !important;
+        font-size: 9pt !important;
+    }
+
+    #app {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* --- 隐藏所有交互元素 --- */
+    .no-print,
+    .page-header .header-actions,
+    .toolbar,
+    .btn-print,
+    .btn-back,
+    .btn-export,
+    .btn-balance,
+    .btn-detail,
+    .lang-toggle,
+    .transfer-buttons,
+    .action-buttons,
+    .action-row,
+    .modal-overlay,
+    .form-actions,
+    button:not(.print-visible) {
+        display: none !important;
+    }
+
+    /* --- 显示仅打印元素 --- */
+    .print-only {
+        display: block !important;
+    }
+
+    /* --- 链接 --- */
+    a {
+        color: #000 !important;
+        text-decoration: none !important;
+    }
+
+    /* --- 卡片 --- */
+    .card,
+    .cashflow-summary,
+    .dashboard-footer-card {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        margin-bottom: 6px !important;
+        padding: 6px 8px !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .card h3 {
+        font-size: 9pt !important;
+        margin-bottom: 3px !important;
+        border-bottom: none !important;
+        text-decoration: none !important;
+        text-align: left !important;
+    }
+
+    .card p {
+        text-align: left !important;
+    }
+
+    /* --- 页面头部 --- */
+    .page-header h1,
+    .page-header h2 {
+        text-align: left !important;
+    }
+
+    /* --- 表格 --- */
+    .table-container {
+        border: none;
+        overflow: visible;
+    }
+
+    .data-table {
+        font-size: 7.5pt !important;
+        table-layout: fixed !important;
+        width: 100% !important;
+    }
+
+    .data-table thead th,
+    .data-table tbody td {
+        padding: 4px 6px !important;
+        font-size: 7pt !important;
+        line-height: 1.2 !important;
+        border: 1px solid #999 !important;
+        height: auto !important;
+        min-height: auto !important;
+        text-align: left !important;
+    }
+
+    .data-table thead th {
+        background: #f0f0f0 !important;
+        font-weight: 700 !important;
+    }
+
+    .data-table tbody tr:hover {
+        background: transparent !important;
+    }
+
+    .data-table.striped tbody tr:nth-child(even) {
+        background: #fafafa !important;
+    }
+
+    .data-table .text-right,
+    .data-table .amount {
+        text-align: right !important;
+    }
+
+    .data-table .text-center {
+        text-align: center !important;
+    }
+
+    /* --- 徽章 --- */
+    .status-badge,
+    .repayment-badge,
+    .payment-method-badge {
+        border: 1px solid #999 !important;
+        background: none !important;
+    }
+
+    /* --- 描述列 --- */
+    .data-table .desc-cell,
+    .cashflow-table .flow-desc,
+    .capital-table .flow-desc,
+    .expense-table .expense-desc {
+        max-width: none !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+    }
+
+    /* --- 统计卡片 --- */
+    .stats-grid {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+
+    .stat-card {
+        flex: 1 1 auto !important;
+        min-width: 90px !important;
+        border: 1px solid #ccc !important;
+        padding: 3px 5px !important;
+        text-align: left !important;
+        box-shadow: none !important;
+    }
+
+    .stat-card .stat-value {
+        font-size: 9pt !important;
+        font-weight: 600 !important;
+        text-align: left !important;
+    }
+
+    .stat-card .stat-label {
+        font-size: 6.5pt !important;
+        text-align: left !important;
+    }
+
+    .stat-card:hover {
+        transform: none !important;
+    }
+
+    /* --- 资金管理 --- */
+    .cashflow-stats {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+
+    .cashflow-item {
+        flex: 1 !important;
+        min-width: 130px !important;
+        text-align: left !important;
+        padding: 6px !important;
+    }
+
+    .cashflow-item .label {
+        text-align: left !important;
+    }
+
+    .cashflow-item .value {
+        text-align: left !important;
+    }
+
+    /* --- 表单 --- */
+    .form-grid,
+    .form-grid.form-grid-3,
+    .form-grid.form-grid-4 {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+
+    .order-first-row {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .fee-cards-row {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .repayment-cards-row {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+
+    .info-display {
+        grid-template-columns: repeat(2, 1fr) !important;
+        border: 1px solid #ccc !important;
+        background: #fff !important;
+    }
+
+    .repayment-card {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        page-break-inside: avoid !important;
+    }
+
+    .repayment-card.selected {
+        border-color: #999 !important;
+        background: #fff !important;
+    }
+
+    .repayment-card:hover {
+        transform: none !important;
+        border-color: #ccc !important;
+    }
+
+    .repayment-card-header input[type="radio"] {
+        display: inline-block !important;
+        border: 1px solid #000 !important;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        border: 1px solid #ccc !important;
+        background: #fff !important;
+    }
+
+    .fixed-repayment-form {
+        border: 1px solid #ccc !important;
+        background: #fff !important;
+        page-break-inside: avoid !important;
+    }
+
+    .fee-card-item,
+    .fee-card {
+        border: 1px solid #ccc !important;
+        background: #fff !important;
+    }
+
+    .payment-method-row {
+        background: #fff !important;
+        border: 1px solid #ccc !important;
+    }
+
+    .payment-method-selector input[type="radio"] {
+        -webkit-appearance: radio !important;
+        appearance: radio !important;
+    }
+
+    /* --- 异常页面 --- */
+    .anomaly-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+
+    .anomaly-card {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+    }
+
+    .anomaly-card:hover {
+        box-shadow: none !important;
+    }
+
+    /* --- 订单详情 --- */
+    .order-detail-grid {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    /* --- 备份页面 --- */
+    .backup-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .backup-card {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+    }
+
+    .backup-card-primary {
+        background: #fff !important;
+        border-left: 4px solid #999 !important;
+    }
+
+    .fixed-repayment-card {
+        background: #fff !important;
+        border-left: 4px solid #999 !important;
+    }
+
+    .btn-backup-primary,
+    .btn-restore,
+    .btn-blacklist {
+        display: none !important;
+    }
+
+    /* --- 底部 --- */
+    .dashboard-footer-card {
+        margin-top: 4px !important;
+        padding-top: 4px !important;
+        font-size: 7pt !important;
+        border-top: none !important;
+    }
+}
