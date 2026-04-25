@@ -1,4 +1,4 @@
-// app-payments.js - v1.1（修复打印页面Logo显示）
+// app-payments.js - v1.2（修复表格头部HTML错误、管理员提示优化、打印Logo路径）
 
 window.APP = window.APP || {};
 
@@ -15,9 +15,36 @@ const PaymentsModule = {
             return;
         }
 
+        // 修复6：管理员禁止操作订单的提示方式优化 - 改为友好页面而非弹窗
         if (profile.role === 'admin') {
-            alert(Utils.t('store_operation'));
-            APP.goBack();
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header">' +
+                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="card" style="text-align:center; padding:40px 20px;">' +
+                    '<div style="font-size:48px; margin-bottom:16px;">🔒</div>' +
+                    '<h3 style="color:#64748b; margin-bottom:12px;">' + 
+                        (lang === 'id' 
+                            ? 'Fitur Ini Khusus Operator Toko' 
+                            : '此功能仅限门店操作员使用') + 
+                    '</h3>' +
+                    '<p style="color:#94a3b8; margin-bottom:8px;">' +
+                        (lang === 'id' 
+                            ? 'Administrator tidak dapat melakukan pembayaran pesanan.' 
+                            : '管理员不能执行订单缴费操作。') +
+                    '</p>' +
+                    '<p style="color:#94a3b8; margin-bottom:16px;">' +
+                        (lang === 'id' 
+                            ? 'Silakan gunakan akun operator toko untuk mengakses halaman pembayaran.' 
+                            : '请使用门店操作员账号访问缴费页面。') +
+                    '</p>' +
+                    '<button onclick="APP.goBack()" class="btn-back" style="padding:10px 24px; font-size:14px;">↩️ ' + 
+                        (lang === 'id' ? 'Kembali ke Dashboard' : '返回仪表盘') + 
+                    '</button>' +
+                '</div>';
             return;
         }
 
@@ -254,7 +281,8 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史') + '</div>' +
                                 '<div class="table-container">' +
                                     '<table class="history-table">' +
-                                        '<thead><tr><th>' + t('date') + '</th><th class="text-right">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="text-right">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="text-right">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></td></thead>' +
+                                        // 修复1b：修正 </th> 与 </thead> 顺序
+                                        '<thead><tr><th>' + t('date') + '</th><th class="text-right">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="text-right">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="text-right">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -318,6 +346,7 @@ const PaymentsModule = {
                     '.history-table th { background: #f8fafc; font-weight: 600; }' +
                     '.text-center { text-align: center; }' +
                     '.text-right { text-align: right; }' +
+                    '.text-success { color: #10b981; }' +
                     '@media (max-width: 768px) { .action-buttons { flex-direction: column; } .btn-action { width: 100%; } .summary-table .label { width: 70px; font-size: 11px; } .history-table { font-size: 10px; } }' +
                 '</style>';
 
@@ -472,7 +501,7 @@ const PaymentsModule = {
         }
     },
 
-    // 修复：结清凭证打印页面添加Logo
+    // 修复9：打印结清凭证 Logo 使用绝对路径
     printSettlementReceipt: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -507,7 +536,7 @@ const PaymentsModule = {
             var safeCollateral = Utils.escapeHtml(order.collateral_name || '-');
             var safeStore = Utils.escapeHtml(AUTH.getCurrentStoreName ? AUTH.getCurrentStoreName() : '-');
 
-            // 修复：添加Logo并调整尺寸（Logo大于标题文字）
+            // 修复9：Logo 使用绝对路径 /icons/pagehead-logo.png
             var html = '' +
             '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
             '<title>' + (lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证') + ' - ' + safeOrderId + '</title>' +
@@ -540,7 +569,7 @@ const PaymentsModule = {
                 '</div>' +
                 '<div class="header">' +
                     '<div class="header-logo">' +
-                        '<img src="icons/pagehead-logo.png" alt="JF!">' +
+                        '<img src="/icons/pagehead-logo.png" alt="JF!">' +
                         '<h1>JF! by Gadai</h1>' +
                     '</div>' +
                     '<div><span class="badge">✅ ' + (lang === 'id' ? 'TANDA TERIMA PELUNASAN' : '结清凭证') + '</span></div>' +
