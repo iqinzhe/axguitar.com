@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.3（资金流水改为独立页面，修复变量冲突）
+// app-dashboard-funds.js - v1.4（修复模态框双重渲染、HTML结构错误、关闭按钮无效）
 
 window.APP = window.APP || {};
 
@@ -67,8 +67,12 @@ const DashboardFunds = {
                 }
             }
             
-            document.getElementById("app").innerHTML = '' +
-                '<div class="modal-overlay">' +
+            // 修复：直接插入到 body，添加 id="capitalModal"，不修改 #app
+            var oldModal = document.getElementById('capitalModal');
+            if (oldModal) oldModal.remove();
+            
+            var modalHtml = '' +
+                '<div id="capitalModal" class="modal-overlay">' +
                     '<div class="modal-content" style="max-width:1000px;">' +
                         '<h3>🏦 ' + (lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录') + '</h3>' +
                         '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">' +
@@ -113,8 +117,8 @@ const DashboardFunds = {
                     '</div>' +
                 '</div>';
             
-            document.body.insertAdjacentHTML('beforeend', document.getElementById("app").querySelector('.modal-overlay').outerHTML);
-            document.getElementById("app").innerHTML = document.getElementById("app").querySelector('.modal-overlay').outerHTML;
+            // 直接插入到 body（不再修改 #app），避免双重渲染
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
             
             window._capitalTransactionsData = transactions;
             this._addFundsTableStyles();
@@ -125,11 +129,11 @@ const DashboardFunds = {
     },
 
     closeCapitalModal: function() {
-        const modal = document.querySelector('#capitalModal');
+        const modal = document.getElementById('capitalModal');
         if (modal) modal.remove();
     },
 
-    // ========== 修改：资金流水改为独立页面（非模态框） ==========
+    // ========== 资金流水改为独立页面（非模态框） ==========
     showCashFlowModal: async function() {
         if (typeof this.showPaymentHistory === 'function' && this !== window.APP) {
             return;
@@ -402,10 +406,7 @@ const DashboardFunds = {
     },
     
     printCapitalTransactions: function() {
-        var modalContent = document.querySelector('.modal-overlay .modal-content');
-        if (!modalContent) {
-            modalContent = document.querySelector('#capitalModal .modal-content');
-        }
+        var modalContent = document.querySelector('#capitalModal .modal-content');
         if (!modalContent) {
             console.error("Cannot find modal content for printing");
             return;
@@ -784,6 +785,8 @@ const DashboardFunds = {
                     '</div>' +
                 '</div>';
             
+            var oldModal = document.getElementById('internalTransferModal');
+            if (oldModal) oldModal.remove();
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             window._internalTransfersData = transfers;
         } catch (error) {
@@ -830,7 +833,8 @@ const DashboardFunds = {
         };
         var rows = '';
         if (transfers.length === 0) {
-            rows = '<table><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + '<\/td><\/tr>';
+            // 修复：添加缺失的 <tr> 标签
+            rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + '<\/td><\/tr>';
         } else {
             for (var i = 0; i < transfers.length; i++) {
                 var transfer = transfers[i];
