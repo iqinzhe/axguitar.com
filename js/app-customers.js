@@ -1,4 +1,4 @@
-// app-customers.js - v2.10（修复订单页面布局、保存刷新、黑名单功能）
+// app-customers.js - v2.11（添加最大展期月数配置、默认利率统一为8%）
 
 window.APP = window.APP || {};
 
@@ -177,11 +177,15 @@ const CustomersModule = {
             '.fee-calc-row .fee-label { min-width: 60px; font-weight: 600; font-size: 0.8rem; }' +
             '.fee-calc-row input { width: 150px; }' +
             '.fee-calc-row select { width: auto; min-width: 80px; }' +
+            '.max-extension-config { margin-top: 10px; padding: 8px 12px; background: #f8fafc; border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }' +
+            '.max-extension-config label { font-size: 0.8rem; font-weight: 600; color: #475569; white-space: nowrap; }' +
+            '.max-extension-config select { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; }' +
             '@media (max-width: 768px) { ' +
                 '.customer-table th, .customer-table td { font-size: 0.7rem; padding: 6px 4px; } ' +
                 '.address-option-inline { flex-direction: column; gap: 8px; } ' +
                 '.fee-calc-row { flex-direction: column; align-items: flex-start; } ' +
                 '.fee-calc-row input { width: 100%; } ' +
+                '.max-extension-config { flex-direction: column; align-items: flex-start; } ' +
             '}';
         document.head.appendChild(style);
     },
@@ -201,13 +205,11 @@ const CustomersModule = {
         }
     },
 
-    // 修复黑名单功能
     blacklistCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
         
         try {
-            // 获取客户信息（使用 UUID）
             const { data: customer, error: customerError } = await supabaseClient
                 .from('customers')
                 .select('id, name, customer_id, store_id')
@@ -637,7 +639,7 @@ const CustomersModule = {
                         '<div class="form-group interest-rate-group">' +
                             '<label>📈 ' + (lang === 'id' ? 'Suku Bunga (Pilih)' : '利率（可选）') + '</label>' +
                             '<select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">' +
-                                Utils.getInterestRateOptions(10) +
+                                Utils.getInterestRateOptions(8) +
                             '</select>' +
                         '</div>' +
                         '<div class="repayment-type-group">' +
@@ -654,6 +656,17 @@ const CustomersModule = {
                                     '<span class="option-desc">' + (lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok)' : '每月固定还款（本金+利息）') + '</span>' +
                                 '</label>' +
                             '</div>' +
+                        '</div>' +
+                        // 修复5：添加最大展期月数配置（灵活还款时显示）
+                        '<div id="flexibleMaxMonthsConfig" class="max-extension-config">' +
+                            '<label>📅 ' + (lang === 'id' ? 'Maksimal Perpanjangan' : '最大展期') + ':</label>' +
+                            '<select id="maxExtensionMonths">' +
+                                '<option value="6">6 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                '<option value="10" selected>10 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                '<option value="12">12 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                '<option value="24">24 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                            '</select>' +
+                            '<small style="color:#64748b;">' + (lang === 'id' ? 'Batas maksimal perpanjangan bunga sebelum harus lunasi pokok' : '利息延期上限，超出后须结清本金') + '</small>' +
                         '</div>' +
                         '<div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">' +
                             '<div class="form-group">' +
@@ -683,6 +696,7 @@ const CustomersModule = {
                     '.order-form-grid .full-width { grid-column: span 2; }' +
                     '.order-form-grid .repayment-type-group { grid-column: span 2; }' +
                     '.order-form-grid .fixed-repayment-form { grid-column: span 2; }' +
+                    '.order-form-grid .max-extension-config { grid-column: span 2; }' +
                     '.form-group { display: flex; flex-direction: column; gap: 6px; }' +
                     '.form-group label { font-weight: 600; font-size: 0.85rem; color: #475569; }' +
                     '.form-group input, .form-group select, .form-group textarea { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; }' +
@@ -702,6 +716,10 @@ const CustomersModule = {
                     '.repayment-option .option-title { font-weight: 700; display: inline-block; margin-bottom: 4px; }' +
                     '.repayment-option .option-desc { display: block; font-size: 11px; color: #64748b; margin-top: 4px; }' +
                     '.fixed-repayment-form { padding: 16px; background: #f0fdf4; border-radius: 10px; margin: 8px 0; }' +
+                    '.max-extension-config { margin: 8px 0; padding: 12px 16px; background: #fffbeb; border-radius: 10px; border: 1px solid #fde68a; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }' +
+                    '.max-extension-config label { font-weight: 600; font-size: 0.85rem; color: #92400e; white-space: nowrap; }' +
+                    '.max-extension-config select { padding: 8px 12px; border: 1px solid #fcd34d; border-radius: 6px; font-size: 0.9rem; background: white; }' +
+                    '.max-extension-config small { color: #a16207; flex-basis: 100%; }' +
                     '.form-actions { grid-column: span 2; display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; }' +
                     '.form-actions button { padding: 12px 24px; font-size: 1rem; }' +
                     '@media (max-width: 768px) { ' +
@@ -709,12 +727,14 @@ const CustomersModule = {
                         '.order-form-grid .full-width { grid-column: span 1; }' +
                         '.order-form-grid .repayment-type-group { grid-column: span 1; }' +
                         '.order-form-grid .fixed-repayment-form { grid-column: span 1; }' +
+                        '.order-form-grid .max-extension-config { grid-column: span 1; }' +
                         '.fund-source-group .fund-source-options { flex-direction: column; align-items: flex-start; gap: 8px; }' +
                         '.service-fee-group .fee-calc-row { flex-direction: column; align-items: flex-start; }' +
                         '.service-fee-group .fee-percent-select { width: 100%; }' +
                         '.service-fee-group .fee-amount-input { width: 100%; }' +
                         '.repayment-type-options { flex-direction: column; }' +
                         '.repayment-option { min-width: auto; }' +
+                        '.max-extension-config { flex-direction: column; align-items: flex-start; }' +
                         '.form-actions { grid-column: span 1; flex-direction: column; }' +
                         '.form-actions button { width: 100%; }' +
                     '}' +
@@ -759,7 +779,7 @@ const CustomersModule = {
         var repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
         if (repaymentType === 'fixed') {
             var rateSelect = document.getElementById('agreedInterestRateSelect');
-            var monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 10) / 100 : 0.10;
+            var monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08;
             var termSelect = document.getElementById('repaymentTermSelect');
             var months = termSelect ? parseInt(termSelect.value) : 5;
             
@@ -807,10 +827,13 @@ const CustomersModule = {
 
     toggleRepaymentForm: function(value) {
         var fixedForm = document.getElementById('fixedRepaymentForm');
+        var flexibleConfig = document.getElementById('flexibleMaxMonthsConfig');
         if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none';
+        if (flexibleConfig) flexibleConfig.style.display = value === 'flexible' ? 'flex' : 'none';
         if (value === 'fixed') APP.recalculateAllFees();
     },
 
+    // 修复5：saveOrderWithCustomer 读取最大展期月数配置
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
@@ -837,12 +860,13 @@ const CustomersModule = {
             serviceFee = Math.round(amount * serviceFeePercent / 100);
         }
         
-        var agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 10;
+        var agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 8;
         
         var repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked');
         var repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
         var repaymentTerm = null;
         var monthlyFixedPayment = null;
+        var maxExtensionMonths = 10;
         
         if (repaymentType === 'fixed') {
             repaymentTerm = parseInt(document.getElementById("repaymentTermSelect")?.value) || 5;
@@ -852,6 +876,9 @@ const CustomersModule = {
                 var monthlyRate = agreedInterestRate / 100;
                 monthlyFixedPayment = Utils.roundMonthlyPayment(Utils.calculateFixedMonthlyPayment(amount, monthlyRate, repaymentTerm));
             }
+        } else {
+            // 修复5：读取灵活还款的最大展期月数配置
+            maxExtensionMonths = parseInt(document.getElementById('maxExtensionMonths')?.value) || 10;
         }
         
         var loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash';
@@ -902,7 +929,9 @@ const CustomersModule = {
                 agreed_interest_rate: agreedInterestRate,
                 repayment_type: repaymentType,
                 repayment_term: repaymentTerm,
-                monthly_fixed_payment: monthlyFixedPayment
+                monthly_fixed_payment: monthlyFixedPayment,
+                // 修复5：传入最大展期月数
+                max_extension_months: maxExtensionMonths
             };
             
             var newOrder = await Order.create(orderData);
@@ -939,12 +968,11 @@ const CustomersModule = {
                     ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Tetap\nJangka: ' + repaymentTerm + ' bulan\nAngsuran per bulan: ' + Utils.formatCurrency(monthlyFixedPayment) + '\nBunga: ' + agreedInterestRate + '%\nAdmin Fee: ' + Utils.formatCurrency(adminFee) + '\nService Fee: ' + Utils.formatCurrency(serviceFee)
                     : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 固定还款\n期限: ' + repaymentTerm + '个月\n每月还款: ' + Utils.formatCurrency(monthlyFixedPayment) + '\n利率: ' + agreedInterestRate + '%\n管理费: ' + Utils.formatCurrency(adminFee) + '\n服务费: ' + Utils.formatCurrency(serviceFee))
                 : (lang === 'id'
-                    ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Fleksibel\nBunga: ' + agreedInterestRate + '%\nAdmin Fee: ' + Utils.formatCurrency(adminFee) + '\nService Fee: ' + Utils.formatCurrency(serviceFee) + '\nMaksimal perpanjangan hingga 10 bulan'
-                    : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 灵活还款\n利率: ' + agreedInterestRate + '%\n管理费: ' + Utils.formatCurrency(adminFee) + '\n服务费: ' + Utils.formatCurrency(serviceFee) + '\n最长可延期至10个月');
+                    ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Fleksibel\nBunga: ' + agreedInterestRate + '%\nAdmin Fee: ' + Utils.formatCurrency(adminFee) + '\nService Fee: ' + Utils.formatCurrency(serviceFee) + '\nMaksimal perpanjangan: ' + maxExtensionMonths + ' bulan'
+                    : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 灵活还款\n利率: ' + agreedInterestRate + '%\n管理费: ' + Utils.formatCurrency(adminFee) + '\n服务费: ' + Utils.formatCurrency(serviceFee) + '\n最长可延期: ' + maxExtensionMonths + '个月');
             
             alert(successMsg);
             
-            // 保存后刷新页面
             setTimeout(function() {
                 window.location.reload();
             }, 1500);
