@@ -1,12 +1,12 @@
-// app-dashboard-anomaly.js - v1.0
+// app-dashboard-anomaly.js - v1.1（修复saveCurrentPageState调用）
 
 window.APP = window.APP || {};
 
 const DashboardAnomaly = {
 
     showAnomaly: async function() {
-        this.currentPage = 'anomaly';
-        this.saveCurrentPageState();
+        APP.currentPage = 'anomaly';
+        APP.saveCurrentPageState();  // 修复：this → APP
         var lang = Utils.lang;
         
         try {
@@ -119,7 +119,7 @@ const DashboardAnomaly = {
                         '<td class="text-center" style="color:#ef4444; font-weight:600;">' + o.overdue_days + '<\/td>' +
                         '<td class="text-right">' + Utils.formatCurrency(o.loan_amount) + '<\/td>' +
                         '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '<\/button><\/td>' +
-                    '</tr>';
+                    '<\/tr>';
                 }
                 overdueTableHtml = '' +
                     '<div class="table-container">' +
@@ -131,10 +131,10 @@ const DashboardAnomaly = {
                                     '<th class="text-center">' + (lang === 'id' ? 'Hari Terlambat' : '逾期天数') + '</th>' +
                                     '<th class="text-right">' + (lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额') + '</th>' +
                                     '<th class="text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
-                                '</tr>' +
+                                '<\/tr>' +
                             '</thead>' +
                             '<tbody>' + overdueRows + '</tbody>' +
-                        '</table>' +
+                        '<\/table>' +
                     '</div>';
             }
             
@@ -155,7 +155,7 @@ const DashboardAnomaly = {
                         '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '<\/td>' +
                         '<td>' + Utils.escapeHtml(b.reason) + '<\/td>' +
                         '<td class="text-center"><button onclick="APP.showCustomerOrders(\'' + b.customer_id + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '<\/button><\/td>' +
-                    '</tr>';
+                    '<\/tr>';
                 }
                 blacklistTableHtml = '' +
                     '<div class="table-container">' +
@@ -167,10 +167,10 @@ const DashboardAnomaly = {
                                     '<th>' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
                                     '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
                                     '<th class="text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
-                                '</tr>' +
+                                '<\/tr>' +
                             '</thead>' +
                             '<tbody>' + blacklistRows + '</tbody>' +
-                        '</table>' +
+                        '<\/table>' +
                     '</div>';
             }
             
