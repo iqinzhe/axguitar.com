@@ -257,43 +257,84 @@
    ============================================================ */
 @media (max-width: 768px) {
     .table-container {
-        border: none;
-        border-radius: 0;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
         margin: var(--spacing-2) 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        /* 关键：提示用户可以左右滑动 */
+        -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+        mask-image: linear-gradient(to right, black 90%, transparent 100%);
     }
 
     .data-table {
         font-size: var(--font-xxs);
-        table-layout: auto;
-        min-width: 100%;
+        table-layout: fixed;
+        min-width: 700px;      /* 关键：强制最小宽度，触发水平滚动 */
+        width: max-content;    /* 关键：内容多宽表格就多宽 */
     }
 
     .data-table thead th,
     .data-table tbody td {
-        padding: 6px 4px;
+        padding: 6px 5px;
         font-size: var(--font-xxs);
         line-height: 1.3;
         height: auto;
         min-height: 32px;
+        white-space: nowrap;    /* 关键：手机端不换行 */
     }
 
-    /* 手机端：隐藏次要列 */
-    .mobile-hide {
-        display: none;
+    /* 长文本列允许换行（地址、描述等） */
+    .data-table .col-address,
+    .data-table .col-desc,
+    .data-table .desc-cell {
+        white-space: normal;
+        word-break: break-word;
+        min-width: 120px;
+        max-width: 160px;
     }
 
-    /* 操作按钮纵向排列 */
+    /* ========================================
+       操作行 — 按钮单行显示
+       ======================================== */
+    .action-row td {
+        padding: 6px 5px !important;
+    }
+
+    .action-row .action-label {
+        font-size: var(--font-xxs);
+        width: 40px;
+        min-width: 40px;
+        padding-right: var(--spacing-1);
+    }
+
     .action-row .action-buttons {
-        flex-direction: column;
-        align-items: stretch;
+        display: flex;
+        flex-direction: row;          /* 关键：单行横向排列 */
+        flex-wrap: nowrap;            /* 关键：不换行 */
+        gap: 4px;
+        align-items: center;
+        overflow-x: auto;             /* 按钮太多时可以滚动 */
+        -webkit-overflow-scrolling: touch;
+        padding: 2px 0;
     }
 
     .action-row .action-buttons .btn-small {
+        flex-shrink: 0;               /* 关键：按钮不缩小 */
+        white-space: nowrap;
+        padding: 5px 10px;
+        font-size: 11px;
+        border-radius: var(--radius-sm);
+        line-height: 1.3;
+        min-width: auto;
+        width: auto;
+        max-width: 120px;             /* 限制按钮最大宽度 */
         text-align: center;
-        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
-    /* 徽章缩小 */
+    /* 徽章保持小巧 */
     .status-badge,
     .repayment-badge,
     .payment-method-badge,
@@ -301,10 +342,13 @@
     .reconciled-badge {
         font-size: 10px;
         padding: 1px 6px;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
-    .desc-cell {
-        max-width: 100px;
+    /* 隐藏次要列（通用工具类） */
+    .mobile-hide {
+        display: none;
     }
 }
 
