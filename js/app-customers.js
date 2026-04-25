@@ -1,4 +1,4 @@
-// app-customers.js - v3.2（精简内联样式，依赖 forms.css 统一管理）
+// app-customers.js - v4.0（移除内联样式，使用组件库）
 
 window.APP = window.APP || {};
 
@@ -20,12 +20,11 @@ const CustomersModule = {
                 storeMap[stores[i].id] = stores[i].name;
             }
             
-            var baseCols = 7;
-            var totalCols = isAdmin ? baseCols + 1 : baseCols;
+            var totalCols = isAdmin ? 8 : 7;
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < customers.length; i++) {
                     var c = customers[i];
@@ -37,41 +36,40 @@ const CustomersModule = {
                     var ktpAddress = Utils.escapeHtml(c.ktp_address || c.address || '-');
                     var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
-                    var escapedId = Utils.escapeAttr(c.id);
                     
                     rows += '<tr>' +
-                        '<td>' + customerId + '<\/td>' +
-                        '<td>' + name + '<\/td>' +
-                        '<td>' + ktpNumber + '<\/td>' +
-                        '<td>' + phone + '<\/td>' +
-                        '<td>' + ktpAddress + '<\/td>' +
-                        '<td>' + livingAddress + '<\/td>' +
-                        '<td class="text-center">' + registeredDate + '<\/td>' +
-                        (isAdmin ? '<td class="text-center">' + storeName + '<\/td>' : '') +
-                    '<\/tr>';
+                        '<td>' + customerId + '</td>' +
+                        '<td>' + name + '</td>' +
+                        '<td>' + ktpNumber + '</td>' +
+                        '<td>' + phone + '</td>' +
+                        '<td>' + ktpAddress + '</td>' +
+                        '<td>' + livingAddress + '</td>' +
+                        '<td class="date-cell text-center">' + registeredDate + '</td>' +
+                        (isAdmin ? '<td class="text-center">' + storeName + '</td>' : '') +
+                    '</tr>';
                     
                     var actionButtons = '';
                     
                     if (!isAdmin) {
-                        actionButtons += '<button onclick="APP.createOrderForCustomer(\'' + escapedId + '\')" class="btn-small success">➕ ' + (lang === 'id' ? 'Buat Order' : '建立订单') + '</button>';
+                        actionButtons += '<button onclick="APP.createOrderForCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small success">➕ ' + (lang === 'id' ? 'Buat Order' : '建立订单') + '</button>';
                     }
                     
-                    actionButtons += '<button onclick="APP.showCustomerOrders(\'' + escapedId + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Lihat Order' : '查看订单') + '</button>';
+                    actionButtons += '<button onclick="APP.showCustomerOrders(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Lihat Order' : '查看订单') + '</button>';
                     
                     if (isAdmin) {
-                        actionButtons += '<button onclick="APP.editCustomer(\'' + escapedId + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Ubah' : '修改') + '</button>';
+                        actionButtons += '<button onclick="APP.editCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Ubah' : '修改') + '</button>';
                     }
                     
                     if (isAdmin) {
-                        actionButtons += '<button onclick="APP.deleteCustomer(\'' + escapedId + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
+                        actionButtons += '<button onclick="APP.deleteCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
                     }
                     
                     if (!isAdmin) {
-                        actionButtons += '<button onclick="APP.blacklistCustomer(\'' + escapedId + '\')" class="btn-small btn-blacklist">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
+                        actionButtons += '<button onclick="APP.blacklistCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small btn-blacklist">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
                     }
                     
                     if (isAdmin) {
-                        actionButtons += '<button onclick="APP.removeCustomerFromBlacklist(\'' + escapedId + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
+                        actionButtons += '<button onclick="APP.removeCustomerFromBlacklist(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
                     }
                     
                     rows += Utils.renderActionRow({
@@ -85,8 +83,8 @@ const CustomersModule = {
             if (!isAdmin) {
                 addCustomerCardHtml = '' +
                 '<div class="card">' +
-                    '<h3>' + (lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户') + '</h3>' +
-                    '<div class="form-grid form-grid-three-col">' +
+                    '<h3>➕ ' + (lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户') + '</h3>' +
+                    '<div class="form-grid form-grid-3">' +
                         '<div class="form-group">' +
                             '<label>' + t('customer_name') + ' *</label>' +
                             '<input type="text" id="customerName" placeholder="' + t('customer_name') + '">' +
@@ -105,7 +103,7 @@ const CustomersModule = {
                         '</div>' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</label>' +
-                            '<div class="address-option address-option-inline">' +
+                            '<div class="address-option">' +
                                 '<label><input type="radio" name="livingAddrOpt" value="same" checked onchange="APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
                                 '<label><input type="radio" name="livingAddrOpt" value="different" onchange="APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）') + '</label>' +
                             '</div>' +
@@ -122,8 +120,8 @@ const CustomersModule = {
                 '<div class="page-header">' +
                     '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ' + t('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card">' +
@@ -132,15 +130,15 @@ const CustomersModule = {
                         '<table class="data-table customer-table">' +
                             '<thead>' +
                                 '<tr>' +
-                                    '<th>' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
-                                    '<th>' + t('customer_name') + '</th>' +
-                                    '<th>' + t('ktp_number') + '</th>' +
-                                    '<th>' + t('phone') + '</th>' +
-                                    '<th>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</th>' +
-                                    '<th>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</th>' +
-                                    '<th class="text-center">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + '</th>' +
-                                    (isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
-                                '<tr>' +
+                                    '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
+                                    '<th class="col-name">' + t('customer_name') + '</th>' +
+                                    '<th class="col-ktp">' + t('ktp_number') + '</th>' +
+                                    '<th class="col-phone">' + t('phone') + '</th>' +
+                                    '<th class="col-address">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</th>' +
+                                    '<th class="col-address">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</th>' +
+                                    '<th class="col-date text-center">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + '</th>' +
+                                    (isAdmin ? '<th class="col-store text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
+                                '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
@@ -148,36 +146,10 @@ const CustomersModule = {
                 '</div>' +
                 addCustomerCardHtml;
             
-            this._addDataTableStyles();
-            
         } catch (error) {
             console.error("showCustomers error:", error);
             alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
         }
-    },
-    
-    _addDataTableStyles: function() {
-        if (document.getElementById('data-table-styles')) return;
-        var style = document.createElement('style');
-        style.id = 'data-table-styles';
-        style.textContent = '' +
-            '.customer-table th, .customer-table td { padding: 8px 6px; font-size: 0.75rem; }' +
-            '.customer-table th:nth-child(1), .customer-table td:nth-child(1) { width: 90px; min-width: 80px; }' +
-            '.customer-table th:nth-child(2), .customer-table td:nth-child(2) { width: 120px; min-width: 100px; }' +
-            '.customer-table th:nth-child(3), .customer-table td:nth-child(3) { width: 130px; min-width: 110px; }' +
-            '.customer-table th:nth-child(4), .customer-table td:nth-child(4) { width: 110px; min-width: 90px; }' +
-            '.customer-table th:nth-child(5), .customer-table td:nth-child(5) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }' +
-            '.customer-table th:nth-child(6), .customer-table td:nth-child(6) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }' +
-            '.customer-table th:nth-child(7), .customer-table td:nth-child(7) { width: 90px; min-width: 80px; white-space: nowrap; }' +
-            '.address-option-inline { display: flex; gap: 24px; flex-wrap: nowrap; }' +
-            '.address-option-inline label { white-space: nowrap; }' +
-            '.btn-blacklist { background: #f97316 !important; color: #fff !important; border-color: #ea580c !important; }' +
-            '.btn-blacklist:hover { background: #ea580c !important; }' +
-            '@media (max-width: 768px) { ' +
-                '.customer-table th, .customer-table td { font-size: 0.7rem; padding: 6px 4px; } ' +
-                '.address-option-inline { flex-direction: column; gap: 8px; } ' +
-            '}';
-        document.head.appendChild(style);
     },
 
     removeCustomerFromBlacklist: async function(customerId) {
@@ -349,7 +321,7 @@ const CustomersModule = {
                     
                     if (error) {
                         if (error.code === '23505') {
-                            console.warn(`客户ID ${customerId} 已存在，重试第 ${attempt + 1} 次`);
+                            console.warn('客户ID ' + customerId + ' 已存在，重试第 ' + (attempt + 1) + ' 次');
                             lastError = error;
                             continue;
                         }
@@ -406,14 +378,14 @@ const CustomersModule = {
             modal.innerHTML = '' +
                 '<div class="modal-content" style="max-width:600px;">' +
                     '<h3>✏️ ' + (lang === 'id' ? 'Ubah Data Nasabah' : '修改客户信息') + '</h3>' +
-                    '<div class="form-grid form-grid-three-col">' +
+                    '<div class="form-grid form-grid-3">' +
                         '<div class="form-group"><label>' + t('customer_name') + ' *</label><input id="ec_name" value="' + Utils.escapeHtml(c.name) + '"></div>' +
                         '<div class="form-group"><label>' + t('phone') + ' *</label><input id="ec_phone" value="' + Utils.escapeHtml(c.phone || '') + '"></div>' +
                         '<div class="form-group"><label>' + t('ktp_number') + '</label><input id="ec_ktp" value="' + Utils.escapeHtml(c.ktp_number || '') + '"></div>' +
                         '<div class="form-group full-width"><label>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</label><textarea id="ec_ktpAddr" rows="2">' + Utils.escapeHtml(c.ktp_address || c.address || '') + '</textarea></div>' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</label>' +
-                            '<div class="address-option address-option-inline">' +
+                            '<div class="address-option">' +
                                 '<label><input type="radio" name="ec_livingOpt" value="same" ' + (livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
                                 '<label><input type="radio" name="ec_livingOpt" value="different" ' + (!livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Berbeda' : '不同') + '</label>' +
                             '</div>' +
@@ -503,7 +475,7 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单页面（美化版：依赖 forms.css 统一样式） ====================
+    // ==================== 创建订单页面 ====================
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang || 'id';
         var t = function(key) { return Utils.t(key); };
@@ -574,191 +546,186 @@ const CustomersModule = {
             APP.currentPage = 'createOrder';
             APP.currentCustomerId = customerId;
             
-            // ========== 页面 HTML（样式依赖 forms.css） ==========
+            // ========== 页面 HTML ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>📝 ' + t('create_order') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
                 '<div class="card">' +
-                    '<h3>👤 ' + t('customer_info') + '</h3>' +
-                    '<div class="customer-info-display">' +
-                        '<p><strong>' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + ':</strong> ' + Utils.escapeHtml(customer.customer_id || '-') + '</p>' +
-                        '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(customer.name) + '</p>' +
-                        '<p><strong>' + t('ktp_number') + ':</strong> ' + Utils.escapeHtml(customer.ktp_number || '-') + '</p>' +
-                        '<p><strong>' + t('phone') + ':</strong> ' + Utils.escapeHtml(customer.phone) + '</p>' +
-                        '<p><strong>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + ':</strong> ' + Utils.escapeHtml(customer.ktp_address || customer.address || '-') + '</p>' +
-                        '<p><strong>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</strong> ' + (customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')) + '</p>' +
-                    '</div>' +
                     
-                    '<h3>💎 ' + t('collateral_info') + '</h3>' +
-                    
-                    '<!-- 第一行表单：四列网格 -->' +
-                    '<div class="order-first-row">' +
-                        '<div class="form-group">' +
-                            '<label>' + t('collateral_name') + ' *</label>' +
-                            '<input id="collateral" placeholder="' + t('collateral_name') + '">' +
+                    // 第一部分：客户信息摘要
+                    '<div class="form-section">' +
+                        '<div class="form-section-title">' +
+                            '<span class="section-icon">👤</span> ' + t('customer_info') +
                         '</div>' +
-                        '<div class="form-group">' +
-                            '<label>' + (lang === 'id' ? 'Keterangan Barang' : '物品备注') + '</label>' +
-                            '<input id="collateralNote" placeholder="' + (lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年') + '">' +
-                        '</div>' +
-                        '<div class="form-group">' +
-                            '<label>' + (lang === 'id' ? 'Jumlah Gadai' : '当金金额') + ' *</label>' +
-                            '<input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()">' +
-                        '</div>' +
-                        '<div class="form-group fund-source-group">' +
-                            '<label>' + (lang === 'id' ? 'Sumber Dana' : '资金来源') + '</label>' +
-                            '<div class="fund-source-options">' +
-                                '<label><input type="radio" name="loanSource" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
-                                '<label><input type="radio" name="loanSource" value="bank"> 🏧 ' + t('bank') + '</label>' +
+                        '<div class="info-display">' +
+                            '<div class="info-display-item">' +
+                                '<span class="info-label">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</span>' +
+                                '<span class="info-value">' + Utils.escapeHtml(customer.customer_id || '-') + '</span>' +
+                            '</div>' +
+                            '<div class="info-display-item">' +
+                                '<span class="info-label">' + t('customer_name') + '</span>' +
+                                '<span class="info-value">' + Utils.escapeHtml(customer.name) + '</span>' +
+                            '</div>' +
+                            '<div class="info-display-item">' +
+                                '<span class="info-label">' + t('ktp_number') + '</span>' +
+                                '<span class="info-value">' + Utils.escapeHtml(customer.ktp_number || '-') + '</span>' +
+                            '</div>' +
+                            '<div class="info-display-item">' +
+                                '<span class="info-label">' + t('phone') + '</span>' +
+                                '<span class="info-value">' + Utils.escapeHtml(customer.phone) + '</span>' +
+                            '</div>' +
+                            '<div class="info-display-item">' +
+                                '<span class="info-label">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</span>' +
+                                '<span class="info-value">' + Utils.escapeHtml(customer.ktp_address || customer.address || '-') + '</span>' +
+                            '</div>' +
+                            '<div class="info-display-item">' +
+                                '<span class="info-label">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</span>' +
+                                '<span class="info-value">' + (customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')) + '</span>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
                     
-                    '<!-- 费用区域：两卡片并排 -->' +
-                    '<div class="fees-two-columns">' +
-                        '<!-- 左：管理费卡片 -->' +
-                        '<div class="fee-card-item">' +
-                            '<div class="fee-card-title">' +
-                                '<span>📋</span> ' + (lang === 'id' ? 'Admin Fee' : '管理费') +
-                            '</div>' +
-                            '<div class="fee-card-value">' +
-                                '<input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">' +
-                            '</div>' +
+                    // 第二部分：典当信息
+                    '<div class="form-section">' +
+                        '<div class="form-section-title">' +
+                            '<span class="section-icon">💎</span> ' + t('collateral_info') +
                         '</div>' +
-                        '<!-- 右：服务费卡片 -->' +
-                        '<div class="fee-card-item">' +
-                            '<div class="fee-card-title">' +
-                                '<span>✨</span> ' + (lang === 'id' ? 'Service Fee' : '服务费') +
+                        '<div class="order-first-row">' +
+                            '<div class="form-group">' +
+                                '<label>' + t('collateral_name') + ' *</label>' +
+                                '<input id="collateral" placeholder="' + t('collateral_name') + '">' +
                             '</div>' +
-                            '<div class="service-fee-controls">' +
-                                '<select id="serviceFeePercentSelect" class="fee-percent-select" onchange="APP.recalculateServiceFee()">' +
-                                    Utils.getServiceFeePercentOptions(2) +
-                                '</select>' +
-                                '<input type="text" id="serviceFeeInput" value="0" class="fee-amount-input amount-input" oninput="APP.onServiceFeeManualChange()">' +
+                            '<div class="form-group">' +
+                                '<label>' + (lang === 'id' ? 'Keterangan Barang' : '物品备注') + '</label>' +
+                                '<input id="collateralNote" placeholder="' + (lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年') + '">' +
                             '</div>' +
-                        '</div>' +
-                    '</div>' +
-                    
-                    '<!-- 统一提示 -->' +
-                    '<div class="hint-container">' +
-                        '<span class="auto-calc-hint">💡 ' + (lang === 'id' ? 'Dihitung otomatis berdasarkan jumlah gadai' : '根据当金金额自动计算') + '</span>' +
-                    '</div>' +
-                    
-                    '<!-- 入账方式 -->' +
-                    '<div class="payment-method-row">' +
-                        '<div class="payment-method-title">' +
-                            '<span>📥</span> ' + (lang === 'id' ? 'Metode Pemasukan' : '入账方式') +
-                        '</div>' +
-                        '<div class="fee-payment-options">' +
-                            '<label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
-                            '<label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ' + t('bank') + '</label>' +
-                        '</div>' +
-                        '<div class="payment-hint">' +
-                            '💡 ' + (lang === 'id' ? 'Admin Fee & Service Fee akan dicatat bersama' : '管理费和服务费将一起入账') +
+                            '<div class="form-group">' +
+                                '<label>' + (lang === 'id' ? 'Jumlah Gadai' : '当金金额') + ' *</label>' +
+                                '<input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()">' +
+                            '</div>' +
+                            '<div class="form-group">' +
+                                '<label>' + (lang === 'id' ? 'Sumber Dana' : '资金来源') + '</label>' +
+                                '<div class="payment-method-selector compact">' +
+                                    '<label><input type="radio" name="loanSource" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
+                                    '<label><input type="radio" name="loanSource" value="bank"> 🏧 ' + t('bank') + '</label>' +
+                                '</div>' +
+                            '</div>' +
                         '</div>' +
                     '</div>' +
                     
-                    '<div class="form-group interest-rate-group">' +
-                        '<label>📈 ' + (lang === 'id' ? 'Suku Bunga (Pilih)' : '利率（可选）') + '</label>' +
-                        '<select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">' +
-                            Utils.getInterestRateOptions(8) +
-                        '</select>' +
-                    '</div>' +
-                    
-                    '<!-- 三卡片布局 -->' +
-                    '<div class="repayment-cards-row">' +
-                        '<div class="repayment-card" onclick="document.getElementById(\'flexibleRadio\').checked=true;APP.toggleRepaymentForm(\'flexible\')">' +
-                            '<div class="repayment-card-header">' +
-                                '<input type="radio" name="repaymentType" id="flexibleRadio" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)">' +
-                                '<span class="repayment-card-title">💰 ' + (lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款') + '</span>' +
+                    // 第三部分：费用区
+                    '<div class="form-section">' +
+                        '<div class="form-section-title">' +
+                            '<span class="section-icon">💰</span> ' + (lang === 'id' ? 'Rincian Biaya' : '费用明细') +
+                        '</div>' +
+                        '<div class="fee-cards-row">' +
+                            '<div class="fee-card">' +
+                                '<div class="fee-card-label">📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</div>' +
+                                '<div class="fee-card-body">' +
+                                    '<input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">' +
+                                '</div>' +
+                                '<div class="fee-card-hint">💡 ' + (lang === 'id' ? 'Dihitung otomatis' : '自动计算') + '</div>' +
                             '</div>' +
-                            '<div class="repayment-card-desc">' + (lang === 'id' ? 'Bayar bunga dulu, pokok bisa kapan saja' : '先付利息，本金随时可还') + '</div>' +
-                            '<div class="repayment-card-note">' + (lang === 'id' ? 'Maksimal 10 bulan' : '最长10个月') + '</div>' +
+                            '<div class="fee-card">' +
+                                '<div class="fee-card-label">✨ ' + (lang === 'id' ? 'Service Fee' : '服务费') + '</div>' +
+                                '<div class="fee-card-body">' +
+                                    '<select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">' +
+                                        Utils.getServiceFeePercentOptions(2) +
+                                    '</select>' +
+                                    '<input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()">' +
+                                '</div>' +
+                                '<div class="fee-card-hint">💡 ' + (lang === 'id' ? 'Dihitung otomatis berdasarkan jumlah gadai' : '根据当金金额自动计算') + '</div>' +
+                            '</div>' +
                         '</div>' +
                         
-                        '<div class="repayment-card" onclick="document.getElementById(\'fixedRadio\').checked=true;APP.toggleRepaymentForm(\'fixed\')">' +
-                            '<div class="repayment-card-header">' +
-                                '<input type="radio" name="repaymentType" id="fixedRadio" value="fixed" onchange="APP.toggleRepaymentForm(this.value)">' +
-                                '<span class="repayment-card-title">📅 ' + (lang === 'id' ? 'Cicilan Tetap' : '固定还款') + '</span>' +
+                        '<div class="payment-method-row">' +
+                            '<span class="payment-method-label">📥 ' + (lang === 'id' ? 'Metode Pemasukan' : '入账方式') + '</span>' +
+                            '<div class="payment-method-selector compact" style="padding:0;">' +
+                                '<label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
+                                '<label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ' + t('bank') + '</label>' +
                             '</div>' +
-                            '<div class="repayment-card-desc">' + (lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok)' : '每月固定还款（本金+利息）') + '</div>' +
-                            '<div class="repayment-card-note">' + (lang === 'id' ? 'Pilihan 1-10 bulan' : '可选1-10个月') + '</div>' +
+                            '<div class="payment-method-hint">💡 ' + (lang === 'id' ? 'Admin Fee & Service Fee akan dicatat bersama' : '管理费和服务费将一起入账') + '</div>' +
                         '</div>' +
                         
-                        '<div id="flexibleMaxMonthsCard" class="repayment-card extension-card">' +
-                            '<div class="repayment-card-header">' +
-                                '<span class="repayment-card-title">📅 ' + (lang === 'id' ? 'Maksimal Perpanjangan' : '最大展期') + '</span>' +
-                            '</div>' +
-                            '<div class="extension-select">' +
-                                '<select id="maxExtensionMonths">' +
-                                    '<option value="6">6 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="10" selected>10 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="12">12 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                    '<option value="24">24 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
-                                '</select>' +
-                            '</div>' +
-                            '<div class="repayment-card-note extension-note">' + (lang === 'id' ? 'Batas maksimal perpanjangan bunga sebelum harus lunasi pokok' : '利息延期上限，超出后须结清本金') + '</div>' +
-                        '</div>' +
-                    '</div>' +
-                    
-                    '<div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">' +
-                        '<div class="form-group">' +
-                            '<label>📅 ' + (lang === 'id' ? 'Jangka Waktu' : '还款期限') + '</label>' +
-                            '<select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">' +
-                                Utils.getRepaymentTermOptions(5) +
+                        '<div class="form-group interest-rate-group">' +
+                            '<label>📈 ' + (lang === 'id' ? 'Suku Bunga (Pilih)' : '利率（可选）') + '</label>' +
+                            '<select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">' +
+                                Utils.getInterestRateOptions(8) +
                             '</select>' +
                         '</div>' +
-                        '<div class="form-group">' +
-                            '<label>💰 ' + (lang === 'id' ? 'Angsuran Bulanan' : '每月还款') + '</label>' +
-                            '<input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()">' +
-                            '<small style="color:#64748b;">' + (lang === 'id' ? 'Dibulatkan ke Rp 10.000, bisa disesuaikan' : '取整到Rp 10,000，可手动调整') + '</small>' +
+                    '</div>' +
+                    
+                    // 第四部分：还款方式
+                    '<div class="form-section">' +
+                        '<div class="form-section-title">' +
+                            '<span class="section-icon">📅</span> ' + (lang === 'id' ? 'Metode Cicilan' : '还款方式') +
+                        '</div>' +
+                        '<div class="repayment-cards-row">' +
+                            '<div class="repayment-card selected" id="flexibleCard" onclick="document.getElementById(\'flexibleRadio\').checked=true;APP.toggleRepaymentForm(\'flexible\')">' +
+                                '<div class="repayment-card-header">' +
+                                    '<input type="radio" name="repaymentType" id="flexibleRadio" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)">' +
+                                    '<span class="repayment-card-title">💰 ' + t('flexible_repayment') + '</span>' +
+                                '</div>' +
+                                '<div class="repayment-card-desc">' + (lang === 'id' ? 'Bayar bunga dulu, pokok bisa kapan saja' : '先付利息，本金随时可还') + '</div>' +
+                                '<div class="repayment-card-note">' + (lang === 'id' ? 'Maksimal 10 bulan' : '最长10个月') + '</div>' +
+                            '</div>' +
+                            '<div class="repayment-card" id="fixedCard" onclick="document.getElementById(\'fixedRadio\').checked=true;APP.toggleRepaymentForm(\'fixed\')">' +
+                                '<div class="repayment-card-header">' +
+                                    '<input type="radio" name="repaymentType" id="fixedRadio" value="fixed" onchange="APP.toggleRepaymentForm(this.value)">' +
+                                    '<span class="repayment-card-title">📅 ' + t('fixed_repayment') + '</span>' +
+                                '</div>' +
+                                '<div class="repayment-card-desc">' + (lang === 'id' ? 'Angsuran tetap per bulan (bunga + pokok)' : '每月固定还款（本金+利息）') + '</div>' +
+                                '<div class="repayment-card-note">' + (lang === 'id' ? 'Pilihan 1-10 bulan' : '可选1-10个月') + '</div>' +
+                            '</div>' +
+                            '<div id="flexibleMaxMonthsCard" class="repayment-card extension-card">' +
+                                '<div class="repayment-card-header">' +
+                                    '<span class="repayment-card-title">📅 ' + (lang === 'id' ? 'Maksimal Perpanjangan' : '最大展期') + '</span>' +
+                                '</div>' +
+                                '<div class="extension-select">' +
+                                    '<select id="maxExtensionMonths">' +
+                                        '<option value="6">6 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                        '<option value="10" selected>10 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                        '<option value="12">12 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                        '<option value="24">24 ' + (lang === 'id' ? 'bulan' : '个月') + '</option>' +
+                                    '</select>' +
+                                '</div>' +
+                                '<div class="repayment-card-note extension-note">' + (lang === 'id' ? 'Batas maksimal perpanjangan bunga sebelum harus lunasi pokok' : '利息延期上限，超出后须结清本金') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">' +
+                            '<div class="form-grid">' +
+                                '<div class="form-group">' +
+                                    '<label>📅 ' + (lang === 'id' ? 'Jangka Waktu' : '还款期限') + '</label>' +
+                                    '<select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">' +
+                                        Utils.getRepaymentTermOptions(5) +
+                                    '</select>' +
+                                '</div>' +
+                                '<div class="form-group">' +
+                                    '<label>💰 ' + (lang === 'id' ? 'Angsuran Bulanan' : '每月还款') + '</label>' +
+                                    '<input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()">' +
+                                    '<div class="form-hint">' + (lang === 'id' ? 'Dibulatkan ke Rp 10.000, bisa disesuaikan' : '取整到Rp 10,000，可手动调整') + '</div>' +
+                                '</div>' +
+                            '</div>' +
                         '</div>' +
                     '</div>' +
                     
-                    '<div class="form-group full-width">' +
-                        '<label>' + t('notes') + '</label>' +
-                        '<textarea id="notes" rows="2" placeholder="' + t('notes') + '"></textarea>' +
+                    // 第五部分：备注与操作
+                    '<div class="form-section">' +
+                        '<div class="form-group full-width">' +
+                            '<label>' + t('notes') + '</label>' +
+                            '<textarea id="notes" rows="2" placeholder="' + t('notes') + '"></textarea>' +
+                        '</div>' +
+                        '<div class="form-actions">' +
+                            '<button onclick="APP.saveOrderForCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success" id="saveOrderBtn">💾 ' + (lang === 'id' ? 'Simpan' : '保存') + '</button>' +
+                            '<button onclick="APP.goBack()">↩️ ' + t('cancel') + '</button>' +
+                        '</div>' +
                     '</div>' +
-                    
-                    '<div class="form-actions">' +
-                        '<button onclick="APP.saveOrderForCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success" id="saveOrderBtn">💾 ' + (lang === 'id' ? 'Simpan' : '保存') + '</button>' +
-                        '<button onclick="APP.goBack()">↩️ ' + t('cancel') + '</button>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<style>' +
-                    '/* 三卡片布局 */' +
-                    '.repayment-cards-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 16px 0; }' +
-                    '.repayment-card { background: white; border: 2px solid #e2e8f0; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; }' +
-                    '.repayment-card:hover { border-color: #2563eb; background: #eff6ff; }' +
-                    '.repayment-card-active { border-color: #2563eb; background: #eff6ff; }' +
-                    '.repayment-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }' +
-                    '.repayment-card-header input[type="radio"] { width: 18px; height: 18px; margin: 0; cursor: pointer; }' +
-                    '.repayment-card-title { font-weight: 700; font-size: 0.95rem; color: #1e293b; }' +
-                    '.repayment-card-desc { font-size: 0.75rem; color: #64748b; margin-bottom: 6px; }' +
-                    '.repayment-card-note { font-size: 0.7rem; color: #94a3b8; }' +
-                    '.extension-card .repayment-card-header { margin-bottom: 12px; }' +
-                    '.extension-select select { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 0.9rem; background: white; margin-bottom: 8px; }' +
-                    '.extension-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0; color: #d97706; }' +
-                    '.fixed-repayment-form { padding: 16px; background: #f0fdf4; border-radius: 12px; margin: 16px 0; border: 1px solid #bbf7d0; }' +
-                    '.fixed-repayment-form .form-group { margin-bottom: 12px; }' +
-                    '.fixed-repayment-form .form-group:last-child { margin-bottom: 0; }' +
-                    '.fixed-repayment-form label { font-weight: 600; font-size: 0.85rem; color: #166534; margin-bottom: 6px; display: block; }' +
-                    '@media (max-width: 768px) { .repayment-cards-row { grid-template-columns: 1fr; gap: 12px; } }' +
-                    '@media print { ' +
-                        '.repayment-cards-row { display: block; }' +
-                        '.repayment-card { border: 1px solid #ccc; margin-bottom: 12px; page-break-inside: avoid; background: white; box-shadow: none; }' +
-                        '.repayment-card:hover { transform: none; border-color: #ccc; }' +
-                        '.repayment-card-header input[type="radio"] { display: inline-block; border: 1px solid #000; }' +
-                        '.extension-select select { border: none; padding: 0; background: transparent; font-size: 10pt; }' +
-                        '.fixed-repayment-form { border: 1px solid #ccc; background: white; page-break-inside: avoid; }' +
-                    '}' +
-                '</style>';
+                '</div>';
             
             // 绑定金额格式化
             var amountInput = document.getElementById("amount");
@@ -782,7 +749,6 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 保存订单（保存后清空表单，停留当前页） ====================
     saveOrderForCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t.bind(Utils);
@@ -799,11 +765,9 @@ const CustomersModule = {
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
         var notes = document.getElementById("notes").value;
         
-        // 管理费
         var adminFeeStr = document.getElementById("adminFeeInput").value;
         var adminFee = Utils.parseNumberFromCommas(adminFeeStr) || Utils.calculateAdminFee(amount);
         
-        // 服务费
         var serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 0;
         var serviceFeeStr = document.getElementById("serviceFeeInput").value;
         var serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
@@ -811,13 +775,9 @@ const CustomersModule = {
             serviceFee = Math.round(amount * serviceFeePercent / 100);
         }
         
-        // 管理费+服务费的统一入账方式
         var feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
-        
-        // 利率
         var agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 8;
         
-        // 还款方式
         var repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked');
         var repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
         var repaymentTerm = null;
@@ -836,7 +796,6 @@ const CustomersModule = {
             maxExtensionMonths = parseInt(document.getElementById('maxExtensionMonths')?.value) || 10;
         }
         
-        // 当金资金来源（贷款发放的入账方式）
         var loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash';
         var fullCollateralName = collateralNote ? collateral + ' (' + collateralNote + ')' : collateral;
         
@@ -853,7 +812,6 @@ const CustomersModule = {
                 .eq('id', customerId)
                 .single();
             
-            // 检查黑名单
             const { data: blacklistData } = await supabaseClient
                 .from('blacklist')
                 .select('id')
@@ -866,7 +824,6 @@ const CustomersModule = {
                 return;
             }
             
-            // 创建订单
             var orderData = {
                 customer: { 
                     name: customer.name, 
@@ -891,7 +848,6 @@ const CustomersModule = {
             
             var newOrder = await Order.create(orderData);
             
-            // 记录管理费（使用 feePaymentMethod）
             if (adminFee > 0) {
                 try {
                     await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee);
@@ -900,7 +856,6 @@ const CustomersModule = {
                 }
             }
             
-            // 记录服务费（使用 feePaymentMethod）
             if (serviceFee > 0) {
                 try {
                     await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod);
@@ -909,7 +864,6 @@ const CustomersModule = {
                 }
             }
             
-            // 记录当金发放（使用 loanSource）
             if (amount > 0) {
                 try {
                     var disbursementDesc = lang === 'id' 
@@ -921,7 +875,6 @@ const CustomersModule = {
                 }
             }
             
-            // 成功提示
             var successMsg = repaymentType === 'fixed'
                 ? (lang === 'id' 
                     ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Tetap\nJangka: ' + repaymentTerm + ' bulan\nAngsuran per bulan: ' + Utils.formatCurrency(monthlyFixedPayment)
@@ -932,48 +885,56 @@ const CustomersModule = {
             
             alert(successMsg);
             
-            // ========== 清空表单，停留在当前页面 ==========
+            // 清空表单
             document.getElementById("collateral").value = '';
             document.getElementById("collateralNote").value = '';
             document.getElementById("amount").value = '';
             document.getElementById("notes").value = '';
             
-            // 重置金额为 0 的显示
             var amountInput = document.getElementById("amount");
             if (amountInput) amountInput.value = '';
             
-            // 重置管理费和服务费
             var adminFeeInput = document.getElementById("adminFeeInput");
-            if (adminFeeInput) adminFeeInput.value = '0';
+            if (adminFeeInput) {
+                adminFeeInput.value = '0';
+                delete adminFeeInput.dataset.manual;
+            }
             
             var serviceFeePercentSelect = document.getElementById("serviceFeePercentSelect");
-            if (serviceFeePercentSelect) serviceFeePercentSelect.value = '2';
+            if (serviceFeePercentSelect) {
+                serviceFeePercentSelect.value = '2';
+                delete serviceFeePercentSelect.dataset.manual;
+            }
             
             var serviceFeeInput = document.getElementById("serviceFeeInput");
-            if (serviceFeeInput) serviceFeeInput.value = '0';
+            if (serviceFeeInput) {
+                serviceFeeInput.value = '0';
+                delete serviceFeeInput.dataset.manual;
+            }
             
-            // 重置入账方式为默认（现金）
             var cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]');
             if (cashRadio) cashRadio.checked = true;
             
             var loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]');
             if (loanCashRadio) loanCashRadio.checked = true;
             
-            // 重置利率为默认 8%
             var interestSelect = document.getElementById("agreedInterestRateSelect");
             if (interestSelect) interestSelect.value = '8';
             
-            // 重置还款方式为灵活还款
             var flexibleRadio = document.getElementById("flexibleRadio");
             if (flexibleRadio) {
                 flexibleRadio.checked = true;
                 APP.toggleRepaymentForm('flexible');
             }
             
-            // 重新计算费用
             APP.recalculateAllFees();
             
-            // 聚焦到质押物名称输入框
+            var monthlyInput = document.getElementById("monthlyPaymentInput");
+            if (monthlyInput) {
+                monthlyInput.value = '0';
+                delete monthlyInput.dataset.manual;
+            }
+            
             document.getElementById("collateral").focus();
             
         } catch (error) {
@@ -1061,24 +1022,17 @@ const CustomersModule = {
     toggleRepaymentForm: function(value) {
         var fixedForm = document.getElementById('fixedRepaymentForm');
         var flexibleCard = document.getElementById('flexibleMaxMonthsCard');
+        var flexibleCardDiv = document.getElementById('flexibleCard');
+        var fixedCardDiv = document.getElementById('fixedCard');
+        
         if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none';
         if (flexibleCard) flexibleCard.style.display = value === 'flexible' ? 'block' : 'none';
         
-        var flexibleCardDiv = document.querySelector('.repayment-card:has(#flexibleRadio)');
-        var fixedCardDiv = document.querySelector('.repayment-card:has(#fixedRadio)');
         if (flexibleCardDiv) {
-            if (value === 'flexible') {
-                flexibleCardDiv.classList.add('repayment-card-active');
-            } else {
-                flexibleCardDiv.classList.remove('repayment-card-active');
-            }
+            flexibleCardDiv.classList.toggle('selected', value === 'flexible');
         }
         if (fixedCardDiv) {
-            if (value === 'fixed') {
-                fixedCardDiv.classList.add('repayment-card-active');
-            } else {
-                fixedCardDiv.classList.remove('repayment-card-active');
-            }
+            fixedCardDiv.classList.toggle('selected', value === 'fixed');
         }
         
         if (value === 'fixed') APP.recalculateAllFees();
@@ -1107,30 +1061,31 @@ const CustomersModule = {
             
             var rows = '';
             if (!orders || orders.length === 0) {
-                rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < orders.length; i++) {
                     var o = orders[i];
-                    var sc = o.status === 'active' ? 'status-active' : (o.status === 'completed' ? 'status-completed' : 'status-liquidated');
+                    var sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
+                    var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
                     var repaymentTypeText = o.repayment_type === 'fixed' 
                         ? (lang === 'id' ? 'Tetap' : '固定') 
                         : (lang === 'id' ? 'Fleksibel' : '灵活');
                     
                     rows += '<tr>' +
-                        '<td data-label="' + t('order_id') + '" class="order-id">' + Utils.escapeHtml(o.order_id) + '<\/td>' +
-                        '<td data-label="' + (lang === 'id' ? 'Tanggal' : '日期') + '" class="date-cell">' + Utils.formatDate(o.created_at) + '<\/td>' +
-                        '<td data-label="' + t('loan_amount') + '" class="text-right">' + Utils.formatCurrency(o.loan_amount) + '<\/td>' +
-                        '<td data-label="' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '" class="text-right">' + Utils.formatCurrency(o.principal_paid) + '<\/td>' +
-                        '<td data-label="' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '" class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '<\/td>' +
-                        '<td data-label="' + (lang === 'id' ? 'Jenis' : '方式') + '" class="text-center"><span class="repayment-badge ' + (o.repayment_type === 'fixed' ? 'badge-fixed' : 'badge-flexible') + '">' + repaymentTypeText + '<\/span><\/td>' +
-                        '<td data-label="' + t('status') + '" class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '<\/span><\/td>' +
-                    '<\/tr>';
+                        '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
+                        '<td class="date-cell">' + Utils.formatDate(o.created_at) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(o.principal_paid) + '</td>' +
+                        '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
+                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
+                    '</tr>';
                     
                     var actionButtons = '';
                     if (o.status === 'active' && !AUTH.isAdmin()) {
                         actionButtons += '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small success">💰 ' + (lang === 'id' ? 'Bayar' : '缴费') + '</button>';
                     }
-                    actionButtons += '<button onclick="APP.navigateTo(\'viewOrder\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small">👁️ ' + t('view') + '<\/button>';
+                    actionButtons += '<button onclick="APP.navigateTo(\'viewOrder\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small">👁️ ' + t('view') + '</button>';
                     
                     rows += Utils.renderActionRow({
                         colspan: 7,
@@ -1143,7 +1098,7 @@ const CustomersModule = {
                 '<div class="page-header">' +
                     '<h2>📋 ' + (lang === 'id' ? 'Order Nasabah' : '客户订单') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card customer-summary">' +
@@ -1156,12 +1111,11 @@ const CustomersModule = {
                     '<h3>📋 ' + t('order_list') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th>ID</th><th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="text-right">' + t('loan_amount') + '</th><th class="text-right">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></tr></thead>' +
+                            '<thead><tr><th class="col-id">ID</th><th class="col-date">' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="col-amount amount">' + t('loan_amount') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
-                        '<\/table>' +
+                        '</table>' +
                     '</div>' +
-                '</div>' +
-                '<style>.repayment-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}.badge-fixed{background:#d1fae5;color:#065f46}.badge-flexible{background:#fed7aa;color:#9a3412}</style>';
+                '</div>';
         } catch (error) {
             console.error("showCustomerOrders error:", error);
             alert(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
@@ -1193,26 +1147,27 @@ const CustomersModule = {
             
             var rows = '';
             if (allPayments.length === 0) {
-                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
+                    var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
                     rows += '<tr>' +
-                        '<td data-label="' + t('date') + '" class="date-cell">' + Utils.formatDate(p.date) + '<\/td>' +
-                        '<td data-label="' + t('order_id') + '" class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '<\/td>' +
-                        '<td data-label="' + t('type') + '">' + (typeMap[p.type] || p.type) + '<\/td>' +
-                        '<td data-label="' + (lang === 'id' ? 'Bulan' : '月数') + '" class="text-center">' + (p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '<\/td>' +
-                        '<td data-label="' + t('amount') + '" class="text-right">' + Utils.formatCurrency(p.amount) + '<\/td>' +
-                        '<td data-label="' + (lang === 'id' ? 'Metode' : '支付方式') + '" class="text-center"><span class="payment-method-badge ' + (p.payment_method === 'cash' ? 'method-cash' : 'method-bank') + '">' + (methodMap[p.payment_method] || '-') + '<\/span><\/td>' +
-                        '<td data-label="' + t('description') + '">' + Utils.escapeHtml(p.description || '-') + '<\/td>' +
-                    '<\/tr>';
+                        '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                        '<td class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '</td>' +
+                        '<td>' + (typeMap[p.type] || p.type) + '</td>' +
+                        '<td class="text-center">' + (p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
+                    '</tr>';
                 }
             }
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card customer-summary">' +
@@ -1223,9 +1178,9 @@ const CustomersModule = {
                     '<h3>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th>' + t('date') + '</th><th>' + t('order_id') + '</th><th>' + t('type') + '</th><th class="text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="text-right">' + t('amount') + '</th><th class="text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th><th>' + t('description') + '</th></tr></thead>' +
+                            '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-id">' + t('order_id') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
-                        '<\/table>' +
+                        '</table>' +
                     '</div>' +
                 '</div>';
         } catch (error) {
