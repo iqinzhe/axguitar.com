@@ -633,3 +633,192 @@ button.warning.highlight {
         font-size: var(--font-xs);
     }
 }
+
+/* ============================================
+   新建订单页面 - 三卡片一行布局
+   ============================================ */
+
+/* 三卡片容器 */
+.repayment-cards-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin: 24px 0;
+}
+
+/* 卡片通用样式 */
+.repayment-card {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.repayment-card:hover {
+    border-color: #2563eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 卡片选中状态 */
+.repayment-card-active {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+/* 卡片头部 */
+.repayment-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.repayment-card-header input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #2563eb;
+}
+
+.repayment-card-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #1e293b;
+}
+
+/* 卡片描述 */
+.repayment-card-desc {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.repayment-card-note {
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+/* 最大展期卡片（第三张） */
+.extension-card .repayment-card-header {
+    margin-bottom: 16px;
+}
+
+.extension-card .repayment-card-title {
+    margin-left: 28px;  /* 与前面卡片对齐（无单选框） */
+}
+
+.extension-select select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-size: 0.9rem;
+    background: white;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+
+.extension-select select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.extension-note {
+    font-size: 0.7rem;
+    color: #d97706;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* 固定还款额外表单 */
+.fixed-repayment-form {
+    padding: 16px;
+    background: #f0fdf4;
+    border-radius: 12px;
+    margin: 16px 0;
+    border: 1px solid #bbf7d0;
+}
+
+.fixed-repayment-form .form-group {
+    margin-bottom: 12px;
+}
+
+.fixed-repayment-form .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.fixed-repayment-form label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #166534;
+    margin-bottom: 6px;
+    display: block;
+}
+
+/* ============================================
+   响应式调整
+   ============================================ */
+@media (max-width: 768px) {
+    .repayment-cards-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin: 16px 0;
+    }
+    
+    .extension-card .repayment-card-title {
+        margin-left: 0;
+    }
+}
+
+/* ============================================
+   打印样式
+   ============================================ */
+@media print {
+    .repayment-cards-row {
+        display: block;
+        margin: 16px 0;
+    }
+    
+    .repayment-card {
+        border: 1px solid #ccc;
+        margin-bottom: 12px;
+        page-break-inside: avoid;
+        background: white;
+        box-shadow: none;
+    }
+    
+    .repayment-card:hover {
+        transform: none;
+        border-color: #ccc;
+    }
+    
+    .repayment-card-active {
+        border-color: #999;
+        background: white;
+    }
+    
+    .repayment-card-header input[type="radio"] {
+        display: inline-block;
+        border: 1px solid #000;
+    }
+    
+    .extension-select select {
+        border: none;
+        padding: 0;
+        background: transparent;
+        font-size: 10pt;
+    }
+    
+    .fixed-repayment-form {
+        border: 1px solid #ccc;
+        background: white;
+        page-break-inside: avoid;
+    }
+}
