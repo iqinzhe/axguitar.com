@@ -1,12 +1,12 @@
-// app-customers.js - v2.11（添加最大展期月数配置、默认利率统一为8%）
+// app-customers.js - v2.12（修复 this.saveCurrentPageState 上下文错误、统一使用 APP 调用）
 
 window.APP = window.APP || {};
 
 const CustomersModule = {
 
     showCustomers: async function() {
-        this.currentPage = 'customers';
-        this.saveCurrentPageState();
+        APP.currentPage = 'customers';
+        APP.saveCurrentPageState();
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         var isAdmin = AUTH.isAdmin();
@@ -39,7 +39,7 @@ const CustomersModule = {
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     var escapedId = Utils.escapeAttr(c.id);
                     
-                    rows += '<td>' +
+                    rows += '<tr>' +
                         '<td>' + customerId + '<\/td>' +
                         '<td>' + name + '<\/td>' +
                         '<td>' + ktpNumber + '<\/td>' +
@@ -106,8 +106,8 @@ const CustomersModule = {
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</label>' +
                             '<div class="address-option address-option-inline">' +
-                                '<label><input type="radio" name="livingAddrOpt" value="same" checked onchange="window.APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
-                                '<label><input type="radio" name="livingAddrOpt" value="different" onchange="window.APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）') + '</label>' +
+                                '<label><input type="radio" name="livingAddrOpt" value="same" checked onchange="APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
+                                '<label><input type="radio" name="livingAddrOpt" value="different" onchange="APP.toggleLivingAddress(this.value)"> ' + (lang === 'id' ? 'Berbeda (isi manual)' : '不同（手动填写）') + '</label>' +
                             '</div>' +
                             '<textarea id="customerLivingAddress" rows="2" placeholder="' + (lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址') + '" style="display:none;margin-top:8px;"></textarea>' +
                         '</div>' +
@@ -198,7 +198,7 @@ const CustomersModule = {
         try {
             await window.APP.removeFromBlacklist(customerId);
             alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
-            await CustomersModule.showCustomers();
+            await APP.showCustomers();
         } catch (error) {
             var errMsg = error.message || error.details || error.code || JSON.stringify(error);
             alert(lang === 'id' ? 'Gagal membuka blacklist: ' + errMsg : '解除拉黑失败：' + errMsg);
@@ -245,7 +245,7 @@ const CustomersModule = {
                 alert(lang === 'id' 
                     ? '✅ Nasabah "' + customer.name + '" telah ditambahkan ke blacklist.'
                     : '✅ 客户 "' + customer.name + '" 已加入黑名单。');
-                await CustomersModule.showCustomers();
+                await APP.showCustomers();
             } else {
                 throw new Error(lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
             }
@@ -371,7 +371,7 @@ const CustomersModule = {
                         addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
                     }
                     alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + customerId : '客户添加成功！ID: ' + customerId);
-                    await CustomersModule.showCustomers();
+                    await APP.showCustomers();
                     return;
                     
                 } catch (err) {
@@ -424,8 +424,8 @@ const CustomersModule = {
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</label>' +
                             '<div class="address-option address-option-inline">' +
-                                '<label><input type="radio" name="ec_livingOpt" value="same" ' + (livingSame ? 'checked' : '') + ' onchange="window.APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
-                                '<label><input type="radio" name="ec_livingOpt" value="different" ' + (!livingSame ? 'checked' : '') + ' onchange="window.APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Berbeda' : '不同') + '</label>' +
+                                '<label><input type="radio" name="ec_livingOpt" value="same" ' + (livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Sama dengan KTP' : '同上KTP') + '</label>' +
+                                '<label><input type="radio" name="ec_livingOpt" value="different" ' + (!livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + (lang === 'id' ? 'Berbeda' : '不同') + '</label>' +
                             '</div>' +
                             '<textarea id="ec_livingAddr" rows="2" style="margin-top:8px;' + (livingSame ? 'display:none;' : '') + '">' + Utils.escapeHtml(c.living_address || '') + '</textarea>' +
                         '</div>' +
@@ -481,7 +481,7 @@ const CustomersModule = {
             if (error) throw error;
             document.getElementById('editCustomerModal')?.remove();
             alert(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
-            await CustomersModule.showCustomers();
+            await APP.showCustomers();
         } catch (e) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
         }
@@ -506,7 +506,7 @@ const CustomersModule = {
             if (customerError) throw customerError;
             
             alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
-            await CustomersModule.showCustomers();
+            await APP.showCustomers();
         } catch (e) {
             console.error('删除客户异常:', e);
             alert(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
@@ -580,8 +580,8 @@ const CustomersModule = {
                 console.warn('活跃订单检查失败:', ordErr.message);
             }
 
-            this.currentPage = 'createOrder';
-            this.currentCustomerId = customerId;
+            APP.currentPage = 'createOrder';
+            APP.currentCustomerId = customerId;
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -657,7 +657,6 @@ const CustomersModule = {
                                 '</label>' +
                             '</div>' +
                         '</div>' +
-                        // 修复5：添加最大展期月数配置（灵活还款时显示）
                         '<div id="flexibleMaxMonthsConfig" class="max-extension-config">' +
                             '<label>📅 ' + (lang === 'id' ? 'Maksimal Perpanjangan' : '最大展期') + ':</label>' +
                             '<select id="maxExtensionMonths">' +
@@ -833,7 +832,6 @@ const CustomersModule = {
         if (value === 'fixed') APP.recalculateAllFees();
     },
 
-    // 修复5：saveOrderWithCustomer 读取最大展期月数配置
     saveOrderWithCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t;
@@ -877,7 +875,6 @@ const CustomersModule = {
                 monthlyFixedPayment = Utils.roundMonthlyPayment(Utils.calculateFixedMonthlyPayment(amount, monthlyRate, repaymentTerm));
             }
         } else {
-            // 修复5：读取灵活还款的最大展期月数配置
             maxExtensionMonths = parseInt(document.getElementById('maxExtensionMonths')?.value) || 10;
         }
         
@@ -930,7 +927,6 @@ const CustomersModule = {
                 repayment_type: repaymentType,
                 repayment_term: repaymentTerm,
                 monthly_fixed_payment: monthlyFixedPayment,
-                // 修复5：传入最大展期月数
                 max_extension_months: maxExtensionMonths
             };
             
@@ -986,9 +982,9 @@ const CustomersModule = {
     },
 
     showCustomerOrders: async function(customerId) {
-        this.currentPage = 'customerOrders';
-        this.currentCustomerId = customerId;
-        this.saveCurrentPageState();
+        APP.currentPage = 'customerOrders';
+        APP.currentCustomerId = customerId;
+        APP.saveCurrentPageState();
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         try {
@@ -1070,9 +1066,9 @@ const CustomersModule = {
     },
 
     showCustomerPaymentHistory: async function(customerId) {
-        this.currentPage = 'customerPaymentHistory';
-        this.currentCustomerId = customerId;
-        this.saveCurrentPageState();
+        APP.currentPage = 'customerPaymentHistory';
+        APP.currentCustomerId = customerId;
+        APP.saveCurrentPageState();
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
@@ -1136,12 +1132,14 @@ const CustomersModule = {
     }
 };
 
+// 将所有以大写字母开头的方法挂载到 window.APP
 for (var key in CustomersModule) {
     if (typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
     }
 }
 
+// 确保内部辅助函数也挂载到 APP
 window.APP.recalculateAllFees = CustomersModule.recalculateAllFees;
 window.APP.onAdminFeeManualChange = CustomersModule.onAdminFeeManualChange;
 window.APP.recalculateServiceFee = CustomersModule.recalculateServiceFee;
