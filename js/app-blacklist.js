@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.0
+// app-blacklist.js - v1.1（修复黑名单功能，使用UUID正确关联）
 
 window.APP = window.APP || {};
 
@@ -13,48 +13,92 @@ function sanitizeInput(str) {
 
 const BlacklistModule = {
     
+    // 修复：isBlacklisted 支持两种ID类型（UUID 和 customer_id 字符串）
     isBlacklisted: async function(customerId) {
-        const { data, error } = await supabaseClient
+        // 先尝试用 customerId 直接查询（可能是 UUID）
+        let { data, error } = await supabaseClient
             .from('blacklist')
             .select('id, reason')
             .eq('customer_id', customerId)
             .maybeSingle();
         
+        if (error && error.code === '22P02') {
+            // 如果错误是无效UUID格式，则尝试通过 customers 表查找真实 UUID
+            try {
+                const { data: customer } = await supabaseClient
+                    .from('customers')
+                    .select('id')
+                    .eq('customer_id', customerId)
+                    .single();
+                
+                if (customer) {
+                    const { data: retryData, error: retryError } = await supabaseClient
+                        .from('blacklist')
+                        .select('id, reason')
+                        .eq('customer_id', customer.id)
+                        .maybeSingle();
+                    
+                    if (retryError) {
+                        console.error("检查黑名单失败:", retryError);
+                        return { isBlacklisted: false };
+                    }
+                    return retryData ? { isBlacklisted: true, reason: retryData.reason } : { isBlacklisted: false };
+                }
+            } catch (e) {
+                console.warn("通过customer_id查找客户失败:", e.message);
+            }
+            return { isBlacklisted: false };
+        }
+        
         if (error) {
             console.error("检查黑名单失败:", error);
-            return false;
+            return { isBlacklisted: false };
         }
         return data ? { isBlacklisted: true, reason: data.reason } : { isBlacklisted: false };
     },
     
+    // 修复：addToBlacklist 使用客户UUID而不是customer_id字符串
     addToBlacklist: async function(customerId, reason) {
+        var lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
         
         if (!reason || reason.trim() === '') {
-            throw new Error(Utils.lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
+            throw new Error(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
         }
         
-        const check = await this.isBlacklisted(customerId);
-        if (check.isBlacklisted) {
-            throw new Error(Utils.lang === 'id' ? 'Nasabah sudah ada di blacklist' : '客户已在黑名单中');
-        }
-        
+        // 获取客户的详细信息，包括 store_id
         const { data: customer, error: customerError } = await supabaseClient
             .from('customers')
-            .select('store_id')
+            .select('id, store_id, customer_id, name')
             .eq('id', customerId)
             .single();
         
-        if (customerError) throw customerError;
-        
-        if (profile?.role !== 'admin' && customer.store_id !== profile?.store_id) {
-            throw new Error(Utils.lang === 'id' ? 'Anda hanya dapat blacklist nasabah dari toko sendiri' : '只能拉黑本门店的客户');
+        if (customerError) {
+            console.error("获取客户信息失败:", customerError);
+            throw new Error(lang === 'id' ? 'Gagal mendapatkan data nasabah' : '获取客户信息失败');
         }
         
+        // 权限检查
+        if (profile?.role !== 'admin' && customer.store_id !== profile?.store_id) {
+            throw new Error(lang === 'id' ? 'Anda hanya dapat blacklist nasabah dari toko sendiri' : '只能拉黑本门店的客户');
+        }
+        
+        // 检查是否已在黑名单中
+        const { data: existing, error: checkError } = await supabaseClient
+            .from('blacklist')
+            .select('id')
+            .eq('customer_id', customer.id)  // 使用 UUID
+            .maybeSingle();
+        
+        if (existing) {
+            throw new Error(lang === 'id' ? 'Nasabah sudah ada di blacklist' : '客户已在黑名单中');
+        }
+        
+        // 添加到黑名单
         const { data, error } = await supabaseClient
             .from('blacklist')
             .insert({
-                customer_id: customerId,
+                customer_id: customer.id,  // 使用 UUID
                 reason: reason.trim(),
                 blacklisted_by: profile.id,
                 store_id: customer.store_id
@@ -62,23 +106,57 @@ const BlacklistModule = {
             .select('*, customers(*), blacklisted_by_profile:user_profiles!blacklist_blacklisted_by_fkey(name)')
             .single();
         
-        if (error) throw error;
+        if (error) {
+            console.error("添加黑名单失败:", error);
+            throw error;
+        }
+        
         return data;
     },
     
     removeFromBlacklist: async function(customerId) {
+        var lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
         
         if (profile?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? 'Hanya administrator yang dapat menghapus blacklist' : '只有管理员可以解除黑名单');
+            throw new Error(lang === 'id' ? 'Hanya administrator yang dapat menghapus blacklist' : '只有管理员可以解除黑名单');
         }
         
-        const { error } = await supabaseClient
+        // 删除黑名单记录（customer_id 可能是 UUID 或 customer_id 字符串）
+        let deleteError = null;
+        
+        // 先尝试直接删除
+        const { error: directError } = await supabaseClient
             .from('blacklist')
             .delete()
             .eq('customer_id', customerId);
         
-        if (error) throw error;
+        if (directError && directError.code === '22P02') {
+            // 如果是无效UUID格式，尝试通过 customers 表查找真实 UUID
+            try {
+                const { data: customer } = await supabaseClient
+                    .from('customers')
+                    .select('id')
+                    .eq('customer_id', customerId)
+                    .single();
+                
+                if (customer) {
+                    const { error: retryError } = await supabaseClient
+                        .from('blacklist')
+                        .delete()
+                        .eq('customer_id', customer.id);
+                    deleteError = retryError;
+                } else {
+                    deleteError = directError;
+                }
+            } catch (e) {
+                deleteError = directError;
+            }
+        } else {
+            deleteError = directError;
+        }
+        
+        if (deleteError) throw deleteError;
         return true;
     },
     
@@ -195,7 +273,7 @@ const BlacklistModule = {
             
             var rows = '';
             if (!blacklist || blacklist.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${t('no_data')}<\/td><\/tr>`;
+                rows = '<tr><td colspan="' + (isAdmin ? 6 : 5) + '" class="text-center">' + t('no_data') + '<\/td><\/tr>';
             } else {
                 for (var item of blacklist) {
                     var customer = item.customers;
