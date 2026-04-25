@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v1.7（打印标题添加Logo，Logo尺寸大于标题文字）
+// app-dashboard-print.js - v1.8（移除内联样式，使用组件库）
 
 window.APP = window.APP || {};
 
@@ -11,6 +11,7 @@ const DashboardPrint = {
     _doPrint: function() {
         var printContent = document.getElementById("app").cloneNode(true);
         
+        // 移除所有交互元素
         var pageHeader = printContent.querySelector('.page-header');
         if (pageHeader) {
             var headerActions = pageHeader.querySelector('.header-actions');
@@ -36,6 +37,7 @@ const DashboardPrint = {
             allButtons[i].remove();
         }
         
+        // 移除新增表单卡片
         var formCards = printContent.querySelectorAll('.card');
         for (var i = formCards.length - 1; i >= 0; i--) {
             var card = formCards[i];
@@ -129,7 +131,7 @@ const DashboardPrint = {
                     '.anomaly-table th { text-align: left; }' +
                     '.anomaly-table td { text-align: left; }' +
                     '.empty-state { text-align: left; }' +
-                    '.info-card-content { text-align: left; }' +
+                    '.info-bar { text-align: left; }' +
                     '.info-note { text-align: left; }' +
                     '.order-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }' +
                     '.page-header h1, .page-header h2 { text-align: left; }' +
@@ -164,56 +166,11 @@ const DashboardPrint = {
                         'window.print();' +
                         'setTimeout(function() { window.close(); }, 800);' +
                     '};' +
-                '<\/script>' +
+                '</script>' +
             '</body>' +
             '</html>'
         );
         printWindow.document.close();
-    },
-
-    _getPrintStyles: function() {
-        return '' +
-            '*{box-sizing:border-box;margin:0;padding:0}' +
-            'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:9pt;line-height:1.3;color:#1e293b;padding:3mm}' +
-            '.header{text-align:center;margin-bottom:6px;border-bottom:1px solid #ccc;padding-bottom:3px}' +
-            '.header h1{font-size:12pt;margin:2px 0;text-align:center}' +
-            '.header .logo-img{height:28px;width:auto;vertical-align:middle}' +
-            '.store-info{text-align:center;font-size:8pt;color:#475569;margin:2px 0}' +
-            '.user-info{text-align:center;font-size:7pt;color:#64748b;margin-bottom:3px}' +
-            'table{width:100%;border-collapse:collapse;margin-top:4px}' +
-            'th,td{border:1px solid #cbd5e1;padding:3px 5px;text-align:left;font-size:7.5pt}' +
-            'th{background:#f1f5f9;font-weight:600}' +
-            '.stats-grid-optimized{display:flex;flex-wrap:wrap;gap:5px}' +
-            '.stat-card{flex:1 1 auto;min-width:100px;border:1px solid #ccc;padding:3px 5px;text-align:left}' +
-            '.stat-card .stat-value{text-align:left}' +
-            '.stat-card .stat-label{text-align:left}' +
-            '.anomaly-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}' +
-            '.cashflow-stats{display:flex;flex-wrap:wrap;gap:6px}' +
-            '.cashflow-item{flex:1;min-width:120px;text-align:left}' +
-            '.card{border:1px solid #e2e8f0;border-radius:4px;padding:5px;margin-bottom:6px;break-inside:avoid;text-align:left}' +
-            '.card h3{font-size:9pt;margin-bottom:3px;border-bottom:none;text-align:left}' +
-            '.order-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}' +
-            '@media print{@page{size:A4 landscape;margin:5mm 8mm}body{margin:0;padding:0}}';
-    },
-    
-    _generatePrintHeader: function(title, lang, storeName, userName, printDateTime) {
-        return '' +
-            '<div class="header">' +
-                '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:5px;">' +
-                    '<img src="icons/pagehead-logo.png" alt="JF!" class="logo-img" style="height:28px;">' +
-                    '<h1 style="margin:0;">JF! by Gadai</h1>' +
-                '</div>' +
-                '<div class="store-info">🏪 ' + Utils.escapeHtml(storeName) + '</div>' +
-                '<div class="user-info">👤 ' + Utils.escapeHtml(userName) + ' | 📅 ' + printDateTime + '</div>' +
-                '<h3>' + title + '</h3>' +
-            '</div>';
-    },
-    
-    _generatePrintFooter: function(lang, storeName) {
-        return '' +
-            '<div class="footer">' +
-                'JF! by Gadai - ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' | 🏪 ' + Utils.escapeHtml(storeName) +
-            '</div>';
     }
 };
 
