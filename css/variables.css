@@ -1,0 +1,74 @@
+/* ============================================================
+   variables.css - 第1层：设计令牌（全系统唯一变量源）
+   职责：只放 CSS 自定义属性，不包含任何规则或样式
+   ============================================================ */
+
+:root {
+    /* --- 主色调 --- */
+    --primary: #2563eb;
+    --primary-light: #60a5fa;
+    --primary-soft: #dbeafe;
+    --primary-dark: #1d4ed8;
+
+    /* --- 功能色 --- */
+    --success: #10b981;
+    --success-dark: #059669;
+    --success-light: #ecfdf5;
+    --warning: #f59e0b;
+    --warning-dark: #d97706;
+    --warning-light: #fffbeb;
+    --danger: #ef4444;
+    --danger-dark: #dc2626;
+    --danger-light: #fef2f2;
+
+    /* --- 背景色系 --- */
+    --bg-page: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-highlight: #f0f9ff;
+    --bg-hover: #f1f5f9;
+    --bg-modal: rgba(15, 23, 42, 0.5);
+
+    /* --- 文字色系 --- */
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --text-white: #ffffff;
+
+    /* --- 边框色 --- */
+    --border-light: #e2e8f0;
+    --border-medium: #cbd5e1;
+
+    /* --- 阴影 --- */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.08);
+    --shadow-lg: 0 4px 8px -1px rgb(0 0 0 / 0.1);
+
+    /* --- 圆角 --- */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+
+    /* --- 间距 --- */
+    --spacing-1: 4px;
+    --spacing-2: 8px;
+    --spacing-3: 12px;
+    --spacing-4: 16px;
+    --spacing-5: 20px;
+    --spacing-6: 24px;
+    --spacing-7: 28px;
+    --spacing-8: 32px;
+
+    /* --- 过渡 --- */
+    --transition: all 0.2s ease;
+
+    /* --- 字体大小 --- */
+    --font-xxs: 0.75rem;
+    --font-xs: 0.8rem;
+    --font-sm: 0.9rem;
+    --font-md: 1rem;
+    --font-lg: 1.1rem;
+    --font-xl: 1.25rem;
+    --font-2xl: 1.35rem;
+}
