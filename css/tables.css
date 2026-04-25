@@ -1,248 +1,368 @@
-/* tables.css - v1.0（列宽与打印统一 + 表格左对齐） */
+/* tables.css - v2.0（统一行高36px、列宽百分比系统、A4一致） */
 
-/* === 表格容器 === */
+/* ============================================================
+   表格容器
+   ============================================================ */
 .table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     margin: var(--spacing-3) 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
 }
 
-/* === 统一表格样式 === */
+/* ============================================================
+   统一表格基础
+   行高全系统统一：36px
+   列宽使用 table-layout: fixed + 百分比
+   ============================================================ */
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8rem;
+    font-size: var(--font-sm);
     background: var(--bg-card);
+    table-layout: fixed;    /* 固定布局，确保列宽比例屏显与打印一致 */
 }
 
-.data-table th,
-.data-table td {
-    vertical-align: middle;
-    padding: 8px 6px;
-    text-align: left;
-}
-
-.data-table th {
+/* 表头 */
+.data-table thead th {
     background: var(--bg-hover);
     font-weight: 600;
     color: var(--text-primary);
-    border-bottom: 2px solid var(--border-light);
+    border-bottom: 2px solid var(--border-medium);
+    padding: 8px;
+    text-align: left;
+    font-size: var(--font-xs);
     white-space: nowrap;
+    line-height: 1.3;
+    height: 36px;           /* 全系统统一行高 */
+    vertical-align: middle;
 }
 
-.data-table td {
+/* 表体 */
+.data-table tbody td {
+    padding: 8px;
     border-bottom: 1px solid var(--border-light);
+    text-align: left;
+    font-size: var(--font-sm);
+    line-height: 1.4;
+    min-height: 36px;       /* 全系统统一行高 */
+    vertical-align: middle;
+    word-break: break-word;
 }
 
+/* 行悬停 */
 .data-table tbody tr:hover {
     background: var(--bg-hover);
 }
 
-/* 金额列保持右对齐 */
-.data-table td.text-right,
-.data-table th.text-right {
-    text-align: right;
+/* 斑马纹（可选，需要时在 table 上添加 .striped） */
+.data-table.striped tbody tr:nth-child(even) {
+    background: var(--bg-page);
 }
 
-/* 居中列（状态、日期等短文本） */
-.data-table td.text-center,
-.data-table th.text-center {
-    text-align: center;
-}
-
-/* ===============================
-   操作行样式
-   =============================== */
-.action-row td {
-    padding: 6px 12px;
-    border-bottom: 2px solid var(--border-light);
+.data-table.striped tbody tr:hover {
     background: var(--bg-hover);
+}
+
+/* ============================================================
+   列对齐工具
+   ============================================================ */
+.data-table .text-left   { text-align: left; }
+.data-table .text-center { text-align: center; }
+.data-table .text-right  { text-align: right; }
+
+/* 金额列：右对齐 + 等宽数字 */
+.data-table .amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   列宽系统（百分比，屏幕与打印比例一致）
+   ============================================================ */
+.col-id      { width: 8%;  }   /* ID/编码类 */
+.col-name    { width: 14%; }   /* 姓名类 */
+.col-ktp     { width: 16%; }   /* 证件号类 */
+.col-phone   { width: 11%; }   /* 电话类 */
+.col-address { width: 18%; }   /* 地址类（长文本） */
+.col-date    { width: 10%; }   /* 日期类 */
+.col-status  { width: 7%;  }   /* 状态类 */
+.col-store   { width: 9%;  }   /* 门店类 */
+.col-amount  { width: 11%; }   /* 金额类 */
+.col-type    { width: 10%; }   /* 类型/类别 */
+.col-months  { width: 7%;  }   /* 月数类 */
+.col-method  { width: 9%;  }   /* 支付方式类 */
+.col-desc    { width: auto; }  /* 描述类（自适应剩余空间） */
+.col-action  { width: 140px; } /* 操作列（固定宽度） */
+
+/* 更窄的变体 */
+.col-id-narrow   { width: 6%; }
+.col-status-wide { width: 10%; }
+
+/* ============================================================
+   操作行
+   ============================================================ */
+.action-row {
+    background: var(--bg-hover);
+    border-bottom: 2px solid var(--border-medium);
+}
+
+.action-row td {
+    padding: 6px 8px !important;
     vertical-align: middle;
 }
 
-.action-row td.action-label {
-    white-space: nowrap;
-    font-size: 0.75rem;
+.action-row .action-label {
+    font-size: var(--font-xs);
     font-weight: 600;
     color: var(--text-secondary);
-    padding-right: 12px;
-    width: 1%;
-}
-
-.action-row td.action-btns {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 8px;
-}
-
-.action-row .btn-small {
-    margin: 0;
     white-space: nowrap;
-    flex-shrink: 0;
-    padding: 4px 10px;
-    font-size: 0.7rem;
+    width: 50px;
+    padding-right: var(--spacing-2);
 }
 
-/* ========================================
-   客户表格列宽（A4纸打印原则）
-   ======================================== */
-.customer-table th:nth-child(1),
-.customer-table td:nth-child(1) { width: 80px; min-width: 70px; }
+.action-row .action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
 
-.customer-table th:nth-child(2),
-.customer-table td:nth-child(2) { width: 110px; min-width: 90px; }
+/* ============================================================
+   各种徽章（状态、还款方式、支付方式、锁定）
+   ============================================================ */
+.status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: var(--font-xxs);
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.6;
+}
 
-.customer-table th:nth-child(3),
-.customer-table td:nth-child(3) { width: 120px; min-width: 100px; }
+.status-badge.active     { background: #dcfce7; color: #16a34a; }
+.status-badge.completed  { background: #dbeafe; color: #2563eb; }
+.status-badge.liquidated { background: #fee2e2; color: #dc2626; }
 
-.customer-table th:nth-child(4),
-.customer-table td:nth-child(4) { width: 100px; min-width: 85px; }
+.repayment-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: var(--font-xxs);
+    font-weight: 600;
+    white-space: nowrap;
+}
 
-.customer-table th:nth-child(5),
-.customer-table td:nth-child(5) { width: auto; min-width: 130px; max-width: 200px; word-break: break-word; white-space: normal; }
+.repayment-badge.fixed    { background: #d1fae5; color: #065f46; }
+.repayment-badge.flexible { background: #fed7aa; color: #9a3412; }
 
-.customer-table th:nth-child(6),
-.customer-table td:nth-child(6) { width: auto; min-width: 120px; max-width: 180px; word-break: break-word; white-space: normal; }
+.payment-method-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: var(--font-xxs);
+    font-weight: 600;
+    white-space: nowrap;
+}
 
-.customer-table th:nth-child(7),
-.customer-table td:nth-child(7) { width: 85px; min-width: 75px; white-space: nowrap; }
+.payment-method-badge.cash { background: #fef3c7; color: #92400e; }
+.payment-method-badge.bank { background: #e0f2fe; color: #0369a1; }
 
-.customer-table th:nth-child(8),
-.customer-table td:nth-child(8) { width: 75px; min-width: 65px; white-space: nowrap; }
+.locked-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 20px;
+    font-size: var(--font-xxs);
+    font-weight: 600;
+    white-space: nowrap;
+}
 
-/* ========================================
-   订单表格列宽
-   ======================================== */
-.order-table th:nth-child(1),
-.order-table td:nth-child(1) { width: 75px; min-width: 65px; }
+.reconciled-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #ecfdf5;
+    color: #065f46;
+    border-radius: 20px;
+    font-size: var(--font-xxs);
+    font-weight: 600;
+    white-space: nowrap;
+}
 
-.order-table th:nth-child(2),
-.order-table td:nth-child(2) { width: 100px; min-width: 80px; }
+/* ============================================================
+   表格特定样式（补充微调）
+   ============================================================ */
 
-.order-table th:nth-child(3),
-.order-table td:nth-child(3) { width: auto; min-width: 100px; max-width: 160px; word-break: break-word; white-space: normal; }
+/* 订单ID：等宽字体 */
+.order-id {
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+}
 
-.order-table th:nth-child(4),
-.order-table td:nth-child(4) { width: 90px; min-width: 80px; }
+/* 日期列：不换行 */
+.date-cell {
+    white-space: nowrap;
+}
 
-.order-table th:nth-child(5),
-.order-table td:nth-child(5) { width: 85px; min-width: 75px; }
+/* 描述列：溢出省略 */
+.desc-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
-.order-table th:nth-child(6),
-.order-table td:nth-child(6) { width: 70px; min-width: 60px; }
+/* 门店名称 */
+.store-name-cell {
+    font-weight: 500;
+}
 
-.order-table th:nth-child(7),
-.order-table td:nth-child(7) { width: 80px; min-width: 70px; white-space: nowrap; }
+/* 门店编码 */
+.store-code {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+}
 
-.order-table th:nth-child(8),
-.order-table td:nth-child(8) { width: 65px; min-width: 55px; }
+/* ============================================================
+   空状态
+   ============================================================ */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-6) var(--spacing-4);
+    text-align: center;
+    color: var(--text-muted);
+}
 
-.order-table th:nth-child(9),
-.order-table td:nth-child(9) { width: 65px; min-width: 55px; }
+.empty-state .empty-state-icon {
+    font-size: 48px;
+    margin-bottom: var(--spacing-3);
+    opacity: 0.4;
+}
 
-.order-table th:nth-child(10),
-.order-table td:nth-child(10) { width: 70px; min-width: 60px; }
+.empty-state .empty-state-text {
+    font-size: var(--font-sm);
+    font-weight: 500;
+}
 
-/* ========================================
-   支出表格列宽
-   ======================================== */
-.expense-table th:nth-child(1),
-.expense-table td:nth-child(1) { width: 80px; min-width: 70px; white-space: nowrap; }
-
-.expense-table th:nth-child(2),
-.expense-table td:nth-child(2) { width: 90px; min-width: 75px; }
-
-.expense-table th:nth-child(3),
-.expense-table td:nth-child(3) { width: 90px; min-width: 80px; }
-
-.expense-table th:nth-child(4),
-.expense-table td:nth-child(4) { width: 70px; min-width: 60px; }
-
-.expense-table th:nth-child(5),
-.expense-table td:nth-child(5) { width: auto; min-width: 120px; max-width: 200px; word-break: break-word; white-space: normal; }
-
-.expense-table th:nth-child(6),
-.expense-table td:nth-child(6) { width: 75px; min-width: 65px; }
-
-/* ========================================
-   门店表格列宽
-   ======================================== */
-.store-table th:nth-child(1),
-.store-table td:nth-child(1) { width: 85px; min-width: 75px; }
-
-.store-table th:nth-child(2),
-.store-table td:nth-child(2) { width: 120px; min-width: 100px; }
-
-.store-table th:nth-child(3),
-.store-table td:nth-child(3) { width: auto; min-width: 140px; max-width: 220px; word-break: break-word; white-space: normal; }
-
-.store-table th:nth-child(4),
-.store-table td:nth-child(4) { width: 100px; min-width: 85px; }
-
-.store-table th:nth-child(5),
-.store-table td:nth-child(5) { width: 130px; min-width: 110px; }
-
-.store-table th:nth-child(6),
-.store-table td:nth-child(6) { width: 65px; min-width: 55px; }
-
-/* ========================================
-   用户表格列宽
-   ======================================== */
-.user-table th:nth-child(1),
-.user-table td:nth-child(1) { width: 150px; min-width: 130px; }
-
-.user-table th:nth-child(2),
-.user-table td:nth-child(2) { width: 120px; min-width: 100px; }
-
-.user-table th:nth-child(3),
-.user-table td:nth-child(3) { width: 80px; min-width: 65px; }
-
-.user-table th:nth-child(4),
-.user-table td:nth-child(4) { width: 130px; min-width: 110px; }
-
-.user-table th:nth-child(5),
-.user-table td:nth-child(5) { width: 90px; min-width: 80px; white-space: nowrap; }
-
-/* ===============================
-   手机端优化
-   =============================== */
+/* ============================================================
+   手机端
+   ============================================================ */
 @media (max-width: 768px) {
+    .table-container {
+        border: none;
+        border-radius: 0;
+        margin: var(--spacing-2) 0;
+    }
+
     .data-table {
-        min-width: unset;
-        width: 100%;
-        font-size: 0.7rem;
+        font-size: var(--font-xxs);
+        table-layout: auto;
+        min-width: 100%;
     }
 
-    .data-table th,
-    .data-table td {
+    .data-table thead th,
+    .data-table tbody td {
         padding: 6px 4px;
+        font-size: var(--font-xxs);
+        line-height: 1.3;
+        height: auto;
+        min-height: 32px;
     }
 
-    .data-table th {
-        font-size: 0.7rem;
+    /* 手机端：隐藏次要列 */
+    .mobile-hide {
+        display: none;
     }
 
-    .action-row td {
-        padding: 4px 8px;
+    /* 操作按钮纵向排列 */
+    .action-row .action-buttons {
+        flex-direction: column;
+        align-items: stretch;
     }
 
-    .action-row td.action-label {
-        font-size: 0.7rem;
-        padding-right: 6px;
+    .action-row .action-buttons .btn-small {
+        text-align: center;
+        width: 100%;
     }
 
-    .action-row td.action-btns {
-        gap: 6px;
+    /* 徽章缩小 */
+    .status-badge,
+    .repayment-badge,
+    .payment-method-badge,
+    .locked-badge,
+    .reconciled-badge {
+        font-size: 10px;
+        padding: 1px 6px;
     }
 
-    .action-row .btn-small {
-        padding: 3px 8px;
-        font-size: 0.65rem;
+    .desc-cell {
+        max-width: 100px;
     }
 }
 
-/* === 对齐工具类 === */
-.text-left { text-align: left; }
-.text-center { text-align: center; }
-.text-right { text-align: right; }
+/* ============================================================
+   打印样式 - 确保与屏幕显示一致
+   ============================================================ */
+@media print {
+    .table-container {
+        border: none;
+        overflow: visible;
+    }
+
+    .data-table {
+        font-size: 7.5pt;
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    .data-table thead th,
+    .data-table tbody td {
+        padding: 4px 6px;
+        font-size: 7pt;
+        line-height: 1.2;
+        border: 1px solid #999;
+        height: auto;
+        min-height: auto;
+    }
+
+    .data-table thead th {
+        background: #f0f0f0;
+        font-weight: 700;
+    }
+
+    .data-table tbody tr:hover {
+        background: transparent;
+    }
+
+    .data-table.striped tbody tr:nth-child(even) {
+        background: #fafafa;
+    }
+
+    .action-row {
+        display: none;
+    }
+
+    .status-badge,
+    .repayment-badge,
+    .payment-method-badge {
+        border: 1px solid #999;
+        background: none;
+    }
+
+    /* 打印时溢出显示完整内容 */
+    .desc-cell {
+        max-width: none;
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+        word-break: break-word;
+    }
+}
