@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.0（返回键统一位置 + 支出页面优化）
+// app-dashboard-expenses.js - v2.1（移除内联样式，使用组件库）
 
 window.APP = window.APP || {};
 
@@ -46,11 +46,11 @@ const DashboardExpenses = {
             }
             var todayDate = new Date().toISOString().split('T')[0];
 
-            var totalCols = isAdmin ? 7 : 6;
+            var totalCols = isAdmin ? 6 : 5;
             
             var rows = '';
             if (finalExpenses.length === 0) {
-                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < finalExpenses.length; i++) {
                     var e = finalExpenses[i];
@@ -58,9 +58,19 @@ const DashboardExpenses = {
                     var methodText = (e.payment_method === 'cash') ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     var storeName = storeMap[e.store_id] || e.store_id || '-';
                     
+                    rows += '<tr>' +
+                        '<td class="date-cell">' + Utils.formatDate(e.expense_date) + '</td>' +
+                        '<td class="expense-category">' + Utils.escapeHtml(e.category) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(e.amount) + '</td>' +
+                        '<td class="text-center">' + methodText + '</td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(e.description || '-') + '</td>' +
+                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
+                    '</tr>';
+                    
+                    // 操作行
                     var actionHtml = '';
                     if (canEdit) {
-                        actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button> ';
+                        actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
                         actionHtml += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button>';
                     } else if (e.is_reconciled) {
                         actionHtml += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '</span>';
@@ -69,18 +79,15 @@ const DashboardExpenses = {
                     }
                     
                     if (isAdmin && !e.is_reconciled) {
-                        actionHtml += ' <button onclick="APP.balanceExpenses()" class="btn-small btn-balance">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
+                        actionHtml += '<button onclick="APP.balanceExpenses()" class="btn-small warning">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
                     }
                     
-                    rows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(e.expense_date) + '<\/td>' +
-                        '<td class="expense-category">' + Utils.escapeHtml(e.category) + '<\/td>' +
-                        '<td class="text-right">' + Utils.formatCurrency(e.amount) + '<\/td>' +
-                        '<td class="text-center">' + methodText + '<\/td>' +
-                        '<td class="expense-desc">' + Utils.escapeHtml(e.description || '-') + '<\/td>' +
-                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '<\/td>' : '') +
-                        '<td class="text-center action-cell">' + actionHtml + '<\/td>' +
-                    '<\/tr>';
+                    rows += '<tr class="action-row">' +
+                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
+                        '<td colspan="' + (totalCols - 1) + '">' +
+                            '<div class="action-buttons">' + actionHtml + '</div>' +
+                        '</td>' +
+                    '</tr>';
                 }
             }
 
@@ -90,80 +97,84 @@ const DashboardExpenses = {
 
             var categoryOptions = '';
             for (var j = 0; j < expenseCategories.length; j++) {
-                categoryOptions += '<option value="' + expenseCategories[j] + '">' + expenseCategories[j] + '<\/option>';
+                categoryOptions += '<option value="' + expenseCategories[j] + '">' + expenseCategories[j] + '</option>';
             }
 
-            var pageHtml = '' +
+            document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>📝 ' + (lang === 'id' ? 'Pengeluaran Operasional' : '运营支出') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
+                
+                // 支出总额卡片（使用 stat-card 组件）
                 '<div class="card">' +
-                    '<h3>' + (lang === 'id' ? 'Total Pengeluaran' : '支出总额') + ': <span class="total-expense" style="color:var(--danger);">' + Utils.formatCurrency(totalAmount) + '</span></h3>' +
+                    '<div class="stat-card" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">' +
+                        '<div class="stat-value expense">' + Utils.formatCurrency(totalAmount) + '</div>' +
+                        '<div class="stat-label">' + (lang === 'id' ? 'Total Pengeluaran' : '支出总额') + '</div>' +
+                    '</div>' +
                 '</div>' +
+                
+                // 支出列表
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Daftar Pengeluaran' : '支出列表') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table expense-table">' +
                             '<thead>' +
                                 '<tr>' +
-                                    '<th>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th>' +
-                                    '<th>' + (lang === 'id' ? 'Kategori' : '类别') + '</th>' +
-                                    '<th class="text-right">' + (lang === 'id' ? 'Jumlah' : '金额') + '</th>' +
-                                    '<th class="text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
-                                    '<th>' + (lang === 'id' ? 'Deskripsi' : '描述') + '</th>' +
-                                    (isAdmin ? '<th class="text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
-                                    '<th class="text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
+                                    '<th class="col-date">' + (lang === 'id' ? 'Tanggal' : '日期') + '</th>' +
+                                    '<th class="col-type">' + (lang === 'id' ? 'Kategori' : '类别') + '</th>' +
+                                    '<th class="col-amount amount">' + (lang === 'id' ? 'Jumlah' : '金额') + '</th>' +
+                                    '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
+                                    '<th class="col-desc">' + (lang === 'id' ? 'Deskripsi' : '描述') + '</th>' +
+                                    (isAdmin ? '<th class="col-store text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
                     '</div>' +
                 '</div>' +
+                
+                // 新增支出表单
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增运营支出') + '</h3>' +
-                    '<div class="form-grid">' +
-                        '<div class="form-group"><label>' + (lang === 'id' ? 'Tanggal' : '日期') + ' *</label><input type="date" id="expenseDate" value="' + todayDate + '"></div>' +
-                        '<div class="form-group"><label>' + (lang === 'id' ? 'Jumlah' : '金额') + ' *</label><input type="text" id="expenseAmount" placeholder="0" class="amount-input"></div>' +
-                        '<div class="form-group"><label>' + (lang === 'id' ? 'Kategori / Penyebab' : '类别/原因') + ' *</label>' +
+                    '<div class="form-grid form-grid-4">' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Tanggal' : '日期') + ' *</label>' +
+                            '<input type="date" id="expenseDate" value="' + todayDate + '">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Jumlah' : '金额') + ' *</label>' +
+                            '<input type="text" id="expenseAmount" placeholder="0" class="amount-input">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Kategori / Penyebab' : '类别/原因') + ' *</label>' +
                             '<select id="expenseCategory">' +
                                 '<option value="">' + (lang === 'id' ? 'Pilih kategori' : '选择类别') + '</option>' +
                                 categoryOptions +
                             '</select>' +
                         '</div>' +
-                        '<div class="form-group"><label>' + (lang === 'id' ? 'Metode Pembayaran' : '支付方式') + ' *</label>' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Metode Pembayaran' : '支付方式') + ' *</label>' +
                             '<select id="expenseMethod">' +
                                 '<option value="cash">🏦 ' + t('cash') + '</option>' +
                                 '<option value="bank">🏧 ' + t('bank') + '</option>' +
                             '</select>' +
                         '</div>' +
-                        '<div class="form-group full-width"><label>' + (lang === 'id' ? 'Deskripsi' : '描述') + '</label>' +
+                        '<div class="form-group full-width">' +
+                            '<label>' + (lang === 'id' ? 'Deskripsi' : '描述') + '</label>' +
                             '<textarea id="expenseDescription" rows="2" placeholder="' + (lang === 'id' ? 'Catatan tambahan' : '备注') + '"></textarea>' +
                         '</div>' +
-                        '<div class="form-actions"><button onclick="APP.addExpense()" class="success">💾 ' + (lang === 'id' ? 'Simpan Pengeluaran' : '保存支出') + '</button></div>' +
+                        '<div class="form-actions">' +
+                            '<button onclick="APP.addExpense()" class="success">💾 ' + (lang === 'id' ? 'Simpan Pengeluaran' : '保存支出') + '</button>' +
+                        '</div>' +
                     '</div>' +
-                    '<p class="info-note" style="margin-top:12px; font-size:12px; color:#64748b;">' +
+                    '<p class="info-note">' +
                         '💡 ' + (lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。') +
                     '</p>' +
-                '</div>' +
-                '<style>' +
-                    '.expense-table .date-cell { white-space: nowrap; }' +
-                    '.expense-table .expense-category { font-weight: 500; }' +
-                    '.expense-table .expense-desc { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }' +
-                    '.expense-table .action-cell { white-space: nowrap; }' +
-                    '.expense-table .action-cell .btn-small { margin: 1px 2px; }' +
-                    '.reconciled-badge, .locked-badge { display: inline-block; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; }' +
-                    '.reconciled-badge { background: #ecfdf5; color: #065f46; }' +
-                    '.locked-badge { background: #f1f5f9; color: #64748b; }' +
-                    '.btn-balance { background: #f59e0b !important; color: white !important; }' +
-                    '.btn-balance:hover { background: #d97706 !important; }' +
-                    '@media (max-width: 768px) { .expense-table .expense-desc { max-width: 100px; } .expense-table th, .expense-table td { padding: 6px 4px; font-size: 0.7rem; } }' +
-                '</style>';
-            
-            document.getElementById("app").innerHTML = pageHtml;
+                '</div>';
             
             var amountInput = document.getElementById("expenseAmount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
