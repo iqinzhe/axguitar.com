@@ -1,4 +1,4 @@
-// auth.js - v1.3（修复：登录锁定改为 localStorage，跨标签页同步）
+// auth.js - v1.4（配合增强版网络监听 + 登录锁定 localStorage）
 
 const AUTH = {
     user: null,
@@ -98,7 +98,6 @@ const AUTH = {
     _initStorageSync() {
         window.addEventListener('storage', (e) => {
             if (e.key === 'jf_login_attempts' || e.key === 'jf_locked_until') {
-                // 触发重新检查，但不清空当前用户状态
                 console.log('[Auth] 登录锁定状态已同步');
             }
         });
@@ -119,12 +118,49 @@ const AUTH = {
         }
     },
 
-    // ==================== 网络状态监听 ====================
-    _networkListenerInitialized: false,
+    // ==================== 网络状态监听（委托给 Utils.NetworkMonitor） ====================
+    // 注意：原有的独立网络监听已移除，改为使用 Utils.NetworkMonitor 增强版
+    
+    // ==================== 初始化 ====================
+    async init() {
+        // 初始化增强版网络监控（如果存在）
+        if (Utils.NetworkMonitor && !Utils.NetworkMonitor._initialized) {
+            Utils.NetworkMonitor.init();
+            console.log('📡 增强版网络监控已由 Auth 模块启动');
+        } else if (Utils.NetworkMonitor && Utils.NetworkMonitor._initialized) {
+            console.log('📡 网络监控已运行');
+        } else {
+            // 降级：使用原有简单网络监听
+            this._initLegacyNetworkListener();
+        }
 
-    _initNetworkListener: function() {
-        if (this._networkListenerInitialized) return;
-        this._networkListenerInitialized = true;
+        // 初始化跨标签页同步
+        this._initStorageSync();
+
+        try {
+            await this.loadCurrentUser();
+        } catch (e) {
+            console.warn('Auth init error (user not logged in):', e.message);
+            this.user = null;
+        }
+
+        supabaseClient.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') {
+                this.user = null;
+                SUPABASE.clearCache();
+            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+                SUPABASE.clearCache();
+                this.loadCurrentUser();
+            }
+        });
+
+        this._bindEnterKeyLogin();
+    },
+
+    // 降级方案：原有简单网络监听（当 Utils.NetworkMonitor 不可用时）
+    _initLegacyNetworkListener() {
+        if (this._legacyListenerInitialized) return;
+        this._legacyListenerInitialized = true;
         
         var showOfflineBanner = function() {
             var existing = document.getElementById('offlineBanner');
@@ -170,34 +206,6 @@ const AUTH = {
         }
     },
 
-    // ==================== 初始化 ====================
-    async init() {
-        // 初始化网络监听
-        this._initNetworkListener();
-        
-        // 初始化跨标签页同步
-        this._initStorageSync();
-
-        try {
-            await this.loadCurrentUser();
-        } catch (e) {
-            console.warn('Auth init error (user not logged in):', e.message);
-            this.user = null;
-        }
-
-        supabaseClient.auth.onAuthStateChange((event) => {
-            if (event === 'SIGNED_OUT') {
-                this.user = null;
-                SUPABASE.clearCache();
-            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-                SUPABASE.clearCache();
-                this.loadCurrentUser();
-            }
-        });
-
-        this._bindEnterKeyLogin();
-    },
-
     _bindEnterKeyLogin() {
         document.addEventListener('keypress', async (e) => {
             if (e.key === 'Enter' && document.getElementById('app')?.querySelector('.login-box')) {
@@ -230,6 +238,19 @@ const AUTH = {
     async login(usernameOrEmail, password) {
         try {
             if (this._isLocked(usernameOrEmail)) return null;
+
+            // 检查网络状态（使用增强版检测）
+            const isNetworkAvailable = Utils.NetworkMonitor 
+                ? await Utils.NetworkMonitor._checkRealConnectivity()
+                : navigator.onLine;
+            
+            if (!isNetworkAvailable) {
+                const lang = Utils.lang;
+                alert(lang === 'id' 
+                    ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
+                    : '❌ 无网络连接，请检查网络设置。');
+                return null;
+            }
 
             let emailToUse = usernameOrEmail;
             if (!usernameOrEmail.includes('@')) {
@@ -371,16 +392,6 @@ const AUTH = {
             .from('user_profiles').select('id, username, name, role').eq('id', userId).single();
         if (fetchError) throw fetchError;
 
-        const deletedUserInfo = {
-            id: userProfile.id,
-            username: userProfile.username,
-            name: userProfile.name,
-            role: userProfile.role,
-            deleted_by: this.user?.id,
-            deleted_by_name: this.user?.name,
-            deleted_at: new Date().toISOString()
-        };
-
         let authCleaned = false;
         
         // 方案A：优先尝试 Edge Function 删除 Auth 账户
@@ -404,7 +415,6 @@ const AUTH = {
                 const randomPassword = Math.random().toString(36).slice(-12) + '!@#';
                 const disabledEmail = 'disabled_' + Date.now() + '@placeholder.com';
                 
-                // 注意：此方法需要 Service Role Key，如果不可用会失败
                 const { error: updateError } = await supabaseClient.auth.admin.updateUserById(userProfile.id, {
                     password: randomPassword,
                     email: disabledEmail
