@@ -1,4 +1,4 @@
-// app-payments.js - v1.5（移除内联样式，使用组件库）
+// app-payments.js - v1.6（手机端溢出修复 + 文案修正）
 
 window.APP = window.APP || {};
 
@@ -234,9 +234,9 @@ const PaymentsModule = {
             if (order.repayment_type !== 'fixed') {
                 flexibleRepaymentHtml = '' +
                     '<div class="payment-double-column">' +
-                        '<!-- 利息卡片 -->' +
-                        '<div class="card action-card">' +
-                            '<div class="card-header"><h3>💰 ' + t('interest') + '</h3></div>' +
+                        '<!-- 缴纳利息卡片 -->' +
+                        '<div class="card action-card" style="min-width:0;overflow-x:hidden;">' +
+                            '<div class="card-header"><h3>💰 ' + (lang === 'id' ? 'Bayar Bunga' : '缴纳利息') + '</h3></div>' +
                             '<div class="card-body">' +
                                 '<div class="info-box">' +
                                     '<div class="info-row">' +
@@ -265,18 +265,18 @@ const PaymentsModule = {
                                 '<button onclick="APP.payInterestWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
                             '</div>' +
                             '<div class="card-history">' +
-                                '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat Pembayaran Bunga' : '利息缴费历史') + '</div>' +
-                                '<div class="table-container">' +
-                                    '<table class="data-table history-table">' +
+                                '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
+                                '<div class="table-container" style="overflow-x:auto;">' +
+                                    '<table class="data-table history-table" style="min-width:400px;">' +
                                         '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
-                        '<!-- 本金卡片 -->' +
-                        '<div class="card action-card">' +
-                            '<div class="card-header"><h3>🏦 ' + t('principal') + '</h3></div>' +
+                        '<!-- 返还本金卡片 -->' +
+                        '<div class="card action-card" style="min-width:0;overflow-x:hidden;">' +
+                            '<div class="card-header"><h3>🏦 ' + (lang === 'id' ? 'Kembalikan Pokok' : '返还本金') + '</h3></div>' +
                             '<div class="card-body">' +
                                 '<div class="info-box warning-box">' +
                                     '<div class="info-row">' +
@@ -302,9 +302,9 @@ const PaymentsModule = {
                                 '<button onclick="APP.payPrincipalWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
                             '</div>' +
                             '<div class="card-history">' +
-                                '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat Pembayaran Pokok' : '本金还款历史') + '</div>' +
-                                '<div class="table-container">' +
-                                    '<table class="data-table history-table">' +
+                                '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('return_principal') : t('return_principal') + '历史') + '</div>' +
+                                '<div class="table-container" style="overflow-x:auto;">' +
+                                    '<table class="data-table history-table" style="min-width:450px;">' +
                                         '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
                                     '</table>' +
@@ -397,7 +397,7 @@ const PaymentsModule = {
         if (confirm(previewMsg)) {
             try {
                 await Order.recordInterestPayment(orderId, months, method);
-                await this.showPayment(orderId);
+                await PaymentsModule.showPayment(orderId);
             } catch (error) {
                 console.error('payInterestWithMethod error:', error);
                 alert(error.message);
@@ -464,7 +464,7 @@ const PaymentsModule = {
                     }
                 }
                 
-                await this.showPayment(orderId);
+                await PaymentsModule.showPayment(orderId);
             } catch (error) {
                 console.error('payPrincipalWithMethod error:', error);
                 alert(error.message);
@@ -477,7 +477,7 @@ const PaymentsModule = {
         
         try {
             await SUPABASE.recordFixedPayment(orderId, method);
-            await this.showPayment(orderId);
+            await PaymentsModule.showPayment(orderId);
         } catch (error) {
             console.error('payFixedInstallment error:', error);
             alert(error.message);
@@ -489,7 +489,7 @@ const PaymentsModule = {
         
         try {
             await SUPABASE.earlySettleFixedOrder(orderId, method);
-            await this.showPayment(orderId);
+            await PaymentsModule.showPayment(orderId);
         } catch (error) {
             console.error('earlySettleFixedOrder error:', error);
             alert(error.message);
