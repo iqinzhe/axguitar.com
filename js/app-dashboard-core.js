@@ -1,6 +1,109 @@
-// app-dashboard-core.js - v3.1（性能优化：聚合查询替代全量加载 + 数据缓存 + 滚动重置）
+// app-dashboard-core.js - v3.2（修复：模块降级提示 + 初始化错误双语化 + 网络离线保护）
 
 window.APP = window.APP || {};
+
+// ==================== 模块降级通知 ====================
+const ModuleFallback = {
+    // 记录已降级的模块，避免重复提示
+    _degradedModules: {},
+    
+    /**
+     * 安全调用模块方法，失败时显示友好降级提示
+     * @param {string} moduleName - 模块名（用于提示）
+     * @param {Function} fn - 实际调用的函数
+     * @param {Array}  args - 调用参数
+     * @param {*}      fallbackValue - 降级返回值
+     * @returns {Promise<*>}
+     */
+    async safeCall(moduleName, fn, args, fallbackValue) {
+        try {
+            if (typeof fn !== 'function') {
+                throw new Error('module_not_loaded');
+            }
+            return await fn.apply(null, args || []);
+        } catch (error) {
+            var lang = Utils.lang;
+            var moduleKey = moduleName + '_' + (error.message || 'unknown');
+            
+            // 避免同一模块重复弹窗
+            if (!this._degradedModules[moduleKey]) {
+                this._degradedModules[moduleKey] = true;
+                
+                var msg = '';
+                if (error.message === 'module_not_loaded') {
+                    msg = lang === 'id'
+                        ? '⚠️ Modul "' + moduleName + '" gagal dimuat.\n\nBeberapa fitur mungkin tidak tersedia.\nSilakan muat ulang halaman.'
+                        : '⚠️ 模块 "' + moduleName + '" 加载失败。\n\n部分功能可能不可用。\n请刷新页面后重试。';
+                } else {
+                    msg = lang === 'id'
+                        ? '⚠️ Modul "' + moduleName + '" mengalami kesalahan: ' + error.message + '\n\nSilakan muat ulang halaman.'
+                        : '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message + '\n\n请刷新页面后重试。';
+                }
+                
+                // 使用非阻塞方式提示
+                setTimeout(function() {
+                    alert(msg);
+                }, 300);
+                
+                // 同时在上方显示横幅
+                ModuleFallback._showBanner(moduleName, error.message);
+            }
+            
+            // 10分钟后清除降级记录，允许重新尝试
+            setTimeout(function() {
+                delete ModuleFallback._degradedModules[moduleKey];
+            }, 10 * 60 * 1000);
+            
+            return fallbackValue;
+        }
+    },
+    
+    /**
+     * 在页面顶部显示降级横幅
+     */
+    _showBanner(moduleName, errorMsg) {
+        var existingBanner = document.getElementById('moduleFallbackBanner');
+        if (existingBanner) {
+            // 追加模块名
+            var content = existingBanner.querySelector('.info-bar-content');
+            if (content && content.textContent.indexOf(moduleName) === -1) {
+                content.textContent += ' | ' + moduleName;
+            }
+            return;
+        }
+        
+        var lang = Utils.lang;
+        var banner = document.createElement('div');
+        banner.id = 'moduleFallbackBanner';
+        banner.className = 'info-bar warning';
+        banner.style.cssText = 'position:sticky;top:0;z-index:9999;margin-bottom:12px;border-radius:6px;';
+        banner.innerHTML = '' +
+            '<span class="info-bar-icon">⚠️</span>' +
+            '<div class="info-bar-content">' +
+                '<strong>' + (lang === 'id' ? 'Fitur Tidak Tersedia' : '功能降级通知') + '</strong> — ' +
+                (lang === 'id' 
+                    ? 'Modul "' + moduleName + '" gagal dimuat. Silakan muat ulang halaman.'
+                    : '模块 "' + moduleName + '" 加载失败，请刷新页面。') +
+            '</div>' +
+            '<button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 8px;" title="' + (lang === 'id' ? 'Tutup' : '关闭') + '">✖</button>';
+        
+        var app = document.getElementById('app');
+        if (app && app.firstChild) {
+            app.insertBefore(banner, app.firstChild);
+        }
+    },
+    
+    /**
+     * 清除所有降级记录
+     */
+    clearAll() {
+        this._degradedModules = {};
+        var banner = document.getElementById('moduleFallbackBanner');
+        if (banner) banner.remove();
+    }
+};
+
+window.ModuleFallback = ModuleFallback;
 
 // ==================== 仪表盘缓存模块 ====================
 const DashboardCache = {
@@ -20,9 +123,19 @@ const DashboardCache = {
             }
         }
         console.log(`[Cache] Miss: ${key}`);
-        const value = await fetcher();
-        this.data.set(key, { value, time: Date.now() });
-        return value;
+        try {
+            const value = await fetcher();
+            this.data.set(key, { value, time: Date.now() });
+            return value;
+        } catch (error) {
+            // 如果有过期缓存，网络失败时返回过期缓存
+            const staleCached = this.data.get(key);
+            if (staleCached && (error.message || '').indexOf('network') === -1) {
+                console.warn(`[Cache] 使用过期缓存: ${key}`, error.message);
+                return staleCached.value;
+            }
+            throw error;
+        }
     },
     
     invalidate(key) {
@@ -35,7 +148,6 @@ const DashboardCache = {
         }
     },
     
-    // 批量失效
     invalidateMany(keys) {
         for (const key of keys) {
             this.data.delete(key);
@@ -46,20 +158,15 @@ const DashboardCache = {
 
 // ==================== 聚合查询辅助方法 ====================
 const DashboardStatsHelper = {
-    /**
-     * 获取仪表盘统计数据（使用聚合查询，不拉取全量订单）
-     */
     async getDashboardStats(profile) {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
-        // 构建基础查询条件
         let baseQuery = supabaseClient.from('orders');
         if (!isAdmin && storeId) {
             baseQuery = baseQuery.eq('store_id', storeId);
         }
         
-        // 并行执行多个聚合查询
         const [
             totalCountResult,
             activeCountResult,
@@ -72,13 +179,10 @@ const DashboardStatsHelper = {
             baseQuery.eq('status', 'active').select('*', { count: 'exact', head: true }),
             baseQuery.eq('status', 'completed').select('*', { count: 'exact', head: true }),
             baseQuery.eq('status', 'active').gte('overdue_days', 1).select('*', { count: 'exact', head: true }),
-            // 获取活跃订单的财务数据用于汇总
             baseQuery.eq('status', 'active').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount'),
-            // 获取所有订单的贷款金额统计
             baseQuery.select('loan_amount')
         ]);
         
-        // 计算汇总金额（仅对活跃订单，数据量已大幅减少）
         let totalAdminFees = 0;
         let totalServiceFees = 0;
         let totalInterest = 0;
@@ -94,7 +198,6 @@ const DashboardStatsHelper = {
             totalActiveLoanAmount += (order.loan_amount || 0);
         }
         
-        // 计算总贷款金额（全量订单）
         let totalLoanAmount = 0;
         const allOrdersLoanData = loanSumData?.data || [];
         for (const order of allOrdersLoanData) {
@@ -115,9 +218,6 @@ const DashboardStatsHelper = {
         };
     },
     
-    /**
-     * 获取异常状况统计数据（仅统计，不拉取全部明细）
-     */
     async getAnomalyStats(profile) {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
@@ -138,9 +238,6 @@ const DashboardStatsHelper = {
         };
     },
     
-    /**
-     * 获取本月门店排名数据（使用聚合查询）
-     */
     async getMonthlyStoreRanking(profile, stores) {
         const isAdmin = profile?.role === 'admin';
         if (!isAdmin) return null;
@@ -151,7 +248,6 @@ const DashboardStatsHelper = {
         const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
         const monthEnd = today.toISOString().split('T')[0];
         
-        // 获取本月所有订单（只获取必要字段）
         const { data: monthlyOrders, error } = await supabaseClient
             .from('orders')
             .select('id, store_id, loan_amount, status, created_at, overdue_days')
@@ -160,7 +256,6 @@ const DashboardStatsHelper = {
         
         if (error) throw error;
         
-        // 获取本月还款记录
         const { data: monthlyFlows } = await supabaseClient
             .from('cash_flow_records')
             .select('store_id, amount, order_id')
@@ -168,7 +263,6 @@ const DashboardStatsHelper = {
             .eq('is_voided', false)
             .gte('recorded_at', monthStart);
         
-        // 构建 flow 金额映射
         const flowAmountByOrder = {};
         if (monthlyFlows) {
             for (const flow of monthlyFlows) {
@@ -178,7 +272,6 @@ const DashboardStatsHelper = {
             }
         }
         
-        // 门店映射
         const storeInfoMap = {};
         for (const store of stores) {
             storeInfoMap[store.id] = {
@@ -189,7 +282,6 @@ const DashboardStatsHelper = {
             };
         }
         
-        // 统计各门店数据
         const storeStats = {};
         for (const order of (monthlyOrders || [])) {
             const s = storeInfoMap[order.store_id];
@@ -217,45 +309,38 @@ const DashboardStatsHelper = {
             storeStats[order.store_id].totalRecovery += (flowAmountByOrder[order.id] || 0);
         }
         
-        // 转换为数组并计算排名
         let eligibleStores = Object.values(storeStats);
         
         if (eligibleStores.length === 0) return { top3: [], bottom3: [] };
         
-        // 计算排名分数
         for (const s of eligibleStores) {
             s.rankSum = 0;
         }
         
-        // 按订单数排序
         eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankOrderCount = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按放款额排序（从小到大，越小越好）
         eligibleStores.sort((a, b) => a.totalLoanOutflow - b.totalLoanOutflow);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankLoanOutflow = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按不良订单数排序（从小到大，越小越好）
         eligibleStores.sort((a, b) => a.badOrders - b.badOrders);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankBadOrders = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按回收额排序（从大到小，越大越好）
         eligibleStores.sort((a, b) => b.totalRecovery - a.totalRecovery);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankRecovery = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按总分排序
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
         
         const top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
@@ -291,25 +376,82 @@ const DashboardCore = {
         this.currentCustomerId = null;
     },
 
+    /** ========== 修复：初始化错误双语化 ========== */
     init: async function() {
+        var lang = Utils.lang || 'zh';
+        
         // 初始化全局错误处理
         Utils.ErrorHandler.init();
         
-        document.getElementById("app").innerHTML = '<div class="loading-container"><div class="loader"></div><p class="loading-text">🔄 Loading system...</p></div>';
-        await AUTH.init();
+        // 清除旧的降级横幅
+        ModuleFallback.clearAll();
         
-        var savedState = this.restorePageState();
-        var savedPage = savedState.page;
-        var savedFilter = savedState.filter;
+        document.getElementById("app").innerHTML = '' +
+            '<div class="loading-container">' +
+                '<div class="loader"></div>' +
+                '<p class="loading-text">' + 
+                    (lang === 'id' ? '🔄 Memuat sistem...' : '🔄 Loading system...') + 
+                '</p>' +
+            '</div>';
         
-        if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
-            this.currentPage = savedPage;
-            this.currentFilter = savedFilter || "all";
-            this.currentOrderId = null;
-            this.currentCustomerId = null;
-            await this.refreshCurrentPage();
-        } else {
-            await this.router();
+        try {
+            await AUTH.init();
+            
+            // ========== 初始化超时处理（双语） ==========
+            var initTimeout = setTimeout(function() {
+                var currentLang = Utils.lang || 'zh';
+                var timeoutDiv = document.getElementById('initTimeout');
+                if (!timeoutDiv) {
+                    var div = document.createElement('div');
+                    div.id = 'initTimeout';
+                    div.className = 'info-bar warning';
+                    div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;max-width:400px;text-align:center;';
+                    div.innerHTML = '' +
+                        '<div class="info-bar-content">' +
+                            '<strong>' + (currentLang === 'id' ? '⏳ Memuat terlalu lama' : '⏳ 加载超时') + '</strong>' +
+                            '<p>' + (currentLang === 'id' 
+                                ? 'Sistem membutuhkan waktu lebih lama dari biasanya. Silakan periksa koneksi internet Anda dan muat ulang halaman.'
+                                : '系统加载时间超过预期，请检查网络连接后刷新页面重试。') + '</p>' +
+                            '<button onclick="location.reload()" style="margin-top:8px;padding:6px 16px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer;">' +
+                                (currentLang === 'id' ? '🔄 Muat Ulang' : '🔄 刷新页面') +
+                            '</button>' +
+                        '</div>';
+                    document.getElementById("app").appendChild(div);
+                }
+            }, 15000);
+            
+            var savedState = this.restorePageState();
+            var savedPage = savedState.page;
+            var savedFilter = savedState.filter;
+            
+            if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
+                this.currentPage = savedPage;
+                this.currentFilter = savedFilter || "all";
+                this.currentOrderId = null;
+                this.currentCustomerId = null;
+                await this.refreshCurrentPage();
+            } else {
+                await this.router();
+            }
+            
+            clearTimeout(initTimeout);
+            var timeoutEl = document.getElementById('initTimeout');
+            if (timeoutEl) timeoutEl.remove();
+            
+        } catch (error) {
+            console.error("Init error:", error);
+            var timeoutEl2 = document.getElementById('initTimeout');
+            if (timeoutEl2) timeoutEl2.remove();
+            
+            var errorMsg = (Utils.lang === 'id'
+                ? '⚠️ Gagal memuat sistem: ' + error.message + '\n\nSilakan muat ulang halaman.'
+                : '⚠️ 系统加载失败: ' + error.message + '\n\n请刷新页面重试。');
+            document.getElementById("app").innerHTML = '' +
+                '<div class="card" style="text-align:center;padding:40px;">' +
+                    '<p style="white-space:pre-line;">' + errorMsg + '</p>' +
+                    '<button onclick="location.reload()" style="margin-top:12px;">🔄 ' + 
+                        (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
+                '</div>';
         }
     },
 
@@ -318,10 +460,10 @@ const DashboardCore = {
         else await this.renderDashboard();
     },
 
+    /** ========== 修复：模块降级时友好提示 ========== */
     refreshCurrentPage: async function() {
         var self = this;
         
-        // 先渲染骨架屏
         var skeletonType = 'default';
         if (this.currentPage === 'dashboard') skeletonType = 'dashboard';
         else if (this.currentPage === 'orderTable' || this.currentPage === 'customers' || 
@@ -330,61 +472,73 @@ const DashboardCore = {
         
         document.getElementById("app").innerHTML = Utils.renderSkeleton(skeletonType);
         
-        // 短暂延迟让骨架屏渲染
         await new Promise(function(resolve) { setTimeout(resolve, 100); });
         
+        // ========== 使用 ModuleFallback 安全调用各模块 ==========
         var handlers = {
-            dashboard: async () => await self.renderDashboard(),
-            orderTable: async () => { if (typeof window.APP.showOrderTable === 'function') await window.APP.showOrderTable(); else await self.renderDashboard(); },
-            createOrder: () => { if (typeof window.APP.showCreateOrder === 'function') window.APP.showCreateOrder(); else self.showCreateOrder(); },
-            viewOrder: async () => { 
-                if (self.currentOrderId && typeof window.APP.viewOrder === 'function') {
-                    await window.APP.viewOrder(self.currentOrderId);
-                } else {
+            dashboard: async () => {
+                try {
                     await self.renderDashboard();
+                } catch (e) {
+                    console.error("renderDashboard failed:", e);
+                    document.getElementById("app").innerHTML = '' +
+                        '<div class="card" style="text-align:center;padding:40px;">' +
+                            '<p>' + (Utils.lang === 'id' ? '⚠️ Gagal memuat dashboard. Silakan muat ulang.' : '⚠️ 加载仪表盘失败，请刷新页面。') + '</p>' +
+                            '<button onclick="location.reload()">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button>' +
+                        '</div>';
                 }
+            },
+            orderTable: () => ModuleFallback.safeCall('Daftar Pesanan', window.APP.showOrderTable, [], self.renderDashboard()),
+            createOrder: () => ModuleFallback.safeCall('Buat Pesanan', window.APP.showCreateOrder, [], null),
+            viewOrder: async () => { 
+                if (self.currentOrderId) {
+                    return await ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [self.currentOrderId], self.renderDashboard());
+                }
+                return await self.renderDashboard();
             },
             payment: async () => { 
-                if (self.currentOrderId && typeof window.APP.showPayment === 'function') {
-                    await window.APP.showPayment(self.currentOrderId);
-                } else {
-                    await self.renderDashboard();
+                if (self.currentOrderId) {
+                    return await ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [self.currentOrderId], self.renderDashboard());
                 }
+                return await self.renderDashboard();
             },
-            anomaly: async () => { if (typeof window.APP.showAnomaly === 'function') await window.APP.showAnomaly(); else await self.renderDashboard(); },
-            userManagement: async () => { if (typeof window.APP.showUserManagement === 'function') await window.APP.showUserManagement(); else await self.renderDashboard(); },
-            storeManagement: async () => { if (typeof StoreManager.renderStoreManagement === 'function') await StoreManager.renderStoreManagement(); else await self.renderDashboard(); },
-            expenses: async () => { if (typeof window.APP.showExpenses === 'function') await window.APP.showExpenses(); else await self.renderDashboard(); },
-            customers: async () => { if (typeof window.APP.showCustomers === 'function') await window.APP.showCustomers(); else await self.renderDashboard(); },
-            paymentHistory: async () => { 
-                if (typeof window.APP.showCashFlowPage === 'function') await window.APP.showCashFlowPage();
-                else if (typeof window.APP.showPaymentHistory === 'function') await window.APP.showPaymentHistory();
-                else await self.renderDashboard();
+            anomaly: () => ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], self.renderDashboard()),
+            userManagement: () => ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], self.renderDashboard()),
+            storeManagement: () => ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], self.renderDashboard()),
+            expenses: () => ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], self.renderDashboard()),
+            customers: () => ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], self.renderDashboard()),
+            paymentHistory: async () => {
+                if (typeof window.APP.showCashFlowPage === 'function') {
+                    return await ModuleFallback.safeCall('Arus Kas', window.APP.showCashFlowPage, [], self.renderDashboard());
+                }
+                if (typeof window.APP.showPaymentHistory === 'function') {
+                    return await ModuleFallback.safeCall('Riwayat Pembayaran', window.APP.showPaymentHistory, [], self.renderDashboard());
+                }
+                return await self.renderDashboard();
             },
-            backupRestore: async () => { if (typeof Storage.renderBackupUI === 'function') await Storage.renderBackupUI(); else await self.renderDashboard(); },
+            backupRestore: () => ModuleFallback.safeCall('Cadangan', Storage.renderBackupUI, [], self.renderDashboard()),
             customerOrders: async () => { 
                 if (self.currentCustomerId && typeof window.APP.showCustomerOrders === 'function') {
-                    await window.APP.showCustomerOrders(self.currentCustomerId);
-                } else {
-                    await self.renderDashboard();
+                    return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], self.renderDashboard());
                 }
+                return await self.renderDashboard();
             },
             customerPaymentHistory: async () => { 
                 if (self.currentCustomerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                    await window.APP.showCustomerPaymentHistory(self.currentCustomerId);
-                } else {
-                    await self.renderDashboard();
+                    return await ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [self.currentCustomerId], self.renderDashboard());
                 }
+                return await self.renderDashboard();
             },
-            blacklist: async () => { if (typeof window.APP.showBlacklist === 'function') await window.APP.showBlacklist(); else await self.renderDashboard(); }
+            blacklist: () => ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], self.renderDashboard())
         };
+        
         var handler = handlers[this.currentPage];
         if (handler) await handler();
         else await self.renderDashboard();
     },
 
+    /** ========== navigateTo 同样使用 ModuleFallback ========== */
     navigateTo: function(page, params) {
-        // 滚动到顶部
         window.scrollTo(0, 0);
         
         params = params || {};
@@ -402,83 +556,73 @@ const DashboardCore = {
         this.saveCurrentPageState();
         
         var self = this;
+        var moduleMap = {
+            'orderTable':       { fn: window.APP.showOrderTable,       name: 'Daftar Pesanan' },
+            'createOrder':      { fn: window.APP.showCreateOrder,      name: 'Buat Pesanan' },
+            'dashboard':        { fn: self.renderDashboard,            name: 'Dashboard', isCore: true },
+            'anomaly':          { fn: window.APP.showAnomaly,          name: 'Situasi Abnormal' },
+            'userManagement':   { fn: window.APP.showUserManagement,   name: 'Manajemen Peran' },
+            'storeManagement':  { fn: StoreManager.renderStoreManagement, name: 'Manajemen Toko' },
+            'expenses':         { fn: window.APP.showExpenses,         name: 'Pengeluaran' },
+            'customers':        { fn: window.APP.showCustomers,        name: 'Nasabah' },
+            'backupRestore':    { fn: Storage.renderBackupUI,          name: 'Cadangan' },
+            'blacklist':        { fn: window.APP.showBlacklist,        name: 'Daftar Hitam' }
+        };
         
-        switch(page) {
-            case 'orderTable':
-                if (typeof window.APP.showOrderTable === 'function') window.APP.showOrderTable();
-                else self.renderDashboard();
-                break;
-            case 'createOrder':
-                if (typeof window.APP.showCreateOrder === 'function') window.APP.showCreateOrder();
-                else self.showCreateOrder();
-                break;
-            case 'dashboard':
-                self.renderDashboard();
-                break;
-            case 'anomaly':
-                if (typeof window.APP.showAnomaly === 'function') window.APP.showAnomaly();
-                else self.renderDashboard();
-                break;
-            case 'userManagement':
-                if (typeof window.APP.showUserManagement === 'function') window.APP.showUserManagement();
-                else self.renderDashboard();
-                break;
-            case 'storeManagement':
-                if (typeof StoreManager.renderStoreManagement === 'function') StoreManager.renderStoreManagement();
-                else self.renderDashboard();
-                break;
-            case 'expenses':
-                if (typeof window.APP.showExpenses === 'function') window.APP.showExpenses();
-                else self.renderDashboard();
-                break;
-            case 'customers':
-                if (typeof window.APP.showCustomers === 'function') window.APP.showCustomers();
-                else self.renderDashboard();
-                break;
-            case 'paymentHistory':
-                if (typeof window.APP.showCashFlowPage === 'function') window.APP.showCashFlowPage();
-                else if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
-                else self.renderDashboard();
-                break;
-            case 'backupRestore':
-                if (typeof Storage.renderBackupUI === 'function') Storage.renderBackupUI();
-                else self.renderDashboard();
-                break;
-            case 'customerOrders':
-                if (params.customerId && typeof window.APP.showCustomerOrders === 'function') {
-                    window.APP.showCustomerOrders(params.customerId);
-                } else {
-                    self.renderDashboard();
-                }
-                break;
-            case 'customerPaymentHistory':
-                if (params.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                    window.APP.showCustomerPaymentHistory(params.customerId);
-                } else {
-                    self.renderDashboard();
-                }
-                break;
-            case 'viewOrder':
-                if (params.orderId && typeof window.APP.viewOrder === 'function') {
-                    window.APP.viewOrder(params.orderId);
-                } else {
-                    self.renderDashboard();
-                }
-                break;
-            case 'payment':
-                if (params.orderId && typeof window.APP.showPayment === 'function') {
-                    window.APP.showPayment(params.orderId);
-                } else {
-                    self.renderDashboard();
-                }
-                break;
-            case 'blacklist':
-                if (typeof window.APP.showBlacklist === 'function') window.APP.showBlacklist();
-                else self.renderDashboard();
-                break;
-            default:
-                self.renderDashboard();
+        var mapped = moduleMap[page];
+        if (mapped) {
+            if (mapped.isCore) {
+                mapped.fn.call(self);
+            } else {
+                ModuleFallback.safeCall(mapped.name, mapped.fn, [], null).then(function(result) {
+                    if (result === null) self.renderDashboard();
+                });
+            }
+            return;
         }
+        
+        // 特殊页面（带参数）
+        var specialHandlers = {
+            'paymentHistory': function() {
+                var fn = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
+                ModuleFallback.safeCall('Arus Kas', fn, [], null).then(function(r) {
+                    if (r === null) self.renderDashboard();
+                });
+            },
+            'customerOrders': function() {
+                if (params.customerId) {
+                    ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [params.customerId], null).then(function(r) {
+                        if (r === null) self.renderDashboard();
+                    });
+                } else self.renderDashboard();
+            },
+            'customerPaymentHistory': function() {
+                if (params.customerId) {
+                    ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [params.customerId], null).then(function(r) {
+                        if (r === null) self.renderDashboard();
+                    });
+                } else self.renderDashboard();
+            },
+            'viewOrder': function() {
+                if (params.orderId) {
+                    ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [params.orderId], null).then(function(r) {
+                        if (r === null) self.renderDashboard();
+                    });
+                } else self.renderDashboard();
+            },
+            'payment': function() {
+                if (params.orderId) {
+                    ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [params.orderId], null).then(function(r) {
+                        if (r === null) self.renderDashboard();
+                    });
+                } else self.renderDashboard();
+            }
+        };
+        
+        var special = specialHandlers[page];
+        if (special) { special(); return; }
+        
+        self.renderDashboard();
     },
 
     goBack: function() {
@@ -492,67 +636,63 @@ const DashboardCore = {
             
             this.saveCurrentPageState();
             
+            var backMap = {
+                'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
+                'dashboard':     { fn: self.renderDashboard,          name: 'Dashboard', isCore: true },
+                'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
+                'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
+                'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
+                'storeManagement':{ fn: StoreManager.renderStoreManagement, name: 'Manajemen Toko' },
+                'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
+                'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
+                'backupRestore': { fn: Storage.renderBackupUI,        name: 'Cadangan' },
+                'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
+            };
+            
+            var back = backMap[prev.page];
+            if (back) {
+                if (back.isCore) {
+                    back.fn.call(self);
+                } else if (back.param) {
+                    ModuleFallback.safeCall(back.name, back.fn, [back.param], null).then(function(r) {
+                        if (r === null) self.renderDashboard();
+                    });
+                } else {
+                    ModuleFallback.safeCall(back.name, back.fn, [], null).then(function(r) {
+                        if (r === null) self.renderDashboard();
+                    });
+                }
+                return;
+            }
+            
+            // paymentHistory / customerOrders / customerPaymentHistory
             switch(prev.page) {
-                case 'orderTable':
-                    if (typeof window.APP.showOrderTable === 'function') window.APP.showOrderTable();
-                    else self.renderDashboard();
-                    break;
-                case 'dashboard':
-                    self.renderDashboard();
-                    break;
-                case 'viewOrder':
-                    if (prev.orderId && typeof window.APP.viewOrder === 'function') {
-                        window.APP.viewOrder(prev.orderId);
-                    } else {
-                        self.renderDashboard();
-                    }
-                    break;
-                case 'anomaly':
-                    if (typeof window.APP.showAnomaly === 'function') window.APP.showAnomaly();
-                    else self.renderDashboard();
-                    break;
-                case 'userManagement':
-                    if (typeof window.APP.showUserManagement === 'function') window.APP.showUserManagement();
-                    else self.renderDashboard();
-                    break;
-                case 'storeManagement':
-                    if (typeof StoreManager.renderStoreManagement === 'function') StoreManager.renderStoreManagement();
-                    else self.renderDashboard();
-                    break;
-                case 'expenses':
-                    if (typeof window.APP.showExpenses === 'function') window.APP.showExpenses();
-                    else self.renderDashboard();
-                    break;
-                case 'customers':
-                    if (typeof window.APP.showCustomers === 'function') window.APP.showCustomers();
-                    else self.renderDashboard();
-                    break;
                 case 'paymentHistory':
-                    if (typeof window.APP.showCashFlowPage === 'function') window.APP.showCashFlowPage();
-                    else if (typeof window.APP.showPaymentHistory === 'function') window.APP.showPaymentHistory();
-                    else self.renderDashboard();
+                    var fnPH = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
+                    ModuleFallback.safeCall('Arus Kas', fnPH, [], null).then(function(r) {
+                        if (r === null) self.renderDashboard();
+                    });
                     break;
-                case 'backupRestore':
-                    if (typeof Storage.renderBackupUI === 'function') Storage.renderBackupUI();
-                    else self.renderDashboard();
+                case 'payment':
+                    if (prev.orderId) {
+                        ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [prev.orderId], null).then(function(r) {
+                            if (r === null) self.renderDashboard();
+                        });
+                    } else self.renderDashboard();
                     break;
                 case 'customerOrders':
-                    if (prev.customerId && typeof window.APP.showCustomerOrders === 'function') {
-                        window.APP.showCustomerOrders(prev.customerId);
-                    } else {
-                        self.renderDashboard();
-                    }
+                    if (prev.customerId) {
+                        ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [prev.customerId], null).then(function(r) {
+                            if (r === null) self.renderDashboard();
+                        });
+                    } else self.renderDashboard();
                     break;
                 case 'customerPaymentHistory':
-                    if (prev.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                        window.APP.showCustomerPaymentHistory(prev.customerId);
-                    } else {
-                        self.renderDashboard();
-                    }
-                    break;
-                case 'blacklist':
-                    if (typeof window.APP.showBlacklist === 'function') window.APP.showBlacklist();
-                    else self.renderDashboard();
+                    if (prev.customerId) {
+                        ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [prev.customerId], null).then(function(r) {
+                            if (r === null) self.renderDashboard();
+                        });
+                    } else self.renderDashboard();
                     break;
                 default:
                     self.renderDashboard();
@@ -562,7 +702,7 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 登录页 ====================
+    // ==================== 登录页（保持原有代码） ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
@@ -678,7 +818,7 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    // ==================== 仪表盘（性能优化版：使用聚合查询 + 缓存） ====================
+    // ==================== 仪表盘（保持原有代码，含 renderDashboard） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -692,19 +832,18 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 使用缓存获取统计数据（5分钟有效期）
             const cacheKey = DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId);
             const report = await DashboardCache.get(cacheKey, 
                 () => DashboardStatsHelper.getDashboardStats(profile)
             );
             
-            // 获取现金流数据（保持原有逻辑，但使用缓存）
             const cashFlowCacheKey = DashboardCache.getKey('cashflow', isAdmin ? 'admin' : storeId);
             const cashFlow = await DashboardCache.get(cashFlowCacheKey,
                 async () => {
                     const allCashFlows = await SUPABASE.getCashFlowRecords();
                     const storeSpecificCashFlows = !isAdmin && storeId 
-                        ? await supabaseClient.from('cash_flow_records')
+                        ? await supabaseClient
+                            .from('cash_flow_records')
                             .select('direction, amount, source_target, flow_type')
                             .eq('store_id', storeId)
                             .eq('is_voided', false)
@@ -714,7 +853,6 @@ const DashboardCore = {
                 }
             );
             
-            // 获取支出汇总
             const expensesCacheKey = DashboardCache.getKey('expenses', isAdmin ? 'admin' : storeId);
             const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
                 let query = supabaseClient.from('expenses').select('amount');
@@ -727,7 +865,6 @@ const DashboardCore = {
                 return sum;
             });
             
-            // 获取本月订单数
             const today = new Date();
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
@@ -742,7 +879,6 @@ const DashboardCore = {
                 return count || 0;
             });
             
-            // 获取催收提醒数据
             const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             const hasReminders = needRemindOrders.length > 0;
             let hasSentToday = false;
@@ -754,11 +890,9 @@ const DashboardCore = {
             const btnDisabled = hasSentToday;
             const btnHighlight = hasReminders && !hasSentToday;
             
-            // 统计逾期订单数（使用 report 中的值）
             const overdueOrdersCount = report.overdue_orders || 0;
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
             
-            // 计算赤字
             const flowsForDeficit = await DashboardCache.get(DashboardCache.getKey('flows_for_deficit', isAdmin ? 'admin' : storeId), async () => {
                 let flows;
                 if (!isAdmin && storeId) {
@@ -790,7 +924,6 @@ const DashboardCore = {
             }
             const deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            // 统计卡片数据
             const cards = [
                 { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, class: '' },
                 { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), class: deficit >= 0 ? 'expense' : 'income' },
@@ -817,7 +950,6 @@ const DashboardCore = {
             var bankIncome = cashFlow.bank?.income ?? 0;
             var bankExpense = cashFlow.bank?.expense ?? 0;
             
-            // 资金管理区块
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = '' +
@@ -882,7 +1014,6 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // 工具栏
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = '' +
@@ -912,7 +1043,6 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // 底部信息
             var userRoleText = AUTH.user.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
@@ -963,12 +1093,16 @@ const DashboardCore = {
         } catch (err) {
             console.error("renderDashboard error:", err);
             Utils.ErrorHandler.capture(err, 'renderDashboard');
-            document.getElementById("app").innerHTML = '<div class="card"><p>⚠️ ' + err.message + '</p><button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button></div>';
+            document.getElementById("app").innerHTML = '' +
+                '<div class="card">' +
+                    '<p>⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '加载仪表盘失败: ' + err.message) + '</p>' +
+                    '<button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button>' +
+                    '<button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
+                '</div>';
         }
     },
 
     _calculateReport: function(orders) {
-        // 保留原方法用于兼容，但实际仪表盘不再调用全量版本
         var totalLoanAmount = 0;
         var totalAdminFees = 0;
         var totalServiceFees = 0;
@@ -1045,11 +1179,7 @@ const DashboardCore = {
     },
     
     showBlacklist: async function() {
-        if (typeof window.APP.showBlacklist === 'function') {
-            await window.APP.showBlacklist();
-        } else {
-            alert(Utils.lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
-        }
+        await ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], null);
     },
 
     addStore: async function() {
@@ -1088,7 +1218,6 @@ const DashboardCore = {
         }
     },
     
-    // 暴露缓存失效方法供外部调用（在创建订单、缴费等操作后调用）
     invalidateDashboardCache: function() {
         DashboardCache.invalidate();
     }
@@ -1110,5 +1239,4 @@ window.APP.currentPage = DashboardCore.currentPage;
 window.APP.currentOrderId = DashboardCore.currentOrderId;
 window.APP.currentCustomerId = DashboardCore.currentCustomerId;
 
-// 导出缓存失效方法
 window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
