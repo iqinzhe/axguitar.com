@@ -1,13 +1,13 @@
-// utils.js - v2.1（新增利率默认常量）
+// utils.js - v2.2（翻译表同步更新：角色管理）
 
 const Utils = {
     lang: 'id',
     db: null,
 
     // ========== 利率常量（全系统统一） ==========
-    MONTHLY_INTEREST_RATE: 0.08,                     // 月利率（0.08 即 8%）
-    DEFAULT_AGREED_INTEREST_RATE_PERCENT: 8,         // 默认协商利率 - 百分比形式（8 即 8%）
-    DEFAULT_AGREED_INTEREST_RATE: 0.08,              // 默认协商利率 - 小数形式（0.08 即 8%）
+    MONTHLY_INTEREST_RATE: 0.08,
+    DEFAULT_AGREED_INTEREST_RATE_PERCENT: 8,
+    DEFAULT_AGREED_INTEREST_RATE: 0.08,
 
     serviceFeePercentOptions: [
         { value: 0, label: '0% (Tidak Ada)' },
@@ -64,7 +64,6 @@ const Utils = {
         return Math.round(payment / 10000) * 10000;
     },
 
-    // ========== 利率选项（默认选中 8%） ==========
     getInterestRateOptions: function(selectedRate) {
         if (selectedRate === undefined) selectedRate = 8;
         var rates = [10, 9.5, 9.0, 8.5, 8.0];
@@ -142,6 +141,11 @@ const Utils = {
             order_list: "Daftar Pesanan",
             financial_report: "Laporan Keuangan",
             user_management: "Manajemen Peran",
+            role_management: "Manajemen Peran",
+            role_list: "Daftar Peran",
+            login_account: "Akun Login",
+            identity_info: "Informasi Identitas",
+            add_role: "Tambah Peran Baru",
             backup_restore: "Cadangan & Pemulihan",
             store_management: "Manajemen Toko",
             expenses: "Pengeluaran Operasional",
@@ -298,6 +302,11 @@ const Utils = {
             order_list: "订单管理",
             financial_report: "业务报表",
             user_management: "角色管理",
+            role_management: "角色管理",
+            role_list: "角色列表",
+            login_account: "登录账户",
+            identity_info: "身份信息",
+            add_role: "新增角色",
             backup_restore: "备份恢复",
             store_management: "门店管理",
             expenses: "运营支出",
