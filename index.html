@@ -13,12 +13,12 @@
 <link rel="manifest" href="/site.webmanifest?v=1">
 
 <!-- CSS 样式 -->
-     <link rel="stylesheet" href="css/variables.css">
-     <link rel="stylesheet" href="css/reset.css">
-     <link rel="stylesheet" href="css/components.css">
-     <link rel="stylesheet" href="css/layout.css">
-     <link rel="stylesheet" href="css/pages.css">
-     <link rel="stylesheet" href="css/responsive.css">
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/reset.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
 <div id="app">
@@ -57,7 +57,34 @@
 <script src="js/app-dashboard-orders.js"></script>
 <script src="js/app-dashboard-expenses.js"></script>
 
-<!-- 初始化脚本 -->
+<!-- 网络断开提醒（极简版） -->
+<script>
+// 仅在网络断开时显示顶部横幅
+(function() {
+    function showOfflineBanner() {
+        var existing = document.getElementById('offlineBanner');
+        if (existing) return;
+        
+        var banner = document.createElement('div');
+        banner.id = 'offlineBanner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:10px;z-index:10000;font-size:14px;';
+        banner.innerHTML = '⚠️ ' + (navigator.language.startsWith('id') ? 'Koneksi terputus. Data mungkin tidak tersimpan.' : '网络连接已断开，数据可能无法保存。');
+        document.body.insertBefore(banner, document.body.firstChild);
+    }
+    
+    function hideOfflineBanner() {
+        var banner = document.getElementById('offlineBanner');
+        if (banner) banner.remove();
+    }
+    
+    window.addEventListener('offline', showOfflineBanner);
+    window.addEventListener('online', hideOfflineBanner);
+    
+    if (!navigator.onLine) showOfflineBanner();
+})();
+</script>
+
+<!-- 初始化脚本（保持原样） -->
 <script>
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
