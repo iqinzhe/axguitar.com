@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v1.3（修复编辑功能 + 操作行按钮）
+// app-dashboard-users.js - v2.0（角色管理文案修改 + 姓名列补充身份信息）
 
 window.APP = window.APP || {};
 
@@ -28,9 +28,18 @@ const DashboardUsers = {
                     var u = users[i];
                     var storeName = u.stores ? u.stores.name : (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
                     
+                    // 姓名列：姓名 + KTP + 电话
+                    var nameDisplay = Utils.escapeHtml(u.name);
+                    if (u.ktp_number) {
+                        nameDisplay += '<br><small style="color:var(--text-muted);">' + (lang === 'id' ? 'KTP: ' : '身份证: ') + Utils.escapeHtml(u.ktp_number) + '</small>';
+                    }
+                    if (u.phone) {
+                        nameDisplay += '<br><small style="color:var(--text-muted);">📱 ' + Utils.escapeHtml(u.phone) + '</small>';
+                    }
+                    
                     rows += '<tr>' +
                         '<td>' + Utils.escapeHtml(u.username) + '</td>' +
-                        '<td>' + Utils.escapeHtml(u.name) + '</td>' +
+                        '<td>' + nameDisplay + '</td>' +
                         '<td class="text-center">' + (roleMap[u.role] || u.role) + '</td>' +
                         '<td>' + Utils.escapeHtml(storeName) + '</td>' +
                         '<td class="date-cell text-center">' + Utils.formatDate(u.created_at) + '</td>' +
@@ -40,7 +49,6 @@ const DashboardUsers = {
                     var actionButtons = '';
                     
                     if (AUTH.user && AUTH.user.role === 'admin' && u.id !== AUTH.user.id) {
-                        // 角色切换下拉
                         actionButtons += '<select id="role_' + u.id + '" onchange="APP._saveUserRole(\'' + u.id + '\')" class="role-select">' +
                             '<option value="store_manager"' + (u.role === 'store_manager' ? ' selected' : '') + '>' + (lang === 'id' ? 'Manajer Toko' : '店长') + '</option>' +
                             '<option value="staff"' + (u.role === 'staff' ? ' selected' : '') + '>' + (lang === 'id' ? 'Staf' : '员工') + '</option>' +
@@ -72,7 +80,7 @@ const DashboardUsers = {
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>👥 ' + (lang === 'id' ? 'Manajemen Operator' : '操作员管理') + '</h2>' +
+                    '<h2>👥 ' + (lang === 'id' ? 'Manajemen Peran' : '角色管理') + '</h2>' +
                     '<div class="header-actions">' +
                         '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
                         '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
@@ -80,13 +88,13 @@ const DashboardUsers = {
                 '</div>' +
                 
                 '<div class="card">' +
-                    '<h3>' + (lang === 'id' ? 'Daftar Operator' : '操作员列表') + '</h3>' +
+                    '<h3>' + (lang === 'id' ? 'Daftar Peran' : '角色列表') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table user-table">' +
                             '<thead>' +
                                 '<tr>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Username' : '用户名') + '</th>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Nama' : '姓名') + '</th>' +
+                                    '<th class="col-name">' + (lang === 'id' ? 'Akun Login' : '登录账户') + '</th>' +
+                                    '<th class="col-name">' + (lang === 'id' ? 'Informasi Identitas' : '身份信息') + '</th>' +
                                     '<th class="col-status text-center">' + (lang === 'id' ? 'Role' : '角色') + '</th>' +
                                     '<th class="col-store">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' +
                                     '<th class="col-date text-center">' + (lang === 'id' ? 'Tanggal Dibuat' : '创建日期') + '</th>' +
@@ -98,10 +106,10 @@ const DashboardUsers = {
                 '</div>' +
                 
                 '<div class="card">' +
-                    '<h3>' + (lang === 'id' ? 'Tambah Operator Baru' : '新增操作员') + '</h3>' +
+                    '<h3>' + (lang === 'id' ? 'Tambah Peran Baru' : '新增角色') + '</h3>' +
                     '<div class="form-grid form-grid-3">' +
                         '<div class="form-group">' +
-                            '<label>' + (lang === 'id' ? 'Username (Email)' : '用户名（邮箱）') + ' *</label>' +
+                            '<label>' + (lang === 'id' ? 'Akun Login (Email)' : '登录账户（邮箱）') + ' *</label>' +
                             '<input id="newUsername" placeholder="email@domain.com">' +
                         '</div>' +
                         '<div class="form-group">' +
@@ -111,6 +119,14 @@ const DashboardUsers = {
                         '<div class="form-group">' +
                             '<label>' + (lang === 'id' ? 'Nama Lengkap' : '姓名') + ' *</label>' +
                             '<input id="newName" placeholder="' + (lang === 'id' ? 'Nama Lengkap' : '姓名') + '">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Nomor KTP' : '身份证号') + '</label>' +
+                            '<input id="newKtp" placeholder="' + (lang === 'id' ? 'Nomor KTP' : '身份证号') + '">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Telepon' : '电话') + '</label>' +
+                            '<input id="newPhone" placeholder="' + (lang === 'id' ? 'Nomor Telepon' : '电话号码') + '">' +
                         '</div>' +
                         '<div class="form-group">' +
                             '<label>' + (lang === 'id' ? 'Role' : '角色') + ' *</label>' +
@@ -125,7 +141,7 @@ const DashboardUsers = {
                             '<div class="form-hint">' + (lang === 'id' ? 'Kosongkan untuk akun pusat (admin tidak dapat ditambah)' : '留空表示总部账号（不可添加管理员）') + '</div>' +
                         '</div>' +
                         '<div class="form-actions">' +
-                            '<button onclick="APP.addUser()" class="success">➕ ' + (lang === 'id' ? 'Tambah Operator' : '添加操作员') + '</button>' +
+                            '<button onclick="APP.addUser()" class="success">➕ ' + (lang === 'id' ? 'Tambah Peran' : '添加角色') + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -140,6 +156,8 @@ const DashboardUsers = {
         var username = document.getElementById("newUsername").value.trim();
         var password = document.getElementById("newPassword").value;
         var name = document.getElementById("newName").value.trim();
+        var ktp = document.getElementById("newKtp").value.trim();
+        var phone = document.getElementById("newPhone").value.trim();
         var role = document.getElementById("newRole").value;
         var storeId = document.getElementById("newStoreId").value || null;
         
@@ -150,10 +168,26 @@ const DashboardUsers = {
         
         try {
             await AUTH.addUser(username, password, name, role, storeId);
-            alert(lang === 'id' ? '✅ Operator berhasil ditambahkan' : '✅ 操作员添加成功');
+            
+            // 如果填写了 KTP 或电话，更新用户资料
+            var userId = null;
+            var { data: userData } = await supabaseClient
+                .from('user_profiles')
+                .select('id')
+                .eq('username', username)
+                .single();
+            
+            if (userData && (ktp || phone)) {
+                var updates = {};
+                if (ktp) updates.ktp_number = ktp;
+                if (phone) updates.phone = phone;
+                await AUTH.updateUser(userData.id, updates);
+            }
+            
+            alert(lang === 'id' ? '✅ Peran berhasil ditambahkan' : '✅ 角色添加成功');
             await this.showUserManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menambah operator: ' + error.message : '添加操作员失败：' + error.message);
+            alert(lang === 'id' ? 'Gagal menambah peran: ' + error.message : '添加角色失败：' + error.message);
         }
     },
 
@@ -161,8 +195,8 @@ const DashboardUsers = {
         var lang = Utils.lang;
         
         if (!confirm(lang === 'id' 
-            ? '⚠️ Reset password untuk operator "' + userName + '"?\n\nOperator harus login ulang dengan password baru.'
-            : '⚠️ 重置操作员 "' + userName + '" 的密码？\n\n操作员需要使用新密码重新登录。')) {
+            ? '⚠️ Reset password untuk "' + userName + '"?\n\nHarus login ulang dengan password baru.'
+            : '⚠️ 重置 "' + userName + '" 的密码？\n\n需要使用新密码重新登录。')) {
             return;
         }
         
@@ -192,24 +226,22 @@ const DashboardUsers = {
 
     deleteUser: async function(userId) {
         var lang = Utils.lang;
-        if (!confirm(lang === 'id' ? 'Hapus operator ini?' : '删除此操作员？')) return;
+        if (!confirm(lang === 'id' ? 'Hapus peran ini?' : '删除此角色？')) return;
         
         try {
             await AUTH.deleteUser(userId);
-            alert(lang === 'id' ? '✅ Operator berhasil dihapus' : '✅ 操作员已删除');
+            alert(lang === 'id' ? '✅ Peran berhasil dihapus' : '✅ 角色已删除');
             await this.showUserManagement();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
         }
     },
 
-    // ========== 修复：编辑改为打开完整编辑模态框 ==========
     editUser: async function(userId) {
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         
         try {
-            // 获取用户信息
             const { data: user, error: userError } = await supabaseClient
                 .from('user_profiles')
                 .select('*, stores(*)')
@@ -218,7 +250,6 @@ const DashboardUsers = {
             
             if (userError) throw userError;
             
-            // 获取所有门店列表（用于下拉选择）
             const stores = await SUPABASE.getAllStores();
             
             var storeOptions = '<option value="">' + (lang === 'id' ? 'Tidak ada (Kantor Pusat)' : '无（总部）') + '</option>';
@@ -237,17 +268,27 @@ const DashboardUsers = {
             modal.className = 'modal-overlay';
             modal.innerHTML = '' +
                 '<div class="modal-content" style="max-width:500px;">' +
-                    '<h3>✏️ ' + (lang === 'id' ? 'Edit Operator' : '编辑操作员') + '</h3>' +
+                    '<h3>✏️ ' + (lang === 'id' ? 'Edit Peran' : '编辑角色') + '</h3>' +
                     
                     '<div class="form-group">' +
-                        '<label>' + (lang === 'id' ? 'Username (Email)' : '用户名（邮箱）') + '</label>' +
+                        '<label>' + (lang === 'id' ? 'Akun Login (Email)' : '登录账户（邮箱）') + '</label>' +
                         '<input value="' + Utils.escapeHtml(user.username || user.email || '') + '" readonly>' +
-                        '<div class="form-hint">⚠️ ' + (lang === 'id' ? 'Username tidak dapat diubah' : '用户名不可修改') + '</div>' +
+                        '<div class="form-hint">⚠️ ' + (lang === 'id' ? 'Akun login tidak dapat diubah' : '登录账户不可修改') + '</div>' +
                     '</div>' +
                     
                     '<div class="form-group">' +
                         '<label>' + (lang === 'id' ? 'Nama Lengkap' : '姓名') + ' *</label>' +
                         '<input id="editUserName" value="' + Utils.escapeHtml(user.name || '') + '">' +
+                    '</div>' +
+                    
+                    '<div class="form-group">' +
+                        '<label>' + (lang === 'id' ? 'Nomor KTP' : '身份证号') + '</label>' +
+                        '<input id="editUserKtp" value="' + Utils.escapeHtml(user.ktp_number || '') + '">' +
+                    '</div>' +
+                    
+                    '<div class="form-group">' +
+                        '<label>' + (lang === 'id' ? 'Telepon' : '电话') + '</label>' +
+                        '<input id="editUserPhone" value="' + Utils.escapeHtml(user.phone || '') + '">' +
                     '</div>' +
                     
                     '<div class="form-group">' +
@@ -269,13 +310,15 @@ const DashboardUsers = {
             
         } catch (error) {
             console.error("editUser error:", error);
-            alert(lang === 'id' ? 'Gagal memuat data operator' : '加载操作员数据失败');
+            alert(lang === 'id' ? 'Gagal memuat data peran' : '加载角色数据失败');
         }
     },
 
     _saveEditUser: async function(userId) {
         var lang = Utils.lang;
         var name = document.getElementById('editUserName')?.value.trim();
+        var ktp = document.getElementById('editUserKtp')?.value.trim();
+        var phone = document.getElementById('editUserPhone')?.value.trim();
         var role = document.getElementById('editUserRole')?.value;
         var storeId = document.getElementById('editUserStoreId')?.value || null;
         
@@ -286,11 +329,13 @@ const DashboardUsers = {
         
         try {
             var updates = { name: name, role: role, store_id: storeId };
+            if (ktp) updates.ktp_number = ktp;
+            if (phone) updates.phone = phone;
             
             await AUTH.updateUser(userId, updates);
             
             document.getElementById('editUserModal')?.remove();
-            alert(lang === 'id' ? '✅ Data operator berhasil diperbarui' : '✅ 操作员信息已更新');
+            alert(lang === 'id' ? '✅ Data peran berhasil diperbarui' : '✅ 角色信息已更新');
             await this.showUserManagement();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
