@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.5（移除内联样式，使用组件库）
+// app-dashboard-funds.js - v1.6（typeMap 补充冲销/变卖类型）
 
 window.APP = window.APP || {};
 
@@ -28,16 +28,7 @@ const DashboardFunds = {
                 transactions = storeFlows || [];
             }
             
-            var typeMap = {
-                loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
-                admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
-                service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
-                interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
-                principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
-                expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
-                internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
-                internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
-            };
+            var typeMap = DashboardFunds._getFlowTypeMap(lang);
             
             var directionMap = {
                 inflow: lang === 'id' ? '📥 Masuk' : '📥 流入',
@@ -67,7 +58,6 @@ const DashboardFunds = {
                 }
             }
             
-            // 移除旧模态框
             var oldModal = document.getElementById('capitalModal');
             if (oldModal) oldModal.remove();
             
@@ -156,16 +146,7 @@ const DashboardFunds = {
                 transactions = storeFlows || [];
             }
             
-            var typeMap = {
-                loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
-                admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
-                service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
-                interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
-                principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
-                expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
-                internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
-                internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
-            };
+            var typeMap = DashboardFunds._getFlowTypeMap(lang);
             
             var directionMap = {
                 inflow: lang === 'id' ? '📥 Masuk' : '📥 流入',
@@ -245,7 +226,7 @@ const DashboardFunds = {
             if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
             return true;
         });
-        this._renderCashFlowPageTable(filtered);
+        DashboardFunds._renderCashFlowPageTable(filtered);
     },
 
     resetCashFlowPageFilters: function() {
@@ -253,7 +234,7 @@ const DashboardFunds = {
         var endInput = document.getElementById('cashFlowFilterEnd');
         if (startInput) startInput.value = '';
         if (endInput) endInput.value = '';
-        this.filterCashFlowPage();
+        DashboardFunds.filterCashFlowPage();
     },
 
     _renderCashFlowPageTable: function(transactions) {
@@ -261,16 +242,7 @@ const DashboardFunds = {
         if (!tbody) return;
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
-        var typeMap = {
-            loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
-            admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
-            service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
-            interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
-            principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
-            expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
-            internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
-            internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
-        };
+        var typeMap = DashboardFunds._getFlowTypeMap(lang);
         var directionMap = {
             inflow: lang === 'id' ? '📥 Masuk' : '📥 流入',
             outflow: lang === 'id' ? '📤 Keluar' : '📤 流出'
@@ -313,7 +285,7 @@ const DashboardFunds = {
             if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
             return true;
         });
-        this._renderCapitalTransactionsTable(filtered);
+        DashboardFunds._renderCapitalTransactionsTable(filtered);
     },
     
     resetCapitalFilters: function() {
@@ -325,7 +297,7 @@ const DashboardFunds = {
         if (typeSelect) typeSelect.value = '';
         if (startInput) startInput.value = '';
         if (endInput) endInput.value = '';
-        this.filterCapitalTransactions();
+        DashboardFunds.filterCapitalTransactions();
     },
     
     _renderCapitalTransactionsTable: function(transactions) {
@@ -333,16 +305,7 @@ const DashboardFunds = {
         if (!tbody) return;
         var lang = Utils.lang;
         var isAdmin = AUTH.isAdmin();
-        var typeMap = {
-            loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
-            admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
-            service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
-            interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
-            principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
-            expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
-            internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
-            internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入'
-        };
+        var typeMap = DashboardFunds._getFlowTypeMap(lang);
         var directionMap = {
             inflow: lang === 'id' ? '📥 Masuk' : '📥 流入',
             outflow: lang === 'id' ? '📤 Keluar' : '📤 流出'
@@ -437,14 +400,7 @@ const DashboardFunds = {
         var headers = lang === 'id'
             ? ['Tanggal', 'Tipe', 'Arah', 'Sumber', 'Jumlah', 'Deskripsi']
             : ['日期', '类型', '方向', '来源/去向', '金额', '描述'];
-        var typeMap = {
-            loan_disbursement: lang === 'id' ? 'Pencairan Pinjaman' : '贷款发放',
-            admin_fee: lang === 'id' ? 'Admin Fee' : '管理费',
-            service_fee: lang === 'id' ? 'Service Fee' : '服务费',
-            interest: lang === 'id' ? 'Bunga' : '利息',
-            principal: lang === 'id' ? 'Pokok' : '本金',
-            expense: lang === 'id' ? 'Pengeluaran' : '运营支出'
-        };
+        var typeMap = DashboardFunds._getFlowTypeMap(lang);
         var rows = transactions.map(function(t) {
             return [
                 t.recorded_at.split('T')[0],
@@ -529,7 +485,7 @@ const DashboardFunds = {
             : '确认转账：\n\n' + fromLabel + ' → ' + toLabel + '\n' + Utils.formatCurrency(numAmount) + '\n\n继续吗？';
         
         if (confirm(confirmMsg)) {
-            await this.executeTransfer(transferType, numAmount);
+            await DashboardFunds.executeTransfer(transferType, numAmount);
         }
     },
 
@@ -656,7 +612,7 @@ const DashboardFunds = {
             if (endDate && t.transfer_date > endDate) return false;
             return true;
         });
-        this._renderInternalTransferHistory(filtered);
+        DashboardFunds._renderInternalTransferHistory(filtered);
     },
 
     resetInternalTransferFilters: function() {
@@ -664,7 +620,7 @@ const DashboardFunds = {
         var endInput = document.getElementById('transferFilterEnd');
         if (startInput) startInput.value = '';
         if (endInput) endInput.value = '';
-        this.filterInternalTransferHistory();
+        DashboardFunds.filterInternalTransferHistory();
     },
 
     _renderInternalTransferHistory: function(transfers) {
@@ -728,6 +684,30 @@ const DashboardFunds = {
         a.click();
         URL.revokeObjectURL(url);
         alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
+    },
+
+    // ==================== 统一 flow_type 翻译表 ====================
+    _getFlowTypeMap: function(lang) {
+        return {
+            loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+            admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
+            service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
+            interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
+            principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
+            expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
+            internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
+            internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入',
+            // 冲销类型
+            interest_reversal: lang === 'id' ? '↩️ Batal Bunga' : '↩️ 利息冲销',
+            principal_reversal: lang === 'id' ? '↩️ Batal Pokok' : '↩️ 本金冲销',
+            admin_fee_reversal: lang === 'id' ? '↩️ Batal Admin Fee' : '↩️ 管理费冲销',
+            service_fee_reversal: lang === 'id' ? '↩️ Batal Service Fee' : '↩️ 服务费冲销',
+            // 变卖类型
+            collateral_sale_principal: lang === 'id' ? '💎 Jual Jaminan - Pokok' : '💎 变卖抵押物-本金',
+            collateral_sale_interest: lang === 'id' ? '💎 Jual Jaminan - Bunga' : '💎 变卖抵押物-利息',
+            collateral_sale_surplus: lang === 'id' ? '💎 Jual Jaminan - Surplus' : '💎 变卖抵押物-盈余',
+            collateral_sale_loss: lang === 'id' ? '💎 Jual Jaminan - Rugi' : '💎 变卖抵押物-亏损'
+        };
     }
 };
 
