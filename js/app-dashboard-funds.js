@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.6（typeMap 补充冲销/变卖类型）
+// app-dashboard-funds.js - v1.7（门店列显示 + 列宽调整）
 
 window.APP = window.APP || {};
 
@@ -13,7 +13,7 @@ const DashboardFunds = {
             if (isAdmin) {
                 const { data: allFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*')
+                    .select('*, stores(name)')
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
                 transactions = allFlows || [];
@@ -21,7 +21,7 @@ const DashboardFunds = {
                 const profile = await SUPABASE.getCurrentProfile();
                 const { data: storeFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*')
+                    .select('*, stores(name)')
                     .eq('store_id', profile?.store_id)
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
@@ -51,7 +51,7 @@ const DashboardFunds = {
                         '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
                         '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
                         '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
-                        '<td class="amount ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                         '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
                     '</tr>';
@@ -132,14 +132,14 @@ const DashboardFunds = {
             if (isAdmin) {
                 const { data: allFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*')
+                    .select('*, stores(name)')
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
                 transactions = allFlows || [];
             } else {
                 const { data: storeFlows } = await supabaseClient
                     .from('cash_flow_records')
-                    .select('*')
+                    .select('*, stores(name)')
                     .eq('store_id', profile?.store_id)
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
@@ -169,7 +169,7 @@ const DashboardFunds = {
                         '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
                         '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
                         '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
-                        '<td class="amount ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                         '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
                     '</tr>';
@@ -262,7 +262,7 @@ const DashboardFunds = {
                     '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
                     '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
                     '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
-                    '<td class="amount ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '</td>' +
+                    '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                     '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
                 '</tr>';
@@ -325,7 +325,7 @@ const DashboardFunds = {
                     '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
                     '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
                     '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
-                    '<td class="amount ' + (t.direction === 'inflow' ? 'income' : 'expense') + '">' + Utils.formatCurrency(t.amount) + '</td>' +
+                    '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                     '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
                 '</tr>';
@@ -697,12 +697,10 @@ const DashboardFunds = {
             expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
             internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
             internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入',
-            // 冲销类型
             interest_reversal: lang === 'id' ? '↩️ Batal Bunga' : '↩️ 利息冲销',
             principal_reversal: lang === 'id' ? '↩️ Batal Pokok' : '↩️ 本金冲销',
             admin_fee_reversal: lang === 'id' ? '↩️ Batal Admin Fee' : '↩️ 管理费冲销',
             service_fee_reversal: lang === 'id' ? '↩️ Batal Service Fee' : '↩️ 服务费冲销',
-            // 变卖类型
             collateral_sale_principal: lang === 'id' ? '💎 Jual Jaminan - Pokok' : '💎 变卖抵押物-本金',
             collateral_sale_interest: lang === 'id' ? '💎 Jual Jaminan - Bunga' : '💎 变卖抵押物-利息',
             collateral_sale_surplus: lang === 'id' ? '💎 Jual Jaminan - Surplus' : '💎 变卖抵押物-盈余',
