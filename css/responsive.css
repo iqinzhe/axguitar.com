@@ -140,6 +140,9 @@
 
     .toolbar button {
         font-size: var(--font-xs);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: var(--spacing-1) var(--spacing-2);
     }
 
     .btn-action {
@@ -205,7 +208,7 @@
     .action-row .action-buttons {
         flex-direction: row;
         flex-wrap: nowrap;
-        gap: 10px;
+        gap: 12px;
         align-items: center;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -227,11 +230,17 @@
         text-overflow: ellipsis;
     }
 
+    /* 门店管理操作按钮 */
+    .store-table .action-buttons .btn-small {
+        padding: 6px 10px;
+        font-size: 10px;
+    }
+
     /* 缴费页面按钮 */
     .action-buttons {
         flex-direction: row;
         flex-wrap: nowrap;
-        gap: 10px;
+        gap: 12px;
         overflow-x: auto;
     }
 
