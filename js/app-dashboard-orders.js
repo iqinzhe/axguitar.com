@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.1（移除内联样式，使用组件库）
+// app-dashboard-orders.js - v2.2（加载更多分页、按钮图标、错误上报）
 
 window.APP = window.APP || {};
 
@@ -10,9 +10,22 @@ const DashboardOrders = {
         var t = function(key) { return Utils.t(key); };
         var profile = await SUPABASE.getCurrentProfile();
         var isAdmin = profile?.role === 'admin';
+        
+        // 分页状态
+        var PAGE_SIZE = 50;
+        var currentFrom = 0;
+        var totalCount = 0;
+        var allOrders = [];
+        
         try {
             var filters = { status: APP.currentFilter, search: '' };
-            var orders = await SUPABASE.getOrders(filters);
+            
+            // 首次加载
+            var result = await SUPABASE.getOrders(filters, currentFrom, currentFrom + PAGE_SIZE - 1);
+            allOrders = result.data;
+            totalCount = result.totalCount;
+            currentFrom += PAGE_SIZE;
+            
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             
             var stores = await SUPABASE.getAllStores();
@@ -20,14 +33,16 @@ const DashboardOrders = {
             for (var i = 0; i < stores.length; i++) {
                 storeMap[stores[i].id] = stores[i].name;
             }
-
+            
             var baseCols = 9;
             var totalCols = isAdmin ? baseCols + 1 : baseCols;
             
-            var rows = '';
-            if (orders.length === 0) {
-                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
-            } else {
+            // 渲染表格的辅助函数
+            var renderOrdersIntoTable = function(orders, append) {
+                var tbody = document.getElementById('orderTableBody');
+                if (!tbody) return;
+                
+                var rows = '';
                 for (var i = 0; i < orders.length; i++) {
                     var o = orders[i];
                     var sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
@@ -60,7 +75,7 @@ const DashboardOrders = {
                     // 操作行
                     var actionButtons = '';
                     if (o.status === 'active' && !isAdmin) {
-                        actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💰 ' + (lang === 'id' ? 'Bayar' : '缴费') + '</button>';
+                        actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💸 ' + (lang === 'id' ? '续费' : '缴费') + '</button>';
                     }
                     actionButtons += '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>';
                     actionButtons += '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">🖨️ ' + t('print') + '</button>';
@@ -75,8 +90,45 @@ const DashboardOrders = {
                         '</td>' +
                     '</tr>';
                 }
-            }
-
+                
+                if (append) {
+                    // 追加模式：移除旧加载更多行，追加新数据
+                    var loadMoreRow = document.getElementById('loadMoreRow');
+                    if (loadMoreRow) loadMoreRow.remove();
+                    tbody.insertAdjacentHTML('beforeend', rows);
+                } else {
+                    tbody.innerHTML = rows;
+                }
+                
+                // 更新加载更多区域
+                updateLoadMoreArea();
+            };
+            
+            // 更新加载更多区域的辅助函数
+            var updateLoadMoreArea = function() {
+                var tbody = document.getElementById('orderTableBody');
+                if (!tbody) return;
+                
+                var existingRow = document.getElementById('loadMoreRow');
+                if (existingRow) existingRow.remove();
+                
+                if (currentFrom < totalCount) {
+                    var remaining = totalCount - currentFrom;
+                    var loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;">' +
+                        '<button onclick="APP.loadMoreOrders()" class="btn-small primary" style="padding:10px 32px;font-size:14px;">' +
+                        '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
+                        ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
+                        '</button></td></tr>';
+                    tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
+                } else if (totalCount > PAGE_SIZE) {
+                    var doneHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;color:var(--text-muted);">' +
+                        '✅ ' + (lang === 'id' ? 'Semua ' + totalCount + ' pesanan telah dimuat' : '已加载全部 ' + totalCount + ' 条订单') +
+                        '</td></tr>';
+                    tbody.insertAdjacentHTML('beforeend', doneHtml);
+                }
+            };
+            
+            // 渲染页面框架
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>📋 ' + t('order_list') + '</h2>' +
@@ -93,12 +145,11 @@ const DashboardOrders = {
                     '</select>' +
                 '</div>' +
                 
-                // 提示条
                 '<div class="info-bar info">' +
                     '<span class="info-bar-icon">📌</span>' +
                     '<div class="info-bar-content">' +
-                        '<strong>' + (lang === 'id' ? 'Informasi Penting:' : '重要提示：') + '</strong> ' + 
-                        (lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pembayaran pokok lebih awal dapat mengurangi beban bunga. Setelah lunas, sistem akan membuat tanda terima pelunasan secara otomatis.' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。') +
+                        '<strong>' + (lang === 'id' ? 'Total' : '共') + ' ' + totalCount + ' ' + (lang === 'id' ? 'pesanan' : '条订单') + '</strong> — ' + 
+                        (lang === 'id' ? 'Menampilkan ' + Math.min(PAGE_SIZE, totalCount) + ' pertama' : '显示前 ' + Math.min(PAGE_SIZE, totalCount) + ' 条') +
                     '</div>' +
                 '</div>' +
                 
@@ -119,14 +170,67 @@ const DashboardOrders = {
                                     (isAdmin ? '<th class="col-store text-center">' + t('store') + '</th>' : '') +
                                 '</tr>' +
                             '</thead>' +
-                            '<tbody>' + rows + '</tbody>' +
+                            '<tbody id="orderTableBody"></tbody>' +
                         '</table>' +
                     '</div>' +
                 '</div>';
             
+            // 初始渲染
+            renderOrdersIntoTable(allOrders, false);
+            
+            // 存储分页状态到 window
+            window._orderTableState = {
+                currentFrom: currentFrom,
+                totalCount: totalCount,
+                allOrders: allOrders,
+                totalCols: totalCols,
+                pageSize: PAGE_SIZE,
+                filters: filters,
+                storeMap: storeMap,
+                renderOrdersIntoTable: renderOrdersIntoTable
+            };
+            
         } catch (err) {
             console.error("showOrderTable error:", err);
+            Utils.ErrorHandler.capture(err, 'showOrderTable');
             alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
+        }
+    },
+    
+    // ==================== 加载更多订单 ====================
+    loadMoreOrders: async function() {
+        var state = window._orderTableState;
+        if (!state) return;
+        
+        var lang = Utils.lang;
+        var loadMoreBtn = document.querySelector('#loadMoreRow button');
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...');
+        }
+        
+        try {
+            var result = await SUPABASE.getOrders(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
+            var newOrders = result.data;
+            
+            // 更新状态
+            state.allOrders = state.allOrders.concat(newOrders);
+            state.currentFrom += result.data.length;
+            state.totalCount = result.totalCount;
+            
+            // 渲染新数据（追加模式）
+            state.renderOrdersIntoTable(newOrders, true);
+            
+        } catch (err) {
+            console.error("loadMoreOrders error:", err);
+            Utils.ErrorHandler.capture(err, 'loadMoreOrders');
+            
+            // 恢复按钮
+            if (loadMoreBtn) {
+                loadMoreBtn.disabled = false;
+                loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
+            }
+            alert(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
         }
     },
     
@@ -238,7 +342,6 @@ const DashboardOrders = {
                         '</div>' +
                     '</div>' +
                     
-                    // 提示条
                     '<div class="info-bar info">' +
                         '<span class="info-bar-icon">💡</span>' +
                         '<div class="info-bar-content">' +
@@ -264,17 +367,17 @@ const DashboardOrders = {
                         '</table>' +
                     '</div>' +
                     
-                    // 底部操作栏
                     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
                         '<button onclick="APP.goBack()">↩️ ' + t('back') + '</button>' +
-                        (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(order.order_id) + '\'})" class="success">💰 ' + (lang === 'id' ? 'Bayar' : '缴纳费用') + '</button>' : '') +
-                        (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeAttr(order.order_id) + '\')" class="success">🧾 ' + (lang === 'id' ? 'Cetak Tanda Terima Pelunasan' : '打印结清凭证') + '</button>' : '') +
-                        '<button onclick="APP.sendWAReminder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="warning">📱 ' + (lang === 'id' ? 'Pengingat WA' : 'WA提醒') + '</button>' +
+                        (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(order.order_id) + '\'})" class="success">💸 ' + (lang === 'id' ? '续费缴费' : '缴纳费用') + '</button>' : '') +
+                        (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeAttr(order.order_id) + '\')" class="success">🧾 ' + (lang === 'id' ? '结清凭证' : '结清凭证') + '</button>' : '') +
+                        '<button onclick="APP.sendWAReminder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="warning">📱 ' + (lang === 'id' ? 'WA提醒' : 'WA提醒') + '</button>' +
                     '</div>' +
                 '</div>';
             
         } catch (error) {
             console.error("viewOrder error:", error);
+            Utils.ErrorHandler.capture(error, 'viewOrder');
             alert(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
             APP.goBack();
         }
@@ -308,6 +411,7 @@ const DashboardOrders = {
             await APP.showOrderTable();
         } catch (error) {
             console.error("deleteOrder error:", error);
+            Utils.ErrorHandler.capture(error, 'deleteOrder');
             alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
         }
     },
@@ -417,6 +521,7 @@ const DashboardOrders = {
             printWindow.document.close();
         } catch (error) {
             console.error("printOrder error:", error);
+            Utils.ErrorHandler.capture(error, 'printOrder');
             alert(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
         }
     },
@@ -468,7 +573,6 @@ const DashboardOrders = {
                     '</div>' +
                 '</div>' +
                 
-                // 统计卡片
                 '<div class="stats-grid stats-grid-auto">' +
                     '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalAdminFee) + '</div><div class="stat-label">' + t('admin_fee') + '</div></div>' +
                     '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalServiceFee) + '</div><div class="stat-label">' + t('service_fee') + '</div></div>' +
@@ -499,6 +603,7 @@ const DashboardOrders = {
             
         } catch (error) {
             console.error("showPaymentHistory error:", error);
+            Utils.ErrorHandler.capture(error, 'showPaymentHistory');
             alert(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
         }
     }
