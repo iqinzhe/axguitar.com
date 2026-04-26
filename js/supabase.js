@@ -1,4 +1,4 @@
-// supabase.js - v1.8（统一默认利率8%、最大展期月数可配置）
+// supabase.js - v1.9（审计日志集成）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -467,8 +467,7 @@ const SupabaseAPI = {
         const adminFee = orderData.admin_fee || Utils.calculateAdminFee(orderData.loan_amount);
         const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
         const serviceFeeAmount = orderData.service_fee_amount || 0;
-        // 修复2：默认利率统一为 8%（即 0.08）
-        const agreedInterestRate = (orderData.agreed_interest_rate || 8) / 100;
+        const agreedInterestRate = (orderData.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT) / 100;
         const repaymentType = orderData.repayment_type || 'flexible';
         const repaymentTerm = orderData.repayment_term || null;
         
@@ -537,7 +536,6 @@ const SupabaseAPI = {
                     fixed_paid_months: 0,
                     overdue_days: 0,
                     liquidation_status: 'normal',
-                    // 修复5：最大展期月数，支持配置（默认10个月）
                     max_extension_months: orderData.max_extension_months || 10
                 };
 
@@ -553,6 +551,12 @@ const SupabaseAPI = {
                 }
                 
                 console.log('✅ 订单创建成功: ' + orderId + ' (还款方式: ' + repaymentType + ')');
+                
+                // 审计：创建订单
+                if (window.Audit) {
+                    await window.Audit.logOrderCreate(orderId, orderData.customer_name, orderData.loan_amount);
+                }
+                
                 return data;
                 
             } catch (err) {
@@ -601,6 +605,11 @@ const SupabaseAPI = {
             description: Utils.t('admin_fee') + ' - ' + order.order_id,
             reference_id: order.order_id
         });
+        
+        // 审计：管理费收款
+        if (window.Audit) {
+            await window.Audit.logPayment(order.order_id, 'admin_fee', feeAmount, paymentMethod);
+        }
         
         return true;
     },
@@ -653,10 +662,14 @@ const SupabaseAPI = {
             reference_id: order.order_id
         });
         
+        // 审计：服务费收款
+        if (window.Audit) {
+            await window.Audit.logPayment(order.order_id, 'service_fee', totalServiceFee, paymentMethod);
+        }
+        
         return true;
     },
 
-    // 修复2 + 修复5：默认利率 0.08，最大展期月数从订单读取
     async recordInterestPayment(orderId, months, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -666,8 +679,7 @@ const SupabaseAPI = {
             throw new Error(Utils.t('order_completed'));
         }
         
-        // 修复2：默认利率 0.08（8%）
-        const monthlyRate = currentOrder.agreed_interest_rate || 0.08;
+        const monthlyRate = currentOrder.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
         
         const loanAmount = currentOrder.loan_amount || 0;
         const principalPaid = currentOrder.principal_paid || 0;
@@ -678,7 +690,6 @@ const SupabaseAPI = {
         const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
         const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + totalInterest;
         
-        // 修复5：最大月数从订单配置读取（默认10个月）
         const maxMonths = currentOrder.max_extension_months || 10;
         
         if (newInterestPaidMonths > maxMonths) {
@@ -731,10 +742,14 @@ const SupabaseAPI = {
             reference_id: currentOrder.order_id
         });
         
+        // 审计：利息收款
+        if (window.Audit) {
+            await window.Audit.logPayment(currentOrder.order_id, 'interest', totalInterest, paymentMethod);
+        }
+        
         return true;
     },
 
-    // 修复2：默认利率 0.08
     async recordPrincipalPayment(orderId, amount, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -760,8 +775,7 @@ const SupabaseAPI = {
         
         const newPrincipalPaid = principalPaid + paidAmount;
         const newPrincipalRemaining = loanAmount - newPrincipalPaid;
-        // 修复2：默认利率 0.08
-        const monthlyRate = currentOrder.agreed_interest_rate || 0.08;
+        const monthlyRate = currentOrder.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
         
         let updates = { 
             principal_paid: newPrincipalPaid, 
@@ -813,6 +827,11 @@ const SupabaseAPI = {
             reference_id: currentOrder.order_id
         });
         
+        // 审计：本金还款
+        if (window.Audit) {
+            await window.Audit.logPayment(currentOrder.order_id, 'principal', paidAmount, paymentMethod);
+        }
+        
         if (isFullRepayment) {
             alert(Utils.lang === 'id' ? '✅ Pesanan lunas' : '✅ 订单已结清');
         } else {
@@ -822,7 +841,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // 修复2：默认利率 0.08
     async recordFixedPayment(orderId, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -844,8 +862,7 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? '❌ Pesanan sudah lunas' : '❌ 订单已结清');
         }
         
-        // 修复2：默认利率 0.08
-        const monthlyRate = order.agreed_interest_rate || 0.08;
+        const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
         const remainingPrincipal = order.principal_remaining;
         const interestAmount = remainingPrincipal * monthlyRate;
         const principalAmount = fixedPayment - interestAmount;
@@ -936,10 +953,14 @@ const SupabaseAPI = {
             });
         }
         
+        // 审计：固定还款
+        if (window.Audit) {
+            await window.Audit.logPayment(order.order_id, 'fixed_installment', fixedPayment, paymentMethod);
+        }
+        
         return true;
     },
 
-    // 修复2：默认利率 0.08
     async earlySettleFixedOrder(orderId, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
         const profile = await this.getCurrentProfile();
@@ -955,8 +976,7 @@ const SupabaseAPI = {
         
         const paidMonths = order.fixed_paid_months || 0;
         const remainingPrincipal = order.principal_remaining;
-        // 修复2：默认利率 0.08
-        const monthlyRate = order.agreed_interest_rate || 0.08;
+        const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
         const remainingMonths = order.repayment_term - paidMonths;
         
         const settlementAmount = remainingPrincipal;
@@ -1003,6 +1023,11 @@ const SupabaseAPI = {
             .eq('order_id', orderId);
         
         if (error) throw error;
+        
+        // 审计：提前结清
+        if (window.Audit) {
+            await window.Audit.logPayment(order.order_id, 'early_settlement', settlementAmount, paymentMethod);
+        }
         
         alert((Utils.lang === 'id' ? '✅ Pelunasan dipercepat berhasil!\nJumlah: ' : '✅ 提前结清成功！\n结清金额: ') + this.formatCurrency(settlementAmount));
         return true;
@@ -1130,6 +1155,12 @@ const SupabaseAPI = {
         
         const { error: e2 } = await supabaseClient.from('orders').delete().eq('order_id', orderId);
         if (e2) throw e2;
+        
+        // 审计：删除订单
+        if (window.Audit) {
+            await window.Audit.logOrderDelete(order.order_id, order.customer_name, order.loan_amount, profile?.name);
+        }
+        
         return true;
     },
 
@@ -1157,7 +1188,7 @@ const SupabaseAPI = {
         
         for (var i = 0; i < activeOrders.length; i++) {
             var o = activeOrders[i];
-            expectedMonthlyInterest += ((o.loan_amount || 0) - (o.principal_paid || 0)) * (o.agreed_interest_rate || 0.10);
+            expectedMonthlyInterest += ((o.loan_amount || 0) - (o.principal_paid || 0)) * (o.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE);
         }
         
         return {
@@ -1232,6 +1263,12 @@ const SupabaseAPI = {
         const { data, error } = await supabaseClient
             .from('stores').insert({ code: code, name: name, address: address, phone: phone }).select().single();
         if (error) throw error;
+        
+        // 审计：创建门店
+        if (window.Audit) {
+            await window.Audit.logStoreCreate(code, name, AUTH.user?.id);
+        }
+        
         return data;
     },
 
@@ -1239,6 +1276,12 @@ const SupabaseAPI = {
         const { data, error } = await supabaseClient
             .from('stores').update(updates).eq('id', id).select().single();
         if (error) throw error;
+        
+        // 审计：更新门店
+        if (window.Audit) {
+            await window.Audit.logStoreAction(id, 'update', JSON.stringify(updates));
+        }
+        
         return data;
     },
 
@@ -1265,6 +1308,12 @@ const SupabaseAPI = {
         
         const { error } = await supabaseClient.from('stores').delete().eq('id', id);
         if (error) throw error;
+        
+        // 审计：删除门店
+        if (window.Audit) {
+            await window.Audit.logStoreAction(id, 'delete', '');
+        }
+        
         return true;
     },
 
@@ -1519,6 +1568,15 @@ const SupabaseAPI = {
             description: expenseData.category,
             reference_id: data.id
         });
+        
+        // 审计：运营支出
+        if (window.Audit) {
+            await window.Audit.log('expense_add', JSON.stringify({
+                category: expenseData.category,
+                amount: expenseData.amount,
+                payment_method: expenseData.payment_method
+            }));
+        }
         
         return data;
     },
