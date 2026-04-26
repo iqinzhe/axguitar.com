@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.1（兼容 getOrdersLegacy、错误上报）
+// app-dashboard-anomaly.js - v2.2（门店只显示逾期+黑名单，黑名单全部门店共享）
 
 window.APP = window.APP || {};
 
@@ -43,16 +43,16 @@ const DashboardAnomaly = {
                     }
                 })(),
                 
-                // Q2: 黑名单客户
+                // Q2: 黑名单客户 —— 门店也查全部门店（共享黑名单）
                 (async function() {
                     try {
                         let query = supabaseClient
                             .from('blacklist')
                             .select('*, customers(name, phone, customer_id)');
                         
-                        if (!isAdmin && storeId) {
-                            query = query.eq('store_id', storeId);
-                        }
+                        // 注意：这里不再限制 store_id，门店也能看到全部门店的黑名单
+                        // 但只在本门店 store_id 有值时过滤（如果没有 store_id 说明是总部，看全部）
+                        // 门店账号一定有 store_id，但我们不再过滤，让它看全部黑名单
                         
                         const { data, error } = await query;
                         if (error) { console.warn("获取黑名单失败:", error); return []; }
@@ -63,15 +63,127 @@ const DashboardAnomaly = {
                     }
                 })(),
                 
-                // Q3: 所有门店
+                // Q3: 所有门店（仅总部需要）
                 SUPABASE.getAllStores(),
                 
-                // Q4: 所有订单（用于排名计算）—— 使用兼容方法
+                // Q4: 所有订单（仅总部需要排名计算）
                 SUPABASE.getOrdersLegacy()
             ]);
             
             var overdueOrders = overdueResult;
             var blacklist = blacklistResult;
+            
+            // ========== 逾期30天订单渲染 ==========
+            var overdueTableHtml = '';
+            if (overdueOrders.length === 0) {
+                overdueTableHtml = '' +
+                    '<div class="empty-state">' +
+                        '<div class="empty-state-icon">✅</div>' +
+                        '<div class="empty-state-text">' + (lang === 'id' ? 'Semua pesanan dalam keadaan baik' : '所有订单状态良好') + '</div>' +
+                    '</div>';
+            } else {
+                var overdueRows = '';
+                for (var i = 0; i < overdueOrders.length; i++) {
+                    var o = overdueOrders[i];
+                    overdueRows += '<tr>' +
+                        '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
+                        '<td>' + Utils.escapeHtml(o.customers?.name || o.customer_name) + '</td>' +
+                        '<td class="text-center expense">' + o.overdue_days + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
+                        '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
+                    '</tr>';
+                }
+                overdueTableHtml = '' +
+                    '<div class="table-container">' +
+                        '<table class="data-table anomaly-table">' +
+                            '<thead>' +
+                                '<tr>' +
+                                    '<th class="col-id">' + (lang === 'id' ? 'ID Pesanan' : '订单号') + '</th>' +
+                                    '<th class="col-name">' + (lang === 'id' ? 'Nama Nasabah' : '客户姓名') + '</th>' +
+                                    '<th class="col-months text-center">' + (lang === 'id' ? 'Hari Terlambat' : '逾期天数') + '</th>' +
+                                    '<th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额') + '</th>' +
+                                    '<th class="text-center" style="width:60px;">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
+                                '</tr>' +
+                            '</thead>' +
+                            '<tbody>' + overdueRows + '</tbody>' +
+                        '</table>' +
+                    '</div>';
+            }
+            
+            // ========== 黑名单客户渲染（全部门店共享） ==========
+            var blacklistTableHtml = '';
+            if (blacklist.length === 0) {
+                blacklistTableHtml = '' +
+                    '<div class="empty-state">' +
+                        '<div class="empty-state-icon">👍</div>' +
+                        '<div class="empty-state-text">' + (lang === 'id' ? 'Tidak ada nasabah di blacklist' : '暂无黑名单客户') + '</div>' +
+                    '</div>';
+            } else {
+                var blacklistRows = '';
+                for (var i = 0; i < blacklist.length; i++) {
+                    var b = blacklist[i];
+                    blacklistRows += '<tr>' +
+                        '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
+                        '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
+                        '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '</td>' +
+                        '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
+                    '</tr>';
+                }
+                blacklistTableHtml = '' +
+                    '<div class="table-container">' +
+                        '<table class="data-table anomaly-table">' +
+                            '<thead>' +
+                                '<tr>' +
+                                    '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
+                                    '<th class="col-name">' + (lang === 'id' ? 'Nama' : '姓名') + '</th>' +
+                                    '<th class="col-phone">' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
+                                    '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
+                                '</tr>' +
+                            '</thead>' +
+                            '<tbody>' + blacklistRows + '</tbody>' +
+                        '</table>' +
+                    '</div>';
+            }
+            
+            // ========== 门店视图：只显示逾期30天 + 黑名单（单列堆叠） ==========
+            if (!isAdmin) {
+                document.getElementById("app").innerHTML = '' +
+                    '<div class="page-header">' +
+                        '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
+                        '<div class="header-actions">' +
+                            '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
+                            '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                    
+                    // 卡片1：逾期30天订单（全宽）
+                    '<div class="anomaly-card anomaly-card-danger" style="margin-bottom:16px;">' +
+                        '<div class="anomaly-card-header">' +
+                            '<span class="anomaly-icon">⚠️</span>' +
+                            '<h3>' + (lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单') + '</h3>' +
+                            '<span class="anomaly-badge">' + overdueOrders.length + '</span>' +
+                        '</div>' +
+                        '<div class="anomaly-card-body">' + overdueTableHtml + '</div>' +
+                        (overdueOrders.length > 0 ? 
+                            '<div class="anomaly-card-footer">' +
+                                '<span class="warning-text">💡 ' + (lang === 'id' ? 'Pesanan ini akan memasuki proses likuidasi' : '这些订单即将进入变卖程序') + '</span>' +
+                            '</div>' : '') +
+                    '</div>' +
+                    
+                    // 卡片2：黑名单客户（全部门店共享，全宽）
+                    '<div class="anomaly-card anomaly-card-warning" style="margin-bottom:16px;">' +
+                        '<div class="anomaly-card-header">' +
+                            '<span class="anomaly-icon">🚫</span>' +
+                            '<h3>' + (lang === 'id' ? 'Daftar Hitam Nasabah (Semua Toko)' : '黑名单客户（全部门店）') + '</h3>' +
+                            '<span class="anomaly-badge">' + blacklist.length + '</span>' +
+                        '</div>' +
+                        '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
+                    '</div>';
+                
+                return;
+            }
+            
+            // ========== 以下为总部视图（isAdmin = true）：四个卡片 ==========
             
             // ========== 本月日期范围 ==========
             var today = new Date();
@@ -107,7 +219,6 @@ const DashboardAnomaly = {
                 };
             }
             
-            // 计算当月订单的当金流出
             var monthlyOrderIds = [];
             for (var i = 0; i < orders.length; i++) {
                 var o = orders[i];
@@ -120,7 +231,6 @@ const DashboardAnomaly = {
                         storeMonthlyStats[o.store_id].orderCount++;
                         storeMonthlyStats[o.store_id].totalLoanOutflow += (o.loan_amount || 0);
                         
-                        // 不良客户订单：逾期 ≥ 15 天
                         if ((o.overdue_days || 0) >= 15 && o.status === 'active') {
                             storeMonthlyStats[o.store_id].badOrders++;
                         }
@@ -128,7 +238,6 @@ const DashboardAnomaly = {
                 }
             }
             
-            // 计算当月资金回收数额
             if (monthlyOrderIds.length > 0) {
                 var { data: monthlyFlows } = await supabaseClient
                     .from('cash_flow_records')
@@ -147,7 +256,6 @@ const DashboardAnomaly = {
                 }
             }
             
-            // ========== 构建排行数组（排除总部 + 排除暂停营业） ==========
             var eligibleStores = [];
             var storeKeys = Object.keys(storeMonthlyStats);
             for (var i = 0; i < storeKeys.length; i++) {
@@ -157,40 +265,34 @@ const DashboardAnomaly = {
                 eligibleStores.push(s);
             }
             
-            // ========== 4项指标综合排名 ==========
             for (var i = 0; i < eligibleStores.length; i++) {
                 eligibleStores[i].rankSum = 0;
             }
             
-            // 指标1：订单总数（越多越好）
             eligibleStores.sort(function(a, b) { return b.orderCount - a.orderCount; });
             for (var i = 0; i < eligibleStores.length; i++) {
                 eligibleStores[i].rankOrderCount = i + 1;
                 eligibleStores[i].rankSum += (i + 1);
             }
             
-            // 指标2：当金流出总额（越少越好）
             eligibleStores.sort(function(a, b) { return a.totalLoanOutflow - b.totalLoanOutflow; });
             for (var i = 0; i < eligibleStores.length; i++) {
                 eligibleStores[i].rankLoanOutflow = i + 1;
                 eligibleStores[i].rankSum += (i + 1);
             }
             
-            // 指标3：不良客户订单（越少越好）
             eligibleStores.sort(function(a, b) { return a.badOrders - b.badOrders; });
             for (var i = 0; i < eligibleStores.length; i++) {
                 eligibleStores[i].rankBadOrders = i + 1;
                 eligibleStores[i].rankSum += (i + 1);
             }
             
-            // 指标4：资金回收数额（越多越好）
             eligibleStores.sort(function(a, b) { return b.totalRecovery - a.totalRecovery; });
             for (var i = 0; i < eligibleStores.length; i++) {
                 eligibleStores[i].rankRecovery = i + 1;
                 eligibleStores[i].rankSum += (i + 1);
             }
             
-            // 按综合得分排序（越低越好）
             eligibleStores.sort(function(a, b) { return a.rankSum - b.rankSum; });
             
             var top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
@@ -258,79 +360,7 @@ const DashboardAnomaly = {
                 bottom3Html = '<div class="ranking-list">' + bottom3Items + '</div>';
             }
             
-            // ========== 渲染：逾期30天订单 ==========
-            var overdueTableHtml = '';
-            if (overdueOrders.length === 0) {
-                overdueTableHtml = '' +
-                    '<div class="empty-state">' +
-                        '<div class="empty-state-icon">✅</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Semua pesanan dalam keadaan baik' : '所有订单状态良好') + '</div>' +
-                    '</div>';
-            } else {
-                var overdueRows = '';
-                for (var i = 0; i < overdueOrders.length; i++) {
-                    var o = overdueOrders[i];
-                    overdueRows += '<tr>' +
-                        '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
-                        '<td>' + Utils.escapeHtml(o.customers?.name || o.customer_name) + '</td>' +
-                        '<td class="text-center expense">' + o.overdue_days + '</td>' +
-                        '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
-                        '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
-                    '</tr>';
-                }
-                overdueTableHtml = '' +
-                    '<div class="table-container">' +
-                        '<table class="data-table anomaly-table">' +
-                            '<thead>' +
-                                '<tr>' +
-                                    '<th class="col-id">' + (lang === 'id' ? 'ID Pesanan' : '订单号') + '</th>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Nama Nasabah' : '客户姓名') + '</th>' +
-                                    '<th class="col-months text-center">' + (lang === 'id' ? 'Hari Terlambat' : '逾期天数') + '</th>' +
-                                    '<th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额') + '</th>' +
-                                    '<th class="text-center" style="width:60px;">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
-                                '</tr>' +
-                            '</thead>' +
-                            '<tbody>' + overdueRows + '</tbody>' +
-                        '</table>' +
-                    '</div>';
-            }
-            
-            // ========== 渲染：黑名单客户 ==========
-            var blacklistTableHtml = '';
-            if (blacklist.length === 0) {
-                blacklistTableHtml = '' +
-                    '<div class="empty-state">' +
-                        '<div class="empty-state-icon">👍</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Tidak ada nasabah di blacklist' : '暂无黑名单客户') + '</div>' +
-                    '</div>';
-            } else {
-                var blacklistRows = '';
-                for (var i = 0; i < blacklist.length; i++) {
-                    var b = blacklist[i];
-                    blacklistRows += '<tr>' +
-                        '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
-                    '</tr>';
-                }
-                blacklistTableHtml = '' +
-                    '<div class="table-container">' +
-                        '<table class="data-table anomaly-table">' +
-                            '<thead>' +
-                                '<tr>' +
-                                    '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Nama' : '姓名') + '</th>' +
-                                    '<th class="col-phone">' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
-                                    '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
-                                '</tr>' +
-                            '</thead>' +
-                            '<tbody>' + blacklistRows + '</tbody>' +
-                        '</table>' +
-                    '</div>';
-            }
-            
-            // ========== 组装页面 ==========
+            // ========== 总部视图：四个卡片 ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
@@ -382,7 +412,7 @@ const DashboardAnomaly = {
                             '</div>' : '') +
                     '</div>' +
                     
-                    // 卡片4：黑名单客户
+                    // 卡片4：黑名单客户（全部门店共享）
                     '<div class="anomaly-card anomaly-card-warning">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🚫</span>' +
