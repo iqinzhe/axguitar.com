@@ -1,26 +1,31 @@
-// auth.js - v1.2（新增：记住我、网络状态监听）
+// auth.js - v1.3（修复：登录锁定改为 localStorage，跨标签页同步）
 
 const AUTH = {
     user: null,
 
-    // ==================== 登录锁定机制 ====================
+    // ==================== 登录锁定机制（使用 localStorage） ====================
 
     _getLoginAttempts() {
-        const stored = sessionStorage.getItem('jf_login_attempts');
+        const stored = localStorage.getItem('jf_login_attempts');
         return stored ? JSON.parse(stored) : {};
     },
 
     _setLoginAttempts(attempts) {
-        sessionStorage.setItem('jf_login_attempts', JSON.stringify(attempts));
+        localStorage.setItem('jf_login_attempts', JSON.stringify(attempts));
     },
 
     _getLockedUntil() {
-        const stored = sessionStorage.getItem('jf_locked_until');
+        const stored = localStorage.getItem('jf_locked_until');
         return stored ? JSON.parse(stored) : {};
     },
 
     _setLockedUntil(locked) {
-        sessionStorage.setItem('jf_locked_until', JSON.stringify(locked));
+        localStorage.setItem('jf_locked_until', JSON.stringify(locked));
+    },
+
+    _clearAllLoginFailures() {
+        localStorage.removeItem('jf_login_attempts');
+        localStorage.removeItem('jf_locked_until');
     },
 
     _isLocked(username) {
@@ -89,9 +94,14 @@ const AUTH = {
         this._setLockedUntil(lockedUntil);
     },
 
-    _clearAllLoginFailures() {
-        sessionStorage.removeItem('jf_login_attempts');
-        sessionStorage.removeItem('jf_locked_until');
+    // 跨标签页同步 - 监听 storage 事件
+    _initStorageSync() {
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'jf_login_attempts' || e.key === 'jf_locked_until') {
+                // 触发重新检查，但不清空当前用户状态
+                console.log('[Auth] 登录锁定状态已同步');
+            }
+        });
     },
 
     // ==================== 记住我功能 ====================
@@ -164,6 +174,9 @@ const AUTH = {
     async init() {
         // 初始化网络监听
         this._initNetworkListener();
+        
+        // 初始化跨标签页同步
+        this._initStorageSync();
 
         try {
             await this.loadCurrentUser();
@@ -368,20 +381,56 @@ const AUTH = {
             deleted_at: new Date().toISOString()
         };
 
-        const edgeFail = Utils.lang === 'id'
-            ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.'
-            : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。';
-
+        let authCleaned = false;
+        
+        // 方案A：优先尝试 Edge Function 删除 Auth 账户
         try {
-            const { error: edgeError } = await supabaseClient.functions.invoke('delete-user', {
+            const { data, error } = await supabaseClient.functions.invoke('delete-user', {
                 body: { userId: userProfile.id }
             });
-            if (edgeError) { console.warn('Edge Function 调用失败:', edgeError); alert(edgeFail); }
+            if (!error) {
+                authCleaned = true;
+                console.log('✅ Edge Function 已删除 Auth 账户');
+            } else {
+                console.warn('Edge Function 调用失败:', error);
+            }
         } catch (e) {
-            console.warn('Edge Function 未部署:', e);
-            alert(edgeFail);
+            console.warn('Edge Function 未部署或调用失败:', e.message);
+        }
+        
+        // 方案B：如果 Edge Function 不可用，尝试禁用用户（改密码和邮箱）
+        if (!authCleaned) {
+            try {
+                const randomPassword = Math.random().toString(36).slice(-12) + '!@#';
+                const disabledEmail = 'disabled_' + Date.now() + '@placeholder.com';
+                
+                // 注意：此方法需要 Service Role Key，如果不可用会失败
+                const { error: updateError } = await supabaseClient.auth.admin.updateUserById(userProfile.id, {
+                    password: randomPassword,
+                    email: disabledEmail
+                });
+                
+                if (!updateError) {
+                    authCleaned = true;
+                    console.log('✅ 已禁用 Auth 账户（密码和邮箱已更改）');
+                } else {
+                    console.warn('Auth 账户清理失败，需要管理员手动处理:', updateError?.message);
+                }
+            } catch (adminError) {
+                console.warn('Admin API 不可用，Auth 账户未被清理');
+            }
+        }
+        
+        // 警告用户
+        if (!authCleaned) {
+            const lang = Utils.lang;
+            const warningMsg = lang === 'id'
+                ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.\n\nHubungi administrator untuk pembersihan manual.'
+                : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。\n\n请联系管理员进行手动清理。';
+            alert(warningMsg);
         }
 
+        // 删除本地 profile
         const { error } = await supabaseClient.from('user_profiles').delete().eq('id', userId);
         if (error) throw error;
 
@@ -407,14 +456,18 @@ const AUTH = {
     },
 
     async resetUserPassword(userId, newPassword) {
+        const lang = Utils.lang;
+        
         if (this.user?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
+            throw new Error(lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
         }
         
         if (!newPassword || newPassword.length < 6) {
-            throw new Error(Utils.lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+            throw new Error(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
         }
         
+        // 优先使用 Edge Function
+        let edgeSuccess = false;
         try {
             const { data, error } = await supabaseClient.functions.invoke('reset-user-password', {
                 body: { 
@@ -425,31 +478,29 @@ const AUTH = {
             });
             
             if (error) {
-                console.warn('Edge Function 不可用，尝试直接重置:', error.message);
-                
-                const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
-                    userId,
-                    { password: newPassword }
-                );
-                
-                if (updateError) {
-                    throw updateError;
-                }
+                console.warn('Edge Function 调用失败:', error.message);
+            } else {
+                edgeSuccess = true;
+                console.log('✅ Edge Function 已重置密码');
             }
-            
-            // 审计：重置密码
-            if (window.Audit) {
-                await window.Audit.logPasswordReset(userId, this.user?.id);
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('重置密码失败:', error);
-            throw new Error(Utils.lang === 'id' 
-                ? 'Gagal mereset password. Fungsi ini memerlukan Service Role Key pada Supabase.'
-                : '重置密码失败，需要配置 Supabase Service Role Key。'
-            );
+        } catch (e) {
+            console.warn('Edge Function 未部署:', e.message);
         }
+        
+        // 如果 Edge Function 不可用，给出明确提示
+        if (!edgeSuccess) {
+            const errorMsg = lang === 'id'
+                ? '❌ Fungsi reset password tidak tersedia. Hubungi administrator untuk mengaktifkan Edge Function atau lakukan reset manual di Supabase Dashboard.'
+                : '❌ 密码重置功能不可用。请联系管理员部署 Edge Function，或在 Supabase 后台手动重置密码。';
+            throw new Error(errorMsg);
+        }
+        
+        // 审计：重置密码
+        if (window.Audit) {
+            await window.Audit.logPasswordReset(userId, this.user?.id);
+        }
+        
+        return true;
     },
 
     getCurrentUserId()    { return this.user?.id || null; },
