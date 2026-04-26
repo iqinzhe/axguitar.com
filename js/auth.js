@@ -1,4 +1,4 @@
-// auth.js - v1.1（审计日志集成）
+// auth.js - v1.2（新增：记住我、网络状态监听）
 
 const AUTH = {
     user: null,
@@ -94,7 +94,77 @@ const AUTH = {
         sessionStorage.removeItem('jf_locked_until');
     },
 
+    // ==================== 记住我功能 ====================
+    _rememberMeKey: 'jf_remember_me',
+
+    isRememberMe: function() {
+        return localStorage.getItem(this._rememberMeKey) === 'true';
+    },
+
+    setRememberMe: function(remember) {
+        if (remember) {
+            localStorage.setItem(this._rememberMeKey, 'true');
+        } else {
+            localStorage.removeItem(this._rememberMeKey);
+        }
+    },
+
+    // ==================== 网络状态监听 ====================
+    _networkListenerInitialized: false,
+
+    _initNetworkListener: function() {
+        if (this._networkListenerInitialized) return;
+        this._networkListenerInitialized = true;
+        
+        var showOfflineBanner = function() {
+            var existing = document.getElementById('offlineBanner');
+            if (existing) return;
+            
+            var banner = document.createElement('div');
+            banner.id = 'offlineBanner';
+            banner.className = 'info-bar danger';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;border-radius:0;margin:0;text-align:center;justify-content:center;';
+            banner.innerHTML = '<span class="info-bar-icon">📡</span><div class="info-bar-content"><strong>' + 
+                (Utils.lang === 'id' ? 'Koneksi Terputus' : '网络连接已断开') + 
+                '</strong> — ' + 
+                (Utils.lang === 'id' ? 'Data mungkin tidak tersimpan.' : '数据可能无法保存。') + 
+                '</div>';
+            document.body.insertBefore(banner, document.body.firstChild);
+        };
+        
+        var hideOfflineBanner = function() {
+            var banner = document.getElementById('offlineBanner');
+            if (banner) banner.remove();
+        };
+        
+        var showOnlineToast = function() {
+            var toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 20px;border-radius:20px;z-index:10001;font-size:14px;transition:opacity 0.5s;';
+            toast.textContent = Utils.lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复';
+            document.body.appendChild(toast);
+            setTimeout(function() { 
+                toast.style.opacity = '0'; 
+                setTimeout(function() { toast.remove(); }, 500); 
+            }, 2000);
+        };
+        
+        window.addEventListener('offline', showOfflineBanner);
+        window.addEventListener('online', function() {
+            hideOfflineBanner();
+            showOnlineToast();
+        });
+        
+        // 初始检查
+        if (!navigator.onLine) {
+            showOfflineBanner();
+        }
+    },
+
+    // ==================== 初始化 ====================
     async init() {
+        // 初始化网络监听
+        this._initNetworkListener();
+
         try {
             await this.loadCurrentUser();
         } catch (e) {
@@ -161,7 +231,6 @@ const AUTH = {
                     this._recordLoginFailure(usernameOrEmail);
                     const lang = Utils.lang;
                     alert(lang === 'id' ? 'Username atau password salah' : '用户名或密码错误');
-                    // 审计：登录失败
                     if (window.Audit) {
                         await window.Audit.logLoginFailure(usernameOrEmail, 'username_not_found');
                     }
@@ -176,7 +245,6 @@ const AUTH = {
                 this._recordLoginFailure(usernameOrEmail);
                 const lang = Utils.lang;
                 alert(lang === 'id' ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
-                // 审计：登录失败
                 if (window.Audit) {
                     await window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials');
                 }
