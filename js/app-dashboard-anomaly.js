@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.2（移除内联样式，使用组件库）
+// app-dashboard-anomaly.js - v1.3（业绩排行：排除总部 + 排除暂停营业门店）
 
 window.APP = window.APP || {};
 
@@ -73,13 +73,25 @@ const DashboardAnomaly = {
             var overdueOrders = overdueResult;
             var blacklist = blacklistResult;
             
-            // 基于已有数据计算门店业绩
+            // ========== 基于已有数据计算门店业绩 ==========
+            // 1. 建立门店映射表（id → 门店信息）
+            var storeInfoMap = {};
+            for (var i = 0; i < stores.length; i++) {
+                storeInfoMap[stores[i].id] = {
+                    name: stores[i].name,
+                    code: stores[i].code,
+                    isActive: stores[i].is_active !== false   // 默认营业中
+                };
+            }
+            
+            // 2. 统计各门店订单数
             var storeOrderCount = {};
             for (var i = 0; i < stores.length; i++) {
-                storeOrderCount[stores[i].id] = { 
-                    name: stores[i].name, 
-                    code: stores[i].code, 
-                    count: 0 
+                storeOrderCount[stores[i].id] = {
+                    name: stores[i].name,
+                    code: stores[i].code,
+                    isActive: storeInfoMap[stores[i].id].isActive,
+                    count: 0
                 };
             }
             for (var i = 0; i < orders.length; i++) {
@@ -88,6 +100,7 @@ const DashboardAnomaly = {
                 }
             }
             
+            // 3. 构建数组并排序
             var storeArray = [];
             for (var key in storeOrderCount) {
                 if (storeOrderCount.hasOwnProperty(key)) {
@@ -95,10 +108,23 @@ const DashboardAnomaly = {
                 }
             }
             storeArray.sort(function(a, b) { return b.count - a.count; });
+            
+            // 4. 全部门店排行（用于"门店业绩排行"卡片）
             var allStoreRanking = storeArray;
             
-            var lowest = storeArray.slice().sort(function(a, b) { return a.count - b.count; });
-            var lowestStores = lowest.slice(0, Math.min(3, lowest.length));
+            // 5. 最低业绩：排除总部(STORE_000) + 排除暂停营业 + 只取订单数最小的3个
+            var eligibleForLowest = [];
+            for (var i = 0; i < storeArray.length; i++) {
+                var s = storeArray[i];
+                // 排除总部
+                if (s.code === 'STORE_000') continue;
+                // 排除暂停营业
+                if (!s.isActive) continue;
+                eligibleForLowest.push(s);
+            }
+            // 按订单数升序排列
+            eligibleForLowest.sort(function(a, b) { return a.count - b.count; });
+            var lowestStores = eligibleForLowest.slice(0, Math.min(3, eligibleForLowest.length));
             
             // ========== 渲染：逾期30天订单 ==========
             var overdueTableHtml = '';
@@ -178,7 +204,7 @@ const DashboardAnomaly = {
                 lowestStoresHtml = '' +
                     '<div class="empty-state">' +
                         '<div class="empty-state-icon">📊</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko' : '暂无门店数据') + '</div>' +
+                        '<div class="empty-state-text">' + (lang === 'id' ? 'Semua toko memiliki pesanan' : '所有门店均有订单') + '</div>' +
                     '</div>';
             } else {
                 var storeItems = '';
@@ -265,7 +291,7 @@ const DashboardAnomaly = {
                         '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
                     '</div>' +
                     
-                    // 卡片3：最低业绩门店
+                    // 卡片3：最低业绩门店（已排除总部和暂停营业门店）
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">📉</span>' +
@@ -274,7 +300,7 @@ const DashboardAnomaly = {
                         '</div>' +
                         '<div class="anomaly-card-body">' + lowestStoresHtml + '</div>' +
                         '<div class="anomaly-card-footer">' +
-                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Paling sedikit pesanan' : '订单数最少') + '</span>' +
+                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Tidak termasuk kantor pusat dan toko yang ditutup' : '不含总部及已暂停门店') + '</span>' +
                         '</div>' +
                     '</div>' +
                     
