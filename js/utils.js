@@ -1,4 +1,4 @@
-// utils.js - v2.2（翻译表同步更新：角色管理）
+// utils.js - v2.3（新增 pay_interest / return_principal 翻译键）
 
 const Utils = {
     lang: 'id',
@@ -259,6 +259,7 @@ const Utils = {
             login_required: "Silakan login kembali",
             invalid_amount: "Jumlah tidak valid",
             payment_success: "Pembayaran berhasil",
+            pay_interest: "Bayar Bunga",
             order_completed: "Pesanan sudah lunas",
             customer_has_active_order: "Nasabah ini masih memiliki pesanan aktif.",
             blacklisted_cannot_order: "❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.",
@@ -276,6 +277,7 @@ const Utils = {
             monthly_installment: "Angsuran Bulanan",
             term_period: "Jangka Waktu",
             rounded_to: "Dibulatkan ke Rp 10.000",
+            return_principal: "Kembalikan Pokok",
             manual_adjust: "Dapat disesuaikan manual",
             more_pawn_higher_fee: "Semakin besar gadai, semakin tinggi biaya. Semakin lama jangka, semakin tinggi biaya.",
             contract_pay_info: "Tanda tangan kontrak: Admin Fee & Service Fee. Bunga dibayar sesuai kesepakatan.",
@@ -420,6 +422,7 @@ const Utils = {
             login_required: "请重新登录",
             invalid_amount: "金额无效",
             payment_success: "支付成功",
+            pay_interest: "缴纳利息",
             order_completed: "订单已结清",
             customer_has_active_order: "该客户还有未结清的订单。",
             blacklisted_cannot_order: "❌ 此客户已被拉黑，无法创建新订单。",
@@ -437,6 +440,7 @@ const Utils = {
             monthly_installment: "每月还款",
             term_period: "还款期限",
             rounded_to: "取整到 Rp 10,000",
+            return_principal: "返还本金",
             manual_adjust: "可手动调整",
             more_pawn_higher_fee: "当金越多，费用越贵，当期越长，费用越贵",
             contract_pay_info: "签合同支付：管理费和服务费。利息按约定支付。",
