@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.6（移除内联样式，使用组件库）
+// app-dashboard-core.js - v2.7（修复文本重复显示）
 
 window.APP = window.APP || {};
 
@@ -636,7 +636,7 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // ========== 底部信息 ==========
+            // ========== 修复：底部信息（去除重复文本） ==========
             var userRoleText = AUTH.user.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
@@ -645,16 +645,16 @@ const DashboardCore = {
             if (isAdmin) {
                 bottomHtml = '' +
                 '<div class="card dashboard-footer-card">' +
-                    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(AUTH.user.name) + ' (' + userRoleText + ')</h3>' +
-                    '<p>📍 ' + t('store') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
+                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(AUTH.user.name) + ' (' + userRoleText + ')</p>' +
+                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
                     '<p>📌 ' + t('more_pawn_higher_fee') + '</p>' +
                     '<p>🔒 ' + t('order_saved_locked') + '</p>' +
                 '</div>';
             } else {
                 bottomHtml = '' +
                 '<div class="card dashboard-footer-card">' +
-                    '<h3>🏪 ' + t('current_user') + ': ' + Utils.escapeHtml(storeName) + ' (' + userRoleText + ')</h3>' +
-                    '<p>📍 ' + t('store') + ': ' + Utils.escapeHtml(storeName) + '</p>' +
+                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(storeName) + ' (' + userRoleText + ')</p>' +
+                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + Utils.escapeHtml(storeName) + '</p>' +
                     '<p>📌 ' + t('contract_pay_info') + '</p>' +
                     '<p>🔒 ' + t('order_saved_locked') + ' ' + t('more_pawn_higher_fee') + '</p>' +
                 '</div>';
@@ -727,8 +727,7 @@ const DashboardCore = {
             total_service_fees: totalServiceFees,
             total_interest: totalInterest,
             total_principal: totalPrincipal,
-            expected_monthly_interest: expectedMonthlyInterest
-        };
+            expected_monthly_interest: expectedMonthlyInterest        };
     },
     
     _calculateCashFlowSummary: function(allFlows, isAdmin, storeId, storeSpecificCashFlows) {
