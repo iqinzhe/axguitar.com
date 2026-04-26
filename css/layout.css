@@ -2,6 +2,7 @@
    layout.css - 第4层：页面级布局模式
    职责：卡片、页面头部、资金管理、仪表盘、登录、模态框、工具栏、
          表单网格、三卡片、客户摘要
+   升级：资金区块渐变背景 + 彩色左边框
    ============================================================ */
 
 /* ============================================================
@@ -256,14 +257,15 @@ button.warning.highlight {
 
 
 /* ============================================================
-   L4. 资金管理区块（仪表盘专属）
+   L4. 资金管理区块（仪表盘专属）—— 视觉增强
    ============================================================ */
 .cashflow-summary {
-    background: var(--bg-card);
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
     border-radius: var(--radius-xl);
     padding: var(--spacing-3) var(--spacing-4);
     margin-bottom: var(--spacing-4);
-    border: 1px solid var(--border-medium);
+    border: 2px solid #bae6fd;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08);
 }
 
 .cashflow-summary h3 {
@@ -281,11 +283,27 @@ button.warning.highlight {
 }
 
 .cashflow-item {
-    background: var(--bg-hover);
+    background: var(--bg-card);
     border-radius: var(--radius-lg);
     padding: var(--spacing-2) var(--spacing-3);
     border: 1px solid var(--border-light);
     text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* 现金卡片加黄色左边框 */
+.cashflow-item:nth-child(1) {
+    border-left: 4px solid var(--warning);
+}
+
+/* 银行卡片加蓝色左边框 */
+.cashflow-item:nth-child(2) {
+    border-left: 4px solid var(--primary);
+}
+
+/* 转账卡片加绿色左边框 */
+.cashflow-item:nth-child(3) {
+    border-left: 4px solid var(--success);
 }
 
 .cashflow-item .label {
