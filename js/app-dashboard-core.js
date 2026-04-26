@@ -1,31 +1,19 @@
-// app-dashboard-core.js - v3.2（修复：模块降级提示 + 初始化错误双语化 + 网络离线保护）
+// app-dashboard-core.js - v3.3（修复：getDashboardStats 查询冲突 + 缓存优化）
 
 window.APP = window.APP || {};
 
 // ==================== 模块降级通知 ====================
 const ModuleFallback = {
-    // 记录已降级的模块，避免重复提示
     _degradedModules: {},
     
-    /**
-     * 安全调用模块方法，失败时显示友好降级提示
-     * @param {string} moduleName - 模块名（用于提示）
-     * @param {Function} fn - 实际调用的函数
-     * @param {Array}  args - 调用参数
-     * @param {*}      fallbackValue - 降级返回值
-     * @returns {Promise<*>}
-     */
     async safeCall(moduleName, fn, args, fallbackValue) {
         try {
-            if (typeof fn !== 'function') {
-                throw new Error('module_not_loaded');
-            }
+            if (typeof fn !== 'function') throw new Error('module_not_loaded');
             return await fn.apply(null, args || []);
         } catch (error) {
             var lang = Utils.lang;
             var moduleKey = moduleName + '_' + (error.message || 'unknown');
             
-            // 避免同一模块重复弹窗
             if (!this._degradedModules[moduleKey]) {
                 this._degradedModules[moduleKey] = true;
                 
@@ -40,16 +28,10 @@ const ModuleFallback = {
                         : '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message + '\n\n请刷新页面后重试。';
                 }
                 
-                // 使用非阻塞方式提示
-                setTimeout(function() {
-                    alert(msg);
-                }, 300);
-                
-                // 同时在上方显示横幅
+                setTimeout(function() { alert(msg); }, 300);
                 ModuleFallback._showBanner(moduleName, error.message);
             }
             
-            // 10分钟后清除降级记录，允许重新尝试
             setTimeout(function() {
                 delete ModuleFallback._degradedModules[moduleKey];
             }, 10 * 60 * 1000);
@@ -58,13 +40,9 @@ const ModuleFallback = {
         }
     },
     
-    /**
-     * 在页面顶部显示降级横幅
-     */
     _showBanner(moduleName, errorMsg) {
         var existingBanner = document.getElementById('moduleFallbackBanner');
         if (existingBanner) {
-            // 追加模块名
             var content = existingBanner.querySelector('.info-bar-content');
             if (content && content.textContent.indexOf(moduleName) === -1) {
                 content.textContent += ' | ' + moduleName;
@@ -93,9 +71,6 @@ const ModuleFallback = {
         }
     },
     
-    /**
-     * 清除所有降级记录
-     */
     clearAll() {
         this._degradedModules = {};
         var banner = document.getElementById('moduleFallbackBanner');
@@ -108,11 +83,9 @@ window.ModuleFallback = ModuleFallback;
 // ==================== 仪表盘缓存模块 ====================
 const DashboardCache = {
     data: new Map(),
-    ttl: 5 * 60 * 1000,  // 5分钟缓存
+    ttl: 5 * 60 * 1000,
     
-    getKey(...parts) {
-        return parts.join(':');
-    },
+    getKey(...parts) { return parts.join(':'); },
     
     async get(key, fetcher, forceRefresh = false) {
         if (!forceRefresh) {
@@ -128,9 +101,8 @@ const DashboardCache = {
             this.data.set(key, { value, time: Date.now() });
             return value;
         } catch (error) {
-            // 如果有过期缓存，网络失败时返回过期缓存
             const staleCached = this.data.get(key);
-            if (staleCached && (error.message || '').indexOf('network') === -1) {
+            if (staleCached) {
                 console.warn(`[Cache] 使用过期缓存: ${key}`, error.message);
                 return staleCached.value;
             }
@@ -146,26 +118,67 @@ const DashboardCache = {
             this.data.clear();
             console.log(`[Cache] Cleared all`);
         }
-    },
-    
-    invalidateMany(keys) {
-        for (const key of keys) {
-            this.data.delete(key);
-        }
-        console.log(`[Cache] Invalidated: ${keys.join(', ')}`);
     }
 };
 
 // ==================== 聚合查询辅助方法 ====================
 const DashboardStatsHelper = {
+    /**
+     * 修复：每个查询使用独立的 QueryBuilder，避免共享状态冲突
+     */
     async getDashboardStats(profile) {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
-        let baseQuery = supabaseClient.from('orders');
-        if (!isAdmin && storeId) {
-            baseQuery = baseQuery.eq('store_id', storeId);
-        }
+        // 构建基础过滤条件
+        const buildFilteredQuery = () => {
+            let query = supabaseClient.from('orders').select('*');
+            if (!isAdmin && storeId) {
+                query = query.eq('store_id', storeId);
+            }
+            return query;
+        };
+        
+        // 每个 Promise 使用独立的查询链
+        const totalCountPromise = (() => {
+            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            return q;
+        })();
+        
+        const activeCountPromise = (() => {
+            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            q = q.eq('status', 'active');
+            return q;
+        })();
+        
+        const completedCountPromise = (() => {
+            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            q = q.eq('status', 'completed');
+            return q;
+        })();
+        
+        const overdueCountPromise = (() => {
+            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            q = q.eq('status', 'active').gte('overdue_days', 1);
+            return q;
+        })();
+        
+        const activeOrdersPromise = (() => {
+            let q = supabaseClient.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount');
+            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            q = q.eq('status', 'active');
+            return q;
+        })();
+        
+        const allOrdersLoanPromise = (() => {
+            let q = supabaseClient.from('orders').select('loan_amount');
+            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            return q;
+        })();
         
         const [
             totalCountResult,
@@ -175,12 +188,12 @@ const DashboardStatsHelper = {
             activeOrdersData,
             loanSumData
         ] = await Promise.all([
-            baseQuery.select('*', { count: 'exact', head: true }),
-            baseQuery.eq('status', 'active').select('*', { count: 'exact', head: true }),
-            baseQuery.eq('status', 'completed').select('*', { count: 'exact', head: true }),
-            baseQuery.eq('status', 'active').gte('overdue_days', 1).select('*', { count: 'exact', head: true }),
-            baseQuery.eq('status', 'active').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount'),
-            baseQuery.select('loan_amount')
+            totalCountPromise,
+            activeCountPromise,
+            completedCountPromise,
+            overdueCountPromise,
+            activeOrdersPromise,
+            allOrdersLoanPromise
         ]);
         
         let totalAdminFees = 0;
@@ -222,14 +235,15 @@ const DashboardStatsHelper = {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
-        let query = supabaseClient.from('orders');
-        if (!isAdmin && storeId) {
-            query = query.eq('store_id', storeId);
-        }
+        let overdueQuery = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+        if (!isAdmin && storeId) overdueQuery = overdueQuery.eq('store_id', storeId);
+        overdueQuery = overdueQuery.eq('status', 'active').gte('overdue_days', 30);
+        
+        let blacklistQuery = supabaseClient.from('blacklist').select('*', { count: 'exact', head: true });
         
         const [overdue30Result, blacklistResult] = await Promise.all([
-            query.eq('status', 'active').gte('overdue_days', 30).select('*', { count: 'exact', head: true }),
-            supabaseClient.from('blacklist').select('*', { count: 'exact', head: true })
+            overdueQuery,
+            blacklistQuery
         ]);
         
         return {
@@ -310,12 +324,9 @@ const DashboardStatsHelper = {
         }
         
         let eligibleStores = Object.values(storeStats);
-        
         if (eligibleStores.length === 0) return { top3: [], bottom3: [] };
         
-        for (const s of eligibleStores) {
-            s.rankSum = 0;
-        }
+        for (const s of eligibleStores) s.rankSum = 0;
         
         eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
         for (let i = 0; i < eligibleStores.length; i++) {
@@ -343,10 +354,10 @@ const DashboardStatsHelper = {
         
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
         
-        const top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
-        const bottom3 = eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse();
-        
-        return { top3, bottom3 };
+        return {
+            top3: eligibleStores.slice(0, Math.min(3, eligibleStores.length)),
+            bottom3: eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse()
+        };
     }
 };
 
@@ -358,32 +369,38 @@ const DashboardCore = {
     currentCustomerId: null,
 
     saveCurrentPageState: function() {
-        sessionStorage.setItem('jf_current_page', this.currentPage);
-        sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
+        try {
+            sessionStorage.setItem('jf_current_page', this.currentPage || '');
+            sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
+        } catch(e) {
+            // sessionStorage 不可用时静默失败
+        }
     },
     
     restorePageState: function() {
-        return {
-            page: sessionStorage.getItem('jf_current_page'),
-            filter: sessionStorage.getItem('jf_current_filter') || "all"
-        };
+        try {
+            return {
+                page: sessionStorage.getItem('jf_current_page'),
+                filter: sessionStorage.getItem('jf_current_filter') || "all"
+            };
+        } catch(e) {
+            return { page: null, filter: "all" };
+        }
     },
     
     clearPageState: function() {
-        sessionStorage.removeItem('jf_current_page');
-        sessionStorage.removeItem('jf_current_filter');
+        try {
+            sessionStorage.removeItem('jf_current_page');
+            sessionStorage.removeItem('jf_current_filter');
+        } catch(e) {}
         this.currentOrderId = null;
         this.currentCustomerId = null;
     },
 
-    /** ========== 修复：初始化错误双语化 ========== */
     init: async function() {
         var lang = Utils.lang || 'zh';
         
-        // 初始化全局错误处理
         Utils.ErrorHandler.init();
-        
-        // 清除旧的降级横幅
         ModuleFallback.clearAll();
         
         document.getElementById("app").innerHTML = '' +
@@ -397,7 +414,6 @@ const DashboardCore = {
         try {
             await AUTH.init();
             
-            // ========== 初始化超时处理（双语） ==========
             var initTimeout = setTimeout(function() {
                 var currentLang = Utils.lang || 'zh';
                 var timeoutDiv = document.getElementById('initTimeout');
@@ -460,7 +476,6 @@ const DashboardCore = {
         else await this.renderDashboard();
     },
 
-    /** ========== 修复：模块降级时友好提示 ========== */
     refreshCurrentPage: async function() {
         var self = this;
         
@@ -474,7 +489,6 @@ const DashboardCore = {
         
         await new Promise(function(resolve) { setTimeout(resolve, 100); });
         
-        // ========== 使用 ModuleFallback 安全调用各模块 ==========
         var handlers = {
             dashboard: async () => {
                 try {
@@ -504,7 +518,12 @@ const DashboardCore = {
             },
             anomaly: () => ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], self.renderDashboard()),
             userManagement: () => ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], self.renderDashboard()),
-            storeManagement: () => ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], self.renderDashboard()),
+            storeManagement: () => {
+                if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') {
+                    return ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], self.renderDashboard());
+                }
+                return self.renderDashboard();
+            },
             expenses: () => ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], self.renderDashboard()),
             customers: () => ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], self.renderDashboard()),
             paymentHistory: async () => {
@@ -516,7 +535,12 @@ const DashboardCore = {
                 }
                 return await self.renderDashboard();
             },
-            backupRestore: () => ModuleFallback.safeCall('Cadangan', Storage.renderBackupUI, [], self.renderDashboard()),
+            backupRestore: () => {
+                if (typeof Storage !== 'undefined' && typeof Storage.renderBackupUI === 'function') {
+                    return ModuleFallback.safeCall('Cadangan', Storage.renderBackupUI, [], self.renderDashboard());
+                }
+                return self.renderDashboard();
+            },
             customerOrders: async () => { 
                 if (self.currentCustomerId && typeof window.APP.showCustomerOrders === 'function') {
                     return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], self.renderDashboard());
@@ -537,7 +561,6 @@ const DashboardCore = {
         else await self.renderDashboard();
     },
 
-    /** ========== navigateTo 同样使用 ModuleFallback ========== */
     navigateTo: function(page, params) {
         window.scrollTo(0, 0);
         
@@ -562,10 +585,16 @@ const DashboardCore = {
             'dashboard':        { fn: self.renderDashboard,            name: 'Dashboard', isCore: true },
             'anomaly':          { fn: window.APP.showAnomaly,          name: 'Situasi Abnormal' },
             'userManagement':   { fn: window.APP.showUserManagement,   name: 'Manajemen Peran' },
-            'storeManagement':  { fn: StoreManager.renderStoreManagement, name: 'Manajemen Toko' },
+            'storeManagement':  { 
+                fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
+                name: 'Manajemen Toko' 
+            },
             'expenses':         { fn: window.APP.showExpenses,         name: 'Pengeluaran' },
             'customers':        { fn: window.APP.showCustomers,        name: 'Nasabah' },
-            'backupRestore':    { fn: Storage.renderBackupUI,          name: 'Cadangan' },
+            'backupRestore':    { 
+                fn: typeof Storage !== 'undefined' ? Storage.renderBackupUI : null, 
+                name: 'Cadangan' 
+            },
             'blacklist':        { fn: window.APP.showBlacklist,        name: 'Daftar Hitam' }
         };
         
@@ -581,7 +610,6 @@ const DashboardCore = {
             return;
         }
         
-        // 特殊页面（带参数）
         var specialHandlers = {
             'paymentHistory': function() {
                 var fn = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
@@ -590,14 +618,14 @@ const DashboardCore = {
                 });
             },
             'customerOrders': function() {
-                if (params.customerId) {
+                if (params.customerId && typeof window.APP.showCustomerOrders === 'function') {
                     ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [params.customerId], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
                 } else self.renderDashboard();
             },
             'customerPaymentHistory': function() {
-                if (params.customerId) {
+                if (params.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
                     ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [params.customerId], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
@@ -642,10 +670,16 @@ const DashboardCore = {
                 'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
                 'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
                 'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
-                'storeManagement':{ fn: StoreManager.renderStoreManagement, name: 'Manajemen Toko' },
+                'storeManagement':{ 
+                    fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
+                    name: 'Manajemen Toko' 
+                },
                 'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
                 'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
-                'backupRestore': { fn: Storage.renderBackupUI,        name: 'Cadangan' },
+                'backupRestore': { 
+                    fn: typeof Storage !== 'undefined' ? Storage.renderBackupUI : null, 
+                    name: 'Cadangan' 
+                },
                 'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
             };
             
@@ -665,7 +699,6 @@ const DashboardCore = {
                 return;
             }
             
-            // paymentHistory / customerOrders / customerPaymentHistory
             switch(prev.page) {
                 case 'paymentHistory':
                     var fnPH = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
@@ -681,14 +714,14 @@ const DashboardCore = {
                     } else self.renderDashboard();
                     break;
                 case 'customerOrders':
-                    if (prev.customerId) {
+                    if (prev.customerId && typeof window.APP.showCustomerOrders === 'function') {
                         ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [prev.customerId], null).then(function(r) {
                             if (r === null) self.renderDashboard();
                         });
                     } else self.renderDashboard();
                     break;
                 case 'customerPaymentHistory':
-                    if (prev.customerId) {
+                    if (prev.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
                         ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [prev.customerId], null).then(function(r) {
                             if (r === null) self.renderDashboard();
                         });
@@ -702,7 +735,7 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 登录页（保持原有代码） ====================
+    // ==================== 登录页 ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
@@ -802,7 +835,6 @@ const DashboardCore = {
 
     logout: async function() {
         var confirmMsg = Utils.t('save_exit_confirm');
-        
         if (!confirm(confirmMsg)) return;
         
         this.clearPageState();
@@ -818,7 +850,7 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    // ==================== 仪表盘（保持原有代码，含 renderDashboard） ====================
+    // ==================== 仪表盘 ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -832,39 +864,33 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
+            // 使用修复后的 getDashboardStats
             const cacheKey = DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId);
             const report = await DashboardCache.get(cacheKey, 
                 () => DashboardStatsHelper.getDashboardStats(profile)
             );
             
+            // 现金流汇总
             const cashFlowCacheKey = DashboardCache.getKey('cashflow', isAdmin ? 'admin' : storeId);
             const cashFlow = await DashboardCache.get(cashFlowCacheKey,
                 async () => {
                     const allCashFlows = await SUPABASE.getCashFlowRecords();
-                    const storeSpecificCashFlows = !isAdmin && storeId 
-                        ? await supabaseClient
-                            .from('cash_flow_records')
-                            .select('direction, amount, source_target, flow_type')
-                            .eq('store_id', storeId)
-                            .eq('is_voided', false)
-                            .then(res => res.data || [])
-                        : [];
-                    return this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId, storeSpecificCashFlows);
+                    return this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId);
                 }
             );
             
+            // 总支出
             const expensesCacheKey = DashboardCache.getKey('expenses', isAdmin ? 'admin' : storeId);
             const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
                 let query = supabaseClient.from('expenses').select('amount');
-                if (!isAdmin && storeId) {
-                    query = query.eq('store_id', storeId);
-                }
+                if (!isAdmin && storeId) query = query.eq('store_id', storeId);
                 const { data } = await query;
                 let sum = 0;
                 for (const ex of (data || [])) sum += (ex.amount || 0);
                 return sum;
             });
             
+            // 本月订单数
             const today = new Date();
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
@@ -879,6 +905,7 @@ const DashboardCore = {
                 return count || 0;
             });
             
+            // 提醒相关
             const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             const hasReminders = needRemindOrders.length > 0;
             let hasSentToday = false;
@@ -893,23 +920,12 @@ const DashboardCore = {
             const overdueOrdersCount = report.overdue_orders || 0;
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
             
+            // 计算赤字
             const flowsForDeficit = await DashboardCache.get(DashboardCache.getKey('flows_for_deficit', isAdmin ? 'admin' : storeId), async () => {
-                let flows;
-                if (!isAdmin && storeId) {
-                    const { data } = await supabaseClient
-                        .from('cash_flow_records')
-                        .select('direction, amount, flow_type')
-                        .eq('store_id', storeId)
-                        .eq('is_voided', false);
-                    flows = data || [];
-                } else {
-                    const { data } = await supabaseClient
-                        .from('cash_flow_records')
-                        .select('direction, amount, flow_type')
-                        .eq('is_voided', false);
-                    flows = data || [];
-                }
-                return flows;
+                let q = supabaseClient.from('cash_flow_records').select('direction, amount, flow_type').eq('is_voided', false);
+                if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                const { data } = await q;
+                return data || [];
             });
             
             let totalInflowExcludingPrincipal = 0;
@@ -1043,7 +1059,7 @@ const DashboardCore = {
                 '</div>';
             }
             
-            var userRoleText = AUTH.user.role === 'admin' 
+            var userRoleText = AUTH.user?.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
             var storeName = AUTH.getCurrentStoreName();
@@ -1052,7 +1068,7 @@ const DashboardCore = {
             if (isAdmin) {
                 bottomHtml = '' +
                 '<div class="card dashboard-footer-card">' +
-                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(AUTH.user.name) + ' (' + userRoleText + ')</p>' +
+                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(AUTH.user?.name || '') + ' (' + userRoleText + ')</p>' +
                     '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
                     '<p>📌 ' + t('more_pawn_higher_fee') + '</p>' +
                     '<p>🔒 ' + t('order_saved_locked') + '</p>' +
@@ -1077,6 +1093,7 @@ const DashboardCore = {
                     '</div>' +
                     '<div class="header-actions">' +
                         backButtonHtml +
+                        '<button onclick="APP.toggleLanguage()" class="lang-btn" style="margin-left:8px;">🌐 ' + (lang === 'id' ? '中文' : 'Bahasa Indonesia') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div style="margin:0 0 12px 0;">' +
@@ -1094,66 +1111,19 @@ const DashboardCore = {
             console.error("renderDashboard error:", err);
             Utils.ErrorHandler.capture(err, 'renderDashboard');
             document.getElementById("app").innerHTML = '' +
-                '<div class="card">' +
-                    '<p>⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '加载仪表盘失败: ' + err.message) + '</p>' +
+                '<div class="card" style="padding:40px;text-align:center;">' +
+                    '<p style="margin-bottom:16px;">⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '加载仪表盘失败: ' + err.message) + '</p>' +
                     '<button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button>' +
                     '<button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
                 '</div>';
         }
     },
 
-    _calculateReport: function(orders) {
-        var totalLoanAmount = 0;
-        var totalAdminFees = 0;
-        var totalServiceFees = 0;
-        var totalInterest = 0;
-        var totalPrincipal = 0;
-        var activeCount = 0;
-        var completedCount = 0;
-        var expectedMonthlyInterest = 0;
-        
-        for (var i = 0; i < orders.length; i++) {
-            var o = orders[i];
-            totalLoanAmount += (o.loan_amount || 0);
-            
-            if (o.admin_fee_paid) totalAdminFees += (o.admin_fee || 0);
-            totalServiceFees += (o.service_fee_paid || 0);
-            totalInterest += (o.interest_paid_total || 0);
-            totalPrincipal += (o.principal_paid || 0);
-            
-            if (o.status === 'active') {
-                activeCount++;
-                var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                var rate = o.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
-                expectedMonthlyInterest += remainingPrincipal * rate;
-            } else if (o.status === 'completed') {
-                completedCount++;
-            }
-        }
-        
-        return {
-            total_orders: orders.length,
-            active_orders: activeCount,
-            completed_orders: completedCount,
-            total_loan_amount: totalLoanAmount,
-            total_admin_fees: totalAdminFees,
-            total_service_fees: totalServiceFees,
-            total_interest: totalInterest,
-            total_principal: totalPrincipal,
-            expected_monthly_interest: expectedMonthlyInterest
-        };
-    },
-    
-    _calculateCashFlowSummary: function(allFlows, isAdmin, storeId, storeSpecificCashFlows) {
+    _calculateCashFlowSummary: function(allFlows, isAdmin, storeId) {
         var cashInflow = 0, cashOutflow = 0;
         var bankInflow = 0, bankOutflow = 0;
         
-        var flowsToUse = [];
-        if (!isAdmin && storeSpecificCashFlows && Array.isArray(storeSpecificCashFlows)) {
-            flowsToUse = storeSpecificCashFlows;
-        } else if (allFlows && Array.isArray(allFlows)) {
-            flowsToUse = allFlows;
-        }
+        var flowsToUse = allFlows || [];
         
         for (var i = 0; i < flowsToUse.length; i++) {
             var flow = flowsToUse[i];
@@ -1194,25 +1164,29 @@ const DashboardCore = {
         }
         
         try {
-            await StoreManager.createStore(name, address, phone);
-            alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
-            await StoreManager.renderStoreManagement();
+            if (typeof StoreManager !== 'undefined') {
+                await StoreManager.createStore(name, address, phone);
+                alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+                await StoreManager.renderStoreManagement();
+            }
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
         }
     },
     
     editStore: async function(storeId) { 
-        await StoreManager.editStore(storeId); 
+        if (typeof StoreManager !== 'undefined') await StoreManager.editStore(storeId); 
     },
     
     deleteStore: async function(storeId) {
         var lang = Utils.lang;
         if (!confirm(Utils.t('confirm_delete'))) return;
         try {
-            await StoreManager.deleteStore(storeId);
-            alert(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
-            await StoreManager.renderStoreManagement();
+            if (typeof StoreManager !== 'undefined') {
+                await StoreManager.deleteStore(storeId);
+                alert(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
+                await StoreManager.renderStoreManagement();
+            }
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
         }
@@ -1223,6 +1197,7 @@ const DashboardCore = {
     }
 };
 
+// 挂载方法到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' && 
         key !== 'showExpenses' && key !== 'showOrderTable' && key !== 'showReport' && 
@@ -1238,5 +1213,4 @@ window.APP.historyStack = DashboardCore.historyStack;
 window.APP.currentPage = DashboardCore.currentPage;
 window.APP.currentOrderId = DashboardCore.currentOrderId;
 window.APP.currentCustomerId = DashboardCore.currentCustomerId;
-
 window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
