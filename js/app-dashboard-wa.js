@@ -1,5 +1,9 @@
+// app-dashboard-wa.js - v1.1（印尼语 WA 提醒 - 手动发送 - 修复语法错误）
+
+window.APP = window.APP || {};
+
 // ========== WA 提醒模板（精简版：3个核心信息） ==========
-generateWAText: function(order, senderNumber) {
+window.APP.generateWAText = function(order, senderNumber) {
     var lang = Utils.lang;
     
     // 使用订单自己的利率
@@ -21,68 +25,50 @@ generateWAText: function(order, senderNumber) {
             var paidMonths = order.fixed_paid_months || 0;
             var totalMonths = order.repayment_term || '?';
             
-            return `🔔 *Pengingat Pembayaran - JF!*
-
-Kepada Bpk/Ibu ${order.customer_name},
-
-📋 ${order.order_id}
-💰 ${Utils.formatCurrency(monthlyFixedPayment)}
-📅 ${dueDate}
-
-Angsuran ke-${paidMonths + 1}/${totalMonths}
-
-Harap bayar tepat waktu. Terima kasih.
-
-- ${senderNumber || 'JF! by Gadai'}`;
+            return '🔔 *Pengingat Pembayaran - JF!*\n\n' +
+                'Kepada Bpk/Ibu ' + order.customer_name + ',\n\n' +
+                '📋 ' + order.order_id + '\n' +
+                '💰 ' + Utils.formatCurrency(monthlyFixedPayment) + '\n' +
+                '📅 ' + dueDate + '\n\n' +
+                'Angsuran ke-' + (paidMonths + 1) + '/' + totalMonths + '\n\n' +
+                'Harap bayar tepat waktu. Terima kasih.\n\n' +
+                '- ' + (senderNumber || 'JF! by Gadai');
         } else {
             // 灵活还款
-            return `🔔 *Pengingat Pembayaran - JF!*
-
-Kepada Bpk/Ibu ${order.customer_name},
-
-📋 ${order.order_id}
-💰 ${Utils.formatCurrency(currentMonthlyInterest)}
-📅 ${dueDate}
-
-Harap bayar tepat waktu. Terima kasih.
-
-- ${senderNumber || 'JF! by Gadai'}`;
+            return '🔔 *Pengingat Pembayaran - JF!*\n\n' +
+                'Kepada Bpk/Ibu ' + order.customer_name + ',\n\n' +
+                '📋 ' + order.order_id + '\n' +
+                '💰 ' + Utils.formatCurrency(currentMonthlyInterest) + '\n' +
+                '📅 ' + dueDate + '\n\n' +
+                'Harap bayar tepat waktu. Terima kasih.\n\n' +
+                '- ' + (senderNumber || 'JF! by Gadai');
         }
         
     } else {
         // ========== 中文 - 精简版 ==========
         
         if (repaymentType === 'fixed') {
-            var monthlyFixedPayment = order.monthly_fixed_payment || 0;
-            var paidMonths = order.fixed_paid_months || 0;
-            var totalMonths = order.repayment_term || '?';
+            var monthlyFixedPaymentZh = order.monthly_fixed_payment || 0;
+            var paidMonthsZh = order.fixed_paid_months || 0;
+            var totalMonthsZh = order.repayment_term || '?';
             
-            return `🔔 *缴费提醒 - JF!*
-
-尊敬的 ${order.customer_name}，
-
-📋 ${order.order_id}
-💰 ${Utils.formatCurrency(monthlyFixedPayment)}
-📅 ${dueDate}
-
-第${paidMonths + 1}/${totalMonths}期
-
-请按时缴费。感谢信任。
-
-- ${senderNumber || 'JF! by Gadai'}`;
+            return '🔔 *缴费提醒 - JF!*\n\n' +
+                '尊敬的 ' + order.customer_name + '，\n\n' +
+                '📋 ' + order.order_id + '\n' +
+                '💰 ' + Utils.formatCurrency(monthlyFixedPaymentZh) + '\n' +
+                '📅 ' + dueDate + '\n\n' +
+                '第' + (paidMonthsZh + 1) + '/' + totalMonthsZh + '期\n\n' +
+                '请按时缴费。感谢信任。\n\n' +
+                '- ' + (senderNumber || 'JF! by Gadai');
         } else {
             // 灵活还款
-            return `🔔 *缴费提醒 - JF!*
-
-尊敬的 ${order.customer_name}，
-
-📋 ${order.order_id}
-💰 ${Utils.formatCurrency(currentMonthlyInterest)}
-📅 ${dueDate}
-
-请按时缴费。感谢信任。
-
-- ${senderNumber || 'JF! by Gadai'}`;
+            return '🔔 *缴费提醒 - JF!*\n\n' +
+                '尊敬的 ' + order.customer_name + '，\n\n' +
+                '📋 ' + order.order_id + '\n' +
+                '💰 ' + Utils.formatCurrency(currentMonthlyInterest) + '\n' +
+                '📅 ' + dueDate + '\n\n' +
+                '请按时缴费。感谢信任。\n\n' +
+                '- ' + (senderNumber || 'JF! by Gadai');
         }
     }
-},
+};
