@@ -349,7 +349,7 @@
 .action-row .action-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-2);
+    gap: 10px;
     align-items: center;
 }
 
