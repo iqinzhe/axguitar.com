@@ -1,4 +1,4 @@
-// utils.js - v2.3（新增 pay_interest / return_principal 翻译键）
+// utils.js - v2.4（新增：ErrorHandler、骨架屏、密码切换、Toast）
 
 const Utils = {
     lang: 'id',
@@ -21,6 +21,184 @@ const Utils = {
         this.lang = (stored === 'id' || stored === 'zh') ? stored : 'id';
         if (!stored) localStorage.setItem('jf_language', 'id');
         return this.lang;
+    },
+
+    // ==================== 全局错误处理模块 ====================
+    ErrorHandler: {
+        _initialized: false,
+        
+        init: function() {
+            if (this._initialized) return;
+            this._initialized = true;
+            
+            var self = this;
+            
+            // 捕获未处理的错误
+            window.onerror = function(message, source, lineno, colno, error) {
+                self.log({
+                    type: 'uncaught_error',
+                    message: String(message),
+                    source: source,
+                    line: lineno,
+                    column: colno,
+                    stack: error ? error.stack : null,
+                    user: window.AUTH && window.AUTH.user ? window.AUTH.user.id : 'anonymous',
+                    page: window.APP ? window.APP.currentPage : 'unknown'
+                });
+                return false;
+            };
+            
+            // 捕获未处理的 Promise 拒绝
+            window.onunhandledrejection = function(event) {
+                self.log({
+                    type: 'unhandled_rejection',
+                    message: String(event.reason),
+                    stack: event.reason && event.reason.stack ? event.reason.stack : null,
+                    user: window.AUTH && window.AUTH.user ? window.AUTH.user.id : 'anonymous',
+                    page: window.APP ? window.APP.currentPage : 'unknown'
+                });
+            };
+            
+            console.log('✅ 全局错误处理已初始化');
+        },
+        
+        log: async function(errorData) {
+            try {
+                console.error('[ErrorHandler]', errorData.type, errorData.message);
+                
+                if (typeof supabaseClient !== 'undefined') {
+                    await supabaseClient.from('error_logs').insert({
+                        type: errorData.type,
+                        message: errorData.message,
+                        source: errorData.source || null,
+                        line: errorData.line || null,
+                        stack: errorData.stack ? errorData.stack.substring(0, 2000) : null,
+                        user_id: errorData.user || null,
+                        page: errorData.page || null,
+                        created_at: new Date().toISOString()
+                    });
+                }
+            } catch (e) {
+                console.warn('错误上报失败:', e.message);
+            }
+        },
+        
+        capture: function(error, context) {
+            this.log({
+                type: 'manual_capture',
+                message: context ? context + ': ' + error.message : error.message,
+                stack: error.stack || null,
+                user: window.AUTH && window.AUTH.user ? window.AUTH.user.id : 'anonymous',
+                page: window.APP ? window.APP.currentPage : 'unknown'
+            });
+        }
+    },
+
+    // ==================== 骨架屏渲染 ====================
+    renderSkeleton: function(pageType) {
+        var lang = this.lang;
+        
+        var skeletonCard = function(lines) {
+            lines = lines || 3;
+            var html = '<div class="card" style="animation: pulse 1.5s infinite;">';
+            html += '<div style="height:18px;background:#e2e8f0;border-radius:4px;width:30%;margin-bottom:12px;"></div>';
+            for (var i = 0; i < lines; i++) {
+                html += '<div style="height:14px;background:#f1f5f9;border-radius:4px;width:' + (85 - i * 10) + '%;margin-bottom:8px;"></div>';
+            }
+            html += '</div>';
+            return html;
+        };
+        
+        var skeletonTable = function(rows, cols) {
+            rows = rows || 5;
+            cols = cols || 6;
+            var html = '<div class="card" style="animation: pulse 1.5s infinite;">';
+            html += '<div style="height:18px;background:#e2e8f0;border-radius:4px;width:25%;margin-bottom:12px;"></div>';
+            html += '<div class="table-container"><table class="data-table"><thead><tr>';
+            for (var c = 0; c < cols; c++) {
+                html += '<th><div style="height:14px;background:#e2e8f0;border-radius:4px;width:' + (60 + Math.random() * 40) + 'px;"></div></th>';
+            }
+            html += '</tr></thead><tbody>';
+            for (var r = 0; r < rows; r++) {
+                html += '<tr>';
+                for (var c2 = 0; c2 < cols; c2++) {
+                    html += '<td><div style="height:12px;background:#f1f5f9;border-radius:4px;width:' + (40 + Math.random() * 60) + 'px;"></div></td>';
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table></div></div>';
+            return html;
+        };
+        
+        var skeletonStats = function(count) {
+            count = count || 4;
+            var html = '<div class="stats-grid">';
+            for (var i = 0; i < count; i++) {
+                html += '<div class="stat-card" style="animation: pulse 1.5s infinite;">' +
+                    '<div style="height:24px;background:#e2e8f0;border-radius:4px;width:60%;margin:0 auto 8px;"></div>' +
+                    '<div style="height:14px;background:#f1f5f9;border-radius:4px;width:40%;margin:0 auto;"></div>' +
+                '</div>';
+            }
+            html += '</div>';
+            return html;
+        };
+        
+        switch(pageType) {
+            case 'dashboard':
+                return '<div class="page-header"><h2>📊 ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</h2></div>' +
+                    skeletonCard(2) +
+                    '<div style="margin:12px 0;"><div style="height:18px;background:#e2e8f0;border-radius:4px;width:20%;"></div></div>' +
+                    skeletonStats(8) +
+                    '<div style="margin:12px 0;"><div style="height:18px;background:#e2e8f0;border-radius:4px;width:15%;"></div></div>' +
+                    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">' +
+                        Array(10).fill('<div style="height:36px;background:#f1f5f9;border-radius:6px;"></div>').join('') +
+                    '</div>';
+            case 'table':
+                return '<div class="page-header"><h2>📋 ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</h2></div>' + skeletonTable(8, 8);
+            case 'detail':
+                return '<div class="page-header"><h2>📄 ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</h2></div>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">' + skeletonCard(5) + skeletonCard(5) + '</div>' +
+                    skeletonTable(3, 5);
+            default:
+                return '<div class="page-header"><h2>⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</h2></div>' + skeletonCard(4);
+        }
+    },
+
+    // ==================== 密码可见性切换 ====================
+    togglePasswordVisibility: function(inputId, iconElement) {
+        var input = document.getElementById(inputId);
+        if (!input) return;
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (iconElement) iconElement.textContent = '🙈';
+        } else {
+            input.type = 'password';
+            if (iconElement) iconElement.textContent = '👁️';
+        }
+    },
+
+    // ==================== 简易 Toast 提示 ====================
+    showToast: function(message, type) {
+        type = type || 'info';
+        var bgColors = {
+            success: '#10b981',
+            error: '#ef4444',
+            warning: '#f59e0b',
+            info: '#3b82f6'
+        };
+        
+        var toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:' + 
+            (bgColors[type] || bgColors.info) + 
+            ';color:#fff;padding:10px 24px;border-radius:8px;z-index:10001;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.2);transition:opacity 0.3s;max-width:90%;text-align:center;';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(function() {
+            toast.style.opacity = '0';
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 3000);
     },
 
     setDb(db) { this.db = db; },
