@@ -1,4 +1,4 @@
-// supabase.js - v1.9（审计日志集成）
+// supabase.js - v2.0（新增：getOrders 分页支持、getOrdersLegacy 兼容方法）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -414,10 +414,11 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
-    async getOrders(filters) {
+    // ==================== getOrders（新：支持分页） ====================
+    async getOrders(filters, from, to) {
         if (filters === undefined) filters = {};
         const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('orders').select('*');
+        let query = supabaseClient.from('orders').select('*', { count: 'exact' });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
@@ -427,11 +428,23 @@ const SupabaseAPI = {
             query = query.eq('status', filters.status);
         }
         
+        // 分页：如果有 from 和 to 参数则使用 .range()
+        if (from !== undefined && to !== undefined) {
+            query = query.range(from, to);
+        }
+        
         query = query.order('created_at', { ascending: false });
         
-        const { data, error } = await query;
+        const { data, error, count } = await query;
         if (error) throw error;
-        return data;
+        
+        return { data: data || [], totalCount: count || 0 };
+    },
+
+    // ==================== getOrdersLegacy（兼容旧调用） ====================
+    async getOrdersLegacy(filters) {
+        var result = await this.getOrders(filters);
+        return result.data;
     },
 
     async getOrder(orderId) {
@@ -552,7 +565,6 @@ const SupabaseAPI = {
                 
                 console.log('✅ 订单创建成功: ' + orderId + ' (还款方式: ' + repaymentType + ')');
                 
-                // 审计：创建订单
                 if (window.Audit) {
                     await window.Audit.logOrderCreate(orderId, orderData.customer_name, orderData.loan_amount);
                 }
@@ -606,7 +618,6 @@ const SupabaseAPI = {
             reference_id: order.order_id
         });
         
-        // 审计：管理费收款
         if (window.Audit) {
             await window.Audit.logPayment(order.order_id, 'admin_fee', feeAmount, paymentMethod);
         }
@@ -662,7 +673,6 @@ const SupabaseAPI = {
             reference_id: order.order_id
         });
         
-        // 审计：服务费收款
         if (window.Audit) {
             await window.Audit.logPayment(order.order_id, 'service_fee', totalServiceFee, paymentMethod);
         }
@@ -742,7 +752,6 @@ const SupabaseAPI = {
             reference_id: currentOrder.order_id
         });
         
-        // 审计：利息收款
         if (window.Audit) {
             await window.Audit.logPayment(currentOrder.order_id, 'interest', totalInterest, paymentMethod);
         }
@@ -827,7 +836,6 @@ const SupabaseAPI = {
             reference_id: currentOrder.order_id
         });
         
-        // 审计：本金还款
         if (window.Audit) {
             await window.Audit.logPayment(currentOrder.order_id, 'principal', paidAmount, paymentMethod);
         }
@@ -953,7 +961,6 @@ const SupabaseAPI = {
             });
         }
         
-        // 审计：固定还款
         if (window.Audit) {
             await window.Audit.logPayment(order.order_id, 'fixed_installment', fixedPayment, paymentMethod);
         }
@@ -1024,7 +1031,6 @@ const SupabaseAPI = {
         
         if (error) throw error;
         
-        // 审计：提前结清
         if (window.Audit) {
             await window.Audit.logPayment(order.order_id, 'early_settlement', settlementAmount, paymentMethod);
         }
@@ -1156,7 +1162,6 @@ const SupabaseAPI = {
         const { error: e2 } = await supabaseClient.from('orders').delete().eq('order_id', orderId);
         if (e2) throw e2;
         
-        // 审计：删除订单
         if (window.Audit) {
             await window.Audit.logOrderDelete(order.order_id, order.customer_name, order.loan_amount, profile?.name);
         }
@@ -1165,7 +1170,7 @@ const SupabaseAPI = {
     },
 
     async getReport() {
-        const orders = await this.getOrders();
+        const orders = await this.getOrdersLegacy();
         var activeOrders = [];
         for (var i = 0; i < orders.length; i++) {
             if (orders[i].status === 'active') activeOrders.push(orders[i]);
@@ -1264,7 +1269,6 @@ const SupabaseAPI = {
             .from('stores').insert({ code: code, name: name, address: address, phone: phone }).select().single();
         if (error) throw error;
         
-        // 审计：创建门店
         if (window.Audit) {
             await window.Audit.logStoreCreate(code, name, AUTH.user?.id);
         }
@@ -1277,7 +1281,6 @@ const SupabaseAPI = {
             .from('stores').update(updates).eq('id', id).select().single();
         if (error) throw error;
         
-        // 审计：更新门店
         if (window.Audit) {
             await window.Audit.logStoreAction(id, 'update', JSON.stringify(updates));
         }
@@ -1309,7 +1312,6 @@ const SupabaseAPI = {
         const { error } = await supabaseClient.from('stores').delete().eq('id', id);
         if (error) throw error;
         
-        // 审计：删除门店
         if (window.Audit) {
             await window.Audit.logStoreAction(id, 'delete', '');
         }
@@ -1569,7 +1571,6 @@ const SupabaseAPI = {
             reference_id: data.id
         });
         
-        // 审计：运营支出
         if (window.Audit) {
             await window.Audit.log('expense_add', JSON.stringify({
                 category: expenseData.category,
