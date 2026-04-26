@@ -1,4 +1,4 @@
-// app-payments.js - v1.6（手机端溢出修复 + 文案修正）
+// app-payments.js - v1.7（修复手机端卡片溢出 + 错误上报）
 
 window.APP = window.APP || {};
 
@@ -229,7 +229,7 @@ const PaymentsModule = {
                     '</div>';
             }
 
-            // ========== 灵活还款板块 ==========
+            // ========== 灵活还款板块（修复手机端表格溢出） ==========
             var flexibleRepaymentHtml = '';
             if (order.repayment_type !== 'fixed') {
                 flexibleRepaymentHtml = '' +
@@ -267,7 +267,7 @@ const PaymentsModule = {
                             '<div class="card-history">' +
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
-                                    '<table class="data-table history-table" style="min-width:400px;">' +
+                                    '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
@@ -304,7 +304,7 @@ const PaymentsModule = {
                             '<div class="card-history">' +
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('return_principal') : t('return_principal') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
-                                    '<table class="data-table history-table" style="min-width:450px;">' +
+                                    '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
                                     '</table>' +
@@ -350,6 +350,7 @@ const PaymentsModule = {
             
         } catch (error) {
             console.error("showPayment error:", error);
+            Utils.ErrorHandler.capture(error, 'showPayment');
             alert(lang === 'id' ? 'Gagal memuat data: ' + error.message : '加载失败：' + error.message);
             APP.goBack();
         }
@@ -400,6 +401,7 @@ const PaymentsModule = {
                 await PaymentsModule.showPayment(orderId);
             } catch (error) {
                 console.error('payInterestWithMethod error:', error);
+                Utils.ErrorHandler.capture(error, 'payInterestWithMethod');
                 alert(error.message);
             }
         }
@@ -467,6 +469,7 @@ const PaymentsModule = {
                 await PaymentsModule.showPayment(orderId);
             } catch (error) {
                 console.error('payPrincipalWithMethod error:', error);
+                Utils.ErrorHandler.capture(error, 'payPrincipalWithMethod');
                 alert(error.message);
             }
         }
@@ -480,6 +483,7 @@ const PaymentsModule = {
             await PaymentsModule.showPayment(orderId);
         } catch (error) {
             console.error('payFixedInstallment error:', error);
+            Utils.ErrorHandler.capture(error, 'payFixedInstallment');
             alert(error.message);
         }
     },
@@ -492,6 +496,7 @@ const PaymentsModule = {
             await PaymentsModule.showPayment(orderId);
         } catch (error) {
             console.error('earlySettleFixedOrder error:', error);
+            Utils.ErrorHandler.capture(error, 'earlySettleFixedOrder');
             alert(error.message);
         }
     },
@@ -602,6 +607,7 @@ const PaymentsModule = {
             }, 800);
         } catch (error) {
             console.error('printSettlementReceipt error:', error);
+            Utils.ErrorHandler.capture(error, 'printSettlementReceipt');
             alert(Utils.lang === 'id' ? 'Gagal mencetak' : '打印失败');
             APP.navigateTo('orderTable');
         }
