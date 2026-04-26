@@ -4,8 +4,6 @@ const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
 // ==================== 自定义存储：绕过浏览器 Tracking Prevention ====================
-// Safari / Firefox 隐私模式 / ETP 会阻止 localStorage 和 sessionStorage
-// 此自定义实现使用多层后备：localStorage → cookie → 内存
 const SafeStorage = {
     _memoryStore: {},
     _storageAvailable: null,
@@ -2151,3 +2149,4 @@ window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
 window.SafeStorage = SafeStorage;
 window.SafeSessionStorage = SafeSessionStorage;
+window.SUPABASE_URL = SUPABASE_URL;
