@@ -1,26 +1,31 @@
-// auth.js - v1.2（新增：记住我、网络状态监听）
+// auth.js - v1.5（修复版：统一状态管理、锁定集成、门店检查移层）
 
 const AUTH = {
     user: null,
 
-    // ==================== 登录锁定机制 ====================
+    // ==================== 登录锁定机制（使用 localStorage） ====================
 
     _getLoginAttempts() {
-        const stored = sessionStorage.getItem('jf_login_attempts');
+        const stored = localStorage.getItem('jf_login_attempts');
         return stored ? JSON.parse(stored) : {};
     },
 
     _setLoginAttempts(attempts) {
-        sessionStorage.setItem('jf_login_attempts', JSON.stringify(attempts));
+        localStorage.setItem('jf_login_attempts', JSON.stringify(attempts));
     },
 
     _getLockedUntil() {
-        const stored = sessionStorage.getItem('jf_locked_until');
+        const stored = localStorage.getItem('jf_locked_until');
         return stored ? JSON.parse(stored) : {};
     },
 
     _setLockedUntil(locked) {
-        sessionStorage.setItem('jf_locked_until', JSON.stringify(locked));
+        localStorage.setItem('jf_locked_until', JSON.stringify(locked));
+    },
+
+    _clearAllLoginFailures() {
+        localStorage.removeItem('jf_login_attempts');
+        localStorage.removeItem('jf_locked_until');
     },
 
     _isLocked(username) {
@@ -89,9 +94,13 @@ const AUTH = {
         this._setLockedUntil(lockedUntil);
     },
 
-    _clearAllLoginFailures() {
-        sessionStorage.removeItem('jf_login_attempts');
-        sessionStorage.removeItem('jf_locked_until');
+    // 跨标签页同步 - 监听 storage 事件
+    _initStorageSync() {
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'jf_login_attempts' || e.key === 'jf_locked_until') {
+                console.log('[Auth] 登录锁定状态已同步');
+            }
+        });
     },
 
     // ==================== 记住我功能 ====================
@@ -109,12 +118,50 @@ const AUTH = {
         }
     },
 
-    // ==================== 网络状态监听 ====================
-    _networkListenerInitialized: false,
+    // ==================== 网络状态监听（委托给 Utils.NetworkMonitor） ====================
+    
+    // ==================== 初始化 ====================
+    async init() {
+        // 初始化增强版网络监控（如果存在）
+        if (Utils.NetworkMonitor && !Utils.NetworkMonitor._initialized) {
+            Utils.NetworkMonitor.init();
+            console.log('📡 增强版网络监控已由 Auth 模块启动');
+        } else if (Utils.NetworkMonitor && Utils.NetworkMonitor._initialized) {
+            console.log('📡 网络监控已运行');
+        } else {
+            // 降级：使用原有简单网络监听
+            this._initLegacyNetworkListener();
+        }
 
-    _initNetworkListener: function() {
-        if (this._networkListenerInitialized) return;
-        this._networkListenerInitialized = true;
+        // 初始化跨标签页同步
+        this._initStorageSync();
+
+        try {
+            await this.loadCurrentUser();
+        } catch (e) {
+            console.warn('Auth init error (user not logged in):', e.message);
+            this.user = null;
+        }
+
+        // 使用 SUPABASE.getClient() 统一客户端引用
+        const client = SUPABASE.getClient();
+        client.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') {
+                this.user = null;
+                SUPABASE.clearCache();
+            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+                SUPABASE.clearCache();
+                this.loadCurrentUser();
+            }
+        });
+
+        this._bindEnterKeyLogin();
+    },
+
+    // 降级方案：原有简单网络监听
+    _initLegacyNetworkListener() {
+        if (this._legacyListenerInitialized) return;
+        this._legacyListenerInitialized = true;
         
         var showOfflineBanner = function() {
             var existing = document.getElementById('offlineBanner');
@@ -154,35 +201,9 @@ const AUTH = {
             showOnlineToast();
         });
         
-        // 初始检查
         if (!navigator.onLine) {
             showOfflineBanner();
         }
-    },
-
-    // ==================== 初始化 ====================
-    async init() {
-        // 初始化网络监听
-        this._initNetworkListener();
-
-        try {
-            await this.loadCurrentUser();
-        } catch (e) {
-            console.warn('Auth init error (user not logged in):', e.message);
-            this.user = null;
-        }
-
-        supabaseClient.auth.onAuthStateChange((event) => {
-            if (event === 'SIGNED_OUT') {
-                this.user = null;
-                SUPABASE.clearCache();
-            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-                SUPABASE.clearCache();
-                this.loadCurrentUser();
-            }
-        });
-
-        this._bindEnterKeyLogin();
     },
 
     _bindEnterKeyLogin() {
@@ -213,45 +234,45 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
-    // ==================== 登录逻辑 ====================
+    // ==================== 登录逻辑（修复版）====================
     async login(usernameOrEmail, password) {
         try {
+            // 1. 检查锁定状态
             if (this._isLocked(usernameOrEmail)) return null;
 
-            let emailToUse = usernameOrEmail;
-            if (!usernameOrEmail.includes('@')) {
-                const { data: profileData, error: profileError } = await supabaseClient
-                    .from('user_profiles')
-                    .select('username, email')
-                    .or('username.eq.' + usernameOrEmail + ',email.eq.' + usernameOrEmail)
-                    .maybeSingle();
-
-                if (profileError || !profileData) {
-                    console.error('找不到该用户名:', usernameOrEmail);
-                    this._recordLoginFailure(usernameOrEmail);
-                    const lang = Utils.lang;
-                    alert(lang === 'id' ? 'Username atau password salah' : '用户名或密码错误');
-                    if (window.Audit) {
-                        await window.Audit.logLoginFailure(usernameOrEmail, 'username_not_found');
-                    }
-                    return null;
-                }
-                emailToUse = profileData.email || profileData.username;
+            // 2. 检查网络状态
+            const isNetworkAvailable = Utils.NetworkMonitor 
+                ? await Utils.NetworkMonitor._checkRealConnectivity()
+                : navigator.onLine;
+            
+            if (!isNetworkAvailable) {
+                const lang = Utils.lang;
+                alert(lang === 'id' 
+                    ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
+                    : '❌ 无网络连接，请检查网络设置。');
+                return null;
             }
 
-            const result = await SUPABASE.login(emailToUse, password);
+            // 3. 使用 SUPABASE 统一方法登录
+            const result = await SUPABASE.login(usernameOrEmail, password);
+            
             if (!result || result.error) {
                 console.error('Login error:', result?.error);
                 this._recordLoginFailure(usernameOrEmail);
                 const lang = Utils.lang;
-                alert(lang === 'id' ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
+                alert(lang === 'id' 
+                    ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') 
+                    : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
                 if (window.Audit) {
                     await window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials');
                 }
                 return null;
             }
 
+            // 4. 重置失败计数
             this._resetLoginFailure(usernameOrEmail);
+            
+            // 5. 加载用户资料
             await this.loadCurrentUser();
 
             if (!this.user) {
@@ -261,21 +282,16 @@ const AUTH = {
                 return null;
             }
 
-            // 检查门店是否暂停
+            // 6. 检查门店状态（已移到 SUPABASE 层）
             if (this.user && this.user.store_id) {
                 try {
-                    const { data: storeData, error: storeError } = await supabaseClient
-                        .from('stores')
-                        .select('is_active, name')
-                        .eq('id', this.user.store_id)
-                        .single();
-                    
-                    if (!storeError && storeData && storeData.is_active === false) {
+                    const storeStatus = await SUPABASE.checkStoreStatus(this.user.store_id);
+                    if (!storeStatus.is_active) {
                         await this.logout();
                         var lang = Utils.lang;
                         alert(lang === 'id' 
-                            ? '⚠️ Toko "' + storeData.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
-                            : '⚠️ 门店 "' + storeData.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。');
+                            ? '⚠️ Toko "' + storeStatus.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
+                            : '⚠️ 门店 "' + storeStatus.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。');
                         return null;
                     }
                 } catch (e) {
@@ -283,7 +299,7 @@ const AUTH = {
                 }
             }
 
-            // 审计：登录成功
+            // 7. 审计：登录成功
             if (window.Audit) {
                 await window.Audit.logLoginSuccess(this.user.id, this.user.name);
             }
@@ -300,6 +316,7 @@ const AUTH = {
 
     async loadCurrentUser() {
         try {
+            // 统一使用 SUPABASE.getCurrentProfile()
             this.user = (await SUPABASE.getCurrentProfile()) || null;
         } catch (e) {
             console.warn('loadCurrentUser error:', e.message);
@@ -314,7 +331,6 @@ const AUTH = {
         }
         this._clearAllLoginFailures();
         this.user = null;
-        SUPABASE.clearCache();
         await SUPABASE.logout();
     },
 
@@ -322,12 +338,13 @@ const AUTH = {
 
     // ==================== 用户管理 ====================
     async addUser(username, password, name, role, storeId) {
-        const { data: existing } = await supabaseClient
+        const client = SUPABASE.getClient();
+        const { data: existing } = await client
             .from('user_profiles').select('username').eq('username', username).single();
 
         if (existing) throw new Error(Utils.lang === 'id' ? 'Username sudah digunakan' : '用户名已存在');
 
-        const { data: authUser, error: signUpError } = await supabaseClient.auth.signUp({
+        const { data: authUser, error: signUpError } = await client.auth.signUp({
             email: username,
             password,
             options: { data: { name, role, store_id: storeId || null } }
@@ -336,7 +353,7 @@ const AUTH = {
         if (signUpError) throw signUpError;
         if (!authUser.user) throw new Error(Utils.lang === 'id' ? 'Gagal membuat pengguna' : '创建用户失败');
 
-        const { error: profileError } = await supabaseClient.from('user_profiles').insert({
+        const { error: profileError } = await client.from('user_profiles').insert({
             id: authUser.user.id, username, email: username, name, role, store_id: storeId || null
         });
         if (profileError) throw profileError;
@@ -354,35 +371,59 @@ const AUTH = {
             throw new Error(Utils.lang === 'id' ? 'Tidak dapat menghapus akun sendiri' : '不能删除自己的账号');
         }
 
-        const { data: userProfile, error: fetchError } = await supabaseClient
+        const client = SUPABASE.getClient();
+        const { data: userProfile, error: fetchError } = await client
             .from('user_profiles').select('id, username, name, role').eq('id', userId).single();
         if (fetchError) throw fetchError;
 
-        const deletedUserInfo = {
-            id: userProfile.id,
-            username: userProfile.username,
-            name: userProfile.name,
-            role: userProfile.role,
-            deleted_by: this.user?.id,
-            deleted_by_name: this.user?.name,
-            deleted_at: new Date().toISOString()
-        };
-
-        const edgeFail = Utils.lang === 'id'
-            ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.'
-            : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。';
-
+        let authCleaned = false;
+        
+        // 方案A：优先尝试 Edge Function 删除 Auth 账户
         try {
-            const { error: edgeError } = await supabaseClient.functions.invoke('delete-user', {
+            const { data, error } = await client.functions.invoke('delete-user', {
                 body: { userId: userProfile.id }
             });
-            if (edgeError) { console.warn('Edge Function 调用失败:', edgeError); alert(edgeFail); }
+            if (!error) {
+                authCleaned = true;
+                console.log('✅ Edge Function 已删除 Auth 账户');
+            } else {
+                console.warn('Edge Function 调用失败:', error);
+            }
         } catch (e) {
-            console.warn('Edge Function 未部署:', e);
-            alert(edgeFail);
+            console.warn('Edge Function 未部署或调用失败:', e.message);
+        }
+        
+        // 方案B：如果 Edge Function 不可用，尝试禁用用户
+        if (!authCleaned) {
+            try {
+                const randomPassword = Math.random().toString(36).slice(-12) + '!@#';
+                const disabledEmail = 'disabled_' + Date.now() + '@placeholder.com';
+                
+                const { error: updateError } = await client.auth.admin.updateUserById(userProfile.id, {
+                    password: randomPassword,
+                    email: disabledEmail
+                });
+                
+                if (!updateError) {
+                    authCleaned = true;
+                    console.log('✅ 已禁用 Auth 账户（密码和邮箱已更改）');
+                } else {
+                    console.warn('Auth 账户清理失败，需要管理员手动处理:', updateError?.message);
+                }
+            } catch (adminError) {
+                console.warn('Admin API 不可用，Auth 账户未被清理');
+            }
+        }
+        
+        if (!authCleaned) {
+            const lang = Utils.lang;
+            const warningMsg = lang === 'id'
+                ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.\n\nHubungi administrator untuk pembersihan manual.'
+                : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。\n\n请联系管理员进行手动清理。';
+            alert(warningMsg);
         }
 
-        const { error } = await supabaseClient.from('user_profiles').delete().eq('id', userId);
+        const { error } = await client.from('user_profiles').delete().eq('id', userId);
         if (error) throw error;
 
         // 审计：删除用户
@@ -393,10 +434,11 @@ const AUTH = {
     },
 
     async updateUser(userId, updates) {
-        const { data: beforeData } = await supabaseClient
+        const client = SUPABASE.getClient();
+        const { data: beforeData } = await client
             .from('user_profiles').select('*').eq('id', userId).single();
 
-        const { error } = await supabaseClient.from('user_profiles').update(updates).eq('id', userId);
+        const { error } = await client.from('user_profiles').update(updates).eq('id', userId);
         if (error) throw error;
 
         // 审计：更新用户
@@ -407,16 +449,21 @@ const AUTH = {
     },
 
     async resetUserPassword(userId, newPassword) {
+        const lang = Utils.lang;
+        const client = SUPABASE.getClient();
+        
         if (this.user?.role !== 'admin') {
-            throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
+            throw new Error(lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
         }
         
         if (!newPassword || newPassword.length < 6) {
-            throw new Error(Utils.lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+            throw new Error(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
         }
         
+        // 优先使用 Edge Function
+        let edgeSuccess = false;
         try {
-            const { data, error } = await supabaseClient.functions.invoke('reset-user-password', {
+            const { data, error } = await client.functions.invoke('reset-user-password', {
                 body: { 
                     userId: userId,
                     newPassword: newPassword,
@@ -425,31 +472,28 @@ const AUTH = {
             });
             
             if (error) {
-                console.warn('Edge Function 不可用，尝试直接重置:', error.message);
-                
-                const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
-                    userId,
-                    { password: newPassword }
-                );
-                
-                if (updateError) {
-                    throw updateError;
-                }
+                console.warn('Edge Function 调用失败:', error.message);
+            } else {
+                edgeSuccess = true;
+                console.log('✅ Edge Function 已重置密码');
             }
-            
-            // 审计：重置密码
-            if (window.Audit) {
-                await window.Audit.logPasswordReset(userId, this.user?.id);
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('重置密码失败:', error);
-            throw new Error(Utils.lang === 'id' 
-                ? 'Gagal mereset password. Fungsi ini memerlukan Service Role Key pada Supabase.'
-                : '重置密码失败，需要配置 Supabase Service Role Key。'
-            );
+        } catch (e) {
+            console.warn('Edge Function 未部署:', e.message);
         }
+        
+        if (!edgeSuccess) {
+            const errorMsg = lang === 'id'
+                ? '❌ Fungsi reset password tidak tersedia. Hubungi administrator untuk mengaktifkan Edge Function atau lakukan reset manual di Supabase Dashboard.'
+                : '❌ 密码重置功能不可用。请联系管理员部署 Edge Function，或在 Supabase 后台手动重置密码。';
+            throw new Error(errorMsg);
+        }
+        
+        // 审计：重置密码
+        if (window.Audit) {
+            await window.Audit.logPasswordReset(userId, this.user?.id);
+        }
+        
+        return true;
     },
 
     getCurrentUserId()    { return this.user?.id || null; },
