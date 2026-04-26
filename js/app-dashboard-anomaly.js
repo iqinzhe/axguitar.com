@@ -1,6 +1,224 @@
-// app-dashboard-anomaly.js - v2.2（门店只显示逾期+黑名单，黑名单全部门店共享）
+// app-dashboard-anomaly.js - v2.3（性能优化：聚合查询替代全量加载 + 排名数据分月限制 + 缓存 + 错误降级）
 
 window.APP = window.APP || {};
+
+// ==================== 异常检测缓存模块 ====================
+const AnomalyCache = {
+    _data: new Map(),
+    _ttl: 3 * 60 * 1000,  // 3分钟缓存
+
+    async get(key, fetcher) {
+        const cached = this._data.get(key);
+        if (cached && Date.now() - cached.time < this._ttl) {
+            console.log('[AnomalyCache] Hit:', key);
+            return cached.value;
+        }
+        console.log('[AnomalyCache] Miss:', key);
+        const value = await fetcher();
+        this._data.set(key, { value, time: Date.now() });
+        return value;
+    },
+
+    clear() {
+        this._data.clear();
+    }
+};
+
+// ==================== 异常检测辅助方法 ====================
+const AnomalyHelper = {
+    /**
+     * 获取逾期30天订单（分页 + 聚合统计）
+     */
+    async getOverdueOrders(profile, page, pageSize) {
+        if (page === undefined) page = 0;
+        if (pageSize === undefined) pageSize = 50;
+        
+        const isAdmin = profile?.role === 'admin';
+        const storeId = profile?.store_id;
+        
+        let query = supabaseClient
+            .from('orders')
+            .select('order_id, customer_name, overdue_days, loan_amount, status, customers(name, phone)', { count: 'exact' })
+            .eq('status', 'active')
+            .gte('overdue_days', 30)
+            .order('overdue_days', { ascending: false });
+        
+        if (!isAdmin && storeId) {
+            query = query.eq('store_id', storeId);
+        }
+        
+        // 分页：使用 .range()
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        query = query.range(from, to);
+        
+        const { data, error, count } = await query;
+        
+        if (error) {
+            console.warn('获取逾期订单失败:', error);
+            return { data: [], totalCount: 0 };
+        }
+        
+        return { 
+            data: data || [], 
+            totalCount: count || 0 
+        };
+    },
+
+    /**
+     * 获取黑名单客户（分页 + 聚合统计）
+     */
+    async getBlacklistCustomers(page, pageSize) {
+        if (page === undefined) page = 0;
+        if (pageSize === undefined) pageSize = 50;
+        
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        
+        const { data, error, count } = await supabaseClient
+            .from('blacklist')
+            .select('*, customers(name, phone, customer_id)', { count: 'exact' })
+            .order('blacklisted_at', { ascending: false })
+            .range(from, to);
+        
+        if (error) {
+            console.warn('获取黑名单失败:', error);
+            return { data: [], totalCount: 0 };
+        }
+        
+        return {
+            data: data || [],
+            totalCount: count || 0
+        };
+    },
+
+    /**
+     * 获取本月门店排名数据（限制数据范围到本月，不再拉全量历史订单）
+     */
+    async getMonthlyStoreRanking(stores) {
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+        const monthEnd = today.toISOString().split('T')[0];
+        
+        // 只拉取本月订单（关键性能优化点）
+        const { data: monthlyOrders, error } = await supabaseClient
+            .from('orders')
+            .select('id, store_id, loan_amount, status, overdue_days')
+            .gte('created_at', monthStart)
+            .lte('created_at', monthEnd);
+        
+        if (error) {
+            console.warn('获取本月订单失败:', error);
+            return { top3: [], bottom3: [] };
+        }
+        
+        // 获取本月还款数据
+        const { data: monthlyFlows } = await supabaseClient
+            .from('cash_flow_records')
+            .select('store_id, amount, order_id')
+            .eq('direction', 'inflow')
+            .eq('is_voided', false)
+            .gte('recorded_at', monthStart);
+        
+        // 构建 flow 金额快速查找表
+        const flowAmountByOrder = {};
+        if (monthlyFlows) {
+            for (const flow of monthlyFlows) {
+                if (flow.order_id) {
+                    flowAmountByOrder[flow.order_id] = (flowAmountByOrder[flow.order_id] || 0) + (flow.amount || 0);
+                }
+            }
+        }
+        
+        // 门店映射
+        const storeInfoMap = {};
+        for (const store of stores) {
+            storeInfoMap[store.id] = {
+                id: store.id,
+                name: store.name,
+                code: store.code,
+                isActive: store.is_active !== false
+            };
+        }
+        
+        // 按门店聚合统计
+        const storeStats = {};
+        for (const order of (monthlyOrders || [])) {
+            const s = storeInfoMap[order.store_id];
+            if (!s || !s.isActive || s.code === 'STORE_000') continue;
+            
+            if (!storeStats[order.store_id]) {
+                storeStats[order.store_id] = {
+                    id: order.store_id,
+                    name: s.name,
+                    code: s.code,
+                    orderCount: 0,
+                    totalLoanOutflow: 0,
+                    badOrders: 0,
+                    totalRecovery: 0
+                };
+            }
+            
+            storeStats[order.store_id].orderCount++;
+            storeStats[order.store_id].totalLoanOutflow += (order.loan_amount || 0);
+            
+            if ((order.overdue_days || 0) >= 15 && order.status === 'active') {
+                storeStats[order.store_id].badOrders++;
+            }
+            
+            storeStats[order.store_id].totalRecovery += (flowAmountByOrder[order.id] || 0);
+        }
+        
+        let eligibleStores = Object.values(storeStats);
+        
+        if (eligibleStores.length === 0) {
+            return { top3: [], bottom3: [] };
+        }
+        
+        // 计算综合排名
+        for (const s of eligibleStores) {
+            s.rankSum = 0;
+        }
+        
+        // 按订单数从大到小排
+        eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankOrderCount = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按放款额从小到大排（越小风险越低）
+        eligibleStores.sort((a, b) => a.totalLoanOutflow - b.totalLoanOutflow);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankLoanOutflow = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按不良订单数从小到大排
+        eligibleStores.sort((a, b) => a.badOrders - b.badOrders);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankBadOrders = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按回收额从大到小排
+        eligibleStores.sort((a, b) => b.totalRecovery - a.totalRecovery);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankRecovery = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按总分从小到大排（越小排名越好）
+        eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
+        
+        const top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
+        const bottom3 = eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse();
+        
+        return { top3, bottom3 };
+    }
+};
 
 const DashboardAnomaly = {
 
@@ -14,64 +232,35 @@ const DashboardAnomaly = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 并行获取所有数据
-            const [
-                overdueResult,
-                blacklistResult,
-                stores,
-                orders
-            ] = await Promise.all([
-                // Q1: 逾期30天订单
-                (async function() {
-                    try {
-                        let query = supabaseClient
-                            .from('orders')
-                            .select('*, customers(name, phone)')
-                            .eq('status', 'active')
-                            .gte('overdue_days', 30);
-                        
-                        if (!isAdmin && storeId) {
-                            query = query.eq('store_id', storeId);
-                        }
-                        
-                        const { data, error } = await query;
-                        if (error) { console.warn("获取逾期订单失败:", error); return []; }
-                        return data || [];
-                    } catch(e) {
-                        console.warn("获取逾期订单失败:", e);
-                        return [];
-                    }
-                })(),
-                
-                // Q2: 黑名单客户 —— 门店也查全部门店（共享黑名单）
-                (async function() {
-                    try {
-                        let query = supabaseClient
-                            .from('blacklist')
-                            .select('*, customers(name, phone, customer_id)');
-                        
-                        // 注意：这里不再限制 store_id，门店也能看到全部门店的黑名单
-                        // 但只在本门店 store_id 有值时过滤（如果没有 store_id 说明是总部，看全部）
-                        // 门店账号一定有 store_id，但我们不再过滤，让它看全部黑名单
-                        
-                        const { data, error } = await query;
-                        if (error) { console.warn("获取黑名单失败:", error); return []; }
-                        return data || [];
-                    } catch(e) {
-                        console.warn("获取黑名单失败:", e);
-                        return [];
-                    }
-                })(),
-                
-                // Q3: 所有门店（仅总部需要）
-                SUPABASE.getAllStores(),
-                
-                // Q4: 所有订单（仅总部需要排名计算）
-                SUPABASE.getOrdersLegacy()
-            ]);
+            // ========== 并行获取数据（使用聚合查询 + 缓存） ==========
             
-            var overdueOrders = overdueResult;
-            var blacklist = blacklistResult;
+            // 逾期30天订单（分页加载，初始50条）
+            const overdueCacheKey = 'overdue_orders_' + (isAdmin ? 'admin' : storeId) + '_0';
+            const overdueResult = await AnomalyCache.get(overdueCacheKey, 
+                () => AnomalyHelper.getOverdueOrders(profile, 0, 50)
+            );
+            var overdueOrders = overdueResult.data;
+            var overdueTotalCount = overdueResult.totalCount;
+            
+            // 黑名单客户（分页加载，初始50条）
+            const blacklistCacheKey = 'blacklist_customers_0';
+            const blacklistResult = await AnomalyCache.get(blacklistCacheKey,
+                () => AnomalyHelper.getBlacklistCustomers(0, 50)
+            );
+            var blacklist = blacklistResult.data;
+            var blacklistTotalCount = blacklistResult.totalCount;
+            
+            // 门店排名（仅总部需要）
+            var top3 = [], bottom3 = [];
+            if (isAdmin) {
+                const stores = await SUPABASE.getAllStores();
+                const rankingCacheKey = 'monthly_store_ranking';
+                const rankingResult = await AnomalyCache.get(rankingCacheKey,
+                    () => AnomalyHelper.getMonthlyStoreRanking(stores)
+                );
+                top3 = rankingResult.top3;
+                bottom3 = rankingResult.bottom3;
+            }
             
             // ========== 逾期30天订单渲染 ==========
             var overdueTableHtml = '';
@@ -85,14 +274,31 @@ const DashboardAnomaly = {
                 var overdueRows = '';
                 for (var i = 0; i < overdueOrders.length; i++) {
                     var o = overdueOrders[i];
+                    // 兼容两种数据结构：直接字段 或 嵌套 customers
+                    var customerName = o.customers?.name || o.customer_name || '-';
                     overdueRows += '<tr>' +
                         '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
-                        '<td>' + Utils.escapeHtml(o.customers?.name || o.customer_name) + '</td>' +
-                        '<td class="text-center expense">' + o.overdue_days + '</td>' +
+                        '<td>' + Utils.escapeHtml(customerName) + '</td>' +
+                        '<td class="text-center expense">' + (o.overdue_days || 0) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
                         '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
                     '</tr>';
                 }
+                
+                // 判断是否还有更多
+                var loadMoreHtml = '';
+                if (overdueTotalCount > overdueOrders.length) {
+                    loadMoreHtml = '' +
+                        '<tr id="overdueLoadMoreRow">' +
+                            '<td colspan="5" style="text-align:center;padding:10px;">' +
+                                '<button onclick="APP.loadMoreOverdueOrders()" class="btn-small primary" style="padding:8px 24px;">' +
+                                    '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
+                                    ' (' + (overdueTotalCount - overdueOrders.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
+                                '</button>' +
+                            '</td>' +
+                        '</tr>';
+                }
+                
                 overdueTableHtml = '' +
                     '<div class="table-container">' +
                         '<table class="data-table anomaly-table">' +
@@ -105,12 +311,12 @@ const DashboardAnomaly = {
                                     '<th class="text-center" style="width:60px;">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
                                 '</tr>' +
                             '</thead>' +
-                            '<tbody>' + overdueRows + '</tbody>' +
+                            '<tbody>' + overdueRows + loadMoreHtml + '</tbody>' +
                         '</table>' +
                     '</div>';
             }
             
-            // ========== 黑名单客户渲染（全部门店共享） ==========
+            // ========== 黑名单客户渲染 ==========
             var blacklistTableHtml = '';
             if (blacklist.length === 0) {
                 blacklistTableHtml = '' +
@@ -129,6 +335,20 @@ const DashboardAnomaly = {
                         '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
                     '</tr>';
                 }
+                
+                var blacklistLoadMoreHtml = '';
+                if (blacklistTotalCount > blacklist.length) {
+                    blacklistLoadMoreHtml = '' +
+                        '<tr id="blacklistLoadMoreRow">' +
+                            '<td colspan="4" style="text-align:center;padding:10px;">' +
+                                '<button onclick="APP.loadMoreBlacklist()" class="btn-small primary" style="padding:8px 24px;">' +
+                                    '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
+                                    ' (' + (blacklistTotalCount - blacklist.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
+                                '</button>' +
+                            '</td>' +
+                        '</tr>';
+                }
+                
                 blacklistTableHtml = '' +
                     '<div class="table-container">' +
                         '<table class="data-table anomaly-table">' +
@@ -140,12 +360,12 @@ const DashboardAnomaly = {
                                     '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
                                 '</tr>' +
                             '</thead>' +
-                            '<tbody>' + blacklistRows + '</tbody>' +
+                            '<tbody>' + blacklistRows + blacklistLoadMoreHtml + '</tbody>' +
                         '</table>' +
                     '</div>';
             }
             
-            // ========== 门店视图：只显示逾期30天 + 黑名单（单列堆叠） ==========
+            // ========== 门店视图：只显示逾期30天 + 黑名单 ==========
             if (!isAdmin) {
                 document.getElementById("app").innerHTML = '' +
                     '<div class="page-header">' +
@@ -156,12 +376,11 @@ const DashboardAnomaly = {
                         '</div>' +
                     '</div>' +
                     
-                    // 卡片1：逾期30天订单（全宽）
                     '<div class="anomaly-card anomaly-card-danger" style="margin-bottom:16px;">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">⚠️</span>' +
                             '<h3>' + (lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单') + '</h3>' +
-                            '<span class="anomaly-badge">' + overdueOrders.length + '</span>' +
+                            '<span class="anomaly-badge">' + overdueTotalCount + '</span>' +
                         '</div>' +
                         '<div class="anomaly-card-body">' + overdueTableHtml + '</div>' +
                         (overdueOrders.length > 0 ? 
@@ -170,141 +389,42 @@ const DashboardAnomaly = {
                             '</div>' : '') +
                     '</div>' +
                     
-                    // 卡片2：黑名单客户（全部门店共享，全宽）
                     '<div class="anomaly-card anomaly-card-warning" style="margin-bottom:16px;">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🚫</span>' +
                             '<h3>' + (lang === 'id' ? 'Daftar Hitam Nasabah (Semua Toko)' : '黑名单客户（全部门店）') + '</h3>' +
-                            '<span class="anomaly-badge">' + blacklist.length + '</span>' +
+                            '<span class="anomaly-badge">' + blacklistTotalCount + '</span>' +
                         '</div>' +
                         '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
                     '</div>';
                 
+                // 存储状态用于加载更多
+                window._anomalyOverdueState = {
+                    page: 0,
+                    pageSize: 50,
+                    totalCount: overdueTotalCount,
+                    profile: profile,
+                    isAdmin: isAdmin,
+                    storeId: storeId
+                };
+                window._anomalyBlacklistState = {
+                    page: 0,
+                    pageSize: 50,
+                    totalCount: blacklistTotalCount
+                };
+                
                 return;
             }
             
-            // ========== 以下为总部视图（isAdmin = true）：四个卡片 ==========
+            // ========== 以下为总部视图（isAdmin = true） ==========
             
-            // ========== 本月日期范围 ==========
-            var today = new Date();
-            var currentMonth = today.getMonth();
-            var currentYear = today.getFullYear();
-            var monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-            var monthEnd = today.toISOString().split('T')[0];
-            
-            // ========== 门店映射表 ==========
-            var storeInfoMap = {};
-            for (var i = 0; i < stores.length; i++) {
-                storeInfoMap[stores[i].id] = {
-                    id: stores[i].id,
-                    name: stores[i].name,
-                    code: stores[i].code,
-                    isActive: stores[i].is_active !== false
-                };
-            }
-            
-            // ========== 按月统计各门店数据 ==========
-            var storeMonthlyStats = {};
-            for (var i = 0; i < stores.length; i++) {
-                var s = stores[i];
-                storeMonthlyStats[s.id] = {
-                    id: s.id,
-                    name: s.name,
-                    code: s.code,
-                    isActive: s.is_active !== false,
-                    orderCount: 0,
-                    totalLoanOutflow: 0,
-                    badOrders: 0,
-                    totalRecovery: 0
-                };
-            }
-            
-            var monthlyOrderIds = [];
-            for (var i = 0; i < orders.length; i++) {
-                var o = orders[i];
-                var orderDate = o.created_at ? o.created_at.split('T')[0] : '';
-                
-                if (orderDate >= monthStart && orderDate <= monthEnd) {
-                    monthlyOrderIds.push(o.id);
-                    
-                    if (storeMonthlyStats[o.store_id]) {
-                        storeMonthlyStats[o.store_id].orderCount++;
-                        storeMonthlyStats[o.store_id].totalLoanOutflow += (o.loan_amount || 0);
-                        
-                        if ((o.overdue_days || 0) >= 15 && o.status === 'active') {
-                            storeMonthlyStats[o.store_id].badOrders++;
-                        }
-                    }
-                }
-            }
-            
-            if (monthlyOrderIds.length > 0) {
-                var { data: monthlyFlows } = await supabaseClient
-                    .from('cash_flow_records')
-                    .select('store_id, amount')
-                    .eq('direction', 'inflow')
-                    .eq('is_voided', false)
-                    .in('order_id', monthlyOrderIds);
-                
-                if (monthlyFlows) {
-                    for (var i = 0; i < monthlyFlows.length; i++) {
-                        var f = monthlyFlows[i];
-                        if (storeMonthlyStats[f.store_id]) {
-                            storeMonthlyStats[f.store_id].totalRecovery += (f.amount || 0);
-                        }
-                    }
-                }
-            }
-            
-            var eligibleStores = [];
-            var storeKeys = Object.keys(storeMonthlyStats);
-            for (var i = 0; i < storeKeys.length; i++) {
-                var s = storeMonthlyStats[storeKeys[i]];
-                if (s.code === 'STORE_000') continue;
-                if (!s.isActive) continue;
-                eligibleStores.push(s);
-            }
-            
-            for (var i = 0; i < eligibleStores.length; i++) {
-                eligibleStores[i].rankSum = 0;
-            }
-            
-            eligibleStores.sort(function(a, b) { return b.orderCount - a.orderCount; });
-            for (var i = 0; i < eligibleStores.length; i++) {
-                eligibleStores[i].rankOrderCount = i + 1;
-                eligibleStores[i].rankSum += (i + 1);
-            }
-            
-            eligibleStores.sort(function(a, b) { return a.totalLoanOutflow - b.totalLoanOutflow; });
-            for (var i = 0; i < eligibleStores.length; i++) {
-                eligibleStores[i].rankLoanOutflow = i + 1;
-                eligibleStores[i].rankSum += (i + 1);
-            }
-            
-            eligibleStores.sort(function(a, b) { return a.badOrders - b.badOrders; });
-            for (var i = 0; i < eligibleStores.length; i++) {
-                eligibleStores[i].rankBadOrders = i + 1;
-                eligibleStores[i].rankSum += (i + 1);
-            }
-            
-            eligibleStores.sort(function(a, b) { return b.totalRecovery - a.totalRecovery; });
-            for (var i = 0; i < eligibleStores.length; i++) {
-                eligibleStores[i].rankRecovery = i + 1;
-                eligibleStores[i].rankSum += (i + 1);
-            }
-            
-            eligibleStores.sort(function(a, b) { return a.rankSum - b.rankSum; });
-            
-            var top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
-            var bottom3 = eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse();
-            
-            // ========== 渲染：门店业绩前三排行 ==========
+            // 渲染门店排名前三
             var top3Html = '';
             if (top3.length === 0) {
                 top3Html = '' +
                     '<div class="empty-state">' +
                         '<div class="empty-state-icon">📊</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko' : '暂无门店数据') + '</div>' +
+                        '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko bulan ini' : '本月暂无门店数据') + '</div>' +
                     '</div>';
             } else {
                 var top3Items = '';
@@ -329,13 +449,13 @@ const DashboardAnomaly = {
                 top3Html = '<div class="ranking-list">' + top3Items + '</div>';
             }
             
-            // ========== 渲染：门店业绩后三排行 ==========
+            // 渲染门店排名后三
             var bottom3Html = '';
             if (bottom3.length === 0) {
                 bottom3Html = '' +
                     '<div class="empty-state">' +
                         '<div class="empty-state-icon">📊</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko' : '暂无门店数据') + '</div>' +
+                        '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko bulan ini' : '本月暂无门店数据') + '</div>' +
                     '</div>';
             } else {
                 var bottom3Items = '';
@@ -360,7 +480,7 @@ const DashboardAnomaly = {
                 bottom3Html = '<div class="ranking-list">' + bottom3Items + '</div>';
             }
             
-            // ========== 总部视图：四个卡片 ==========
+            // ========== 总部视图 ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
@@ -372,29 +492,29 @@ const DashboardAnomaly = {
                 
                 '<div class="anomaly-grid">' +
                     
-                    // 卡片1：门店业绩前三排行
+                    // 卡片1：业绩前三
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🏆</span>' +
-                            '<h3>' + (lang === 'id' ? 'Kinerja Terbaik (3 Besar)' : '业绩前三排行') + '</h3>' +
+                            '<h3>' + (lang === 'id' ? 'Kinerja Terbaik Bulan Ini (3 Besar)' : '本月业绩前三排行') + '</h3>' +
                             '<span class="anomaly-badge">' + top3.length + '</span>' +
                         '</div>' +
                         '<div class="anomaly-card-body">' + top3Html + '</div>' +
                         '<div class="anomaly-card-footer">' +
-                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini (tidak termasuk pusat & toko tutup)' : '排名基于当月数据（不含总部及暂停门店）') + '</span>' +
+                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini' : '排名基于当月数据') + '</span>' +
                         '</div>' +
                     '</div>' +
                     
-                    // 卡片2：门店业绩后三排行
+                    // 卡片2：业绩后三
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">📉</span>' +
-                            '<h3>' + (lang === 'id' ? 'Kinerja Terendah (3 Besar)' : '业绩后三排行') + '</h3>' +
+                            '<h3>' + (lang === 'id' ? 'Kinerja Terendah Bulan Ini (3 Besar)' : '本月业绩后三排行') + '</h3>' +
                             '<span class="anomaly-badge">' + bottom3.length + '</span>' +
                         '</div>' +
                         '<div class="anomaly-card-body">' + bottom3Html + '</div>' +
                         '<div class="anomaly-card-footer">' +
-                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini (tidak termasuk pusat & toko tutup)' : '排名基于当月数据（不含总部及暂停门店）') + '</span>' +
+                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini' : '排名基于当月数据') + '</span>' +
                         '</div>' +
                     '</div>' +
                     
@@ -403,7 +523,7 @@ const DashboardAnomaly = {
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">⚠️</span>' +
                             '<h3>' + (lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单') + '</h3>' +
-                            '<span class="anomaly-badge">' + overdueOrders.length + '</span>' +
+                            '<span class="anomaly-badge">' + overdueTotalCount + '</span>' +
                         '</div>' +
                         '<div class="anomaly-card-body">' + overdueTableHtml + '</div>' +
                         (overdueOrders.length > 0 ? 
@@ -412,28 +532,200 @@ const DashboardAnomaly = {
                             '</div>' : '') +
                     '</div>' +
                     
-                    // 卡片4：黑名单客户（全部门店共享）
+                    // 卡片4：黑名单
                     '<div class="anomaly-card anomaly-card-warning">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🚫</span>' +
                             '<h3>' + (lang === 'id' ? 'Daftar Hitam Nasabah' : '黑名单客户') + '</h3>' +
-                            '<span class="anomaly-badge">' + blacklist.length + '</span>' +
+                            '<span class="anomaly-badge">' + blacklistTotalCount + '</span>' +
                         '</div>' +
                         '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
                     '</div>' +
                     
                 '</div>';
             
+            // 存储状态用于加载更多
+            window._anomalyOverdueState = {
+                page: 0,
+                pageSize: 50,
+                totalCount: overdueTotalCount,
+                profile: profile,
+                isAdmin: isAdmin,
+                storeId: storeId
+            };
+            window._anomalyBlacklistState = {
+                page: 0,
+                pageSize: 50,
+                totalCount: blacklistTotalCount
+            };
+            
         } catch (error) {
             console.error("showAnomaly error:", error);
             Utils.ErrorHandler.capture(error, 'showAnomaly');
-            alert(lang === 'id' ? 'Gagal memuat data abnormal' : '加载异常数据失败');
+            alert(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
+        }
+    },
+
+    // ========== 加载更多逾期订单 ==========
+    loadMoreOverdueOrders: async function() {
+        var state = window._anomalyOverdueState;
+        if (!state) return;
+        
+        var lang = Utils.lang;
+        
+        // 禁用按钮
+        var loadMoreBtn = document.querySelector('#overdueLoadMoreRow button');
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...');
+        }
+        
+        try {
+            var nextPage = state.page + 1;
+            var result = await AnomalyHelper.getOverdueOrders(state.profile, nextPage, state.pageSize);
+            
+            // 构建新行HTML
+            var newRows = '';
+            for (var i = 0; i < result.data.length; i++) {
+                var o = result.data[i];
+                var customerName = o.customers?.name || o.customer_name || '-';
+                newRows += '<tr>' +
+                    '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
+                    '<td>' + Utils.escapeHtml(customerName) + '</td>' +
+                    '<td class="text-center expense">' + (o.overdue_days || 0) + '</td>' +
+                    '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
+                    '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
+                '</tr>';
+            }
+            
+            // 移除旧加载更多行
+            var oldLoadMoreRow = document.getElementById('overdueLoadMoreRow');
+            if (oldLoadMoreRow) oldLoadMoreRow.remove();
+            
+            // 插入新行
+            var tbody = document.querySelector('.anomaly-card-danger table tbody');
+            if (tbody) {
+                tbody.insertAdjacentHTML('beforeend', newRows);
+                
+                // 更新状态
+                state.page = nextPage;
+                state.totalCount = result.totalCount;
+                
+                // 如果还有更多，追加新的加载更多行
+                var loadedCount = (nextPage + 1) * state.pageSize;
+                if (result.totalCount > loadedCount) {
+                    var loadMoreHtml = '' +
+                        '<tr id="overdueLoadMoreRow">' +
+                            '<td colspan="5" style="text-align:center;padding:10px;">' +
+                                '<button onclick="APP.loadMoreOverdueOrders()" class="btn-small primary" style="padding:8px 24px;">' +
+                                    '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
+                                    ' (' + (result.totalCount - loadedCount) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
+                                '</button>' +
+                            '</td>' +
+                        '</tr>';
+                    tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
+                } else {
+                    // 全部加载完毕
+                    var doneHtml = '' +
+                        '<tr id="overdueLoadMoreRow">' +
+                            '<td colspan="5" style="text-align:center;padding:10px;color:var(--text-muted);">' +
+                                '✅ ' + (lang === 'id' ? 'Semua ' + result.totalCount + ' pesanan telah dimuat' : '已加载全部 ' + result.totalCount + ' 条订单') +
+                            '</td>' +
+                        '</tr>';
+                    tbody.insertAdjacentHTML('beforeend', doneHtml);
+                }
+            }
+            
+        } catch (err) {
+            console.error("loadMoreOverdueOrders error:", err);
+            Utils.ErrorHandler.capture(err, 'loadMoreOverdueOrders');
+            // 恢复按钮
+            if (loadMoreBtn) {
+                loadMoreBtn.disabled = false;
+                loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
+            }
+        }
+    },
+
+    // ========== 加载更多黑名单 ==========
+    loadMoreBlacklist: async function() {
+        var state = window._anomalyBlacklistState;
+        if (!state) return;
+        
+        var lang = Utils.lang;
+        
+        var loadMoreBtn = document.querySelector('#blacklistLoadMoreRow button');
+        if (loadMoreBtn) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...');
+        }
+        
+        try {
+            var nextPage = state.page + 1;
+            var result = await AnomalyHelper.getBlacklistCustomers(nextPage, state.pageSize);
+            
+            var newRows = '';
+            for (var i = 0; i < result.data.length; i++) {
+                var b = result.data[i];
+                newRows += '<tr>' +
+                    '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
+                    '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
+                    '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '</td>' +
+                    '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
+                '</tr>';
+            }
+            
+            var oldLoadMoreRow = document.getElementById('blacklistLoadMoreRow');
+            if (oldLoadMoreRow) oldLoadMoreRow.remove();
+            
+            var tbody = document.querySelector('.anomaly-card-warning table tbody');
+            if (tbody) {
+                tbody.insertAdjacentHTML('beforeend', newRows);
+                
+                state.page = nextPage;
+                state.totalCount = result.totalCount;
+                
+                var loadedCount = (nextPage + 1) * state.pageSize;
+                if (result.totalCount > loadedCount) {
+                    var loadMoreHtml = '' +
+                        '<tr id="blacklistLoadMoreRow">' +
+                            '<td colspan="4" style="text-align:center;padding:10px;">' +
+                                '<button onclick="APP.loadMoreBlacklist()" class="btn-small primary" style="padding:8px 24px;">' +
+                                    '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
+                                    ' (' + (result.totalCount - loadedCount) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
+                                '</button>' +
+                            '</td>' +
+                        '</tr>';
+                    tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
+                } else {
+                    var doneHtml = '' +
+                        '<tr id="blacklistLoadMoreRow">' +
+                            '<td colspan="4" style="text-align:center;padding:10px;color:var(--text-muted);">' +
+                                '✅ ' + (lang === 'id' ? 'Semua ' + result.totalCount + ' data telah dimuat' : '已加载全部 ' + result.totalCount + ' 条数据') +
+                            '</td>' +
+                        '</tr>';
+                    tbody.insertAdjacentHTML('beforeend', doneHtml);
+                }
+            }
+            
+        } catch (err) {
+            console.error("loadMoreBlacklist error:", err);
+            Utils.ErrorHandler.capture(err, 'loadMoreBlacklist');
+            if (loadMoreBtn) {
+                loadMoreBtn.disabled = false;
+                loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
+            }
         }
     }
 };
 
+// 挂载方法到 window.APP
 for (var key in DashboardAnomaly) {
     if (typeof DashboardAnomaly[key] === 'function') {
         window.APP[key] = DashboardAnomaly[key];
     }
 }
+
+// 挂载加载更多方法
+window.APP.loadMoreOverdueOrders = DashboardAnomaly.loadMoreOverdueOrders.bind(DashboardAnomaly);
+window.APP.loadMoreBlacklist = DashboardAnomaly.loadMoreBlacklist.bind(DashboardAnomaly);
