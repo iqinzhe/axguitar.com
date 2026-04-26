@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.1（移除内联样式，使用组件库）
+// app-dashboard-expenses.js - v2.2（门店账号移除支出操作权限）
 
 window.APP = window.APP || {};
 
@@ -69,17 +69,22 @@ const DashboardExpenses = {
                     
                     // 操作行
                     var actionHtml = '';
-                    if (canEdit) {
-                        actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
-                        actionHtml += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button>';
-                    } else if (e.is_reconciled) {
-                        actionHtml += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '</span>';
-                    } else if (!isAdmin) {
-                        actionHtml += '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
-                    }
                     
-                    if (isAdmin && !e.is_reconciled) {
-                        actionHtml += '<button onclick="APP.balanceExpenses()" class="btn-small warning">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
+                    if (isAdmin) {
+                        // 管理员：编辑 + 删除
+                        if (!e.is_reconciled) {
+                            actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
+                            actionHtml += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button>';
+                        } else {
+                            actionHtml += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '</span>';
+                        }
+                        // 管理员：平账按钮
+                        if (!e.is_reconciled) {
+                            actionHtml += '<button onclick="APP.balanceExpenses()" class="btn-small warning">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
+                        }
+                    } else {
+                        // 门店操作员：只显示锁定状态，无任何操作按钮
+                        actionHtml += '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
                     }
                     
                     rows += '<tr class="action-row">' +
@@ -109,7 +114,7 @@ const DashboardExpenses = {
                     '</div>' +
                 '</div>' +
                 
-                // 支出总额卡片（使用 stat-card 组件）
+                // 支出总额卡片
                 '<div class="card">' +
                     '<div class="stat-card" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">' +
                         '<div class="stat-value expense">' + Utils.formatCurrency(totalAmount) + '</div>' +
@@ -219,6 +224,16 @@ const DashboardExpenses = {
 
     editExpense: async function(expenseId) {
         var lang = Utils.lang;
+        var profile = null;
+        try { profile = await SUPABASE.getCurrentProfile(); } catch(e) { console.warn(e); }
+        var isAdmin = profile?.role === 'admin';
+        
+        // 非管理员禁止编辑
+        if (!isAdmin) {
+            alert(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
+            return;
+        }
+        
         try {
             const { data: expense, error } = await supabaseClient.from('expenses').select('*').eq('id', expenseId).single();
             if (error) throw error;
@@ -243,6 +258,15 @@ const DashboardExpenses = {
 
     deleteExpense: async function(expenseId) {
         var lang = Utils.lang;
+        var profile = null;
+        try { profile = await SUPABASE.getCurrentProfile(); } catch(e) { console.warn(e); }
+        var isAdmin = profile?.role === 'admin';
+        
+        // 非管理员禁止删除
+        if (!isAdmin) {
+            alert(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
+            return;
+        }
         
         var confirmMsg = lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？';
         if (!confirm(confirmMsg)) return;
