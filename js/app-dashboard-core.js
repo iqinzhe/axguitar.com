@@ -698,27 +698,30 @@ const DashboardCore = {
             
             // ========== 组装页面 ==========
             var backButtonHtml = (this.historyStack.length > 0) ? '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' : '';
-            
-            document.getElementById("app").innerHTML = '' +
-                '<div class="page-header">' +
-                    '<div style="display:flex;align-items:center;gap:12px;">' +
-                        '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
-                        '<h1 style="margin:0;">JF! by Gadai</h1>' +
-                    '</div>' +
-                    '<div class="header-actions">' +
-                        backButtonHtml +
-                    '</div>' +
-                '</div>' +
-                cashFlowHtml +
-                '<div style="margin-bottom:12px;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + t('financial_indicators') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
-                '</div>' +
-                '<div class="stats-grid">' + cardsHtml + '</div>' +
-                '<div style="margin:20px 0 12px 0;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + t('operation') + '</h3>' +
-                '</div>' +
-                toolbarHtml +
-                bottomHtml;
+
+        document.getElementById("app").innerHTML = '' +
+    '<div class="page-header">' +
+        '<div style="display:flex;align-items:center;gap:12px;">' +
+            '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
+            '<h1 style="margin:0;">JF! by Gadai</h1>' +
+        '</div>' +
+        '<div class="header-actions">' +
+            backButtonHtml +
+        '</div>' +
+    '</div>' +
+    // 1. 业务操作
+    '<div style="margin:0 0 12px 0;">' +
+        '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + t('operation') + '</h3>' +
+    '</div>' +
+    toolbarHtml +
+    // 2. 经营指标
+    '<div style="margin:0 0 12px 0;">' +
+        '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + t('financial_indicators') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
+    '</div>' +
+    '<div class="stats-grid">' + cardsHtml + '</div>' +
+    // 3. 资金管理
+    cashFlowHtml +
+    bottomHtml;
             
         } catch (err) {
             console.error("renderDashboard error:", err);
