@@ -1,6 +1,269 @@
-// app-dashboard-core.js - v3.0（骨架屏、登录重构、移除自动清理、滚动重置）
+// app-dashboard-core.js - v3.1（性能优化：聚合查询替代全量加载 + 数据缓存 + 滚动重置）
 
 window.APP = window.APP || {};
+
+// ==================== 仪表盘缓存模块 ====================
+const DashboardCache = {
+    data: new Map(),
+    ttl: 5 * 60 * 1000,  // 5分钟缓存
+    
+    getKey(...parts) {
+        return parts.join(':');
+    },
+    
+    async get(key, fetcher, forceRefresh = false) {
+        if (!forceRefresh) {
+            const cached = this.data.get(key);
+            if (cached && Date.now() - cached.time < this.ttl) {
+                console.log(`[Cache] Hit: ${key}`);
+                return cached.value;
+            }
+        }
+        console.log(`[Cache] Miss: ${key}`);
+        const value = await fetcher();
+        this.data.set(key, { value, time: Date.now() });
+        return value;
+    },
+    
+    invalidate(key) {
+        if (key) {
+            this.data.delete(key);
+            console.log(`[Cache] Invalidated: ${key}`);
+        } else {
+            this.data.clear();
+            console.log(`[Cache] Cleared all`);
+        }
+    },
+    
+    // 批量失效
+    invalidateMany(keys) {
+        for (const key of keys) {
+            this.data.delete(key);
+        }
+        console.log(`[Cache] Invalidated: ${keys.join(', ')}`);
+    }
+};
+
+// ==================== 聚合查询辅助方法 ====================
+const DashboardStatsHelper = {
+    /**
+     * 获取仪表盘统计数据（使用聚合查询，不拉取全量订单）
+     */
+    async getDashboardStats(profile) {
+        const isAdmin = profile?.role === 'admin';
+        const storeId = profile?.store_id;
+        
+        // 构建基础查询条件
+        let baseQuery = supabaseClient.from('orders');
+        if (!isAdmin && storeId) {
+            baseQuery = baseQuery.eq('store_id', storeId);
+        }
+        
+        // 并行执行多个聚合查询
+        const [
+            totalCountResult,
+            activeCountResult,
+            completedCountResult,
+            overdueCountResult,
+            activeOrdersData,
+            loanSumData
+        ] = await Promise.all([
+            baseQuery.select('*', { count: 'exact', head: true }),
+            baseQuery.eq('status', 'active').select('*', { count: 'exact', head: true }),
+            baseQuery.eq('status', 'completed').select('*', { count: 'exact', head: true }),
+            baseQuery.eq('status', 'active').gte('overdue_days', 1).select('*', { count: 'exact', head: true }),
+            // 获取活跃订单的财务数据用于汇总
+            baseQuery.eq('status', 'active').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount'),
+            // 获取所有订单的贷款金额统计
+            baseQuery.select('loan_amount')
+        ]);
+        
+        // 计算汇总金额（仅对活跃订单，数据量已大幅减少）
+        let totalAdminFees = 0;
+        let totalServiceFees = 0;
+        let totalInterest = 0;
+        let totalPrincipal = 0;
+        let totalActiveLoanAmount = 0;
+        
+        const activeOrders = activeOrdersData?.data || [];
+        for (const order of activeOrders) {
+            if (order.admin_fee_paid) totalAdminFees += (order.admin_fee || 0);
+            totalServiceFees += (order.service_fee_paid || 0);
+            totalInterest += (order.interest_paid_total || 0);
+            totalPrincipal += (order.principal_paid || 0);
+            totalActiveLoanAmount += (order.loan_amount || 0);
+        }
+        
+        // 计算总贷款金额（全量订单）
+        let totalLoanAmount = 0;
+        const allOrdersLoanData = loanSumData?.data || [];
+        for (const order of allOrdersLoanData) {
+            totalLoanAmount += (order.loan_amount || 0);
+        }
+        
+        return {
+            total_orders: totalCountResult?.count || 0,
+            active_orders: activeCountResult?.count || 0,
+            completed_orders: completedCountResult?.count || 0,
+            overdue_orders: overdueCountResult?.count || 0,
+            total_loan_amount: totalLoanAmount,
+            total_active_loan_amount: totalActiveLoanAmount,
+            total_admin_fees: totalAdminFees,
+            total_service_fees: totalServiceFees,
+            total_interest: totalInterest,
+            total_principal: totalPrincipal
+        };
+    },
+    
+    /**
+     * 获取异常状况统计数据（仅统计，不拉取全部明细）
+     */
+    async getAnomalyStats(profile) {
+        const isAdmin = profile?.role === 'admin';
+        const storeId = profile?.store_id;
+        
+        let query = supabaseClient.from('orders');
+        if (!isAdmin && storeId) {
+            query = query.eq('store_id', storeId);
+        }
+        
+        const [overdue30Result, blacklistResult] = await Promise.all([
+            query.eq('status', 'active').gte('overdue_days', 30).select('*', { count: 'exact', head: true }),
+            supabaseClient.from('blacklist').select('*', { count: 'exact', head: true })
+        ]);
+        
+        return {
+            overdue30Count: overdue30Result?.count || 0,
+            blacklistCount: blacklistResult?.count || 0
+        };
+    },
+    
+    /**
+     * 获取本月门店排名数据（使用聚合查询）
+     */
+    async getMonthlyStoreRanking(profile, stores) {
+        const isAdmin = profile?.role === 'admin';
+        if (!isAdmin) return null;
+        
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+        const monthEnd = today.toISOString().split('T')[0];
+        
+        // 获取本月所有订单（只获取必要字段）
+        const { data: monthlyOrders, error } = await supabaseClient
+            .from('orders')
+            .select('id, store_id, loan_amount, status, created_at, overdue_days')
+            .gte('created_at', monthStart)
+            .lte('created_at', monthEnd);
+        
+        if (error) throw error;
+        
+        // 获取本月还款记录
+        const { data: monthlyFlows } = await supabaseClient
+            .from('cash_flow_records')
+            .select('store_id, amount, order_id')
+            .eq('direction', 'inflow')
+            .eq('is_voided', false)
+            .gte('recorded_at', monthStart);
+        
+        // 构建 flow 金额映射
+        const flowAmountByOrder = {};
+        if (monthlyFlows) {
+            for (const flow of monthlyFlows) {
+                if (flow.order_id) {
+                    flowAmountByOrder[flow.order_id] = (flowAmountByOrder[flow.order_id] || 0) + (flow.amount || 0);
+                }
+            }
+        }
+        
+        // 门店映射
+        const storeInfoMap = {};
+        for (const store of stores) {
+            storeInfoMap[store.id] = {
+                id: store.id,
+                name: store.name,
+                code: store.code,
+                isActive: store.is_active !== false
+            };
+        }
+        
+        // 统计各门店数据
+        const storeStats = {};
+        for (const order of (monthlyOrders || [])) {
+            const s = storeInfoMap[order.store_id];
+            if (!s || !s.isActive || s.code === 'STORE_000') continue;
+            
+            if (!storeStats[order.store_id]) {
+                storeStats[order.store_id] = {
+                    id: order.store_id,
+                    name: s.name,
+                    code: s.code,
+                    orderCount: 0,
+                    totalLoanOutflow: 0,
+                    badOrders: 0,
+                    totalRecovery: 0
+                };
+            }
+            
+            storeStats[order.store_id].orderCount++;
+            storeStats[order.store_id].totalLoanOutflow += (order.loan_amount || 0);
+            
+            if ((order.overdue_days || 0) >= 15 && order.status === 'active') {
+                storeStats[order.store_id].badOrders++;
+            }
+            
+            storeStats[order.store_id].totalRecovery += (flowAmountByOrder[order.id] || 0);
+        }
+        
+        // 转换为数组并计算排名
+        let eligibleStores = Object.values(storeStats);
+        
+        if (eligibleStores.length === 0) return { top3: [], bottom3: [] };
+        
+        // 计算排名分数
+        for (const s of eligibleStores) {
+            s.rankSum = 0;
+        }
+        
+        // 按订单数排序
+        eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankOrderCount = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按放款额排序（从小到大，越小越好）
+        eligibleStores.sort((a, b) => a.totalLoanOutflow - b.totalLoanOutflow);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankLoanOutflow = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按不良订单数排序（从小到大，越小越好）
+        eligibleStores.sort((a, b) => a.badOrders - b.badOrders);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankBadOrders = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按回收额排序（从大到小，越大越好）
+        eligibleStores.sort((a, b) => b.totalRecovery - a.totalRecovery);
+        for (let i = 0; i < eligibleStores.length; i++) {
+            eligibleStores[i].rankRecovery = i + 1;
+            eligibleStores[i].rankSum += (i + 1);
+        }
+        
+        // 按总分排序
+        eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
+        
+        const top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
+        const bottom3 = eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse();
+        
+        return { top3, bottom3 };
+    }
+};
 
 const DashboardCore = {
     currentFilter: "all",
@@ -299,7 +562,7 @@ const DashboardCore = {
         }
     },
 
-    // ==================== 登录页（重构） ====================
+    // ==================== 登录页 ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
@@ -320,7 +583,6 @@ const DashboardCore = {
                     '</div>' +
                     '<h3>' + t('login') + '</h3>' +
                     
-                    // 错误提示区域
                     '<div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;">' +
                         '<span class="info-bar-icon">⚠️</span>' +
                         '<div class="info-bar-content" id="loginErrorMessage"></div>' +
@@ -336,7 +598,6 @@ const DashboardCore = {
                         '<span onclick="Utils.togglePasswordVisibility(\'password\', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;user-select:none;z-index:2;">👁️</span>' +
                     '</div>' +
                     
-                    // 记住我复选框
                     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;font-size:var(--font-sm);">' +
                         '<input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;">' +
                         '<label for="rememberMe" style="cursor:pointer;font-weight:500;">' + 
@@ -358,7 +619,6 @@ const DashboardCore = {
         this.renderLogin();
     },
 
-    // ==================== 登录方法（重构） ====================
     login: async function() {
         var username = document.getElementById("username").value.trim();
         var password = document.getElementById("password").value;
@@ -367,7 +627,6 @@ const DashboardCore = {
         var errorMsg = document.getElementById("loginErrorMessage");
         var btnEl = document.getElementById("loginBtn");
         
-        // 隐藏之前的错误
         if (errorDiv) errorDiv.style.display = 'none';
         
         if (!username || !password) {
@@ -380,7 +639,6 @@ const DashboardCore = {
         
         if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
         
-        // 设置记住我
         AUTH.setRememberMe(rememberMe);
         
         var user = await AUTH.login(username, password);
@@ -420,7 +678,7 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    // ==================== 仪表盘（移除自动清理） ====================
+    // ==================== 仪表盘（性能优化版：使用聚合查询 + 缓存） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -434,130 +692,110 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            const queries = [
-                SUPABASE.getOrdersLegacy(),
-                SUPABASE.getCashFlowRecords(),
-                SUPABASE.getOrdersNeedReminder(),
-                SUPABASE.getAllStores()
-            ];
+            // 使用缓存获取统计数据（5分钟有效期）
+            const cacheKey = DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId);
+            const report = await DashboardCache.get(cacheKey, 
+                () => DashboardStatsHelper.getDashboardStats(profile)
+            );
             
-            if (isAdmin) {
-                queries.push(
-                    supabaseClient.from('expenses').select('amount')
-                );
-            } else if (storeId) {
-                queries.push(
-                    supabaseClient.from('expenses').select('amount').eq('store_id', storeId)
-                );
-            } else {
-                queries.push(Promise.resolve({ data: [] }));
+            // 获取现金流数据（保持原有逻辑，但使用缓存）
+            const cashFlowCacheKey = DashboardCache.getKey('cashflow', isAdmin ? 'admin' : storeId);
+            const cashFlow = await DashboardCache.get(cashFlowCacheKey,
+                async () => {
+                    const allCashFlows = await SUPABASE.getCashFlowRecords();
+                    const storeSpecificCashFlows = !isAdmin && storeId 
+                        ? await supabaseClient.from('cash_flow_records')
+                            .select('direction, amount, source_target, flow_type')
+                            .eq('store_id', storeId)
+                            .eq('is_voided', false)
+                            .then(res => res.data || [])
+                        : [];
+                    return this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId, storeSpecificCashFlows);
+                }
+            );
+            
+            // 获取支出汇总
+            const expensesCacheKey = DashboardCache.getKey('expenses', isAdmin ? 'admin' : storeId);
+            const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
+                let query = supabaseClient.from('expenses').select('amount');
+                if (!isAdmin && storeId) {
+                    query = query.eq('store_id', storeId);
+                }
+                const { data } = await query;
+                let sum = 0;
+                for (const ex of (data || [])) sum += (ex.amount || 0);
+                return sum;
+            });
+            
+            // 获取本月订单数
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+            const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+            
+            const monthOrdersCacheKey = DashboardCache.getKey('month_orders', isAdmin ? 'admin' : storeId, currentYear, currentMonth);
+            let thisMonthOrderCount = await DashboardCache.get(monthOrdersCacheKey, async () => {
+                let query = supabaseClient.from('orders').select('created_at', { count: 'exact', head: true });
+                if (!isAdmin && storeId) query = query.eq('store_id', storeId);
+                query = query.gte('created_at', monthStart);
+                const { count } = await query;
+                return count || 0;
+            });
+            
+            // 获取催收提醒数据
+            const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
+            const hasReminders = needRemindOrders.length > 0;
+            let hasSentToday = false;
+            try {
+                hasSentToday = await (window.APP.hasSentRemindersToday ? window.APP.hasSentRemindersToday() : Promise.resolve(false));
+            } catch(e) {
+                hasSentToday = false;
             }
+            const btnDisabled = hasSentToday;
+            const btnHighlight = hasReminders && !hasSentToday;
             
-            if (!isAdmin && storeId) {
-                queries.push(
-                    supabaseClient.from('cash_flow_records')
-                        .select('direction, amount, source_target, flow_type')
+            // 统计逾期订单数（使用 report 中的值）
+            const overdueOrdersCount = report.overdue_orders || 0;
+            const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
+            
+            // 计算赤字
+            const flowsForDeficit = await DashboardCache.get(DashboardCache.getKey('flows_for_deficit', isAdmin ? 'admin' : storeId), async () => {
+                let flows;
+                if (!isAdmin && storeId) {
+                    const { data } = await supabaseClient
+                        .from('cash_flow_records')
+                        .select('direction, amount, flow_type')
                         .eq('store_id', storeId)
-                        .eq('is_voided', false)
-                );
-            } else {
-                queries.push(Promise.resolve([]));
-            }
-            
-            const [
-                allOrders,
-                allCashFlows,
-                needRemindOrders,
-                stores,
-                expensesResult,
-                storeSpecificCashFlows
-            ] = await Promise.all(queries);
-            
-            var report = this._calculateReport(allOrders);
-            
-            var storeMap = {};
-            for (var i = 0; i < stores.length; i++) {
-                storeMap[stores[i].id] = stores[i].name;
-            }
-            
-            var today = new Date();
-            var currentMonth = today.getMonth();
-            var currentYear = today.getFullYear();
-            var thisMonthOrderCount = 0;
-            for (var i = 0; i < allOrders.length; i++) {
-                var orderDate = new Date(allOrders[i].created_at);
-                if (orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear) {
-                    thisMonthOrderCount++;
+                        .eq('is_voided', false);
+                    flows = data || [];
+                } else {
+                    const { data } = await supabaseClient
+                        .from('cash_flow_records')
+                        .select('direction, amount, flow_type')
+                        .eq('is_voided', false);
+                    flows = data || [];
                 }
-            }
+                return flows;
+            });
             
-            var totalExpenses = 0;
-            var expenses = expensesResult?.data || expensesResult || [];
-            if (Array.isArray(expenses)) {
-                for (var i = 0; i < expenses.length; i++) {
-                    totalExpenses += (expenses[i].amount || 0);
-                }
-            }
-            
-            var cashFlow = this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId, storeSpecificCashFlows);
-            
-            var flowsToAnalyze = [];
-            if (!isAdmin && storeSpecificCashFlows && Array.isArray(storeSpecificCashFlows)) {
-                flowsToAnalyze = storeSpecificCashFlows;
-            } else if (allCashFlows && Array.isArray(allCashFlows)) {
-                flowsToAnalyze = allCashFlows;
-            }
-            
-            var totalInflowExcludingPrincipal = 0;
-            var totalOutflow = 0;
-            for (var i = 0; i < flowsToAnalyze.length; i++) {
-                var f = flowsToAnalyze[i];
-                var amount = f.amount || 0;
+            let totalInflowExcludingPrincipal = 0;
+            let totalOutflow = 0;
+            for (const f of flowsForDeficit) {
+                const amount = f.amount || 0;
                 if (f.direction === 'inflow' && f.flow_type !== 'principal') {
                     totalInflowExcludingPrincipal += amount;
                 } else if (f.direction === 'outflow') {
                     totalOutflow += amount;
                 }
             }
-            var deficit = totalOutflow - totalInflowExcludingPrincipal;
+            const deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            // 直接统计订单状态（不再自动清理过期订单）
-            var activeOrdersCount = 0;
-            var overdueOrdersCount = 0;
-            var completedOrdersCount = 0;
-            for (var i = 0; i < allOrders.length; i++) {
-                if (allOrders[i].status === 'active') {
-                    activeOrdersCount++;
-                    if ((allOrders[i].overdue_days || 0) > 0) {
-                        overdueOrdersCount++;
-                    }
-                } else if (allOrders[i].status === 'completed') {
-                    completedOrdersCount++;
-                }
-            }
-            
-            var storeName = AUTH.getCurrentStoreName();
-            var hasReminders = needRemindOrders.length > 0;
-            var hasSentToday = false;
-            try {
-                hasSentToday = await (window.APP.hasSentRemindersToday ? window.APP.hasSentRemindersToday() : Promise.resolve(false));
-            } catch(e) {
-                hasSentToday = false;
-            }
-            var btnDisabled = hasSentToday;
-            var btnHighlight = hasReminders && !hasSentToday;
-            
-            var activeDisplay = activeOrdersCount;
-            if (overdueOrdersCount > 0) {
-                activeDisplay = activeOrdersCount + ' / ⚠️ ' + overdueOrdersCount;
-            }
-            
-            // ========== 统计卡片数据 ==========
-            var cards = [
+            // 统计卡片数据
+            const cards = [
                 { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, class: '' },
                 { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), class: deficit >= 0 ? 'expense' : 'income' },
                 { label: lang === 'id' ? 'Berjalan / Jatuh Tempo' : '进行中 / 逾期单', value: activeDisplay, class: '' },
-                { label: (lang === 'id' ? 'Lunas' : '已结清'), value: completedOrdersCount, class: '' },
+                { label: (lang === 'id' ? 'Lunas' : '已结清'), value: report.completed_orders, class: '' },
                 { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), class: 'income' },
                 { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), class: 'income' },
@@ -579,7 +817,7 @@ const DashboardCore = {
             var bankIncome = cashFlow.bank?.income ?? 0;
             var bankExpense = cashFlow.bank?.expense ?? 0;
             
-            // ========== 资金管理区块 ==========
+            // 资金管理区块
             var cashFlowHtml = '';
             if (isAdmin) {
                 cashFlowHtml = '' +
@@ -644,7 +882,7 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // ========== 工具栏 ==========
+            // 工具栏
             var toolbarHtml = '';
             if (isAdmin) {
                 toolbarHtml = '' +
@@ -662,23 +900,23 @@ const DashboardCore = {
                 '</div>';
             } else {
                 toolbarHtml = '' +
-               toolbarHtml = '' +
-'<div class="toolbar store-grid no-print" style="grid-template-columns: repeat(4, 1fr);">' +
-    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
-    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
-    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
-    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
-    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
-    '<button onclick="APP.navigateTo(\'backupRestore\')">💾 ' + t('backup_restore') + '</button>' +
-    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
-'</div>';
+                '<div class="toolbar store-grid no-print" style="grid-template-columns: repeat(4, 1fr);">' +
+                    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
+                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
+                    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'backupRestore\')">💾 ' + t('backup_restore') + '</button>' +
+                    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
+                '</div>';
             }
             
-            // ========== 底部信息 ==========
+            // 底部信息
             var userRoleText = AUTH.user.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
+            var storeName = AUTH.getCurrentStoreName();
             
             var bottomHtml = '';
             if (isAdmin) {
@@ -699,32 +937,28 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // ========== 组装页面 ==========
             var backButtonHtml = (this.historyStack.length > 0) ? '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' : '';
 
-        document.getElementById("app").innerHTML = '' +
-    '<div class="page-header">' +
-        '<div style="display:flex;align-items:center;gap:12px;">' +
-            '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
-            '<h1 style="margin:0;">JF! by Gadai</h1>' +
-        '</div>' +
-        '<div class="header-actions">' +
-            backButtonHtml +
-        '</div>' +
-    '</div>' +
-    // 1. 业务操作
-    '<div style="margin:0 0 12px 0;">' +
-        '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + t('operation') + '</h3>' +
-    '</div>' +
-    toolbarHtml +
-    // 2. 经营指标
-    '<div style="margin:0 0 12px 0;">' +
-        '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + t('financial_indicators') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
-    '</div>' +
-    '<div class="stats-grid">' + cardsHtml + '</div>' +
-    // 3. 资金管理
-    cashFlowHtml +
-    bottomHtml;
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header">' +
+                    '<div style="display:flex;align-items:center;gap:12px;">' +
+                        '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
+                        '<h1 style="margin:0;">JF! by Gadai</h1>' +
+                    '</div>' +
+                    '<div class="header-actions">' +
+                        backButtonHtml +
+                    '</div>' +
+                '</div>' +
+                '<div style="margin:0 0 12px 0;">' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + t('operation') + '</h3>' +
+                '</div>' +
+                toolbarHtml +
+                '<div style="margin:0 0 12px 0;">' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + t('financial_indicators') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
+                '</div>' +
+                '<div class="stats-grid">' + cardsHtml + '</div>' +
+                cashFlowHtml +
+                bottomHtml;
             
         } catch (err) {
             console.error("renderDashboard error:", err);
@@ -734,6 +968,7 @@ const DashboardCore = {
     },
 
     _calculateReport: function(orders) {
+        // 保留原方法用于兼容，但实际仪表盘不再调用全量版本
         var totalLoanAmount = 0;
         var totalAdminFees = 0;
         var totalServiceFees = 0;
@@ -851,6 +1086,11 @@ const DashboardCore = {
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
         }
+    },
+    
+    // 暴露缓存失效方法供外部调用（在创建订单、缴费等操作后调用）
+    invalidateDashboardCache: function() {
+        DashboardCache.invalidate();
     }
 };
 
@@ -869,3 +1109,6 @@ window.APP.historyStack = DashboardCore.historyStack;
 window.APP.currentPage = DashboardCore.currentPage;
 window.APP.currentOrderId = DashboardCore.currentOrderId;
 window.APP.currentCustomerId = DashboardCore.currentCustomerId;
+
+// 导出缓存失效方法
+window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
