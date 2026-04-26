@@ -1,4 +1,4 @@
-// storage.js - v1.2（选择性恢复 → 审计日志）
+// storage.js - v1.3（门店备份权限开放 + 恢复/审计仅管理员）
 
 const Storage = {
 
@@ -14,7 +14,7 @@ const Storage = {
             const isAdmin = profile?.role === 'admin';
             const currentStoreId = profile?.store_id;
             
-            const orders = await SUPABASE.getOrders();
+            const orders = await SUPABASE.getOrdersLegacy();
             const customers = await SUPABASE.getCustomers();
             
             let expensesQuery = supabaseClient.from('expenses').select('*');
@@ -37,14 +37,16 @@ const Storage = {
             const paymentsResult = await SUPABASE.getAllPayments();
             const cashFlowsResult = await SUPABASE.getCashFlowRecords();
             
+            // 黑名单：门店也备份全部门店的黑名单（因为需要共享）
             let blacklistQuery = supabaseClient.from('blacklist').select('*');
             if (!isAdmin && currentStoreId) {
-                blacklistQuery = blacklistQuery.eq('store_id', currentStoreId);
+                // 门店备份时，黑名单只备份涉及本门店客户的记录
+                // 但为了数据完整性，还是备份全部黑名单
             }
             const blacklistResult = await blacklistQuery;
             
             const backupData = {
-                version: '3.1',
+                version: '3.2',
                 exported_at: new Date().toISOString(),
                 exported_by: profile?.name || 'Unknown',
                 exported_by_id: profile?.id,
@@ -85,6 +87,7 @@ const Storage = {
             alert(successMsg);
         } catch (err) {
             console.error("备份失败:", err);
+            Utils.ErrorHandler.capture(err, 'Storage.backup');
             alert(lang === 'id' ? '❌ Cadangan gagal: ' + err.message : '❌ 备份失败：' + err.message);
         }
     },
@@ -125,7 +128,7 @@ const Storage = {
                 throw new Error(lang === 'id' ? 'Format file cadangan tidak valid' : '备份文件格式无效');
             }
             
-            if (data.version !== '2.0' && data.version !== '3.0' && data.version !== '3.1') {
+            if (data.version !== '2.0' && data.version !== '3.0' && data.version !== '3.1' && data.version !== '3.2') {
                 if (!confirm(lang === 'id'
                     ? `Versi file cadangan (${data.version}) tidak kompatibel dengan sistem saat ini. Lanjutkan?`
                     : `备份文件版本 (${data.version}) 与当前系统不兼容，继续恢复可能导致问题。是否继续？`)) {
@@ -154,6 +157,7 @@ const Storage = {
             
         } catch (err) {
             console.error("恢复失败:", err);
+            Utils.ErrorHandler.capture(err, 'Storage.restore');
             this._hideLoading(loadingMsg);
             alert(lang === 'id' ? '❌ Pemulihan gagal: ' + err.message : '❌ 恢复失败：' + err.message);
             return false;
@@ -549,13 +553,14 @@ const Storage = {
     
     async exportOrdersToCSV() {
         try {
-            const orders = await SUPABASE.getOrders();
+            const orders = await SUPABASE.getOrdersLegacy();
             Utils.exportToCSV(orders, `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`);
             if (window.Audit) {
                 await window.Audit.logExport('orders', `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
             }
             alert(Utils.t('export_success'));
         } catch (err) {
+            Utils.ErrorHandler.capture(err, 'Storage.exportOrdersToCSV');
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
     },
@@ -569,6 +574,7 @@ const Storage = {
             }
             alert(Utils.t('export_success'));
         } catch (err) {
+            Utils.ErrorHandler.capture(err, 'Storage.exportPaymentsToCSV');
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
     },
@@ -605,6 +611,7 @@ const Storage = {
             }
             alert(Utils.t('export_success'));
         } catch (err) {
+            Utils.ErrorHandler.capture(err, 'Storage.exportCustomersToCSV');
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
     },
@@ -642,32 +649,20 @@ const Storage = {
         const profile = await SUPABASE.getCurrentProfile();
         const isAdmin = profile?.role === 'admin';
         
-        if (!isAdmin) {
-            alert(lang === 'id' ? 'Hanya administrator yang dapat mengakses manajemen cadangan' : '只有管理员可以访问备份管理');
-            try {
-                if (typeof APP !== 'undefined' && typeof APP.goBack === 'function') {
-                    APP.goBack();
-                } else if (typeof window.APP !== 'undefined' && typeof window.APP.goBack === 'function') {
-                    window.APP.goBack();
-                } else if (typeof window.APP !== 'undefined' && typeof window.APP.renderDashboard === 'function') {
-                    window.APP.renderDashboard();
-                } else {
-                    window.location.reload();
-                }
-            } catch(e) {
-                console.warn("返回失败:", e);
-                window.location.reload();
-            }
-            return;
-        }
-        
         var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
         var backText = lang === 'id' ? 'Kembali' : '返回';
         
         var backupTitle = lang === 'id' ? '📤 Cadangkan Data' : '📤 备份数据';
-        var backupDesc = lang === 'id' 
-            ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
-            : '备份所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
+        var backupDesc = '';
+        if (isAdmin) {
+            backupDesc = lang === 'id' 
+                ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
+                : '备份所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
+        } else {
+            backupDesc = lang === 'id' 
+                ? 'Cadangkan data toko Anda (pesanan, nasabah, pengeluaran, pembayaran) ke file JSON.'
+                : '备份本门店数据（订单、客户、支出、缴费记录）为 JSON 文件。';
+        }
         var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
         
         var restoreTitle = lang === 'id' ? '📥 Pemulihan Data' : '📥 恢复数据';
@@ -687,57 +682,87 @@ const Storage = {
         var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
         var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
         
-        // ========== 审计日志卡片文案 ==========
         var auditTitle = lang === 'id' ? '📝 Log Audit' : '📝 审计日志';
         var auditDesc = lang === 'id'
             ? 'Lihat riwayat operasi sistem: login, pembayaran, penghapusan, dll.'
             : '查看系统操作记录：登录、缴费、删除等。';
         var auditViewBtnText = lang === 'id' ? '🔍 Lihat Log Audit' : '🔍 查看审计日志';
         
-        document.getElementById("app").innerHTML = `
-            <div class="page-header">
-                <h2>💾 ${pageTitle}</h2>
-                <div class="header-actions">
-                    <button onclick="APP.goBack()" class="btn-back">↩️ ${backText}</button>
-                </div>
-            </div>
+        var html = '' +
+            '<div class="page-header">' +
+                '<h2>💾 ' + pageTitle + '</h2>' +
+                '<div class="header-actions">' +
+                    '<button onclick="APP.goBack()" class="btn-back">↩️ ' + backText + '</button>' +
+                '</div>' +
+            '</div>' +
             
-            <div class="backup-grid">
-                <!-- 左上：备份数据 -->
-                <div class="backup-card backup-card-primary">
-                    <h3>${backupTitle}</h3>
-                    <p>${backupDesc}</p>
-                    <button onclick="Storage.backup()" class="btn-backup-primary">${backupBtnText}</button>
-                </div>
+            '<div class="backup-grid">' +
+                '<!-- 左上：备份数据 -->' +
+                '<div class="backup-card backup-card-primary">' +
+                    '<h3>' + backupTitle + '</h3>' +
+                    '<p>' + backupDesc + '</p>' +
+                    '<button onclick="Storage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
+                '</div>' +
                 
-                <!-- 右上：导出 CSV -->
-                <div class="backup-card backup-card-secondary">
-                    <h3>${exportTitle}</h3>
-                    <p>${exportDesc}</p>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        <button onclick="Storage.exportOrdersToCSV()" class="btn-small">${exportOrdersText}</button>
-                        <button onclick="Storage.exportPaymentsToCSV()" class="btn-small">${exportPaymentsText}</button>
-                        <button onclick="Storage.exportCustomersToCSV()" class="btn-small">${exportCustomersText}</button>
-                    </div>
-                </div>
-                
-                <!-- 左下：恢复数据 -->
-                <div class="backup-card backup-card-secondary">
-                    <h3>${restoreTitle}</h3>
-                    <p>${restoreDesc}</p>
-                    <p class="warning-text-small">${restoreWarning}</p>
-                    <input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">
-                    <button onclick="Storage.restoreFromFile()" class="btn-restore">${restoreBtnText}</button>
-                </div>
-                
-                <!-- 右下：审计日志 -->
-                <div class="backup-card backup-card-secondary">
-                    <h3>${auditTitle}</h3>
-                    <p>${auditDesc}</p>
-                    <button onclick="Storage.showAuditLog()" class="btn-small primary">${auditViewBtnText}</button>
-                </div>
-            </div>
-        `;
+                '<!-- 右上：导出 CSV -->' +
+                '<div class="backup-card backup-card-secondary">' +
+                    '<h3>' + exportTitle + '</h3>' +
+                    '<p>' + exportDesc + '</p>' +
+                    '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+                        '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
+                        '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
+                        '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                    '</div>' +
+                '</div>';
+        
+        // 恢复数据：仅管理员可见
+        if (isAdmin) {
+            html += '' +
+                '<!-- 左下：恢复数据 -->' +
+                '<div class="backup-card backup-card-secondary">' +
+                    '<h3>' + restoreTitle + '</h3>' +
+                    '<p>' + restoreDesc + '</p>' +
+                    '<p class="warning-text-small">' + restoreWarning + '</p>' +
+                    '<input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">' +
+                    '<button onclick="Storage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
+                '</div>';
+        } else {
+            html += '' +
+                '<!-- 左下：恢复数据（门店不可用） -->' +
+                '<div class="backup-card backup-card-secondary" style="opacity:0.6;">' +
+                    '<h3>' + restoreTitle + '</h3>' +
+                    '<p>' + restoreDesc + '</p>' +
+                    '<p class="warning-text-small">' + restoreWarning + '</p>' +
+                    '<p style="color:var(--text-muted);font-size:var(--font-sm);text-align:center;">🔒 ' + 
+                        (lang === 'id' ? 'Hanya administrator yang dapat memulihkan data' : '仅管理员可执行数据恢复') + 
+                    '</p>' +
+                '</div>';
+        }
+        
+        // 审计日志：仅管理员可见
+        if (isAdmin) {
+            html += '' +
+                '<!-- 右下：审计日志 -->' +
+                '<div class="backup-card backup-card-secondary">' +
+                    '<h3>' + auditTitle + '</h3>' +
+                    '<p>' + auditDesc + '</p>' +
+                    '<button onclick="Storage.showAuditLog()" class="btn-small primary">' + auditViewBtnText + '</button>' +
+                '</div>';
+        } else {
+            html += '' +
+                '<!-- 右下：审计日志（门店不可用） -->' +
+                '<div class="backup-card backup-card-secondary" style="opacity:0.6;">' +
+                    '<h3>' + auditTitle + '</h3>' +
+                    '<p>' + auditDesc + '</p>' +
+                    '<p style="color:var(--text-muted);font-size:var(--font-sm);text-align:center;">🔒 ' + 
+                        (lang === 'id' ? 'Hanya administrator yang dapat melihat log audit' : '仅管理员可查看审计日志') + 
+                    '</p>' +
+                '</div>';
+        }
+        
+        html += '</div>';
+        
+        document.getElementById("app").innerHTML = html;
     },
 
     restoreFromFile: async function() {
@@ -751,12 +776,6 @@ const Storage = {
 
     // ==================== 审计日志 ====================
 
-    /**
-     * 显示审计日志模态框
-     * 使用已有 class：modal-overlay / modal-content / data-table / table-container
-     * btn-small / col-date / col-type / col-name / col-desc / date-cell / desc-cell
-     * text-center / modal-actions
-     */
     showAuditLog: async function() {
         const lang = Utils.lang;
         
@@ -880,6 +899,7 @@ const Storage = {
             
         } catch (error) {
             console.error("showAuditLog error:", error);
+            Utils.ErrorHandler.capture(error, 'Storage.showAuditLog');
             alert(lang === 'id' ? 'Gagal memuat log audit: ' + error.message : '加载审计日志失败：' + error.message);
         }
     },
