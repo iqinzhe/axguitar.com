@@ -1,4 +1,4 @@
-// app-payments.js - v1.7（修复手机端卡片溢出 + 错误上报）
+// app-payments.js - v1.8（修复：结清凭证XSS漏洞 + 转义所有用户输入）
 
 window.APP = window.APP || {};
 
@@ -229,12 +229,11 @@ const PaymentsModule = {
                     '</div>';
             }
 
-            // ========== 灵活还款板块（修复手机端表格溢出） ==========
+            // ========== 灵活还款板块 ==========
             var flexibleRepaymentHtml = '';
             if (order.repayment_type !== 'fixed') {
                 flexibleRepaymentHtml = '' +
                     '<div class="payment-double-column">' +
-                        '<!-- 缴纳利息卡片 -->' +
                         '<div class="card action-card" style="min-width:0;overflow-x:hidden;">' +
                             '<div class="card-header"><h3>💰 ' + (lang === 'id' ? 'Bayar Bunga' : '缴纳利息') + '</h3></div>' +
                             '<div class="card-body">' +
@@ -268,13 +267,12 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
+                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></table></thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
-                        '<!-- 返还本金卡片 -->' +
                         '<div class="card action-card" style="min-width:0;overflow-x:hidden;">' +
                             '<div class="card-header"><h3>🏦 ' + (lang === 'id' ? 'Kembalikan Pokok' : '返还本金') + '</h3></div>' +
                             '<div class="card-body">' +
@@ -307,7 +305,7 @@ const PaymentsModule = {
                                     '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
-                                    '</table>' +
+                                    '<table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -324,7 +322,6 @@ const PaymentsModule = {
                     '</div>' +
                 '</div>' +
                 
-                // 订单摘要
                 '<div class="card">' +
                     '<div class="summary-grid">' +
                         '<div class="summary-item"><span class="label">' + t('customer_name') + ':</span><span class="value">' + Utils.escapeHtml(order.customer_name) + '</span></div>' +
@@ -501,6 +498,7 @@ const PaymentsModule = {
         }
     },
 
+    // ==================== 打印结清凭证（XSS 修复版） ====================
     printSettlementReceipt: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -524,12 +522,20 @@ const PaymentsModule = {
                 ? Utils.formatDate(order.completed_at)
                 : new Date().toLocaleDateString(lang === 'id' ? 'id-ID' : 'zh-CN');
 
+            // ========== XSS 修复：对所有用户输入进行转义 ==========
             var safeOrderId = Utils.escapeHtml(order.order_id);
             var safeCustomer = Utils.escapeHtml(order.customer_name);
             var safeKtp = Utils.escapeHtml(order.customer_ktp || '-');
             var safePhone = Utils.escapeHtml(order.customer_phone || '-');
             var safeCollateral = Utils.escapeHtml(order.collateral_name || '-');
             var safeStore = Utils.escapeHtml(AUTH.getCurrentStoreName ? AUTH.getCurrentStoreName() : '-');
+            var safeLoanAmount = Utils.formatCurrency(order.loan_amount);
+            var safeTotalAdminFee = Utils.formatCurrency(totalAdminFee);
+            var safeTotalServiceFee = Utils.formatCurrency(totalServiceFee);
+            var safeTotalInterest = Utils.formatCurrency(totalInterest);
+            var safeTotalPrincipal = Utils.formatCurrency(totalPrincipal);
+            var safeGrandTotal = Utils.formatCurrency(grandTotal);
+            var safeInterestPaidMonths = order.interest_paid_months || 0;
 
             var html = '' +
             '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
@@ -578,15 +584,15 @@ const PaymentsModule = {
                 '<div class="section">' +
                     '<h3>💎 ' + (lang === 'id' ? 'Jaminan' : '质押物') + '</h3>' +
                     '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Nama Barang' : '物品名称') + '</span><span class="val">' + safeCollateral + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Pinjaman Awal' : '原始贷款') + '</span><span class="val">' + Utils.formatCurrency(order.loan_amount) + '</span></div>' +
+                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Pinjaman Awal' : '原始贷款') + '</span><span class="val">' + safeLoanAmount + '</span></div>' +
                 '</div>' +
                 '<div class="section">' +
                     '<h3>💰 ' + (lang === 'id' ? 'Ringkasan Pembayaran' : '付款汇总') + '</h3>' +
-                    '<div class="row"><span class="lbl">' + t('admin_fee') + '</span><span class="val">' + Utils.formatCurrency(totalAdminFee) + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + t('service_fee') + '</span><span class="val">' + Utils.formatCurrency(totalServiceFee) + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + t('interest') + '</span><span class="val">' + Utils.formatCurrency(totalInterest) + ' (' + (order.interest_paid_months || 0) + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</span></div>' +
-                    '<div class="row"><span class="lbl">' + t('principal') + '</span><span class="val">' + Utils.formatCurrency(totalPrincipal) + '</span></div>' +
-                    '<div class="total-row"><span>' + (lang === 'id' ? 'Total Dibayar' : '累计已付总额') + '</span><span>' + Utils.formatCurrency(grandTotal) + '</span></div>' +
+                    '<div class="row"><span class="lbl">' + t('admin_fee') + '</span><span class="val">' + safeTotalAdminFee + '</span></div>' +
+                    '<div class="row"><span class="lbl">' + t('service_fee') + '</span><span class="val">' + safeTotalServiceFee + '</span></div>' +
+                    '<div class="row"><span class="lbl">' + t('interest') + '</span><span class="val">' + safeTotalInterest + ' (' + safeInterestPaidMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</span></div>' +
+                    '<div class="row"><span class="lbl">' + t('principal') + '</span><span class="val">' + safeTotalPrincipal + '</span></div>' +
+                    '<div class="total-row"><span>' + (lang === 'id' ? 'Total Dibayar' : '累计已付总额') + '</span><span>' + safeGrandTotal + '</span></div>' +
                 '</div>' +
                 '<div class="stamp">' +
                     '<div style="font-size:18px">✅</div>' +
