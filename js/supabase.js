@@ -1,4 +1,4 @@
-// supabase.js - v2.0（新增：getOrders 分页支持、getOrdersLegacy 兼容方法）
+// supabase.js - v2.1（修复版：集成锁定检查、门店状态检查、统一客户端引用）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
@@ -65,6 +65,10 @@ const SupabaseAPI = {
             }
             
             _profileCache = data;
+            // 同步到 AUTH.user（保持状态一致）
+            if (window.AUTH) {
+                window.AUTH.user = data;
+            }
             return data;
         } catch (err) {
             console.warn("getCurrentProfile exception:", err.message);
@@ -77,6 +81,27 @@ const SupabaseAPI = {
         _storePrefixCache.clear();
         _storesCache = null;
         _storesCacheTime = 0;
+    },
+
+    // 新增：检查门店状态
+    async checkStoreStatus(storeId) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('stores')
+                .select('is_active, name')
+                .eq('id', storeId)
+                .single();
+            
+            if (error) {
+                console.warn('检查门店状态失败:', error.message);
+                return { is_active: true, name: 'Unknown' };
+            }
+            
+            return data || { is_active: true, name: 'Unknown' };
+        } catch (e) {
+            console.warn('检查门店状态异常:', e.message);
+            return { is_active: true, name: 'Unknown' };
+        }
     },
 
     async isAdmin() {
@@ -94,13 +119,43 @@ const SupabaseAPI = {
         return profile?.stores?.name || 'Kantor';
     },
 
-    async login(email, password) {
+    // 修复：集成了查找用户名的逻辑
+    async login(emailOrUsername, password) {
+        let emailToUse = emailOrUsername;
+        
+        // 如果不是邮箱格式，先查找用户名对应的邮箱
+        if (!emailOrUsername.includes('@')) {
+            const { data: profileData, error: profileError } = await supabaseClient
+                .from('user_profiles')
+                .select('username, email')
+                .or('username.eq.' + emailOrUsername + ',email.eq.' + emailOrUsername)
+                .maybeSingle();
+
+            if (profileError || !profileData) {
+                return { 
+                    error: { 
+                        message: Utils.lang === 'id' ? 'Username tidak ditemukan' : '用户名不存在' 
+                    } 
+                };
+            }
+            emailToUse = profileData.email || profileData.username;
+        }
+        
+        // 执行登录
         const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: email,
+            email: emailToUse,
             password: password
         });
+        
         if (error) return { error };
+        
         this.clearCache();
+        
+        // 同步到 AUTH.user
+        if (window.AUTH && data.user) {
+            await window.AUTH.loadCurrentUser();
+        }
+        
         return data;
     },
 
@@ -428,7 +483,6 @@ const SupabaseAPI = {
             query = query.eq('status', filters.status);
         }
         
-        // 分页：如果有 from 和 to 参数则使用 .range()
         if (from !== undefined && to !== undefined) {
             query = query.range(from, to);
         }
