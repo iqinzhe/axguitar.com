@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.3（业绩排行：排除总部 + 排除暂停营业门店）
+// app-dashboard-anomaly.js - v2.0（异常状况页面重构）
 
 window.APP = window.APP || {};
 
@@ -14,7 +14,7 @@ const DashboardAnomaly = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 并行获取所有异常数据
+            // 并行获取所有数据
             const [
                 overdueResult,
                 blacklistResult,
@@ -73,58 +73,130 @@ const DashboardAnomaly = {
             var overdueOrders = overdueResult;
             var blacklist = blacklistResult;
             
-            // ========== 基于已有数据计算门店业绩 ==========
-            // 1. 建立门店映射表（id → 门店信息）
+            // ========== 本月日期范围 ==========
+            var today = new Date();
+            var currentMonth = today.getMonth();
+            var currentYear = today.getFullYear();
+            var monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+            var monthEnd = today.toISOString().split('T')[0];
+            
+            // ========== 门店映射表 ==========
             var storeInfoMap = {};
             for (var i = 0; i < stores.length; i++) {
                 storeInfoMap[stores[i].id] = {
+                    id: stores[i].id,
                     name: stores[i].name,
                     code: stores[i].code,
-                    isActive: stores[i].is_active !== false   // 默认营业中
+                    isActive: stores[i].is_active !== false
                 };
             }
             
-            // 2. 统计各门店订单数
-            var storeOrderCount = {};
+            // ========== 按月统计各门店数据 ==========
+            var storeMonthlyStats = {};
             for (var i = 0; i < stores.length; i++) {
-                storeOrderCount[stores[i].id] = {
-                    name: stores[i].name,
-                    code: stores[i].code,
-                    isActive: storeInfoMap[stores[i].id].isActive,
-                    count: 0
+                var s = stores[i];
+                storeMonthlyStats[s.id] = {
+                    id: s.id,
+                    name: s.name,
+                    code: s.code,
+                    isActive: s.is_active !== false,
+                    orderCount: 0,           // 订单总数
+                    totalLoanOutflow: 0,     // 当金流出总额
+                    badOrders: 0,            // 不良客户订单(逾期≥15天)
+                    totalRecovery: 0         // 资金回收数额(inflow总额)
                 };
             }
+            
+            // 计算当月订单的当金流出
+            var monthlyOrderIds = [];
             for (var i = 0; i < orders.length; i++) {
-                if (storeOrderCount[orders[i].store_id]) {
-                    storeOrderCount[orders[i].store_id].count++;
+                var o = orders[i];
+                var orderDate = o.created_at ? o.created_at.split('T')[0] : '';
+                
+                if (orderDate >= monthStart && orderDate <= monthEnd) {
+                    monthlyOrderIds.push(o.id);
+                    
+                    if (storeMonthlyStats[o.store_id]) {
+                        storeMonthlyStats[o.store_id].orderCount++;
+                        storeMonthlyStats[o.store_id].totalLoanOutflow += (o.loan_amount || 0);
+                        
+                        // 不良客户订单：逾期 ≥ 15 天
+                        if ((o.overdue_days || 0) >= 15 && o.status === 'active') {
+                            storeMonthlyStats[o.store_id].badOrders++;
+                        }
+                    }
                 }
             }
             
-            // 3. 构建数组并排序
-            var storeArray = [];
-            for (var key in storeOrderCount) {
-                if (storeOrderCount.hasOwnProperty(key)) {
-                    storeArray.push(storeOrderCount[key]);
+            // 计算当月资金回收数额（inflow总额）
+            if (monthlyOrderIds.length > 0) {
+                var { data: monthlyFlows } = await supabaseClient
+                    .from('cash_flow_records')
+                    .select('store_id, amount')
+                    .eq('direction', 'inflow')
+                    .eq('is_voided', false)
+                    .in('order_id', monthlyOrderIds);
+                
+                if (monthlyFlows) {
+                    for (var i = 0; i < monthlyFlows.length; i++) {
+                        var f = monthlyFlows[i];
+                        if (storeMonthlyStats[f.store_id]) {
+                            storeMonthlyStats[f.store_id].totalRecovery += (f.amount || 0);
+                        }
+                    }
                 }
             }
-            storeArray.sort(function(a, b) { return b.count - a.count; });
             
-            // 4. 全部门店排行（用于"门店业绩排行"卡片）
-            var allStoreRanking = storeArray;
-            
-            // 5. 最低业绩：排除总部(STORE_000) + 排除暂停营业 + 只取订单数最小的3个
-            var eligibleForLowest = [];
-            for (var i = 0; i < storeArray.length; i++) {
-                var s = storeArray[i];
-                // 排除总部
-                if (s.code === 'STORE_000') continue;
-                // 排除暂停营业
-                if (!s.isActive) continue;
-                eligibleForLowest.push(s);
+            // ========== 构建排行数组（排除总部 + 排除暂停营业） ==========
+            var eligibleStores = [];
+            var storeKeys = Object.keys(storeMonthlyStats);
+            for (var i = 0; i < storeKeys.length; i++) {
+                var s = storeMonthlyStats[storeKeys[i]];
+                if (s.code === 'STORE_000') continue;  // 排除总部
+                if (!s.isActive) continue;              // 排除暂停营业
+                eligibleStores.push(s);
             }
-            // 按订单数升序排列
-            eligibleForLowest.sort(function(a, b) { return a.count - b.count; });
-            var lowestStores = eligibleForLowest.slice(0, Math.min(3, eligibleForLowest.length));
+            
+            // ========== 4项指标综合排名 ==========
+            // 每项指标独立排名，rank 1 = 最好
+            // 综合得分 = 四项排名之和，得分越低越优秀
+            for (var i = 0; i < eligibleStores.length; i++) {
+                eligibleStores[i].rankSum = 0;
+            }
+            
+            // 指标1：订单总数（越多越好）
+            eligibleStores.sort(function(a, b) { return b.orderCount - a.orderCount; });
+            for (var i = 0; i < eligibleStores.length; i++) {
+                eligibleStores[i].rankOrderCount = i + 1;
+                eligibleStores[i].rankSum += (i + 1);
+            }
+            
+            // 指标2：当金流出总额（越少越好，说明风险控制好）
+            eligibleStores.sort(function(a, b) { return a.totalLoanOutflow - b.totalLoanOutflow; });
+            for (var i = 0; i < eligibleStores.length; i++) {
+                eligibleStores[i].rankLoanOutflow = i + 1;
+                eligibleStores[i].rankSum += (i + 1);
+            }
+            
+            // 指标3：不良客户订单（越少越好）
+            eligibleStores.sort(function(a, b) { return a.badOrders - b.badOrders; });
+            for (var i = 0; i < eligibleStores.length; i++) {
+                eligibleStores[i].rankBadOrders = i + 1;
+                eligibleStores[i].rankSum += (i + 1);
+            }
+            
+            // 指标4：资金回收数额（越多越好）
+            eligibleStores.sort(function(a, b) { return b.totalRecovery - a.totalRecovery; });
+            for (var i = 0; i < eligibleStores.length; i++) {
+                eligibleStores[i].rankRecovery = i + 1;
+                eligibleStores[i].rankSum += (i + 1);
+            }
+            
+            // 按综合得分排序（越低越好）
+            eligibleStores.sort(function(a, b) { return a.rankSum - b.rankSum; });
+            
+            var top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
+            var bottom3 = eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse(); // 最差排第一
             
             // ========== 渲染：逾期30天订单 ==========
             var overdueTableHtml = '';
@@ -198,64 +270,70 @@ const DashboardAnomaly = {
                     '</div>';
             }
             
-            // ========== 渲染：最低业绩门店 ==========
-            var lowestStoresHtml = '';
-            if (lowestStores.length === 0) {
-                lowestStoresHtml = '' +
-                    '<div class="empty-state">' +
-                        '<div class="empty-state-icon">📊</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Semua toko memiliki pesanan' : '所有门店均有订单') + '</div>' +
-                    '</div>';
-            } else {
-                var storeItems = '';
-                for (var i = 0; i < lowestStores.length; i++) {
-                    var s = lowestStores[i];
-                    storeItems += '' +
-                        '<div class="store-item">' +
-                            '<div class="store-item-info">' +
-                                '<span class="store-item-name">' + Utils.escapeHtml(s.name) + '</span>' +
-                                '<span class="store-item-code">' + Utils.escapeHtml(s.code) + '</span>' +
-                            '</div>' +
-                            '<div class="store-item-count' + (i === 0 ? ' lowest' : '') + '">' +
-                                s.count + ' ' + (lang === 'id' ? 'pesanan' : '订单') +
-                                (i === 0 ? ' 🔴' : '') +
-                            '</div>' +
-                        '</div>';
-                }
-                lowestStoresHtml = '<div class="store-list">' + storeItems + '</div>';
-            }
-            
-            // ========== 渲染：门店排名 ==========
-            var rankingHtml = '';
-            if (allStoreRanking.length === 0) {
-                rankingHtml = '' +
+            // ========== 渲染：门店业绩前三排行 ==========
+            var top3Html = '';
+            if (top3.length === 0) {
+                top3Html = '' +
                     '<div class="empty-state">' +
                         '<div class="empty-state-icon">📊</div>' +
                         '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko' : '暂无门店数据') + '</div>' +
                     '</div>';
             } else {
-                var rankingItems = '';
-                for (var i = 0; i < allStoreRanking.length; i++) {
-                    var s = allStoreRanking[i];
-                    var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
-                    var rankClass = i === 0 ? 'first' : i === allStoreRanking.length - 1 ? 'last' : '';
-                    rankingItems += '' +
-                        '<div class="ranking-item ' + rankClass + '">' +
+                var top3Items = '';
+                for (var i = 0; i < top3.length; i++) {
+                    var s = top3[i];
+                    var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+                    top3Items += '' +
+                        '<div class="ranking-item ' + (i === 0 ? 'first' : '') + '">' +
                             '<div class="ranking-number">' + medal + '</div>' +
                             '<div class="ranking-info">' +
                                 '<span class="ranking-name">' + Utils.escapeHtml(s.name) + '</span>' +
                                 '<span class="ranking-code">' + Utils.escapeHtml(s.code) + '</span>' +
                             '</div>' +
-                            '<div class="ranking-count">' +
-                                s.count + ' ' + (lang === 'id' ? 'pesanan' : '订单') +
-                                (i === 0 ? ' ↑' : i === allStoreRanking.length - 1 ? ' ↓' : '') +
+                            '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
+                                (lang === 'id' ? '订单: ' : '订单: ') + s.orderCount + '<br>' +
+                                (lang === 'id' ? '放款: ' : '放款: ') + Utils.formatCurrency(s.totalLoanOutflow) + '<br>' +
+                                (lang === 'id' ? '不良: ' : '不良: ') + s.badOrders + '<br>' +
+                                (lang === 'id' ? '回收: ' : '回收: ') + Utils.formatCurrency(s.totalRecovery) +
                             '</div>' +
                         '</div>';
                 }
-                rankingHtml = '<div class="ranking-list">' + rankingItems + '</div>';
+                top3Html = '<div class="ranking-list">' + top3Items + '</div>';
+            }
+            
+            // ========== 渲染：门店业绩后三排行 ==========
+            var bottom3Html = '';
+            if (bottom3.length === 0) {
+                bottom3Html = '' +
+                    '<div class="empty-state">' +
+                        '<div class="empty-state-icon">📊</div>' +
+                        '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko' : '暂无门店数据') + '</div>' +
+                    '</div>';
+            } else {
+                var bottom3Items = '';
+                for (var i = 0; i < bottom3.length; i++) {
+                    var s = bottom3[i];
+                    var mark = i === 0 ? '🔴' : i === 1 ? '🟡' : '🟠';
+                    bottom3Items += '' +
+                        '<div class="ranking-item ' + (i === 0 ? 'last' : '') + '">' +
+                            '<div class="ranking-number">' + mark + '</div>' +
+                            '<div class="ranking-info">' +
+                                '<span class="ranking-name">' + Utils.escapeHtml(s.name) + '</span>' +
+                                '<span class="ranking-code">' + Utils.escapeHtml(s.code) + '</span>' +
+                            '</div>' +
+                            '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
+                                (lang === 'id' ? '订单: ' : '订单: ') + s.orderCount + '<br>' +
+                                (lang === 'id' ? '放款: ' : '放款: ') + Utils.formatCurrency(s.totalLoanOutflow) + '<br>' +
+                                (lang === 'id' ? '不良: ' : '不良: ') + s.badOrders + '<br>' +
+                                (lang === 'id' ? '回收: ' : '回收: ') + Utils.formatCurrency(s.totalRecovery) +
+                            '</div>' +
+                        '</div>';
+                }
+                bottom3Html = '<div class="ranking-list">' + bottom3Items + '</div>';
             }
             
             // ========== 组装页面 ==========
+            // 顺序：逾期30天订单、黑名单客户、门店业绩前三、门店业绩后三
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
@@ -291,29 +369,29 @@ const DashboardAnomaly = {
                         '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
                     '</div>' +
                     
-                    // 卡片3：最低业绩门店（已排除总部和暂停营业门店）
-                    '<div class="anomaly-card anomaly-card-info">' +
-                        '<div class="anomaly-card-header">' +
-                            '<span class="anomaly-icon">📉</span>' +
-                            '<h3>' + (lang === 'id' ? 'Kinerja Terendah' : '业绩最低门店') + '</h3>' +
-                            '<span class="anomaly-badge">' + lowestStores.length + '</span>' +
-                        '</div>' +
-                        '<div class="anomaly-card-body">' + lowestStoresHtml + '</div>' +
-                        '<div class="anomaly-card-footer">' +
-                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Tidak termasuk kantor pusat dan toko yang ditutup' : '不含总部及已暂停门店') + '</span>' +
-                        '</div>' +
-                    '</div>' +
-                    
-                    // 卡片4：门店业绩排行
+                    // 卡片3：门店业绩前三排行
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🏆</span>' +
-                            '<h3>' + (lang === 'id' ? 'Peringkat Kinerja Toko' : '门店业绩排行') + '</h3>' +
-                            '<span class="anomaly-badge">' + allStoreRanking.length + '</span>' +
+                            '<h3>' + (lang === 'id' ? 'Kinerja Terbaik (3 Besar)' : '业绩前三排行') + '</h3>' +
+                            '<span class="anomaly-badge">' + top3.length + '</span>' +
                         '</div>' +
-                        '<div class="anomaly-card-body">' + rankingHtml + '</div>' +
+                        '<div class="anomaly-card-body">' + top3Html + '</div>' +
                         '<div class="anomaly-card-footer">' +
-                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan total pesanan' : '排名基于订单总数') + '</span>' +
+                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini (tidak termasuk pusat & toko tutup)' : '排名基于当月数据（不含总部及暂停门店）') + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    
+                    // 卡片4：门店业绩后三排行
+                    '<div class="anomaly-card anomaly-card-info">' +
+                        '<div class="anomaly-card-header">' +
+                            '<span class="anomaly-icon">📉</span>' +
+                            '<h3>' + (lang === 'id' ? 'Kinerja Terendah (3 Besar)' : '业绩后三排行') + '</h3>' +
+                            '<span class="anomaly-badge">' + bottom3.length + '</span>' +
+                        '</div>' +
+                        '<div class="anomaly-card-body">' + bottom3Html + '</div>' +
+                        '<div class="anomaly-card-footer">' +
+                            '<span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini (tidak termasuk pusat & toko tutup)' : '排名基于当月数据（不含总部及暂停门店）') + '</span>' +
                         '</div>' +
                     '</div>' +
                     
