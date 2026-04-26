@@ -1,4 +1,4 @@
-// auth.js - v1.0
+// auth.js - v1.1（审计日志集成）
 
 const AUTH = {
     user: null,
@@ -161,6 +161,10 @@ const AUTH = {
                     this._recordLoginFailure(usernameOrEmail);
                     const lang = Utils.lang;
                     alert(lang === 'id' ? 'Username atau password salah' : '用户名或密码错误');
+                    // 审计：登录失败
+                    if (window.Audit) {
+                        await window.Audit.logLoginFailure(usernameOrEmail, 'username_not_found');
+                    }
                     return null;
                 }
                 emailToUse = profileData.email || profileData.username;
@@ -172,6 +176,10 @@ const AUTH = {
                 this._recordLoginFailure(usernameOrEmail);
                 const lang = Utils.lang;
                 alert(lang === 'id' ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
+                // 审计：登录失败
+                if (window.Audit) {
+                    await window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials');
+                }
                 return null;
             }
 
@@ -185,7 +193,7 @@ const AUTH = {
                 return null;
             }
 
-            // ========== 新增：检查门店是否暂停 ==========
+            // 检查门店是否暂停
             if (this.user && this.user.store_id) {
                 try {
                     const { data: storeData, error: storeError } = await supabaseClient
@@ -204,11 +212,14 @@ const AUTH = {
                     }
                 } catch (e) {
                     console.warn('检查门店状态失败:', e.message);
-                    // 不阻止登录，避免因查询失败导致无法登录
                 }
             }
 
-            await this._logLoginSuccess(this.user.id);
+            // 审计：登录成功
+            if (window.Audit) {
+                await window.Audit.logLoginSuccess(this.user.id, this.user.name);
+            }
+            
             return this.user;
         } catch (error) {
             console.error('LOGIN ERROR:', error);
@@ -216,19 +227,6 @@ const AUTH = {
             const lang = Utils.lang;
             alert(lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误');
             return null;
-        }
-    },
-
-    async _logLoginSuccess(userId) {
-        try {
-            if (window.Audit?.log) {
-                await window.Audit.log('login_success', JSON.stringify({
-                    user_id: userId,
-                    timestamp: new Date().toISOString()
-                }));
-            }
-        } catch (e) {
-            console.warn('登录日志记录失败:', e);
         }
     },
 
@@ -242,12 +240,9 @@ const AUTH = {
     },
 
     async logout() {
+        // 审计：退出登录
         if (this.user && window.Audit) {
-            await window.Audit.log('logout', JSON.stringify({
-                user_id: this.user.id,
-                user_name: this.user.name,
-                timestamp: new Date().toISOString()
-            }));
+            await window.Audit.logLogout(this.user.id, this.user.name);
         }
         this._clearAllLoginFailures();
         this.user = null;
@@ -278,11 +273,9 @@ const AUTH = {
         });
         if (profileError) throw profileError;
 
+        // 审计：创建用户
         if (window.Audit) {
-            await window.Audit.log('user_create', JSON.stringify({
-                new_user_id: authUser.user.id, username, name, role,
-                store_id: storeId, created_by: this.user?.id
-            }));
+            await window.Audit.logUserCreate(authUser.user.id, username, name, role, storeId, this.user?.id);
         }
 
         return authUser.user;
@@ -298,7 +291,10 @@ const AUTH = {
         if (fetchError) throw fetchError;
 
         const deletedUserInfo = {
-            ...userProfile,
+            id: userProfile.id,
+            username: userProfile.username,
+            name: userProfile.name,
+            role: userProfile.role,
             deleted_by: this.user?.id,
             deleted_by_name: this.user?.name,
             deleted_at: new Date().toISOString()
@@ -321,7 +317,10 @@ const AUTH = {
         const { error } = await supabaseClient.from('user_profiles').delete().eq('id', userId);
         if (error) throw error;
 
-        if (window.Audit) await window.Audit.log('user_delete', JSON.stringify(deletedUserInfo));
+        // 审计：删除用户
+        if (window.Audit) {
+            await window.Audit.logUserDelete(userProfile.id, userProfile.name, userProfile.role, this.user?.id);
+        }
         return true;
     },
 
@@ -332,16 +331,13 @@ const AUTH = {
         const { error } = await supabaseClient.from('user_profiles').update(updates).eq('id', userId);
         if (error) throw error;
 
+        // 审计：更新用户
         if (window.Audit) {
-            await window.Audit.log('user_update', JSON.stringify({
-                user_id: userId, before: beforeData, after: updates,
-                updated_by: this.user?.id, updated_at: new Date().toISOString()
-            }));
+            await window.Audit.logUserUpdate(userId, beforeData, updates, this.user?.id);
         }
         return true;
     },
 
-    // ========== 新增：重置密码 ==========
     async resetUserPassword(userId, newPassword) {
         if (this.user?.role !== 'admin') {
             throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
@@ -352,7 +348,6 @@ const AUTH = {
         }
         
         try {
-            // 优先使用 Edge Function
             const { data, error } = await supabaseClient.functions.invoke('reset-user-password', {
                 body: { 
                     userId: userId,
@@ -364,7 +359,6 @@ const AUTH = {
             if (error) {
                 console.warn('Edge Function 不可用，尝试直接重置:', error.message);
                 
-                // 备选：通过 Admin API（需要 supabaseClient 有 service_role key）
                 const { error: updateError } = await supabaseClient.auth.admin.updateUserById(
                     userId,
                     { password: newPassword }
@@ -375,12 +369,9 @@ const AUTH = {
                 }
             }
             
+            // 审计：重置密码
             if (window.Audit) {
-                await window.Audit.log('password_reset', JSON.stringify({
-                    target_user_id: userId,
-                    reset_by: this.user?.id,
-                    reset_at: new Date().toISOString()
-                }));
+                await window.Audit.logPasswordReset(userId, this.user?.id);
             }
             
             return true;
