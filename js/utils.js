@@ -547,32 +547,6 @@ window.Utils = window.Utils || {};
         return skeletonHtml;
     };
 
-    // ==================== 网络监控（增强版） ====================
-    Utils.NetworkMonitor = {
-        _initialized: false,
-        _isOnline: true,
-        _callbacks: [],
-        _checkUrl: SUPABASE_URL + '/rest/v1/',
-
-        init: function() {
-            if (this._initialized) return;
-            this._initialized = true;
-            this._isOnline = navigator.onLine;
-
-            var self = this;
-
-            window.addEventListener('online', function() {
-                self._isOnline = true;
-                self._notify(true);
-                self._showToast(_lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复');
-            });
-
-            window.addEventListener('offline', function() {
-                self._isOnline = false;
-                self._notify(false);
-                self._showBanner();
-            });
-
             // 定时检查实际连通性
             setInterval(function() {
                 self._checkRealConnectivity().then(function(online) {
