@@ -549,15 +549,24 @@ window.Utils = window.Utils || {};
 
     // ==================== 网络监控（增强版） ====================
     Utils.NetworkMonitor = {
-        _initialized: false,
-        _isOnline: true,
-        _callbacks: [],
-        _checkUrl: SUPABASE_URL + '/rest/v1/',
+    _initialized: false,
+    _isOnline: true,
+    _callbacks: [],
+    _checkUrl: '',
 
-        init: function() {
-            if (this._initialized) return;
-            this._initialized = true;
-            this._isOnline = navigator.onLine;
+            init: function() {
+        if (this._initialized) return;
+        this._initialized = true;
+        this._isOnline = navigator.onLine;
+        
+        // 动态获取 Supabase URL
+        if (typeof SUPABASE_URL !== 'undefined') {
+            this._checkUrl = SUPABASE_URL + '/rest/v1/';
+        } else if (typeof window.SUPABASE_URL !== 'undefined') {
+            this._checkUrl = window.SUPABASE_URL + '/rest/v1/';
+        } else {
+            this._checkUrl = 'https://hiupsvsbcdsgoyiieqiv.supabase.co/rest/v1/';
+        }
 
             var self = this;
 
