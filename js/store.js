@@ -1,4 +1,4 @@
-// store.js - v1.0（门店暂停/恢复功能）
+// store.js - v1.1（修复暂停营业/恢复营业：去掉 updated_at 列）
 
 const StoreManager = {
     stores: [],
@@ -55,7 +55,7 @@ const StoreManager = {
         this.stores = this.stores.filter(function(s) { return s.id !== id; });
     },
 
-    // ========== 新增：暂停门店 ==========
+    // ========== 修复：暂停门店（去掉 updated_at） ==========
     async suspendStore(storeId) {
         var lang = Utils.lang;
         
@@ -66,9 +66,10 @@ const StoreManager = {
         }
         
         try {
+            // 只更新 is_active，不碰 updated_at
             const { error } = await supabaseClient
                 .from('stores')
-                .update({ is_active: false, updated_at: new Date().toISOString() })
+                .update({ is_active: false })
                 .eq('id', storeId);
             
             if (error) throw error;
@@ -83,16 +84,17 @@ const StoreManager = {
         }
     },
 
-    // ========== 新增：恢复门店 ==========
+    // ========== 修复：恢复门店（去掉 updated_at） ==========
     async resumeStore(storeId) {
         var lang = Utils.lang;
         
         if (!confirm(lang === 'id' ? 'Aktifkan kembali toko ini?' : '恢复此门店营业？')) return;
         
         try {
+            // 只更新 is_active，不碰 updated_at
             const { error } = await supabaseClient
                 .from('stores')
-                .update({ is_active: true, updated_at: new Date().toISOString() })
+                .update({ is_active: true })
                 .eq('id', storeId);
             
             if (error) throw error;
@@ -120,16 +122,27 @@ const StoreManager = {
             
             if (error) throw error;
             
+            var isActive = store.is_active !== false;
+            var statusText = isActive 
+                ? (lang === 'id' ? 'Aktif' : '营业中')
+                : (lang === 'id' ? 'Ditutup' : '已暂停');
+            var statusBadgeClass = isActive ? 'active' : 'liquidated';
+            
             var modal = document.createElement('div');
             modal.id = 'editStoreModal';
-            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+            modal.className = 'modal-overlay';
             modal.innerHTML = '' +
-                '<div style="background:#ffffff;border-radius:12px;padding:24px;width:100%;max-width:500px;">' +
-                    '<h3 style="margin-top:0;color:#1e293b;">✏️ ' + (lang === 'id' ? 'Edit Toko' : '编辑门店') + '</h3>' +
+                '<div class="modal-content" style="max-width:500px;">' +
+                    '<h3>✏️ ' + (lang === 'id' ? 'Edit Toko' : '编辑门店') + '</h3>' +
+                    
+                    '<div style="margin-bottom:16px;">' +
+                        '<span class="status-badge ' + statusBadgeClass + '">' + statusText + '</span>' +
+                    '</div>' +
+                    
                     '<div class="form-group">' +
-                        '<label>' + (lang === 'id' ? 'Kode Toko' : '门店编码') + ' *</label>' +
-                        '<input id="editStoreCode" value="' + Utils.escapeHtml(store.code) + '" readonly style="background:#f1f5f9;cursor:not-allowed;">' +
-                        '<small style="color:#64748b;">⚠️ ' + (lang === 'id' ? 'Kode tidak dapat diubah' : '编码不可修改') + '</small>' +
+                        '<label>' + (lang === 'id' ? 'Kode Toko' : '门店编码') + '</label>' +
+                        '<input value="' + Utils.escapeHtml(store.code) + '" readonly>' +
+                        '<div class="form-hint">⚠️ ' + (lang === 'id' ? 'Kode tidak dapat diubah' : '编码不可修改') + '</div>' +
                     '</div>' +
                     '<div class="form-group">' +
                         '<label>' + (lang === 'id' ? 'Nama Toko' : '门店名称') + ' *</label>' +
@@ -146,11 +159,11 @@ const StoreManager = {
                     '<div class="form-group">' +
                         '<label>📱 ' + (lang === 'id' ? 'Nomor WhatsApp' : 'WhatsApp 号码') + '</label>' +
                         '<input id="editStoreWA" value="' + Utils.escapeHtml(store.wa_number || '') + '" placeholder="628xxxxxxxxxx">' +
-                        '<small>' + (lang === 'id' ? 'Contoh: 6281234567890 (tanpa +)' : '示例: 6281234567890 (不带+)') + '</small>' +
+                        '<div class="form-hint">' + (lang === 'id' ? 'Contoh: 6281234567890 (tanpa +)' : '示例: 6281234567890 (不带+)') + '</div>' +
                     '</div>' +
-                    '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">' +
+                    '<div class="modal-actions">' +
                         '<button onclick="StoreManager._saveEditStore(\'' + storeId + '\')" class="success">💾 ' + t('save') + '</button>' +
-                        '<button onclick="document.getElementById(\'editStoreModal\').remove()">✖ ' + t('cancel') + '</button>' +
+                        '<button onclick="document.getElementById(\'editStoreModal\').remove()" class="btn-back">✖ ' + t('cancel') + '</button>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(modal);
@@ -161,10 +174,10 @@ const StoreManager = {
 
     _saveEditStore: async function(storeId) {
         var lang = Utils.lang;
-        var name = document.getElementById('editStoreName').value.trim();
-        var address = document.getElementById('editStoreAddress').value.trim();
-        var phone = document.getElementById('editStorePhone').value.trim();
-        var waNumber = document.getElementById('editStoreWA').value.trim();
+        var name = document.getElementById('editStoreName')?.value.trim();
+        var address = document.getElementById('editStoreAddress')?.value.trim();
+        var phone = document.getElementById('editStorePhone')?.value.trim();
+        var waNumber = document.getElementById('editStoreWA')?.value.trim();
         
         if (!name) {
             alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
@@ -172,7 +185,7 @@ const StoreManager = {
         }
         
         try {
-            const updates = { 
+            var updates = { 
                 name: name, 
                 address: address || null, 
                 phone: phone || null 
@@ -252,8 +265,6 @@ const StoreManager = {
         const lang = Utils.lang;
         const t = function(key) { return Utils.t(key); };
         
-        console.log('开始加载门店管理数据...');
-        
         const [
             allOrdersResult,
             allExpensesResult,
@@ -269,8 +280,6 @@ const StoreManager = {
         const allOrders = allOrdersResult.data || [];
         const allExpenses = allExpensesResult.data || [];
         const allPayments = allPaymentsResult.data || [];
-        
-        console.log('数据加载完成: 订单 ' + allOrders.length + ' 条, 支出 ' + allExpenses.length + ' 条, 付款 ' + allPayments.length + ' 条');
         
         const orderStoreMap = {};
         for (var i = 0; i < allOrders.length; i++) {
@@ -352,22 +361,22 @@ const StoreManager = {
             
             var storeStatusBadge = '';
             if (store.is_active === false) {
-                storeStatusBadge = ' <span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:10px;">' + (lang === 'id' ? 'DITUTUP' : '已暂停') + '</span>';
+                storeStatusBadge = ' <span class="status-badge liquidated">' + (lang === 'id' ? 'DITUTUP' : '已暂停') + '</span>';
             }
             
             storeStatsRows += '<tr>' +
                 '<td class="store-name-cell"><strong>' + Utils.escapeHtml(store.name) + storeStatusBadge + '</strong><br><small>' + Utils.escapeHtml(store.code) + '</small></td>' +
                 '<td class="text-center">' + ordsCount + '</td>' +
                 '<td class="text-center">' + activeCount + '</td>' +
-                '<td class="text-right">' + Utils.formatCurrency(totalLoan) + '</td>' +
-                '<td class="text-right income">' + Utils.formatCurrency(totalAdminFee) + '</td>' +
-                '<td class="text-right income">' + Utils.formatCurrency(totalServiceFee) + '</td>' +
-                '<td class="text-right income">' + Utils.formatCurrency(totalInterest) + '</td>' +
-                '<td class="text-right">' + Utils.formatCurrency(totalPrincipal) + '</td>' +
-                '<td class="text-right income">' + Utils.formatCurrency(totalIncome) + '</td>' +
-                '<td class="text-right expense">' + Utils.formatCurrency(totalExpenses) + '</td>' +
-                '<td class="text-right">' + Utils.formatCurrency(cashBalance) + '</td>' +
-                '<td class="text-right">' + Utils.formatCurrency(bankBalance) + '</td>' +
+                '<td class="amount">' + Utils.formatCurrency(totalLoan) + '</td>' +
+                '<td class="amount income">' + Utils.formatCurrency(totalAdminFee) + '</td>' +
+                '<td class="amount income">' + Utils.formatCurrency(totalServiceFee) + '</td>' +
+                '<td class="amount income">' + Utils.formatCurrency(totalInterest) + '</td>' +
+                '<td class="amount">' + Utils.formatCurrency(totalPrincipal) + '</td>' +
+                '<td class="amount income">' + Utils.formatCurrency(totalIncome) + '</td>' +
+                '<td class="amount expense">' + Utils.formatCurrency(totalExpenses) + '</td>' +
+                '<td class="amount">' + Utils.formatCurrency(cashBalance) + '</td>' +
+                '<td class="amount">' + Utils.formatCurrency(bankBalance) + '</td>' +
             '</tr>';
         }
         
@@ -375,36 +384,36 @@ const StoreManager = {
             '<td class="store-name-cell"><strong>' + (lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计') + '</strong></td>' +
             '<td class="text-center"><strong>' + grandTotal.orders + '</strong></td>' +
             '<td class="text-center"><strong>' + grandTotal.active + '</strong></td>' +
-            '<td class="text-right"><strong>' + Utils.formatCurrency(grandTotal.loan) + '</strong></td>' +
-            '<td class="text-right income"><strong>' + Utils.formatCurrency(grandTotal.adminFee) + '</strong></td>' +
-            '<td class="text-right income"><strong>' + Utils.formatCurrency(grandTotal.serviceFee) + '</strong></td>' +
-            '<td class="text-right income"><strong>' + Utils.formatCurrency(grandTotal.interest) + '</strong></td>' +
-            '<td class="text-right"><strong>' + Utils.formatCurrency(grandTotal.principal) + '</strong></td>' +
-            '<td class="text-right income"><strong>' + Utils.formatCurrency(grandTotal.income) + '</strong></td>' +
-            '<td class="text-right expense"><strong>' + Utils.formatCurrency(grandTotal.expenses) + '</strong></td>' +
-            '<td class="text-right"><strong>' + Utils.formatCurrency(grandTotal.cashBalance) + '</strong></td>' +
-            '<td class="text-right"><strong>' + Utils.formatCurrency(grandTotal.bankBalance) + '</strong></td>' +
+            '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.loan) + '</strong></td>' +
+            '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.adminFee) + '</strong></td>' +
+            '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.serviceFee) + '</strong></td>' +
+            '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.interest) + '</strong></td>' +
+            '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.principal) + '</strong></td>' +
+            '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.income) + '</strong></td>' +
+            '<td class="amount expense"><strong>' + Utils.formatCurrency(grandTotal.expenses) + '</strong></td>' +
+            '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.cashBalance) + '</strong></td>' +
+            '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.bankBalance) + '</strong></td>' +
         '</tr>';
 
         var storeRows = '';
         if (this.stores.length === 0) {
-            storeRows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '<\/td><\/tr>';
+            storeRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
         } else {
             for (var i = 0; i < this.stores.length; i++) {
                 var store = this.stores[i];
                 var isActive = store.is_active !== false;
                 var statusBadge = isActive 
-                    ? '<span class="status-badge status-active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
-                    : '<span class="status-badge status-liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
+                    ? '<span class="status-badge active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
+                    : '<span class="status-badge liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
                 
                 storeRows += '<tr>' +
                     '<td class="store-code">' + Utils.escapeHtml(store.code) + '</td>' +
                     '<td class="store-name">' + Utils.escapeHtml(store.name) + '</td>' +
-                    '<td class="store-address">' + Utils.escapeHtml(store.address || '-') + '</td>' +
+                    '<td class="store-address desc-cell">' + Utils.escapeHtml(store.address || '-') + '</td>' +
                     '<td>' + Utils.escapeHtml(store.phone || '-') + '</td>' +
                     '<td>' +
                         '<input type="text" id="wa_' + store.id + '" value="' + Utils.escapeHtml(store.wa_number || '') + '" ' +
-                               'placeholder="628xxxxxxxxxx" style="width:140px; font-size:12px; padding:6px;" ' +
+                               'placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" ' +
                                'onchange="APP.updateStoreWANumber(\'' + store.id + '\', this.value)">' +
                     '</td>' +
                     '<td class="text-center">' + statusBadge + '</td>' +
@@ -421,10 +430,12 @@ const StoreManager = {
                 
                 actionButtons += '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
                 
-                storeRows += Utils.renderActionRow({
-                    colspan: 5,
-                    buttonsHtml: actionButtons
-                });
+                storeRows += '<tr class="action-row">' +
+                    '<td class="action-label">' + t('action') + '</td>' +
+                    '<td colspan="5">' +
+                        '<div class="action-buttons">' + actionButtons + '</div>' +
+                    '</td>' +
+                '</tr>';
             }
         }
 
@@ -432,8 +443,8 @@ const StoreManager = {
             '<div class="page-header">' +
                 '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
                 '<div class="header-actions">' +
-                    '<button onclick="APP.printCurrentPage()" class="btn-print print-btn">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                    '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                    '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
+                    '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
                 '</div>' +
             '</div>' +
 
@@ -469,15 +480,15 @@ const StoreManager = {
                                 '<th>' + (lang === 'id' ? 'Toko' : '门店') + '</th>' +
                                 '<th class="text-center">' + t('total_orders') + '</th>' +
                                 '<th class="text-center">' + t('active') + '</th>' +
-                                '<th class="text-right">' + t('total_loan') + '</th>' +
-                                '<th class="text-right">' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</th>' +
-                                '<th class="text-right">' + (lang === 'id' ? 'Service Fee' : '服务费') + '</th>' +
-                                '<th class="text-right">' + (lang === 'id' ? 'Bunga' : '利息') + '</th>' +
-                                '<th class="text-right">' + (lang === 'id' ? 'Pokok' : '本金') + '</th>' +
-                                '<th class="text-right">' + (lang === 'id' ? 'Pendapatan' : '收入') + '</th>' +
-                                '<th class="text-right">' + (lang === 'id' ? 'Pengeluaran' : '运营支出') + '</th>' +
-                                '<th class="text-right">🏦 ' + (lang === 'id' ? 'Brankas' : '保险柜') + '</th>' +
-                                '<th class="text-right">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行BNI') + '</th>' +
+                                '<th class="amount">' + t('total_loan') + '</th>' +
+                                '<th class="amount">' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</th>' +
+                                '<th class="amount">' + (lang === 'id' ? 'Service Fee' : '服务费') + '</th>' +
+                                '<th class="amount">' + (lang === 'id' ? 'Bunga' : '利息') + '</th>' +
+                                '<th class="amount">' + (lang === 'id' ? 'Pokok' : '本金') + '</th>' +
+                                '<th class="amount">' + (lang === 'id' ? 'Pendapatan' : '收入') + '</th>' +
+                                '<th class="amount">' + (lang === 'id' ? 'Pengeluaran' : '运营支出') + '</th>' +
+                                '<th class="amount">🏦 ' + (lang === 'id' ? 'Brankas' : '保险柜') + '</th>' +
+                                '<th class="amount">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行BNI') + '</th>' +
                             '</tr>' +
                         '</thead>' +
                         '<tbody>' +
@@ -495,18 +506,18 @@ const StoreManager = {
                     '<table class="data-table store-table">' +
                         '<thead>' +
                             '<tr>' +
-                                '<th>' + (lang === 'id' ? 'Kode' : '编码') + '</th>' +
-                                '<th>' + (lang === 'id' ? 'Nama' : '名称') + '</th>' +
-                                '<th>' + (lang === 'id' ? 'Alamat' : '地址') + '</th>' +
-                                '<th>' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
-                                '<th>📱 WA</th>' +
-                                '<th class="text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th>' +                                
+                                '<th class="col-id">' + (lang === 'id' ? 'Kode' : '编码') + '</th>' +
+                                '<th class="col-name">' + (lang === 'id' ? 'Nama' : '名称') + '</th>' +
+                                '<th class="col-address">' + (lang === 'id' ? 'Alamat' : '地址') + '</th>' +
+                                '<th class="col-phone">' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
+                                '<th class="col-phone">📱 WA</th>' +
+                                '<th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th>' +
                             '</tr>' +
                         '</thead>' +
                         '<tbody>' + storeRows + '</tbody>' +
                     '</table>' +
                 '</div>' +
-                '<p style="font-size:12px; color:#64748b; margin-top:8px;">' +
+                '<p class="info-note">' +
                     '💡 ' + (lang === 'id' ? 'Kode toko dibuat otomatis. Klik pada kolom WA untuk mengedit nomor. Toko yang ditutup tidak dapat diakses operator.' : '门店编码自动生成。点击 WA 列编辑号码。暂停的门店操作员将无法登录。') +
                 '</p>' +
             '</div>' +
@@ -518,7 +529,7 @@ const StoreManager = {
                     '<div class="form-group">' +
                         '<label>' + (lang === 'id' ? 'Nama Toko' : '门店名称') + ' *</label>' +
                         '<input id="newStoreName" placeholder="' + (lang === 'id' ? 'Contoh: Bangil, Gempol' : '例如: Bangil, Gempol') + '">' +
-                        '<small style="color:#64748b;font-size:11px;">' + (lang === 'id' ? 'Kode toko akan dibuat otomatis (STORE_XXX)' : '门店编码将自动生成 (STORE_XXX)') + '</small>' +
+                        '<div class="form-hint">' + (lang === 'id' ? 'Kode toko akan dibuat otomatis (STORE_XXX)' : '门店编码将自动生成 (STORE_XXX)') + '</div>' +
                     '</div>' +
                     '<div class="form-group">' +
                         '<label>' + (lang === 'id' ? 'Alamat' : '地址') + '</label>' +
@@ -532,29 +543,7 @@ const StoreManager = {
                         '<button onclick="APP.addStore()" class="success">➕ ' + (lang === 'id' ? 'Tambah Toko' : '添加门店') + '</button>' +
                     '</div>' +
                 '</div>' +
-            '</div>' +
-            
-            '<style>' +
-                '.store-table .store-code { font-family: monospace; font-weight: 600; color: var(--primary-dark); }' +
-                '.store-table .store-name { font-weight: 500; }' +
-                '.store-table .store-address { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }' +
-                '.store-table td input { width: 140px; font-size: 12px; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; }' +
-                '.store-table td input:focus { outline: none; border-color: #2563eb; }' +
-                '.store-stats-table .store-name-cell { font-weight: 500; background: #f8fafc; }' +
-                '.store-stats-table tbody tr:last-child { border-top: 2px solid #cbd5e1; background: #f1f5f9; }' +
-                '.cashflow-card { margin-bottom: 20px; }' +
-                '.cashflow-stats { display: flex; gap: 16px; flex-wrap: wrap; }' +
-                '.cashflow-item-card { flex: 1; min-width: 180px; background: #f8fafc; border-radius: 12px; padding: 16px; transition: all 0.2s ease; }' +
-                '.cashflow-item-card:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }' +
-                '.cashflow-item-card .label { font-size: 13px; color: #64748b; margin-bottom: 8px; }' +
-                '.cashflow-item-card .value { font-size: 22px; font-weight: 700; color: #1e293b; }' +
-                '.cashflow-item-card .value.negative { color: #ef4444; }' +
-                '.cashflow-item-card .sub { font-size: 11px; color: #94a3b8; margin-top: 6px; }' +
-                '.cashflow-note { font-size: 11px; color: #64748b; margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; }' +
-                '.status-badge.status-active { background: #dcfce7; color: #16a34a; }' +
-                '.status-badge.status-liquidated { background: #fee2e2; color: #dc2626; }' +
-                '@media (max-width: 640px) { .cashflow-stats { flex-direction: column; } .cashflow-item-card { min-width: auto; } .store-table .store-address { max-width: 120px; } .store-table td input { width: 100px; font-size: 10px; } }' +
-            '</style>';
+            '</div>';
     }
 };
 
