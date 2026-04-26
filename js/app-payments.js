@@ -1,8 +1,100 @@
-// app-payments.js - v1.8（修复：结清凭证XSS漏洞 + 转义所有用户输入）
+// app-payments.js - v1.9（修复：防重复提交 + 审计日志全覆盖 + 按钮加载状态 + XSS防护）
 
 window.APP = window.APP || {};
 
+// ========== 防重复提交全局锁 ==========
+window.APP._paymentLock = {};
+
+window.APP._acquirePaymentLock = function(lockKey) {
+    if (window.APP._paymentLock[lockKey]) return false;
+    window.APP._paymentLock[lockKey] = true;
+    return true;
+};
+
+window.APP._releasePaymentLock = function(lockKey) {
+    delete window.APP._paymentLock[lockKey];
+};
+
 const PaymentsModule = {
+
+    // ========== 辅助：设置按钮加载状态 ==========
+    _setButtonLoading: function(btn, loading) {
+        if (!btn) return;
+        var lang = Utils.lang;
+        if (loading) {
+            btn.disabled = true;
+            btn.dataset.originalHtml = btn.innerHTML;
+            btn.innerHTML = '⏳ ' + (lang === 'id' ? 'Memproses...' : '处理中...');
+            btn.style.cursor = 'wait';
+            btn.style.opacity = '0.7';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = btn.dataset.originalHtml || btn.innerHTML;
+            btn.style.cursor = '';
+            btn.style.opacity = '';
+            delete btn.dataset.originalHtml;
+        }
+    },
+
+    // ========== 辅助：禁用页面所有操作按钮 ==========
+    _disableAllActionButtons: function() {
+        var buttons = document.querySelectorAll('button.btn-action, button.success, button.early-settle');
+        var disabledList = [];
+        for (var i = 0; i < buttons.length; i++) {
+            if (!buttons[i].disabled) {
+                buttons[i].disabled = true;
+                buttons[i].style.opacity = '0.6';
+                buttons[i].style.cursor = 'not-allowed';
+                disabledList.push(buttons[i]);
+            }
+        }
+        return disabledList;
+    },
+
+    // ========== 辅助：恢复被禁用的按钮 ==========
+    _restoreDisabledButtons: function(disabledList) {
+        for (var i = 0; i < disabledList.length; i++) {
+            disabledList[i].disabled = false;
+            disabledList[i].style.opacity = '';
+            disabledList[i].style.cursor = '';
+        }
+    },
+
+    // ========== 根据订单ID查找对应的确认按钮 ==========
+    _findConfirmButton: function(type) {
+        var lang = Utils.lang;
+        var buttons = document.querySelectorAll('button.btn-action.success');
+        var searchTexts = {
+            'interest': [lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'],
+            'principal': [lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款'],
+            'fixed': [lang === 'id' ? 'Bayar Angsuran Bulan Ini' : '支付本月还款'],
+            'early_settle': [lang === 'id' ? 'Pelunasan Dipercepat' : '提前结清']
+        };
+        
+        var targets = searchTexts[type] || [];
+        for (var i = 0; i < buttons.length; i++) {
+            for (var j = 0; j < targets.length; j++) {
+                if (buttons[i].textContent.indexOf(targets[j]) !== -1) {
+                    // 进一步确认上下文
+                    var card = buttons[i].closest('.card-body');
+                    if (type === 'principal' && card && 
+                        (card.textContent.indexOf('Kembalikan Pokok') !== -1 || 
+                         card.textContent.indexOf('返还本金') !== -1)) {
+                        return buttons[i];
+                    }
+                    if (type === 'interest' && card && 
+                        (card.textContent.indexOf('Bayar Bunga') !== -1 || 
+                         card.textContent.indexOf('缴纳利息') !== -1)) {
+                        return buttons[i];
+                    }
+                    if (type === 'fixed' || type === 'early_settle') {
+                        return buttons[i];
+                    }
+                }
+            }
+        }
+        return null;
+    },
 
     showPayment: async function(orderId) {
         var lang = Utils.lang;
@@ -70,6 +162,15 @@ const PaymentsModule = {
                 alert(Utils.t('unauthorized'));
                 APP.goBack();
                 return;
+            }
+
+            // ========== 审计：查看缴费页面 ==========
+            if (window.Audit) {
+                await window.Audit.log('payment_page_view', JSON.stringify({
+                    order_id: order.order_id,
+                    customer_name: order.customer_name,
+                    viewed_by: profile.name
+                }));
             }
 
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -217,10 +318,10 @@ const PaymentsModule = {
                                 '</div>' +
                             '</div>' +
                             '<div class="action-buttons">' +
-                                '<button onclick="APP.payFixedInstallment(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success">' +
+                                '<button onclick="APP.payFixedInstallment(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="fixedPayBtn">' +
                                     '✅ ' + (lang === 'id' ? 'Bayar Angsuran Bulan Ini' : '支付本月还款') +
                                 '</button>' +
-                                (remainingMonths > 0 ? '<button onclick="APP.earlySettleFixedOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action early-settle">🎯 ' + t('early_settlement') + '</button>' : '') +
+                                (remainingMonths > 0 ? '<button onclick="APP.earlySettleFixedOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action early-settle" id="earlySettleBtn">🎯 ' + t('early_settlement') + '</button>' : '') +
                             '</div>' +
                         '</div>' +
                         '<div class="card-info">' +
@@ -261,13 +362,13 @@ const PaymentsModule = {
                                         '<label><input type="radio" name="interestMethod" value="bank"> 🏧 ' + t('bank') + '</label>' +
                                     '</div>' +
                                 '</div>' +
-                                '<button onclick="APP.payInterestWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
+                                '<button onclick="APP.payInterestWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="interestConfirmBtn">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
                             '</div>' +
                             '<div class="card-history">' +
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></table></thead>' +
+                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -297,7 +398,7 @@ const PaymentsModule = {
                                         '<label><input type="radio" name="principalTarget" value="cash"> 🏦 ' + t('cash') + '</label>' +
                                     '</div>' +
                                 '</div>' +
-                                '<button onclick="APP.payPrincipalWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
+                                '<button onclick="APP.payPrincipalWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="principalConfirmBtn">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
                             '</div>' +
                             '<div class="card-history">' +
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('return_principal') : t('return_principal') + '历史') + '</div>' +
@@ -305,7 +406,7 @@ const PaymentsModule = {
                                     '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
-                                    '<table>' +
+                                    '</table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -353,57 +454,79 @@ const PaymentsModule = {
         }
     },
 
+    // ========== 利息收款（防重复提交 + 审计） ==========
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
         
-        var order = await SUPABASE.getOrder(orderId);
+        // ========== 防重复提交检查 ==========
+        if (!window.APP._acquirePaymentLock(orderId + '_interest')) {
+            alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
+            return;
+        }
         
-        var loanAmount = order.loan_amount || 0;
-        var principalPaid = order.principal_paid || 0;
-        var remainingPrincipal = loanAmount - principalPaid;
-        var monthlyRate = order.agreed_interest_rate || 0.08;
-        var currentMonthlyInterest = remainingPrincipal * monthlyRate;
-        var totalInterest = currentMonthlyInterest * months;
-        var nextInterestNumber = (order.interest_paid_months || 0) + 1;
-        var endNumber = nextInterestNumber + months - 1;
+        var confirmBtn = this._findConfirmButton('interest');
+        this._setButtonLoading(confirmBtn, true);
+        var disabledButtons = this._disableAllActionButtons();
         
-        var previewMsg = lang === 'id'
-            ? '📋 Konfirmasi Pembayaran Bunga\n' +
-              'Pesanan: ' + order.order_id + '\n' +
-              'Nasabah: ' + order.customer_name + '\n' +
-              'Periode: ke-' + nextInterestNumber + (months > 1 ? ' sampai ke-' + endNumber : '') + '\n' +
-              'Sisa Pokok: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
-              'Suku Bunga: ' + (monthlyRate*100).toFixed(0) + '%\n' +
-              'Bulan: ' + months + ' bulan\n' +
-              'Jumlah Dibayar: ' + Utils.formatCurrency(totalInterest) + '\n' +
-              'Metode: ' + methodName + '\n' +
-              'Lanjutkan?'
-            : '📋 利息收款确认\n' +
-              '订单号: ' + order.order_id + '\n' +
-              '客户: ' + order.customer_name + '\n' +
-              '期数: 第' + nextInterestNumber + '期' + (months > 1 ? ' 至 第' + endNumber + '期' : '') + '\n' +
-              '剩余本金: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
-              '月利率: ' + (monthlyRate*100).toFixed(0) + '%\n' +
-              '收取月数: ' + months + ' 个月\n' +
-              '本次收款: ' + Utils.formatCurrency(totalInterest) + '\n' +
-              '入账方式: ' + methodName + '\n' +
-              '确认收款？';
+        try {
+            var order = await SUPABASE.getOrder(orderId);
+            
+            var loanAmount = order.loan_amount || 0;
+            var principalPaid = order.principal_paid || 0;
+            var remainingPrincipal = loanAmount - principalPaid;
+            var monthlyRate = order.agreed_interest_rate || 0.08;
+            var currentMonthlyInterest = remainingPrincipal * monthlyRate;
+            var totalInterest = currentMonthlyInterest * months;
+            var nextInterestNumber = (order.interest_paid_months || 0) + 1;
+            var endNumber = nextInterestNumber + months - 1;
+            
+            var previewMsg = lang === 'id'
+                ? '📋 Konfirmasi Pembayaran Bunga\n' +
+                  'Pesanan: ' + order.order_id + '\n' +
+                  'Nasabah: ' + order.customer_name + '\n' +
+                  'Periode: ke-' + nextInterestNumber + (months > 1 ? ' sampai ke-' + endNumber : '') + '\n' +
+                  'Sisa Pokok: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
+                  'Suku Bunga: ' + (monthlyRate*100).toFixed(0) + '%\n' +
+                  'Bulan: ' + months + ' bulan\n' +
+                  'Jumlah Dibayar: ' + Utils.formatCurrency(totalInterest) + '\n' +
+                  'Metode: ' + methodName + '\n' +
+                  'Lanjutkan?'
+                : '📋 利息收款确认\n' +
+                  '订单号: ' + order.order_id + '\n' +
+                  '客户: ' + order.customer_name + '\n' +
+                  '期数: 第' + nextInterestNumber + '期' + (months > 1 ? ' 至 第' + endNumber + '期' : '') + '\n' +
+                  '剩余本金: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
+                  '月利率: ' + (monthlyRate*100).toFixed(0) + '%\n' +
+                  '收取月数: ' + months + ' 个月\n' +
+                  '本次收款: ' + Utils.formatCurrency(totalInterest) + '\n' +
+                  '入账方式: ' + methodName + '\n' +
+                  '确认收款？';
 
-        if (confirm(previewMsg)) {
-            try {
+            if (confirm(previewMsg)) {
                 await Order.recordInterestPayment(orderId, months, method);
+                
+                // ========== 审计：利息收款 ==========
+                if (window.Audit) {
+                    await window.Audit.logPayment(order.order_id, 'interest', totalInterest, method);
+                }
+                
                 await PaymentsModule.showPayment(orderId);
-            } catch (error) {
-                console.error('payInterestWithMethod error:', error);
-                Utils.ErrorHandler.capture(error, 'payInterestWithMethod');
-                alert(error.message);
             }
+        } catch (error) {
+            console.error('payInterestWithMethod error:', error);
+            Utils.ErrorHandler.capture(error, 'payInterestWithMethod');
+            alert(error.message);
+        } finally {
+            window.APP._releasePaymentLock(orderId + '_interest');
+            this._setButtonLoading(confirmBtn, false);
+            this._restoreDisabledButtons(disabledButtons);
         }
     },
 
+    // ========== 本金收款（防重复提交 + 审计） ==========
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -416,42 +539,57 @@ const PaymentsModule = {
             return;
         }
         
-        var order = await SUPABASE.getOrder(orderId);
+        // ========== 防重复提交检查 ==========
+        if (!window.APP._acquirePaymentLock(orderId + '_principal')) {
+            alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
+            return;
+        }
         
-        var loanAmount = order.loan_amount || 0;
-        var principalPaid = order.principal_paid || 0;
-        var remainingPrincipal = loanAmount - principalPaid;
-        var actualAmount = Math.min(amount, remainingPrincipal);
-        var remainingAfter = remainingPrincipal - actualAmount;
-        var isFullSettlement = remainingAfter <= 0;
+        var confirmBtn = this._findConfirmButton('principal');
+        this._setButtonLoading(confirmBtn, true);
+        var disabledButtons = this._disableAllActionButtons();
         
-        var previewMsg = lang === 'id'
-            ? '📋 Konfirmasi Pembayaran Pokok\n' +
-              'Pesanan: ' + order.order_id + '\n' +
-              'Nasabah: ' + order.customer_name + '\n' +
-              'Total Pinjaman: ' + Utils.formatCurrency(loanAmount) + '\n' +
-              'Pokok Dibayar: ' + Utils.formatCurrency(principalPaid) + '\n' +
-              'Sisa Sebelum: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
-              'Dibayar Sekarang: ' + Utils.formatCurrency(actualAmount) + '\n' +
-              'Sisa Setelah: ' + Utils.formatCurrency(remainingAfter) + '\n' +
-              'Metode: ' + targetName + '\n' +
-              (isFullSettlement ? '🎉 LUNAS' : 'Pembayaran sebagian') + '\n' +
-              'Lanjutkan?'
-            : '📋 本金还款确认\n' +
-              '订单号: ' + order.order_id + '\n' +
-              '客户: ' + order.customer_name + '\n' +
-              '贷款总额: ' + Utils.formatCurrency(loanAmount) + '\n' +
-              '已还本金: ' + Utils.formatCurrency(principalPaid) + '\n' +
-              '还款前剩余: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
-              '本次还款: ' + Utils.formatCurrency(actualAmount) + '\n' +
-              '还款后剩余: ' + Utils.formatCurrency(remainingAfter) + '\n' +
-              '入账方式: ' + targetName + '\n' +
-              (isFullSettlement ? '🎉 全额结清' : '部分还款') + '\n' +
-              '确认收款？';
+        try {
+            var order = await SUPABASE.getOrder(orderId);
+            
+            var loanAmount = order.loan_amount || 0;
+            var principalPaid = order.principal_paid || 0;
+            var remainingPrincipal = loanAmount - principalPaid;
+            var actualAmount = Math.min(amount, remainingPrincipal);
+            var remainingAfter = remainingPrincipal - actualAmount;
+            var isFullSettlement = remainingAfter <= 0;
+            
+            var previewMsg = lang === 'id'
+                ? '📋 Konfirmasi Pembayaran Pokok\n' +
+                  'Pesanan: ' + order.order_id + '\n' +
+                  'Nasabah: ' + order.customer_name + '\n' +
+                  'Total Pinjaman: ' + Utils.formatCurrency(loanAmount) + '\n' +
+                  'Pokok Dibayar: ' + Utils.formatCurrency(principalPaid) + '\n' +
+                  'Sisa Sebelum: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
+                  'Dibayar Sekarang: ' + Utils.formatCurrency(actualAmount) + '\n' +
+                  'Sisa Setelah: ' + Utils.formatCurrency(remainingAfter) + '\n' +
+                  'Metode: ' + targetName + '\n' +
+                  (isFullSettlement ? '🎉 LUNAS' : 'Pembayaran sebagian') + '\n' +
+                  'Lanjutkan?'
+                : '📋 本金还款确认\n' +
+                  '订单号: ' + order.order_id + '\n' +
+                  '客户: ' + order.customer_name + '\n' +
+                  '贷款总额: ' + Utils.formatCurrency(loanAmount) + '\n' +
+                  '已还本金: ' + Utils.formatCurrency(principalPaid) + '\n' +
+                  '还款前剩余: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
+                  '本次还款: ' + Utils.formatCurrency(actualAmount) + '\n' +
+                  '还款后剩余: ' + Utils.formatCurrency(remainingAfter) + '\n' +
+                  '入账方式: ' + targetName + '\n' +
+                  (isFullSettlement ? '🎉 全额结清' : '部分还款') + '\n' +
+                  '确认收款？';
 
-        if (confirm(previewMsg)) {
-            try {
+            if (confirm(previewMsg)) {
                 await Order.recordPrincipalPayment(orderId, actualAmount, target);
+                
+                // ========== 审计：本金还款 ==========
+                if (window.Audit) {
+                    await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
+                }
                 
                 if (isFullSettlement) {
                     var printConfirm = lang === 'id'
@@ -464,37 +602,91 @@ const PaymentsModule = {
                 }
                 
                 await PaymentsModule.showPayment(orderId);
-            } catch (error) {
-                console.error('payPrincipalWithMethod error:', error);
-                Utils.ErrorHandler.capture(error, 'payPrincipalWithMethod');
-                alert(error.message);
             }
+        } catch (error) {
+            console.error('payPrincipalWithMethod error:', error);
+            Utils.ErrorHandler.capture(error, 'payPrincipalWithMethod');
+            alert(error.message);
+        } finally {
+            window.APP._releasePaymentLock(orderId + '_principal');
+            this._setButtonLoading(confirmBtn, false);
+            this._restoreDisabledButtons(disabledButtons);
         }
     },
 
+    // ========== 固定还款（防重复提交 + 审计） ==========
     payFixedInstallment: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
+        var lang = Utils.lang;
+        
+        // ========== 防重复提交检查 ==========
+        if (!window.APP._acquirePaymentLock(orderId + '_fixed')) {
+            alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
+            return;
+        }
+        
+        var confirmBtn = this._findConfirmButton('fixed');
+        this._setButtonLoading(confirmBtn, true);
+        var disabledButtons = this._disableAllActionButtons();
         
         try {
+            var orderBefore = await SUPABASE.getOrder(orderId);
+            var fixedPaymentBefore = orderBefore.monthly_fixed_payment || 0;
+            
             await SUPABASE.recordFixedPayment(orderId, method);
+            
+            // ========== 审计：固定还款 ==========
+            if (window.Audit) {
+                await window.Audit.logPayment(orderBefore.order_id, 'fixed_installment', fixedPaymentBefore, method);
+            }
+            
             await PaymentsModule.showPayment(orderId);
         } catch (error) {
             console.error('payFixedInstallment error:', error);
             Utils.ErrorHandler.capture(error, 'payFixedInstallment');
             alert(error.message);
+        } finally {
+            window.APP._releasePaymentLock(orderId + '_fixed');
+            this._setButtonLoading(confirmBtn, false);
+            this._restoreDisabledButtons(disabledButtons);
         }
     },
 
+    // ========== 提前结清（防重复提交 + 审计） ==========
     earlySettleFixedOrder: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
+        var lang = Utils.lang;
+        
+        // ========== 防重复提交检查 ==========
+        if (!window.APP._acquirePaymentLock(orderId + '_early_settle')) {
+            alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
+            return;
+        }
+        
+        var confirmBtn = this._findConfirmButton('early_settle');
+        this._setButtonLoading(confirmBtn, true);
+        var disabledButtons = this._disableAllActionButtons();
         
         try {
+            var orderBefore = await SUPABASE.getOrder(orderId);
+            var remainingPrincipal = orderBefore.principal_remaining || orderBefore.loan_amount || 0;
+            
             await SUPABASE.earlySettleFixedOrder(orderId, method);
+            
+            // ========== 审计：提前结清 ==========
+            if (window.Audit) {
+                await window.Audit.logPayment(orderBefore.order_id, 'early_settlement', remainingPrincipal, method);
+            }
+            
             await PaymentsModule.showPayment(orderId);
         } catch (error) {
             console.error('earlySettleFixedOrder error:', error);
             Utils.ErrorHandler.capture(error, 'earlySettleFixedOrder');
             alert(error.message);
+        } finally {
+            window.APP._releasePaymentLock(orderId + '_early_settle');
+            this._setButtonLoading(confirmBtn, false);
+            this._restoreDisabledButtons(disabledButtons);
         }
     },
 
@@ -536,6 +728,16 @@ const PaymentsModule = {
             var safeTotalPrincipal = Utils.formatCurrency(totalPrincipal);
             var safeGrandTotal = Utils.formatCurrency(grandTotal);
             var safeInterestPaidMonths = order.interest_paid_months || 0;
+
+            // ========== 审计：打印结清凭证 ==========
+            if (window.Audit) {
+                await window.Audit.log('print_settlement_receipt', JSON.stringify({
+                    order_id: order.order_id,
+                    customer_name: order.customer_name,
+                    total_paid: grandTotal,
+                    printed_by: AUTH.user?.name || 'System'
+                }));
+            }
 
             var html = '' +
             '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
