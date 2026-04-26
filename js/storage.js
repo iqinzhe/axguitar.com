@@ -1,4 +1,4 @@
-// storage.js - v1.1（客户恢复添加去重、支出恢复添加去重）
+// storage.js - v1.2（选择性恢复 → 审计日志）
 
 const Storage = {
 
@@ -76,11 +76,7 @@ const Storage = {
             this._hideLoading(loadingMsg);
             
             if (window.Audit) {
-                await window.Audit.log('backup', JSON.stringify({
-                    filename: filename,
-                    stats: backupData.stats,
-                    exported_at: backupData.exported_at
-                }));
+                await window.Audit.logBackup(filename, backupData.stats, profile?.name);
             }
             
             const successMsg = t('backup_complete')
@@ -145,11 +141,7 @@ const Storage = {
             this._hideLoading(loadingMsg);
             
             if (window.Audit) {
-                await window.Audit.log('restore', JSON.stringify({
-                    filename: file.name,
-                    results: results,
-                    restored_at: new Date().toISOString()
-                }));
+                await window.Audit.logRestore(file.name, results, profile?.name);
             }
             
             const resultMsg = lang === 'id'
@@ -377,10 +369,8 @@ const Storage = {
             }
         }
         
-        // 修复7：expenses 添加去重逻辑（按日期+类别+金额+门店去重）
         if (backupData.expenses && backupData.expenses.length > 0) {
             for (const expense of backupData.expenses) {
-                // 检查是否已存在相同的支出记录
                 const { data: existing } = await supabaseClient
                     .from('expenses')
                     .select('id')
@@ -405,7 +395,6 @@ const Storage = {
                         });
                     if (!error) results.expenses++;
                 }
-                // 如果已存在，跳过（不重复插入）
             }
         }
         
@@ -498,7 +487,6 @@ const Storage = {
         }
     },
     
-    // 修复4：restoreCustomersOnly 添加重复检查
     async restoreCustomersOnly(file) {
         const lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
@@ -520,7 +508,6 @@ const Storage = {
             var skippedCount = 0;
             
             for (const customer of customers) {
-                // 检查是否已存在相同 customer_id 的客户
                 const { data: existing } = await supabaseClient
                     .from('customers')
                     .select('id')
@@ -528,7 +515,6 @@ const Storage = {
                     .maybeSingle();
                 
                 if (existing) {
-                    // 已存在，更新而非插入
                     const { error: updateError } = await supabaseClient
                         .from('customers')
                         .update({
@@ -565,6 +551,9 @@ const Storage = {
         try {
             const orders = await SUPABASE.getOrders();
             Utils.exportToCSV(orders, `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`);
+            if (window.Audit) {
+                await window.Audit.logExport('orders', `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
+            }
             alert(Utils.t('export_success'));
         } catch (err) {
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
@@ -575,6 +564,9 @@ const Storage = {
         try {
             const payments = await SUPABASE.getAllPayments();
             Utils.exportPaymentsToCSV(payments, `jf_gadai_payments_${new Date().toISOString().split('T')[0]}.csv`);
+            if (window.Audit) {
+                await window.Audit.logExport('payments', `jf_gadai_payments_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
+            }
             alert(Utils.t('export_success'));
         } catch (err) {
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
@@ -608,6 +600,9 @@ const Storage = {
             a.click();
             URL.revokeObjectURL(url);
             
+            if (window.Audit) {
+                await window.Audit.logExport('customers', `jf_gadai_customers_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
+            }
             alert(Utils.t('export_success'));
         } catch (err) {
             alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
@@ -639,6 +634,8 @@ const Storage = {
     _hideLoading(element) {
         if (element && element.remove) element.remove();
     },
+    
+    // ==================== 备份恢复 UI ====================
     
     renderBackupUI: async function() {
         const lang = Utils.lang;
@@ -682,13 +679,6 @@ const Storage = {
             : '⚠️ 警告：将覆盖现有数据！';
         var restoreBtnText = lang === 'id' ? '🔄 Pulihkan Data' : '🔄 恢复数据';
         
-        var selectiveTitle = lang === 'id' ? '🎯 Pemulihan Selektif' : '🎯 选择性恢复';
-        var selectiveDesc = lang === 'id' 
-            ? 'Pulihkan hanya jenis data tertentu.'
-            : '仅恢复特定类型的数据。';
-        var restoreOrdersText = lang === 'id' ? '📋 Pulihkan Pesanan' : '📋 恢复订单';
-        var restoreCustomersText = lang === 'id' ? '👥 Pulihkan Nasabah' : '👥 恢复客户';
-        
         var exportTitle = lang === 'id' ? '📊 Ekspor CSV' : '📊 导出 CSV';
         var exportDesc = lang === 'id' 
             ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
@@ -696,6 +686,13 @@ const Storage = {
         var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
         var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
         var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
+        
+        // ========== 审计日志卡片文案 ==========
+        var auditTitle = lang === 'id' ? '📝 Log Audit' : '📝 审计日志';
+        var auditDesc = lang === 'id'
+            ? 'Lihat riwayat operasi sistem: login, pembayaran, penghapusan, dll.'
+            : '查看系统操作记录：登录、缴费、删除等。';
+        var auditViewBtnText = lang === 'id' ? '🔍 Lihat Log Audit' : '🔍 查看审计日志';
         
         document.getElementById("app").innerHTML = `
             <div class="page-header">
@@ -733,119 +730,16 @@ const Storage = {
                     <button onclick="Storage.restoreFromFile()" class="btn-restore">${restoreBtnText}</button>
                 </div>
                 
-                <!-- 右下：选择性恢复 -->
+                <!-- 右下：审计日志 -->
                 <div class="backup-card backup-card-secondary">
-                    <h3>${selectiveTitle}</h3>
-                    <p>${selectiveDesc}</p>
-                    <input type="file" id="selectiveFile" accept=".json" style="margin-bottom:10px; width:100%;">
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        <button onclick="Storage.restoreOrdersOnlyFromFile()" class="btn-small">${restoreOrdersText}</button>
-                        <button onclick="Storage.restoreCustomersOnlyFromFile()" class="btn-small">${restoreCustomersText}</button>
-                    </div>
+                    <h3>${auditTitle}</h3>
+                    <p>${auditDesc}</p>
+                    <button onclick="Storage.showAuditLog()" class="btn-small primary">${auditViewBtnText}</button>
                 </div>
             </div>
-            
-            <style>
-                .backup-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 20px;
-                }
-                
-                .backup-card {
-                    background: var(--bg-card);
-                    border-radius: 12px;
-                    padding: 20px;
-                    border: 1px solid var(--border-light);
-                    transition: all 0.2s ease;
-                }
-                
-                .backup-card-primary {
-                    background: linear-gradient(135deg, #e8f4e8 0%, #d4ecd4 100%);
-                    border-left: 4px solid #10b981;
-                }
-                
-                .backup-card-primary h3 {
-                    color: #065f46;
-                    font-size: 1.2rem;
-                    margin-bottom: 12px;
-                }
-                
-                .backup-card-primary p {
-                    color: #065f46;
-                    margin-bottom: 16px;
-                    line-height: 1.5;
-                }
-                
-                .btn-backup-primary {
-                    background: #10b981;
-                    color: white;
-                    border: none;
-                    padding: 12px 20px;
-                    border-radius: 8px;
-                    font-size: 1rem;
-                    font-weight: 600;
-                    cursor: pointer;
-                    width: 100%;
-                    transition: all 0.2s ease;
-                }
-                
-                .btn-backup-primary:hover {
-                    background: #059669;
-                    transform: translateY(-1px);
-                }
-                
-                .backup-card-secondary {
-                    background: var(--bg-card);
-                }
-                
-                .backup-card-secondary h3 {
-                    font-size: 1rem;
-                    margin-bottom: 10px;
-                    color: var(--text-primary);
-                }
-                
-                .backup-card-secondary p {
-                    font-size: 0.8rem;
-                    color: var(--text-secondary);
-                    margin-bottom: 12px;
-                }
-                
-                .warning-text-small {
-                    font-size: 0.7rem !important;
-                    color: #e74c3c !important;
-                    background: #fee2e2;
-                    padding: 6px 10px;
-                    border-radius: 6px;
-                    margin-bottom: 12px;
-                }
-                
-                .btn-restore {
-                    background: #f59e0b;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 6px;
-                    font-size: 0.85rem;
-                    cursor: pointer;
-                    width: 100%;
-                    transition: all 0.2s ease;
-                }
-                
-                .btn-restore:hover {
-                    background: #d97706;
-                }
-                
-                @media (max-width: 768px) {
-                    .backup-grid {
-                        grid-template-columns: 1fr;
-                        gap: 16px;
-                    }
-                }
-            </style>
         `;
     },
-    
+
     restoreFromFile: async function() {
         const fileInput = document.getElementById('restoreFile');
         if (!fileInput || !fileInput.files[0]) {
@@ -854,23 +748,269 @@ const Storage = {
         }
         await this.restore(fileInput.files[0]);
     },
-    
-    restoreOrdersOnlyFromFile: async function() {
-        const fileInput = document.getElementById('selectiveFile');
-        if (!fileInput || !fileInput.files[0]) {
-            alert(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
-            return;
+
+    // ==================== 审计日志 ====================
+
+    /**
+     * 显示审计日志模态框
+     * 使用已有 class：modal-overlay / modal-content / data-table / table-container
+     * btn-small / col-date / col-type / col-name / col-desc / date-cell / desc-cell
+     * text-center / modal-actions
+     */
+    showAuditLog: async function() {
+        const lang = Utils.lang;
+        
+        const oldModal = document.getElementById('auditLogModal');
+        if (oldModal) oldModal.remove();
+        
+        try {
+            const users = await SUPABASE.getAllUsers();
+            const logs = await window.Audit.getLogs({ limit: 200 });
+            
+            var actionMap = {
+                login_success: lang === 'id' ? '✅ Login Berhasil' : '✅ 登录成功',
+                login_failure: lang === 'id' ? '❌ Login Gagal' : '❌ 登录失败',
+                logout: lang === 'id' ? '🚪 Logout' : '🚪 退出',
+                order_create: lang === 'id' ? '📋 Buat Pesanan' : '📋 创建订单',
+                order_delete: lang === 'id' ? '🗑️ Hapus Pesanan' : '🗑️ 删除订单',
+                payment: lang === 'id' ? '💰 Pembayaran' : '💰 缴费',
+                user_create: lang === 'id' ? '👤 Tambah User' : '👤 新增用户',
+                user_delete: lang === 'id' ? '👤 Hapus User' : '👤 删除用户',
+                user_update: lang === 'id' ? '✏️ Ubah User' : '✏️ 修改用户',
+                password_reset: lang === 'id' ? '🔑 Reset Password' : '🔑 重置密码',
+                store_create: lang === 'id' ? '🏪 Tambah Toko' : '🏪 新增门店',
+                store_update: lang === 'id' ? '✏️ Ubah Toko' : '✏️ 修改门店',
+                store_delete: lang === 'id' ? '🗑️ Hapus Toko' : '🗑️ 删除门店',
+                blacklist_add: lang === 'id' ? '🚫 Tambah Blacklist' : '🚫 加入黑名单',
+                blacklist_remove: lang === 'id' ? '🔓 Buka Blacklist' : '🔓 解除黑名单',
+                backup: lang === 'id' ? '💾 Cadangan' : '💾 备份',
+                restore: lang === 'id' ? '📥 Pemulihan' : '📥 恢复',
+                export: lang === 'id' ? '📎 Ekspor' : '📎 导出'
+            };
+            
+            var rows = '';
+            if (logs.length === 0) {
+                rows = '<tr><td colspan="4" class="text-center">' + (lang === 'id' ? 'Tidak ada log' : '暂无记录') + '</td></tr>';
+            } else {
+                for (var i = 0; i < logs.length; i++) {
+                    var log = logs[i];
+                    var actionText = actionMap[log.action] || log.action;
+                    var detailsText = '';
+                    
+                    try {
+                        var details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+                        if (details) {
+                            if (details.order_id) {
+                                detailsText = '📋 ' + Utils.escapeHtml(details.order_id);
+                            } else if (details.username) {
+                                detailsText = '👤 ' + Utils.escapeHtml(details.username);
+                            } else if (details.store_name) {
+                                detailsText = '🏪 ' + Utils.escapeHtml(details.store_name);
+                            } else if (details.filename) {
+                                detailsText = '📄 ' + Utils.escapeHtml(details.filename);
+                            } else if (details.customer_id) {
+                                detailsText = '👥 ' + Utils.escapeHtml(details.customer_id);
+                            } else {
+                                detailsText = Utils.escapeHtml(log.details || '').substring(0, 80);
+                            }
+                        }
+                    } catch (e) {
+                        detailsText = Utils.escapeHtml(String(log.details || '')).substring(0, 80);
+                    }
+                    
+                    rows += '<tr>' +
+                        '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</td>' +
+                        '<td>' + actionText + '</td>' +
+                        '<td>' + Utils.escapeHtml(log.user_name || '-') + '</td>' +
+                        '<td class="desc-cell">' + detailsText + '</td>' +
+                    '</tr>';
+                }
+            }
+            
+            var userOptions = '<option value="">' + (lang === 'id' ? 'Semua pengguna' : '全部用户') + '</option>';
+            for (var j = 0; j < users.length; j++) {
+                userOptions += '<option value="' + users[j].id + '">' + Utils.escapeHtml(users[j].name) + '</option>';
+            }
+            
+            var actionOptions = '<option value="">' + (lang === 'id' ? 'Semua aksi' : '全部操作') + '</option>';
+            var actionKeys = Object.keys(actionMap);
+            for (var k = 0; k < actionKeys.length; k++) {
+                actionOptions += '<option value="' + actionKeys[k] + '">' + actionMap[actionKeys[k]] + '</option>';
+            }
+            
+            var modalHtml = '' +
+                '<div id="auditLogModal" class="modal-overlay">' +
+                    '<div class="modal-content" style="max-width:900px;">' +
+                        '<h3>📝 ' + (lang === 'id' ? 'Log Audit' : '审计日志') + '</h3>' +
+                        
+                        '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">' +
+                            '<select id="auditFilterAction">' + actionOptions + '</select>' +
+                            '<select id="auditFilterUser">' + userOptions + '</select>' +
+                            '<input type="date" id="auditFilterStart" placeholder="' + (lang === 'id' ? 'Dari tanggal' : '开始日期') + '">' +
+                            '<input type="date" id="auditFilterEnd" placeholder="' + (lang === 'id' ? 'Sampai tanggal' : '结束日期') + '">' +
+                            '<button onclick="Storage.filterAuditLog()" class="btn-small">🔍 ' + (lang === 'id' ? 'Filter' : '筛选') + '</button>' +
+                            '<button onclick="Storage.resetAuditFilter()" class="btn-small">🔄 ' + (lang === 'id' ? 'Reset' : '重置') + '</button>' +
+                        '</div>' +
+                        
+                        '<div class="table-container" style="max-height:450px; overflow-y:auto;">' +
+                            '<table class="data-table">' +
+                                '<thead>' +
+                                    '<tr>' +
+                                        '<th class="col-date">' + (lang === 'id' ? 'Waktu' : '时间') + '</th>' +
+                                        '<th class="col-type">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
+                                        '<th class="col-name">' + (lang === 'id' ? 'Pengguna' : '用户') + '</th>' +
+                                        '<th class="col-desc">' + (lang === 'id' ? 'Detail' : '详情') + '</th>' +
+                                    '</tr>' +
+                                '</thead>' +
+                                '<tbody id="auditLogBody">' + rows + '</tbody>' +
+                            '</table>' +
+                        '</div>' +
+                        
+                        '<div class="modal-actions">' +
+                            '<button onclick="Storage.exportAuditLogCSV()" class="btn-small">📎 ' + (lang === 'id' ? 'Ekspor CSV' : '导出CSV') + '</button>' +
+                            '<button onclick="document.getElementById(\'auditLogModal\').remove()" class="btn-small">✖ ' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            window._auditLogData = logs;
+            window._auditUsersData = users;
+            
+        } catch (error) {
+            console.error("showAuditLog error:", error);
+            alert(lang === 'id' ? 'Gagal memuat log audit: ' + error.message : '加载审计日志失败：' + error.message);
         }
-        await this.restoreOrdersOnly(fileInput.files[0]);
     },
-    
-    restoreCustomersOnlyFromFile: async function() {
-        const fileInput = document.getElementById('selectiveFile');
-        if (!fileInput || !fileInput.files[0]) {
-            alert(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
-            return;
+
+    filterAuditLog: function() {
+        var logs = window._auditLogData || [];
+        var actionFilter = document.getElementById('auditFilterAction')?.value || '';
+        var userFilter = document.getElementById('auditFilterUser')?.value || '';
+        var startDate = document.getElementById('auditFilterStart')?.value || '';
+        var endDate = document.getElementById('auditFilterEnd')?.value || '';
+        
+        var filtered = logs.filter(function(log) {
+            if (actionFilter && log.action !== actionFilter) return false;
+            if (userFilter && log.user_id !== userFilter) return false;
+            if (startDate && log.created_at < startDate) return false;
+            if (endDate && log.created_at > endDate + 'T23:59:59') return false;
+            return true;
+        });
+        Storage._renderAuditLogTable(filtered);
+    },
+
+    resetAuditFilter: function() {
+        var actionEl = document.getElementById('auditFilterAction');
+        var userEl = document.getElementById('auditFilterUser');
+        var startEl = document.getElementById('auditFilterStart');
+        var endEl = document.getElementById('auditFilterEnd');
+        if (actionEl) actionEl.value = '';
+        if (userEl) userEl.value = '';
+        if (startEl) startEl.value = '';
+        if (endEl) endEl.value = '';
+        Storage.filterAuditLog();
+    },
+
+    _renderAuditLogTable: function(logs) {
+        var tbody = document.getElementById('auditLogBody');
+        if (!tbody) return;
+        
+        var lang = Utils.lang;
+        var actionMap = {
+            login_success: lang === 'id' ? '✅ Login Berhasil' : '✅ 登录成功',
+            login_failure: lang === 'id' ? '❌ Login Gagal' : '❌ 登录失败',
+            logout: lang === 'id' ? '🚪 Logout' : '🚪 退出',
+            order_create: lang === 'id' ? '📋 Buat Pesanan' : '📋 创建订单',
+            order_delete: lang === 'id' ? '🗑️ Hapus Pesanan' : '🗑️ 删除订单',
+            payment: lang === 'id' ? '💰 Pembayaran' : '💰 缴费',
+            user_create: lang === 'id' ? '👤 Tambah User' : '👤 新增用户',
+            user_delete: lang === 'id' ? '👤 Hapus User' : '👤 删除用户',
+            user_update: lang === 'id' ? '✏️ Ubah User' : '✏️ 修改用户',
+            password_reset: lang === 'id' ? '🔑 Reset Password' : '🔑 重置密码',
+            store_create: lang === 'id' ? '🏪 Tambah Toko' : '🏪 新增门店',
+            store_update: lang === 'id' ? '✏️ Ubah Toko' : '✏️ 修改门店',
+            store_delete: lang === 'id' ? '🗑️ Hapus Toko' : '🗑️ 删除门店',
+            blacklist_add: lang === 'id' ? '🚫 Tambah Blacklist' : '🚫 加入黑名单',
+            blacklist_remove: lang === 'id' ? '🔓 Buka Blacklist' : '🔓 解除黑名单',
+            backup: lang === 'id' ? '💾 Cadangan' : '💾 备份',
+            restore: lang === 'id' ? '📥 Pemulihan' : '📥 恢复',
+            export: lang === 'id' ? '📎 Ekspor' : '📎 导出'
+        };
+        
+        var rows = '';
+        if (logs.length === 0) {
+            rows = '<tr><td colspan="4" class="text-center">' + (lang === 'id' ? 'Tidak ada log' : '暂无记录') + '</td></tr>';
+        } else {
+            for (var i = 0; i < logs.length; i++) {
+                var log = logs[i];
+                var detailsText = '';
+                try {
+                    var details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+                    if (details) {
+                        if (details.order_id) {
+                            detailsText = '📋 ' + Utils.escapeHtml(details.order_id);
+                        } else if (details.username) {
+                            detailsText = '👤 ' + Utils.escapeHtml(details.username);
+                        } else if (details.store_name) {
+                            detailsText = '🏪 ' + Utils.escapeHtml(details.store_name);
+                        } else if (details.filename) {
+                            detailsText = '📄 ' + Utils.escapeHtml(details.filename);
+                        } else if (details.customer_id) {
+                            detailsText = '👥 ' + Utils.escapeHtml(details.customer_id);
+                        } else {
+                            detailsText = Utils.escapeHtml(log.details || '').substring(0, 80);
+                        }
+                    }
+                } catch (e) {
+                    detailsText = Utils.escapeHtml(String(log.details || '')).substring(0, 80);
+                }
+                
+                rows += '<tr>' +
+                    '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</td>' +
+                    '<td>' + (actionMap[log.action] || log.action) + '</td>' +
+                    '<td>' + Utils.escapeHtml(log.user_name || '-') + '</td>' +
+                    '<td class="desc-cell">' + detailsText + '</td>' +
+                '</tr>';
+            }
         }
-        await this.restoreCustomersOnly(fileInput.files[0]);
+        tbody.innerHTML = rows;
+    },
+
+    exportAuditLogCSV: function() {
+        var logs = window._auditLogData || [];
+        var lang = Utils.lang;
+        
+        var headers = lang === 'id'
+            ? ['Waktu', 'Aksi', 'Pengguna', 'Detail']
+            : ['时间', '操作', '用户', '详情'];
+        
+        var rows = logs.map(function(log) {
+            return [
+                log.created_at,
+                log.action,
+                log.user_name || '-',
+                (log.details || '').substring(0, 200)
+            ];
+        });
+        
+        var csvContent = [headers].concat(rows).map(function(row) {
+            return row.map(function(cell) { return '"' + String(cell || '').replace(/"/g, '""') + '"'; }).join(',');
+        }).join('\n');
+        
+        var blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'jf_audit_log_' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        if (window.Audit) {
+            window.Audit.logExport('audit_log', 'jf_audit_log_' + new Date().toISOString().split('T')[0] + '.csv', AUTH.user?.name);
+        }
+        alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     }
 };
 
