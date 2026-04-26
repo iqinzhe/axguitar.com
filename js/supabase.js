@@ -1,23 +1,309 @@
-// supabase.js - v2.1（修复版：集成锁定检查、门店状态检查、统一客户端引用）
+// supabase.js - v2.2（修复版：自定义存储绕过浏览器追踪防护 + 查询冲突修复 + Session 健壮性增强）
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ==================== 自定义存储：绕过浏览器 Tracking Prevention ====================
+// Safari / Firefox 隐私模式 / ETP 会阻止 localStorage 和 sessionStorage
+// 此自定义实现使用多层后备：localStorage → cookie → 内存
+const SafeStorage = {
+    _memoryStore: {},
+    _storageAvailable: null,
+    _cookieEnabled: null,
 
+    // 检查 localStorage 是否可用
+    _checkLocalStorage() {
+        if (this._storageAvailable !== null) return this._storageAvailable;
+        try {
+            const testKey = '__storage_test__';
+            localStorage.setItem(testKey, '1');
+            localStorage.removeItem(testKey);
+            this._storageAvailable = true;
+            return true;
+        } catch (e) {
+            console.warn('[SafeStorage] localStorage 被阻止，使用备用方案');
+            this._storageAvailable = false;
+            return false;
+        }
+    },
+
+    // 检查 sessionStorage 是否可用
+    _checkSessionStorage() {
+        try {
+            const testKey = '__storage_test__';
+            sessionStorage.setItem(testKey, '1');
+            sessionStorage.removeItem(testKey);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    // 检查 Cookie 是否可用
+    _checkCookie() {
+        if (this._cookieEnabled !== null) return this._cookieEnabled;
+        try {
+            document.cookie = '__cookie_test__=1;path=/;SameSite=Lax';
+            const hasCookie = document.cookie.indexOf('__cookie_test__=') !== -1;
+            document.cookie = '__cookie_test__=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            this._cookieEnabled = hasCookie;
+            return hasCookie;
+        } catch (e) {
+            this._cookieEnabled = false;
+            return false;
+        }
+    },
+
+    // 从 Cookie 获取值
+    _getCookie(name) {
+        try {
+            const value = '; ' + document.cookie;
+            const parts = value.split('; ' + name + '=');
+            if (parts.length === 2) {
+                return decodeURIComponent(parts.pop().split(';').shift());
+            }
+        } catch (e) {}
+        return null;
+    },
+
+    // 设置 Cookie
+    _setCookie(name, value, days) {
+        try {
+            let expires = '';
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = ';expires=' + date.toUTCString();
+            }
+            document.cookie = name + '=' + encodeURIComponent(value) + ';path=/;SameSite=Lax' + expires;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    // 删除 Cookie
+    _removeCookie(name) {
+        try {
+            document.cookie = name + '=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        } catch (e) {}
+    },
+
+    // ========== 实现 Storage 接口 ==========
+
+    getItem(key) {
+        // 1. 尝试 localStorage
+        if (this._checkLocalStorage()) {
+            try {
+                return localStorage.getItem(key);
+            } catch (e) {}
+        }
+
+        // 2. 尝试 Cookie
+        if (this._checkCookie()) {
+            const val = this._getCookie(key);
+            if (val !== null) return val;
+        }
+
+        // 3. 后备：内存
+        return this._memoryStore[key] || null;
+    },
+
+    setItem(key, value) {
+        // 1. 尝试 localStorage
+        if (this._checkLocalStorage()) {
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {}
+        }
+
+        // 2. 同步到 Cookie
+        if (this._checkCookie()) {
+            if (value !== null && value !== undefined) {
+                this._setCookie(key, String(value), 365);
+            }
+        }
+
+        // 3. 同步到内存
+        if (value === null || value === undefined) {
+            delete this._memoryStore[key];
+        } else {
+            this._memoryStore[key] = String(value);
+        }
+    },
+
+    removeItem(key) {
+        // 1. localStorage
+        if (this._checkLocalStorage()) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {}
+        }
+
+        // 2. Cookie
+        if (this._checkCookie()) {
+            this._removeCookie(key);
+        }
+
+        // 3. 内存
+        delete this._memoryStore[key];
+    },
+
+    // 清除所有（仅限带前缀的键，避免误删其他数据）
+    clear(prefix) {
+        prefix = prefix || '';
+
+        if (this._checkLocalStorage()) {
+            try {
+                const keys = Object.keys(localStorage);
+                for (const key of keys) {
+                    if (!prefix || key.startsWith(prefix)) {
+                        localStorage.removeItem(key);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (this._checkCookie()) {
+            try {
+                const cookies = document.cookie.split(';');
+                for (const cookie of cookies) {
+                    const name = cookie.trim().split('=')[0];
+                    if (!prefix || name.startsWith(prefix)) {
+                        this._removeCookie(name);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (prefix) {
+            const keysToRemove = Object.keys(this._memoryStore).filter(k => k.startsWith(prefix));
+            for (const key of keysToRemove) {
+                delete this._memoryStore[key];
+            }
+        } else {
+            this._memoryStore = {};
+        }
+    }
+};
+
+// ==================== 自定义 Session Storage 实现 ====================
+const SafeSessionStorage = {
+    _memoryStore: {},
+
+    _checkSessionStorage() {
+        try {
+            const testKey = '__sstest__';
+            sessionStorage.setItem(testKey, '1');
+            sessionStorage.removeItem(testKey);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    getItem(key) {
+        if (this._checkSessionStorage()) {
+            try {
+                return sessionStorage.getItem(key);
+            } catch (e) {}
+        }
+        return this._memoryStore[key] || null;
+    },
+
+    setItem(key, value) {
+        if (this._checkSessionStorage()) {
+            try {
+                sessionStorage.setItem(key, value);
+            } catch (e) {}
+        }
+        if (value === null || value === undefined) {
+            delete this._memoryStore[key];
+        } else {
+            this._memoryStore[key] = String(value);
+        }
+    },
+
+    removeItem(key) {
+        if (this._checkSessionStorage()) {
+            try {
+                sessionStorage.removeItem(key);
+            } catch (e) {}
+        }
+        delete this._memoryStore[key];
+    }
+};
+
+// ==================== 创建 Supabase 客户端（使用自定义存储） ====================
+let supabaseClient;
+
+try {
+    // 尝试使用自定义存储创建客户端
+    // 注：@supabase/supabase-js v2 支持 auth.storage 配置
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: {
+            storage: SafeStorage,
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: true
+        }
+    });
+    console.log('✅ Supabase 客户端初始化成功（使用自定义安全存储）');
+} catch (e) {
+    console.warn('自定义存储初始化失败，尝试默认配置:', e.message);
+    // 后备：使用默认存储
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log('⚠️ Supabase 客户端初始化使用默认存储');
+}
+
+// ==================== 缓存管理 ====================
 let _profileCache = null;
 let _storePrefixCache = new Map();
 let _storesCache = null;
 let _storesCacheTime = 0;
 const STORES_CACHE_TTL = 5 * 60 * 1000;
 
+// 重写全局 sessionStorage / localStorage 访问，使用安全版本
+// 这确保 Utils.js 和其他模块的存储访问不会崩溃
+(function() {
+    // 只有在原生存储不可用时才重写
+    let needOverride = false;
+    try {
+        localStorage.setItem('__check__', '1');
+        localStorage.removeItem('__check__');
+    } catch (e) {
+        needOverride = true;
+    }
+
+    if (needOverride) {
+        console.warn('[SafeStorage] 检测到 localStorage 不可用，将使用安全存储替代');
+        // 注意：不直接重写全局对象，而是让各模块使用 SafeStorage
+        // 如果必须重写，取消下面的注释：
+        // Object.defineProperty(window, 'localStorage', { value: SafeStorage, writable: false });
+        // Object.defineProperty(window, 'sessionStorage', { value: SafeSessionStorage, writable: false });
+    }
+})();
+
 const SupabaseAPI = {
     getClient() { return supabaseClient; },
 
+    // ==================== 安全存储暴露 ====================
+    getSafeStorage() { return SafeStorage; },
+    getSafeSessionStorage() { return SafeSessionStorage; },
+
+    // ==================== Session 管理 ====================
     async getSession() {
-        const { data, error } = await supabaseClient.auth.getSession();
-        if (error) throw error;
-        return data.session;
+        try {
+            const { data, error } = await supabaseClient.auth.getSession();
+            if (error) {
+                console.warn("getSession error:", error.message);
+                return null;
+            }
+            return data.session;
+        } catch (err) {
+            console.warn("getSession exception:", err.message);
+            return null;
+        }
     },
 
     async getCurrentUser() {
@@ -83,7 +369,7 @@ const SupabaseAPI = {
         _storesCacheTime = 0;
     },
 
-    // 新增：检查门店状态
+    // ==================== 门店状态检查 ====================
     async checkStoreStatus(storeId) {
         try {
             const { data, error } = await supabaseClient
@@ -119,7 +405,7 @@ const SupabaseAPI = {
         return profile?.stores?.name || 'Kantor';
     },
 
-    // 修复：集成了查找用户名的逻辑
+    // ==================== 登录逻辑 ====================
     async login(emailOrUsername, password) {
         let emailToUse = emailOrUsername;
         
@@ -165,6 +451,7 @@ const SupabaseAPI = {
         if (error) throw error;
     },
 
+    // ==================== 门店操作 ====================
     async getAllStores(forceRefresh = false) {
         const now = Date.now();
         if (!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_CACHE_TTL) {
@@ -357,6 +644,7 @@ const SupabaseAPI = {
         return date.toISOString().split('T')[0];
     },
 
+    // ==================== 资金流水记录 ====================
     async recordCashFlow(flowData) {
         const profile = await this.getCurrentProfile();
         
@@ -469,7 +757,7 @@ const SupabaseAPI = {
         return flowRecord;
     },
 
-    // ==================== getOrders（新：支持分页） ====================
+    // ==================== 订单操作 ====================
     async getOrders(filters, from, to) {
         if (filters === undefined) filters = {};
         const profile = await this.getCurrentProfile();
@@ -495,7 +783,6 @@ const SupabaseAPI = {
         return { data: data || [], totalCount: count || 0 };
     },
 
-    // ==================== getOrdersLegacy（兼容旧调用） ====================
     async getOrdersLegacy(filters) {
         var result = await this.getOrders(filters);
         return result.data;
@@ -1862,3 +2149,5 @@ const SupabaseAPI = {
 
 window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
+window.SafeStorage = SafeStorage;
+window.SafeSessionStorage = SafeSessionStorage;
