@@ -1,4 +1,4 @@
-// order.js - v1.3（支持实际费用字段：管理费/服务费/月供）
+// order.js - v1.4（默认利率改为统一常量 8%）
 
 const Order = {
     // ==================== 创建订单 ====================
@@ -10,12 +10,13 @@ const Order = {
             customer_address: data.customer.address,
             collateral_name: data.collateral_name,
             loan_amount: data.loan_amount,
-            admin_fee: data.admin_fee || 30000,
+            admin_fee: data.admin_fee || Utils.calculateAdminFee(data.loan_amount),
             service_fee_percent: data.service_fee_percent !== undefined ? data.service_fee_percent : 2,
             service_fee_amount: data.service_fee_amount || 0,
             notes: data.notes,
             customer_id: data.customer_id || null,
-            agreed_interest_rate: data.agreed_interest_rate || 10,
+            // 修复2：默认利率改为统一常量 8%
+            agreed_interest_rate: data.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT,
             repayment_type: data.repayment_type || 'flexible',
             repayment_term: data.repayment_term || null,
             monthly_fixed_payment: data.monthly_fixed_payment || null
@@ -60,7 +61,8 @@ const Order = {
     
     // ==================== 获取当前月利息（灵活还款用） ====================
     getCurrentMonthlyInterest(order) {
-        const monthlyRate = order.agreed_interest_rate || 0.08;
+        // 修复2：默认利率用常量
+        const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
         return (order.loan_amount - order.principal_paid) * monthlyRate;
     },
     
@@ -97,7 +99,8 @@ const Order = {
     
     // ==================== 获取协商利率 ====================
     getAgreedInterestRate(order) {
-        return order.agreed_interest_rate || 0.08;
+        // 修复2：默认利率用常量
+        return order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
     },
     
     // ==================== 获取还款方式 ====================
