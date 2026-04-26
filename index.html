@@ -28,10 +28,10 @@
     </div>
 </div>
 
-<!-- ==================== 第三方库 ==================== -->
+<!-- ===== 第三方库 ====== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ==================== 基础模块（按依赖顺序加载） ==================== -->
+<!-- ====== 基础模块（按依赖顺序加载） ====== -->
 <!-- utils.js - 必须最先加载（定义 Utils、语言、格式化等） -->
 <script src="js/utils.js"></script>
 <script src="js/supabase.js"></script>
@@ -43,12 +43,12 @@
 <script src="js/audit.js"></script>
 <script src="js/migration.js"></script>
 
-<!-- ==================== 功能模块 ==================== -->
+<!-- ======= 功能模块 ======= -->
 <script src="js/app-blacklist.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
 
-<!-- ====== 仪表盘子模块（必须在 core 之前加载）====== -->
+<!-- ===== 仪表盘子模块（必须在 core 之前加载）===== -->
 <script src="js/app-dashboard-anomaly.js"></script>
 <script src="js/app-dashboard-funds.js"></script>
 <script src="js/app-dashboard-users.js"></script>
@@ -57,10 +57,10 @@
 <script src="js/app-dashboard-orders.js"></script>
 <script src="js/app-dashboard-expenses.js"></script>
 
-<!-- ==================== 仪表盘核心模块（最后加载） ==================== -->
+<!-- ===== 仪表盘核心模块（最后加载） ===== -->
 <script src="js/app-dashboard-core.js"></script>
 
-<!-- ==================== 网络断开提醒（极简版，不依赖任何模块） ==================== -->
+<!-- ===== 网络断开提醒（极简版，不依赖任何模块） ===== -->
 <script>
 (function() {
     function showOfflineBanner() {
