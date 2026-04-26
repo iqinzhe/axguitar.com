@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.3（错误上报）
+// app-dashboard-expenses.js - v2.4（操作列合并到数据行 + 错误上报）
 
 window.APP = window.APP || {};
 
@@ -46,7 +46,8 @@ const DashboardExpenses = {
             }
             var todayDate = new Date().toISOString().split('T')[0];
 
-            var totalCols = isAdmin ? 6 : 5;
+            // 总列数（新增操作列）
+            var totalCols = isAdmin ? 7 : 6;
             
             var rows = '';
             if (finalExpenses.length === 0) {
@@ -54,28 +55,18 @@ const DashboardExpenses = {
             } else {
                 for (var i = 0; i < finalExpenses.length; i++) {
                     var e = finalExpenses[i];
-                    var canEdit = isAdmin && !e.is_reconciled;
                     var methodText = (e.payment_method === 'cash') ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
                     var storeName = storeMap[e.store_id] || e.store_id || '-';
                     
-                    rows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(e.expense_date) + '</td>' +
-                        '<td class="expense-category">' + Utils.escapeHtml(e.category) + '</td>' +
-                        '<td class="amount">' + Utils.formatCurrency(e.amount) + '</td>' +
-                        '<td class="text-center">' + methodText + '</td>' +
-                        '<td class="desc-cell">' + Utils.escapeHtml(e.description || '-') + '</td>' +
-                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
-                    '</tr>';
-                    
-                    // 操作行
+                    // 构建操作列内容
                     var actionHtml = '';
                     
                     if (isAdmin) {
                         if (!e.is_reconciled) {
-                            actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
-                            actionHtml += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button>';
+                            actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button> ';
+                            actionHtml += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button> ';
                         } else {
-                            actionHtml += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '</span>';
+                            actionHtml += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '</span> ';
                         }
                         if (!e.is_reconciled) {
                             actionHtml += '<button onclick="APP.balanceExpenses()" class="btn-small warning">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
@@ -84,11 +75,14 @@ const DashboardExpenses = {
                         actionHtml += '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
                     }
                     
-                    rows += '<tr class="action-row">' +
-                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
-                        '<td colspan="' + (totalCols - 1) + '">' +
-                            '<div class="action-buttons">' + actionHtml + '</div>' +
-                        '</td>' +
+                    rows += '<tr>' +
+                        '<td class="date-cell">' + Utils.formatDate(e.expense_date) + '</td>' +
+                        '<td class="expense-category">' + Utils.escapeHtml(e.category) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(e.amount) + '</td>' +
+                        '<td class="text-center">' + methodText + '</td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(e.description || '-') + '</td>' +
+                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
+                        '<td class="text-center" style="white-space:nowrap;">' + actionHtml + '</td>' +
                     '</tr>';
                 }
             }
@@ -130,6 +124,7 @@ const DashboardExpenses = {
                                     '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th class="col-desc">' + (lang === 'id' ? 'Deskripsi' : '描述') + '</th>' +
                                     (isAdmin ? '<th class="col-store text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
+                                    '<th class="col-action text-center">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
