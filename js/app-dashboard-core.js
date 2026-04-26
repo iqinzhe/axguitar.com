@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.7（修复文本重复显示）
+// app-dashboard-core.js - v2.8（利率 fallback 统一）
 
 window.APP = window.APP || {};
 
@@ -636,7 +636,7 @@ const DashboardCore = {
                 '</div>';
             }
             
-            // ========== 修复：底部信息（去除重复文本） ==========
+            // ========== 底部信息 ==========
             var userRoleText = AUTH.user.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
@@ -712,7 +712,9 @@ const DashboardCore = {
             if (o.status === 'active') {
                 activeCount++;
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                expectedMonthlyInterest += remainingPrincipal * (o.agreed_interest_rate || 0.08);
+                // 修复2：使用订单自身利率，fallback 为统一常量
+                var rate = o.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
+                expectedMonthlyInterest += remainingPrincipal * rate;
             } else if (o.status === 'completed') {
                 completedCount++;
             }
@@ -727,7 +729,8 @@ const DashboardCore = {
             total_service_fees: totalServiceFees,
             total_interest: totalInterest,
             total_principal: totalPrincipal,
-            expected_monthly_interest: expectedMonthlyInterest        };
+            expected_monthly_interest: expectedMonthlyInterest
+        };
     },
     
     _calculateCashFlowSummary: function(allFlows, isAdmin, storeId, storeSpecificCashFlows) {
