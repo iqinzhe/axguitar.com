@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.2（加载更多分页、按钮图标、错误上报）
+// app-dashboard-orders.js - v2.3（修复：打印收据XSS漏洞 + 结清凭证转义）
 
 window.APP = window.APP || {};
 
@@ -292,7 +292,7 @@ const DashboardOrders = {
                     var p = payments[i];
                     var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    payRows += '<tr>' +
+                    payRows += '</table>' +
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
                         '<td>' + typeText + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
@@ -416,6 +416,7 @@ const DashboardOrders = {
         }
     },
 
+    // ==================== 打印订单（XSS 修复版） ====================
     printOrder: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -432,6 +433,15 @@ const DashboardOrders = {
                 bank: lang === 'id' ? 'Transfer Bank BNI' : '银行转账 BNI' 
             };
             
+            // ========== XSS 修复：对所有用户输入进行转义 ==========
+            var safeOrderId = Utils.escapeHtml(order.order_id);
+            var safeCustomerName = Utils.escapeHtml(order.customer_name);
+            var safeCustomerKtp = Utils.escapeHtml(order.customer_ktp || '-');
+            var safeCustomerPhone = Utils.escapeHtml(order.customer_phone || '-');
+            var safeCustomerAddress = Utils.escapeHtml(order.customer_address || '-');
+            var safeCollateral = Utils.escapeHtml(order.collateral_name || '-');
+            var safeNotes = Utils.escapeHtml(order.notes || '-');
+            
             var paymentRows = '';
             for (var i = 0; i < payments.length; i++) {
                 var p = payments[i];
@@ -443,11 +453,13 @@ const DashboardOrders = {
                 else typeText = p.type || '-';
                 
                 var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? 'Tunai' : 'Bank');
+                var safeDate = Utils.formatDate(p.date);
+                var safeAmount = Utils.formatCurrency(p.amount);
                 
                 paymentRows += '<tr>' +
-                    '<td>' + Utils.formatDate(p.date) + '</td>' +
+                    '<td>' + safeDate + '</td>' +
                     '<td>' + typeText + '</td>' +
-                    '<td class="text-right">' + Utils.formatCurrency(p.amount) + '</td>' +
+                    '<td class="text-right">' + safeAmount + '</td>' +
                     '<td>' + methodText + '</td>' +
                 '</tr>';
             }
@@ -457,7 +469,10 @@ const DashboardOrders = {
             }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-            var safeStoreName = AUTH.getCurrentStoreName();
+            var safeStoreName = Utils.escapeHtml(AUTH.getCurrentStoreName());
+            var safeLoanAmount = Utils.formatCurrency(order.loan_amount);
+            var safeRemainingPrincipal = Utils.formatCurrency(remainingPrincipal);
+            var safeCreatedAt = Utils.formatDate(order.created_at);
             
             var printWindow = window.open('', '_blank');
             printWindow.document.write('' +
@@ -465,7 +480,7 @@ const DashboardOrders = {
                 '<html>' +
                 '<head>' +
                     '<meta charset="UTF-8">' +
-                    '<title>JF! by Gadai - ' + order.order_id + '</title>' +
+                    '<title>JF! by Gadai - ' + safeOrderId + '</title>' +
                     '<style>' +
                         '*{margin:0;padding:0;box-sizing:border-box}' +
                         'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:12px;padding:15mm}' +
@@ -486,21 +501,21 @@ const DashboardOrders = {
                 '<body>' +
                     '<div class="header">' +
                         '<h1>JF! by Gadai</h1>' +
-                        '<p>' + (lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证') + ' | <strong>' + order.order_id + '</strong> | ' + Utils.formatDate(order.created_at) + '</p>' +
+                        '<p>' + (lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证') + ' | <strong>' + safeOrderId + '</strong> | ' + safeCreatedAt + '</p>' +
                     '</div>' +
                     '<div class="section">' +
                         '<h3>' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '</h3>' +
-                        '<div class="info-row"><div class="info-label">' + t('customer_name') + ':</div><div>' + order.customer_name + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">KTP:</div><div>' + (order.customer_ktp || '-') + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('phone') + ':</div><div>' + (order.customer_phone || '-') + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('address') + ':</div><div>' + (order.customer_address || '-') + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">' + t('customer_name') + ':</div><div>' + safeCustomerName + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">KTP:</div><div>' + safeCustomerKtp + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">' + t('phone') + ':</div><div>' + safeCustomerPhone + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">' + t('address') + ':</div><div>' + safeCustomerAddress + '</div></div>' +
                     '</div>' +
                     '<div class="section">' +
                         '<h3>' + (lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款') + '</h3>' +
-                        '<div class="info-row"><div class="info-label">' + t('collateral_name') + ':</div><div>' + order.collateral_name + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('loan_amount') + ':</div><div>' + Utils.formatCurrency(order.loan_amount) + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</div><div>' + Utils.formatCurrency(remainingPrincipal) + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('notes') + ':</div><div>' + (order.notes || '-') + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">' + t('collateral_name') + ':</div><div>' + safeCollateral + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">' + t('loan_amount') + ':</div><div>' + safeLoanAmount + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</div><div>' + safeRemainingPrincipal + '</div></div>' +
+                        '<div class="info-row"><div class="info-label">' + t('notes') + ':</div><div>' + safeNotes + '</div></div>' +
                     '</div>' +
                     '<div class="section">' +
                         '<h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
@@ -594,7 +609,7 @@ const DashboardOrders = {
                                     '<th class="col-amount amount">' + t('amount') + '</th>' +
                                     '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th class="col-desc">' + t('description') + '</th>' +
-                                '</tr>' +
+                                '</td>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
