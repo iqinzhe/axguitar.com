@@ -1,4 +1,4 @@
-// app-customers.js - v4.0（移除内联样式，使用组件库）
+// app-customers.js - v4.1（修复操作行按钮间距）
 
 window.APP = window.APP || {};
 
@@ -72,10 +72,12 @@ const CustomersModule = {
                         actionButtons += '<button onclick="APP.removeCustomerFromBlacklist(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
                     }
                     
-                    rows += Utils.renderActionRow({
-                        colspan: totalCols,
-                        buttonsHtml: actionButtons
-                    });
+                    rows += '<tr class="action-row">' +
+                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
+                        '<td colspan="' + (totalCols - 1) + '">' +
+                            '<div class="action-buttons">' + actionButtons + '</div>' +
+                        '</td>' +
+                    '</tr>';
                 }
             }
 
@@ -1087,10 +1089,12 @@ const CustomersModule = {
                     }
                     actionButtons += '<button onclick="APP.navigateTo(\'viewOrder\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small">👁️ ' + t('view') + '</button>';
                     
-                    rows += Utils.renderActionRow({
-                        colspan: 7,
-                        buttonsHtml: actionButtons
-                    });
+                    rows += '<tr class="action-row">' +
+                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
+                        '<td colspan="6">' +
+                            '<div class="action-buttons">' + actionButtons + '</div>' +
+                        '</td>' +
+                    '</tr>';
                 }
             }
 
