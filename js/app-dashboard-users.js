@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v1.2（移除内联样式，使用组件库）
+// app-dashboard-users.js - v1.3（修复编辑功能 + 操作行按钮）
 
 window.APP = window.APP || {};
 
@@ -203,21 +203,97 @@ const DashboardUsers = {
         }
     },
 
+    // ========== 修复：编辑改为打开完整编辑模态框 ==========
     editUser: async function(userId) {
         var lang = Utils.lang;
-        var newRole = prompt(lang === 'id' ? 'Masukkan role baru (store_manager/staff):' : '请输入新角色 (store_manager/staff):');
-        if (!newRole) return;
-        if (newRole !== 'store_manager' && newRole !== 'staff') {
-            alert(lang === 'id' ? 'Role tidak valid' : '角色无效');
+        var t = function(key) { return Utils.t(key); };
+        
+        try {
+            // 获取用户信息
+            const { data: user, error: userError } = await supabaseClient
+                .from('user_profiles')
+                .select('*, stores(*)')
+                .eq('id', userId)
+                .single();
+            
+            if (userError) throw userError;
+            
+            // 获取所有门店列表（用于下拉选择）
+            const stores = await SUPABASE.getAllStores();
+            
+            var storeOptions = '<option value="">' + (lang === 'id' ? 'Tidak ada (Kantor Pusat)' : '无（总部）') + '</option>';
+            for (var j = 0; j < stores.length; j++) {
+                var s = stores[j];
+                var selected = (user.store_id === s.id) ? ' selected' : '';
+                storeOptions += '<option value="' + s.id + '"' + selected + '>' + Utils.escapeHtml(s.name) + ' (' + Utils.escapeHtml(s.code) + ')</option>';
+            }
+            
+            var roleOptions = '' +
+                '<option value="store_manager"' + (user.role === 'store_manager' ? ' selected' : '') + '>' + (lang === 'id' ? 'Manajer Toko' : '店长') + '</option>' +
+                '<option value="staff"' + (user.role === 'staff' ? ' selected' : '') + '>' + (lang === 'id' ? 'Staf' : '员工') + '</option>';
+            
+            var modal = document.createElement('div');
+            modal.id = 'editUserModal';
+            modal.className = 'modal-overlay';
+            modal.innerHTML = '' +
+                '<div class="modal-content" style="max-width:500px;">' +
+                    '<h3>✏️ ' + (lang === 'id' ? 'Edit Operator' : '编辑操作员') + '</h3>' +
+                    
+                    '<div class="form-group">' +
+                        '<label>' + (lang === 'id' ? 'Username (Email)' : '用户名（邮箱）') + '</label>' +
+                        '<input value="' + Utils.escapeHtml(user.username || user.email || '') + '" readonly>' +
+                        '<div class="form-hint">⚠️ ' + (lang === 'id' ? 'Username tidak dapat diubah' : '用户名不可修改') + '</div>' +
+                    '</div>' +
+                    
+                    '<div class="form-group">' +
+                        '<label>' + (lang === 'id' ? 'Nama Lengkap' : '姓名') + ' *</label>' +
+                        '<input id="editUserName" value="' + Utils.escapeHtml(user.name || '') + '">' +
+                    '</div>' +
+                    
+                    '<div class="form-group">' +
+                        '<label>' + (lang === 'id' ? 'Role' : '角色') + ' *</label>' +
+                        '<select id="editUserRole">' + roleOptions + '</select>' +
+                    '</div>' +
+                    
+                    '<div class="form-group">' +
+                        '<label>' + (lang === 'id' ? 'Toko' : '门店') + '</label>' +
+                        '<select id="editUserStoreId">' + storeOptions + '</select>' +
+                    '</div>' +
+                    
+                    '<div class="modal-actions">' +
+                        '<button onclick="APP._saveEditUser(\'' + userId + '\')" class="success">💾 ' + t('save') + '</button>' +
+                        '<button onclick="document.getElementById(\'editUserModal\').remove()" class="btn-back">✖ ' + t('cancel') + '</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(modal);
+            
+        } catch (error) {
+            console.error("editUser error:", error);
+            alert(lang === 'id' ? 'Gagal memuat data operator' : '加载操作员数据失败');
+        }
+    },
+
+    _saveEditUser: async function(userId) {
+        var lang = Utils.lang;
+        var name = document.getElementById('editUserName')?.value.trim();
+        var role = document.getElementById('editUserRole')?.value;
+        var storeId = document.getElementById('editUserStoreId')?.value || null;
+        
+        if (!name) {
+            alert(lang === 'id' ? 'Nama harus diisi' : '姓名必须填写');
             return;
         }
         
         try {
-            await AUTH.updateUser(userId, { role: newRole });
-            alert(lang === 'id' ? '✅ Role berhasil diubah' : '✅ 角色已修改');
+            var updates = { name: name, role: role, store_id: storeId };
+            
+            await AUTH.updateUser(userId, updates);
+            
+            document.getElementById('editUserModal')?.remove();
+            alert(lang === 'id' ? '✅ Data operator berhasil diperbarui' : '✅ 操作员信息已更新');
             await this.showUserManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal mengubah role: ' + error.message : '修改角色失败：' + error.message);
+            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
 
