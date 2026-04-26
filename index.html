@@ -28,12 +28,13 @@
     </div>
 </div>
 
-<!-- 第三方库 -->
+<!-- ==================== 第三方库 ==================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 基础模块 -->
-<script src="js/supabase.js"></script>
+<!-- ==================== 基础模块（按依赖顺序加载） ==================== -->
+<!-- utils.js - 必须最先加载（定义 Utils、语言、格式化等） -->
 <script src="js/utils.js"></script>
+<script src="js/supabase.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/permission.js"></script>
 <script src="js/order.js"></script>
@@ -42,14 +43,13 @@
 <script src="js/audit.js"></script>
 <script src="js/migration.js"></script>
 
-<!-- 功能模块 -->
+<!-- ==================== 功能模块 ==================== -->
 <script src="js/app-blacklist.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
 
-<!-- 仪表盘模块 -->
+<!-- ====== 仪表盘子模块（必须在 core 之前加载）====== -->
 <script src="js/app-dashboard-anomaly.js"></script>
-<script src="js/app-dashboard-core.js"></script>
 <script src="js/app-dashboard-funds.js"></script>
 <script src="js/app-dashboard-users.js"></script>
 <script src="js/app-dashboard-wa.js"></script>
@@ -57,9 +57,11 @@
 <script src="js/app-dashboard-orders.js"></script>
 <script src="js/app-dashboard-expenses.js"></script>
 
-<!-- 网络断开提醒（极简版） -->
+<!-- ==================== 仪表盘核心模块（最后加载） ==================== -->
+<script src="js/app-dashboard-core.js"></script>
+
+<!-- ==================== 网络断开提醒（极简版，不依赖任何模块） ==================== -->
 <script>
-// 仅在网络断开时显示顶部横幅
 (function() {
     function showOfflineBanner() {
         var existing = document.getElementById('offlineBanner');
@@ -84,40 +86,58 @@
 })();
 </script>
 
-<!-- 初始化脚本（保持原样） -->
+<!-- ==================== 初始化脚本 ==================== -->
 <script>
+// 全局错误捕获
 window.addEventListener('error', function(e) {
-    console.error('Global error:', e.error);
+    console.error('Global error:', e.error || e.message);
 });
 
+// 初始化超时处理（15秒）
 var initTimeout = setTimeout(function() {
-    showError('加载超时，请刷新页面重试');
-}, 10000);
+    showError(
+        (navigator.language && navigator.language.startsWith('id'))
+            ? '⏳ Memuat terlalu lama. Silakan periksa koneksi internet Anda dan muat ulang halaman.'
+            : '⏳ 加载超时，请检查网络连接后刷新页面重试。'
+    );
+}, 15000);
 
+// DOM 加载完成后初始化 APP
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         clearTimeout(initTimeout);
         try {
-            if (!window.APP) throw new Error('APP module not loaded');
-            if (typeof window.APP.init !== 'function') throw new Error('APP.init is not a function');
+            if (!window.APP) {
+                throw new Error('APP module not loaded - check if app-dashboard-core.js exists');
+            }
+            if (typeof window.APP.init !== 'function') {
+                throw new Error('APP.init is not a function - check app-dashboard-core.js exports');
+            }
+            console.log('✅ 所有模块加载完成，初始化 APP...');
             window.APP.init();
         } catch (err) {
             console.error('Init error:', err);
-            showError('Gagal memuat aplikasi: ' + err.message);
+            var langMsg = (navigator.language && navigator.language.startsWith('id'))
+                ? 'Gagal memuat aplikasi: ' + err.message
+                : '应用加载失败: ' + err.message;
+            showError(langMsg);
         }
-    }, 100);
+    }, 200); // 增加到 200ms，确保所有脚本执行完毕
 });
 
 function showError(message) {
     var app = document.getElementById('app');
     if (app) {
+        var isId = navigator.language && navigator.language.startsWith('id');
         app.innerHTML = '' +
-            '<div class="error-container">' +
-                '<div class="error-card">' +
-                    '<div class="error-icon">⚠️</div>' +
-                    '<h3 class="error-title">Error Sistem</h3>' +
-                    '<p class="error-message">' + escapeHtml(message) + '</p>' +
-                    '<button onclick="location.reload()" class="error-btn">Muat Ulang</button>' +
+            '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8fafc;padding:20px;">' +
+                '<div style="max-width:420px;width:100%;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);padding:32px;text-align:center;">' +
+                    '<div style="font-size:48px;margin-bottom:16px;">⚠️</div>' +
+                    '<h3 style="margin:0 0 12px 0;font-size:18px;color:#1e293b;">' + (isId ? 'Error Sistem' : '系统错误') + '</h3>' +
+                    '<p style="margin:0 0 20px 0;color:#64748b;font-size:14px;line-height:1.5;white-space:pre-wrap;">' + escapeHtml(message) + '</p>' +
+                    '<button onclick="location.reload()" style="padding:10px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">' +
+                        (isId ? '🔄 Muat Ulang' : '🔄 刷新页面') +
+                    '</button>' +
                 '</div>' +
             '</div>';
     }
