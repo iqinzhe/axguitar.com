@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.8（利率 fallback 统一）
+// app-dashboard-core.js - v3.0（骨架屏、登录重构、移除自动清理、滚动重置）
 
 window.APP = window.APP || {};
 
@@ -29,6 +29,9 @@ const DashboardCore = {
     },
 
     init: async function() {
+        // 初始化全局错误处理
+        Utils.ErrorHandler.init();
+        
         document.getElementById("app").innerHTML = '<div class="loading-container"><div class="loader"></div><p class="loading-text">🔄 Loading system...</p></div>';
         await AUTH.init();
         
@@ -54,6 +57,19 @@ const DashboardCore = {
 
     refreshCurrentPage: async function() {
         var self = this;
+        
+        // 先渲染骨架屏
+        var skeletonType = 'default';
+        if (this.currentPage === 'dashboard') skeletonType = 'dashboard';
+        else if (this.currentPage === 'orderTable' || this.currentPage === 'customers' || 
+                 this.currentPage === 'paymentHistory' || this.currentPage === 'expenses') skeletonType = 'table';
+        else if (this.currentPage === 'viewOrder' || this.currentPage === 'payment') skeletonType = 'detail';
+        
+        document.getElementById("app").innerHTML = Utils.renderSkeleton(skeletonType);
+        
+        // 短暂延迟让骨架屏渲染
+        await new Promise(function(resolve) { setTimeout(resolve, 100); });
+        
         var handlers = {
             dashboard: async () => await self.renderDashboard(),
             orderTable: async () => { if (typeof window.APP.showOrderTable === 'function') await window.APP.showOrderTable(); else await self.renderDashboard(); },
@@ -105,6 +121,9 @@ const DashboardCore = {
     },
 
     navigateTo: function(page, params) {
+        // 滚动到顶部
+        window.scrollTo(0, 0);
+        
         params = params || {};
         this.historyStack.push({
             page: this.currentPage,
@@ -280,6 +299,7 @@ const DashboardCore = {
         }
     },
 
+    // ==================== 登录页（重构） ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
@@ -299,15 +319,32 @@ const DashboardCore = {
                         '<h2 class="login-title" style="margin:0;">JF! by Gadai</h2>' +
                     '</div>' +
                     '<h3>' + t('login') + '</h3>' +
+                    
+                    // 错误提示区域
+                    '<div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;">' +
+                        '<span class="info-bar-icon">⚠️</span>' +
+                        '<div class="info-bar-content" id="loginErrorMessage"></div>' +
+                    '</div>' +
+                    
                     '<div class="form-group">' +
                         '<label>' + (lang === 'id' ? 'Email / Username' : '邮箱 / 用户名') + '</label>' +
-                        '<input id="username" placeholder="email@domain.com">' +
+                        '<input id="username" placeholder="email@domain.com" autocomplete="username">' +
                     '</div>' +
-                    '<div class="form-group">' +
+                    '<div class="form-group" style="position:relative;">' +
                         '<label>' + t('password') + '</label>' +
-                        '<input id="password" type="password" placeholder="' + t('password') + '">' +
+                        '<input id="password" type="password" placeholder="' + t('password') + '" autocomplete="current-password">' +
+                        '<span onclick="Utils.togglePasswordVisibility(\'password\', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;user-select:none;z-index:2;">👁️</span>' +
                     '</div>' +
-                    '<button onclick="APP.login()">' + t('login') + '</button>' +
+                    
+                    // 记住我复选框
+                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;font-size:var(--font-sm);">' +
+                        '<input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;">' +
+                        '<label for="rememberMe" style="cursor:pointer;font-weight:500;">' + 
+                            (lang === 'id' ? 'Ingat saya' : '记住我') + 
+                        '</label>' +
+                    '</div>' +
+                    
+                    '<button onclick="APP.login()" id="loginBtn">' + t('login') + '</button>' +
                     '<p class="login-note">' +
                         'ℹ️ ' + (lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号') +
                     '</p>' +
@@ -321,19 +358,48 @@ const DashboardCore = {
         this.renderLogin();
     },
 
+    // ==================== 登录方法（重构） ====================
     login: async function() {
         var username = document.getElementById("username").value.trim();
         var password = document.getElementById("password").value;
-        if (!username || !password) { alert(Utils.t('fill_all_fields')); return; }
-        var btnEl = document.querySelector('#app button');
+        var rememberMe = document.getElementById("rememberMe").checked;
+        var errorDiv = document.getElementById("loginError");
+        var errorMsg = document.getElementById("loginErrorMessage");
+        var btnEl = document.getElementById("loginBtn");
+        
+        // 隐藏之前的错误
+        if (errorDiv) errorDiv.style.display = 'none';
+        
+        if (!username || !password) {
+            if (errorDiv) {
+                errorDiv.style.display = 'flex';
+                errorMsg.textContent = Utils.t('fill_all_fields');
+            }
+            return;
+        }
+        
         if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
+        
+        // 设置记住我
+        AUTH.setRememberMe(rememberMe);
+        
         var user = await AUTH.login(username, password);
         if (!user) {
-            alert(Utils.t('login_failed'));
+            if (errorDiv) {
+                errorDiv.style.display = 'flex';
+                errorMsg.textContent = Utils.lang === 'id' 
+                    ? 'Login gagal. Periksa kembali email/username dan password Anda.'
+                    : '登录失败，请检查邮箱/用户名和密码。';
+            }
             if (btnEl) { btnEl.disabled = false; btnEl.textContent = Utils.t('login'); }
             return;
         }
         await this.router();
+    },
+
+    clearLoginError: function() {
+        var errorDiv = document.getElementById('loginError');
+        if (errorDiv) errorDiv.style.display = 'none';
     },
 
     logout: async function() {
@@ -354,6 +420,7 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
+    // ==================== 仪表盘（移除自动清理） ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -368,7 +435,7 @@ const DashboardCore = {
             const storeId = profile?.store_id;
             
             const queries = [
-                SUPABASE.getOrders(),
+                SUPABASE.getOrdersLegacy(),
                 SUPABASE.getCashFlowRecords(),
                 SUPABASE.getOrdersNeedReminder(),
                 SUPABASE.getAllStores()
@@ -454,51 +521,20 @@ const DashboardCore = {
             }
             var deficit = totalOutflow - totalInflowExcludingPrincipal;
             
-            var twoYearsAgo = new Date();
-            twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-            
-            var expiredOrders = [];
-            for (var i = 0; i < allOrders.length; i++) {
-                var o = allOrders[i];
-                if (o.status === 'completed') {
-                    var completedDate = o.completed_at || o.updated_at;
-                    if (completedDate && new Date(completedDate) < twoYearsAgo) {
-                        expiredOrders.push(o);
-                    }
-                }
-            }
-            
-            if (expiredOrders.length > 0) {
-                console.log('检测到 ' + expiredOrders.length + ' 个已结清超过2年的订单，正在自动清理...');
-                for (var i = 0; i < expiredOrders.length; i++) {
-                    try {
-                        await supabaseClient.from('cash_flow_records').delete().eq('order_id', expiredOrders[i].id);
-                        await supabaseClient.from('payment_history').delete().eq('order_id', expiredOrders[i].id);
-                        await supabaseClient.from('orders').delete().eq('id', expiredOrders[i].id);
-                        console.log('已清理过期订单: ' + expiredOrders[i].order_id);
-                    } catch (cleanErr) {
-                        console.warn('清理订单 ' + expiredOrders[i].order_id + ' 失败:', cleanErr);
-                    }
-                }
-                var updatedOrders = await SUPABASE.getOrders();
-            } else {
-                var updatedOrders = allOrders;
-            }
-            
+            // 直接统计订单状态（不再自动清理过期订单）
             var activeOrdersCount = 0;
             var overdueOrdersCount = 0;
             var completedOrdersCount = 0;
-            for (var i = 0; i < updatedOrders.length; i++) {
-                if (updatedOrders[i].status === 'active') {
+            for (var i = 0; i < allOrders.length; i++) {
+                if (allOrders[i].status === 'active') {
                     activeOrdersCount++;
-                    if ((updatedOrders[i].overdue_days || 0) > 0) {
+                    if ((allOrders[i].overdue_days || 0) > 0) {
                         overdueOrdersCount++;
                     }
-                } else if (updatedOrders[i].status === 'completed') {
+                } else if (allOrders[i].status === 'completed') {
                     completedOrdersCount++;
                 }
             }
-            var expiredCount = expiredOrders.length;
             
             var storeName = AUTH.getCurrentStoreName();
             var hasReminders = needRemindOrders.length > 0;
@@ -521,7 +557,7 @@ const DashboardCore = {
                 { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, class: '' },
                 { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), class: deficit >= 0 ? 'expense' : 'income' },
                 { label: lang === 'id' ? 'Berjalan / Jatuh Tempo' : '进行中 / 逾期单', value: activeDisplay, class: '' },
-                { label: (lang === 'id' ? 'Lunas' : '已结清') + ' / ' + (lang === 'id' ? 'Kedaluwarsa' : '已失效'), value: completedOrdersCount + ' / ' + expiredCount, class: '' },
+                { label: (lang === 'id' ? 'Lunas' : '已结清'), value: completedOrdersCount, class: '' },
                 { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), class: 'income' },
                 { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), class: 'income' },
                 { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), class: 'income' },
@@ -686,6 +722,7 @@ const DashboardCore = {
             
         } catch (err) {
             console.error("renderDashboard error:", err);
+            Utils.ErrorHandler.capture(err, 'renderDashboard');
             document.getElementById("app").innerHTML = '<div class="card"><p>⚠️ ' + err.message + '</p><button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button></div>';
         }
     },
@@ -712,7 +749,6 @@ const DashboardCore = {
             if (o.status === 'active') {
                 activeCount++;
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                // 修复2：使用订单自身利率，fallback 为统一常量
                 var rate = o.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
                 expectedMonthlyInterest += remainingPrincipal * rate;
             } else if (o.status === 'completed') {
