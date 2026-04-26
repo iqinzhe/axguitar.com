@@ -1,110 +1,325 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#ffffff">
-<title>JF! by Gadai - Sistem Manajemen Gadai</title>
-
-<!-- Favicon -->
-<link rel="icon" href="icons/favicon-192x192.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest?v=1">
-
-<!-- CSS 样式 -->
-     <link rel="stylesheet" href="css/variables.css">
-     <link rel="stylesheet" href="css/reset.css">
-     <link rel="stylesheet" href="css/components.css">
-     <link rel="stylesheet" href="css/layout.css">
-     <link rel="stylesheet" href="css/pages.css">
-     <link rel="stylesheet" href="css/responsive.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>JF! by Gadai - Sistem Manajemen Gadai</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- 预加载关键字体和样式 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <style>
+        /* 加载指示器样式 */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            gap: 16px;
+        }
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #64748b;
+            font-size: 14px;
+        }
+        .error-container {
+            max-width: 500px;
+            margin: 80px auto;
+            padding: 32px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .error-container h3 {
+            color: #ef4444;
+            margin-bottom: 16px;
+        }
+        .error-container p {
+            color: #475569;
+            margin-bottom: 24px;
+        }
+        .error-container button {
+            padding: 10px 24px;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 8px;
+        }
+        .error-container button:hover {
+            background: #1d4ed8;
+        }
+        .retry-btn {
+            background: #10b981;
+        }
+        .retry-btn:hover {
+            background: #059669;
+        }
+        .force-btn {
+            background: #64748b;
+        }
+    </style>
 </head>
 <body>
-<div id="app">
-    <div class="loading-container">
-        <div class="loader"></div>
-        <p class="loading-text">Memuat sistem...</p>
+    <div id="app">
+        <div class="loading-container">
+            <div class="loader"></div>
+            <p class="loading-text">🔄 Memuat sistem JF! by Gadai...</p>
+            <p class="loading-text" style="font-size:12px; color:#94a3b8;">⏳ Mohon tunggu, sedang memuat modul...</p>
+        </div>
     </div>
-</div>
 
-<!-- 第三方库 -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- 基础模块 -->
-<script src="js/supabase.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/permission.js"></script>
-<script src="js/order.js"></script>
-<script src="js/store.js"></script>
-<script src="js/storage.js"></script>
-<script src="js/audit.js"></script>
-<script src="js/migration.js"></script>
+    <script>
+    // ==================== 智能脚本加载器 v2.0 ====================
+    (function() {
+        // 定义所有需要加载的脚本（按依赖顺序）
+        const SCRIPT_GROUPS = [
+            // 第一组：核心基础模块（必须按顺序）
+            {
+                name: '核心工具',
+                scripts: [
+                    { src: 'utils.js', required: true },
+                    { src: 'supabase.js', required: true },
+                    { src: 'auth.js', required: true },
+                    { src: 'permission.js', required: true }
+                ]
+            },
+            // 第二组：业务核心模块（依赖第一组）
+            {
+                name: '业务核心',
+                scripts: [
+                    { src: 'audit.js', required: true },
+                    { src: 'order.js', required: true },
+                    { src: 'store.js', required: true }
+                ]
+            },
+            // 第三组：仪表盘模块（依赖前两组）
+            {
+                name: '仪表盘模块',
+                scripts: [
+                    { src: 'app-dashboard-core.js', required: true },
+                    { src: 'app-dashboard-orders.js', required: true },
+                    { src: 'app-dashboard-funds.js', required: true },
+                    { src: 'app-customers.js', required: true },
+                    { src: 'app-payments.js', required: true },
+                    { src: 'app-blacklist.js', required: true }
+                ]
+            },
+            // 第四组：扩展模块（允许部分失败）
+            {
+                name: '扩展模块',
+                scripts: [
+                    { src: 'app-dashboard-expenses.js', required: false },
+                    { src: 'app-dashboard-users.js', required: false },
+                    { src: 'app-dashboard-anomaly.js', required: false },
+                    { src: 'app-dashboard-print.js', required: false },
+                    { src: 'migration.js', required: false },
+                    { src: 'storage.js', required: false }
+                ]
+            }
+        ];
 
-<!-- 功能模块 -->
-<script src="js/app-blacklist.js"></script>
-<script src="js/app-customers.js"></script>
-<script src="js/app-payments.js"></script>
+        let loadedCount = 0;
+        let totalScripts = 0;
+        let failedScripts = [];
+        let loadingStartTime = Date.now();
 
-<!-- 仪表盘模块 -->
-<script src="js/app-dashboard-anomaly.js"></script>
-<script src="js/app-dashboard-core.js"></script>
-<script src="js/app-dashboard-funds.js"></script>
-<script src="js/app-dashboard-users.js"></script>
-<script src="js/app-dashboard-wa.js"></script>
-<script src="js/app-dashboard-print.js"></script>
-<script src="js/app-dashboard-orders.js"></script>
-<script src="js/app-dashboard-expenses.js"></script>
-
-<!-- 初始化脚本 -->
-<script>
-window.addEventListener('error', function(e) {
-    console.error('Global error:', e.error);
-});
-
-var initTimeout = setTimeout(function() {
-    showError('加载超时，请刷新页面重试');
-}, 10000);
-
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        clearTimeout(initTimeout);
-        try {
-            if (!window.APP) throw new Error('APP module not loaded');
-            if (typeof window.APP.init !== 'function') throw new Error('APP.init is not a function');
-            window.APP.init();
-        } catch (err) {
-            console.error('Init error:', err);
-            showError('Gagal memuat aplikasi: ' + err.message);
+        // 计算总脚本数
+        for (const group of SCRIPT_GROUPS) {
+            totalScripts += group.scripts.length;
         }
-    }, 100);
-});
 
-function showError(message) {
-    var app = document.getElementById('app');
-    if (app) {
-        app.innerHTML = '' +
-            '<div class="error-container">' +
-                '<div class="error-card">' +
-                    '<div class="error-icon">⚠️</div>' +
-                    '<h3 class="error-title">Error Sistem</h3>' +
-                    '<p class="error-message">' + escapeHtml(message) + '</p>' +
-                    '<button onclick="location.reload()" class="error-btn">Muat Ulang</button>' +
-                '</div>' +
-            '</div>';
-    }
-}
+        // 显示加载进度
+        function updateLoadingProgress(scriptName, status, groupName) {
+            const loadingText = document.querySelector('.loading-text:first-of-type');
+            if (loadingText) {
+                const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(0);
+                if (status === 'loaded') {
+                    loadingText.innerHTML = `🔄 Memuat ${groupName}... (${loadedCount}/${totalScripts})<br><span style="font-size:11px;color:#94a3b8;">✅ ${scriptName}</span>`;
+                } else if (status === 'failed') {
+                    loadingText.innerHTML = `⚠️ Gagal memuat: ${scriptName}<br><span style="font-size:11px;color:#ef4444;">Aplikasi akan tetap berjalan dengan fungsi terbatas</span>`;
+                }
+            }
+        }
 
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-</script>
+        // 加载单个脚本
+        function loadScript(scriptInfo, groupName) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = scriptInfo.src;
+                script.defer = true;
+                
+                // 设置超时（10秒）
+                const timeoutId = setTimeout(() => {
+                    script.onload = null;
+                    script.onerror = null;
+                    const error = new Error(`Timeout loading: ${scriptInfo.src}`);
+                    error.timeout = true;
+                    reject(error);
+                }, 10000);
+                
+                script.onload = () => {
+                    clearTimeout(timeoutId);
+                    loadedCount++;
+                    updateLoadingProgress(scriptInfo.src, 'loaded', groupName);
+                    console.log(`✅ [${groupName}] 已加载: ${scriptInfo.src} (${loadedCount}/${totalScripts})`);
+                    resolve();
+                };
+                
+                script.onerror = (err) => {
+                    clearTimeout(timeoutId);
+                    const error = new Error(`Failed to load: ${scriptInfo.src}`);
+                    error.script = scriptInfo;
+                    reject(error);
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+
+        // 加载一组脚本（串行，按依赖顺序）
+        async function loadScriptGroup(group) {
+            console.log(`📦 开始加载组: ${group.name} (${group.scripts.length} 个文件)`);
+            
+            for (const scriptInfo of group.scripts) {
+                try {
+                    await loadScript(scriptInfo, group.name);
+                } catch (error) {
+                    console.error(`❌ 加载失败: ${scriptInfo.src}`, error.message);
+                    
+                    if (scriptInfo.required) {
+                        // 必需模块失败，抛出致命错误
+                        throw new Error(`必需模块加载失败: ${scriptInfo.src}\n请检查网络连接后刷新页面重试。`);
+                    } else {
+                        // 非必需模块失败，记录但继续
+                        failedScripts.push(scriptInfo.src);
+                        updateLoadingProgress(scriptInfo.src, 'failed', group.name);
+                    }
+                }
+            }
+        }
+
+        // 启动应用
+        function startApp() {
+            const elapsed = ((Date.now() - loadingStartTime) / 1000).toFixed(1);
+            console.log(`🎉 所有脚本加载完成！耗时 ${elapsed} 秒，成功 ${totalScripts - failedScripts.length}/${totalScripts} 个文件`);
+            
+            if (failedScripts.length > 0) {
+                console.warn(`⚠️ 以下模块加载失败，部分功能可能受限:`, failedScripts);
+                // 显示非阻塞提示
+                const appDiv = document.getElementById('app');
+                if (appDiv && !appDiv.querySelector('.partial-warning')) {
+                    const warning = document.createElement('div');
+                    warning.className = 'info-bar warning';
+                    warning.style.cssText = 'position:fixed;bottom:10px;right:10px;z-index:9999;max-width:300px;font-size:12px;';
+                    warning.innerHTML = '<span class="info-bar-icon">⚠️</span><div class="info-bar-content">' +
+                        (Utils.lang === 'id' 
+                            ? 'Beberapa modul tidak dapat dimuat. Beberapa fitur mungkin tidak tersedia.'
+                            : '部分模块加载失败，部分功能可能不可用。') +
+                        ' <button onclick="location.reload()" style="background:none;border:1px solid;padding:2px 8px;margin-left:8px;cursor:pointer;">重试</button>' +
+                        '</div>';
+                    document.body.appendChild(warning);
+                    setTimeout(() => warning.remove(), 8000);
+                }
+            }
+            
+            // 启动应用
+            if (typeof APP !== 'undefined' && APP.init) {
+                APP.init().catch(e => {
+                    console.error('APP.init 失败:', e);
+                    showFatalError('应用初始化失败: ' + e.message);
+                });
+            } else if (typeof window.initApp === 'function') {
+                window.initApp();
+            } else {
+                console.warn('未找到 APP.init，尝试延迟启动');
+                setTimeout(() => {
+                    if (typeof APP !== 'undefined' && APP.init) {
+                        APP.init();
+                    } else {
+                        showFatalError('无法启动应用：核心模块未正确加载');
+                    }
+                }, 500);
+            }
+        }
+
+        // 显示致命错误
+        function showFatalError(message) {
+            const appDiv = document.getElementById('app');
+            if (appDiv) {
+                appDiv.innerHTML = `
+                    <div class="error-container">
+                        <h3>❌ 系统加载失败</h3>
+                        <p>${Utils?.escapeHtml ? Utils.escapeHtml(message) : message}</p>
+                        <p style="font-size:12px;color:#94a3b8;">请检查网络连接后刷新页面重试。</p>
+                        <div>
+                            <button onclick="location.reload()" class="retry-btn">🔄 刷新页面</button>
+                            <button onclick="location.href='?force=1'" class="force-btn">⚡ 强制加载</button>
+                        </div>
+                        <details style="margin-top:16px;text-align:left;font-size:12px;">
+                            <summary>详细信息</summary>
+                            <p style="margin-top:8px;">失败模块: ${failedScripts.join(', ') || '无'}</p>
+                            <p>请确保所有 .js 文件存在于服务器上。</p>
+                        </details>
+                    </div>
+                `;
+            }
+        }
+
+        // 主加载流程
+        async function loadAllScripts() {
+            try {
+                // 串行加载各组（保证依赖顺序）
+                for (const group of SCRIPT_GROUPS) {
+                    await loadScriptGroup(group);
+                }
+                startApp();
+            } catch (fatalError) {
+                console.error('致命错误:', fatalError);
+                showFatalError(fatalError.message);
+            }
+        }
+
+        // 设置全局超时保护（30秒）
+        const globalTimeout = setTimeout(() => {
+            if (loadedCount < totalScripts) {
+                console.error(`全局超时：已完成 ${loadedCount}/${totalScripts} 个文件`);
+                if (loadedCount === 0) {
+                    showFatalError('加载超时。请检查网络连接或服务器状态。');
+                } else {
+                    // 部分加载成功，尝试启动
+                    console.warn('部分加载成功，尝试启动应用...');
+                    startApp();
+                }
+            }
+        }, 30000);
+
+        // 开始加载
+        console.log(`🚀 开始加载 ${totalScripts} 个脚本文件...`);
+        loadAllScripts().finally(() => {
+            clearTimeout(globalTimeout);
+        });
+    })();
+    </script>
 </body>
 </html>
