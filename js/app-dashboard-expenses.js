@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.2（门店账号移除支出操作权限）
+// app-dashboard-expenses.js - v2.3（错误上报）
 
 window.APP = window.APP || {};
 
@@ -71,19 +71,16 @@ const DashboardExpenses = {
                     var actionHtml = '';
                     
                     if (isAdmin) {
-                        // 管理员：编辑 + 删除
                         if (!e.is_reconciled) {
                             actionHtml += '<button onclick="APP.editExpense(\'' + e.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
                             actionHtml += '<button class="btn-small danger" onclick="APP.deleteExpense(\'' + e.id + '\')">🗑️ ' + t('delete') + '</button>';
                         } else {
                             actionHtml += '<span class="reconciled-badge">✅ ' + (lang === 'id' ? 'Direkonsiliasi' : '已平账') + '</span>';
                         }
-                        // 管理员：平账按钮
                         if (!e.is_reconciled) {
                             actionHtml += '<button onclick="APP.balanceExpenses()" class="btn-small warning">⚖️ ' + (lang === 'id' ? 'Rekonsiliasi' : '平账') + '</button>';
                         }
                     } else {
-                        // 门店操作员：只显示锁定状态，无任何操作按钮
                         actionHtml += '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
                     }
                     
@@ -114,7 +111,6 @@ const DashboardExpenses = {
                     '</div>' +
                 '</div>' +
                 
-                // 支出总额卡片
                 '<div class="card">' +
                     '<div class="stat-card" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">' +
                         '<div class="stat-value expense">' + Utils.formatCurrency(totalAmount) + '</div>' +
@@ -122,7 +118,6 @@ const DashboardExpenses = {
                     '</div>' +
                 '</div>' +
                 
-                // 支出列表
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Daftar Pengeluaran' : '支出列表') + '</h3>' +
                     '<div class="table-container">' +
@@ -142,7 +137,6 @@ const DashboardExpenses = {
                     '</div>' +
                 '</div>' +
                 
-                // 新增支出表单
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增运营支出') + '</h3>' +
                     '<div class="form-grid form-grid-4">' +
@@ -185,6 +179,7 @@ const DashboardExpenses = {
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         } catch (error) {
             console.error("showExpenses error:", error);
+            Utils.ErrorHandler.capture(error, 'showExpenses');
             alert(lang === 'id' ? 'Gagal memuat pengeluaran: ' + error.message : '加载支出失败：' + error.message);
         }
     },
@@ -218,6 +213,7 @@ const DashboardExpenses = {
             await APP.showExpenses();
         } catch (error) {
             console.error("addExpense error:", error);
+            Utils.ErrorHandler.capture(error, 'addExpense');
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
@@ -228,7 +224,6 @@ const DashboardExpenses = {
         try { profile = await SUPABASE.getCurrentProfile(); } catch(e) { console.warn(e); }
         var isAdmin = profile?.role === 'admin';
         
-        // 非管理员禁止编辑
         if (!isAdmin) {
             alert(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
             return;
@@ -252,6 +247,7 @@ const DashboardExpenses = {
             }
         } catch (error) {
             console.error("editExpense error:", error);
+            Utils.ErrorHandler.capture(error, 'editExpense');
             alert(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
         }
     },
@@ -262,7 +258,6 @@ const DashboardExpenses = {
         try { profile = await SUPABASE.getCurrentProfile(); } catch(e) { console.warn(e); }
         var isAdmin = profile?.role === 'admin';
         
-        // 非管理员禁止删除
         if (!isAdmin) {
             alert(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
             return;
@@ -277,6 +272,7 @@ const DashboardExpenses = {
             await APP.showExpenses();
         } catch (error) {
             console.error("deleteExpense error:", error);
+            Utils.ErrorHandler.capture(error, 'deleteExpense');
             alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
         }
     },
@@ -361,6 +357,7 @@ const DashboardExpenses = {
             
         } catch (error) {
             console.error("balanceExpenses error:", error);
+            Utils.ErrorHandler.capture(error, 'balanceExpenses');
             alert(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
         }
     }
