@@ -662,14 +662,17 @@ const DashboardCore = {
                 '</div>';
             } else {
                 toolbarHtml = '' +
-                '<div class="toolbar store-grid no-print">' +
-                    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
-                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
-                    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
-                    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
-                '</div>';
+               toolbarHtml = '' +
+'<div class="toolbar store-grid no-print" style="grid-template-columns: repeat(4, 1fr);">' +
+    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
+    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
+    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
+    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
+    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
+    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
+    '<button onclick="APP.navigateTo(\'backupRestore\')">💾 ' + t('backup_restore') + '</button>' +
+    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
+'</div>';
             }
             
             // ========== 底部信息 ==========
