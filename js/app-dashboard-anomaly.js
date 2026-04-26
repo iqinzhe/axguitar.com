@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.0（异常状况页面重构）
+// app-dashboard-anomaly.js - v2.1（兼容 getOrdersLegacy、错误上报）
 
 window.APP = window.APP || {};
 
@@ -66,8 +66,8 @@ const DashboardAnomaly = {
                 // Q3: 所有门店
                 SUPABASE.getAllStores(),
                 
-                // Q4: 所有订单（用于排名计算）
-                SUPABASE.getOrders()
+                // Q4: 所有订单（用于排名计算）—— 使用兼容方法
+                SUPABASE.getOrdersLegacy()
             ]);
             
             var overdueOrders = overdueResult;
@@ -331,9 +331,6 @@ const DashboardAnomaly = {
             }
             
             // ========== 组装页面 ==========
-            // 卡片 DOM 顺序即显示顺序
-            // 桌面端（2列 grid）：1左上 2右上 / 3左下 4右下
-            // 手机端（1列）：1→2→3→4 自上而下
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
@@ -345,7 +342,7 @@ const DashboardAnomaly = {
                 
                 '<div class="anomaly-grid">' +
                     
-                    // 卡片1：门店业绩前三排行（桌面左上，手机第1）
+                    // 卡片1：门店业绩前三排行
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🏆</span>' +
@@ -358,7 +355,7 @@ const DashboardAnomaly = {
                         '</div>' +
                     '</div>' +
                     
-                    // 卡片2：门店业绩后三排行（桌面右上，手机第2）
+                    // 卡片2：门店业绩后三排行
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">📉</span>' +
@@ -371,7 +368,7 @@ const DashboardAnomaly = {
                         '</div>' +
                     '</div>' +
                     
-                    // 卡片3：逾期30天订单（桌面左下，手机第3）
+                    // 卡片3：逾期30天订单
                     '<div class="anomaly-card anomaly-card-danger">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">⚠️</span>' +
@@ -385,7 +382,7 @@ const DashboardAnomaly = {
                             '</div>' : '') +
                     '</div>' +
                     
-                    // 卡片4：黑名单客户（桌面右下，手机第4）
+                    // 卡片4：黑名单客户
                     '<div class="anomaly-card anomaly-card-warning">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🚫</span>' +
@@ -399,6 +396,7 @@ const DashboardAnomaly = {
             
         } catch (error) {
             console.error("showAnomaly error:", error);
+            Utils.ErrorHandler.capture(error, 'showAnomaly');
             alert(lang === 'id' ? 'Gagal memuat data abnormal' : '加载异常数据失败');
         }
     }
