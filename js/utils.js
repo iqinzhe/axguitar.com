@@ -206,7 +206,7 @@ window.Utils = window.Utils || {};
                 'store_management': '门店管理',
                 'store': '门店',
                 'backup_restore': '备份恢复',
-                'save_exit': '保存并退出',
+                'save_exit': '保存退出',
                 'save_exit_confirm': '保存更改并退出？',
                 'send_reminder': '发送提醒',
                 'repayment_type': '还款方式',
