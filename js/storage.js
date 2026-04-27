@@ -763,7 +763,7 @@ renderBackupUI: async function() {
         '</div>';
     
     document.getElementById("app").innerHTML = html;
-}
+},
 
     restoreFromFile: async function() {
         const fileInput = document.getElementById('restoreFile');
