@@ -593,6 +593,17 @@ const SupabaseAPI = {
     if (filters === undefined) filters = {};
     const profile = await this.getCurrentProfile();
     
+    let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
+    
+    if (profile?.role !== 'admin' && profile?.store_id) {
+        query = query.eq('store_id', profile.store_id);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+},
+    
     // 获取黑名单客户ID列表
     const { data: blacklistData } = await supabaseClient
         .from('blacklist')
