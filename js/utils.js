@@ -1,5 +1,4 @@
-// utils.js - v2.0（补全所有工具函数 + 离线队列 + 网络监控 + 错误上报 + 性能标记）
-
+// utils.js - v1.0
 window.Utils = window.Utils || {};
 
 (function() {
