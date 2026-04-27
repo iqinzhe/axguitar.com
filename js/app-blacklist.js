@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.4（移除内联样式，使用组件库）
+// app-blacklist.js - v1.5（添加详细错误处理和调试日志）
 
 window.APP = window.APP || {};
 
@@ -53,12 +53,31 @@ const BlacklistModule = {
     
     addToBlacklist: async function(customerId, reason) {
         var lang = Utils.lang;
-        const profile = await SUPABASE.getCurrentProfile();
         
+        console.log("=== addToBlacklist 调试开始 ===");
+        console.log("1. 接收参数 - customerId:", customerId, "类型:", typeof customerId);
+        console.log("2. 接收参数 - reason:", reason);
+        
+        // 验证原因
         if (!reason || reason.trim() === '') {
+            console.error("原因不能为空");
             throw new Error(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
         }
         
+        // 获取当前用户信息
+        const profile = await SUPABASE.getCurrentProfile();
+        console.log("3. 当前用户 profile:", profile);
+        console.log("4. profile.id:", profile?.id, "类型:", typeof profile?.id);
+        console.log("5. profile.store_id:", profile?.store_id, "类型:", typeof profile?.store_id);
+        console.log("6. profile.role:", profile?.role);
+        
+        if (!profile) {
+            console.error("无法获取当前用户信息");
+            throw new Error(lang === 'id' ? 'Gagal mendapatkan data user' : '无法获取用户信息');
+        }
+        
+        // 获取客户信息
+        console.log("7. 查询客户信息, customerId:", customerId);
         const { data: customer, error: customerError } = await supabaseClient
             .from('customers')
             .select('id, store_id, customer_id, name')
@@ -66,48 +85,131 @@ const BlacklistModule = {
             .single();
         
         if (customerError) {
-            console.error("获取客户信息失败:", customerError);
-            throw new Error(lang === 'id' ? 'Gagal mendapatkan data nasabah' : '获取客户信息失败');
+            console.error("获取客户信息失败 - 详细错误:", customerError);
+            console.error("错误代码:", customerError.code);
+            console.error("错误消息:", customerError.message);
+            throw new Error(lang === 'id' ? 'Gagal mendapatkan data nasabah: ' + customerError.message : '获取客户信息失败：' + customerError.message);
         }
         
-        if (profile?.role !== 'admin' && customer.store_id !== profile?.store_id) {
-            throw new Error(lang === 'id' ? 'Anda hanya dapat blacklist nasabah dari toko sendiri' : '只能拉黑本门店的客户');
+        console.log("8. 客户信息:", customer);
+        console.log("9. customer.id:", customer.id, "类型:", typeof customer.id);
+        console.log("10. customer.store_id:", customer.store_id, "类型:", typeof customer.store_id);
+        console.log("11. customer.customer_id:", customer.customer_id);
+        console.log("12. customer.name:", customer.name);
+        
+        // 权限检查：门店操作员只能拉黑自己门店的客户
+        if (profile.role !== 'admin') {
+            const customerStoreId = customer.store_id ? String(customer.store_id) : null;
+            const userStoreId = profile.store_id ? String(profile.store_id) : null;
+            
+            console.log("13. 权限检查 - 非管理员模式");
+            console.log("14. customerStoreId (String):", customerStoreId);
+            console.log("15. userStoreId (String):", userStoreId);
+            console.log("16. 是否匹配:", customerStoreId === userStoreId);
+            
+            if (!customer.store_id) {
+                console.error("客户没有关联门店");
+                throw new Error(lang === 'id' ? 'Nasabah tidak memiliki toko' : '客户没有关联门店');
+            }
+            
+            if (!profile.store_id) {
+                console.error("当前用户没有关联门店");
+                throw new Error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
+            }
+            
+            if (customerStoreId !== userStoreId) {
+                console.error("门店不匹配 - 不能拉黑其他门店的客户");
+                throw new Error(lang === 'id' ? 'Anda hanya dapat blacklist nasabah dari toko sendiri' : '只能拉黑本门店的客户');
+            }
+        } else {
+            console.log("13. 权限检查 - 管理员模式，跳过门店检查");
         }
         
+        // 检查是否已在黑名单
+        console.log("17. 检查是否已在黑名单, customer.id:", customer.id);
         const { data: existing, error: checkError } = await supabaseClient
             .from('blacklist')
             .select('id')
             .eq('customer_id', customer.id)
             .maybeSingle();
         
+        if (checkError) {
+            console.error("检查黑名单存在性失败:", checkError);
+            // 继续执行，不抛出异常
+        }
+        
         if (existing) {
+            console.log("18. 客户已在黑名单中, 黑名单ID:", existing.id);
             throw new Error(lang === 'id' ? 'Nasabah sudah ada di blacklist' : '客户已在黑名单中');
         }
+        console.log("18. 客户不在黑名单中，可以添加");
         
-        const { data, error } = await supabaseClient
-            .from('blacklist')
-            .insert({
-                customer_id: customer.id,
-                reason: reason.trim(),
-                blacklisted_by: profile.id,
-                store_id: customer.store_id
-            })
-            .select('*, customers(*), blacklisted_by_profile:user_profiles!blacklist_blacklisted_by_fkey(name)')
-            .single();
+        // 准备插入数据
+        const insertData = {
+            customer_id: customer.id,
+            reason: reason.trim(),
+            blacklisted_by: profile.id,
+            store_id: customer.store_id
+        };
         
-        if (error) {
-            console.error("添加黑名单失败:", error);
-            throw error;
+        console.log("19. 准备插入黑名单数据:", insertData);
+        console.log("20. insertData.customer_id:", insertData.customer_id, "类型:", typeof insertData.customer_id);
+        console.log("21. insertData.blacklisted_by:", insertData.blacklisted_by, "类型:", typeof insertData.blacklisted_by);
+        console.log("22. insertData.store_id:", insertData.store_id, "类型:", typeof insertData.store_id);
+        
+        // 执行插入
+        try {
+            const { data, error } = await supabaseClient
+                .from('blacklist')
+                .insert(insertData)
+                .select('*, customers(*), blacklisted_by_profile:user_profiles!blacklist_blacklisted_by_fkey(name)')
+                .single();
+            
+            if (error) {
+                console.error("23. 添加黑名单失败 - 数据库错误:");
+                console.error("错误代码:", error.code);
+                console.error("错误消息:", error.message);
+                console.error("错误详情:", error.details);
+                console.error("完整错误对象:", error);
+                
+                // 根据错误类型给出更友好的提示
+                if (error.code === '23503') {
+                    throw new Error(lang === 'id' 
+                        ? 'Gagal menambahkan ke blacklist: Data referensi tidak valid (customer_id atau blacklisted_by tidak ditemukan)'
+                        : '添加黑名单失败：引用数据无效（客户ID或操作用户不存在）');
+                } else if (error.code === '23505') {
+                    throw new Error(lang === 'id' 
+                        ? 'Nasabah sudah ada di blacklist'
+                        : '客户已在黑名单中');
+                } else {
+                    throw new Error(lang === 'id' 
+                        ? 'Gagal menambahkan ke blacklist: ' + error.message
+                        : '添加黑名单失败：' + error.message);
+                }
+            }
+            
+            console.log("24. 黑名单添加成功!");
+            console.log("25. 返回数据:", data);
+            console.log("=== addToBlacklist 调试结束 ===");
+            
+            return data;
+            
+        } catch (insertError) {
+            console.error("插入操作异常:", insertError);
+            throw insertError;
         }
-        
-        return data;
     },
     
     removeFromBlacklist: async function(customerId) {
         var lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
         
+        console.log("=== removeFromBlacklist 调试 ===");
+        console.log("customerId:", customerId);
+        console.log("profile.role:", profile?.role);
+        
         if (profile?.role !== 'admin') {
+            console.error("非管理员尝试解除黑名单");
             throw new Error(lang === 'id' ? 'Hanya administrator yang dapat menghapus blacklist' : '只有管理员可以解除黑名单');
         }
         
@@ -142,12 +244,21 @@ const BlacklistModule = {
             deleteError = directError;
         }
         
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+            console.error("解除黑名单失败:", deleteError);
+            throw deleteError;
+        }
+        
+        console.log("解除黑名单成功");
         return true;
     },
     
     getBlacklist: async function() {
         const profile = await SUPABASE.getCurrentProfile();
+        
+        console.log("=== getBlacklist 调试 ===");
+        console.log("profile.role:", profile?.role);
+        console.log("profile.store_id:", profile?.store_id);
         
         let query = supabaseClient
             .from('blacklist')
@@ -162,11 +273,17 @@ const BlacklistModule = {
             .order('blacklisted_at', { ascending: false });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
+            console.log("应用门店过滤: store_id =", profile.store_id);
             query = query.eq('customers.store_id', profile.store_id);
         }
         
         const { data, error } = await query;
-        if (error) throw error;
+        if (error) {
+            console.error("获取黑名单列表失败:", error);
+            throw error;
+        }
+        
+        console.log("获取到黑名单数量:", data?.length || 0);
         return data;
     },
     
@@ -292,7 +409,6 @@ const BlacklistModule = {
                     '</div>' +
                 '</div>' +
                 
-                // 使用统一提示条组件
                 '<div class="info-bar warning">' +
                     '<span class="info-bar-icon">⚠️</span>' +
                     '<div class="info-bar-content">' +
@@ -330,3 +446,5 @@ const BlacklistModule = {
 };
 
 Object.assign(window.APP, BlacklistModule);
+
+console.log("✅ app-blacklist.js 加载完成 (v1.5 - 添加详细调试日志)");
