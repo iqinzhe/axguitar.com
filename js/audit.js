@@ -1,4 +1,4 @@
-// audit.js - v2.0（审计日志已启用）
+// audit.js - v1.0
 
 window.Audit = {
     
