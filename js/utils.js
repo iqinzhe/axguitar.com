@@ -1,4 +1,4 @@
-// utils.js - v1.1（修复 _checkRealConnectivity 相对路径导致误判离线）
+// utils.js - v1.0
 window.Utils = window.Utils || {};
 
 (function() {
@@ -547,32 +547,25 @@ window.Utils = window.Utils || {};
     };
 
     // ==================== 网络监控（增强版） ====================
-    // 修复说明：
-    // 原 _checkRealConnectivity() 使用相对路径 '/icons/favicon-192x192.png' 做探测，
-    // 在某些浏览器隐私模式、CDN 环境或 cache: 'no-cache' 被拦截时会失败，
-    // 导致误判为离线，进而在 AUTH.login() 中阻断登录流程。
-    // 修复：改用 Supabase 的 /rest/v1/ 端点（已在 NetworkMonitor.init() 中动态设置），
-    // 该端点是应用必须能访问的，更能反映真实连通性；
-    // 同时增加超时到 5 秒，减少因网络抖动导致的误判。
     Utils.NetworkMonitor = {
     _initialized: false,
     _isOnline: true,
     _callbacks: [],
     _checkUrl: '',
 
-        init: function() {
-            if (this._initialized) return;
-            this._initialized = true;
-            this._isOnline = navigator.onLine;
-
-            // 动态获取 Supabase URL 作为连通性探测目标
-            if (typeof SUPABASE_URL !== 'undefined') {
-                this._checkUrl = SUPABASE_URL + '/rest/v1/';
-            } else if (typeof window.SUPABASE_URL !== 'undefined') {
-                this._checkUrl = window.SUPABASE_URL + '/rest/v1/';
-            } else {
-                this._checkUrl = 'https://hiupsvsbcdsgoyiieqiv.supabase.co/rest/v1/';
-            }
+            init: function() {
+        if (this._initialized) return;
+        this._initialized = true;
+        this._isOnline = navigator.onLine;
+        
+        // 动态获取 Supabase URL
+        if (typeof SUPABASE_URL !== 'undefined') {
+            this._checkUrl = SUPABASE_URL + '/rest/v1/';
+        } else if (typeof window.SUPABASE_URL !== 'undefined') {
+            this._checkUrl = window.SUPABASE_URL + '/rest/v1/';
+        } else {
+            this._checkUrl = 'https://hiupsvsbcdsgoyiieqiv.supabase.co/rest/v1/';
+        }
 
             var self = this;
 
@@ -588,7 +581,7 @@ window.Utils = window.Utils || {};
                 self._showBanner();
             });
 
-            // 定时检查实际连通性（每2分钟）
+            // 定时检查实际连通性
             setInterval(function() {
                 self._checkRealConnectivity().then(function(online) {
                     if (online !== self._isOnline) {
@@ -617,26 +610,23 @@ window.Utils = window.Utils || {};
             this._callbacks.push(callback);
         },
 
-        // 修复：使用 Supabase REST 端点探测（而非相对路径 favicon），
-        // 超时从 3 秒提升到 5 秒，避免网络抖动误判。
-        // 注意：此函数仅用于定时巡检，登录时不再调用它（见 auth.js）。
-        async _checkRealConnectivity() {
+                async _checkRealConnectivity() {
+            // 优先使用浏览器原生判断
             if (!navigator.onLine) return false;
-
+            
             try {
-                var url = this._checkUrl || 'https://hiupsvsbcdsgoyiieqiv.supabase.co/rest/v1/';
                 var controller = new AbortController();
-                var timeout = setTimeout(function() { controller.abort(); }, 5000);
-                var response = await fetch(url, {
+                var timeout = setTimeout(function() { controller.abort(); }, 3000);
+                // 使用 favicon 或 robots.txt 等不依赖认证的轻量请求
+                var response = await fetch('/icons/favicon-192x192.png', {
                     method: 'HEAD',
                     signal: controller.signal,
-                    // 不设 cache: 'no-cache'，避免在某些浏览器中触发预检请求失败
+                    cache: 'no-cache'
                 });
                 clearTimeout(timeout);
-                // Supabase /rest/v1/ 未带 apikey 会返回 401，属于正常响应，说明网络通
-                return response.status < 500;
+                return response.ok;
             } catch (e) {
-                // fetch 失败（网络断开、超时），回退到 navigator.onLine
+                // 请求失败，但浏览器说在线，假设网络可用
                 return navigator.onLine;
             }
         },
