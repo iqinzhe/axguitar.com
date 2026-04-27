@@ -1,4 +1,4 @@
-// supabase.js - v1.2（修复 getCustomers 语法错误）
+// supabase.js - v1.1（增加客户职业字段）
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
@@ -348,46 +348,38 @@ const SupabaseAPI = {
     },
 
     async login(emailOrUsername, password) {
-        // ==================== 修复说明 ====================
-        // 原始问题：
-        // 1. 登录前通过 .or() 查询 user_profiles 以将用户名转换为 email。
-        //    但 Supabase RLS 策略禁止匿名用户查询该表，导致 profileData 始终为空，
-        //    返回"用户名不存在"错误，根本无法执行 signInWithPassword。
-        // 2. SUPABASE.login() 内部调用了一次 AUTH.loadCurrentUser()，
-        //    AUTH.login() 成功后又调用一次，造成重复加载和状态混乱。
-        // 修复：先直接尝试用输入值（email 或 username）登录，登录成功后
-        //    再通过已认证会话查询 user_profiles（RLS 允许用户查自己的数据），
-        //    并移除内部多余的 loadCurrentUser() 调用，统一交由 AUTH.login() 处理。
-        // =====================================================
-
         let emailToUse = emailOrUsername;
+        
+        if (!emailOrUsername.includes('@')) {
+            const { data: profileData, error: profileError } = await supabaseClient
+                .from('user_profiles')
+                .select('username, email')
+                .or('username.eq.' + emailOrUsername + ',email.eq.' + emailOrUsername)
+                .maybeSingle();
 
-        // 如果输入不含 @，先尝试当作 email 直接登录（兼容 username=email 的情况）；
-        // 若失败，再通过已认证后查 profile 的方式无法提前获取——因此直接用原值尝试。
-        // Supabase signInWithPassword 的 email 字段也支持部分自定义（取决于后端设置），
-        // 对于纯用户名账号，账号创建时 email 字段通常填的就是 username，直接传入即可。
+            if (profileError || !profileData) {
+                return { 
+                    error: { 
+                        message: Utils.lang === 'id' ? 'Username tidak ditemukan' : '用户名不存在' 
+                    } 
+                };
+            }
+            emailToUse = profileData.email || profileData.username;
+        }
+        
         const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: emailToUse,
             password: password
         });
-
-        if (error) {
-            // 如果直接登录失败，且输入的不是 email 格式，给出更友好的提示
-            if (!emailOrUsername.includes('@')) {
-                return {
-                    error: {
-                        message: Utils.lang === 'id'
-                            ? 'Login gagal: pastikan username/email dan password sudah benar'
-                            : '登录失败：请确认用户名/邮箱和密码正确'
-                    }
-                };
-            }
-            return { error };
-        }
-
-        // 登录成功：清除缓存，由 AUTH.login() 统一调用 loadCurrentUser()
+        
+        if (error) return { error };
+        
         this.clearCache();
-
+        
+        if (window.AUTH && data.user) {
+            await window.AUTH.loadCurrentUser();
+        }
+        
         return data;
     },
 
@@ -538,7 +530,7 @@ const SupabaseAPI = {
                         address: customerData.address || null,
                         living_same_as_ktp: customerData.living_same_as_ktp,
                         living_address: customerData.living_address || null,
-                        occupation: customerData.occupation || null,
+                        occupation: customerData.occupation || null,  // 新增职业字段
                         registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
                         created_by: profile.id,
                         updated_at: new Date().toISOString()
@@ -582,7 +574,7 @@ const SupabaseAPI = {
             address: customerData.ktp_address || null,
             living_same_as_ktp: customerData.living_same_as_ktp,
             living_address: customerData.living_address || null,
-            occupation: customerData.occupation || null,
+            occupation: customerData.occupation || null,  // 新增职业字段
             updated_at: new Date().toISOString()
         };
         
@@ -596,15 +588,27 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ========== 获取客户列表（不过滤黑名单，简洁稳定） ==========
+    // ========== 获取客户列表（过滤黑名单，增加 occupation 字段） ==========
     async getCustomers(filters) {
         if (filters === undefined) filters = {};
         const profile = await this.getCurrentProfile();
+        
+        // 获取黑名单客户ID列表
+        const { data: blacklistData } = await supabaseClient
+            .from('blacklist')
+            .select('customer_id');
+        
+        const blacklistedIds = (blacklistData || []).map(b => b.customer_id);
         
         let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
+        }
+        
+        // 排除黑名单客户
+        if (blacklistedIds.length > 0) {
+            query = query.not('id', 'in', '(' + blacklistedIds.map(id => `'${id}'`).join(',') + ')');
         }
         
         const { data, error } = await query;
