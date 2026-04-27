@@ -1,5 +1,4 @@
-// app-dashboard-orders.js - v2.3（修复：打印收据XSS漏洞 + 结清凭证转义）
-
+// app-dashboard-orders.js - v1.0
 window.APP = window.APP || {};
 
 const DashboardOrders = {
