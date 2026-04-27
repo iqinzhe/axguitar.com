@@ -1,5 +1,4 @@
 // app-payments.js - v1.0
-
 window.APP = window.APP || {};
 
 // ========== 防重复提交全局锁 ==========
