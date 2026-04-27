@@ -1,5 +1,4 @@
-// app-dashboard-funds.js - v1.7（门店列显示 + 列宽调整）
-
+// app-dashboard-funds.js - v1.0
 window.APP = window.APP || {};
 
 const DashboardFunds = {
