@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.4（操作列合并到数据行 + 错误上报）
+// app-dashboard-expenses.js - v1.0
 
 window.APP = window.APP || {};
 
