@@ -360,7 +360,7 @@ window.Utils = window.Utils || {};
     // ==================== 费用计算 ====================
     Utils.calculateAdminFee = function(loanAmount) {
         if (!loanAmount || loanAmount <= 0) return 0;
-        return Math.max(30000, Math.round(loanAmount * Utils.ADMIN_FEE_RATE / 10000) * 10000);
+        return Math.max(120000, Math.round(loanAmount * Utils.ADMIN_FEE_RATE / 10000) * 10000);
     };
 
     Utils.calculateServiceFeeNew = function(loanAmount) {
@@ -596,7 +596,7 @@ window.Utils = window.Utils || {};
                         }
                     }
                 });
-            }, 30000);
+            }, 120000);
 
             if (!this._isOnline) {
                 this._showBanner();
@@ -611,11 +611,15 @@ window.Utils = window.Utils || {};
             this._callbacks.push(callback);
         },
 
-        async _checkRealConnectivity() {
+                async _checkRealConnectivity() {
+            // 优先使用浏览器原生判断
+            if (!navigator.onLine) return false;
+            
             try {
                 var controller = new AbortController();
-                var timeout = setTimeout(function() { controller.abort(); }, 5000);
-                var response = await fetch(this._checkUrl, {
+                var timeout = setTimeout(function() { controller.abort(); }, 3000);
+                // 使用 favicon 或 robots.txt 等不依赖认证的轻量请求
+                var response = await fetch('/icons/favicon-192x192.png', {
                     method: 'HEAD',
                     signal: controller.signal,
                     cache: 'no-cache'
@@ -623,7 +627,8 @@ window.Utils = window.Utils || {};
                 clearTimeout(timeout);
                 return response.ok;
             } catch (e) {
-                return false;
+                // 请求失败，但浏览器说在线，假设网络可用
+                return navigator.onLine;
             }
         },
 
