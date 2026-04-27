@@ -1,5 +1,4 @@
-// app-dashboard-core.js - v3.3（修复：getDashboardStats 查询冲突 + 缓存优化）
-
+// app-dashboard-core.js - v1.0
 window.APP = window.APP || {};
 
 // ==================== 模块降级通知 ====================
