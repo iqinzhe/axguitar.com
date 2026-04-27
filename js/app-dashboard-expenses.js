@@ -1,5 +1,4 @@
 // app-dashboard-expenses.js - v1.0
-
 window.APP = window.APP || {};
 
 const DashboardExpenses = {
