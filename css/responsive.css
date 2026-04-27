@@ -405,7 +405,7 @@
 
     /* --- 备份页面 --- */
     .backup-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
         gap: var(--spacing-4);
     }
 
