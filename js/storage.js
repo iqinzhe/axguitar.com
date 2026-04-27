@@ -1,4 +1,4 @@
-// storage.js - v1.4（门店备份恢复页面：只显示备份本门店数据和导出本门店数据）
+// storage.js - v1.0
 
 const Storage = {
 
