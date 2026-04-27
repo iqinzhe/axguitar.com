@@ -1,5 +1,4 @@
 // auth.js - v1.0
-
 const AUTH = {
     user: null,
 
