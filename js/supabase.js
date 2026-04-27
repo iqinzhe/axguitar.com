@@ -590,31 +590,31 @@ const SupabaseAPI = {
 
     // ========== 获取客户列表（过滤黑名单，增加 occupation 字段） ==========
     async getCustomers(filters) {
-        if (filters === undefined) filters = {};
-        const profile = await this.getCurrentProfile();
-        
-        // 获取黑名单客户ID列表
-        const { data: blacklistData } = await supabaseClient
-            .from('blacklist')
-            .select('customer_id');
-        
-        const blacklistedIds = (blacklistData || []).map(b => b.customer_id);
-        
-        let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-        
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('store_id', profile.store_id);
-        }
-        
-        // 排除黑名单客户
-        if (blacklistedIds.length > 0) {
-            query = query.not('id', 'in', '(' + blacklistedIds.map(id => `'${id}'`).join(',') + ')');
-        }
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        return data;
-    },
+    if (filters === undefined) filters = {};
+    const profile = await this.getCurrentProfile();
+    
+    // 获取黑名单客户ID列表
+    const { data: blacklistData } = await supabaseClient
+        .from('blacklist')
+        .select('customer_id');
+    
+    const blacklistedIds = (blacklistData || []).map(b => b.customer_id).filter(id => id);
+    
+    let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
+    
+    if (profile?.role !== 'admin' && profile?.store_id) {
+        query = query.eq('store_id', profile.store_id);
+    }
+    
+    // 排除黑名单客户 - 使用 filter 方法
+    if (blacklistedIds.length > 0) {
+        query = query.filter('id', 'not.in', blacklistedIds);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+},
 
     // ========== 获取单个客户（包含 occupation） ==========
     async getCustomer(customerId) {
