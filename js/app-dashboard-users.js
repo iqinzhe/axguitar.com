@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v2.0（角色管理文案修改 + 姓名列补充身份信息）
+// app-dashboard-users.js - v1.0
 
 window.APP = window.APP || {};
 
