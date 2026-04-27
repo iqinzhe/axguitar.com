@@ -1,5 +1,4 @@
-// app-dashboard-wa.js - v1.1（印尼语 WA 提醒 - 手动发送 - 修复语法错误）
-
+// app-dashboard-wa.js - v1.0
 window.APP = window.APP || {};
 
 // ========== WA 提醒模板（精简版：3个核心信息） ==========
