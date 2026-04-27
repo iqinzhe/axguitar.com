@@ -55,9 +55,9 @@ const AnomalyHelper = {
         const { data, error, count } = await query;
         
         if (error) {
-            console.warn('获取逾期订单失败:', error);
-            return { data: [], totalCount: 0 };
-        }
+    console.warn('获取黑名单失败:', JSON.stringify(error));
+    return { data: [], totalCount: 0 };
+}
         
         return { 
             data: data || [], 
