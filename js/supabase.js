@@ -607,9 +607,9 @@ const SupabaseAPI = {
         }
         
         // 排除黑名单客户
-        if (blacklistedIds.length > 0) {
-            query = query.not('id', 'in', '(' + blacklistedIds.map(id => `'${id}'`).join(',') + ')');
-        }
+if (blacklistedIds.length > 0) {
+    query = query.not('id', 'in', '(' + blacklistedIds.join(',') + ')');
+}
         
         const { data, error } = await query;
         if (error) throw error;
