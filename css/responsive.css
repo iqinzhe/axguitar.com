@@ -140,7 +140,7 @@
         font-size: var(--font-xs);
         overflow: hidden;
         text-overflow: ellipsis;
-        padding: var(--spacing-1) var(--spacing-2);
+        padding: var(--spacing-3) var(--spacing-1);
     }
 
     .btn-action {
