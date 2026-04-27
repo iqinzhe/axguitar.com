@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.0
+// app-blacklist.js - v1.1（增加职业列）
 window.APP = window.APP || {};
 
 // 辅助函数：安全过滤输入
@@ -60,7 +60,7 @@ const BlacklistModule = {
         
         const { data: customer, error: customerError } = await supabaseClient
             .from('customers')
-            .select('id, store_id, customer_id, name')
+            .select('id, store_id, customer_id, name, occupation')
             .eq('id', customerId)
             .single();
         
@@ -90,7 +90,7 @@ const BlacklistModule = {
             throw new Error(lang === 'id' ? 'Nasabah sudah ada di blacklist' : '客户已在黑名单中');
         }
         
-        // 插入黑名单记录（不使用 .select() 嵌套查询，避免多个外键关系错误）
+        // 插入黑名单记录
         const insertData = {
             customer_id: customer.id,
             reason: reason.trim(),
@@ -107,7 +107,7 @@ const BlacklistModule = {
             throw new Error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + insertError.message : '添加黑名单失败：' + insertError.message);
         }
         
-        // 重新获取完整数据用于返回（可选）
+        // 重新获取完整数据用于返回
         const { data: newBlacklist, error: fetchError } = await supabaseClient
             .from('blacklist')
             .select('*')
@@ -116,7 +116,6 @@ const BlacklistModule = {
         
         if (fetchError) {
             console.warn("获取新黑名单记录失败:", fetchError);
-            // 即使获取失败，插入已经成功
         }
         
         return newBlacklist || { customer_id: customer.id, reason: reason.trim() };
@@ -173,7 +172,7 @@ const BlacklistModule = {
             .select(`
                 *,
                 customers:customer_id (
-                    id, customer_id, name, ktp_number, phone, ktp_address, store_id,
+                    id, customer_id, name, ktp_number, phone, occupation, ktp_address, store_id,
                     stores:store_id (name, code)
                 ),
                 blacklisted_by_profile:blacklisted_by (name)
@@ -258,7 +257,7 @@ const BlacklistModule = {
         };
     },
     
-    // ========== 显示黑名单列表页面 ==========
+    // ========== 显示黑名单列表页面（增加职业列） ==========
     showBlacklist: async function() {
         APP.currentPage = 'blacklist';
         APP.saveCurrentPageState();
@@ -271,13 +270,18 @@ const BlacklistModule = {
         try {
             const blacklist = await this.getBlacklist();
             
+            // 总列数：ID, 姓名, 职业, 电话, 原因, 日期, 操作
+            var totalCols = isAdmin ? 7 : 6;
+            
             var rows = '';
             if (!blacklist || blacklist.length === 0) {
-                rows = '<tr><td colspan="' + (isAdmin ? 6 : 5) + '" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var item of blacklist) {
                     var customer = item.customers;
                     if (!customer) continue;
+                    
+                    var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
                     
                     var actionHtml = '';
                     if (isAdmin) {
@@ -289,13 +293,14 @@ const BlacklistModule = {
                     rows += '<tr>' +
                         '<td class="col-id">' + Utils.escapeHtml(customer.customer_id || '-') + '</td>' +
                         '<td class="col-name">' + Utils.escapeHtml(customer.name) + '</td>' +
+                        '<td class="col-name">' + occupationDisplay + '</td>' +  // 新增职业列
                         '<td class="col-phone">' + Utils.escapeHtml(customer.phone || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(item.reason) + '</td>' +
-                        '<td class="col-date">' + Utils.formatDate(item.blacklisted_at) + '</td>' +
+                        '<td class="col-date">' + Utils.formatDate(item.blacklisted_at) + '</tr>' +
                     '</tr>' +
                     '<tr class="action-row">' +
                         '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
-                        '<td colspan="' + (isAdmin ? 5 : 4) + '">' +
+                        '<td colspan="' + (totalCols - 1) + '">' +
                             '<div class="action-buttons">' + actionHtml + '</div>' +
                         '</td>' +
                     '</tr>';
@@ -329,11 +334,12 @@ const BlacklistModule = {
                                 '<tr>' +
                                     '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
                                     '<th class="col-name">' + t('customer_name') + '</th>' +
+                                    '<th class="col-name">' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</th>' +  // 新增职业列头
                                     '<th class="col-phone">' + t('phone') + '</th>' +
                                     '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
                                     '<th class="col-date">' + (lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期') + '</th>' +
                                     (isAdmin ? '<th class="col-action">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' : '') +
-                                '</tr>' +
+                                '</td>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
