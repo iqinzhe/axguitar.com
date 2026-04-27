@@ -1,4 +1,4 @@
-// supabase.js - v1.1（增加客户职业字段）
+// supabase.js - v1.2（修复 getCustomers 语法错误）
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
@@ -530,7 +530,7 @@ const SupabaseAPI = {
                         address: customerData.address || null,
                         living_same_as_ktp: customerData.living_same_as_ktp,
                         living_address: customerData.living_address || null,
-                        occupation: customerData.occupation || null,  // 新增职业字段
+                        occupation: customerData.occupation || null,
                         registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
                         created_by: profile.id,
                         updated_at: new Date().toISOString()
@@ -574,7 +574,7 @@ const SupabaseAPI = {
             address: customerData.ktp_address || null,
             living_same_as_ktp: customerData.living_same_as_ktp,
             living_address: customerData.living_address || null,
-            occupation: customerData.occupation || null,  // 新增职业字段
+            occupation: customerData.occupation || null,
             updated_at: new Date().toISOString()
         };
         
@@ -588,44 +588,21 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ========== 获取客户列表（过滤黑名单，增加 occupation 字段） ==========
+    // ========== 获取客户列表（不过滤黑名单，简洁稳定） ==========
     async getCustomers(filters) {
-    if (filters === undefined) filters = {};
-    const profile = await this.getCurrentProfile();
-    
-    let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-    
-    if (profile?.role !== 'admin' && profile?.store_id) {
-        query = query.eq('store_id', profile.store_id);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
-},
-    
-    // 获取黑名单客户ID列表
-    const { data: blacklistData } = await supabaseClient
-        .from('blacklist')
-        .select('customer_id');
-    
-    const blacklistedIds = (blacklistData || []).map(b => b.customer_id).filter(id => id);
-    
-    let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-    
-    if (profile?.role !== 'admin' && profile?.store_id) {
-        query = query.eq('store_id', profile.store_id);
-    }
-    
-    // 排除黑名单客户 - 使用 filter 方法
-    if (blacklistedIds.length > 0) {
-        query = query.filter('id', 'not.in', blacklistedIds);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
-},
+        if (filters === undefined) filters = {};
+        const profile = await this.getCurrentProfile();
+        
+        let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
 
     // ========== 获取单个客户（包含 occupation） ==========
     async getCustomer(customerId) {
