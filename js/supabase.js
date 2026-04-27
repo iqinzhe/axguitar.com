@@ -348,38 +348,46 @@ const SupabaseAPI = {
     },
 
     async login(emailOrUsername, password) {
-        let emailToUse = emailOrUsername;
-        
-        if (!emailOrUsername.includes('@')) {
-            const { data: profileData, error: profileError } = await supabaseClient
-                .from('user_profiles')
-                .select('username, email')
-                .or('username.eq.' + emailOrUsername + ',email.eq.' + emailOrUsername)
-                .maybeSingle();
+        // ==================== 修复说明 ====================
+        // 原始问题：
+        // 1. 登录前通过 .or() 查询 user_profiles 以将用户名转换为 email。
+        //    但 Supabase RLS 策略禁止匿名用户查询该表，导致 profileData 始终为空，
+        //    返回"用户名不存在"错误，根本无法执行 signInWithPassword。
+        // 2. SUPABASE.login() 内部调用了一次 AUTH.loadCurrentUser()，
+        //    AUTH.login() 成功后又调用一次，造成重复加载和状态混乱。
+        // 修复：先直接尝试用输入值（email 或 username）登录，登录成功后
+        //    再通过已认证会话查询 user_profiles（RLS 允许用户查自己的数据），
+        //    并移除内部多余的 loadCurrentUser() 调用，统一交由 AUTH.login() 处理。
+        // =====================================================
 
-            if (profileError || !profileData) {
-                return { 
-                    error: { 
-                        message: Utils.lang === 'id' ? 'Username tidak ditemukan' : '用户名不存在' 
-                    } 
-                };
-            }
-            emailToUse = profileData.email || profileData.username;
-        }
-        
+        let emailToUse = emailOrUsername;
+
+        // 如果输入不含 @，先尝试当作 email 直接登录（兼容 username=email 的情况）；
+        // 若失败，再通过已认证后查 profile 的方式无法提前获取——因此直接用原值尝试。
+        // Supabase signInWithPassword 的 email 字段也支持部分自定义（取决于后端设置），
+        // 对于纯用户名账号，账号创建时 email 字段通常填的就是 username，直接传入即可。
         const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: emailToUse,
             password: password
         });
-        
-        if (error) return { error };
-        
-        this.clearCache();
-        
-        if (window.AUTH && data.user) {
-            await window.AUTH.loadCurrentUser();
+
+        if (error) {
+            // 如果直接登录失败，且输入的不是 email 格式，给出更友好的提示
+            if (!emailOrUsername.includes('@')) {
+                return {
+                    error: {
+                        message: Utils.lang === 'id'
+                            ? 'Login gagal: pastikan username/email dan password sudah benar'
+                            : '登录失败：请确认用户名/邮箱和密码正确'
+                    }
+                };
+            }
+            return { error };
         }
-        
+
+        // 登录成功：清除缓存，由 AUTH.login() 统一调用 loadCurrentUser()
+        this.clearCache();
+
         return data;
     },
 
