@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.0
+// app-dashboard-anomaly.js - v1.1（修复 orders 与 customers 多外键关联冲突）
 
 window.APP = window.APP || {};
 
@@ -28,6 +28,7 @@ const AnomalyCache = {
 const AnomalyHelper = {
     /**
      * 获取逾期30天订单（分页 + 聚合统计）
+     * 修复：移除 customers 关联，使用 orders 表自带的 customer_name
      */
     async getOverdueOrders(profile, page, pageSize) {
         if (page === undefined) page = 0;
@@ -38,7 +39,7 @@ const AnomalyHelper = {
         
         let query = supabaseClient
             .from('orders')
-            .select('order_id, customer_name, overdue_days, loan_amount, status, customers(name, phone)', { count: 'exact' })
+            .select('order_id, customer_name, overdue_days, loan_amount, status', { count: 'exact' })
             .eq('status', 'active')
             .gte('overdue_days', 30)
             .order('overdue_days', { ascending: false });
@@ -55,9 +56,9 @@ const AnomalyHelper = {
         const { data, error, count } = await query;
         
         if (error) {
-    console.warn('获取黑名单失败:', JSON.stringify(error));
-    return { data: [], totalCount: 0 };
-}
+            console.warn('获取逾期订单失败:', error);
+            return { data: [], totalCount: 0 };
+        }
         
         return { 
             data: data || [], 
@@ -67,6 +68,7 @@ const AnomalyHelper = {
 
     /**
      * 获取黑名单客户（分页 + 聚合统计）
+     * 修复：明确指定外键关系 blacklist_customer_id_fkey
      */
     async getBlacklistCustomers(page, pageSize) {
         if (page === undefined) page = 0;
@@ -77,7 +79,7 @@ const AnomalyHelper = {
         
         const { data, error, count } = await supabaseClient
             .from('blacklist')
-            .select('*, customers(name, phone, customer_id)', { count: 'exact' })
+            .select('*, customers!blacklist_customer_id_fkey(name, phone, customer_id)', { count: 'exact' })
             .order('blacklisted_at', { ascending: false })
             .range(from, to);
         
@@ -274,15 +276,15 @@ const DashboardAnomaly = {
                 var overdueRows = '';
                 for (var i = 0; i < overdueOrders.length; i++) {
                     var o = overdueOrders[i];
-                    // 兼容两种数据结构：直接字段 或 嵌套 customers
-                    var customerName = o.customers?.name || o.customer_name || '-';
+                    // 修复：直接使用 o.customer_name，不再引用 o.customers
+                    var customerName = o.customer_name || '-';
                     overdueRows += '<tr>' +
                         '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
                         '<td>' + Utils.escapeHtml(customerName) + '</td>' +
                         '<td class="text-center expense">' + (o.overdue_days || 0) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
                         '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
-                    '<tr>';
+                    '</tr>';
                 }
                 
                 // 判断是否还有更多
@@ -332,7 +334,7 @@ const DashboardAnomaly = {
                         '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '</td>' +
-                        '<tr>' + Utils.escapeHtml(b.reason) + '</td>' +
+                        '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
                     '</tr>';
                 }
                 
@@ -346,7 +348,7 @@ const DashboardAnomaly = {
                                     ' (' + (blacklistTotalCount - blacklist.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '</table>';
+                        '</tr>';
                 }
                 
                 blacklistTableHtml = '' +
@@ -592,7 +594,8 @@ const DashboardAnomaly = {
             var newRows = '';
             for (var i = 0; i < result.data.length; i++) {
                 var o = result.data[i];
-                var customerName = o.customers?.name || o.customer_name || '-';
+                // 修复：直接使用 o.customer_name
+                var customerName = o.customer_name || '-';
                 newRows += '<tr>' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
                     '<td>' + Utils.escapeHtml(customerName) + '</td>' +
@@ -699,7 +702,7 @@ const DashboardAnomaly = {
                                     ' (' + (result.totalCount - loadedCount) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '<tr>';
+                        '</tr>';
                     tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
                 } else {
                     var doneHtml = '' +
