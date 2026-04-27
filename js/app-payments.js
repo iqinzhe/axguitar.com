@@ -771,7 +771,7 @@ const PaymentsModule = {
                 '</div>' +
                 '<div class="header">' +
                     '<div class="header-logo">' +
-                        '<img src="/icons/pagehead-logo.png" alt="JF!">' +
+                        '<img src="icons/pagehead-logo.png" alt="JF!">' +
                         '<h1>JF! by Gadai</h1>' +
                     '</div>' +
                     '<div><span class="badge">✅ ' + (lang === 'id' ? 'TANDA TERIMA PELUNASAN' : '结清凭证') + '</span></div>' +
