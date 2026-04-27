@@ -1,4 +1,4 @@
-// auth.js - v1.5（修复版：统一状态管理、锁定集成、门店检查移层）
+// auth.js - v1.0
 
 const AUTH = {
     user: null,
