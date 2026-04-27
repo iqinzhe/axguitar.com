@@ -1,4 +1,4 @@
-// auth.js - v1.1（修复网络检测误判导致无法登录）
+// auth.js - v1.0
 const AUTH = {
     user: null,
 
@@ -233,20 +233,18 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
-    // ==================== 登录逻辑 ====================
-    // 修复说明：
-    // 原来调用 Utils.NetworkMonitor._checkRealConnectivity() 做网络检测，
-    // 该函数内部 fetch('/icons/favicon-192x192.png') 可能因浏览器隐私策略、
-    // CDN 缓存控制或 CORS 而失败，导致在网络正常时也返回 false，阻断登录。
-    // 修复：改为仅使用 navigator.onLine 判断（足够可靠），
-    // 不再做实际 HTTP 探测，避免误判。
+    // ==================== 登录逻辑（修复版）====================
     async login(usernameOrEmail, password) {
         try {
             // 1. 检查锁定状态
             if (this._isLocked(usernameOrEmail)) return null;
 
-            // 2. 检查网络状态（仅用 navigator.onLine，避免 HTTP 探测误判）
-            if (!navigator.onLine) {
+            // 2. 检查网络状态
+            const isNetworkAvailable = Utils.NetworkMonitor 
+                ? await Utils.NetworkMonitor._checkRealConnectivity()
+                : navigator.onLine;
+            
+            if (!isNetworkAvailable) {
                 const lang = Utils.lang;
                 alert(lang === 'id' 
                     ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
@@ -283,7 +281,7 @@ const AUTH = {
                 return null;
             }
 
-            // 6. 检查门店状态
+            // 6. 检查门店状态（已移到 SUPABASE 层）
             if (this.user && this.user.store_id) {
                 try {
                     const storeStatus = await SUPABASE.checkStoreStatus(this.user.store_id);
