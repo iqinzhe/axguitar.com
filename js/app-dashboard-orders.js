@@ -609,7 +609,7 @@ const DashboardOrders = {
                                     '<th class="col-amount amount">' + t('amount') + '</th>' +
                                     '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th class="col-desc">' + t('description') + '</th>' +
-                                '</td>' +
+'</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
