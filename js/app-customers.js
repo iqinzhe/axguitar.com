@@ -1,4 +1,4 @@
-// app-customers.js - v1.0
+// app-customers.js - v2.0（增加职业字段 + 详情弹窗 + 简化操作行）
 window.APP = window.APP || {};
 
 const CustomersModule = {
@@ -19,7 +19,7 @@ const CustomersModule = {
                 storeMap[stores[i].id] = stores[i].name;
             }
             
-            var totalCols = isAdmin ? 8 : 7;
+            var totalCols = isAdmin ? 9 : 8;  // 增加职业列
             
             var rows = '';
             if (!customers || customers.length === 0) {
@@ -32,60 +32,42 @@ const CustomersModule = {
                     var name = Utils.escapeHtml(c.name);
                     var ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
                     var phone = Utils.escapeHtml(c.phone || '-');
+                    var occupation = Utils.escapeHtml(c.occupation || '-');
                     var ktpAddress = Utils.escapeHtml(c.ktp_address || c.address || '-');
                     var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
                     var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     
                     rows += '<tr>' +
-                        '<td>' + customerId + '</td>' +
-                        '<td>' + name + '</td>' +
-                        '<td>' + ktpNumber + '</td>' +
-                        '<td>' + phone + '</td>' +
-                        '<td>' + ktpAddress + '</td>' +
-                        '<td>' + livingAddress + '</td>' +
+                        '<td class="col-id">' + customerId + '</td>' +
+                        '<td class="col-name">' + name + '</td>' +
+                        '<td class="col-ktp">' + ktpNumber + '</td>' +
+                        '<td class="col-phone">' + phone + '</td>' +
+                        '<td class="col-name">' + occupation + '</td>' +
+                        '<td class="col-address">' + ktpAddress + '</td>' +
+                        '<td class="col-address">' + livingAddress + '</td>' +
                         '<td class="date-cell text-center">' + registeredDate + '</td>' +
                         (isAdmin ? '<td class="text-center">' + storeName + '</td>' : '') +
                     '</tr>';
                     
-                    var actionButtons = '';
-                    
-                    if (!isAdmin) {
-                        actionButtons += '<button onclick="APP.createOrderForCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small success">➕ ' + (lang === 'id' ? 'Buat Order' : '建立订单') + '</button>';
-                    }
-                    
-                    actionButtons += '<button onclick="APP.showCustomerOrders(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Lihat Order' : '查看订单') + '</button>';
-                    
-                    if (isAdmin) {
-                        actionButtons += '<button onclick="APP.editCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Ubah' : '修改') + '</button>';
-                    }
-                    
-                    if (isAdmin) {
-                        actionButtons += '<button onclick="APP.deleteCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
-                    }
-                    
-                    if (!isAdmin) {
-                        actionButtons += '<button onclick="APP.blacklistCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small btn-blacklist">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
-                    }
-                    
-                    if (isAdmin) {
-                        actionButtons += '<button onclick="APP.removeCustomerFromBlacklist(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
-                    }
-                    
+                    // 操作行：只有"详情"按钮
                     rows += '<tr class="action-row">' +
                         '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
                         '<td colspan="' + (totalCols - 1) + '">' +
-                            '<div class="action-buttons">' + actionButtons + '</div>' +
+                            '<div class="action-buttons">' +
+                                '<button onclick="APP.showCustomerDetailModal(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small">👁️ ' + (lang === 'id' ? 'Detail' : '详情') + '</button>' +
+                            '</div>' +
                         '</td>' +
                     '</tr>';
                 }
             }
 
+            // 新增客户卡片（增加职业字段，桌面端4列）
             var addCustomerCardHtml = '';
             if (!isAdmin) {
                 addCustomerCardHtml = '' +
                 '<div class="card">' +
                     '<h3>➕ ' + (lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户') + '</h3>' +
-                    '<div class="form-grid form-grid-3">' +
+                    '<div class="form-grid order-first-row">' +  // 使用 order-first-row 实现4列布局
                         '<div class="form-group">' +
                             '<label>' + t('customer_name') + ' *</label>' +
                             '<input type="text" id="customerName" placeholder="' + t('customer_name') + '">' +
@@ -97,6 +79,10 @@ const CustomersModule = {
                         '<div class="form-group">' +
                             '<label>' + t('ktp_number') + '</label>' +
                             '<input type="text" id="customerKtp" placeholder="' + t('ktp_number') + '">' +
+                        '</div>' +
+                        '<div class="form-group">' +
+                            '<label>' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</label>' +
+                            '<input type="text" id="customerOccupation" placeholder="' + (lang === 'id' ? 'Contoh: PNS, Karyawan Swasta' : '例如: 公务员, 企业员工') + '">' +
                         '</div>' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</label>' +
@@ -135,6 +121,7 @@ const CustomersModule = {
                                     '<th class="col-name">' + t('customer_name') + '</th>' +
                                     '<th class="col-ktp">' + t('ktp_number') + '</th>' +
                                     '<th class="col-phone">' + t('phone') + '</th>' +
+                                    '<th class="col-name">' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</th>' +
                                     '<th class="col-address">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</th>' +
                                     '<th class="col-address">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</th>' +
                                     '<th class="col-date text-center">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + '</th>' +
@@ -153,7 +140,211 @@ const CustomersModule = {
         }
     },
 
-    removeCustomerFromBlacklist: async function(customerId) {
+    // ========== 客户详情弹窗 ==========
+    showCustomerDetailModal: async function(customerId) {
+        var lang = Utils.lang;
+        var t = function(key) { return Utils.t(key); };
+        var isAdmin = AUTH.isAdmin();
+        var profile = await SUPABASE.getCurrentProfile();
+        
+        try {
+            // 获取客户信息
+            const customer = await SUPABASE.getCustomer(customerId);
+            if (!customer) throw new Error(lang === 'id' ? 'Nasabah tidak ditemukan' : '客户不存在');
+            
+            // 检查黑名单状态
+            let isBlacklisted = false;
+            let blacklistReason = '';
+            try {
+                const { data: blData } = await supabaseClient
+                    .from('blacklist')
+                    .select('reason')
+                    .eq('customer_id', customerId)
+                    .maybeSingle();
+                if (blData) {
+                    isBlacklisted = true;
+                    blacklistReason = blData.reason;
+                }
+            } catch(blErr) {
+                console.warn('黑名单检查失败:', blErr.message);
+            }
+            
+            // 获取关联订单
+            const { data: orders, error: ordersError } = await supabaseClient
+                .from('orders')
+                .select('order_id, loan_amount, status, created_at')
+                .eq('customer_id', customerId)
+                .order('created_at', { ascending: false })
+                .limit(5);
+            
+            if (ordersError) throw ordersError;
+            
+            var statusMap = {
+                active: lang === 'id' ? '🟢 Aktif' : '🟢 进行中',
+                completed: lang === 'id' ? '✅ Lunas' : '✅ 已结清',
+                liquidated: lang === 'id' ? '⚠️ Likuidasi' : '⚠️ 已变卖'
+            };
+            
+            // 构建订单列表HTML
+            var ordersHtml = '';
+            if (!orders || orders.length === 0) {
+                ordersHtml = '<div class="empty-state" style="padding:var(--spacing-2);"><span class="empty-state-text">' + (lang === 'id' ? 'Belum ada pesanan' : '暂无订单') + '</span></div>';
+            } else {
+                ordersHtml = '<div style="max-height:200px; overflow-y:auto;">';
+                for (var i = 0; i < orders.length; i++) {
+                    var o = orders[i];
+                    var statusClass = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
+                    ordersHtml += '' +
+                        '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-light);">' +
+                            '<div>' +
+                                '<strong>' + Utils.escapeHtml(o.order_id) + '</strong><br>' +
+                                '<small>' + Utils.formatCurrency(o.loan_amount) + '</small>' +
+                            '</div>' +
+                            '<div style="display:flex; align-items:center; gap:8px;">' +
+                                '<span class="status-badge ' + statusClass + '">' + (statusMap[o.status] || o.status) + '</span>' +
+                                '<button onclick="APP.viewOrderFromModal(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small" style="padding:2px 8px;">👁️ ' + t('view') + '</button>' +
+                            '</div>' +
+                        '</div>';
+                }
+                ordersHtml += '</div>';
+                if (orders.length >= 5) {
+                    ordersHtml += '<div style="text-align:center; margin-top:8px;"><button onclick="APP.showCustomerOrders(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Lihat semua pesanan' : '查看全部订单') + '</button></div>';
+                }
+            }
+            
+            // 根据权限和状态决定显示哪个按钮
+            var blacklistButtonHtml = '';
+            var canBlacklist = !isAdmin && !isBlacklisted && profile?.store_id === customer.store_id;
+            var canUnblacklist = isAdmin && isBlacklisted;
+            
+            if (canBlacklist) {
+                blacklistButtonHtml = '<button onclick="APP.blacklistFromModal(\'' + Utils.escapeAttr(customerId) + '\', \'' + Utils.escapeAttr(customer.name) + '\')" class="btn-small btn-blacklist" style="background:#f97316;color:#fff;">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
+            } else if (canUnblacklist) {
+                blacklistButtonHtml = '<button onclick="APP.unblacklistFromModal(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
+            }
+            
+            // 状态徽章
+            var statusBadgeHtml = isBlacklisted 
+                ? '<span class="status-badge liquidated">🚫 ' + (lang === 'id' ? 'Diblacklist' : '已拉黑') + '</span>'
+                : '<span class="status-badge active">✅ ' + (lang === 'id' ? 'Normal' : '正常') + '</span>';
+            
+            // 编辑按钮（仅管理员或本门店）
+            var canEdit = isAdmin || profile?.store_id === customer.store_id;
+            var editButtonHtml = canEdit 
+                ? '<button onclick="APP.editCustomerFromModal(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Edit' : '编辑') + '</button>'
+                : '';
+            
+            // 职业显示
+            var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
+            
+            // 构建弹窗HTML
+            var modalHtml = '' +
+                '<div id="customerDetailModal" class="modal-overlay">' +
+                    '<div class="modal-content" style="max-width:600px; max-height:85vh; overflow-y:auto;">' +
+                        '<h3 style="display:flex; justify-content:space-between; align-items:center;">' +
+                            '<span>👤 ' + (lang === 'id' ? 'Detail Nasabah' : '客户详情') + '</span>' +
+                            '<button onclick="document.getElementById(\'customerDetailModal\').remove()" style="background:none; border:none; font-size:20px; cursor:pointer;">✖</button>' +
+                        '</h3>' +
+                        
+                        // 状态行
+                        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid var(--border-light);">' +
+                            '<div>' + statusBadgeHtml + '</div>' +
+                            (isBlacklisted ? '<div class="info-bar warning" style="margin:0; padding:4px 8px;"><small>⚠️ ' + Utils.escapeHtml(blacklistReason) + '</small></div>' : '') +
+                        '</div>' +
+                        
+                        // 基本信息
+                        '<div class="form-section">' +
+                            '<div class="form-section-title">📋 ' + (lang === 'id' ? 'Informasi Dasar' : '基本信息') + '</div>' +
+                            '<div class="info-display">' +
+                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.customer_id || '-') + '</span></div>' +
+                                '<div class="info-display-item"><span class="info-label">' + t('customer_name') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.name) + '</span></div>' +
+                                '<div class="info-display-item"><span class="info-label">' + t('ktp_number') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.ktp_number || '-') + '</span></div>' +
+                                '<div class="info-display-item"><span class="info-label">' + t('phone') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.phone) + '</span></div>' +
+                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Pekerjaan' : '职业') + ':</span><span class="info-value">' + occupationDisplay + '</span></div>' +
+                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.ktp_address || customer.address || '-') + '</span></div>' +
+                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</span><span class="info-value">' + (customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')) + '</span></div>' +
+                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + ':</span><span class="info-value">' + Utils.formatDate(customer.registered_date) + '</span></div>' +
+                            '</div>' +
+                        '</div>' +
+                        
+                        // 关联订单
+                        '<div class="form-section">' +
+                            '<div class="form-section-title">📋 ' + (lang === 'id' ? 'Pesanan Terkait' : '关联订单') + '</div>' +
+                            ordersHtml +
+                        '</div>' +
+                        
+                        // 操作按钮区
+                        '<div style="display:flex; gap:12px; justify-content:flex-end; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-light); flex-wrap:wrap;">' +
+                            '<button onclick="APP.createOrderForCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small success" style="background:var(--success-dark);color:white;">➕ ' + (lang === 'id' ? 'Buat Pesanan' : '创建订单') + '</button>' +
+                            editButtonHtml +
+                            blacklistButtonHtml +
+                            '<button onclick="document.getElementById(\'customerDetailModal\').remove()" class="btn-back">✖ ' + t('cancel') + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            
+            // 移除已存在的弹窗
+            var oldModal = document.getElementById('customerDetailModal');
+            if (oldModal) oldModal.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+        } catch (error) {
+            console.error("showCustomerDetailModal error:", error);
+            alert(lang === 'id' ? 'Gagal memuat detail nasabah: ' + error.message : '加载客户详情失败：' + error.message);
+        }
+    },
+    
+    // ========== 从弹窗编辑客户 ==========
+    editCustomerFromModal: async function(customerId) {
+        // 关闭弹窗
+        var modal = document.getElementById('customerDetailModal');
+        if (modal) modal.remove();
+        
+        // 调用编辑客户方法
+        await this.editCustomer(customerId);
+    },
+    
+    // ========== 从弹窗拉黑客户 ==========
+    blacklistFromModal: async function(customerId, customerName) {
+        var lang = Utils.lang;
+        
+        // 关闭弹窗
+        var modal = document.getElementById('customerDetailModal');
+        if (modal) modal.remove();
+        
+        var reason = prompt(
+            lang === 'id' 
+                ? 'Masukkan alasan blacklist untuk nasabah "' + customerName + '":\n\nContoh: Telat bayar, Penipuan, dll.'
+                : '请输入拉黑客户 "' + customerName + '" 的原因：\n\n例如：逾期未还、欺诈等。',
+            lang === 'id' ? 'Telat bayar' : '逾期未还'
+        );
+        
+        if (!reason || reason.trim() === '') {
+            alert(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
+            return;
+        }
+        
+        if (!confirm(lang === 'id' 
+            ? '⚠️ Yakin akan blacklist nasabah ini?\n\nNama: ' + customerName + '\nAlasan: ' + reason + '\n\nNasabah yang di-blacklist tidak dapat membuat order baru.'
+            : '⚠️ 确认拉黑此客户？\n\n客户名: ' + customerName + '\n原因: ' + reason + '\n\n被拉黑的客户将无法创建新订单。')) {
+            return;
+        }
+        
+        try {
+            await window.APP.addToBlacklist(customerId, reason);
+            alert(lang === 'id' 
+                ? '✅ Nasabah "' + customerName + '" telah ditambahkan ke blacklist.'
+                : '✅ 客户 "' + customerName + '" 已加入黑名单。');
+            await APP.showCustomers();
+        } catch (error) {
+            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
+            alert(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + errMsg : '拉黑失败：' + errMsg);
+        }
+    },
+    
+    // ========== 从弹窗解除拉黑 ==========
+    unblacklistFromModal: async function(customerId) {
         var lang = Utils.lang;
         
         if (!confirm(lang === 'id' ? 'Yakin ingin membuka blacklist nasabah ini?' : '确认解除此客户的拉黑？')) return;
@@ -161,70 +352,35 @@ const CustomersModule = {
         try {
             await window.APP.removeFromBlacklist(customerId);
             alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
+            
+            // 关闭弹窗
+            var modal = document.getElementById('customerDetailModal');
+            if (modal) modal.remove();
+            
             await APP.showCustomers();
         } catch (error) {
             var errMsg = error.message || error.details || error.code || JSON.stringify(error);
             alert(lang === 'id' ? 'Gagal membuka blacklist: ' + errMsg : '解除拉黑失败：' + errMsg);
         }
     },
-
-    blacklistCustomer: async function(customerId) {
-        var lang = Utils.lang;
-        var t = Utils.t;
+    
+    // ========== 从弹窗查看订单 ==========
+    viewOrderFromModal: function(orderId) {
+        // 关闭弹窗
+        var modal = document.getElementById('customerDetailModal');
+        if (modal) modal.remove();
         
-        try {
-            const { data: customer, error: customerError } = await supabaseClient
-                .from('customers')
-                .select('id, name, customer_id, store_id')
-                .eq('id', customerId)
-                .single();
-            
-            if (customerError) {
-                console.error("获取客户信息失败:", customerError);
-                alert(lang === 'id' ? 'Gagal mendapatkan data nasabah' : '获取客户信息失败');
-                return;
-            }
-            
-            var reason = prompt(
-                lang === 'id' 
-                    ? 'Masukkan alasan blacklist untuk nasabah "' + customer.name + '" (' + customer.customer_id + '):\n\nContoh: Telat bayar, Penipuan, dll.'
-                    : '请输入拉黑客户 "' + customer.name + '" (' + customer.customer_id + ') 的原因：\n\n例如：逾期未还、欺诈等。',
-                lang === 'id' ? 'Telat bayar' : '逾期未还'
-            );
-            
-            if (!reason || reason.trim() === '') {
-                alert(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
-                return;
-            }
-            
-            if (!confirm(lang === 'id' 
-                ? '⚠️ Yakin akan blacklist nasabah ini?\n\nNama: ' + customer.name + '\nID: ' + customer.customer_id + '\nAlasan: ' + reason + '\n\nNasabah yang di-blacklist tidak dapat membuat order baru.'
-                : '⚠️ 确认拉黑此客户？\n\n客户名: ' + customer.name + '\n客户ID: ' + customer.customer_id + '\n原因: ' + reason + '\n\n被拉黑的客户将无法创建新订单。')) {
-                return;
-            }
-            
-            if (typeof window.APP.addToBlacklist === 'function') {
-                await window.APP.addToBlacklist(customer.id, reason);
-                alert(lang === 'id' 
-                    ? '✅ Nasabah "' + customer.name + '" telah ditambahkan ke blacklist.'
-                    : '✅ 客户 "' + customer.name + '" 已加入黑名单。');
-                await APP.showCustomers();
-            } else {
-                throw new Error(lang === 'id' ? 'Modul blacklist belum dimuat' : '黑名单模块未加载');
-            }
-            
-        } catch (error) {
-            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
-            console.error("blacklistCustomer error:", error);
-            alert(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + errMsg : '拉黑失败：' + errMsg);
-        }
+        // 跳转到订单详情
+        APP.navigateTo('viewOrder', { orderId: orderId });
     },
 
+    // ========== 切换居住地址显示 ==========
     toggleLivingAddress: function(value) {
         var el = document.getElementById('customerLivingAddress');
         if (el) el.style.display = value === 'different' ? 'block' : 'none';
     },
 
+    // ========== 新增客户（增加职业字段） ==========
     addCustomer: async function() {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -244,6 +400,7 @@ const CustomersModule = {
         var name = document.getElementById("customerName").value.trim();
         var ktp = document.getElementById("customerKtp").value.trim();
         var phone = document.getElementById("customerPhone").value.trim();
+        var occupation = document.getElementById("customerOccupation").value.trim();
         var ktpAddress = document.getElementById("customerKtpAddress").value.trim();
         var livingOpt = document.querySelector('input[name="livingAddrOpt"]:checked')?.value || 'same';
         var livingSameAsKtp = livingOpt === 'same';
@@ -306,6 +463,7 @@ const CustomersModule = {
                         name: name,
                         ktp_number: ktp || null,
                         phone: phone,
+                        occupation: occupation || null,
                         ktp_address: ktpAddress || null,
                         address: ktpAddress || null,
                         living_same_as_ktp: livingSameAsKtp,
@@ -358,6 +516,7 @@ const CustomersModule = {
         }
     },
 
+    // ========== 编辑客户（增加职业字段） ==========
     editCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -372,6 +531,7 @@ const CustomersModule = {
             const { data: c, error } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
             if (error) throw error;
             var livingSame = c.living_same_as_ktp !== false;
+            var occupation = c.occupation || '';
 
             var modal = document.createElement('div');
             modal.id = 'editCustomerModal';
@@ -379,10 +539,11 @@ const CustomersModule = {
             modal.innerHTML = '' +
                 '<div class="modal-content" style="max-width:600px;">' +
                     '<h3>✏️ ' + (lang === 'id' ? 'Ubah Data Nasabah' : '修改客户信息') + '</h3>' +
-                    '<div class="form-grid form-grid-3">' +
+                    '<div class="form-grid order-first-row">' +
                         '<div class="form-group"><label>' + t('customer_name') + ' *</label><input id="ec_name" value="' + Utils.escapeHtml(c.name) + '"></div>' +
                         '<div class="form-group"><label>' + t('phone') + ' *</label><input id="ec_phone" value="' + Utils.escapeHtml(c.phone || '') + '"></div>' +
                         '<div class="form-group"><label>' + t('ktp_number') + '</label><input id="ec_ktp" value="' + Utils.escapeHtml(c.ktp_number || '') + '"></div>' +
+                        '<div class="form-group"><label>' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</label><input id="ec_occupation" value="' + Utils.escapeHtml(occupation) + '"></div>' +
                         '<div class="form-group full-width"><label>' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</label><textarea id="ec_ktpAddr" rows="2">' + Utils.escapeHtml(c.ktp_address || c.address || '') + '</textarea></div>' +
                         '<div class="form-group full-width">' +
                             '<label>' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</label>' +
@@ -423,6 +584,7 @@ const CustomersModule = {
         var name = document.getElementById('ec_name').value.trim();
         var phone = document.getElementById('ec_phone').value.trim();
         var ktp = document.getElementById('ec_ktp').value.trim();
+        var occupation = document.getElementById('ec_occupation').value.trim();
         var ktpAddr = document.getElementById('ec_ktpAddr').value.trim();
         var livingOpt = document.querySelector('input[name="ec_livingOpt"]:checked')?.value || 'same';
         var livingSame = livingOpt === 'same';
@@ -435,6 +597,7 @@ const CustomersModule = {
                 name: name,
                 phone: phone,
                 ktp_number: ktp || null,
+                occupation: occupation || null,
                 ktp_address: ktpAddr || null,
                 address: ktpAddr || null,
                 living_same_as_ktp: livingSame,
@@ -450,6 +613,7 @@ const CustomersModule = {
         }
     },
 
+    // ========== 删除客户 ==========
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
         if (!confirm(Utils.t('confirm_delete'))) return;
@@ -547,6 +711,9 @@ const CustomersModule = {
             APP.currentPage = 'createOrder';
             APP.currentCustomerId = customerId;
             
+            // 获取职业信息用于显示
+            var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
+            
             // ========== 页面 HTML ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -581,6 +748,10 @@ const CustomersModule = {
                                 '<span class="info-value">' + Utils.escapeHtml(customer.phone) + '</span>' +
                             '</div>' +
                             '<div class="info-display-item">' +
+                                '<span class="info-label">' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</span>' +
+                                '<span class="info-value">' + occupationDisplay + '</span>' +
+                            '</div>' +
+                            '<div class="info-display-item">' +
                                 '<span class="info-label">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</span>' +
                                 '<span class="info-value">' + Utils.escapeHtml(customer.ktp_address || customer.address || '-') + '</span>' +
                             '</div>' +
@@ -591,7 +762,7 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第二部分：典当信息
+                    // 第二部分：典当信息（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">💎</span> ' + t('collateral_info') +
@@ -619,7 +790,7 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第三部分：费用区
+                    // 第三部分：费用区（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">💰</span> ' + (lang === 'id' ? 'Rincian Biaya' : '费用明细') +
@@ -661,7 +832,7 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第四部分：还款方式
+                    // 第四部分：还款方式（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">📅</span> ' + (lang === 'id' ? 'Metode Cicilan' : '还款方式') +
@@ -715,7 +886,7 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第五部分：备注与操作
+                    // 第五部分：备注与操作（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-group full-width">' +
                             '<label>' + t('notes') + '</label>' +
@@ -1046,11 +1217,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         try {
-            const { data: customer } = await supabaseClient
-                .from('customers')
-                .select('*')
-                .eq('id', customerId)
-                .single();
+            const customer = await SUPABASE.getCustomer(customerId);
             const { data: orders, error } = await supabaseClient
                 .from('orders')
                 .select('*')
@@ -1109,6 +1276,7 @@ const CustomersModule = {
                     '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(customer.name) + '</p>' +
                     '<p><strong>' + t('ktp_number') + ':</strong> ' + Utils.escapeHtml(customer.ktp_number || '-') + '</p>' +
                     '<p><strong>' + t('phone') + ':</strong> ' + Utils.escapeHtml(customer.phone) + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Pekerjaan' : '职业') + ':</strong> ' + Utils.escapeHtml(customer.occupation || '-') + '</p>' +
                 '</div>' +
                 '<div class="card">' +
                     '<h3>📋 ' + t('order_list') + '</h3>' +
@@ -1133,7 +1301,7 @@ const CustomersModule = {
         var t = function(key) { return Utils.t(key); };
         var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
         try {
-            const { data: customer } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
+            const customer = await SUPABASE.getCustomer(customerId);
             const { data: orders } = await supabaseClient.from('orders').select('id, order_id').eq('customer_id', customerId);
             var orderIds = [];
             if (orders) {
@@ -1150,7 +1318,7 @@ const CustomersModule = {
             
             var rows = '';
             if (allPayments.length === 0) {
-                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + 'NonNull';
             } else {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
@@ -1176,6 +1344,7 @@ const CustomersModule = {
                 '<div class="card customer-summary">' +
                     '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(customer.name) + '</p>' +
                     '<p><strong>' + t('phone') + ':</strong> ' + Utils.escapeHtml(customer.phone) + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Pekerjaan' : '职业') + ':</strong> ' + Utils.escapeHtml(customer.occupation || '-') + '</p>' +
                 '</div>' +
                 '<div class="card">' +
                     '<h3>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + '</h3>' +
@@ -1200,6 +1369,7 @@ for (var key in CustomersModule) {
     }
 }
 
+// 保留原有的一些方法引用
 window.APP.recalculateAllFees = CustomersModule.recalculateAllFees;
 window.APP.onAdminFeeManualChange = CustomersModule.onAdminFeeManualChange;
 window.APP.recalculateServiceFee = CustomersModule.recalculateServiceFee;
