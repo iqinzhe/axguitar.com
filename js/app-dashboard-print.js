@@ -1,5 +1,4 @@
-// app-dashboard-print.js - v1.8（移除内联样式，使用组件库）
-
+// app-dashboard-print.js - v1.0
 window.APP = window.APP || {};
 
 const DashboardPrint = {
