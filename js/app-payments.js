@@ -1,4 +1,4 @@
-// app-payments.js - v1.9（修复：防重复提交 + 审计日志全覆盖 + 按钮加载状态 + XSS防护）
+// app-payments.js - v1.0
 
 window.APP = window.APP || {};
 
