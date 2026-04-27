@@ -1,5 +1,4 @@
 // migration.js - v1.0
-
 const Migration = {
     isMigrating: false,
     progress: { total: 0, current: 0, success: 0, failed: 0, skipped: 0 },
