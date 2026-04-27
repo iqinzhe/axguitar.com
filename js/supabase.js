@@ -1,4 +1,4 @@
-// supabase.js - v1.0
+// supabase.js - v1.1（增加客户职业字段）
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
@@ -8,7 +8,6 @@ const SafeStorage = {
     _storageAvailable: null,
     _cookieEnabled: null,
 
-    // 检查 localStorage 是否可用
     _checkLocalStorage() {
         if (this._storageAvailable !== null) return this._storageAvailable;
         try {
@@ -24,10 +23,9 @@ const SafeStorage = {
         }
     },
 
-    // 检查 sessionStorage 是否可用
     _checkSessionStorage() {
         try {
-            const testKey = '__storage_test__';
+            const testKey = '__sstest__';
             sessionStorage.setItem(testKey, '1');
             sessionStorage.removeItem(testKey);
             return true;
@@ -36,7 +34,6 @@ const SafeStorage = {
         }
     },
 
-    // 检查 Cookie 是否可用
     _checkCookie() {
         if (this._cookieEnabled !== null) return this._cookieEnabled;
         try {
@@ -51,7 +48,6 @@ const SafeStorage = {
         }
     },
 
-    // 从 Cookie 获取值
     _getCookie(name) {
         try {
             const value = '; ' + document.cookie;
@@ -63,7 +59,6 @@ const SafeStorage = {
         return null;
     },
 
-    // 设置 Cookie
     _setCookie(name, value, days) {
         try {
             let expires = '';
@@ -79,49 +74,36 @@ const SafeStorage = {
         }
     },
 
-    // 删除 Cookie
     _removeCookie(name) {
         try {
             document.cookie = name + '=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
         } catch (e) {}
     },
 
-    // ========== 实现 Storage 接口 ==========
-
     getItem(key) {
-        // 1. 尝试 localStorage
         if (this._checkLocalStorage()) {
             try {
                 return localStorage.getItem(key);
             } catch (e) {}
         }
-
-        // 2. 尝试 Cookie
         if (this._checkCookie()) {
             const val = this._getCookie(key);
             if (val !== null) return val;
         }
-
-        // 3. 后备：内存
         return this._memoryStore[key] || null;
     },
 
     setItem(key, value) {
-        // 1. 尝试 localStorage
         if (this._checkLocalStorage()) {
             try {
                 localStorage.setItem(key, value);
             } catch (e) {}
         }
-
-        // 2. 同步到 Cookie
         if (this._checkCookie()) {
             if (value !== null && value !== undefined) {
                 this._setCookie(key, String(value), 365);
             }
         }
-
-        // 3. 同步到内存
         if (value === null || value === undefined) {
             delete this._memoryStore[key];
         } else {
@@ -130,23 +112,17 @@ const SafeStorage = {
     },
 
     removeItem(key) {
-        // 1. localStorage
         if (this._checkLocalStorage()) {
             try {
                 localStorage.removeItem(key);
             } catch (e) {}
         }
-
-        // 2. Cookie
         if (this._checkCookie()) {
             this._removeCookie(key);
         }
-
-        // 3. 内存
         delete this._memoryStore[key];
     },
 
-    // 清除所有（仅限带前缀的键，避免误删其他数据）
     clear(prefix) {
         prefix = prefix || '';
 
@@ -184,7 +160,6 @@ const SafeStorage = {
     }
 };
 
-// ==================== 自定义 Session Storage 实现 ====================
 const SafeSessionStorage = {
     _memoryStore: {},
 
@@ -231,12 +206,9 @@ const SafeSessionStorage = {
     }
 };
 
-// ==================== 创建 Supabase 客户端（使用自定义存储） ====================
 let supabaseClient;
 
 try {
-    // 尝试使用自定义存储创建客户端
-    // 注：@supabase/supabase-js v2 支持 auth.storage 配置
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         auth: {
             storage: SafeStorage,
@@ -248,47 +220,22 @@ try {
     console.log('✅ Supabase 客户端初始化成功（使用自定义安全存储）');
 } catch (e) {
     console.warn('自定义存储初始化失败，尝试默认配置:', e.message);
-    // 后备：使用默认存储
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log('⚠️ Supabase 客户端初始化使用默认存储');
 }
 
-// ==================== 缓存管理 ====================
 let _profileCache = null;
 let _storePrefixCache = new Map();
 let _storesCache = null;
 let _storesCacheTime = 0;
 const STORES_CACHE_TTL = 5 * 60 * 1000;
 
-// 重写全局 sessionStorage / localStorage 访问，使用安全版本
-// 这确保 Utils.js 和其他模块的存储访问不会崩溃
-(function() {
-    // 只有在原生存储不可用时才重写
-    let needOverride = false;
-    try {
-        localStorage.setItem('__check__', '1');
-        localStorage.removeItem('__check__');
-    } catch (e) {
-        needOverride = true;
-    }
-
-    if (needOverride) {
-        console.warn('[SafeStorage] 检测到 localStorage 不可用，将使用安全存储替代');
-        // 注意：不直接重写全局对象，而是让各模块使用 SafeStorage
-        // 如果必须重写，取消下面的注释：
-        // Object.defineProperty(window, 'localStorage', { value: SafeStorage, writable: false });
-        // Object.defineProperty(window, 'sessionStorage', { value: SafeSessionStorage, writable: false });
-    }
-})();
-
 const SupabaseAPI = {
     getClient() { return supabaseClient; },
 
-    // ==================== 安全存储暴露 ====================
     getSafeStorage() { return SafeStorage; },
     getSafeSessionStorage() { return SafeSessionStorage; },
 
-    // ==================== Session 管理 ====================
     async getSession() {
         try {
             const { data, error } = await supabaseClient.auth.getSession();
@@ -348,7 +295,6 @@ const SupabaseAPI = {
             }
             
             _profileCache = data;
-            // 同步到 AUTH.user（保持状态一致）
             if (window.AUTH) {
                 window.AUTH.user = data;
             }
@@ -366,7 +312,6 @@ const SupabaseAPI = {
         _storesCacheTime = 0;
     },
 
-    // ==================== 门店状态检查 ====================
     async checkStoreStatus(storeId) {
         try {
             const { data, error } = await supabaseClient
@@ -402,11 +347,9 @@ const SupabaseAPI = {
         return profile?.stores?.name || 'Kantor';
     },
 
-    // ==================== 登录逻辑 ====================
     async login(emailOrUsername, password) {
         let emailToUse = emailOrUsername;
         
-        // 如果不是邮箱格式，先查找用户名对应的邮箱
         if (!emailOrUsername.includes('@')) {
             const { data: profileData, error: profileError } = await supabaseClient
                 .from('user_profiles')
@@ -424,7 +367,6 @@ const SupabaseAPI = {
             emailToUse = profileData.email || profileData.username;
         }
         
-        // 执行登录
         const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: emailToUse,
             password: password
@@ -434,7 +376,6 @@ const SupabaseAPI = {
         
         this.clearCache();
         
-        // 同步到 AUTH.user
         if (window.AUTH && data.user) {
             await window.AUTH.loadCurrentUser();
         }
@@ -448,7 +389,6 @@ const SupabaseAPI = {
         if (error) throw error;
     },
 
-    // ==================== 门店操作 ====================
     async getAllStores(forceRefresh = false) {
         const now = Date.now();
         if (!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_CACHE_TTL) {
@@ -565,6 +505,7 @@ const SupabaseAPI = {
         return prefix + serial;
     },
 
+    // ========== 创建客户（增加 occupation 字段） ==========
     async createCustomer(customerData) {
         const profile = await this.getCurrentProfile();
         const storeId = customerData.store_id || profile.store_id;
@@ -589,6 +530,7 @@ const SupabaseAPI = {
                         address: customerData.address || null,
                         living_same_as_ktp: customerData.living_same_as_ktp,
                         living_address: customerData.living_address || null,
+                        occupation: customerData.occupation || null,  // 新增职业字段
                         registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
                         created_by: profile.id,
                         updated_at: new Date().toISOString()
@@ -618,6 +560,72 @@ const SupabaseAPI = {
         }
         
         throw lastError || new Error('无法创建客户，请重试');
+    },
+
+    // ========== 更新客户（增加 occupation 字段） ==========
+    async updateCustomer(customerId, customerData) {
+        const profile = await this.getCurrentProfile();
+        
+        const updates = {
+            name: customerData.name,
+            phone: customerData.phone,
+            ktp_number: customerData.ktp_number || null,
+            ktp_address: customerData.ktp_address || null,
+            address: customerData.ktp_address || null,
+            living_same_as_ktp: customerData.living_same_as_ktp,
+            living_address: customerData.living_address || null,
+            occupation: customerData.occupation || null,  // 新增职业字段
+            updated_at: new Date().toISOString()
+        };
+        
+        const { error } = await supabaseClient
+            .from('customers')
+            .update(updates)
+            .eq('id', customerId);
+        
+        if (error) throw error;
+        
+        return true;
+    },
+
+    // ========== 获取客户列表（过滤黑名单，增加 occupation 字段） ==========
+    async getCustomers(filters) {
+        if (filters === undefined) filters = {};
+        const profile = await this.getCurrentProfile();
+        
+        // 获取黑名单客户ID列表
+        const { data: blacklistData } = await supabaseClient
+            .from('blacklist')
+            .select('customer_id');
+        
+        const blacklistedIds = (blacklistData || []).map(b => b.customer_id);
+        
+        let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
+        
+        if (profile?.role !== 'admin' && profile?.store_id) {
+            query = query.eq('store_id', profile.store_id);
+        }
+        
+        // 排除黑名单客户
+        if (blacklistedIds.length > 0) {
+            query = query.not('id', 'in', '(' + blacklistedIds.map(id => `'${id}'`).join(',') + ')');
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    // ========== 获取单个客户（包含 occupation） ==========
+    async getCustomer(customerId) {
+        const { data, error } = await supabaseClient
+            .from('customers')
+            .select('*')
+            .eq('id', customerId)
+            .single();
+        
+        if (error) throw error;
+        return data;
     },
 
     calculateNextDueDate: function(startDate, paidMonths) {
@@ -1655,20 +1663,6 @@ const SupabaseAPI = {
         }
         
         return true;
-    },
-
-    async getCustomers(filters) {
-        if (filters === undefined) filters = {};
-        const profile = await this.getCurrentProfile();
-        let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-        
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('store_id', profile.store_id);
-        }
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        return data;
     },
 
     async getCashFlowRecords(storeId, startDate, endDate) {
