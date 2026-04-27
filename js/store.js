@@ -1,5 +1,4 @@
 // store.js - v1.1（修复暂停营业/恢复营业：去掉 updated_at 列）
-
 const StoreManager = {
     stores: [],
     _loaded: false,
