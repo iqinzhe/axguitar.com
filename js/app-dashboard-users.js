@@ -1,5 +1,4 @@
 // app-dashboard-users.js - v1.0
-
 window.APP = window.APP || {};
 
 const DashboardUsers = {
