@@ -642,84 +642,31 @@ const Storage = {
     },
     
     // ==================== 备份恢复 UI ====================
+renderBackupUI: async function() {
+    const lang = Utils.lang;
+    const profile = await SUPABASE.getCurrentProfile();
+    const isAdmin = profile?.role === 'admin';
     
-    renderBackupUI: async function() {
-        const lang = Utils.lang;
-        const profile = await SUPABASE.getCurrentProfile();
-        const isAdmin = profile?.role === 'admin';
-        
-        var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
-        var backText = lang === 'id' ? 'Kembali' : '返回';
-        
-        var exportTitle = lang === 'id' ? '📊 Ekspor CSV' : '📊 导出 CSV';
-        var exportDesc = lang === 'id' 
-            ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
-            : '导出为 CSV 格式，可在 Excel 中打开。';
-        var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
-        var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
-        var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
-        
-        // ========== 门店视图：只显示备份本门店数据和导出本门店数据 ==========
-        if (!isAdmin) {
-            var backupTitle = lang === 'id' ? '📤 Cadangkan Data Toko' : '📤 备份本门店数据';
-            var backupDesc = lang === 'id' 
-                ? 'Cadangkan data toko Anda (pesanan, nasabah, pengeluaran, pembayaran) ke file JSON.'
-                : '备份本门店数据（订单、客户、支出、缴费记录）为 JSON 文件。';
-            var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
-            
-            document.getElementById("app").innerHTML = '' +
-                '<div class="page-header">' +
-                    '<h2>💾 ' + pageTitle + '</h2>' +
-                    '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + backText + '</button>' +
-                    '</div>' +
-                '</div>' +
-                
-                '<div class="backup-grid" style="grid-template-columns: repeat(2, 1fr);">' +
-                    '<!-- 卡片1：备份本门店数据 -->' +
-                    '<div class="backup-card backup-card-primary">' +
-                        '<h3>' + backupTitle + '</h3>' +
-                        '<p>' + backupDesc + '</p>' +
-                        '<button onclick="Storage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
-                    '</div>' +
-                    
-                    '<!-- 卡片2：导出本门店数据 -->' +
-                    '<div class="backup-card backup-card-secondary">' +
-                        '<h3>' + exportTitle + '</h3>' +
-                        '<p>' + exportDesc + '</p>' +
-                        '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
-                            '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
-                            '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
-                            '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>';
-            return;
-        }
-        
-        // ========== 管理员视图：完整功能（保持不变） ==========
-        var backupTitle = lang === 'id' ? '📤 Cadangkan Data' : '📤 备份数据';
+    var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
+    var backText = lang === 'id' ? 'Kembali' : '返回';
+    
+    var exportTitle = lang === 'id' ? '📊 Ekspor CSV' : '📊 导出 CSV';
+    var exportDesc = lang === 'id' 
+        ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
+        : '导出为 CSV 格式，可在 Excel 中打开。';
+    var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
+    var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
+    var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
+    
+    // ========== 门店视图：只显示备份本门店数据和导出本门店数据 ==========
+    if (!isAdmin) {
+        var backupTitle = lang === 'id' ? '📤 Cadangkan Data Toko' : '📤 备份本门店数据';
         var backupDesc = lang === 'id' 
-            ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
-            : '备份所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
+            ? 'Cadangkan data toko Anda (pesanan, nasabah, pengeluaran, pembayaran) ke file JSON.'
+            : '备份本门店数据（订单、客户、支出、缴费记录）为 JSON 文件。';
         var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
         
-        var restoreTitle = lang === 'id' ? '📥 Pemulihan Data' : '📥 恢复数据';
-        var restoreDesc = lang === 'id' 
-            ? 'Pulihkan data dari file cadangan.'
-            : '从备份文件恢复数据。';
-        var restoreWarning = lang === 'id' 
-            ? '⚠️ PERINGATAN: Akan menimpa data yang ada!'
-            : '⚠️ 警告：将覆盖现有数据！';
-        var restoreBtnText = lang === 'id' ? '🔄 Pulihkan Data' : '🔄 恢复数据';
-        
-        var auditTitle = lang === 'id' ? '📝 Log Audit' : '📝 审计日志';
-        var auditDesc = lang === 'id'
-            ? 'Lihat riwayat operasi sistem: login, pembayaran, penghapusan, dll.'
-            : '查看系统操作记录：登录、缴费、删除等。';
-        var auditViewBtnText = lang === 'id' ? '🔍 Lihat Log Audit' : '🔍 查看审计日志';
-        
-        var html = '' +
+        document.getElementById("app").innerHTML = '' +
             '<div class="page-header">' +
                 '<h2>💾 ' + pageTitle + '</h2>' +
                 '<div class="header-actions">' +
@@ -727,16 +674,16 @@ const Storage = {
                 '</div>' +
             '</div>' +
             
-            '<div class="backup-grid">' +
-                '<!-- 备份数据 -->' +
-                '<div class="backup-card backup-card-primary">' +
+            '<div class="backup-grid backup-grid-store">' +
+                '<!-- 卡片1：备份本门店数据 -->' +
+                '<div class="backup-card backup-card-store-primary">' +
                     '<h3>' + backupTitle + '</h3>' +
                     '<p>' + backupDesc + '</p>' +
-                    '<button onclick="Storage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
+                    '<button onclick="Storage.backup()" class="btn-backup-store-primary">' + backupBtnText + '</button>' +
                 '</div>' +
                 
-                '<!-- 导出 CSV -->' +
-                '<div class="backup-card backup-card-secondary">' +
+                '<!-- 卡片2：导出本门店数据 -->' +
+                '<div class="backup-card backup-card-store-secondary">' +
                     '<h3>' + exportTitle + '</h3>' +
                     '<p>' + exportDesc + '</p>' +
                     '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
@@ -745,26 +692,78 @@ const Storage = {
                         '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
                     '</div>' +
                 '</div>' +
-                
-                '<!-- 恢复数据 -->' +
-                '<div class="backup-card backup-card-secondary">' +
-                    '<h3>' + restoreTitle + '</h3>' +
-                    '<p>' + restoreDesc + '</p>' +
-                    '<p class="warning-text-small">' + restoreWarning + '</p>' +
-                    '<input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">' +
-                    '<button onclick="Storage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
-                '</div>' +
-                
-                '<!-- 审计日志 -->' +
-                '<div class="backup-card backup-card-secondary">' +
-                    '<h3>' + auditTitle + '</h3>' +
-                    '<p>' + auditDesc + '</p>' +
-                    '<button onclick="Storage.showAuditLog()" class="btn-small primary">' + auditViewBtnText + '</button>' +
-                '</div>' +
             '</div>';
+        return;
+    }
+    
+    // ========== 管理员视图：完整功能（保持不变） ==========
+    var backupTitle = lang === 'id' ? '📤 Cadangkan Data' : '📤 备份数据';
+    var backupDesc = lang === 'id' 
+        ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
+        : '备份所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
+    var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
+    
+    var restoreTitle = lang === 'id' ? '📥 Pemulihan Data' : '📥 恢复数据';
+    var restoreDesc = lang === 'id' 
+        ? 'Pulihkan data dari file cadangan.'
+        : '从备份文件恢复数据。';
+    var restoreWarning = lang === 'id' 
+        ? '⚠️ PERINGATAN: Akan menimpa data yang ada!'
+        : '⚠️ 警告：将覆盖现有数据！';
+    var restoreBtnText = lang === 'id' ? '🔄 Pulihkan Data' : '🔄 恢复数据';
+    
+    var auditTitle = lang === 'id' ? '📝 Log Audit' : '📝 审计日志';
+    var auditDesc = lang === 'id'
+        ? 'Lihat riwayat operasi sistem: login, pembayaran, penghapusan, dll.'
+        : '查看系统操作记录：登录、缴费、删除等。';
+    var auditViewBtnText = lang === 'id' ? '🔍 Lihat Log Audit' : '🔍 查看审计日志';
+    
+    var html = '' +
+        '<div class="page-header">' +
+            '<h2>💾 ' + pageTitle + '</h2>' +
+            '<div class="header-actions">' +
+                '<button onclick="APP.goBack()" class="btn-back">↩️ ' + backText + '</button>' +
+            '</div>' +
+        '</div>' +
         
-        document.getElementById("app").innerHTML = html;
-    },
+        '<div class="backup-grid">' +
+            '<!-- 备份数据 -->' +
+            '<div class="backup-card backup-card-primary">' +
+                '<h3>' + backupTitle + '</h3>' +
+                '<p>' + backupDesc + '</p>' +
+                '<button onclick="Storage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
+            '</div>' +
+            
+            '<!-- 导出 CSV -->' +
+            '<div class="backup-card backup-card-secondary">' +
+                '<h3>' + exportTitle + '</h3>' +
+                '<p>' + exportDesc + '</p>' +
+                '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+                    '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
+                    '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
+                    '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                '</div>' +
+            '</div>' +
+            
+            '<!-- 恢复数据 -->' +
+            '<div class="backup-card backup-card-secondary">' +
+                '<h3>' + restoreTitle + '</h3>' +
+                '<p>' + restoreDesc + '</p>' +
+                '<p class="warning-text-small">' + restoreWarning + '</p>' +
+                '<input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">' +
+                '<button onclick="Storage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
+            '</div>' +
+            
+            '<!-- 审计日志 -->' +
+            '<div class="backup-card backup-card-secondary">' +
+                '<h3>' + auditTitle + '</h3>' +
+                '<p>' + auditDesc + '</p>' +
+                '<button onclick="Storage.showAuditLog()" class="btn-small primary">' + auditViewBtnText + '</button>' +
+            '</div>' +
+        '</div>';
+    
+    document.getElementById("app").innerHTML = html;
+}
 
     restoreFromFile: async function() {
         const fileInput = document.getElementById('restoreFile');
