@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.4（门店视图改为2列布局 + 性能优化：聚合查询替代全量加载 + 排名数据分月限制 + 缓存 + 错误降级）
+// app-dashboard-anomaly.js - v1.0
 
 window.APP = window.APP || {};
 
