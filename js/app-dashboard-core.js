@@ -1046,7 +1046,7 @@ const DashboardCore = {
                 '</div>';
             } else {
                 toolbarHtml = '' +
-                '<div class="toolbar store-grid no-print" style="grid-template-columns: repeat(4, 1fr);">' +
+                '<div class="toolbar store-grid no-print">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
                     '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
                     '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
