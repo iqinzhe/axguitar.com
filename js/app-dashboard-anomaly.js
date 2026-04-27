@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.3（性能优化：聚合查询替代全量加载 + 排名数据分月限制 + 缓存 + 错误降级）
+// app-dashboard-anomaly.js - v2.4（门店视图改为2列布局 + 性能优化：聚合查询替代全量加载 + 排名数据分月限制 + 缓存 + 错误降级）
 
 window.APP = window.APP || {};
 
@@ -282,7 +282,7 @@ const DashboardAnomaly = {
                         '<td class="text-center expense">' + (o.overdue_days || 0) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
                         '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
-                    '</tr>';
+                    '<tr>';
                 }
                 
                 // 判断是否还有更多
@@ -332,7 +332,7 @@ const DashboardAnomaly = {
                         '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
+                        '<tr>' + Utils.escapeHtml(b.reason) + '</td>' +
                     '</tr>';
                 }
                 
@@ -346,7 +346,7 @@ const DashboardAnomaly = {
                                     ' (' + (blacklistTotalCount - blacklist.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '</tr>';
+                        '</table>';
                 }
                 
                 blacklistTableHtml = '' +
@@ -365,7 +365,7 @@ const DashboardAnomaly = {
                     '</div>';
             }
             
-            // ========== 门店视图：只显示逾期30天 + 黑名单 ==========
+            // ========== 门店视图：2列布局（逾期30天 + 黑名单） ==========
             if (!isAdmin) {
                 document.getElementById("app").innerHTML = '' +
                     '<div class="page-header">' +
@@ -376,26 +376,30 @@ const DashboardAnomaly = {
                         '</div>' +
                     '</div>' +
                     
-                    '<div class="anomaly-card anomaly-card-danger" style="margin-bottom:16px;">' +
-                        '<div class="anomaly-card-header">' +
-                            '<span class="anomaly-icon">⚠️</span>' +
-                            '<h3>' + (lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单') + '</h3>' +
-                            '<span class="anomaly-badge">' + overdueTotalCount + '</span>' +
+                    '<div class="anomaly-grid">' +
+                        // 卡片1：逾期30天订单
+                        '<div class="anomaly-card anomaly-card-danger">' +
+                            '<div class="anomaly-card-header">' +
+                                '<span class="anomaly-icon">⚠️</span>' +
+                                '<h3>' + (lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单') + '</h3>' +
+                                '<span class="anomaly-badge">' + overdueTotalCount + '</span>' +
+                            '</div>' +
+                            '<div class="anomaly-card-body">' + overdueTableHtml + '</div>' +
+                            (overdueOrders.length > 0 ? 
+                                '<div class="anomaly-card-footer">' +
+                                    '<span class="warning-text">💡 ' + (lang === 'id' ? 'Pesanan ini akan memasuki proses likuidasi' : '这些订单即将进入变卖程序') + '</span>' +
+                                '</div>' : '') +
                         '</div>' +
-                        '<div class="anomaly-card-body">' + overdueTableHtml + '</div>' +
-                        (overdueOrders.length > 0 ? 
-                            '<div class="anomaly-card-footer">' +
-                                '<span class="warning-text">💡 ' + (lang === 'id' ? 'Pesanan ini akan memasuki proses likuidasi' : '这些订单即将进入变卖程序') + '</span>' +
-                            '</div>' : '') +
-                    '</div>' +
-                    
-                    '<div class="anomaly-card anomaly-card-warning" style="margin-bottom:16px;">' +
-                        '<div class="anomaly-card-header">' +
-                            '<span class="anomaly-icon">🚫</span>' +
-                            '<h3>' + (lang === 'id' ? 'Daftar Hitam Nasabah (Semua Toko)' : '黑名单客户（全部门店）') + '</h3>' +
-                            '<span class="anomaly-badge">' + blacklistTotalCount + '</span>' +
+                        
+                        // 卡片2：黑名单客户
+                        '<div class="anomaly-card anomaly-card-warning">' +
+                            '<div class="anomaly-card-header">' +
+                                '<span class="anomaly-icon">🚫</span>' +
+                                '<h3>' + (lang === 'id' ? 'Daftar Hitam Nasabah (Semua Toko)' : '黑名单客户（全部门店）') + '</h3>' +
+                                '<span class="anomaly-badge">' + blacklistTotalCount + '</span>' +
+                            '</div>' +
+                            '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
                         '</div>' +
-                        '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
                     '</div>';
                 
                 // 存储状态用于加载更多
@@ -480,7 +484,7 @@ const DashboardAnomaly = {
                 bottom3Html = '<div class="ranking-list">' + bottom3Items + '</div>';
             }
             
-            // ========== 总部视图 ==========
+            // ========== 总部视图（保持原有4卡片网格布局） ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
@@ -695,7 +699,7 @@ const DashboardAnomaly = {
                                     ' (' + (result.totalCount - loadedCount) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '</tr>';
+                        '<tr>';
                     tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
                 } else {
                     var doneHtml = '' +
