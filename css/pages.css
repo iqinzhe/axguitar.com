@@ -1,7 +1,5 @@
 /* ============================================================
    pages.css - 第5层：只在特定页面出现的零散样式
-   职责：异常页面、备份恢复、门店管理、订单详情双列、
-         固定还款卡片、资金流水微调、支出微调、用户管理、黑名单
    ============================================================ */
 
 /* ============================================================
@@ -494,4 +492,80 @@
    ============================================================ */
 .transfer-table .date-cell {
     white-space: nowrap;
+}
+
+/* ============================================================
+   P15. 门店备份恢复页面 - 统一卡片样式
+   ============================================================ */
+
+/* 门店备份页面 - 2列网格布局 */
+.backup-grid-store {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-5);
+}
+
+/* 门店备份卡片 - 统一背景色（柔和蓝色系） */
+.backup-card-store-primary,
+.backup-card-store-secondary {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-5);
+    border: 1px solid #bae6fd;
+    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.08);
+}
+
+.backup-card-store-primary:hover,
+.backup-card-store-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.12);
+}
+
+.backup-card-store-primary h3,
+.backup-card-store-secondary h3 {
+    font-size: var(--font-md);
+    margin-bottom: var(--spacing-3);
+    border-bottom: none;
+    padding-bottom: 0;
+    color: var(--primary-dark);
+}
+
+.backup-card-store-primary p,
+.backup-card-store-secondary p {
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-4);
+    line-height: 1.5;
+}
+
+/* 门店备份按钮 - 统一绿色主题 */
+.btn-backup-store-primary {
+    background: var(--success-dark);
+    color: white;
+    border: none;
+    padding: var(--spacing-3) var(--spacing-5);
+    border-radius: var(--radius-md);
+    font-size: var(--font-md);
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: var(--transition);
+}
+
+.btn-backup-store-primary:hover {
+    background: var(--success);
+    transform: translateY(-1px);
+}
+
+/* 门店导出卡片内的按钮样式调整 */
+.backup-card-store-secondary .btn-small {
+    background: white;
+    border: 1px solid #bae6fd;
+    color: var(--primary-dark);
+}
+
+.backup-card-store-secondary .btn-small:hover {
+    background: var(--primary-soft);
+    transform: translateY(-1px);
 }
