@@ -1,12 +1,5 @@
-// toast.js - v1.0
-// Toast 通知系统 - 替换所有 alert/confirm 弹窗
-// 使用方法：
-//   Toast.success('操作成功')
-//   Toast.error('操作失败')
-//   Toast.warning('警告信息')
-//   Toast.info('提示信息')
-//   const confirmed = await Toast.confirmPromise('确认删除？')
-//   Toast.createInlineConfirmButtons(onConfirm, onCancel) - 用于表格内联确认
+// toast.js - v1.1
+// 修改内容：增强稳定性，确保 Utils 可用时的兼容性
 
 window.Toast = window.Toast || {};
 
@@ -16,6 +9,28 @@ window.Toast = window.Toast || {};
     let toastContainer = null;
     let confirmModal = null;
     let toastCounter = 0;
+    
+    // 安全获取语言
+    function getLang() {
+        if (window.Utils && typeof Utils.lang !== 'undefined') {
+            return Utils.lang;
+        }
+        return localStorage.getItem('jf_lang') === 'id' ? 'id' : 'zh';
+    }
+    
+    // 安全转义
+    function escapeHtml(str) {
+        if (!str) return '';
+        if (window.Utils && typeof Utils.escapeHtml === 'function') {
+            return Utils.escapeHtml(str);
+        }
+        return String(str).replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
     
     // ==================== 初始化容器 ====================
     function initContainer() {
@@ -125,12 +140,7 @@ window.Toast = window.Toast || {};
         const messageLines = String(message).split('\n');
         const messageHtml = messageLines.map(line => {
             if (line.trim() === '') return '<br>';
-            return Utils.escapeHtml ? Utils.escapeHtml(line) : line.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
+            return escapeHtml(line);
         }).join('<br>');
         
         toast.innerHTML = `
@@ -184,7 +194,7 @@ window.Toast = window.Toast || {};
             confirmModal = null;
         }
         
-        const lang = window.Utils ? Utils.lang : 'id';
+        const lang = getLang();
         const defaultTitle = lang === 'id' ? 'Konfirmasi' : '确认操作';
         const confirmText = lang === 'id' ? 'Ya, Lanjutkan' : '确认';
         const cancelText = lang === 'id' ? 'Batal' : '取消';
@@ -206,15 +216,7 @@ window.Toast = window.Toast || {};
             animation: confirmFadeIn 0.2s ease;
         `;
         
-        // 转义消息内容
-        const escapedMessage = (window.Utils && Utils.escapeHtml) 
-            ? Utils.escapeHtml(message).replace(/\n/g, '<br>')
-            : String(message).replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-              }).replace(/\n/g, '<br>');
+        const escapedMessage = escapeHtml(message).replace(/\n/g, '<br>');
         
         confirmModal.innerHTML = `
             <div class="confirm-modal-content" style="
@@ -226,7 +228,7 @@ window.Toast = window.Toast || {};
                 box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
                 animation: confirmScaleIn 0.2s ease;
             ">
-                <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">${Utils.escapeHtml ? Utils.escapeHtml(titleText) : titleText}</h3>
+                <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">${escapeHtml(titleText)}</h3>
                 <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.5; white-space: pre-line;">${escapedMessage}</p>
                 <div style="display: flex; gap: 12px; justify-content: flex-end;">
                     <button class="confirm-cancel-btn" style="
@@ -310,7 +312,7 @@ window.Toast = window.Toast || {};
     
     // ==================== 内联确认按钮组件（用于表格操作行） ====================
     function createInlineConfirmButtons(onConfirm, onCancel) {
-        const lang = window.Utils ? Utils.lang : 'id';
+        const lang = getLang();
         const container = document.createElement('div');
         container.style.display = 'inline-flex';
         container.style.gap = '4px';
@@ -385,6 +387,9 @@ window.Toast = window.Toast || {};
     // 初始化
     addAnimations();
     initContainer();
+    
+    // 标记已初始化
+    Toast._initialized = true;
     
     console.log('✅ Toast 通知系统已初始化');
 })();
