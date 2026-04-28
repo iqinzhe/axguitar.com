@@ -1,4 +1,4 @@
-// app-customers.js - v2.0（增加职业字段 + 详情弹窗 + 简化操作行）
+// app-customers.js - v2.1（增加：黑名单重复检查 + 编辑后黑名单状态刷新）
 window.APP = window.APP || {};
 
 const CustomersModule = {
@@ -19,11 +19,11 @@ const CustomersModule = {
                 storeMap[stores[i].id] = stores[i].name;
             }
             
-            var totalCols = isAdmin ? 9 : 8;  // 增加职业列
+            var totalCols = isAdmin ? 9 : 8;
             
             var rows = '';
             if (!customers || customers.length === 0) {
-                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></table>';
             } else {
                 for (var i = 0; i < customers.length; i++) {
                     var c = customers[i];
@@ -49,7 +49,6 @@ const CustomersModule = {
                         (isAdmin ? '<td class="text-center">' + storeName + '</td>' : '') +
                     '</tr>';
                     
-                    // 操作行：只有"详情"按钮
                     rows += '<tr class="action-row">' +
                         '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
                         '<td colspan="' + (totalCols - 1) + '">' +
@@ -61,13 +60,12 @@ const CustomersModule = {
                 }
             }
 
-            // 新增客户卡片（增加职业字段，桌面端4列）
             var addCustomerCardHtml = '';
             if (!isAdmin) {
                 addCustomerCardHtml = '' +
                 '<div class="card">' +
                     '<h3>➕ ' + (lang === 'id' ? 'Tambah Nasabah Baru' : '新增客户') + '</h3>' +
-                    '<div class="form-grid order-first-row">' +  // 使用 order-first-row 实现4列布局
+                    '<div class="form-grid order-first-row">' +
                         '<div class="form-group">' +
                             '<label>' + t('customer_name') + ' *</label>' +
                             '<input type="text" id="customerName" placeholder="' + t('customer_name') + '">' +
@@ -105,10 +103,12 @@ const CustomersModule = {
 
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
+                    '<div style="display:flex; align-items:center; gap:12px;">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
+                    '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card">' +
@@ -140,7 +140,7 @@ const CustomersModule = {
         }
     },
 
-    // ========== 客户详情弹窗 ==========
+    // ========== 客户详情弹窗（修复：编辑后刷新黑名单状态） ==========
     showCustomerDetailModal: async function(customerId) {
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
@@ -148,18 +148,17 @@ const CustomersModule = {
         var profile = await SUPABASE.getCurrentProfile();
         
         try {
-            // 获取客户信息
             const customer = await SUPABASE.getCustomer(customerId);
             if (!customer) throw new Error(lang === 'id' ? 'Nasabah tidak ditemukan' : '客户不存在');
             
-            // 检查黑名单状态
+            // 检查黑名单状态 - 使用 customer.id
             let isBlacklisted = false;
             let blacklistReason = '';
             try {
                 const { data: blData } = await supabaseClient
                     .from('blacklist')
                     .select('reason')
-                    .eq('customer_id', customerId)
+                    .eq('customer_id', customer.id)
                     .maybeSingle();
                 if (blData) {
                     isBlacklisted = true;
@@ -169,7 +168,6 @@ const CustomersModule = {
                 console.warn('黑名单检查失败:', blErr.message);
             }
             
-            // 获取关联订单
             const { data: orders, error: ordersError } = await supabaseClient
                 .from('orders')
                 .select('order_id, loan_amount, status, created_at')
@@ -185,7 +183,6 @@ const CustomersModule = {
                 liquidated: lang === 'id' ? '⚠️ Likuidasi' : '⚠️ 已变卖'
             };
             
-            // 构建订单列表HTML
             var ordersHtml = '';
             if (!orders || orders.length === 0) {
                 ordersHtml = '<div class="empty-state" style="padding:var(--spacing-2);"><span class="empty-state-text">' + (lang === 'id' ? 'Belum ada pesanan' : '暂无订单') + '</span></div>';
@@ -212,32 +209,27 @@ const CustomersModule = {
                 }
             }
             
-            // 根据权限和状态决定显示哪个按钮
-            var blacklistButtonHtml = '';
             var canBlacklist = !isAdmin && !isBlacklisted && profile?.store_id === customer.store_id;
             var canUnblacklist = isAdmin && isBlacklisted;
             
+            var blacklistButtonHtml = '';
             if (canBlacklist) {
-                blacklistButtonHtml = '<button onclick="APP.blacklistFromModal(\'' + Utils.escapeAttr(customerId) + '\', \'' + Utils.escapeAttr(customer.name) + '\')" class="btn-small btn-blacklist" style="background:#f97316;color:#fff;">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
+                blacklistButtonHtml = '<button onclick="APP.blacklistFromModal(\'' + Utils.escapeAttr(customer.id) + '\', \'' + Utils.escapeAttr(customer.name) + '\')" class="btn-small btn-blacklist" style="background:#f97316;color:#fff;">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
             } else if (canUnblacklist) {
-                blacklistButtonHtml = '<button onclick="APP.unblacklistFromModal(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
+                blacklistButtonHtml = '<button onclick="APP.unblacklistFromModal(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
             }
             
-            // 状态徽章
             var statusBadgeHtml = isBlacklisted 
                 ? '<span class="status-badge liquidated">🚫 ' + (lang === 'id' ? 'Diblacklist' : '已拉黑') + '</span>'
                 : '<span class="status-badge active">✅ ' + (lang === 'id' ? 'Normal' : '正常') + '</span>';
             
-            // 编辑按钮（仅管理员或本门店）
             var canEdit = isAdmin || profile?.store_id === customer.store_id;
             var editButtonHtml = canEdit 
                 ? '<button onclick="APP.editCustomerFromModal(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Edit' : '编辑') + '</button>'
                 : '';
             
-            // 职业显示
             var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
             
-            // 构建弹窗HTML
             var modalHtml = '' +
                 '<div id="customerDetailModal" class="modal-overlay">' +
                     '<div class="modal-content" style="max-width:600px; max-height:85vh; overflow-y:auto;">' +
@@ -246,13 +238,11 @@ const CustomersModule = {
                             '<button onclick="document.getElementById(\'customerDetailModal\').remove()" style="background:none; border:none; font-size:20px; cursor:pointer;">✖</button>' +
                         '</h3>' +
                         
-                        // 状态行
                         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid var(--border-light);">' +
                             '<div>' + statusBadgeHtml + '</div>' +
                             (isBlacklisted ? '<div class="info-bar warning" style="margin:0; padding:4px 8px;"><small>⚠️ ' + Utils.escapeHtml(blacklistReason) + '</small></div>' : '') +
                         '</div>' +
                         
-                        // 基本信息
                         '<div class="form-section">' +
                             '<div class="form-section-title">📋 ' + (lang === 'id' ? 'Informasi Dasar' : '基本信息') + '</div>' +
                             '<div class="info-display">' +
@@ -267,13 +257,11 @@ const CustomersModule = {
                             '</div>' +
                         '</div>' +
                         
-                        // 关联订单
                         '<div class="form-section">' +
                             '<div class="form-section-title">📋 ' + (lang === 'id' ? 'Pesanan Terkait' : '关联订单') + '</div>' +
                             ordersHtml +
                         '</div>' +
                         
-                        // 操作按钮区
                         '<div style="display:flex; gap:12px; justify-content:flex-end; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-light); flex-wrap:wrap;">' +
                             '<button onclick="APP.createOrderForCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small success" style="background:var(--success-dark);color:white;">➕ ' + (lang === 'id' ? 'Buat Pesanan' : '创建订单') + '</button>' +
                             editButtonHtml +
@@ -283,7 +271,6 @@ const CustomersModule = {
                     '</div>' +
                 '</div>';
             
-            // 移除已存在的弹窗
             var oldModal = document.getElementById('customerDetailModal');
             if (oldModal) oldModal.remove();
             
@@ -295,21 +282,17 @@ const CustomersModule = {
         }
     },
     
-    // ========== 从弹窗编辑客户 ==========
+    // ========== 从弹窗编辑客户（修复：编辑后刷新黑名单状态） ==========
     editCustomerFromModal: async function(customerId) {
-        // 关闭弹窗
         var modal = document.getElementById('customerDetailModal');
         if (modal) modal.remove();
-        
-        // 调用编辑客户方法
         await this.editCustomer(customerId);
     },
     
     // ========== 从弹窗拉黑客户 ==========
-    blacklistFromModal: async function(customerId, customerName) {
+    blacklistFromModal: async function(customerUuid, customerName) {
         var lang = Utils.lang;
         
-        // 关闭弹窗
         var modal = document.getElementById('customerDetailModal');
         if (modal) modal.remove();
         
@@ -332,7 +315,7 @@ const CustomersModule = {
         }
         
         try {
-            await window.APP.addToBlacklist(customerId, reason);
+            await window.APP.addToBlacklist(customerUuid, reason);
             alert(lang === 'id' 
                 ? '✅ Nasabah "' + customerName + '" telah ditambahkan ke blacklist.'
                 : '✅ 客户 "' + customerName + '" 已加入黑名单。');
@@ -344,16 +327,15 @@ const CustomersModule = {
     },
     
     // ========== 从弹窗解除拉黑 ==========
-    unblacklistFromModal: async function(customerId) {
+    unblacklistFromModal: async function(customerUuid) {
         var lang = Utils.lang;
         
         if (!confirm(lang === 'id' ? 'Yakin ingin membuka blacklist nasabah ini?' : '确认解除此客户的拉黑？')) return;
         
         try {
-            await window.APP.removeFromBlacklist(customerId);
+            await window.APP.removeFromBlacklist(customerUuid);
             alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
             
-            // 关闭弹窗
             var modal = document.getElementById('customerDetailModal');
             if (modal) modal.remove();
             
@@ -366,11 +348,8 @@ const CustomersModule = {
     
     // ========== 从弹窗查看订单 ==========
     viewOrderFromModal: function(orderId) {
-        // 关闭弹窗
         var modal = document.getElementById('customerDetailModal');
         if (modal) modal.remove();
-        
-        // 跳转到订单详情
         APP.navigateTo('viewOrder', { orderId: orderId });
     },
 
@@ -380,7 +359,7 @@ const CustomersModule = {
         if (el) el.style.display = value === 'different' ? 'block' : 'none';
     },
 
-    // ========== 新增客户（增加职业字段） ==========
+    // ========== 新增客户（增加黑名单重复检查） ==========
     addCustomer: async function() {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -427,8 +406,51 @@ const CustomersModule = {
                 return;
             }
             
-            let maxRetries = 5;
+            // ========== 问题 #6：黑名单重复检查 ==========
+            if (ktp || phone) {
+                try {
+                    let blacklistCheckQuery = supabaseClient
+                        .from('blacklist')
+                        .select('customers!blacklist_customer_id_fkey(id, name, ktp_number, phone, customer_id)');
+                    
+                    let conditions = [];
+                    if (ktp) conditions.push(`customers.ktp_number.eq.${ktp}`);
+                    if (phone) conditions.push(`customers.phone.eq.${phone}`);
+                    
+                    if (conditions.length > 0) {
+                        blacklistCheckQuery = blacklistCheckQuery.or(conditions.join(','));
+                        const { data: blacklistedCustomers, error: blCheckError } = await blacklistCheckQuery;
+                        
+                        if (!blCheckError && blacklistedCustomers && blacklistedCustomers.length > 0) {
+                            const matchedCustomer = blacklistedCustomers[0].customers;
+                            let reason = '';
+                            if (ktp && matchedCustomer.ktp_number === ktp) {
+                                reason = lang === 'id' 
+                                    ? `❌ Nomor KTP ${ktp} sudah terdaftar di blacklist (Nasabah: ${matchedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
+                                    : `❌ 身份证号 ${ktp} 已被拉黑（客户：${matchedCustomer.name}）\n\n无法添加相同信息的客户。`;
+                            } else if (phone && matchedCustomer.phone === phone) {
+                                reason = lang === 'id'
+                                    ? `❌ Nomor telepon ${phone} sudah terdaftar di blacklist (Nasabah: ${matchedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
+                                    : `❌ 手机号 ${phone} 已被拉黑（客户：${matchedCustomer.name}）\n\n无法添加相同信息的客户。`;
+                            }
+                            
+                            alert(reason);
+                            if (addBtn) {
+                                addBtn.disabled = false;
+                                addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
+                            }
+                            return;
+                        }
+                    }
+                } catch (blErr) {
+                    console.warn('黑名单重复检查失败:', blErr.message);
+                }
+            }
+            // ========== 黑名单重复检查结束 ==========
+            
+            let maxRetries = 8;
             let lastError = null;
+            let newCustomer = null;
             
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
@@ -468,7 +490,7 @@ const CustomersModule = {
                         address: ktpAddress || null,
                         living_same_as_ktp: livingSameAsKtp,
                         living_address: livingAddress || null,
-                        registered_date: new Date().toISOString().split('T')[0],
+                        registered_date: Utils.getLocalToday(),
                         created_by: profile.id
                     };
                     
@@ -480,20 +502,16 @@ const CustomersModule = {
                     
                     if (error) {
                         if (error.code === '23505') {
-                            console.warn('客户ID ' + customerId + ' 已存在，重试第 ' + (attempt + 1) + ' 次');
+                            console.warn(`客户ID ${customerId} 冲突，重试第 ${attempt + 1}/${maxRetries} 次`);
                             lastError = error;
+                            await new Promise(r => setTimeout(r, 50 * Math.pow(2, attempt)));
                             continue;
                         }
                         throw error;
                     }
                     
-                    if (addBtn) {
-                        addBtn.disabled = false;
-                        addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
-                    }
-                    alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + customerId : '客户添加成功！ID: ' + customerId);
-                    await APP.showCustomers();
-                    return;
+                    newCustomer = data;
+                    break;
                     
                 } catch (err) {
                     if (err.code === '23505' && attempt < maxRetries - 1) {
@@ -503,7 +521,16 @@ const CustomersModule = {
                 }
             }
             
-            throw lastError || new Error(lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '无法生成唯一的客户ID');
+            if (!newCustomer) {
+                throw lastError || new Error(lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '无法生成唯一的客户ID');
+            }
+            
+            if (addBtn) {
+                addBtn.disabled = false;
+                addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
+            }
+            alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
+            await APP.showCustomers();
             
         } catch (error) {
             if (addBtn) { 
@@ -516,7 +543,7 @@ const CustomersModule = {
         }
     },
 
-    // ========== 编辑客户（增加职业字段） ==========
+    // ========== 编辑客户（修复：编辑后刷新黑名单状态） ==========
     editCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -571,6 +598,7 @@ const CustomersModule = {
         if (el) el.style.display = val === 'different' ? 'block' : 'none';
     },
 
+    // ========== 问题 #11：保存编辑后刷新黑名单状态 ==========
     _saveEditCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -593,6 +621,7 @@ const CustomersModule = {
         if (!name || !phone) { alert(lang === 'id' ? 'Nama dan telepon wajib diisi' : '姓名和手机号必须填写'); return; }
 
         try {
+            // 更新客户信息
             const { error } = await supabaseClient.from('customers').update({
                 name: name,
                 phone: phone,
@@ -602,11 +631,20 @@ const CustomersModule = {
                 address: ktpAddr || null,
                 living_same_as_ktp: livingSame,
                 living_address: livingAddr || null,
-                updated_at: new Date().toISOString()
+                updated_at: Utils.getLocalDateTime()
             }).eq('id', customerId);
+            
             if (error) throw error;
+            
             document.getElementById('editCustomerModal')?.remove();
             alert(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
+            
+            // ========== 问题 #11：清除黑名单状态缓存，强制刷新 ==========
+            // 清除 AnomalyCache 中的黑名单缓存，确保下次打开时获取最新状态
+            if (window.APP.clearAnomalyCache) {
+                window.APP.clearAnomalyCache();
+            }
+            
             await APP.showCustomers();
         } catch (e) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
@@ -629,10 +667,19 @@ const CustomersModule = {
                 await supabaseClient.from('orders').delete().eq('customer_id', customerId);
             }
             
+            // 同时删除黑名单记录
+            await supabaseClient.from('blacklist').delete().eq('customer_id', customerId);
+            
             const { error: customerError } = await supabaseClient.from('customers').delete().eq('id', customerId);
             if (customerError) throw customerError;
             
             alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
+            
+            // 清除缓存
+            if (window.APP.clearAnomalyCache) {
+                window.APP.clearAnomalyCache();
+            }
+            
             await APP.showCustomers();
         } catch (e) {
             console.error('删除客户异常:', e);
@@ -682,7 +729,7 @@ const CustomersModule = {
                 const { data: blData } = await supabaseClient
                     .from('blacklist')
                     .select('id, reason')
-                    .eq('customer_id', customerId)
+                    .eq('customer_id', customer.id)
                     .maybeSingle();
                 blacklistCheck = blData ? { isBlacklisted: true, reason: blData.reason } : { isBlacklisted: false };
             } catch(blErr) {
@@ -711,21 +758,20 @@ const CustomersModule = {
             APP.currentPage = 'createOrder';
             APP.currentCustomerId = customerId;
             
-            // 获取职业信息用于显示
             var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
             
-            // ========== 页面 HTML ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>📝 ' + t('create_order') + '</h2>' +
+                    '<div style="display:flex; align-items:center; gap:12px;">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<h2>📝 ' + t('create_order') + '</h2>' +
+                    '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
                 '<div class="card">' +
-                    
-                    // 第一部分：客户信息摘要
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">👤</span> ' + t('customer_info') +
@@ -762,7 +808,6 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第二部分：典当信息（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">💎</span> ' + t('collateral_info') +
@@ -790,7 +835,6 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第三部分：费用区（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">💰</span> ' + (lang === 'id' ? 'Rincian Biaya' : '费用明细') +
@@ -832,7 +876,6 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第四部分：还款方式（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">📅</span> ' + (lang === 'id' ? 'Metode Cicilan' : '还款方式') +
@@ -886,7 +929,6 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
-                    // 第五部分：备注与操作（保持不变）
                     '<div class="form-section">' +
                         '<div class="form-group full-width">' +
                             '<label>' + t('notes') + '</label>' +
@@ -899,7 +941,6 @@ const CustomersModule = {
                     '</div>' +
                 '</div>';
             
-            // 绑定金额格式化
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
             
@@ -912,7 +953,6 @@ const CustomersModule = {
             var monthlyPaymentInput = document.getElementById("monthlyPaymentInput");
             if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
             
-            // 初始化计算
             APP.recalculateAllFees();
             
         } catch (error) {
@@ -987,7 +1027,7 @@ const CustomersModule = {
             const { data: blacklistData } = await supabaseClient
                 .from('blacklist')
                 .select('id')
-                .eq('customer_id', customerId)
+                .eq('customer_id', customer.id)
                 .maybeSingle();
             
             if (blacklistData) {
@@ -1057,7 +1097,6 @@ const CustomersModule = {
             
             alert(successMsg);
             
-            // 清空表单
             document.getElementById("collateral").value = '';
             document.getElementById("collateralNote").value = '';
             document.getElementById("amount").value = '';
@@ -1266,9 +1305,12 @@ const CustomersModule = {
 
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>📋 ' + (lang === 'id' ? 'Order Nasabah' : '客户订单') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
+                    '<div style="display:flex; align-items:center; gap:12px;">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<h2>📋 ' + (lang === 'id' ? 'Order Nasabah' : '客户订单') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
+                    '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card customer-summary">' +
@@ -1336,9 +1378,12 @@ const CustomersModule = {
             }
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
+                    '<div style="display:flex; align-items:center; gap:12px;">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<h2>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
+                    '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card customer-summary">' +
@@ -1369,7 +1414,6 @@ for (var key in CustomersModule) {
     }
 }
 
-// 保留原有的一些方法引用
 window.APP.recalculateAllFees = CustomersModule.recalculateAllFees;
 window.APP.onAdminFeeManualChange = CustomersModule.onAdminFeeManualChange;
 window.APP.recalculateServiceFee = CustomersModule.recalculateServiceFee;
