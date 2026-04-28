@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.2（修复：内存缓存无限增长 + LRU清理机制）
+// app-dashboard-anomaly.js - v1.3（修复：alert 替换为 Toast + 内存缓存清理机制）
 
 window.APP = window.APP || {};
 
@@ -41,7 +41,6 @@ const AnomalyCache = {
     
     // LRU: 记录访问顺序
     _recordAccess: function(key) {
-        // 将当前访问的 key 移到数组末尾（表示最近使用）
         const index = this._accessOrder.indexOf(key);
         if (index !== -1) {
             this._accessOrder.splice(index, 1);
@@ -70,7 +69,6 @@ const AnomalyCache = {
             return cached.value;
         }
         
-        // 如果存在但已过期，删除它
         if (cached) {
             this._data.delete(key);
         }
@@ -78,7 +76,6 @@ const AnomalyCache = {
         console.log('[AnomalyCache] Miss:', key);
         const value = await fetcher();
         
-        // 存储新值
         this._data.set(key, { value, time: Date.now() });
         this._recordAccess(key);
         this._enforceMaxSize();
@@ -86,7 +83,6 @@ const AnomalyCache = {
         return value;
     },
     
-    // 带 TTL 的 set 方法
     set(key, value, customTtl = null) {
         this._initCleanup();
         this._data.set(key, { 
@@ -98,7 +94,6 @@ const AnomalyCache = {
         this._enforceMaxSize();
     },
     
-    // 手动清除特定缓存
     invalidate(key) {
         if (key) {
             this._data.delete(key);
@@ -110,14 +105,12 @@ const AnomalyCache = {
         }
     },
     
-    // 清除所有缓存
     clear() {
         this._data.clear();
         this._accessOrder = [];
         console.log('[AnomalyCache] Cleared all');
     },
     
-    // 获取缓存统计信息
     getStats() {
         const now = Date.now();
         let activeCount = 0;
@@ -132,7 +125,6 @@ const AnomalyCache = {
         };
     },
     
-    // 停止定时器（页面卸载时调用）
     destroy() {
         if (this._cleanupInterval) {
             clearInterval(this._cleanupInterval);
@@ -143,9 +135,6 @@ const AnomalyCache = {
 
 // ==================== 异常检测辅助方法 ====================
 const AnomalyHelper = {
-    /**
-     * 获取逾期30天订单（分页 + 聚合统计）
-     */
     async getOverdueOrders(profile, page, pageSize) {
         if (page === undefined) page = 0;
         if (pageSize === undefined) pageSize = 50;
@@ -181,9 +170,6 @@ const AnomalyHelper = {
         };
     },
 
-    /**
-     * 获取黑名单客户（分页 + 聚合统计）
-     */
     async getBlacklistCustomers(page, pageSize) {
         if (page === undefined) page = 0;
         if (pageSize === undefined) pageSize = 50;
@@ -208,9 +194,6 @@ const AnomalyHelper = {
         };
     },
 
-    /**
-     * 获取本月门店排名数据
-     */
     async getMonthlyStoreRanking(stores) {
         const today = new Date();
         const currentMonth = today.getMonth();
@@ -446,7 +429,7 @@ const DashboardAnomaly = {
                                     '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
                                     ' (' + (blacklistTotalCount - blacklist.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
-                            '</td>' +
+                            '</table>' +
                         '</tr>';
                 }
                 
@@ -462,7 +445,7 @@ const DashboardAnomaly = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + blacklistRows + blacklistLoadMoreHtml + '</tbody>' +
-                        '</table>' +
+                        '</tr>' +
                     '</div>';
             }
             
@@ -654,7 +637,6 @@ const DashboardAnomaly = {
                 totalCount: blacklistTotalCount
             };
             
-            // 可选：输出缓存统计（调试用）
             if (window._debugAnomalyCache !== false) {
                 console.log('[AnomalyCache] 统计:', AnomalyCache.getStats());
             }
@@ -662,7 +644,11 @@ const DashboardAnomaly = {
         } catch (error) {
             console.error("showAnomaly error:", error);
             Utils.ErrorHandler.capture(error, 'showAnomaly');
-            alert(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
+            }
         }
     },
 
@@ -736,6 +722,9 @@ const DashboardAnomaly = {
                 loadMoreBtn.disabled = false;
                 loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
             }
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
+            }
         }
     },
 
@@ -807,12 +796,18 @@ const DashboardAnomaly = {
                 loadMoreBtn.disabled = false;
                 loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
             }
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
+            }
         }
     },
     
-    // 手动清除异常页面缓存（供外部调用）
+    // 手动清除异常页面缓存
     clearAnomalyCache: function() {
         AnomalyCache.clear();
+        if (window.Toast) {
+            window.Toast.info('缓存已清除', 2000);
+        }
         console.log('[AnomalyCache] 已手动清除所有缓存');
     }
 };
