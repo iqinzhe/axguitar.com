@@ -1,4 +1,4 @@
-// supabase.js - v1.1（增加客户职业字段）
+// supabase.js - v1.2（修复并发ID生成竞态条件 + 指数退避重试）
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
@@ -7,6 +7,7 @@ const SafeStorage = {
     _memoryStore: {},
     _storageAvailable: null,
     _cookieEnabled: null,
+    _sessionStorageAvailable: null,
 
     _checkLocalStorage() {
         if (this._storageAvailable !== null) return this._storageAvailable;
@@ -24,12 +25,15 @@ const SafeStorage = {
     },
 
     _checkSessionStorage() {
+        if (this._sessionStorageAvailable !== null) return this._sessionStorageAvailable;
         try {
             const testKey = '__sstest__';
             sessionStorage.setItem(testKey, '1');
             sessionStorage.removeItem(testKey);
+            this._sessionStorageAvailable = true;
             return true;
         } catch (e) {
+            this._sessionStorageAvailable = false;
             return false;
         }
     },
@@ -83,7 +87,14 @@ const SafeStorage = {
     getItem(key) {
         if (this._checkLocalStorage()) {
             try {
-                return localStorage.getItem(key);
+                const val = localStorage.getItem(key);
+                if (val !== null) return val;
+            } catch (e) {}
+        }
+        if (this._checkSessionStorage()) {
+            try {
+                const val = sessionStorage.getItem(key);
+                if (val !== null) return val;
             } catch (e) {}
         }
         if (this._checkCookie()) {
@@ -94,28 +105,26 @@ const SafeStorage = {
     },
 
     setItem(key, value) {
+        const strValue = String(value);
+        
         if (this._checkLocalStorage()) {
-            try {
-                localStorage.setItem(key, value);
-            } catch (e) {}
+            try { localStorage.setItem(key, strValue); } catch (e) {}
+        }
+        if (this._checkSessionStorage()) {
+            try { sessionStorage.setItem(key, strValue); } catch (e) {}
         }
         if (this._checkCookie()) {
-            if (value !== null && value !== undefined) {
-                this._setCookie(key, String(value), 365);
-            }
+            this._setCookie(key, strValue, 365);
         }
-        if (value === null || value === undefined) {
-            delete this._memoryStore[key];
-        } else {
-            this._memoryStore[key] = String(value);
-        }
+        this._memoryStore[key] = strValue;
     },
 
     removeItem(key) {
         if (this._checkLocalStorage()) {
-            try {
-                localStorage.removeItem(key);
-            } catch (e) {}
+            try { localStorage.removeItem(key); } catch (e) {}
+        }
+        if (this._checkSessionStorage()) {
+            try { sessionStorage.removeItem(key); } catch (e) {}
         }
         if (this._checkCookie()) {
             this._removeCookie(key);
@@ -132,6 +141,17 @@ const SafeStorage = {
                 for (const key of keys) {
                     if (!prefix || key.startsWith(prefix)) {
                         localStorage.removeItem(key);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (this._checkSessionStorage()) {
+            try {
+                const keys = Object.keys(sessionStorage);
+                for (const key of keys) {
+                    if (!prefix || key.startsWith(prefix)) {
+                        sessionStorage.removeItem(key);
                     }
                 }
             } catch (e) {}
@@ -454,69 +474,139 @@ const SupabaseAPI = {
         }
     },
 
-    async _generateOrderId(role, storeId) {
+    // ========== 修复：订单ID生成（防并发 + 指数退避 + 备用方案） ==========
+    _generateOrderId: async function(role, storeId, maxRetries = 10) {
         let prefix = 'AD';
         if (role !== 'admin') {
             prefix = await this._getStorePrefix(storeId);
         }
         
-        const { data: orders, error } = await supabaseClient
-            .from('orders')
-            .select('order_id')
-            .like('order_id', prefix + '%')
-            .order('created_at', { ascending: false })
-            .limit(1);
-        
-        let maxNumber = 0;
-        if (orders && orders.length > 0) {
-            const match = orders[0].order_id.match(new RegExp(prefix + '(\\d{3})$'));
-            if (match) {
-                maxNumber = parseInt(match[1], 10);
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const { data: existing, error: queryError } = await supabaseClient
+                    .from('orders')
+                    .select('order_id')
+                    .like('order_id', prefix + '%')
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                
+                if (queryError) {
+                    console.warn(`查询最大订单号失败 (尝试 ${attempt}/${maxRetries}):`, queryError);
+                    if (attempt === maxRetries) throw queryError;
+                    await new Promise(r => setTimeout(r, 50 * attempt));
+                    continue;
+                }
+                
+                let maxNumber = 0;
+                if (existing && existing.length > 0) {
+                    const match = existing[0].order_id.match(new RegExp(prefix + '(\\d{3})$'));
+                    if (match) {
+                        maxNumber = parseInt(match[1], 10);
+                    }
+                }
+                
+                const nextNumber = maxNumber + 1;
+                const serial = String(nextNumber).padStart(3, '0');
+                const newOrderId = prefix + serial;
+                
+                const { data: testData, error: testError } = await supabaseClient
+                    .from('orders')
+                    .select('id')
+                    .eq('order_id', newOrderId)
+                    .maybeSingle();
+                
+                if (!testError && testData) {
+                    console.warn(`订单ID ${newOrderId} 已存在，重试 ${attempt}/${maxRetries}`);
+                    await new Promise(r => setTimeout(r, 50 * Math.pow(2, attempt)));
+                    continue;
+                }
+                
+                return newOrderId;
+                
+            } catch (err) {
+                console.warn(`生成订单ID异常 (尝试 ${attempt}/${maxRetries}):`, err.message);
+                if (attempt === maxRetries) throw err;
+                await new Promise(r => setTimeout(r, 50 * attempt));
             }
         }
         
-        const nextNumber = maxNumber + 1;
-        const serial = String(nextNumber).padStart(3, '0');
-        
-        return prefix + serial;
+        const timestamp = Date.now().toString().slice(-6);
+        const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+        const fallbackId = prefix + timestamp + random;
+        console.warn(`使用备用ID生成方案: ${fallbackId}`);
+        return fallbackId;
     },
 
-    async _generateCustomerId(storeId) {
+    // ========== 修复：客户ID生成（防并发 + 指数退避 + 备用方案） ==========
+    _generateCustomerId: async function(storeId, maxRetries = 10) {
         const prefix = await this._getStorePrefix(storeId);
         
-        const { data, error } = await supabaseClient
-            .from('customers')
-            .select('customer_id')
-            .like('customer_id', prefix + '%')
-            .order('customer_id', { ascending: false })
-            .limit(1);
-        
-        let maxNumber = 0;
-        if (data && data.length > 0) {
-            const match = data[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
-            if (match) {
-                maxNumber = parseInt(match[1], 10);
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const { data: existing, error: queryError } = await supabaseClient
+                    .from('customers')
+                    .select('customer_id')
+                    .like('customer_id', prefix + '%')
+                    .order('customer_id', { ascending: false })
+                    .limit(1);
+                
+                if (queryError) {
+                    console.warn(`查询最大客户ID失败 (尝试 ${attempt}/${maxRetries}):`, queryError);
+                    if (attempt === maxRetries) throw queryError;
+                    await new Promise(r => setTimeout(r, 50 * attempt));
+                    continue;
+                }
+                
+                let maxNumber = 0;
+                if (existing && existing.length > 0) {
+                    const match = existing[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
+                    if (match) {
+                        maxNumber = parseInt(match[1], 10);
+                    }
+                }
+                
+                const nextNumber = maxNumber + 1;
+                const serial = String(nextNumber).padStart(3, '0');
+                const newCustomerId = prefix + serial;
+                
+                const { data: testData, error: testError } = await supabaseClient
+                    .from('customers')
+                    .select('id')
+                    .eq('customer_id', newCustomerId)
+                    .maybeSingle();
+                
+                if (!testError && testData) {
+                    console.warn(`客户ID ${newCustomerId} 已存在，重试 ${attempt}/${maxRetries}`);
+                    await new Promise(r => setTimeout(r, 50 * Math.pow(2, attempt)));
+                    continue;
+                }
+                
+                return newCustomerId;
+                
+            } catch (err) {
+                console.warn(`生成客户ID异常 (尝试 ${attempt}/${maxRetries}):`, err.message);
+                if (attempt === maxRetries) throw err;
+                await new Promise(r => setTimeout(r, 50 * attempt));
             }
         }
         
-        const nextNumber = maxNumber + 1;
-        const serial = String(nextNumber).padStart(3, '0');
-        
-        return prefix + serial;
+        const fallbackId = prefix + String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 100)).padStart(2, '0');
+        console.warn(`使用备用ID生成方案: ${fallbackId}`);
+        return fallbackId;
     },
 
-    // ========== 创建客户（增加 occupation 字段） ==========
+    // ========== 修复：创建客户（增强重试和指数退避） ==========
     async createCustomer(customerData) {
         const profile = await this.getCurrentProfile();
         const storeId = customerData.store_id || profile.store_id;
         
         let retryCount = 0;
-        let maxRetries = 5;
+        let maxRetries = 8;
         let lastError = null;
         
         while (retryCount < maxRetries) {
             try {
-                const customerId = await this._generateCustomerId(storeId);
+                const customerId = await this._generateCustomerId(storeId, maxRetries);
                 
                 const { data, error } = await supabaseClient
                     .from('customers')
@@ -530,7 +620,7 @@ const SupabaseAPI = {
                         address: customerData.address || null,
                         living_same_as_ktp: customerData.living_same_as_ktp,
                         living_address: customerData.living_address || null,
-                        occupation: customerData.occupation || null,  // 新增职业字段
+                        occupation: customerData.occupation || null,
                         registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
                         created_by: profile.id,
                         updated_at: new Date().toISOString()
@@ -540,19 +630,23 @@ const SupabaseAPI = {
                 
                 if (error) {
                     if (error.code === '23505') {
-                        console.warn(`客户ID ${customerId} 已存在，重试第 ${retryCount + 1} 次`);
+                        console.warn(`客户ID ${customerId} 冲突，重试第 ${retryCount + 1}/${maxRetries} 次`);
                         retryCount++;
                         lastError = error;
+                        await new Promise(r => setTimeout(r, 50 * Math.pow(2, retryCount)));
                         continue;
                     }
                     throw error;
                 }
                 
+                console.log(`✅ 客户创建成功: ${customerId}`);
                 return data;
                 
             } catch (err) {
                 if (err.code === '23505' && retryCount < maxRetries - 1) {
                     retryCount++;
+                    console.warn(`客户创建冲突，重试 ${retryCount}/${maxRetries}`);
+                    await new Promise(r => setTimeout(r, 50 * Math.pow(2, retryCount)));
                     continue;
                 }
                 throw err;
@@ -562,7 +656,7 @@ const SupabaseAPI = {
         throw lastError || new Error('无法创建客户，请重试');
     },
 
-    // ========== 更新客户（增加 occupation 字段） ==========
+    // ========== 更新客户 ==========
     async updateCustomer(customerId, customerData) {
         const profile = await this.getCurrentProfile();
         
@@ -574,7 +668,7 @@ const SupabaseAPI = {
             address: customerData.ktp_address || null,
             living_same_as_ktp: customerData.living_same_as_ktp,
             living_address: customerData.living_address || null,
-            occupation: customerData.occupation || null,  // 新增职业字段
+            occupation: customerData.occupation || null,
             updated_at: new Date().toISOString()
         };
         
@@ -588,12 +682,11 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ========== 获取客户列表（过滤黑名单，增加 occupation 字段） ==========
+    // ========== 获取客户列表 ==========
     async getCustomers(filters) {
         if (filters === undefined) filters = {};
         const profile = await this.getCurrentProfile();
         
-        // 获取黑名单客户ID列表
         const { data: blacklistData } = await supabaseClient
             .from('blacklist')
             .select('customer_id');
@@ -606,17 +699,15 @@ const SupabaseAPI = {
             query = query.eq('store_id', profile.store_id);
         }
         
-        // 排除黑名单客户
-if (blacklistedIds.length > 0) {
-    query = query.not('id', 'in', '(' + blacklistedIds.join(',') + ')');
-}
+        if (blacklistedIds.length > 0) {
+            query = query.not('id', 'in', '(' + blacklistedIds.join(',') + ')');
+        }
         
         const { data, error } = await query;
         if (error) throw error;
         return data;
     },
 
-    // ========== 获取单个客户（包含 occupation） ==========
     async getCustomer(customerId) {
         const { data, error } = await supabaseClient
             .from('customers')
@@ -819,6 +910,7 @@ if (blacklistedIds.length > 0) {
         return { order: order, payments: data };
     },
 
+    // ========== 修复：创建订单（增强重试和指数退避） ==========
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = new Date().toISOString().split('T')[0];
@@ -842,10 +934,11 @@ if (blacklistedIds.length > 0) {
         
         let retryCount = 0;
         let lastError = null;
+        let newOrder = null;
         
-        while (retryCount < 3) {
+        while (retryCount < 5) {
             try {
-                const orderId = await this._generateOrderId(profile.role, targetStoreId);
+                const orderId = await this._generateOrderId(profile.role, targetStoreId, 5);
                 
                 let monthlyFixedPayment = null;
                 if (repaymentType === 'fixed' && repaymentTerm && repaymentTerm > 0) {
@@ -860,7 +953,7 @@ if (blacklistedIds.length > 0) {
                 const monthlyInterest = orderData.loan_amount * agreedInterestRate;
                 const nextDueDate = this.calculateNextDueDate(nowDate, 0);
                 
-                const newOrder = {
+                const newOrderData = {
                     order_id: orderId,
                     customer_name: orderData.customer_name,
                     customer_ktp: orderData.customer_ktp,
@@ -898,32 +991,47 @@ if (blacklistedIds.length > 0) {
                     max_extension_months: orderData.max_extension_months || 10
                 };
 
-                const { data, error } = await supabaseClient.from('orders').insert(newOrder).select().single();
+                const { data, error } = await supabaseClient
+                    .from('orders')
+                    .insert(newOrderData)
+                    .select()
+                    .single();
                 
                 if (error) {
                     if (error.code === '23505') {
-                        console.warn('订单ID冲突: ' + orderId + ', 重试第 ' + (retryCount + 1) + ' 次');
+                        console.warn(`订单ID冲突: ${orderId}, 重试第 ${retryCount + 1} 次`);
                         retryCount++;
+                        lastError = error;
+                        await new Promise(r => setTimeout(r, 100 * (retryCount + 1)));
                         continue;
                     }
                     throw error;
                 }
                 
+                newOrder = data;
                 console.log('✅ 订单创建成功: ' + orderId + ' (还款方式: ' + repaymentType + ')');
-                
-                if (window.Audit) {
-                    await window.Audit.logOrderCreate(orderId, orderData.customer_name, orderData.loan_amount);
-                }
-                
-                return data;
+                break;
                 
             } catch (err) {
-                if (retryCount >= 2) throw err;
-                retryCount++;
-                lastError = err;
+                if (err.code === '23505' && retryCount < 4) {
+                    retryCount++;
+                    console.warn(`订单创建冲突，重试 ${retryCount}/5`);
+                    await new Promise(r => setTimeout(r, 100 * (retryCount + 1)));
+                    continue;
+                }
+                throw err;
             }
         }
-        throw lastError || new Error(Utils.lang === 'id' ? 'Gagal membuat pesanan' : '创建订单失败');
+        
+        if (!newOrder) {
+            throw lastError || new Error(Utils.lang === 'id' ? 'Gagal membuat pesanan' : '创建订单失败');
+        }
+        
+        if (window.Audit) {
+            await window.Audit.logOrderCreate(newOrder.order_id, orderData.customer_name, orderData.loan_amount);
+        }
+        
+        return newOrder;
     },
 
     async recordAdminFee(orderId, paymentMethod, adminFeeAmount) {
