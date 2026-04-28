@@ -1,10 +1,28 @@
-// utils.js - v1.0
+// utils.js - v1.1
+// 修改内容：
+// 1. 强化语言初始化，统一通过 Utils.lang 访问
+// 2. 添加 forceSyncLanguage 方法确保语言同步
+// 3. 添加 toastConfirm 辅助方法，简化确认框调用
+
 window.Utils = window.Utils || {};
 
 (function() {
     'use strict';
 
-    var _lang = localStorage.getItem('jf_lang') || 'id';
+    // ==================== 语言初始化（强化版） ====================
+    var getInitialLang = function() {
+        var stored = localStorage.getItem('jf_lang');
+        if (stored === 'id' || stored === 'zh') return stored;
+        
+        // 降级：检测浏览器语言
+        try {
+            var browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+            if (browserLang.startsWith('id')) return 'id';
+        } catch(e) {}
+        return 'zh';  // 默认中文
+    };
+    
+    var _lang = getInitialLang();
     var _translations = {};
     var _listeners = {};
 
@@ -15,7 +33,7 @@ window.Utils = window.Utils || {};
     Utils.CURRENCY_SYMBOL = 'Rp';
     Utils.ADMIN_FEE_RATE = 0.02;  // 2%
 
-    // ==================== Toast 快捷方法 ====================
+    // ==================== Toast 快捷方法（统一入口） ====================
     Utils.toast = {
         success: function(msg, duration) {
             if (window.Toast) {
@@ -45,14 +63,18 @@ window.Utils = window.Utils || {};
                 alert(msg);
             }
         },
-        confirm: function(msg, title) {
-            if (window.Toast) {
-                return window.Toast.confirmPromise(msg, title);
+        // 统一确认框方法（简化调用，无需 fallback）
+        confirm: async function(msg, title) {
+            if (window.Toast && window.Toast.confirmPromise) {
+                return await window.Toast.confirmPromise(msg, title);
             } else {
                 return Promise.resolve(confirm(msg));
             }
         }
     };
+
+    // 快捷导出，方便直接调用
+    Utils.confirm = Utils.toast.confirm;
 
     // ==================== 语言管理 ====================
     Object.defineProperty(Utils, 'lang', {
@@ -61,8 +83,17 @@ window.Utils = window.Utils || {};
         configurable: false
     });
 
+    // 强制同步语言（用于页面初始化后确保语言正确）
+    Utils.forceSyncLanguage = function() {
+        var newLang = localStorage.getItem('jf_lang');
+        if (newLang === 'id' || newLang === 'zh') {
+            _lang = newLang;
+        }
+        return _lang;
+    };
+
     Utils.initLanguage = function() {
-        _lang = localStorage.getItem('jf_lang') || 'id';
+        _lang = getInitialLang();
         _translations = {
             'id': {
                 'login': 'Masuk',
@@ -266,6 +297,7 @@ window.Utils = window.Utils || {};
     };
 
     Utils.setLanguage = function(lang) {
+        if (lang !== 'id' && lang !== 'zh') return;
         _lang = lang;
         localStorage.setItem('jf_lang', lang);
         for (var key in _listeners) {
@@ -520,9 +552,10 @@ window.Utils = window.Utils || {};
     Utils.getRepaymentTermOptions = function(defaultMonths) {
         if (defaultMonths === undefined) defaultMonths = 5;
         var html = '';
+        var lang = Utils.lang;
         for (var i = 1; i <= 10; i++) {
             var selected = i === defaultMonths ? ' selected' : '';
-            html += '<option value="' + i + '"' + selected + '>' + i + ' ' + (_lang === 'id' ? 'bulan' : '个月') + '</option>';
+            html += '<option value="' + i + '"' + selected + '>' + i + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</option>';
         }
         return html;
     };
@@ -547,11 +580,11 @@ window.Utils = window.Utils || {};
                     var data = JSON.parse(e.target.result);
                     resolve(data);
                 } catch(err) {
-                    reject(new Error(_lang === 'id' ? 'Format file tidak valid' : '文件格式无效'));
+                    reject(new Error(Utils.lang === 'id' ? 'Format file tidak valid' : '文件格式无效'));
                 }
             };
             reader.onerror = function() {
-                reject(new Error(_lang === 'id' ? 'Gagal membaca file' : '文件读取失败'));
+                reject(new Error(Utils.lang === 'id' ? 'Gagal membaca file' : '文件读取失败'));
             };
             reader.readAsText(file);
         });
@@ -579,7 +612,8 @@ window.Utils = window.Utils || {};
 
     Utils.exportPaymentsToCSV = function(payments, filename) {
         if (!payments || payments.length === 0) return;
-        var headers = _lang === 'id' 
+        var lang = Utils.lang;
+        var headers = lang === 'id' 
             ? ['Tanggal', 'ID Pesanan', 'Nasabah', 'Tipe', 'Jumlah', 'Metode', 'Deskripsi']
             : ['日期', '订单号', '客户', '类型', '金额', '支付方式', '描述'];
         var rows = payments.map(function(p) {
@@ -683,7 +717,7 @@ window.Utils = window.Utils || {};
             window.addEventListener('online', function() {
                 self._isOnline = true;
                 self._notify(true);
-                self._showToast(_lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复');
+                self._showToast(Utils.lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复');
             });
 
             window.addEventListener('offline', function() {
@@ -699,7 +733,7 @@ window.Utils = window.Utils || {};
                         self._notify(online);
                         if (online) {
                             self._hideBanner();
-                            self._showToast(_lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复');
+                            self._showToast(Utils.lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复');
                         } else {
                             self._showBanner();
                         }
@@ -752,9 +786,9 @@ window.Utils = window.Utils || {};
             banner.className = 'info-bar danger';
             banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;border-radius:0;margin:0;text-align:center;justify-content:center;';
             banner.innerHTML = '<span class="info-bar-icon">📡</span><div class="info-bar-content"><strong>' +
-                (_lang === 'id' ? 'Koneksi Terputus' : '网络连接已断开') +
+                (Utils.lang === 'id' ? 'Koneksi Terputus' : '网络连接已断开') +
                 '</strong> — ' +
-                (_lang === 'id' ? 'Data mungkin tidak tersimpan.' : '数据可能无法保存。') +
+                (Utils.lang === 'id' ? 'Data mungkin tidak tersimpan.' : '数据可能无法保存。') +
                 '</div>';
             document.body.insertBefore(banner, document.body.firstChild);
         },
@@ -814,7 +848,7 @@ window.Utils = window.Utils || {};
             this._persist();
             console.log('[OfflineQueue] 操作已入队:', operation.name);
             if (window.Toast) {
-                window.Toast.info(_lang === 'id' 
+                window.Toast.info(Utils.lang === 'id' 
                     ? '📡 Tidak ada koneksi, data akan diproses nanti' 
                     : '📡 无网络连接，数据将在恢复后处理', 3000);
             }
@@ -853,7 +887,7 @@ window.Utils = window.Utils || {};
             if (this._queue.length === 0) {
                 console.log('[OfflineQueue] 队列已清空');
                 if (window.Toast) {
-                    window.Toast.success(_lang === 'id' ? '✅ Data offline berhasil diproses' : '✅ 离线数据处理完成', 3000);
+                    window.Toast.success(Utils.lang === 'id' ? '✅ Data offline berhasil diproses' : '✅ 离线数据处理完成', 3000);
                 }
             }
         },
@@ -886,7 +920,7 @@ window.Utils = window.Utils || {};
                         name: operationName,
                         data: args[0]
                     });
-                    throw new Error(_lang === 'id'
+                    throw new Error(Utils.lang === 'id'
                         ? 'Tidak ada koneksi. Data akan diproses saat koneksi pulih.'
                         : '无网络连接。数据将在恢复连接后处理。');
                 }
@@ -924,7 +958,6 @@ window.Utils = window.Utils || {};
             }
             console.error('[ErrorHandler]', context + ':', entry.message, entry.stack ? '\n' + entry.stack : '');
             
-            // 可选：显示 Toast 错误提示
             if (window.Toast && context !== 'uncaught' && context !== 'unhandled_promise') {
                 window.Toast.error('错误: ' + (error.message || String(error)).substring(0, 100), 4000);
             }
@@ -961,4 +994,6 @@ window.Utils = window.Utils || {};
     Utils.initLanguage();
     Utils.OfflineQueue.init();
 
+    // 导出到 window 确保可用
+    window.Utils = Utils;
 })();
