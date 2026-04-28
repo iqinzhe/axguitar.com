@@ -1,4 +1,6 @@
-// migration.js - v1.1（修复：alert 替换为 Toast）
+// migration.js - v1.2
+// 修改内容：简化 Toast 调用，统一使用 Utils.toast
+
 const Migration = {
     isMigrating: false,
     progress: { total: 0, current: 0, success: 0, failed: 0, skipped: 0 },
@@ -12,11 +14,7 @@ const Migration = {
 
         const oldDb = this.loadLocalStorage();
         if (!oldDb?.orders?.length) {
-            if (window.Toast) {
-                window.Toast.warning(Utils.lang === 'id' ? 'Tidak ada data untuk dimigrasi' : '没有需要迁移的数据');
-            } else {
-                alert(Utils.lang === 'id' ? 'Tidak ada data untuk dimigrasi' : '没有需要迁移的数据');
-            }
+            Utils.toast.warning(Utils.lang === 'id' ? 'Tidak ada data untuk dimigrasi' : '没有需要迁移的数据');
             this.isMigrating = false;
             return;
         }
@@ -30,21 +28,13 @@ const Migration = {
             const allUsers = await SUPABASE.getAllUsers();
             adminUser = allUsers.find(u => u.role === 'admin');
         } catch (err) {
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat data awal: ' + err.message : '加载初始数据失败：' + err.message);
-            } else {
-                alert(Utils.lang === 'id' ? 'Gagal memuat data awal: ' + err.message : '加载初始数据失败：' + err.message);
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat data awal: ' + err.message : '加载初始数据失败：' + err.message);
             this.isMigrating = false;
             return;
         }
 
         if (!adminUser) {
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Admin user tidak ditemukan' : '未找到管理员用户');
-            } else {
-                alert(Utils.lang === 'id' ? 'Admin user tidak ditemukan' : '未找到管理员用户');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Admin user tidak ditemukan' : '未找到管理员用户');
             this.isMigrating = false;
             return;
         }
@@ -187,14 +177,10 @@ const Migration = {
             if (this.failedOrders.length > 5) msg += '...';
         }
         
-        if (window.Toast) {
-            if (this.progress.failed > 0) {
-                window.Toast.warning(msg, 8000);
-            } else {
-                window.Toast.success(msg, 5000);
-            }
+        if (this.progress.failed > 0) {
+            Utils.toast.warning(msg, 8000);
         } else {
-            alert(msg);
+            Utils.toast.success(msg, 5000);
         }
 
         if (this.progress.success > 0) {
