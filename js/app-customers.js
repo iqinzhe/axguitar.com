@@ -1,4 +1,9 @@
-// app-customers.js - v1.0
+// app-customers.js - v1.1
+// 修改内容：
+// 1. 将所有直接调用 supabaseClient 的地方改为使用 SUPABASE 封装方法
+// 2. 将 alert/confirm 改为 Utils.toast 统一调用
+// 3. 优化黑名单检查逻辑
+
 window.APP = window.APP || {};
 
 const CustomersModule = {
@@ -122,15 +127,11 @@ const CustomersModule = {
             
         } catch (error) {
             console.error("showCustomers error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? '加载客户数据失败：' + error.message : 'Gagal memuat data nasabah: ' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? '加载客户数据失败：' + error.message : 'Gagal memuat data nasabah: ' + error.message);
         }
     },
 
-    // ========== 详情卡片弹窗（只显示列表中没有的字段：注册日期、KTP地址、居住地址） ==========
+    // ========== 详情卡片弹窗 ==========
     showCustomerDetailCard: async function(customerId) {
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
@@ -141,67 +142,28 @@ const CustomersModule = {
             const customer = await SUPABASE.getCustomer(customerId);
             if (!customer) throw new Error(lang === 'id' ? 'Nasabah tidak ditemukan' : '客户不存在');
             
-            // 检查黑名单状态
+            // 使用 SUPABASE 封装方法检查黑名单状态
             let isBlacklisted = false;
             let blacklistReason = '';
             try {
-                const { data: blData } = await supabaseClient
-                    .from('blacklist')
-                    .select('reason')
-                    .eq('customer_id', customer.id)
-                    .maybeSingle();
-                if (blData) {
+                const blResult = await SUPABASE.checkBlacklist(customer.id);
+                if (blResult.isBlacklisted) {
                     isBlacklisted = true;
-                    blacklistReason = blData.reason;
+                    blacklistReason = blResult.reason;
                 }
             } catch(blErr) {
                 console.warn('黑名单检查失败:', blErr.message);
             }
             
-            // 获取客户的所有订单
-            const { data: orders, error: ordersError } = await supabaseClient
-                .from('orders')
-                .select('id, order_id, status, created_at')
-                .eq('customer_id', customerId)
-                .order('created_at', { ascending: false });
-            
-            if (ordersError) throw ordersError;
-            
-            // 统计订单状态
-            let activeCount = 0;
-            let completedCount = 0;
-            let abnormalCount = 0;
-            
-            for (var i = 0; i < (orders || []).length; i++) {
-                var o = orders[i];
-                if (o.status === 'active') {
-                    activeCount++;
-                } else if (o.status === 'completed') {
-                    completedCount++;
-                } else if (o.status === 'liquidated') {
-                    abnormalCount++;
-                }
-            }
-            
-            // 获取逾期订单数量（额外查询逾期>=30天的活跃订单）
-            try {
-                const { count: overdueCount } = await supabaseClient
-                    .from('orders')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('customer_id', customerId)
-                    .eq('status', 'active')
-                    .gte('overdue_days', 30);
-                abnormalCount += (overdueCount || 0);
-            } catch(e) {
-                console.warn('获取逾期订单失败:', e);
-            }
+            // 使用 SUPABASE 封装方法获取订单统计
+            const { activeCount, completedCount, abnormalCount, orders } = await SUPABASE.getCustomerOrdersStats(customerId);
             
             // 权限控制
             var canEdit = isAdmin;
             var canBlacklist = !isBlacklisted;
             var canUnblacklist = isAdmin && isBlacklisted;
             
-            // 获取注册日期、KTP地址、居住地址（列表中没有的补充信息）
+            // 获取注册日期、KTP地址、居住地址
             var registeredDate = Utils.formatDate(customer.registered_date);
             var ktpAddress = Utils.escapeHtml(customer.ktp_address || customer.address || '-');
             var livingAddress = Utils.escapeHtml(
@@ -210,7 +172,7 @@ const CustomersModule = {
                     : (customer.living_address || '-')
             );
             
-            // 构建订单统计HTML（可点击跳转）
+            // 构建订单统计HTML
             var orderStatsHtml = '' +
                 '<div class="order-stats">' +
                     '<div class="stat-item active" onclick="APP.showCustomerOrdersByStatus(\'' + Utils.escapeAttr(customerId) + '\', \'active\')" style="cursor:pointer;">' +
@@ -282,11 +244,7 @@ const CustomersModule = {
             
         } catch (error) {
             console.error("showCustomerDetailCard error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? '加载客户详情失败：' + error.message : 'Gagal memuat detail nasabah: ' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat detail nasabah: ' + error.message : '加载客户详情失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? '加载客户详情失败：' + error.message : 'Gagal memuat detail nasabah: ' + error.message);
         }
     },
     
@@ -312,11 +270,7 @@ const CustomersModule = {
         );
         
         if (!reason || reason.trim() === '') {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
-            } else {
-                alert(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
             return;
         }
         
@@ -324,24 +278,16 @@ const CustomersModule = {
             ? '⚠️ Yakin akan blacklist nasabah ini?\n\nNama: ' + customerName + '\nAlasan: ' + reason + '\n\nNasabah yang di-blacklist tidak dapat membuat order baru.'
             : '⚠️ 确认拉黑此客户？\n\n客户名: ' + customerName + '\n原因: ' + reason + '\n\n被拉黑的客户将无法创建新订单。';
         
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
         
         try {
             await window.APP.addToBlacklist(customerUuid, reason);
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? '✅ Nasabah "' + customerName + '" telah ditambahkan ke blacklist.' : '✅ 客户 "' + customerName + '" 已加入黑名单。');
-            } else {
-                alert(lang === 'id' ? '✅ Nasabah "' + customerName + '" telah ditambahkan ke blacklist.' : '✅ 客户 "' + customerName + '" 已加入黑名单。');
-            }
+            Utils.toast.success(lang === 'id' ? '✅ Nasabah "' + customerName + '" telah ditambahkan ke blacklist.' : '✅ 客户 "' + customerName + '" 已加入黑名单。');
             await APP.showCustomers();
         } catch (error) {
             var errMsg = error.message || error.details || error.code || JSON.stringify(error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + errMsg : '拉黑失败：' + errMsg);
-            } else {
-                alert(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + errMsg : '拉黑失败：' + errMsg);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + errMsg : '拉黑失败：' + errMsg);
         }
     },
     
@@ -350,16 +296,12 @@ const CustomersModule = {
         var lang = Utils.lang;
         
         var confirmMsg = lang === 'id' ? 'Yakin ingin membuka blacklist nasabah ini?' : '确认解除此客户的拉黑？';
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
         
         try {
             await window.APP.removeFromBlacklist(customerUuid);
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
-            } else {
-                alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
-            }
+            Utils.toast.success(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
             
             var modal = document.getElementById('customerDetailCard');
             if (modal) modal.remove();
@@ -367,11 +309,7 @@ const CustomersModule = {
             await APP.showCustomers();
         } catch (error) {
             var errMsg = error.message || error.details || error.code || JSON.stringify(error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal membuka blacklist: ' + errMsg : '解除拉黑失败：' + errMsg);
-            } else {
-                alert(lang === 'id' ? 'Gagal membuka blacklist: ' + errMsg : '解除拉黑失败：' + errMsg);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal membuka blacklist: ' + errMsg : '解除拉黑失败：' + errMsg);
         }
     },
     
@@ -383,22 +321,8 @@ const CustomersModule = {
             const customer = await SUPABASE.getCustomer(customerId);
             if (!customer) return;
             
-            let query = supabaseClient
-                .from('orders')
-                .select('*')
-                .eq('customer_id', customerId)
-                .order('created_at', { ascending: false });
-            
-            if (statusType === 'active') {
-                query = query.eq('status', 'active');
-            } else if (statusType === 'completed') {
-                query = query.eq('status', 'completed');
-            } else if (statusType === 'abnormal') {
-                query = query.or('status.eq.liquidated,and(status.eq.active,overdue_days.gte.30)');
-            }
-            
-            const { data: orders, error } = await query;
-            if (error) throw error;
+            // 使用 SUPABASE 封装方法
+            const orders = await SUPABASE.getCustomerOrdersByStatus(customerId, statusType);
             
             var modal = document.getElementById('customerDetailCard');
             if (modal) modal.remove();
@@ -408,9 +332,7 @@ const CustomersModule = {
             
         } catch (error) {
             console.error("showCustomerOrdersByStatus error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
         }
     },
 
@@ -427,11 +349,7 @@ const CustomersModule = {
         var t = Utils.t;
         
         if (isAdmin) {
-            if (window.Toast) {
-                window.Toast.warning(t('store_operation'));
-            } else {
-                alert(t('store_operation'));
-            }
+            Utils.toast.warning(t('store_operation'));
             return;
         }
         
@@ -452,20 +370,12 @@ const CustomersModule = {
 
         if (!name) {
             if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写');
-            } else {
-                alert(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Nama nasabah harus diisi' : '客户姓名必须填写');
             return;
         }
         if (!phone) {
             if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写');
-            } else {
-                alert(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Nomor telepon harus diisi' : '手机号必须填写');
             return;
         }
 
@@ -475,53 +385,32 @@ const CustomersModule = {
             
             if (!storeId) {
                 if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户'); }
-                if (window.Toast) {
-                    window.Toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
-                } else {
-                    alert(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
-                }
+                Utils.toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
                 return;
             }
             
-            // 黑名单重复检查
+            // 使用 SUPABASE 封装方法检查黑名单重复
             if (ktp || phone) {
                 try {
-                    let blacklistCheckQuery = supabaseClient
-                        .from('blacklist')
-                        .select('customers!blacklist_customer_id_fkey(id, name, ktp_number, phone, customer_id)');
-                    
-                    let conditions = [];
-                    if (ktp) conditions.push(`customers.ktp_number.eq.${ktp}`);
-                    if (phone) conditions.push(`customers.phone.eq.${phone}`);
-                    
-                    if (conditions.length > 0) {
-                        blacklistCheckQuery = blacklistCheckQuery.or(conditions.join(','));
-                        const { data: blacklistedCustomers, error: blCheckError } = await blacklistCheckQuery;
-                        
-                        if (!blCheckError && blacklistedCustomers && blacklistedCustomers.length > 0) {
-                            const matchedCustomer = blacklistedCustomers[0].customers;
-                            let reason = '';
-                            if (ktp && matchedCustomer.ktp_number === ktp) {
-                                reason = lang === 'id' 
-                                    ? `❌ Nomor KTP ${ktp} sudah terdaftar di blacklist (Nasabah: ${matchedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
-                                    : `❌ 身份证号 ${ktp} 已被拉黑（客户：${matchedCustomer.name}）\n\n无法添加相同信息的客户。`;
-                            } else if (phone && matchedCustomer.phone === phone) {
-                                reason = lang === 'id'
-                                    ? `❌ Nomor telepon ${phone} sudah terdaftar di blacklist (Nasabah: ${matchedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
-                                    : `❌ 手机号 ${phone} 已被拉黑（客户：${matchedCustomer.name}）\n\n无法添加相同信息的客户。`;
-                            }
-                            
-                            if (window.Toast) {
-                                window.Toast.error(reason, 5000);
-                            } else {
-                                alert(reason);
-                            }
-                            if (addBtn) {
-                                addBtn.disabled = false;
-                                addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
-                            }
-                            return;
+                    const blacklistedCustomer = await SUPABASE.checkBlacklistDuplicate(ktp, phone);
+                    if (blacklistedCustomer) {
+                        let reason = '';
+                        if (ktp && blacklistedCustomer.ktp_number === ktp) {
+                            reason = lang === 'id' 
+                                ? `❌ Nomor KTP ${ktp} sudah terdaftar di blacklist (Nasabah: ${blacklistedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
+                                : `❌ 身份证号 ${ktp} 已被拉黑（客户：${blacklistedCustomer.name}）\n\n无法添加相同信息的客户。`;
+                        } else if (phone && blacklistedCustomer.phone === phone) {
+                            reason = lang === 'id'
+                                ? `❌ Nomor telepon ${phone} sudah terdaftar di blacklist (Nasabah: ${blacklistedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
+                                : `❌ 手机号 ${phone} 已被拉黑（客户：${blacklistedCustomer.name}）\n\n无法添加相同信息的客户。`;
                         }
+                        
+                        Utils.toast.error(reason, 5000);
+                        if (addBtn) {
+                            addBtn.disabled = false;
+                            addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
+                        }
+                        return;
                     }
                 } catch (blErr) {
                     console.warn('黑名单重复检查失败:', blErr.message);
@@ -609,11 +498,7 @@ const CustomersModule = {
                 addBtn.disabled = false;
                 addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan Nasabah' : '保存客户');
             }
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
-            } else {
-                alert(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
-            }
+            Utils.toast.success(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
             await APP.showCustomers();
             
         } catch (error) {
@@ -623,11 +508,7 @@ const CustomersModule = {
             }
             console.error("addCustomer error:", error);
             var errMsg = error.message || error.details || error.code || (lang === 'id' ? 'Gagal menyimpan' : '保存失败');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menyimpan: ' + errMsg : '保存失败：' + errMsg);
-            } else {
-                alert(lang === 'id' ? 'Gagal menyimpan: ' + errMsg : '保存失败：' + errMsg);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + errMsg : '保存失败：' + errMsg);
         }
     },
 
@@ -637,11 +518,7 @@ const CustomersModule = {
         var t = Utils.t;
         
         if (!isAdmin) {
-            if (window.Toast) {
-                window.Toast.warning(t('store_operation'));
-            } else {
-                alert(t('store_operation'));
-            }
+            Utils.toast.warning(t('store_operation'));
             return;
         }
         
@@ -680,11 +557,7 @@ const CustomersModule = {
             document.body.appendChild(modal);
             
         } catch (e) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data: ' + e.message : '加载失败：' + e.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data: ' + e.message : '加载失败：' + e.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data: ' + e.message : '加载失败：' + e.message);
         }
     },
 
@@ -699,11 +572,7 @@ const CustomersModule = {
         var t = Utils.t;
         
         if (!isAdmin) {
-            if (window.Toast) {
-                window.Toast.warning(t('store_operation'));
-            } else {
-                alert(t('store_operation'));
-            }
+            Utils.toast.warning(t('store_operation'));
             return;
         }
         
@@ -717,11 +586,7 @@ const CustomersModule = {
         var livingAddr = livingSame ? null : document.getElementById('ec_livingAddr').value.trim();
 
         if (!name || !phone) { 
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Nama dan telepon wajib diisi' : '姓名和手机号必须填写');
-            } else {
-                alert(lang === 'id' ? 'Nama dan telepon wajib diisi' : '姓名和手机号必须填写');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Nama dan telepon wajib diisi' : '姓名和手机号必须填写');
             return; 
         }
 
@@ -741,11 +606,7 @@ const CustomersModule = {
             if (error) throw error;
             
             document.getElementById('editCustomerModal')?.remove();
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
-            } else {
-                alert(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
-            }
+            Utils.toast.success(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
             
             if (window.APP.clearAnomalyCache) {
                 window.APP.clearAnomalyCache();
@@ -753,17 +614,13 @@ const CustomersModule = {
             
             await APP.showCustomers();
         } catch (e) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
         }
     },
 
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(Utils.t('confirm_delete')) : confirm(Utils.t('confirm_delete'));
+        var confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
         if (!confirmed) return;
         
         try {
@@ -782,11 +639,7 @@ const CustomersModule = {
             const { error: customerError } = await supabaseClient.from('customers').delete().eq('id', customerId);
             if (customerError) throw customerError;
             
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
-            } else {
-                alert(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
-            }
+            Utils.toast.success(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
             
             if (window.APP.clearAnomalyCache) {
                 window.APP.clearAnomalyCache();
@@ -795,11 +648,7 @@ const CustomersModule = {
             await APP.showCustomers();
         } catch (e) {
             console.error('删除客户异常:', e);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
         }
     },
 
@@ -813,66 +662,42 @@ const CustomersModule = {
             profile = await SUPABASE.getCurrentProfile();
         } catch(e) {
             console.error('获取用户资料失败:', e);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data user' : '加载用户数据失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data user' : '加载用户数据失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data user' : '加载用户数据失败');
             return;
         }
 
         var isAdmin = profile?.role === 'admin';
 
         if (isAdmin) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Operasi ini hanya untuk operator toko' : '此操作仅限门店操作员');
-            } else {
-                alert(lang === 'id' ? 'Operasi ini hanya untuk operator toko' : '此操作仅限门店操作员');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Operasi ini hanya untuk operator toko' : '此操作仅限门店操作员');
             return;
         }
 
         if (!customerId) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'ID nasabah tidak valid' : '客户ID无效');
-            } else {
-                alert(lang === 'id' ? 'ID nasabah tidak valid' : '客户ID无效');
-            }
+            Utils.toast.warning(lang === 'id' ? 'ID nasabah tidak valid' : '客户ID无效');
             return;
         }
 
         try {
-            const { data: customer, error: customerError } = await supabaseClient
-                .from('customers')
-                .select('*')
-                .eq('id', customerId)
-                .single();
-            
-            if (customerError || !customer) {
+            const customer = await SUPABASE.getCustomer(customerId);
+            if (!customer) {
                 throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据');
             }
 
+            // 使用 SUPABASE 封装方法检查黑名单
             var blacklistCheck = { isBlacklisted: false };
             try {
-                const { data: blData } = await supabaseClient
-                    .from('blacklist')
-                    .select('id, reason')
-                    .eq('customer_id', customer.id)
-                    .maybeSingle();
-                blacklistCheck = blData ? { isBlacklisted: true, reason: blData.reason } : { isBlacklisted: false };
+                blacklistCheck = await SUPABASE.checkBlacklist(customer.id);
             } catch(blErr) {
                 console.warn('黑名单检查失败:', blErr.message);
             }
 
             if (blacklistCheck && blacklistCheck.isBlacklisted) {
-                if (window.Toast) {
-                    window.Toast.error(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。', 4000);
-                } else {
-                    alert(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。');
-                }
+                Utils.toast.error(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。', 4000);
                 return;
             }
 
+            // 检查活跃订单
             try {
                 const { data: existingOrders } = await supabaseClient
                     .from('orders')
@@ -880,11 +705,7 @@ const CustomersModule = {
                     .eq('customer_id', customerId)
                     .eq('status', 'active');
                 if (existingOrders && existingOrders.length > 0) {
-                    if (window.Toast) {
-                        window.Toast.warning(lang === 'id' ? 'Nasabah ini masih memiliki pesanan aktif.' : '该客户还有未结清的订单。');
-                    } else {
-                        alert(lang === 'id' ? 'Nasabah ini masih memiliki pesanan aktif.' : '该客户还有未结清的订单。');
-                    }
+                    Utils.toast.warning(lang === 'id' ? 'Nasabah ini masih memiliki pesanan aktif.' : '该客户还有未结清的订单。');
                     return;
                 }
             } catch(ordErr) {
@@ -1090,11 +911,7 @@ const CustomersModule = {
             
         } catch (error) {
             console.error("createOrderForCustomer 错误:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
         }
     },
 
@@ -1150,11 +967,7 @@ const CustomersModule = {
         
         if (!collateral || !amount || amount <= 0) {
             if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan' : '保存'); }
-            if (window.Toast) {
-                window.Toast.warning(t('fill_all_fields'));
-            } else {
-                alert(t('fill_all_fields'));
-            }
+            Utils.toast.warning(t('fill_all_fields'));
             return;
         }
         
@@ -1165,33 +978,17 @@ const CustomersModule = {
             
             if (!storeId) {
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan' : '保存'); }
-                if (window.Toast) {
-                    window.Toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
-                } else {
-                    alert(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
-                }
+                Utils.toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
                 return;
             }
             
-            const { data: customer } = await supabaseClient
-                .from('customers')
-                .select('*')
-                .eq('id', customerId)
-                .single();
+            const customer = await SUPABASE.getCustomer(customerId);
             
-            const { data: blacklistData } = await supabaseClient
-                .from('blacklist')
-                .select('id')
-                .eq('customer_id', customer.id)
-                .maybeSingle();
-            
-            if (blacklistData) {
+            // 使用 SUPABASE 封装方法检查黑名单
+            const blacklistData = await SUPABASE.checkBlacklist(customer.id);
+            if (blacklistData.isBlacklisted) {
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan' : '保存'); }
-                if (window.Toast) {
-                    window.Toast.error(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。', 4000);
-                } else {
-                    alert(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。');
-                }
+                Utils.toast.error(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。', 4000);
                 return;
             }
             
@@ -1254,11 +1051,7 @@ const CustomersModule = {
                     ? '✅ Pesanan berhasil dibuat!\n\nID Pesanan: ' + newOrder.order_id + '\nJenis: Cicilan Fleksibel\nMaksimal perpanjangan: ' + maxExtensionMonths + ' bulan'
                     : '✅ 订单创建成功！\n\n订单号: ' + newOrder.order_id + '\n还款方式: 灵活还款\n最长可延期: ' + maxExtensionMonths + '个月');
             
-            if (window.Toast) {
-                window.Toast.success(successMsg, 5000);
-            } else {
-                alert(successMsg);
-            }
+            Utils.toast.success(successMsg, 5000);
             
             document.getElementById("collateral").value = '';
             document.getElementById("collateralNote").value = '';
@@ -1315,11 +1108,7 @@ const CustomersModule = {
             if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan' : '保存'); }
             console.error("saveOrderForCustomer error:", error);
             var errMsg = error.message || error.details || error.code || JSON.stringify(error);
-            if (window.Toast) {
-                window.Toast.error(t('save_failed') + ': ' + errMsg);
-            } else {
-                alert(t('save_failed') + ': ' + errMsg);
-            }
+            Utils.toast.error(t('save_failed') + ': ' + errMsg);
         } finally {
             if (saveBtn) {
                 saveBtn.disabled = false;
@@ -1435,7 +1224,7 @@ const CustomersModule = {
             
             var rows = '';
             if (!orders || orders.length === 0) {
-                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + 'NonNull';
             } else {
                 for (var i = 0; i < orders.length; i++) {
                     var o = orders[i];
@@ -1495,11 +1284,7 @@ const CustomersModule = {
                 '</div>';
         } catch (error) {
             console.error("showCustomerOrders error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
         }
     },
 
@@ -1528,7 +1313,7 @@ const CustomersModule = {
             
             var rows = '';
             if (allPayments.length === 0) {
-                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<td><td colspan="7" class="text-center">' + t('no_data') + 'NonNull';
             } else {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
@@ -1577,16 +1362,12 @@ const CustomersModule = {
                 '</div>';
         } catch (error) {
             console.error("showCustomerPaymentHistory error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
         }
     }
 };
 
-// 统一挂载到 window.APP（仅通过 for-in 遍历自身可枚举属性）
+// 统一挂载到 window.APP
 for (var key in CustomersModule) {
     if (CustomersModule.hasOwnProperty(key) && typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
