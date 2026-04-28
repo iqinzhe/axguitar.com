@@ -190,7 +190,7 @@
     button,
     .btn-small {
         font-size: var(--font-xs);
-        padding: 8px 14px;
+        padding: 6px 14px;
     }
 
     .toolbar button {
