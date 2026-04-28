@@ -1,4 +1,6 @@
-// app-dashboard-funds.js - v1.0 (修复：返回键统一右上角)
+// app-dashboard-funds.js - v1.1
+// 修改内容：简化 Toast 调用，统一使用 Utils.toast
+
 window.APP = window.APP || {};
 
 const DashboardFunds = {
@@ -94,7 +96,7 @@ const DashboardFunds = {
                                     '</tr>' +
                                 '</thead>' +
                                 '<tbody id="capitalTransactionsBody">' + rows + '</tbody>' +
-                            '<tr>' +
+                            '</table>' +
                         '</div>' +
                         '<div class="modal-actions">' +
                             '<button onclick="APP.printCapitalTransactions()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
@@ -109,11 +111,7 @@ const DashboardFunds = {
             window._capitalTransactionsData = transactions;
         } catch (error) {
             console.error("showCapitalModal error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data transaksi' : '加载交易记录失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data transaksi' : '加载交易记录失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data transaksi' : '加载交易记录失败');
         }
     },
 
@@ -168,7 +166,7 @@ const DashboardFunds = {
                 for (var i = 0; i < transactions.length; i++) {
                     var t = transactions[i];
                     rows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '</td>' +
+                        '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '</tr>' +
                         '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
                         '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
                         '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
@@ -215,11 +213,7 @@ const DashboardFunds = {
             window._cashFlowPageData = transactions;
         } catch (error) {
             console.error("showCashFlowPage error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
         }
     },
 
@@ -272,7 +266,7 @@ const DashboardFunds = {
                     '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                     '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
-                '</tr>';
+                '<tr>';
             }
         }
         tbody.innerHTML = rows;
@@ -428,11 +422,7 @@ const DashboardFunds = {
         a.download = 'jf_cash_flow_' + new Date().toISOString().split('T')[0] + '.csv';
         a.click();
         URL.revokeObjectURL(url);
-        if (window.Toast) {
-            window.Toast.success(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
-        } else {
-            alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
-        }
+        Utils.toast.success(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
     showTransferModal: async function(transferType) {
@@ -469,11 +459,7 @@ const DashboardFunds = {
         }
         
         if (maxAmount <= 0) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? '❌ Saldo tidak mencukupi' : '❌ 余额不足');
-            } else {
-                alert(lang === 'id' ? '❌ Saldo tidak mencukupi' : '❌ 余额不足');
-            }
+            Utils.toast.warning(lang === 'id' ? '❌ Saldo tidak mencukupi' : '❌ 余额不足');
             return;
         }
         
@@ -486,20 +472,12 @@ const DashboardFunds = {
         
         var numAmount = Utils.parseNumberFromCommas(amount);
         if (isNaN(numAmount) || numAmount <= 0) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Jumlah tidak valid' : '金额无效');
-            } else {
-                alert(lang === 'id' ? 'Jumlah tidak valid' : '金额无效');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Jumlah tidak valid' : '金额无效');
             return;
         }
         
         if (numAmount > maxAmount) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Jumlah melebihi saldo' : '金额超过余额');
-            } else {
-                alert(lang === 'id' ? 'Jumlah melebihi saldo' : '金额超过余额');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Jumlah melebihi saldo' : '金额超过余额');
             return;
         }
         
@@ -507,7 +485,7 @@ const DashboardFunds = {
             ? 'Konfirmasi transfer:\n\n' + fromLabel + ' → ' + toLabel + '\n' + Utils.formatCurrency(numAmount) + '\n\nLanjutkan?'
             : '确认转账：\n\n' + fromLabel + ' → ' + toLabel + '\n' + Utils.formatCurrency(numAmount) + '\n\n继续吗？';
         
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (confirmed) {
             await DashboardFunds.executeTransfer(transferType, numAmount);
         }
@@ -527,11 +505,7 @@ const DashboardFunds = {
                     description: lang === 'id' ? 'Transfer kas ke bank' : '现金存入银行',
                     store_id: profile?.store_id
                 });
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
-                } else {
-                    alert(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
-                }
+                Utils.toast.success(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
             } else if (transferType === 'bank_to_cash') {
                 await SUPABASE.recordInternalTransfer({
                     transfer_type: 'bank_to_cash',
@@ -541,27 +515,15 @@ const DashboardFunds = {
                     description: lang === 'id' ? 'Tarik tunai dari bank' : '银行取现',
                     store_id: profile?.store_id
                 });
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
-                } else {
-                    alert(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
-                }
+                Utils.toast.success(lang === 'id' ? '✅ Transfer berhasil' : '✅ 转账成功');
             } else if (transferType === 'store_to_hq') {
                 await SUPABASE.remitToHeadquarters(profile?.store_id, amount, lang === 'id' ? 'Setoran ke kantor pusat' : '上缴总部');
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? '✅ Setoran berhasil' : '✅ 上缴成功');
-                } else {
-                    alert(lang === 'id' ? '✅ Setoran berhasil' : '✅ 上缴成功');
-                }
+                Utils.toast.success(lang === 'id' ? '✅ Setoran berhasil' : '✅ 上缴成功');
             }
             
             await APP.renderDashboard();
         } catch (error) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? '❌ Gagal: ' + error.message : '❌ 失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? '❌ Gagal: ' + error.message : '❌ 失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? '❌ Gagal: ' + error.message : '❌ 失败：' + error.message);
         }
     },
 
@@ -633,11 +595,7 @@ const DashboardFunds = {
             window._internalTransfersData = transfers;
         } catch (error) {
             console.error("showInternalTransferHistory error:", error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat riwayat transfer' : '加载转账记录失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat riwayat transfer' : '加载转账记录失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat transfer' : '加载转账记录失败');
         }
     },
 
@@ -727,11 +685,7 @@ const DashboardFunds = {
         a.download = 'jf_internal_transfers_' + new Date().toISOString().split('T')[0] + '.csv';
         a.click();
         URL.revokeObjectURL(url);
-        if (window.Toast) {
-            window.Toast.success(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
-        } else {
-            alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
-        }
+        Utils.toast.success(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
     },
 
     // ==================== 统一 flow_type 翻译表 ====================
