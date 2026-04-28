@@ -1,4 +1,4 @@
-// order.js - v1.0（默认利率改为统一常量 8%）
+// order.js - v1.1（修复：alert 替换为 Toast）
 const Order = {
     // ==================== 创建订单 ====================
     async create(data) {
@@ -14,53 +14,125 @@ const Order = {
             service_fee_amount: data.service_fee_amount || 0,
             notes: data.notes,
             customer_id: data.customer_id || null,
-            // 修复2：默认利率改为统一常量 8%
             agreed_interest_rate: data.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT,
             repayment_type: data.repayment_type || 'flexible',
             repayment_term: data.repayment_term || null,
-            monthly_fixed_payment: data.monthly_fixed_payment || null
+            monthly_fixed_payment: data.monthly_fixed_payment || null,
+            max_extension_months: data.max_extension_months || 10
         };
-        return await SUPABASE.createOrder(orderData);
+        
+        try {
+            return await SUPABASE.createOrder(orderData);
+        } catch (error) {
+            console.error("Order.create error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal membuat pesanan: ' + error.message : '创建订单失败：' + error.message);
+            } else {
+                alert(Utils.lang === 'id' ? 'Gagal membuat pesanan: ' + error.message : '创建订单失败：' + error.message);
+            }
+            throw error;
+        }
     },
     
     // ==================== 管理费记录 ====================
     async recordAdminFee(orderId, paymentMethod, adminFeeAmount) { 
-        return await SUPABASE.recordAdminFee(orderId, paymentMethod, adminFeeAmount); 
+        try {
+            return await SUPABASE.recordAdminFee(orderId, paymentMethod, adminFeeAmount);
+        } catch (error) {
+            console.error("recordAdminFee error:", error);
+            if (window.Toast) {
+                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya admin' : '管理费记录失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 服务费记录 ====================
     async recordServiceFee(orderId, monthsPaid, paymentMethod) { 
-        return await SUPABASE.recordServiceFee(orderId, monthsPaid, paymentMethod); 
+        try {
+            return await SUPABASE.recordServiceFee(orderId, monthsPaid, paymentMethod);
+        } catch (error) {
+            console.error("recordServiceFee error:", error);
+            if (window.Toast) {
+                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya layanan' : '服务费记录失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 利息记录（灵活还款） ====================
     async recordInterestPayment(orderId, monthsPaid, paymentMethod) { 
-        return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod); 
+        try {
+            return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod);
+        } catch (error) {
+            console.error("recordInterestPayment error:", error);
+            if (window.Toast) {
+                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran bunga' : '利息记录失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 本金记录（灵活还款） ====================
     async recordPrincipalPayment(orderId, amount, paymentMethod) { 
-        return await SUPABASE.recordPrincipalPayment(orderId, amount, paymentMethod); 
+        try {
+            return await SUPABASE.recordPrincipalPayment(orderId, amount, paymentMethod);
+        } catch (error) {
+            console.error("recordPrincipalPayment error:", error);
+            if (window.Toast) {
+                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran pokok' : '本金记录失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 贷款发放记录 ====================
     async recordLoanDisbursement(orderId, amount, source, description) {
-        return await SUPABASE.recordLoanDisbursement(orderId, amount, source, description);
+        try {
+            return await SUPABASE.recordLoanDisbursement(orderId, amount, source, description);
+        } catch (error) {
+            console.error("recordLoanDisbursement error:", error);
+            if (error.message === Utils.t('loan_already_disbursed')) {
+                if (window.Toast) {
+                    window.Toast.warning(error.message);
+                } else {
+                    alert(error.message);
+                }
+            } else if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal mencatat pencairan pinjaman' : '贷款发放记录失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 固定还款 - 按期还款 ====================
     async recordFixedPayment(orderId, paymentMethod) {
-        return await SUPABASE.recordFixedPayment(orderId, paymentMethod);
+        try {
+            return await SUPABASE.recordFixedPayment(orderId, paymentMethod);
+        } catch (error) {
+            console.error("recordFixedPayment error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal memproses pembayaran cicilan tetap' : '固定还款处理失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 固定还款 - 提前结清 ====================
     async earlySettleFixedOrder(orderId, paymentMethod) {
-        return await SUPABASE.earlySettleFixedOrder(orderId, paymentMethod);
+        try {
+            return await SUPABASE.earlySettleFixedOrder(orderId, paymentMethod);
+        } catch (error) {
+            console.error("earlySettleFixedOrder error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal memproses pelunasan dipercepat' : '提前结清处理失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 获取当前月利息（灵活还款用） ====================
     getCurrentMonthlyInterest(order) {
-        // 修复2：默认利率用常量
         const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
         return (order.loan_amount - order.principal_paid) * monthlyRate;
     },
@@ -98,7 +170,6 @@ const Order = {
     
     // ==================== 获取协商利率 ====================
     getAgreedInterestRate(order) {
-        // 修复2：默认利率用常量
         return order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
     },
     
@@ -114,13 +185,29 @@ const Order = {
     
     // ==================== 获取缴费历史 ====================
     async getPaymentHistory(orderId) { 
-        const { payments } = await SUPABASE.getPaymentHistory(orderId); 
-        return payments; 
+        try {
+            const { payments } = await SUPABASE.getPaymentHistory(orderId); 
+            return payments;
+        } catch (error) {
+            console.error("getPaymentHistory error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 删除订单 ====================
     async delete(orderId) { 
-        return await SUPABASE.deleteOrder(orderId); 
+        try {
+            return await SUPABASE.deleteOrder(orderId);
+        } catch (error) {
+            console.error("deleteOrder error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal menghapus pesanan' : '删除订单失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 更新订单 ====================
@@ -138,44 +225,103 @@ const Order = {
         if (updates.agreed_interest_rate !== undefined) updateData.agreed_interest_rate = updates.agreed_interest_rate;
         if (updates.repayment_type !== undefined) updateData.repayment_type = updates.repayment_type;
         if (updates.repayment_term !== undefined) updateData.repayment_term = updates.repayment_term;
-        return await SUPABASE.updateOrder(orderId, updateData, customerId);
+        
+        try {
+            return await SUPABASE.updateOrder(orderId, updateData, customerId);
+        } catch (error) {
+            console.error("updateOrder error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal mengupdate pesanan' : '更新订单失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 获取报表 ====================
     async getReport() { 
-        return await SUPABASE.getReport(); 
+        try {
+            return await SUPABASE.getReport();
+        } catch (error) {
+            console.error("getReport error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报表失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 解锁订单 ====================
     async unlockOrder(orderId) { 
-        return await SUPABASE.unlockOrder(orderId); 
+        try {
+            return await SUPABASE.unlockOrder(orderId);
+        } catch (error) {
+            console.error("unlockOrder error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal membuka kunci pesanan' : '解锁订单失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 重新锁定订单 ====================
     async relockOrder(orderId) { 
-        return await SUPABASE.relockOrder(orderId); 
+        try {
+            return await SUPABASE.relockOrder(orderId);
+        } catch (error) {
+            console.error("relockOrder error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal mengunci pesanan' : '锁定订单失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 获取订单资金流水 ====================
     async getOrderCashFlow(orderId) {
-        const order = await SUPABASE.getOrder(orderId);
-        if (!order) return [];
-        return await SUPABASE.getCashFlowRecords(order.store_id);
+        try {
+            const order = await SUPABASE.getOrder(orderId);
+            if (!order) return [];
+            return await SUPABASE.getCashFlowRecords(order.store_id);
+        } catch (error) {
+            console.error("getOrderCashFlow error:", error);
+            return [];
+        }
     },
     
     // ==================== 更新逾期天数 ====================
     async updateOverdueDays() {
-        return await SUPABASE.updateOverdueDays();
+        try {
+            return await SUPABASE.updateOverdueDays();
+        } catch (error) {
+            console.error("updateOverdueDays error:", error);
+            return false;
+        }
     },
     
     // ==================== 获取订单详情（带权限检查） ====================
     async getOrder(orderId) {
-        return await SUPABASE.getOrder(orderId);
+        try {
+            return await SUPABASE.getOrder(orderId);
+        } catch (error) {
+            console.error("getOrder error:", error);
+            if (window.Toast && error.message !== Utils.t('unauthorized')) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 获取所有订单 ====================
     async getOrders(filters) {
-        return await SUPABASE.getOrders(filters);
+        try {
+            return await SUPABASE.getOrders(filters);
+        } catch (error) {
+            console.error("getOrders error:", error);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
+            }
+            throw error;
+        }
     },
     
     // ==================== 计算固定还款每月金额（工具方法） ====================
