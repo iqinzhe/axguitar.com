@@ -3,7 +3,7 @@
    ============================================================ */
 
 /* ============================================================
-   R1. 桌面端字体响应式（≥769px）
+   R1. 桌面端响应式（≥769px）- 修复表格列宽问题
    ============================================================ */
 @media (min-width: 769px) {
     html {
@@ -65,6 +65,63 @@
 
     .dashboard-footer-card p {
         font-size: var(--font-sm);
+    }
+
+    /* ========== 关键修复：覆盖手机端的表格强制设置 ========== */
+    .table-container {
+        overflow-x: visible;
+    }
+
+    .data-table {
+        table-layout: auto !important;  /* 覆盖手机端的 fixed */
+        min-width: auto !important;
+        width: 100%;
+    }
+
+    /* ========== 黑名单表格/异常表格列宽修复 ========== */
+    .anomaly-table,
+    .blacklist-table {
+        table-layout: fixed;
+    }
+
+    /* 客户ID列 */
+    .anomaly-table .col-id,
+    .blacklist-table .col-id,
+    .anomaly-table th:first-child,
+    .anomaly-table td:first-child,
+    .blacklist-table th:first-child,
+    .blacklist-table td:first-child {
+        width: 12%;
+    }
+
+    /* 姓名列 - 增加左侧间距 */
+    .anomaly-table .col-name,
+    .blacklist-table .col-name,
+    .anomaly-table th:nth-child(2),
+    .anomaly-table td:nth-child(2),
+    .blacklist-table th:nth-child(2),
+    .blacklist-table td:nth-child(2) {
+        width: 18%;
+        padding-left: 16px;
+    }
+
+    /* 电话列 - 禁止换行 */
+    .anomaly-table .col-phone,
+    .blacklist-table .col-phone,
+    .anomaly-table th:nth-child(3),
+    .anomaly-table td:nth-child(3),
+    .blacklist-table th:nth-child(3),
+    .blacklist-table td:nth-child(3) {
+        width: 15%;
+        white-space: nowrap;
+    }
+
+    /* 原因/操作列 - 自适应 */
+    .anomaly-table th:last-child,
+    .anomaly-table td:last-child,
+    .blacklist-table th:last-child,
+    .blacklist-table td:last-child {
+        width: auto;
     }
 }
 
@@ -148,7 +205,7 @@
         text-align: center;
     }
 
-    /* --- 表格：水平滚动，不换行 --- */
+    /* --- 表格：水平滚动，不换行（手机端保持原有设计）--- */
     .table-container {
         border: 1px solid var(--border-light);
         border-radius: var(--radius-md);
