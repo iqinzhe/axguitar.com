@@ -1,4 +1,6 @@
-// app-dashboard-wa.js - v1.0
+// app-dashboard-wa.js - v1.1
+// 修改内容：简化 Toast 调用，统一使用 Utils.toast，保持 WA 提醒模板不变
+
 window.APP = window.APP || {};
 
 // ========== WA 提醒模板（精简版：3个核心信息） ==========
