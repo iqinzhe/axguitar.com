@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.3（修复：刷新后停留当前页面 + Toast 集成）
+// app-dashboard-core.js - v1.4（修复：刷新后停留当前页面 + Toast 集成 + 状态持久化增强）
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -30,7 +30,6 @@ const ModuleFallback = {
                         : '⚠️ Module "' + moduleName + '" error: ' + error.message;
                 }
                 
-                // 使用 Toast 替代 alert
                 if (window.Toast) {
                     window.Toast.warning(msg, 5000);
                 } else {
@@ -362,7 +361,7 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ========== 修复：页面状态持久化（刷新后停留当前页面） ==========
+    // ========== 页面状态持久化（刷新后停留当前页面） ==========
     saveCurrentPageState: function() {
         try {
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
@@ -377,15 +376,27 @@ const DashboardCore = {
             } else {
                 sessionStorage.removeItem('jf_current_customer_id');
             }
-            // 额外保存到 localStorage 作为备份（刷新时更可靠）
+            // 额外保存到 localStorage 作为备份
             localStorage.setItem('jf_last_page', this.currentPage);
             localStorage.setItem('jf_last_filter', this.currentFilter);
-        } catch(e) {}
+            if (this.currentOrderId) {
+                localStorage.setItem('jf_last_order_id', this.currentOrderId);
+            } else {
+                localStorage.removeItem('jf_last_order_id');
+            }
+            if (this.currentCustomerId) {
+                localStorage.setItem('jf_last_customer_id', this.currentCustomerId);
+            } else {
+                localStorage.removeItem('jf_last_customer_id');
+            }
+            console.log('[State] 已保存页面状态:', this.currentPage);
+        } catch(e) {
+            console.warn('[State] 保存状态失败:', e);
+        }
     },
     
     restorePageState: function() {
         try {
-            // 优先从 sessionStorage 读取
             let page = sessionStorage.getItem('jf_current_page');
             let filter = sessionStorage.getItem('jf_current_filter') || "all";
             let orderId = sessionStorage.getItem('jf_current_order_id');
@@ -395,19 +406,23 @@ const DashboardCore = {
             if (!page) {
                 page = localStorage.getItem('jf_last_page');
                 filter = localStorage.getItem('jf_last_filter') || "all";
+                orderId = localStorage.getItem('jf_last_order_id');
+                customerId = localStorage.getItem('jf_last_customer_id');
             }
             
-            // 验证页面是否有效（不能是登录页）
+            // 验证页面是否有效
             const validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
                                 'anomaly', 'userManagement', 'storeManagement', 'expenses', 
                                 'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
                                 'customerPaymentHistory', 'blacklist'];
             
             if (page && validPages.includes(page) && page !== 'login') {
+                console.log('[State] 从存储恢复页面:', page);
                 return { page, filter, orderId, customerId };
             }
             return { page: null, filter: "all", orderId: null, customerId: null };
         } catch(e) {
+            console.warn('[State] 恢复状态失败:', e);
             return { page: null, filter: "all", orderId: null, customerId: null };
         }
     },
@@ -418,7 +433,6 @@ const DashboardCore = {
             sessionStorage.removeItem('jf_current_filter');
             sessionStorage.removeItem('jf_current_order_id');
             sessionStorage.removeItem('jf_current_customer_id');
-            // 注意：不清除 localStorage 的 jf_last_page，因为那是备份
         } catch(e) {}
         this.currentOrderId = null;
         this.currentCustomerId = null;
@@ -464,6 +478,7 @@ const DashboardCore = {
         }, 5000);
     },
 
+    // ========== 修复：init 方法 - 优先使用 HTML 传递的状态 ==========
     init: async function() {
         var lang = Utils.lang || 'zh';
         
@@ -509,21 +524,45 @@ const DashboardCore = {
                 }
             }, 15000);
             
-            // ========== 修复：刷新后停留当前页面 ==========
-            var savedState = this.restorePageState();
+            // ========== 关键修复：刷新后停留当前页面 ==========
+            // 优先使用从 HTML 传递过来的恢复状态（由 index.html 在 APP 加载前设置）
+            var savedState = null;
+            
+            if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
+                // 使用 HTML 传递的状态（最可靠）
+                savedState = window._RESTORED_STATE;
+                console.log('[状态恢复] 使用 HTML 传递的状态:', savedState.page);
+                // 清除全局变量，避免重复使用
+                delete window._RESTORED_STATE;
+            } else {
+                // 降级：从存储中恢复
+                savedState = this.restorePageState();
+                console.log('[状态恢复] 从存储恢复:', savedState.page);
+            }
+            
             var savedPage = savedState.page;
             var savedFilter = savedState.filter;
             var savedOrderId = savedState.orderId;
             var savedCustomerId = savedState.customerId;
             
-            if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
+            // 检查用户是否已登录
+            const isLoggedIn = AUTH.isLoggedIn();
+            
+            if (savedPage && savedPage !== 'login' && isLoggedIn) {
+                // 恢复保存的页面状态
                 this.currentPage = savedPage;
                 this.currentFilter = savedFilter || "all";
                 this.currentOrderId = savedOrderId || null;
                 this.currentCustomerId = savedCustomerId || null;
-                console.log('[状态恢复] 恢复页面:', savedPage, '订单ID:', savedOrderId);
+                console.log('[状态恢复] 最终恢复页面:', savedPage, '订单ID:', savedOrderId, '客户ID:', savedCustomerId);
                 await this.refreshCurrentPage();
+            } else if (isLoggedIn) {
+                // 已登录但没有保存的页面，显示仪表盘
+                console.log('[状态恢复] 无保存状态，显示仪表盘');
+                await this.renderDashboard();
             } else {
+                // 未登录，显示登录页
+                console.log('[状态恢复] 未登录，显示登录页');
                 await this.router();
             }
             
@@ -924,7 +963,6 @@ const DashboardCore = {
         this._clearOverdueUpdateInterval();
         
         var confirmMsg = Utils.t('save_exit_confirm');
-        // 使用 Toast 确认框替代 confirm
         var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
         if (!confirmed) return;
         
@@ -1285,7 +1323,6 @@ const DashboardCore = {
     
     deleteStore: async function(storeId) {
         var lang = Utils.lang;
-        // 使用 Toast 确认框
         var confirmed = window.Toast ? await window.Toast.confirmPromise(Utils.t('confirm_delete')) : confirm(Utils.t('confirm_delete'));
         if (!confirmed) return;
         try {
@@ -1332,7 +1369,7 @@ window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bin
 
 // 页面关闭前保存状态
 window.addEventListener('beforeunload', function() {
-    if (window.APP && window.APP.saveCurrentPageState) {
+    if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
         window.APP.saveCurrentPageState();
     }
 });
