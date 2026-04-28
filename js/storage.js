@@ -1,4 +1,4 @@
-// storage.js - v1.1（修复：alert 替换为 Toast）
+// storage.js - v1.2（修复：导出分组展示 + 新增资金流水和运营支出导出）
 const Storage = {
 
     // ==================== 备份功能 ====================
@@ -693,6 +693,156 @@ const Storage = {
             }
         }
     },
+
+    // ========== 导出资金流水（新增） ==========
+    async exportCashFlowToCSV() {
+        const lang = Utils.lang;
+        const profile = await SUPABASE.getCurrentProfile();
+        const isAdmin = profile?.role === 'admin';
+        
+        try {
+            let query = supabaseClient
+                .from('cash_flow_records')
+                .select('*, stores(name)')
+                .eq('is_voided', false)
+                .order('recorded_at', { ascending: false });
+            
+            if (!isAdmin && profile?.store_id) {
+                query = query.eq('store_id', profile.store_id);
+            }
+            
+            const { data: flows, error } = await query;
+            if (error) throw error;
+            
+            const typeMap = {
+                loan_disbursement: lang === 'id' ? 'Pencairan Pinjaman' : '贷款发放',
+                admin_fee: lang === 'id' ? 'Admin Fee' : '管理费',
+                service_fee: lang === 'id' ? 'Service Fee' : '服务费',
+                interest: lang === 'id' ? 'Bunga' : '利息',
+                principal: lang === 'id' ? 'Pokok' : '本金',
+                expense: lang === 'id' ? 'Pengeluaran' : '运营支出',
+                internal_transfer_out: lang === 'id' ? 'Transfer Keluar' : '转出',
+                internal_transfer_in: lang === 'id' ? 'Transfer Masuk' : '转入',
+                interest_reversal: lang === 'id' ? 'Batal Bunga' : '利息冲销',
+                principal_reversal: lang === 'id' ? 'Batal Pokok' : '本金冲销',
+                admin_fee_reversal: lang === 'id' ? 'Batal Admin Fee' : '管理费冲销',
+                service_fee_reversal: lang === 'id' ? 'Batal Service Fee' : '服务费冲销'
+            };
+            
+            const directionMap = {
+                inflow: lang === 'id' ? 'Masuk' : '流入',
+                outflow: lang === 'id' ? 'Keluar' : '流出'
+            };
+            
+            const sourceMap = {
+                cash: lang === 'id' ? 'Tunai (Brankas)' : '现金 (保险柜)',
+                bank: lang === 'id' ? 'Bank BNI' : '银行BNI'
+            };
+            
+            const headers = lang === 'id'
+                ? ['Tanggal', 'Tipe', 'Arah', 'Sumber', 'Jumlah', 'Deskripsi', 'Toko']
+                : ['日期', '类型', '方向', '来源/去向', '金额', '描述', '门店'];
+            
+            const rows = (flows || []).map(flow => [
+                Utils.formatDate(flow.recorded_at),
+                typeMap[flow.flow_type] || flow.flow_type,
+                directionMap[flow.direction] || flow.direction,
+                sourceMap[flow.source_target] || flow.source_target,
+                flow.amount,
+                flow.description || '-',
+                isAdmin ? (flow.stores?.name || '-') : ''
+            ]);
+            
+            const csvContent = [headers, ...rows].map(row => 
+                row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
+            ).join('\n');
+            
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `jf_cashflow_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            if (window.Audit) {
+                await window.Audit.logExport('cash_flow', a.download, profile?.name);
+            }
+            
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Ekspor arus kas berhasil!' : '✅ 资金流水导出成功！');
+            }
+        } catch (err) {
+            console.error("exportCashFlowToCSV error:", err);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal ekspor arus kas' : '资金流水导出失败');
+            }
+        }
+    },
+
+    // ========== 导出运营支出（新增） ==========
+    async exportExpensesToCSV() {
+        const lang = Utils.lang;
+        const profile = await SUPABASE.getCurrentProfile();
+        const isAdmin = profile?.role === 'admin';
+        
+        try {
+            let query = supabaseClient
+                .from('expenses')
+                .select('*, stores(name)')
+                .order('expense_date', { ascending: false });
+            
+            if (!isAdmin && profile?.store_id) {
+                query = query.eq('store_id', profile.store_id);
+            }
+            
+            const { data: expenses, error } = await query;
+            if (error) throw error;
+            
+            const methodMap = {
+                cash: lang === 'id' ? 'Tunai' : '现金',
+                bank: lang === 'id' ? 'Bank BNI' : '银行BNI'
+            };
+            
+            const headers = lang === 'id'
+                ? ['Tanggal', 'Kategori', 'Jumlah', 'Metode', 'Deskripsi', 'Toko']
+                : ['日期', '类别', '金额', '支付方式', '描述', '门店'];
+            
+            const rows = (expenses || []).map(exp => [
+                Utils.formatDate(exp.expense_date),
+                exp.category || '-',
+                exp.amount,
+                methodMap[exp.payment_method] || exp.payment_method,
+                exp.description || '-',
+                isAdmin ? (exp.stores?.name || '-') : ''
+            ]);
+            
+            const csvContent = [headers, ...rows].map(row => 
+                row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
+            ).join('\n');
+            
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `jf_expenses_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            if (window.Audit) {
+                await window.Audit.logExport('expenses', a.download, profile?.name);
+            }
+            
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Ekspor pengeluaran berhasil!' : '✅ 运营支出导出成功！');
+            }
+        } catch (err) {
+            console.error("exportExpensesToCSV error:", err);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal ekspor pengeluaran' : '运营支出导出失败');
+            }
+        }
+    },
     
     // ==================== 辅助函数 ====================
     
@@ -729,13 +879,19 @@ const Storage = {
         var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
         var backText = lang === 'id' ? 'Kembali' : '返回';
         
-        var exportTitle = lang === 'id' ? '📊 Ekspor CSV' : '📊 导出 CSV';
-        var exportDesc = lang === 'id' 
-            ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
-            : '导出为 CSV 格式，可在 Excel 中打开。';
+        // ========== 方式A：分组展示 ==========
+        var exportTitle = lang === 'id' ? '📊 Ekspor Data' : '📊 导出数据';
+        
+        // 业务数据组
+        var businessDataTitle = lang === 'id' ? '📁 Data Bisnis' : '📁 业务数据';
         var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
         var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
         var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
+        
+        // 财务数据组
+        var financialDataTitle = lang === 'id' ? '💰 Data Keuangan' : '💰 财务数据';
+        var exportCashFlowText = lang === 'id' ? '💸 Ekspor Arus Kas' : '💸 导出资金流水';
+        var exportExpensesText = lang === 'id' ? '📝 Ekspor Pengeluaran' : '📝 导出运营支出';
         
         // ========== 门店视图：只显示备份本门店数据和导出本门店数据 ==========
         if (!isAdmin) {
@@ -762,11 +918,25 @@ const Storage = {
                     
                     '<div class="backup-card backup-card-store-secondary">' +
                         '<h3>' + exportTitle + '</h3>' +
-                        '<p>' + exportDesc + '</p>' +
-                        '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
-                            '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
-                            '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
-                            '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                        '<p>' + (lang === 'id' ? 'Ekspor data ke format CSV' : '导出数据为 CSV 格式') + '</p>' +
+                        
+                        '<!-- 方式A：分组展示 - 业务数据 -->' +
+                        '<div style="margin-bottom: 12px;">' +
+                            '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary);">' + businessDataTitle + '</div>' +
+                            '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
+                                '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
+                                '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
+                                '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                            '</div>' +
+                        '</div>' +
+                        
+                        '<!-- 方式A：分组展示 - 财务数据 -->' +
+                        '<div>' +
+                            '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary);">' + financialDataTitle + '</div>' +
+                            '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
+                                '<button onclick="Storage.exportCashFlowToCSV()" class="btn-small">' + exportCashFlowText + '</button>' +
+                                '<button onclick="Storage.exportExpensesToCSV()" class="btn-small">' + exportExpensesText + '</button>' +
+                            '</div>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -812,11 +982,25 @@ const Storage = {
                 
                 '<div class="backup-card backup-card-secondary">' +
                     '<h3>' + exportTitle + '</h3>' +
-                    '<p>' + exportDesc + '</p>' +
-                    '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
-                        '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
-                        '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
-                        '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                    '<p>' + (lang === 'id' ? 'Ekspor data ke format CSV, dapat dibuka di Excel.' : '导出为 CSV 格式，可在 Excel 中打开。') + '</p>' +
+                    
+                    '<!-- 方式A：分组展示 - 业务数据 -->' +
+                    '<div style="margin-bottom: 16px;">' +
+                        '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary); border-left: 3px solid var(--primary); padding-left: 8px;">' + businessDataTitle + '</div>' +
+                        '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
+                            '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
+                            '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
+                            '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                    
+                    '<!-- 方式A：分组展示 - 财务数据 -->' +
+                    '<div>' +
+                        '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary); border-left: 3px solid var(--success); padding-left: 8px;">' + financialDataTitle + '</div>' +
+                        '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
+                            '<button onclick="Storage.exportCashFlowToCSV()" class="btn-small">' + exportCashFlowText + '</button>' +
+                            '<button onclick="Storage.exportExpensesToCSV()" class="btn-small">' + exportExpensesText + '</button>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
                 
@@ -916,7 +1100,7 @@ const Storage = {
                     
                     rows += '<tr>' +
                         '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</td>' +
-                        '<td>' + actionText + '</td>' +
+                        '</table>' + actionText + '</td>' +
                         '<td>' + Utils.escapeHtml(log.user_name || '-') + '</td>' +
                         '<td class="desc-cell">' + detailsText + '</td>' +
                     '</tr>';
@@ -1069,7 +1253,7 @@ const Storage = {
                 }
                 
                 rows += '<tr>' +
-                    '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</table>' +
+                    '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</td>' +
                     '<td>' + (actionMap[log.action] || log.action) + '</td>' +
                     '<td>' + Utils.escapeHtml(log.user_name || '-') + '</td>' +
                     '<td class="desc-cell">' + detailsText + '</td>' +
