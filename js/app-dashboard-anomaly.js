@@ -1,26 +1,143 @@
-// app-dashboard-anomaly.js - v1.1（修复 orders 与 customers 多外键关联冲突）
+// app-dashboard-anomaly.js - v1.2（修复：内存缓存无限增长 + LRU清理机制）
 
 window.APP = window.APP || {};
 
-// ==================== 异常检测缓存模块 ====================
+// ==================== 异常检测缓存模块（增强版：自动清理 + LRU） ====================
 const AnomalyCache = {
     _data: new Map(),
     _ttl: 3 * 60 * 1000,  // 3分钟缓存
-
+    _maxSize: 100,         // 最大缓存条目数
+    _cleanupInterval: null,
+    _accessOrder: [],      // LRU 访问顺序记录
+    
+    // 初始化定时清理
+    _initCleanup: function() {
+        if (this._cleanupInterval) return;
+        this._cleanupInterval = setInterval(() => {
+            this._cleanupExpired();
+        }, 60 * 1000); // 每分钟清理一次
+        console.log('[AnomalyCache] 缓存清理定时器已启动');
+    },
+    
+    // 清理过期缓存
+    _cleanupExpired: function() {
+        const now = Date.now();
+        let cleanedCount = 0;
+        
+        for (const [key, value] of this._data) {
+            if (now - value.time > this._ttl) {
+                this._data.delete(key);
+                cleanedCount++;
+            }
+        }
+        
+        // 清理访问顺序记录中已删除的条目
+        this._accessOrder = this._accessOrder.filter(key => this._data.has(key));
+        
+        if (cleanedCount > 0) {
+            console.log(`[AnomalyCache] 清理过期缓存: ${cleanedCount} 条，剩余: ${this._data.size} 条`);
+        }
+    },
+    
+    // LRU: 记录访问顺序
+    _recordAccess: function(key) {
+        // 将当前访问的 key 移到数组末尾（表示最近使用）
+        const index = this._accessOrder.indexOf(key);
+        if (index !== -1) {
+            this._accessOrder.splice(index, 1);
+        }
+        this._accessOrder.push(key);
+    },
+    
+    // 当超过最大容量时，删除最久未使用的条目
+    _enforceMaxSize: function() {
+        while (this._data.size > this._maxSize && this._accessOrder.length > 0) {
+            const lruKey = this._accessOrder.shift();
+            if (lruKey && this._data.has(lruKey)) {
+                this._data.delete(lruKey);
+                console.log(`[AnomalyCache] LRU淘汰: ${lruKey}`);
+            }
+        }
+    },
+    
     async get(key, fetcher) {
+        this._initCleanup();
+        
         const cached = this._data.get(key);
         if (cached && Date.now() - cached.time < this._ttl) {
             console.log('[AnomalyCache] Hit:', key);
+            this._recordAccess(key);
             return cached.value;
         }
+        
+        // 如果存在但已过期，删除它
+        if (cached) {
+            this._data.delete(key);
+        }
+        
         console.log('[AnomalyCache] Miss:', key);
         const value = await fetcher();
+        
+        // 存储新值
         this._data.set(key, { value, time: Date.now() });
+        this._recordAccess(key);
+        this._enforceMaxSize();
+        
         return value;
     },
-
+    
+    // 带 TTL 的 set 方法
+    set(key, value, customTtl = null) {
+        this._initCleanup();
+        this._data.set(key, { 
+            value, 
+            time: Date.now(),
+            ttl: customTtl || this._ttl
+        });
+        this._recordAccess(key);
+        this._enforceMaxSize();
+    },
+    
+    // 手动清除特定缓存
+    invalidate(key) {
+        if (key) {
+            this._data.delete(key);
+            const index = this._accessOrder.indexOf(key);
+            if (index !== -1) this._accessOrder.splice(index, 1);
+            console.log('[AnomalyCache] Invalidated:', key);
+        } else {
+            this.clear();
+        }
+    },
+    
+    // 清除所有缓存
     clear() {
         this._data.clear();
+        this._accessOrder = [];
+        console.log('[AnomalyCache] Cleared all');
+    },
+    
+    // 获取缓存统计信息
+    getStats() {
+        const now = Date.now();
+        let activeCount = 0;
+        for (const [key, value] of this._data) {
+            if (now - value.time < this._ttl) activeCount++;
+        }
+        return {
+            total: this._data.size,
+            active: activeCount,
+            expired: this._data.size - activeCount,
+            maxSize: this._maxSize
+        };
+    },
+    
+    // 停止定时器（页面卸载时调用）
+    destroy() {
+        if (this._cleanupInterval) {
+            clearInterval(this._cleanupInterval);
+            this._cleanupInterval = null;
+        }
     }
 };
 
@@ -28,7 +145,6 @@ const AnomalyCache = {
 const AnomalyHelper = {
     /**
      * 获取逾期30天订单（分页 + 聚合统计）
-     * 修复：移除 customers 关联，使用 orders 表自带的 customer_name
      */
     async getOverdueOrders(profile, page, pageSize) {
         if (page === undefined) page = 0;
@@ -48,7 +164,6 @@ const AnomalyHelper = {
             query = query.eq('store_id', storeId);
         }
         
-        // 分页：使用 .range()
         const from = page * pageSize;
         const to = from + pageSize - 1;
         query = query.range(from, to);
@@ -68,7 +183,6 @@ const AnomalyHelper = {
 
     /**
      * 获取黑名单客户（分页 + 聚合统计）
-     * 修复：明确指定外键关系 blacklist_customer_id_fkey
      */
     async getBlacklistCustomers(page, pageSize) {
         if (page === undefined) page = 0;
@@ -95,7 +209,7 @@ const AnomalyHelper = {
     },
 
     /**
-     * 获取本月门店排名数据（限制数据范围到本月，不再拉全量历史订单）
+     * 获取本月门店排名数据
      */
     async getMonthlyStoreRanking(stores) {
         const today = new Date();
@@ -104,7 +218,6 @@ const AnomalyHelper = {
         const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
         const monthEnd = today.toISOString().split('T')[0];
         
-        // 只拉取本月订单（关键性能优化点）
         const { data: monthlyOrders, error } = await supabaseClient
             .from('orders')
             .select('id, store_id, loan_amount, status, overdue_days')
@@ -116,7 +229,6 @@ const AnomalyHelper = {
             return { top3: [], bottom3: [] };
         }
         
-        // 获取本月还款数据
         const { data: monthlyFlows } = await supabaseClient
             .from('cash_flow_records')
             .select('store_id, amount, order_id')
@@ -124,7 +236,6 @@ const AnomalyHelper = {
             .eq('is_voided', false)
             .gte('recorded_at', monthStart);
         
-        // 构建 flow 金额快速查找表
         const flowAmountByOrder = {};
         if (monthlyFlows) {
             for (const flow of monthlyFlows) {
@@ -134,7 +245,6 @@ const AnomalyHelper = {
             }
         }
         
-        // 门店映射
         const storeInfoMap = {};
         for (const store of stores) {
             storeInfoMap[store.id] = {
@@ -145,7 +255,6 @@ const AnomalyHelper = {
             };
         }
         
-        // 按门店聚合统计
         const storeStats = {};
         for (const order of (monthlyOrders || [])) {
             const s = storeInfoMap[order.store_id];
@@ -179,40 +288,34 @@ const AnomalyHelper = {
             return { top3: [], bottom3: [] };
         }
         
-        // 计算综合排名
         for (const s of eligibleStores) {
             s.rankSum = 0;
         }
         
-        // 按订单数从大到小排
         eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankOrderCount = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按放款额从小到大排（越小风险越低）
         eligibleStores.sort((a, b) => a.totalLoanOutflow - b.totalLoanOutflow);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankLoanOutflow = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按不良订单数从小到大排
         eligibleStores.sort((a, b) => a.badOrders - b.badOrders);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankBadOrders = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按回收额从大到小排
         eligibleStores.sort((a, b) => b.totalRecovery - a.totalRecovery);
         for (let i = 0; i < eligibleStores.length; i++) {
             eligibleStores[i].rankRecovery = i + 1;
             eligibleStores[i].rankSum += (i + 1);
         }
         
-        // 按总分从小到大排（越小排名越好）
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
         
         const top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
@@ -233,8 +336,6 @@ const DashboardAnomaly = {
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
-            
-            // ========== 并行获取数据（使用聚合查询 + 缓存） ==========
             
             // 逾期30天订单（分页加载，初始50条）
             const overdueCacheKey = 'overdue_orders_' + (isAdmin ? 'admin' : storeId) + '_0';
@@ -276,7 +377,6 @@ const DashboardAnomaly = {
                 var overdueRows = '';
                 for (var i = 0; i < overdueOrders.length; i++) {
                     var o = overdueOrders[i];
-                    // 修复：直接使用 o.customer_name，不再引用 o.customers
                     var customerName = o.customer_name || '-';
                     overdueRows += '<tr>' +
                         '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
@@ -287,7 +387,6 @@ const DashboardAnomaly = {
                     '</tr>';
                 }
                 
-                // 判断是否还有更多
                 var loadMoreHtml = '';
                 if (overdueTotalCount > overdueOrders.length) {
                     loadMoreHtml = '' +
@@ -367,19 +466,20 @@ const DashboardAnomaly = {
                     '</div>';
             }
             
-            // ========== 门店视图：2列布局（逾期30天 + 黑名单） ==========
+            // ========== 门店视图：2列布局 ==========
             if (!isAdmin) {
                 document.getElementById("app").innerHTML = '' +
                     '<div class="page-header">' +
-                        '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
+                        '<div style="display:flex; align-items:center; gap:12px;">' +
+                            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                            '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
+                        '</div>' +
                         '<div class="header-actions">' +
-                            '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                            '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                            '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                         '</div>' +
                     '</div>' +
                     
                     '<div class="anomaly-grid">' +
-                        // 卡片1：逾期30天订单
                         '<div class="anomaly-card anomaly-card-danger">' +
                             '<div class="anomaly-card-header">' +
                                 '<span class="anomaly-icon">⚠️</span>' +
@@ -393,7 +493,6 @@ const DashboardAnomaly = {
                                 '</div>' : '') +
                         '</div>' +
                         
-                        // 卡片2：黑名单客户
                         '<div class="anomaly-card anomaly-card-warning">' +
                             '<div class="anomaly-card-header">' +
                                 '<span class="anomaly-icon">🚫</span>' +
@@ -404,7 +503,6 @@ const DashboardAnomaly = {
                         '</div>' +
                     '</div>';
                 
-                // 存储状态用于加载更多
                 window._anomalyOverdueState = {
                     page: 0,
                     pageSize: 50,
@@ -422,9 +520,7 @@ const DashboardAnomaly = {
                 return;
             }
             
-            // ========== 以下为总部视图（isAdmin = true） ==========
-            
-            // 渲染门店排名前三
+            // ========== 总部视图 ==========
             var top3Html = '';
             if (top3.length === 0) {
                 top3Html = '' +
@@ -455,7 +551,6 @@ const DashboardAnomaly = {
                 top3Html = '<div class="ranking-list">' + top3Items + '</div>';
             }
             
-            // 渲染门店排名后三
             var bottom3Html = '';
             if (bottom3.length === 0) {
                 bottom3Html = '' +
@@ -486,19 +581,18 @@ const DashboardAnomaly = {
                 bottom3Html = '<div class="ranking-list">' + bottom3Items + '</div>';
             }
             
-            // ========== 总部视图（保持原有4卡片网格布局） ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
+                    '<div style="display:flex; align-items:center; gap:12px;">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                        '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
+                    '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
                 '<div class="anomaly-grid">' +
-                    
-                    // 卡片1：业绩前三
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🏆</span>' +
@@ -511,7 +605,6 @@ const DashboardAnomaly = {
                         '</div>' +
                     '</div>' +
                     
-                    // 卡片2：业绩后三
                     '<div class="anomaly-card anomaly-card-info">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">📉</span>' +
@@ -524,7 +617,6 @@ const DashboardAnomaly = {
                         '</div>' +
                     '</div>' +
                     
-                    // 卡片3：逾期30天订单
                     '<div class="anomaly-card anomaly-card-danger">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">⚠️</span>' +
@@ -538,7 +630,6 @@ const DashboardAnomaly = {
                             '</div>' : '') +
                     '</div>' +
                     
-                    // 卡片4：黑名单
                     '<div class="anomaly-card anomaly-card-warning">' +
                         '<div class="anomaly-card-header">' +
                             '<span class="anomaly-icon">🚫</span>' +
@@ -547,10 +638,8 @@ const DashboardAnomaly = {
                         '</div>' +
                         '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
                     '</div>' +
-                    
                 '</div>';
             
-            // 存储状态用于加载更多
             window._anomalyOverdueState = {
                 page: 0,
                 pageSize: 50,
@@ -564,6 +653,11 @@ const DashboardAnomaly = {
                 pageSize: 50,
                 totalCount: blacklistTotalCount
             };
+            
+            // 可选：输出缓存统计（调试用）
+            if (window._debugAnomalyCache !== false) {
+                console.log('[AnomalyCache] 统计:', AnomalyCache.getStats());
+            }
             
         } catch (error) {
             console.error("showAnomaly error:", error);
@@ -579,7 +673,6 @@ const DashboardAnomaly = {
         
         var lang = Utils.lang;
         
-        // 禁用按钮
         var loadMoreBtn = document.querySelector('#overdueLoadMoreRow button');
         if (loadMoreBtn) {
             loadMoreBtn.disabled = true;
@@ -590,11 +683,9 @@ const DashboardAnomaly = {
             var nextPage = state.page + 1;
             var result = await AnomalyHelper.getOverdueOrders(state.profile, nextPage, state.pageSize);
             
-            // 构建新行HTML
             var newRows = '';
             for (var i = 0; i < result.data.length; i++) {
                 var o = result.data[i];
-                // 修复：直接使用 o.customer_name
                 var customerName = o.customer_name || '-';
                 newRows += '<tr>' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
@@ -605,20 +696,16 @@ const DashboardAnomaly = {
                 '</tr>';
             }
             
-            // 移除旧加载更多行
             var oldLoadMoreRow = document.getElementById('overdueLoadMoreRow');
             if (oldLoadMoreRow) oldLoadMoreRow.remove();
             
-            // 插入新行
             var tbody = document.querySelector('.anomaly-card-danger table tbody');
             if (tbody) {
                 tbody.insertAdjacentHTML('beforeend', newRows);
                 
-                // 更新状态
                 state.page = nextPage;
                 state.totalCount = result.totalCount;
                 
-                // 如果还有更多，追加新的加载更多行
                 var loadedCount = (nextPage + 1) * state.pageSize;
                 if (result.totalCount > loadedCount) {
                     var loadMoreHtml = '' +
@@ -632,7 +719,6 @@ const DashboardAnomaly = {
                         '</tr>';
                     tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
                 } else {
-                    // 全部加载完毕
                     var doneHtml = '' +
                         '<tr id="overdueLoadMoreRow">' +
                             '<td colspan="5" style="text-align:center;padding:10px;color:var(--text-muted);">' +
@@ -646,7 +732,6 @@ const DashboardAnomaly = {
         } catch (err) {
             console.error("loadMoreOverdueOrders error:", err);
             Utils.ErrorHandler.capture(err, 'loadMoreOverdueOrders');
-            // 恢复按钮
             if (loadMoreBtn) {
                 loadMoreBtn.disabled = false;
                 loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
@@ -723,6 +808,12 @@ const DashboardAnomaly = {
                 loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
             }
         }
+    },
+    
+    // 手动清除异常页面缓存（供外部调用）
+    clearAnomalyCache: function() {
+        AnomalyCache.clear();
+        console.log('[AnomalyCache] 已手动清除所有缓存');
     }
 };
 
@@ -736,3 +827,4 @@ for (var key in DashboardAnomaly) {
 // 挂载加载更多方法
 window.APP.loadMoreOverdueOrders = DashboardAnomaly.loadMoreOverdueOrders.bind(DashboardAnomaly);
 window.APP.loadMoreBlacklist = DashboardAnomaly.loadMoreBlacklist.bind(DashboardAnomaly);
+window.APP.clearAnomalyCache = DashboardAnomaly.clearAnomalyCache.bind(DashboardAnomaly);
