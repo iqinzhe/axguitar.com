@@ -1,4 +1,4 @@
-// app-customers.js - v1.0
+// app-customers.js - v1.0 (修复：返回键统一右上角)
 window.APP = window.APP || {};
 
 const CustomersModule = {
@@ -158,13 +158,13 @@ const CustomersModule = {
                 '</style>';
             
             document.getElementById("app").innerHTML = inlineStyles + '' +
-    '<div class="page-header">' +
-        '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
-        '<div class="header-actions">' +
-            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-            '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
-        '</div>' +
-    '</div>' +
+                '<div class="page-header">' +
+                    '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
+                    '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
+                    '</div>' +
+                '</div>' +
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Daftar Nasabah' : '客户列表') + '</h3>' +
                     '<div class="table-container">' +
@@ -963,12 +963,12 @@ const CustomersModule = {
             var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
             
             document.getElementById("app").innerHTML = '' +
-    '<div class="page-header">' +
-        '<h2>📋 ' + (lang === 'id' ? 'Order Nasabah' : '客户订单') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
-        '<div class="header-actions">' +
-            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-        '</div>' +
-    '</div>' +
+                '<div class="page-header">' +
+                    '<h2>📝 ' + t('create_order') + '</h2>' +
+                    '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                    '</div>' +
+                '</div>' +
                 
                 '<div class="card">' +
                     '<div class="form-section">' +
@@ -1524,10 +1524,7 @@ const CustomersModule = {
 
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<div style="display:flex; align-items:center; gap:12px;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<h2>📋 ' + (lang === 'id' ? 'Order Nasabah' : '客户订单') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
-                    '</div>' +
+                    '<h2>📋 ' + (lang === 'id' ? 'Order Nasabah' : '客户订单') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
                     '<div class="header-actions">' +
                         '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '</div>' +
@@ -1543,7 +1540,7 @@ const CustomersModule = {
                     '<h3>📋 ' + t('order_list') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th class="col-id">ID</th><th class="col-date">' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="col-amount amount">' + t('loan_amount') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></td></thead>' +
+                            '<thead><tr><th class="col-id">ID</th><th class="col-date">' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="col-amount amount">' + t('loan_amount') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
                     '</div>' +
@@ -1601,10 +1598,7 @@ const CustomersModule = {
             }
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<div style="display:flex; align-items:center; gap:12px;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<h2>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
-                    '</div>' +
+                    '<h2>💰 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '付款记录') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
                     '<div class="header-actions">' +
                         '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '</div>' +
