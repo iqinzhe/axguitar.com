@@ -1,4 +1,13 @@
-// toast.js - v1.0 新增文件
+// toast.js - v1.0
+// Toast 通知系统 - 替换所有 alert/confirm 弹窗
+// 使用方法：
+//   Toast.success('操作成功')
+//   Toast.error('操作失败')
+//   Toast.warning('警告信息')
+//   Toast.info('提示信息')
+//   const confirmed = await Toast.confirmPromise('确认删除？')
+//   Toast.createInlineConfirmButtons(onConfirm, onCancel) - 用于表格内联确认
+
 window.Toast = window.Toast || {};
 
 (function() {
@@ -6,8 +15,9 @@ window.Toast = window.Toast || {};
     
     let toastContainer = null;
     let confirmModal = null;
+    let toastCounter = 0;
     
-    // 初始化 Toast 容器
+    // ==================== 初始化容器 ====================
     function initContainer() {
         if (toastContainer) return;
         
@@ -16,22 +26,68 @@ window.Toast = window.Toast || {};
         toastContainer.style.cssText = `
             position: fixed;
             bottom: 20px;
-            left: 20px;
             right: 20px;
+            left: auto;
             z-index: 10050;
             display: flex;
             flex-direction: column;
             gap: 10px;
             pointer-events: none;
+            max-width: 380px;
         `;
         document.body.appendChild(toastContainer);
     }
     
-    // 显示 Toast 通知
+    // ==================== 添加动画样式 ====================
+    function addAnimations() {
+        if (document.getElementById('toast-animations')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'toast-animations';
+        style.textContent = `
+            @keyframes toastSlideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes toastSlideOutRight {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+            }
+            @keyframes confirmFadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            @keyframes confirmScaleIn {
+                from {
+                    transform: scale(0.95);
+                    opacity: 0;
+                }
+                to {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // ==================== 显示 Toast 通知 ====================
     function show(message, type = 'info', duration = 3000) {
         initContainer();
         
-        const toast = document.createElement('div');
+        const id = 'toast_' + (++toastCounter) + '_' + Date.now();
         const icons = {
             success: '✅',
             error: '❌',
@@ -46,6 +102,8 @@ window.Toast = window.Toast || {};
             info: '#3b82f6'
         };
         
+        const toast = document.createElement('div');
+        toast.id = id;
         toast.style.cssText = `
             background: ${bgColors[type] || bgColors.info};
             color: white;
@@ -57,83 +115,80 @@ window.Toast = window.Toast || {};
             align-items: center;
             gap: 10px;
             pointer-events: auto;
-            animation: slideIn 0.3s ease;
+            animation: toastSlideInRight 0.3s ease;
             cursor: pointer;
+            backdrop-filter: blur(0px);
+            line-height: 1.4;
         `;
+        
+        // 处理多行消息
+        const messageLines = String(message).split('\n');
+        const messageHtml = messageLines.map(line => {
+            if (line.trim() === '') return '<br>';
+            return Utils.escapeHtml ? Utils.escapeHtml(line) : line.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }).join('<br>');
         
         toast.innerHTML = `
-            <span style="font-size: 18px;">${icons[type] || icons.info}</span>
-            <span style="flex:1;">${message}</span>
-            <span style="cursor:pointer; opacity:0.7;">✖</span>
+            <span style="font-size: 18px; flex-shrink: 0;">${icons[type] || icons.info}</span>
+            <span style="flex:1; word-break: break-word;">${messageHtml}</span>
+            <span style="cursor:pointer; opacity:0.7; flex-shrink:0; font-size:16px;">✖</span>
         `;
         
-        // 点击关闭
+        // 点击关闭按钮
         const closeBtn = toast.querySelector('span:last-child');
-        closeBtn.onclick = () => {
-            toast.style.animation = 'slideOut 0.2s ease';
-            setTimeout(() => toast.remove(), 200);
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            closeToast(toast);
         };
         
-        // 点击任意位置关闭
+        // 点击 Toast 本体也关闭
         toast.onclick = (e) => {
             if (e.target !== closeBtn) {
-                toast.style.animation = 'slideOut 0.2s ease';
-                setTimeout(() => toast.remove(), 200);
+                closeToast(toast);
             }
         };
         
         toastContainer.appendChild(toast);
         
+        // 自动关闭
         if (duration > 0) {
             setTimeout(() => {
                 if (toast.parentElement) {
-                    toast.style.animation = 'slideOut 0.2s ease';
-                    setTimeout(() => toast.remove(), 200);
+                    closeToast(toast);
                 }
             }, duration);
         }
-    }
-    
-    // 添加动画样式
-    function addAnimations() {
-        if (document.getElementById('toast-animations')) return;
         
-        const style = document.createElement('style');
-        style.id = 'toast-animations';
-        style.textContent = `
-            @keyframes slideIn {
-                from {
-                    transform: translateX(-100%);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-            }
-            @keyframes slideOut {
-                from {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-                to {
-                    transform: translateX(-100%);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
+        return toast;
     }
     
-    // 确认对话框（替换 confirm）
-    function confirm(message, title, onConfirm, onCancel) {
+    function closeToast(toast) {
+        if (!toast || !toast.parentElement) return;
+        toast.style.animation = 'toastSlideOutRight 0.2s ease';
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            if (toast.parentElement) toast.remove();
+        }, 200);
+    }
+    
+    // ==================== 确认对话框（替换 confirm） ====================
+    function confirmDialog(message, title, onConfirm, onCancel) {
         // 移除已有的确认框
-        if (confirmModal) confirmModal.remove();
+        if (confirmModal && confirmModal.parentElement) {
+            confirmModal.remove();
+            confirmModal = null;
+        }
         
-        const lang = Utils.lang;
+        const lang = window.Utils ? Utils.lang : 'id';
         const defaultTitle = lang === 'id' ? 'Konfirmasi' : '确认操作';
         const confirmText = lang === 'id' ? 'Ya, Lanjutkan' : '确认';
         const cancelText = lang === 'id' ? 'Batal' : '取消';
+        const titleText = title || defaultTitle;
         
         confirmModal = document.createElement('div');
         confirmModal.className = 'confirm-modal-overlay';
@@ -148,8 +203,18 @@ window.Toast = window.Toast || {};
             align-items: center;
             justify-content: center;
             z-index: 10060;
-            animation: fadeIn 0.2s ease;
+            animation: confirmFadeIn 0.2s ease;
         `;
+        
+        // 转义消息内容
+        const escapedMessage = (window.Utils && Utils.escapeHtml) 
+            ? Utils.escapeHtml(message).replace(/\n/g, '<br>')
+            : String(message).replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+              }).replace(/\n/g, '<br>');
         
         confirmModal.innerHTML = `
             <div class="confirm-modal-content" style="
@@ -159,10 +224,10 @@ window.Toast = window.Toast || {};
                 width: 90%;
                 padding: 20px;
                 box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-                animation: scaleIn 0.2s ease;
+                animation: confirmScaleIn 0.2s ease;
             ">
-                <h3 style="margin: 0 0 12px 0; font-size: 18px;">${Utils.escapeHtml(title || defaultTitle)}</h3>
-                <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; white-space: pre-line;">${Utils.escapeHtml(message)}</p>
+                <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">${Utils.escapeHtml ? Utils.escapeHtml(titleText) : titleText}</h3>
+                <p style="margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.5; white-space: pre-line;">${escapedMessage}</p>
                 <div style="display: flex; gap: 12px; justify-content: flex-end;">
                     <button class="confirm-cancel-btn" style="
                         padding: 8px 20px;
@@ -171,7 +236,9 @@ window.Toast = window.Toast || {};
                         border-radius: 6px;
                         cursor: pointer;
                         font-size: 14px;
-                    ">${cancelText}</button>
+                        font-weight: 500;
+                        transition: background 0.2s;
+                    " onmouseover="this.style.background='#cbd5e1'" onmouseout="this.style.background='#e2e8f0'">${cancelText}</button>
                     <button class="confirm-ok-btn" style="
                         padding: 8px 20px;
                         background: #3b82f6;
@@ -180,33 +247,12 @@ window.Toast = window.Toast || {};
                         border-radius: 6px;
                         cursor: pointer;
                         font-size: 14px;
-                    ">${confirmText}</button>
+                        font-weight: 500;
+                        transition: background 0.2s;
+                    " onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">${confirmText}</button>
                 </div>
             </div>
         `;
-        
-        // 添加动画样式
-        if (!document.getElementById('confirm-animations')) {
-            const style = document.createElement('style');
-            style.id = 'confirm-animations';
-            style.textContent = `
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes scaleIn {
-                    from {
-                        transform: scale(0.95);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: scale(1);
-                        opacity: 1;
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-        }
         
         const cancelBtn = confirmModal.querySelector('.confirm-cancel-btn');
         const okBtn = confirmModal.querySelector('.confirm-ok-btn');
@@ -221,11 +267,13 @@ window.Toast = window.Toast || {};
         cancelBtn.onclick = () => {
             cleanup();
             if (onCancel) onCancel();
+            else if (typeof onCancel === 'function') onCancel();
         };
         
         okBtn.onclick = () => {
             cleanup();
             if (onConfirm) onConfirm();
+            else if (typeof onConfirm === 'function') onConfirm();
         };
         
         // 点击背景关闭
@@ -233,24 +281,36 @@ window.Toast = window.Toast || {};
             if (e.target === confirmModal) {
                 cleanup();
                 if (onCancel) onCancel();
+                else if (typeof onCancel === 'function') onCancel();
             }
         };
+        
+        // ESC 键关闭
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                cleanup();
+                if (onCancel) onCancel();
+                else if (typeof onCancel === 'function') onCancel();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
         
         document.body.appendChild(confirmModal);
         
         return { modal: confirmModal, cleanup };
     }
     
-    // 声明式确认框（返回 Promise）
+    // ==================== Promise 风格的确认框 ====================
     function confirmPromise(message, title) {
         return new Promise((resolve) => {
-            confirm(message, title, () => resolve(true), () => resolve(false));
+            confirmDialog(message, title, () => resolve(true), () => resolve(false));
         });
     }
     
-    // 内联确认按钮组件（用于表格操作行）
+    // ==================== 内联确认按钮组件（用于表格操作行） ====================
     function createInlineConfirmButtons(onConfirm, onCancel) {
-        const lang = Utils.lang;
+        const lang = window.Utils ? Utils.lang : 'id';
         const container = document.createElement('div');
         container.style.display = 'inline-flex';
         container.style.gap = '4px';
@@ -265,7 +325,8 @@ window.Toast = window.Toast || {};
                 padding: 2px 8px;
                 font-size: 11px;
                 cursor: pointer;
-            ">✓</button>
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">✓</button>
             <button class="confirm-no" style="
                 background: #ef4444;
                 color: white;
@@ -274,15 +335,18 @@ window.Toast = window.Toast || {};
                 padding: 2px 8px;
                 font-size: 11px;
                 cursor: pointer;
-            ">✗</button>
+                transition: background 0.2s;
+            " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">✗</button>
         `;
         
-        container.querySelector('.confirm-yes').onclick = () => {
+        container.querySelector('.confirm-yes').onclick = (e) => {
+            e.stopPropagation();
             container.remove();
-            onConfirm();
+            if (onConfirm) onConfirm();
         };
         
-        container.querySelector('.confirm-no').onclick = () => {
+        container.querySelector('.confirm-no').onclick = (e) => {
+            e.stopPropagation();
             container.remove();
             if (onCancel) onCancel();
         };
@@ -290,41 +354,37 @@ window.Toast = window.Toast || {};
         return container;
     }
     
-    // 包装原始 alert 和 confirm（降级兼容）
-    let _originalAlert = window.alert;
-    let _originalConfirm = window.confirm;
+    // ==================== 快捷方法 ====================
+    const success = (msg, duration) => show(msg, 'success', duration);
+    const error = (msg, duration) => show(msg, 'error', duration);
+    const warning = (msg, duration) => show(msg, 'warning', duration);
+    const info = (msg, duration) => show(msg, 'info', duration);
     
-    function overrideNativeDialogs() {
-        window.alert = function(message) {
-            show(String(message), 'info', 4000);
-        };
-        
-        window.confirm = function(message) {
-            console.warn('confirm 被调用，请使用 Toast.confirm() 替代:', message);
-            return true;
-        };
+    // ==================== 移除所有 Toast ====================
+    function clearAll() {
+        if (toastContainer) {
+            toastContainer.innerHTML = '';
+        }
+        if (confirmModal && confirmModal.parentElement) {
+            confirmModal.remove();
+            confirmModal = null;
+        }
     }
     
-    function restoreNativeDialogs() {
-        window.alert = _originalAlert;
-        window.confirm = _originalConfirm;
-    }
-    
-    // 导出 API
+    // ==================== 导出 API ====================
     Toast.show = show;
-    Toast.success = (msg, duration) => show(msg, 'success', duration);
-    Toast.error = (msg, duration) => show(msg, 'error', duration);
-    Toast.warning = (msg, duration) => show(msg, 'warning', duration);
-    Toast.info = (msg, duration) => show(msg, 'info', duration);
-    Toast.confirm = confirm;
+    Toast.success = success;
+    Toast.error = error;
+    Toast.warning = warning;
+    Toast.info = info;
+    Toast.confirm = confirmDialog;
     Toast.confirmPromise = confirmPromise;
     Toast.createInlineConfirmButtons = createInlineConfirmButtons;
-    Toast.overrideNativeDialogs = overrideNativeDialogs;
-    Toast.restoreNativeDialogs = restoreNativeDialogs;
+    Toast.clearAll = clearAll;
     
     // 初始化
     addAnimations();
+    initContainer();
     
-    // 可选：覆盖原生弹窗（谨慎使用）
-    // Toast.overrideNativeDialogs();
+    console.log('✅ Toast 通知系统已初始化');
 })();
