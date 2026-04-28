@@ -1,4 +1,6 @@
-// app-blacklist.js - v1.0
+// app-blacklist.js - v1.1
+// 修改内容：将所有直接调用 supabaseClient 的地方改为使用 SUPABASE 封装方法
+
 window.APP = window.APP || {};
 
 // 辅助函数：安全过滤输入
@@ -7,7 +9,7 @@ function sanitizeInput(str) {
     return String(str).replace(/[^\p{L}\p{N}\s\-\.]/gu, '');
 }
 
-// 辅助函数：转义 PostgREST 过滤字符串中的特殊字符
+// 辅助函数：转义 PostgREST 过滤字符串中的特殊字符（保留用于兼容）
 function escapePostgRESTValue(str) {
     if (!str) return '';
     // 转义逗号、括号、点号（PostgREST 语法特殊字符）
@@ -16,47 +18,17 @@ function escapePostgRESTValue(str) {
 
 const BlacklistModule = {
     
+    // 使用 SUPABASE 封装方法
     isBlacklisted: async function(customerId) {
-        let { data, error } = await supabaseClient
-            .from('blacklist')
-            .select('id, reason')
-            .eq('customer_id', customerId)
-            .maybeSingle();
-        
-        if (error && error.code === '22P02') {
-            try {
-                const { data: customer } = await supabaseClient
-                    .from('customers')
-                    .select('id')
-                    .eq('customer_id', customerId)
-                    .single();
-                
-                if (customer) {
-                    const { data: retryData, error: retryError } = await supabaseClient
-                        .from('blacklist')
-                        .select('id, reason')
-                        .eq('customer_id', customer.id)
-                        .maybeSingle();
-                    
-                    if (retryError) {
-                        console.error("检查黑名单失败:", retryError);
-                        return { isBlacklisted: false };
-                    }
-                    return retryData ? { isBlacklisted: true, reason: retryData.reason } : { isBlacklisted: false };
-                }
-            } catch (e) {
-                console.warn("通过customer_id查找客户失败:", e.message);
-            }
-            return { isBlacklisted: false };
-        }
-        
-        if (error) {
+        try {
+            return await SUPABASE.checkBlacklist(customerId);
+        } catch (error) {
             console.error("检查黑名单失败:", error);
             return { isBlacklisted: false };
         }
-        return data ? { isBlacklisted: true, reason: data.reason } : { isBlacklisted: false };
     },
     
+    // 使用 SUPABASE 封装方法
     addToBlacklist: async function(customerId, reason) {
         var lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
@@ -65,19 +37,20 @@ const BlacklistModule = {
             throw new Error(lang === 'id' ? 'Alasan harus diisi' : '请填写拉黑原因');
         }
         
-        const { data: customer, error: customerError } = await supabaseClient
-            .from('customers')
-            .select('id, store_id, customer_id, name, occupation')
-            .eq('id', customerId)
-            .single();
-        
-        if (customerError) {
-            console.error("获取客户信息失败:", customerError);
-            throw new Error(lang === 'id' ? 'Gagal mendapatkan data nasabah' : '获取客户信息失败');
-        }
-        
         // 权限检查：门店操作员只能拉黑自己门店的客户
         if (profile?.role !== 'admin') {
+            // 先获取客户信息进行门店校验
+            const { data: customer, error: customerError } = await supabaseClient
+                .from('customers')
+                .select('store_id')
+                .eq('id', customerId)
+                .single();
+            
+            if (customerError) {
+                console.error("获取客户信息失败:", customerError);
+                throw new Error(lang === 'id' ? 'Gagal mendapatkan data nasabah' : '获取客户信息失败');
+            }
+            
             const customerStoreId = customer.store_id ? String(customer.store_id) : null;
             const userStoreId = profile?.store_id ? String(profile?.store_id) : null;
             
@@ -86,48 +59,15 @@ const BlacklistModule = {
             }
         }
         
-        // 检查是否已在黑名单
-        const { data: existing, error: checkError } = await supabaseClient
-            .from('blacklist')
-            .select('id')
-            .eq('customer_id', customer.id)
-            .maybeSingle();
-        
-        if (existing) {
-            throw new Error(lang === 'id' ? 'Nasabah sudah ada di blacklist' : '客户已在黑名单中');
+        try {
+            return await SUPABASE.addToBlacklist(customerId, reason, profile.id);
+        } catch (error) {
+            console.error("添加黑名单失败:", error);
+            throw error;
         }
-        
-        // 插入黑名单记录
-        const insertData = {
-            customer_id: customer.id,
-            reason: reason.trim(),
-            blacklisted_by: profile.id,
-            store_id: customer.store_id
-        };
-        
-        const { error: insertError } = await supabaseClient
-            .from('blacklist')
-            .insert(insertData);
-        
-        if (insertError) {
-            console.error("添加黑名单失败:", insertError);
-            throw new Error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + insertError.message : '添加黑名单失败：' + insertError.message);
-        }
-        
-        // 重新获取完整数据用于返回
-        const { data: newBlacklist, error: fetchError } = await supabaseClient
-            .from('blacklist')
-            .select('*')
-            .eq('customer_id', customer.id)
-            .single();
-        
-        if (fetchError) {
-            console.warn("获取新黑名单记录失败:", fetchError);
-        }
-        
-        return newBlacklist || { customer_id: customer.id, reason: reason.trim() };
     },
     
+    // 使用 SUPABASE 封装方法
     removeFromBlacklist: async function(customerId) {
         var lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
@@ -136,153 +76,26 @@ const BlacklistModule = {
             throw new Error(lang === 'id' ? 'Hanya administrator yang dapat menghapus blacklist' : '只有管理员可以解除黑名单');
         }
         
-        let deleteError = null;
-        
-        const { error: directError } = await supabaseClient
-            .from('blacklist')
-            .delete()
-            .eq('customer_id', customerId);
-        
-        if (directError && directError.code === '22P02') {
-            try {
-                const { data: customer } = await supabaseClient
-                    .from('customers')
-                    .select('id')
-                    .eq('customer_id', customerId)
-                    .single();
-                
-                if (customer) {
-                    const { error: retryError } = await supabaseClient
-                        .from('blacklist')
-                        .delete()
-                        .eq('customer_id', customer.id);
-                    deleteError = retryError;
-                } else {
-                    deleteError = directError;
-                }
-            } catch (e) {
-                deleteError = directError;
-            }
-        } else {
-            deleteError = directError;
+        try {
+            return await SUPABASE.removeFromBlacklist(customerId);
+        } catch (error) {
+            console.error("解除黑名单失败:", error);
+            throw error;
         }
-        
-        if (deleteError) throw deleteError;
-        return true;
     },
     
+    // 使用 SUPABASE 封装方法
     getBlacklist: async function() {
         const profile = await SUPABASE.getCurrentProfile();
-        
-        let query = supabaseClient
-            .from('blacklist')
-            .select(`
-                *,
-                customers:customer_id (
-                    id, customer_id, name, ktp_number, phone, occupation, ktp_address, store_id,
-                    stores:store_id (name, code)
-                ),
-                blacklisted_by_profile:blacklisted_by (name)
-            `)
-            .order('blacklisted_at', { ascending: false });
-        
-        if (profile?.role !== 'admin' && profile?.store_id) {
-            query = query.eq('customers.store_id', profile.store_id);
-        }
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        return data;
+        return await SUPABASE.getBlacklist(profile?.store_id, profile);
     },
     
+    // 使用 SUPABASE 封装方法（保留原有接口兼容）
     checkDuplicateCustomer: async function(name, ktpNumber, phone, excludeCustomerId = null) {
-        // 使用安全的方式构建查询，避免 PostgREST 注入
-        const filters = [];
-        
-        if (name) {
-            filters.push({ column: 'name', value: name });
-        }
-        if (ktpNumber) {
-            filters.push({ column: 'ktp_number', value: ktpNumber });
-        }
-        if (phone) {
-            filters.push({ column: 'phone', value: phone });
-        }
-        
-        if (filters.length === 0) {
-            return null;
-        }
-        
-        // 使用 .or() 的参数化形式：用逗号分隔的 column.eq.value 格式
-        // PostgREST 支持 .or() 接收类似 "name.eq.John,ktp_number.eq.12345" 的字符串
-        // 但我们需要确保 value 中的特殊字符被正确转义
-        const orConditions = filters.map(function(f) {
-            const escapedValue = escapePostgRESTValue(f.value);
-            return f.column + '.eq.' + escapedValue;
-        }).join(',');
-        
-        let query = supabaseClient
-            .from('customers')
-            .select('id, customer_id, name, ktp_number, phone')
-            .or(orConditions);
-        
-        if (excludeCustomerId) {
-            query = query.neq('id', excludeCustomerId);
-        }
-        
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        if (!data || data.length === 0) return null;
-        
-        const duplicateFields = [];
-        const duplicateInfo = {
-            name: null,
-            ktp: null,
-            phone: null
-        };
-        
-        for (var i = 0; i < data.length; i++) {
-            var existing = data[i];
-            if (existing.name === name && !duplicateInfo.name) {
-                duplicateFields.push('name');
-                duplicateInfo.name = existing;
-            }
-            if (existing.ktp_number === ktpNumber && !duplicateInfo.ktp) {
-                duplicateFields.push('ktp');
-                duplicateInfo.ktp = existing;
-            }
-            if (existing.phone === phone && !duplicateInfo.phone) {
-                duplicateFields.push('phone');
-                duplicateInfo.phone = existing;
-            }
-        }
-        
-        const uniqueFields = [];
-        for (var j = 0; j < duplicateFields.length; j++) {
-            if (uniqueFields.indexOf(duplicateFields[j]) === -1) {
-                uniqueFields.push(duplicateFields[j]);
-            }
-        }
-        
-        let bestMatch = data[0];
-        for (var k = 0; k < data.length; k++) {
-            var customer = data[k];
-            if (customer.name === name && customer.ktp_number === ktpNumber && customer.phone === phone) {
-                bestMatch = customer;
-                break;
-            }
-        }
-        
-        return {
-            isDuplicate: true,
-            duplicateFields: uniqueFields,
-            existingCustomer: bestMatch,
-            duplicateInfo: duplicateInfo
-        };
+        return await SUPABASE.checkDuplicateCustomer(name, ktpNumber, phone, excludeCustomerId);
     },
     
-    // ========== 显示黑名单列表页面（增加职业列） ==========
+    // ========== 显示黑名单列表页面 ==========
     showBlacklist: async function() {
         APP.currentPage = 'blacklist';
         APP.saveCurrentPageState();
@@ -322,7 +135,6 @@ const BlacklistModule = {
                     
                     var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
                     
-                    // 修复1：日期单元格使用正确的结束标签
                     rows += '<tr>' +
                         '<td class="col-id">' + Utils.escapeHtml(customer.customer_id || '-') + '</td>' +
                         '<td class="col-name">' + Utils.escapeHtml(customer.name) + '</td>' +
@@ -372,7 +184,7 @@ const BlacklistModule = {
             
         } catch (error) {
             console.error("showBlacklist error:", error);
-            alert(lang === 'id' ? 'Gagal memuat data blacklist: ' + error.message : '加载黑名单失败：' + error.message);
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data blacklist: ' + error.message : '加载黑名单失败：' + error.message);
         }
     }
 };
