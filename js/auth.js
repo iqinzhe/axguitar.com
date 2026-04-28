@@ -1,4 +1,9 @@
-// auth.js - v1.0
+// auth.js - v1.1
+// 修改内容：
+// 1. 简化 Toast.confirmPromise 调用（移除 fallback）
+// 2. 统一使用 Utils.toast 方法
+// 3. 优化登录锁定机制
+
 const AUTH = {
     user: null,
 
@@ -38,11 +43,7 @@ const AUTH = {
             const msg = lang === 'id' 
                 ? '⚠️ Akun telah dikunci. Silakan coba lagi setelah ' + remainingMinutes + ' menit.'
                 : '⚠️ 账号已锁定，请 ' + remainingMinutes + ' 分钟后重试。';
-            if (window.Toast) {
-                window.Toast.warning(msg, 5000);
-            } else {
-                alert(msg);
-            }
+            Utils.toast.warning(msg, 5000);
             return true;
         }
         
@@ -77,11 +78,7 @@ const AUTH = {
             const msg = lang === 'id' 
                 ? '⚠️ Terlalu banyak percobaan login. Akun dikunci selama 15 menit.'
                 : '⚠️ 登录尝试次数过多，账号已锁定15分钟。';
-            if (window.Toast) {
-                window.Toast.warning(msg, 8000);
-            } else {
-                alert(msg);
-            }
+            Utils.toast.warning(msg, 8000);
             return true;
         }
         
@@ -125,8 +122,6 @@ const AUTH = {
         }
     },
 
-    // ==================== 网络状态监听 ====================
-    
     // ==================== 初始化 ====================
     async init() {
         // 初始化增强版网络监控（如果存在）
@@ -192,14 +187,7 @@ const AUTH = {
         };
         
         var showOnlineToast = function() {
-            var toast = document.createElement('div');
-            toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 20px;border-radius:20px;z-index:10001;font-size:14px;transition:opacity 0.5s;';
-            toast.textContent = Utils.lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复';
-            document.body.appendChild(toast);
-            setTimeout(function() { 
-                toast.style.opacity = '0'; 
-                setTimeout(function() { toast.remove(); }, 500); 
-            }, 2000);
+            Utils.toast.info(Utils.lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复', 2000);
         };
         
         window.addEventListener('offline', showOfflineBanner);
@@ -254,15 +242,9 @@ const AUTH = {
             
             if (!isNetworkAvailable) {
                 const lang = Utils.lang;
-                if (window.Toast) {
-                    window.Toast.error(lang === 'id' 
-                        ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
-                        : '❌ 无网络连接，请检查网络设置。', 4000);
-                } else {
-                    alert(lang === 'id' 
-                        ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
-                        : '❌ 无网络连接，请检查网络设置。');
-                }
+                Utils.toast.error(lang === 'id' 
+                    ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
+                    : '❌ 无网络连接，请检查网络设置。', 4000);
                 return null;
             }
 
@@ -273,15 +255,9 @@ const AUTH = {
                 console.error('Login error:', result?.error);
                 this._recordLoginFailure(usernameOrEmail);
                 const lang = Utils.lang;
-                if (window.Toast) {
-                    window.Toast.error(lang === 'id' 
-                        ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') 
-                        : '登录失败：' + (result?.error?.message || '用户名或密码错误'), 4000);
-                } else {
-                    alert(lang === 'id' 
-                        ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') 
-                        : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
-                }
+                Utils.toast.error(lang === 'id' 
+                    ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') 
+                    : '登录失败：' + (result?.error?.message || '用户名或密码错误'), 4000);
                 if (window.Audit) {
                     await window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials');
                 }
@@ -296,12 +272,7 @@ const AUTH = {
 
             if (!this.user) {
                 console.error('Failed to load user profile after login');
-                const lang = Utils.lang;
-                if (window.Toast) {
-                    window.Toast.error(lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败', 4000);
-                } else {
-                    alert(lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败');
-                }
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败', 4000);
                 return null;
             }
 
@@ -312,15 +283,9 @@ const AUTH = {
                     if (!storeStatus.is_active) {
                         await this.logout();
                         var lang = Utils.lang;
-                        if (window.Toast) {
-                            window.Toast.warning(lang === 'id' 
-                                ? '⚠️ Toko "' + storeStatus.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
-                                : '⚠️ 门店 "' + storeStatus.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。', 6000);
-                        } else {
-                            alert(lang === 'id' 
-                                ? '⚠️ Toko "' + storeStatus.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
-                                : '⚠️ 门店 "' + storeStatus.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。');
-                        }
+                        Utils.toast.warning(lang === 'id' 
+                            ? '⚠️ Toko "' + storeStatus.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
+                            : '⚠️ 门店 "' + storeStatus.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。', 6000);
                         return null;
                     }
                 } catch (e) {
@@ -337,12 +302,7 @@ const AUTH = {
         } catch (error) {
             console.error('LOGIN ERROR:', error);
             this._recordLoginFailure(usernameOrEmail);
-            const lang = Utils.lang;
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误', 4000);
-            } else {
-                alert(lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误', 4000);
             return null;
         }
     },
@@ -376,11 +336,7 @@ const AUTH = {
 
         if (existing) {
             const msg = Utils.lang === 'id' ? 'Username sudah digunakan' : '用户名已存在';
-            if (window.Toast) {
-                window.Toast.error(msg);
-            } else {
-                throw new Error(msg);
-            }
+            Utils.toast.error(msg);
             throw new Error(msg);
         }
 
@@ -393,9 +349,7 @@ const AUTH = {
         if (signUpError) throw signUpError;
         if (!authUser.user) {
             const msg = Utils.lang === 'id' ? 'Gagal membuat pengguna' : '创建用户失败';
-            if (window.Toast) {
-                window.Toast.error(msg);
-            }
+            Utils.toast.error(msg);
             throw new Error(msg);
         }
 
@@ -415,9 +369,7 @@ const AUTH = {
     async deleteUser(userId) {
         if (userId === this.user?.id) {
             const msg = Utils.lang === 'id' ? 'Tidak dapat menghapus akun sendiri' : '不能删除自己的账号';
-            if (window.Toast) {
-                window.Toast.error(msg);
-            }
+            Utils.toast.error(msg);
             throw new Error(msg);
         }
 
@@ -470,11 +422,7 @@ const AUTH = {
             const warningMsg = lang === 'id'
                 ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.\n\nHubungi administrator untuk pembersihan manual.'
                 : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。\n\n请联系管理员进行手动清理。';
-            if (window.Toast) {
-                window.Toast.warning(warningMsg, 8000);
-            } else {
-                alert(warningMsg);
-            }
+            Utils.toast.warning(warningMsg, 8000);
         }
 
         const { error } = await client.from('user_profiles').delete().eq('id', userId);
@@ -508,17 +456,13 @@ const AUTH = {
         
         if (this.user?.role !== 'admin') {
             const msg = lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码';
-            if (window.Toast) {
-                window.Toast.error(msg);
-            }
+            Utils.toast.error(msg);
             throw new Error(msg);
         }
         
         if (!newPassword || newPassword.length < 6) {
             const msg = lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符';
-            if (window.Toast) {
-                window.Toast.warning(msg);
-            }
+            Utils.toast.warning(msg);
             throw new Error(msg);
         }
         
@@ -547,9 +491,7 @@ const AUTH = {
             const errorMsg = lang === 'id'
                 ? '❌ Fungsi reset password tidak tersedia. Hubungi administrator untuk mengaktifkan Edge Function atau lakukan reset manual di Supabase Dashboard.'
                 : '❌ 密码重置功能不可用。请联系管理员部署 Edge Function，或在 Supabase 后台手动重置密码。';
-            if (window.Toast) {
-                window.Toast.error(errorMsg, 8000);
-            }
+            Utils.toast.error(errorMsg, 8000);
             throw new Error(errorMsg);
         }
         
@@ -558,9 +500,7 @@ const AUTH = {
             await window.Audit.logPasswordReset(userId, this.user?.id);
         }
         
-        if (window.Toast) {
-            window.Toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
-        }
+        Utils.toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
         
         return true;
     },
