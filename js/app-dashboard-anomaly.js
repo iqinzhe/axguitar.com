@@ -1,138 +1,12 @@
-// app-dashboard-anomaly.js - v1.0
+// app-dashboard-anomaly.js - v1.1
+// 修改内容：
+// 1. 移除独立的 AnomalyCache，改用统一 JFCache 模块
+// 2. 将直接调用 supabaseClient 的地方改为使用 SUPABASE 封装方法
+// 3. 将 alert 改为 Utils.toast 统一调用
+
 window.APP = window.APP || {};
 
-// ==================== 异常检测缓存模块（增强版：自动清理 + LRU） ====================
-const AnomalyCache = {
-    _data: new Map(),
-    _ttl: 3 * 60 * 1000,  // 3分钟缓存
-    _maxSize: 100,         // 最大缓存条目数
-    _cleanupInterval: null,
-    _accessOrder: [],      // LRU 访问顺序记录
-    
-    // 初始化定时清理
-    _initCleanup: function() {
-        if (this._cleanupInterval) return;
-        this._cleanupInterval = setInterval(() => {
-            this._cleanupExpired();
-        }, 60 * 1000); // 每分钟清理一次
-        console.log('[AnomalyCache] 缓存清理定时器已启动');
-    },
-    
-    // 清理过期缓存
-    _cleanupExpired: function() {
-        const now = Date.now();
-        let cleanedCount = 0;
-        
-        for (const [key, value] of this._data) {
-            if (now - value.time > this._ttl) {
-                this._data.delete(key);
-                cleanedCount++;
-            }
-        }
-        
-        // 清理访问顺序记录中已删除的条目
-        this._accessOrder = this._accessOrder.filter(key => this._data.has(key));
-        
-        if (cleanedCount > 0) {
-            console.log(`[AnomalyCache] 清理过期缓存: ${cleanedCount} 条，剩余: ${this._data.size} 条`);
-        }
-    },
-    
-    // LRU: 记录访问顺序
-    _recordAccess: function(key) {
-        const index = this._accessOrder.indexOf(key);
-        if (index !== -1) {
-            this._accessOrder.splice(index, 1);
-        }
-        this._accessOrder.push(key);
-    },
-    
-    // 当超过最大容量时，删除最久未使用的条目
-    _enforceMaxSize: function() {
-        while (this._data.size > this._maxSize && this._accessOrder.length > 0) {
-            const lruKey = this._accessOrder.shift();
-            if (lruKey && this._data.has(lruKey)) {
-                this._data.delete(lruKey);
-                console.log(`[AnomalyCache] LRU淘汰: ${lruKey}`);
-            }
-        }
-    },
-    
-    async get(key, fetcher) {
-        this._initCleanup();
-        
-        const cached = this._data.get(key);
-        if (cached && Date.now() - cached.time < this._ttl) {
-            console.log('[AnomalyCache] Hit:', key);
-            this._recordAccess(key);
-            return cached.value;
-        }
-        
-        if (cached) {
-            this._data.delete(key);
-        }
-        
-        console.log('[AnomalyCache] Miss:', key);
-        const value = await fetcher();
-        
-        this._data.set(key, { value, time: Date.now() });
-        this._recordAccess(key);
-        this._enforceMaxSize();
-        
-        return value;
-    },
-    
-    set(key, value, customTtl = null) {
-        this._initCleanup();
-        this._data.set(key, { 
-            value, 
-            time: Date.now(),
-            ttl: customTtl || this._ttl
-        });
-        this._recordAccess(key);
-        this._enforceMaxSize();
-    },
-    
-    invalidate(key) {
-        if (key) {
-            this._data.delete(key);
-            const index = this._accessOrder.indexOf(key);
-            if (index !== -1) this._accessOrder.splice(index, 1);
-            console.log('[AnomalyCache] Invalidated:', key);
-        } else {
-            this.clear();
-        }
-    },
-    
-    clear() {
-        this._data.clear();
-        this._accessOrder = [];
-        console.log('[AnomalyCache] Cleared all');
-    },
-    
-    getStats() {
-        const now = Date.now();
-        let activeCount = 0;
-        for (const [key, value] of this._data) {
-            if (now - value.time < this._ttl) activeCount++;
-        }
-        return {
-            total: this._data.size,
-            active: activeCount,
-            expired: this._data.size - activeCount,
-            maxSize: this._maxSize
-        };
-    },
-    
-    destroy() {
-        if (this._cleanupInterval) {
-            clearInterval(this._cleanupInterval);
-            this._cleanupInterval = null;
-        }
-    }
-};
-
-// ==================== 异常检测辅助方法 ====================
+// ==================== 异常检测辅助方法（使用 SUPABASE 封装） ====================
 const AnomalyHelper = {
     async getOverdueOrders(profile, page, pageSize) {
         if (page === undefined) page = 0;
@@ -319,29 +193,32 @@ const DashboardAnomaly = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 逾期30天订单（分页加载，初始50条）
+            // 逾期30天订单（分页加载，初始50条）- 使用统一缓存
             const overdueCacheKey = 'overdue_orders_' + (isAdmin ? 'admin' : storeId) + '_0';
-            const overdueResult = await AnomalyCache.get(overdueCacheKey, 
-                () => AnomalyHelper.getOverdueOrders(profile, 0, 50)
+            const overdueResult = await JFCache.get(overdueCacheKey, 
+                () => AnomalyHelper.getOverdueOrders(profile, 0, 50),
+                { ttl: 3 * 60 * 1000 }
             );
             var overdueOrders = overdueResult.data;
             var overdueTotalCount = overdueResult.totalCount;
             
-            // 黑名单客户（分页加载，初始50条）
+            // 黑名单客户（分页加载，初始50条）- 使用统一缓存
             const blacklistCacheKey = 'blacklist_customers_0';
-            const blacklistResult = await AnomalyCache.get(blacklistCacheKey,
-                () => AnomalyHelper.getBlacklistCustomers(0, 50)
+            const blacklistResult = await JFCache.get(blacklistCacheKey,
+                () => AnomalyHelper.getBlacklistCustomers(0, 50),
+                { ttl: 3 * 60 * 1000 }
             );
             var blacklist = blacklistResult.data;
             var blacklistTotalCount = blacklistResult.totalCount;
             
-            // 门店排名（仅总部需要）
+            // 门店排名（仅总部需要）- 使用统一缓存
             var top3 = [], bottom3 = [];
             if (isAdmin) {
                 const stores = await SUPABASE.getAllStores();
                 const rankingCacheKey = 'monthly_store_ranking';
-                const rankingResult = await AnomalyCache.get(rankingCacheKey,
-                    () => AnomalyHelper.getMonthlyStoreRanking(stores)
+                const rankingResult = await JFCache.get(rankingCacheKey,
+                    () => AnomalyHelper.getMonthlyStoreRanking(stores),
+                    { ttl: 5 * 60 * 1000 }
                 );
                 top3 = rankingResult.top3;
                 bottom3 = rankingResult.bottom3;
@@ -379,7 +256,7 @@ const DashboardAnomaly = {
                                     ' (' + (overdueTotalCount - overdueOrders.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '</tr>';
+                        '</td>';
                 }
                 
                 overdueTableHtml = '' +
@@ -502,7 +379,6 @@ const DashboardAnomaly = {
             
             // ========== 总部视图：门店排名渲染 ==========
             
-            // top3 渲染 —— 使用 let 避免变量提升混淆
             var top3Html = '';
             if (top3.length === 0) {
                 top3Html = '' +
@@ -533,7 +409,6 @@ const DashboardAnomaly = {
                 top3Html = '<div class="ranking-list">' + top3Items + '</div>';
             }
             
-            // bottom3 渲染 —— 使用独立的 let 变量，与 top3 循环完全隔离
             var bottom3Html = '';
             if (bottom3.length === 0) {
                 bottom3Html = '' +
@@ -636,17 +511,13 @@ const DashboardAnomaly = {
             };
             
             if (window._debugAnomalyCache !== false) {
-                console.log('[AnomalyCache] 统计:', AnomalyCache.getStats());
+                console.log('[AnomalyCache] 统计:', JFCache.getStats());
             }
             
         } catch (error) {
             console.error("showAnomaly error:", error);
             Utils.ErrorHandler.capture(error, 'showAnomaly');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
         }
     },
 
@@ -720,9 +591,7 @@ const DashboardAnomaly = {
                 loadMoreBtn.disabled = false;
                 loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
             }
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
         }
     },
 
@@ -794,19 +663,15 @@ const DashboardAnomaly = {
                 loadMoreBtn.disabled = false;
                 loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
             }
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
         }
     },
     
-    // 手动清除异常页面缓存
+    // 手动清除异常页面缓存（使用统一缓存模块）
     clearAnomalyCache: function() {
-        AnomalyCache.clear();
-        if (window.Toast) {
-            window.Toast.info('缓存已清除', 2000);
-        }
-        console.log('[AnomalyCache] 已手动清除所有缓存');
+        JFCache.clear();
+        Utils.toast.info('缓存已清除', 2000);
+        console.log('[JFCache] 已手动清除所有缓存');
     }
 };
 
