@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.0
+// app-dashboard-expenses.js - v1.0 (修复：返回键统一右上角)
 window.APP = window.APP || {};
 
 const DashboardExpenses = {
@@ -49,7 +49,7 @@ const DashboardExpenses = {
             
             var rows = '';
             if (finalExpenses.length === 0) {
-                rows = '</table><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < finalExpenses.length; i++) {
                     var e = finalExpenses[i];
@@ -97,8 +97,8 @@ const DashboardExpenses = {
                 '<div class="page-header">' +
                     '<h2>📝 ' + (lang === 'id' ? 'Pengeluaran Operasional' : '运营支出') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
@@ -125,7 +125,7 @@ const DashboardExpenses = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
-                        '</tr>' +
+                        '</table>' +
                     '</div>' +
                 '</div>' +
                 
