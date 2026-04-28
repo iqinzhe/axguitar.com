@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.0（修复：刷新后停留当前页面）
+// app-dashboard-core.js - v2.1（修复：刷新后正确停留当前页面）
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -392,7 +392,7 @@ const DashboardCore = {
                 localStorage.removeItem('jf_last_customer_id');
             }
             
-            console.log('[State] 已保存页面状态:', this.currentPage);
+            console.log('[State] 已保存页面状态:', this.currentPage, '订单ID:', this.currentOrderId, '客户ID:', this.currentCustomerId);
         } catch(e) {
             console.warn('[State] 保存状态失败:', e);
         }
@@ -418,7 +418,7 @@ const DashboardCore = {
                                 'customerPaymentHistory', 'blacklist'];
             
             if (page && validPages.includes(page) && page !== 'login') {
-                console.log('[State] 从存储恢复页面:', page);
+                console.log('[State] 从存储恢复页面:', page, '订单ID:', orderId, '客户ID:', customerId);
                 return { page, filter, orderId, customerId };
             }
             return { page: null, filter: "all", orderId: null, customerId: null };
@@ -478,7 +478,7 @@ const DashboardCore = {
         }, 5000);
     },
 
-    // ========== init 方法 - 修复：刷新后停留当前页面 ==========
+    // ========== init 方法 - 修复：刷新后正确停留当前页面 ==========
     init: async function() {
         var lang = Utils.lang || 'zh';
         
@@ -540,7 +540,7 @@ const DashboardCore = {
                 return;
             }
             
-            // ========== 关键：恢复预加载的页面状态 ==========
+            // ========== 关键修复：恢复预加载的页面状态 ==========
             var targetPage = null;
             var targetOrderId = null;
             var targetCustomerId = null;
@@ -549,10 +549,10 @@ const DashboardCore = {
             // 优先使用预加载的状态（从 HTML 设置）
             if (window.__PRELOADED_PAGE) {
                 targetPage = window.__PRELOADED_PAGE;
-                targetOrderId = window.__PRELOADED_ORDER_ID;
-                targetCustomerId = window.__PRELOADED_CUSTOMER_ID;
-                targetFilter = window.__PRELOADED_FILTER;
-                console.log('[Init] 使用预加载状态:', targetPage);
+                targetOrderId = window.__PRELOADED_ORDER_ID || null;
+                targetCustomerId = window.__PRELOADED_CUSTOMER_ID || null;
+                targetFilter = window.__PRELOADED_FILTER || 'all';
+                console.log('[Init] ✅ 使用预加载状态:', targetPage, '订单ID:', targetOrderId, '客户ID:', targetCustomerId);
                 // 清除预加载变量
                 delete window.__PRELOADED_PAGE;
                 delete window.__PRELOADED_ORDER_ID;
@@ -560,13 +560,13 @@ const DashboardCore = {
                 delete window.__PRELOADED_FILTER;
             } else {
                 // 降级：从存储中读取
-                targetPage = sessionStorage.getItem('jf_current_page');
-                if (!targetPage) targetPage = localStorage.getItem('jf_last_page');
-                targetOrderId = sessionStorage.getItem('jf_current_order_id') || localStorage.getItem('jf_last_order_id');
-                targetCustomerId = sessionStorage.getItem('jf_current_customer_id') || localStorage.getItem('jf_last_customer_id');
-                targetFilter = sessionStorage.getItem('jf_current_filter') || localStorage.getItem('jf_last_filter') || 'all';
-                if (targetPage) {
-                    console.log('[Init] 从存储读取状态:', targetPage);
+                var restored = this.restorePageState();
+                if (restored.page) {
+                    targetPage = restored.page;
+                    targetOrderId = restored.orderId;
+                    targetCustomerId = restored.customerId;
+                    targetFilter = restored.filter;
+                    console.log('[Init] ✅ 从存储恢复状态:', targetPage, '订单ID:', targetOrderId, '客户ID:', targetCustomerId);
                 }
             }
             
@@ -586,7 +586,7 @@ const DashboardCore = {
                 // 保存恢复的状态
                 this.saveCurrentPageState();
                 
-                console.log('[Init] 恢复页面到:', this.currentPage, 
+                console.log('[Init] 🎯 恢复页面到:', this.currentPage, 
                             '订单ID:', this.currentOrderId, 
                             '客户ID:', this.currentCustomerId);
                 
@@ -594,7 +594,7 @@ const DashboardCore = {
                 await this.refreshCurrentPage();
             } else {
                 // 没有保存的页面，显示仪表盘
-                console.log('[Init] 无保存状态，显示仪表盘');
+                console.log('[Init] 📊 无保存状态，显示仪表盘');
                 await this.renderDashboard();
             }
             
@@ -640,7 +640,10 @@ const DashboardCore = {
         
         document.getElementById("app").innerHTML = Utils.renderSkeleton(skeletonType);
         
-        await new Promise(function(resolve) { setTimeout(resolve, 100); });
+        // 短暂延迟，确保 DOM 更新
+        await new Promise(function(resolve) { setTimeout(resolve, 150); });
+        
+        console.log('[Refresh] 正在刷新页面:', this.currentPage, '订单ID:', this.currentOrderId, '客户ID:', this.currentCustomerId);
         
         var handlers = {
             dashboard: async () => {
@@ -648,6 +651,7 @@ const DashboardCore = {
                     await self.renderDashboard();
                 } catch (e) {
                     console.error("renderDashboard failed:", e);
+                    Utils.ErrorHandler.capture(e, 'refreshCurrentPage-dashboard');
                     if (window.Toast) window.Toast.error('加载仪表盘失败，请刷新页面', 4000);
                     document.getElementById("app").innerHTML = '' +
                         '<div class="card" style="text-align:center;padding:40px;">' +
@@ -656,63 +660,73 @@ const DashboardCore = {
                         '</div>';
                 }
             },
-            orderTable: () => ModuleFallback.safeCall('Daftar Pesanan', window.APP.showOrderTable, [], self.renderDashboard()),
+            orderTable: () => ModuleFallback.safeCall('Daftar Pesanan', window.APP.showOrderTable, [], self.renderDashboard.bind(self)),
             createOrder: () => ModuleFallback.safeCall('Buat Pesanan', window.APP.showCreateOrder, [], null),
             viewOrder: async () => { 
                 if (self.currentOrderId) {
-                    return await ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [self.currentOrderId], self.renderDashboard());
+                    return await ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [self.currentOrderId], self.renderDashboard.bind(self));
                 }
+                console.warn('[Refresh] viewOrder 没有订单ID，回退到仪表盘');
                 return await self.renderDashboard();
             },
             payment: async () => { 
                 if (self.currentOrderId) {
-                    return await ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [self.currentOrderId], self.renderDashboard());
+                    return await ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [self.currentOrderId], self.renderDashboard.bind(self));
                 }
+                console.warn('[Refresh] payment 没有订单ID，回退到仪表盘');
                 return await self.renderDashboard();
             },
-            anomaly: () => ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], self.renderDashboard()),
-            userManagement: () => ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], self.renderDashboard()),
+            anomaly: () => ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], self.renderDashboard.bind(self)),
+            userManagement: () => ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], self.renderDashboard.bind(self)),
             storeManagement: () => {
                 if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') {
-                    return ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], self.renderDashboard());
+                    return ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], self.renderDashboard.bind(self));
                 }
                 return self.renderDashboard();
             },
-            expenses: () => ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], self.renderDashboard()),
-            customers: () => ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], self.renderDashboard()),
+            expenses: () => ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], self.renderDashboard.bind(self)),
+            customers: () => ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], self.renderDashboard.bind(self)),
             paymentHistory: async () => {
                 if (typeof window.APP.showCashFlowPage === 'function') {
-                    return await ModuleFallback.safeCall('Arus Kas', window.APP.showCashFlowPage, [], self.renderDashboard());
+                    return await ModuleFallback.safeCall('Arus Kas', window.APP.showCashFlowPage, [], self.renderDashboard.bind(self));
                 }
                 if (typeof window.APP.showPaymentHistory === 'function') {
-                    return await ModuleFallback.safeCall('Riwayat Pembayaran', window.APP.showPaymentHistory, [], self.renderDashboard());
+                    return await ModuleFallback.safeCall('Riwayat Pembayaran', window.APP.showPaymentHistory, [], self.renderDashboard.bind(self));
                 }
+                console.warn('[Refresh] paymentHistory 模块不可用，回退到仪表盘');
                 return await self.renderDashboard();
             },
             backupRestore: () => {
                 if (typeof Storage !== 'undefined' && typeof Storage.renderBackupUI === 'function') {
-                    return ModuleFallback.safeCall('Cadangan', Storage.renderBackupUI, [], self.renderDashboard());
+                    return ModuleFallback.safeCall('Cadangan', Storage.renderBackupUI, [], self.renderDashboard.bind(self));
                 }
                 return self.renderDashboard();
             },
             customerOrders: async () => { 
                 if (self.currentCustomerId && typeof window.APP.showCustomerOrders === 'function') {
-                    return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], self.renderDashboard());
+                    return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], self.renderDashboard.bind(self));
                 }
+                console.warn('[Refresh] customerOrders 没有客户ID');
                 return await self.renderDashboard();
             },
             customerPaymentHistory: async () => { 
                 if (self.currentCustomerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                    return await ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [self.currentCustomerId], self.renderDashboard());
+                    return await ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [self.currentCustomerId], self.renderDashboard.bind(self));
                 }
+                console.warn('[Refresh] customerPaymentHistory 没有客户ID');
                 return await self.renderDashboard();
             },
-            blacklist: () => ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], self.renderDashboard())
+            blacklist: () => ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], self.renderDashboard.bind(self))
         };
         
         var handler = handlers[this.currentPage];
-        if (handler) await handler();
-        else await self.renderDashboard();
+        if (handler) {
+            console.log('[Refresh] 找到处理器:', this.currentPage);
+            await handler();
+        } else {
+            console.warn('[Refresh] 未找到处理器:', this.currentPage, '回退到仪表盘');
+            await self.renderDashboard();
+        }
     },
 
     navigateTo: function(page, params) {
@@ -728,10 +742,15 @@ const DashboardCore = {
         this.currentPage = page;
         
         if (params.orderId) this.currentOrderId = params.orderId;
+        else if (page !== 'viewOrder' && page !== 'payment') this.currentOrderId = null;
+        
         if (params.customerId) this.currentCustomerId = params.customerId;
+        else if (page !== 'customerOrders' && page !== 'customerPaymentHistory') this.currentCustomerId = null;
         
         // 关键：保存状态
         this.saveCurrentPageState();
+        
+        console.log('[Navigate] 导航到:', page, '订单ID:', this.currentOrderId, '客户ID:', this.currentCustomerId);
         
         var self = this;
         var moduleMap = {
@@ -818,6 +837,8 @@ const DashboardCore = {
             this.currentFilter = prev.filter || "all";
             
             this.saveCurrentPageState();
+            
+            console.log('[GoBack] 返回到:', prev.page, '订单ID:', prev.orderId, '客户ID:', prev.customerId);
             
             var backMap = {
                 'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
@@ -1012,6 +1033,7 @@ const DashboardCore = {
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
+        this.currentCustomerId = null;
         this.saveCurrentPageState();
         
         try {
@@ -1019,6 +1041,12 @@ const DashboardCore = {
             var t = function(key) { return Utils.t(key); };
             
             const profile = await SUPABASE.getCurrentProfile();
+            if (!profile) {
+                console.error('renderDashboard: 无法获取用户资料');
+                await this.renderLogin();
+                return;
+            }
+            
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
@@ -1041,7 +1069,11 @@ const DashboardCore = {
                 if (!isAdmin && storeId) query = query.eq('store_id', storeId);
                 const { data } = await query;
                 let sum = 0;
-                for (const ex of (data || [])) sum += (ex.amount || 0);
+                if (data) {
+                    for (var i = 0; i < data.length; i++) {
+                        sum += (data[i].amount || 0);
+                    }
+                }
                 return sum;
             });
             
@@ -1082,8 +1114,9 @@ const DashboardCore = {
             
             let totalInflowExcludingPrincipal = 0;
             let totalOutflow = 0;
-            for (const f of flowsForDeficit) {
-                const amount = f.amount || 0;
+            for (var fi = 0; fi < flowsForDeficit.length; fi++) {
+                var f = flowsForDeficit[fi];
+                var amount = f.amount || 0;
                 if (f.direction === 'inflow' && f.flow_type !== 'principal') {
                     totalInflowExcludingPrincipal += amount;
                 } else if (f.direction === 'outflow') {
@@ -1104,10 +1137,10 @@ const DashboardCore = {
             ];
             
             var cardsHtml = '';
-            for (var i = 0; i < cards.length; i++) {
+            for (var ci = 0; ci < cards.length; ci++) {
                 cardsHtml += '<div class="stat-card">' +
-                    '<div class="stat-value ' + cards[i].class + '">' + cards[i].value + '</div>' +
-                    '<div class="stat-label">' + cards[i].label + '</div>' +
+                    '<div class="stat-value ' + cards[ci].class + '">' + cards[ci].value + '</div>' +
+                    '<div class="stat-label">' + cards[ci].label + '</div>' +
                 '</div>';
             }
             
