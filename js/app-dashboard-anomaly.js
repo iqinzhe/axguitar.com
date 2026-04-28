@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.0
+// app-dashboard-anomaly.js - v1.0 (修复：返回键统一右上角)
 
 window.APP = window.APP || {};
 
@@ -429,7 +429,7 @@ const DashboardAnomaly = {
                                     '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
                                     ' (' + (blacklistTotalCount - blacklist.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
-                            '</table>' +
+                            '</td>' +
                         '</tr>';
                 }
                 
@@ -445,7 +445,7 @@ const DashboardAnomaly = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + blacklistRows + blacklistLoadMoreHtml + '</tbody>' +
-                        '</tr>' +
+                        '</table>' +
                     '</div>';
             }
             
@@ -453,11 +453,9 @@ const DashboardAnomaly = {
             if (!isAdmin) {
                 document.getElementById("app").innerHTML = '' +
                     '<div class="page-header">' +
-                        '<div style="display:flex; align-items:center; gap:12px;">' +
-                            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
-                            '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
-                        '</div>' +
+                        '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
                         '<div class="header-actions">' +
+                            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
                             '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                         '</div>' +
                     '</div>' +
@@ -566,11 +564,9 @@ const DashboardAnomaly = {
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<div style="display:flex; align-items:center; gap:12px;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
-                        '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
-                    '</div>' +
+                    '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
                     '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
                         '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                     '</div>' +
                 '</div>' +
