@@ -682,4 +682,8 @@ const StoreManager = {
 window.StoreManager = StoreManager;
 
 // 挂载 WA 号码更新方法到 APP
-window.APP.updateStoreWANumber = StoreManager.updateStoreWANumber.bind(StoreManager);
+if (window.APP) {
+    window.APP.updateStoreWANumber = StoreManager.updateStoreWANumber.bind(StoreManager);
+} else {
+    window.APP = { updateStoreWANumber: StoreManager.updateStoreWANumber.bind(StoreManager) };
+}
