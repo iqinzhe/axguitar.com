@@ -1,4 +1,7 @@
-// store.js - v1.0
+// store.js - v1.1
+// 修改内容：
+// 1. 简化 Toast 调用，统一使用 Utils.toast
+// 2. 优化门店管理中的确认框逻辑
 
 const StoreManager = {
     stores: [],
@@ -72,7 +75,7 @@ const StoreManager = {
             ? '⚠️ Yakin akan menonaktifkan toko ini?\n\nOperator toko tidak akan bisa login.\nData toko tetap tersimpan.'
             : '⚠️ 确认暂停此门店？\n\n门店操作员将无法登录。\n门店数据将继续保留。';
         
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
         
         try {
@@ -88,18 +91,10 @@ const StoreManager = {
             
             SUPABASE.clearCache();
             
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
-            } else {
-                alert(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
-            }
+            Utils.toast.success(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
             await StoreManager.renderStoreManagement();
         } catch (error) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
         }
     },
 
@@ -107,7 +102,7 @@ const StoreManager = {
         var lang = Utils.lang;
         
         var confirmMsg = lang === 'id' ? 'Aktifkan kembali toko ini?' : '恢复此门店营业？';
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
         
         try {
@@ -123,18 +118,10 @@ const StoreManager = {
             
             SUPABASE.clearCache();
             
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
-            } else {
-                alert(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
-            }
+            Utils.toast.success(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
             await StoreManager.renderStoreManagement();
         } catch (error) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
         }
     },
 
@@ -197,11 +184,7 @@ const StoreManager = {
                 '</div>';
             document.body.appendChild(modal);
         } catch (error) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data toko' : '加载门店数据失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data toko' : '加载门店数据失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data toko' : '加载门店数据失败');
         }
     },
 
@@ -213,11 +196,7 @@ const StoreManager = {
         var waNumber = document.getElementById('editStoreWA')?.value.trim();
         
         if (!name) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
-            } else {
-                alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
             return;
         }
         
@@ -245,18 +224,10 @@ const StoreManager = {
             }
             
             document.getElementById('editStoreModal')?.remove();
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
-            } else {
-                alert(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
-            }
+            Utils.toast.success(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
             await StoreManager.renderStoreManagement();
         } catch (error) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
 
@@ -288,19 +259,11 @@ const StoreManager = {
             console.log(`[StoreManager] WA号码已更新: ${storeId} -> ${waNumber}`);
             
             if (window._debugStoreWA) {
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
-                } else {
-                    alert(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
-                }
+                Utils.toast.success(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
             }
         } catch (error) {
             console.error('updateStoreWANumber 失败:', error);
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memperbarui nomor WA: ' + error.message : '更新WA号码失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memperbarui nomor WA: ' + error.message : '更新WA号码失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memperbarui nomor WA: ' + error.message : '更新WA号码失败：' + error.message);
         }
     },
 
@@ -507,7 +470,7 @@ const StoreManager = {
                 '<td class="text-center"><strong>' + grandTotal.active + '</strong></td>' +
                 '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.loan) + '</strong></td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.adminFee) + '</strong></td>' +
-                '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.serviceFee) + '</strong><td>' +
+                '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.serviceFee) + '</strong></td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.interest) + '</strong></td>' +
                 '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.principal) + '</strong></td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.income) + '</strong></td>' +
@@ -605,7 +568,7 @@ const StoreManager = {
                                     '<th class="amount">' + (lang === 'id' ? 'Pengeluaran' : '运营支出') + '</th>' +
                                     '<th class="amount">🏦 ' + (lang === 'id' ? 'Brankas' : '保险柜') + '</th>' +
                                     '<th class="amount">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行BNI') + '</th>' +
-                                '<tr>' +
+                                '</tr>' +
                             '</thead>' +
                             '<tbody>' + storeStatsRows + summaryRow + '</tbody>' +
                         '</table>' +
@@ -624,7 +587,7 @@ const StoreManager = {
                                     '<th class="col-phone">' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
                                     '<th class="col-phone">📱 WA</th>' +
                                     '<th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th>' +
-                                '</tr>' +
+                                '<tr>' +
                             '</thead>' +
                             '<tbody>' + storeRows + '</tbody>' +
                         '</table>' +
