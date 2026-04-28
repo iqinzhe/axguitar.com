@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v1.0
+// app-dashboard-users.js - v1.1（修复：alert 替换为 Toast）
 window.APP = window.APP || {};
 
 const DashboardUsers = {
@@ -21,13 +21,12 @@ const DashboardUsers = {
             
             var rows = '';
             if (users.length === 0) {
-                rows = '<tr><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<tr><td colspan="5" class="text-center">' + t('no_data') + 'NonNull';
             } else {
                 for (var i = 0; i < users.length; i++) {
                     var u = users[i];
                     var storeName = u.stores ? u.stores.name : (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
                     
-                    // 姓名列：姓名 + KTP + 电话
                     var nameDisplay = Utils.escapeHtml(u.name);
                     if (u.ktp_number) {
                         nameDisplay += '<br><small style="color:var(--text-muted);">' + (lang === 'id' ? 'KTP: ' : '身份证: ') + Utils.escapeHtml(u.ktp_number) + '</small>';
@@ -44,7 +43,6 @@ const DashboardUsers = {
                         '<td class="date-cell text-center">' + Utils.formatDate(u.created_at) + '</td>' +
                     '</tr>';
                     
-                    // 构建操作按钮
                     var actionButtons = '';
                     
                     if (AUTH.user && AUTH.user.role === 'admin' && u.id !== AUTH.user.id) {
@@ -146,7 +144,11 @@ const DashboardUsers = {
                 '</div>';
         } catch (error) {
             console.error("showUserManagement error:", error);
-            alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败');
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败');
+            } else {
+                alert(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败');
+            }
         }
     },
 
@@ -161,14 +163,17 @@ const DashboardUsers = {
         var storeId = document.getElementById("newStoreId").value || null;
         
         if (!username || !password || !name) {
-            alert(lang === 'id' ? 'Harap isi semua bidang yang wajib' : '请填写所有必填字段');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Harap isi semua bidang yang wajib' : '请填写所有必填字段');
+            } else {
+                alert(lang === 'id' ? 'Harap isi semua bidang yang wajib' : '请填写所有必填字段');
+            }
             return;
         }
         
         try {
             await AUTH.addUser(username, password, name, role, storeId);
             
-            // 如果填写了 KTP 或电话，更新用户资料
             var userId = null;
             var { data: userData } = await supabaseClient
                 .from('user_profiles')
@@ -183,56 +188,91 @@ const DashboardUsers = {
                 await AUTH.updateUser(userData.id, updates);
             }
             
-            alert(lang === 'id' ? '✅ Peran berhasil ditambahkan' : '✅ 角色添加成功');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Peran berhasil ditambahkan' : '✅ 角色添加成功');
+            } else {
+                alert(lang === 'id' ? '✅ Peran berhasil ditambahkan' : '✅ 角色添加成功');
+            }
             await this.showUserManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menambah peran: ' + error.message : '添加角色失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal menambah peran: ' + error.message : '添加角色失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal menambah peran: ' + error.message : '添加角色失败：' + error.message);
+            }
         }
     },
 
     resetUserPassword: async function(userId, userName) {
         var lang = Utils.lang;
         
-        if (!confirm(lang === 'id' 
+        var confirmMsg = lang === 'id' 
             ? '⚠️ Reset password untuk "' + userName + '"?\n\nHarus login ulang dengan password baru.'
-            : '⚠️ 重置 "' + userName + '" 的密码？\n\n需要使用新密码重新登录。')) {
-            return;
-        }
+            : '⚠️ 重置 "' + userName + '" 的密码？\n\n需要使用新密码重新登录。';
+        
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return;
         
         var newPassword = prompt(lang === 'id' 
             ? 'Masukkan password baru untuk "' + userName + '":\n\n(Minimal 6 karakter)'
             : '请输入 "' + userName + '" 的新密码：\n\n(至少6个字符)');
         
         if (!newPassword || newPassword.length < 6) {
-            alert(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+            } else {
+                alert(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+            }
             return;
         }
         
         var confirmPassword = prompt(lang === 'id' ? 'Konfirmasi password baru:' : '确认新密码：');
         
         if (newPassword !== confirmPassword) {
-            alert(lang === 'id' ? 'Password tidak cocok' : '密码不匹配');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Password tidak cocok' : '密码不匹配');
+            } else {
+                alert(lang === 'id' ? 'Password tidak cocok' : '密码不匹配');
+            }
             return;
         }
         
         try {
             await AUTH.resetUserPassword(userId, newPassword);
-            alert(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
+            } else {
+                alert(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
+            }
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal reset password: ' + error.message : '重置密码失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal reset password: ' + error.message : '重置密码失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal reset password: ' + error.message : '重置密码失败：' + error.message);
+            }
         }
     },
 
     deleteUser: async function(userId) {
         var lang = Utils.lang;
-        if (!confirm(lang === 'id' ? 'Hapus peran ini?' : '删除此角色？')) return;
+        var confirmMsg = lang === 'id' ? 'Hapus peran ini?' : '删除此角色？';
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return;
         
         try {
             await AUTH.deleteUser(userId);
-            alert(lang === 'id' ? '✅ Peran berhasil dihapus' : '✅ 角色已删除');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Peran berhasil dihapus' : '✅ 角色已删除');
+            } else {
+                alert(lang === 'id' ? '✅ Peran berhasil dihapus' : '✅ 角色已删除');
+            }
             await this.showUserManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            }
         }
     },
 
@@ -309,7 +349,11 @@ const DashboardUsers = {
             
         } catch (error) {
             console.error("editUser error:", error);
-            alert(lang === 'id' ? 'Gagal memuat data peran' : '加载角色数据失败');
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat data peran' : '加载角色数据失败');
+            } else {
+                alert(lang === 'id' ? 'Gagal memuat data peran' : '加载角色数据失败');
+            }
         }
     },
 
@@ -322,7 +366,11 @@ const DashboardUsers = {
         var storeId = document.getElementById('editUserStoreId')?.value || null;
         
         if (!name) {
-            alert(lang === 'id' ? 'Nama harus diisi' : '姓名必须填写');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Nama harus diisi' : '姓名必须填写');
+            } else {
+                alert(lang === 'id' ? 'Nama harus diisi' : '姓名必须填写');
+            }
             return;
         }
         
@@ -334,10 +382,18 @@ const DashboardUsers = {
             await AUTH.updateUser(userId, updates);
             
             document.getElementById('editUserModal')?.remove();
-            alert(lang === 'id' ? '✅ Data peran berhasil diperbarui' : '✅ 角色信息已更新');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Data peran berhasil diperbarui' : '✅ 角色信息已更新');
+            } else {
+                alert(lang === 'id' ? '✅ Data peran berhasil diperbarui' : '✅ 角色信息已更新');
+            }
             await this.showUserManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            }
         }
     },
 
@@ -349,9 +405,17 @@ const DashboardUsers = {
         
         try {
             await AUTH.updateUser(userId, { role: newRole });
-            alert(lang === 'id' ? '✅ Role berhasil diubah' : '✅ 角色已修改');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Role berhasil diubah' : '✅ 角色已修改');
+            } else {
+                alert(lang === 'id' ? '✅ Role berhasil diubah' : '✅ 角色已修改');
+            }
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal mengubah role: ' + error.message : '修改角色失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal mengubah role: ' + error.message : '修改角色失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal mengubah role: ' + error.message : '修改角色失败：' + error.message);
+            }
         }
     }
 };
