@@ -307,7 +307,7 @@ const CustomersModule = {
             // 构建弹窗卡片HTML
             var modalHtml = '' +
                 '<div id="customerDetailCard" class="modal-overlay customer-detail-card">' +
-                    '<div class="modal-content" style="max-width:680px;">' +
+                    '<div class="modal-content" style="max-width:780px;">' +
                         '<h3 style="display:flex; justify-content:space-between; align-items:center;">' +
                             '<span>📋 ' + (lang === 'id' ? 'Detail Nasabah' : '客户详情') + ' - ' + Utils.escapeHtml(customer.name) + '</span>' +
                             '<button onclick="document.getElementById(\'customerDetailCard\').remove()" style="background:none; border:none; font-size:20px; cursor:pointer;">✖</button>' +
