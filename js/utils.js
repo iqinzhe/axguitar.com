@@ -1,4 +1,4 @@
-// utils.js - v1.0
+// utils.js - v1.1（整合时区统一 + 所有工具函数）
 window.Utils = window.Utils || {};
 
 (function() {
@@ -229,7 +229,6 @@ window.Utils = window.Utils || {};
     Utils.setLanguage = function(lang) {
         _lang = lang;
         localStorage.setItem('jf_lang', lang);
-        // 触发语言变更事件
         for (var key in _listeners) {
             if (typeof _listeners[key] === 'function') {
                 try { _listeners[key](lang); } catch(e) {}
@@ -275,21 +274,98 @@ window.Utils = window.Utils || {};
         return isNaN(num) ? 0 : num;
     };
 
+    // ==================== 时区统一的日期函数（印尼 UTC+7） ====================
+
+    Utils.getLocalToday = function() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    Utils.getLocalDateTime = function() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000+07:00`;
+    };
+
+    Utils.toLocalDate = function(dateInput) {
+        if (!dateInput) return Utils.getLocalToday();
+        
+        let date;
+        if (typeof dateInput === 'string') {
+            if (dateInput.includes('T')) {
+                const parts = dateInput.split('T')[0].split('-');
+                if (parts.length === 3) {
+                    return `${parts[0]}-${parts[1]}-${parts[2]}`;
+                }
+            }
+            date = new Date(dateInput);
+        } else {
+            date = dateInput;
+        }
+        
+        if (isNaN(date.getTime())) {
+            console.warn('Utils.toLocalDate: 无效日期', dateInput);
+            return Utils.getLocalToday();
+        }
+        
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     Utils.formatDate = function(dateStr) {
         if (!dateStr) return '-';
-        try {
-            var d = new Date(dateStr);
-            if (isNaN(d.getTime())) return dateStr;
-            var day = String(d.getDate()).padStart(2, '0');
-            var month = String(d.getMonth() + 1).padStart(2, '0');
-            var year = d.getFullYear();
-            if (_lang === 'id') {
-                return day + '/' + month + '/' + year;
-            }
-            return year + '-' + month + '-' + day;
-        } catch(e) {
-            return dateStr;
+        
+        const localDate = Utils.toLocalDate(dateStr);
+        if (localDate === '-') return '-';
+        
+        const parts = localDate.split('-');
+        if (parts.length !== 3) return dateStr;
+        
+        const year = parts[0];
+        const month = parts[1];
+        const day = parts[2];
+        
+        if (Utils.lang === 'id') {
+            return `${day}/${month}/${year}`;
         }
+        return `${year}-${month}-${day}`;
+    };
+
+    Utils.calculateNextDueDate = function(startDate, paidMonths) {
+        let start = startDate || Utils.getLocalToday();
+        
+        const parts = start.split('-');
+        if (parts.length !== 3) {
+            start = Utils.getLocalToday();
+        }
+        
+        let date = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+        if (isNaN(date.getTime())) {
+            date = new Date();
+        }
+        
+        const originalDay = date.getUTCDate();
+        date.setUTCMonth(date.getUTCMonth() + paidMonths + 1);
+        
+        if (date.getUTCDate() !== originalDay) {
+            date.setUTCDate(0);
+        }
+        
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
     };
 
     // ==================== 金额格式化绑定到 input ====================
@@ -311,7 +387,6 @@ window.Utils = window.Utils || {};
             inputEl.setSelectionRange(newCursorPos, newCursorPos);
         });
         
-        // 初始格式化
         var initialRaw = inputEl.value.replace(/[^\d]/g, '');
         if (initialRaw) {
             inputEl.value = Utils.formatNumberWithCommas(initialRaw);
@@ -372,7 +447,6 @@ window.Utils = window.Utils || {};
     Utils.calculateFixedMonthlyPayment = function(loanAmount, monthlyRate, months) {
         if (!loanAmount || !months || months <= 0) return 0;
         if (monthlyRate <= 0) return loanAmount / months;
-        // 等额本息公式
         var pow = Math.pow(1 + monthlyRate, months);
         return (loanAmount * monthlyRate * pow) / (pow - 1);
     };
@@ -534,7 +608,6 @@ window.Utils = window.Utils || {};
         
         var skeletonHtml = skeletonMap[type] || skeletonMap['default'];
         
-        // 添加骨架屏动画
         var styleEl = document.getElementById('skeletonStyle');
         if (!styleEl) {
             styleEl = document.createElement('style');
@@ -548,24 +621,23 @@ window.Utils = window.Utils || {};
 
     // ==================== 网络监控（增强版） ====================
     Utils.NetworkMonitor = {
-    _initialized: false,
-    _isOnline: true,
-    _callbacks: [],
-    _checkUrl: '',
+        _initialized: false,
+        _isOnline: true,
+        _callbacks: [],
+        _checkUrl: '',
 
-            init: function() {
-        if (this._initialized) return;
-        this._initialized = true;
-        this._isOnline = navigator.onLine;
-        
-        // 动态获取 Supabase URL
-        if (typeof SUPABASE_URL !== 'undefined') {
-            this._checkUrl = SUPABASE_URL + '/rest/v1/';
-        } else if (typeof window.SUPABASE_URL !== 'undefined') {
-            this._checkUrl = window.SUPABASE_URL + '/rest/v1/';
-        } else {
-            this._checkUrl = 'https://hiupsvsbcdsgoyiieqiv.supabase.co/rest/v1/';
-        }
+        init: function() {
+            if (this._initialized) return;
+            this._initialized = true;
+            this._isOnline = navigator.onLine;
+            
+            if (typeof SUPABASE_URL !== 'undefined') {
+                this._checkUrl = SUPABASE_URL + '/rest/v1/';
+            } else if (typeof window.SUPABASE_URL !== 'undefined') {
+                this._checkUrl = window.SUPABASE_URL + '/rest/v1/';
+            } else {
+                this._checkUrl = 'https://hiupsvsbcdsgoyiieqiv.supabase.co/rest/v1/';
+            }
 
             var self = this;
 
@@ -581,7 +653,6 @@ window.Utils = window.Utils || {};
                 self._showBanner();
             });
 
-            // 定时检查实际连通性
             setInterval(function() {
                 self._checkRealConnectivity().then(function(online) {
                     if (online !== self._isOnline) {
@@ -610,14 +681,12 @@ window.Utils = window.Utils || {};
             this._callbacks.push(callback);
         },
 
-                async _checkRealConnectivity() {
-            // 优先使用浏览器原生判断
+        async _checkRealConnectivity() {
             if (!navigator.onLine) return false;
             
             try {
                 var controller = new AbortController();
                 var timeout = setTimeout(function() { controller.abort(); }, 3000);
-                // 使用 favicon 或 robots.txt 等不依赖认证的轻量请求
                 var response = await fetch('/icons/favicon-192x192.png', {
                     method: 'HEAD',
                     signal: controller.signal,
@@ -626,7 +695,6 @@ window.Utils = window.Utils || {};
                 clearTimeout(timeout);
                 return response.ok;
             } catch (e) {
-                // 请求失败，但浏览器说在线，假设网络可用
                 return navigator.onLine;
             }
         },
@@ -676,7 +744,6 @@ window.Utils = window.Utils || {};
         _storageKey: 'jf_offline_queue',
 
         init: function() {
-            // 从 storage 恢复队列
             try {
                 var stored = localStorage.getItem(this._storageKey);
                 if (stored) {
@@ -686,7 +753,6 @@ window.Utils = window.Utils || {};
                 this._queue = [];
             }
             
-            // 监听网络恢复
             Utils.NetworkMonitor.onChange(function(online) {
                 if (online) {
                     Utils.OfflineQueue.processQueue();
@@ -720,7 +786,6 @@ window.Utils = window.Utils || {};
                     if (item.operation === 'createOrder' && typeof Order !== 'undefined') {
                         await Order.create(item.data);
                     }
-                    // 移除已处理的项
                     this._queue.shift();
                     this._persist();
                 } catch (error) {
@@ -732,7 +797,7 @@ window.Utils = window.Utils || {};
                         console.warn('[OfflineQueue] 重试中 (' + item.retries + '/3):', error.message);
                     }
                     this._persist();
-                    break;  // 出错后暂停，等待下次触发
+                    break;
                 }
             }
 
@@ -807,9 +872,6 @@ window.Utils = window.Utils || {};
                 this._errors.pop();
             }
             console.error('[ErrorHandler]', context + ':', entry.message, entry.stack ? '\n' + entry.stack : '');
-            
-            // 可选：上报到服务端
-            // this._sendToServer(entry);
         },
 
         getRecentErrors: function(count) {
@@ -842,136 +904,5 @@ window.Utils = window.Utils || {};
     // ==================== 初始化 ====================
     Utils.initLanguage();
     Utils.OfflineQueue.init();
-    // 网络监控由 AUTH.init 启动，避免重复初始化
 
 })();
-
-// 示例：创建订单时自动支持离线队列
-async function createOrderWithOfflineSupport(orderData) {
-    return Utils.wrapWithOfflineSupport(Order.create, 'createOrder')(orderData);
-}
-
-// ==================== 时区统一的日期函数（印尼 UTC+7） ====================
-
-/**
- * 获取当前本地日期（印尼时区 UTC+7）
- * @returns {string} YYYY-MM-DD 格式的本地日期
- */
-Utils.getLocalToday = function() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-/**
- * 获取当前本地日期时间（印尼时区 UTC+7）
- * @returns {string} ISO 格式的本地日期时间字符串
- */
-Utils.getLocalDateTime = function() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000+07:00`;
-};
-
-/**
- * 将任意日期字符串转换为本地日期 YYYY-MM-DD
- * @param {string|Date} dateInput - 日期输入
- * @returns {string} YYYY-MM-DD 格式的本地日期
- */
-Utils.toLocalDate = function(dateInput) {
-    if (!dateInput) return Utils.getLocalToday();
-    
-    let date;
-    if (typeof dateInput === 'string') {
-        // 处理 ISO 格式字符串
-        if (dateInput.includes('T')) {
-            // 提取日期部分，避免时区转换
-            const parts = dateInput.split('T')[0].split('-');
-            if (parts.length === 3) {
-                return `${parts[0]}-${parts[1]}-${parts[2]}`;
-            }
-        }
-        date = new Date(dateInput);
-    } else {
-        date = dateInput;
-    }
-    
-    if (isNaN(date.getTime())) {
-        console.warn('Utils.toLocalDate: 无效日期', dateInput);
-        return Utils.getLocalToday();
-    }
-    
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-/**
- * 格式化日期显示（根据语言）
- * @param {string} dateStr - 日期字符串
- * @returns {string} 格式化后的日期
- */
-Utils.formatDate = function(dateStr) {
-    if (!dateStr) return '-';
-    
-    // 尝试解析为本地日期
-    const localDate = Utils.toLocalDate(dateStr);
-    if (localDate === '-') return '-';
-    
-    const parts = localDate.split('-');
-    if (parts.length !== 3) return dateStr;
-    
-    const year = parts[0];
-    const month = parts[1];
-    const day = parts[2];
-    
-    if (Utils.lang === 'id') {
-        return `${day}/${month}/${year}`;
-    }
-    return `${year}-${month}-${day}`;
-};
-
-/**
- * 计算下一个到期日（基于本地时区）
- * @param {string} startDate - 开始日期 YYYY-MM-DD
- * @param {number} paidMonths - 已付月数
- * @returns {string} 下一个到期日 YYYY-MM-DD
- */
-Utils.calculateNextDueDate = function(startDate, paidMonths) {
-    let start = startDate || Utils.getLocalToday();
-    
-    // 确保日期是本地格式
-    const parts = start.split('-');
-    if (parts.length !== 3) {
-        start = Utils.getLocalToday();
-    }
-    
-    let date = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
-    if (isNaN(date.getTime())) {
-        date = new Date();
-    }
-    
-    const originalDay = date.getUTCDate();
-    date.setUTCMonth(date.getUTCMonth() + paidMonths + 1);
-    
-    if (date.getUTCDate() !== originalDay) {
-        date.setUTCDate(0);
-    }
-    
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}`;
-};
-
-// 覆盖原有的 Utils.formatDate
-Utils.formatDate = Utils.formatDate.bind(Utils);
