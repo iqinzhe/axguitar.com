@@ -1,4 +1,4 @@
-// app-customers.js - v1.1 (内联样式已迁移至 pages.css)
+// app-customers.js - v1.0
 window.APP = window.APP || {};
 
 const CustomersModule = {
