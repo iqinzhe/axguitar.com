@@ -1,4 +1,6 @@
-// app-dashboard-expenses.js - v1.0 
+// app-dashboard-expenses.js - v1.1
+// 修改内容：简化 Toast 调用，统一使用 Utils.toast
+
 window.APP = window.APP || {};
 
 const DashboardExpenses = {
@@ -172,11 +174,7 @@ const DashboardExpenses = {
         } catch (error) {
             console.error("showExpenses error:", error);
             Utils.ErrorHandler.capture(error, 'showExpenses');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat pengeluaran: ' + error.message : '加载支出失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat pengeluaran: ' + error.message : '加载支出失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat pengeluaran: ' + error.message : '加载支出失败：' + error.message);
         }
     },
 
@@ -191,19 +189,11 @@ const DashboardExpenses = {
         var paymentMethod = document.getElementById("expenseMethod").value;
         
         if (!category) { 
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Masukkan kategori' : '请输入类别');
-            } else {
-                alert(lang === 'id' ? 'Masukkan kategori' : '请输入类别');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Masukkan kategori' : '请输入类别');
             return; 
         }
         if (isNaN(amount) || amount <= 0) { 
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
-            } else {
-                alert(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
             return; 
         }
         
@@ -219,20 +209,12 @@ const DashboardExpenses = {
                 payment_method: paymentMethod
             });
             
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
-            } else {
-                alert(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
-            }
+            Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
             await APP.showExpenses();
         } catch (error) {
             console.error("addExpense error:", error);
             Utils.ErrorHandler.capture(error, 'addExpense');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
 
@@ -243,11 +225,7 @@ const DashboardExpenses = {
         var isAdmin = profile?.role === 'admin';
         
         if (!isAdmin) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
-            } else {
-                alert(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
             return;
         }
         
@@ -255,11 +233,7 @@ const DashboardExpenses = {
             const { data: expense, error } = await supabaseClient.from('expenses').select('*').eq('id', expenseId).single();
             if (error) throw error;
             if (expense.is_reconciled) {
-                if (window.Toast) {
-                    window.Toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
-                } else {
-                    alert(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
-                }
+                Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
                 return;
             }
             var newAmount = prompt(lang === 'id' ? 'Masukkan jumlah baru:' : '请输入新金额:', expense.amount);
@@ -268,21 +242,13 @@ const DashboardExpenses = {
                 
                 await supabaseClient.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
                 
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
-                } else {
-                    alert(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
-                }
+                Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
                 await APP.showExpenses();
             }
         } catch (error) {
             console.error("editExpense error:", error);
             Utils.ErrorHandler.capture(error, 'editExpense');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
         }
     },
 
@@ -293,34 +259,22 @@ const DashboardExpenses = {
         var isAdmin = profile?.role === 'admin';
         
         if (!isAdmin) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
-            } else {
-                alert(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
             return;
         }
         
         var confirmMsg = lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？';
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
         
         try {
             await supabaseClient.from('expenses').delete().eq('id', expenseId);
-            if (window.Toast) {
-                window.Toast.success(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
-            } else {
-                alert(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
-            }
+            Utils.toast.success(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
             await APP.showExpenses();
         } catch (error) {
             console.error("deleteExpense error:", error);
             Utils.ErrorHandler.capture(error, 'deleteExpense');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
         }
     },
 
@@ -330,11 +284,7 @@ const DashboardExpenses = {
         try { profile = await SUPABASE.getCurrentProfile(); } catch(e) { console.warn(e); }
         var isAdmin = profile?.role === 'admin';
         if (!isAdmin) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Hanya admin yang dapat melakukan rekonsiliasi' : '仅管理员可执行平账操作');
-            } else {
-                alert(lang === 'id' ? 'Hanya admin yang dapat melakukan rekonsiliasi' : '仅管理员可执行平账操作');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat melakukan rekonsiliasi' : '仅管理员可执行平账操作');
             return;
         }
         
@@ -372,7 +322,7 @@ const DashboardExpenses = {
         var confirmMsg = lang === 'id' 
             ? 'Rekonsiliasi pengeluaran dari ' + startDate + ' sampai ' + endDate + '?' 
             : '确认平账 ' + startDate + ' 至 ' + endDate + ' 期间的支出？';
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
         
         try {
@@ -388,11 +338,7 @@ const DashboardExpenses = {
             var count = expensesToUpdate ? expensesToUpdate.length : 0;
             
             if (count === 0) {
-                if (window.Toast) {
-                    window.Toast.info(lang === 'id' ? 'Tidak ada pengeluaran yang perlu direkonsiliasi' : '没有需要平账的支出记录');
-                } else {
-                    alert(lang === 'id' ? 'Tidak ada pengeluaran yang perlu direkonsiliasi' : '没有需要平账的支出记录');
-                }
+                Utils.toast.info(lang === 'id' ? 'Tidak ada pengeluaran yang perlu direkonsiliasi' : '没有需要平账的支出记录');
                 return;
             }
             
@@ -411,22 +357,13 @@ const DashboardExpenses = {
                 ? '✅ Rekonsiliasi selesai! ' + count + ' pengeluaran telah direkonsiliasi.' 
                 : '✅ 平账完成！已平账 ' + count + ' 条支出记录。';
             
-            if (window.Toast) {
-                window.Toast.success(successMsg);
-            } else {
-                alert(successMsg);
-            }
-            
+            Utils.toast.success(successMsg);
             await APP.showExpenses();
             
         } catch (error) {
             console.error("balanceExpenses error:", error);
             Utils.ErrorHandler.capture(error, 'balanceExpenses');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
         }
     }
 };
