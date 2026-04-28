@@ -1,4 +1,4 @@
-// app-customers.js - v1.0 
+// app-customers.js - v1.1 (内联样式已迁移至 pages.css)
 window.APP = window.APP || {};
 
 const CustomersModule = {
@@ -91,73 +91,7 @@ const CustomersModule = {
                 '</div>';
             }
 
-            // 添加内联样式优化表格
-            var inlineStyles = '' +
-                '<style>' +
-                    '/* 客户列表表格 - 电脑端优化 */' +
-                    '@media (min-width: 769px) {' +
-                        '.customer-list-table {' +
-                            'table-layout: fixed;' +
-                            'width: 100%;' +
-                        '}' +
-                        '.customer-list-table .col-id { width: 10%; }' +
-                        '.customer-list-table .col-name { width: 12%; padding-left: 12px; }' +
-                        '.customer-list-table .col-ktp { width: 14%; }' +
-                        '.customer-list-table .col-phone { width: 12%; white-space: nowrap; }' +
-                        '.customer-list-table .col-occupation { width: 12%; }' +
-                        '.customer-list-table td:nth-child(6) { width: 13%; }' +
-                        '.customer-list-table td:nth-child(7) { width: 8%; }' +
-                        '.customer-list-table .col-address-ktp,' +
-                        '.customer-list-table .col-address-living,' +
-                        '.customer-list-table .col-store,' +
-                        '.customer-list-table .date-cell {' +
-                            'display: none;' +
-                        '}' +
-                    '}' +
-                    '/* 手机端保持原有样式 */' +
-                    '@media (max-width: 768px) {' +
-                        '.customer-list-table .col-address-ktp,' +
-                        '.customer-list-table .col-address-living {' +
-                            'display: table-cell;' +
-                        '}' +
-                    '}' +
-                    '/* 详情卡片样式 */' +
-                    '.customer-detail-card .order-stats {' +
-                        'display: flex;' +
-                        'gap: 16px;' +
-                        'flex-wrap: wrap;' +
-                        'margin: 16px 0;' +
-                        'padding: 12px;' +
-                        'background: var(--bg-hover);' +
-                        'border-radius: var(--radius-md);' +
-                    '}' +
-                    '.customer-detail-card .stat-item {' +
-                        'flex: 1;' +
-                        'text-align: center;' +
-                        'cursor: pointer;' +
-                        'transition: transform 0.2s;' +
-                        'padding: 8px;' +
-                        'border-radius: var(--radius-sm);' +
-                    '}' +
-                    '.customer-detail-card .stat-item:hover {' +
-                        'background: var(--border-light);' +
-                        'transform: translateY(-2px);' +
-                    '}' +
-                    '.customer-detail-card .stat-number {' +
-                        'font-size: 24px;' +
-                        'font-weight: 700;' +
-                        'display: block;' +
-                    '}' +
-                    '.customer-detail-card .stat-label {' +
-                        'font-size: var(--font-xs);' +
-                        'color: var(--text-secondary);' +
-                    '}' +
-                    '.customer-detail-card .stat-item.active .stat-number { color: var(--primary); }' +
-                    '.customer-detail-card .stat-item.completed .stat-number { color: var(--success-dark); }' +
-                    '.customer-detail-card .stat-item.abnormal .stat-number { color: var(--danger); }' +
-                '</style>';
-            
-            document.getElementById("app").innerHTML = inlineStyles + '' +
+            document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
                     '<div class="header-actions">' +
