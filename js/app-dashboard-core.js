@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.2.2（修复：刷新后保留在当前页面 + 性能优化）
+// app-dashboard-core.js - v1.1（整合逾期天数自动更新 + 页面卸载清理）
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -93,9 +93,11 @@ const DashboardCache = {
         if (!forceRefresh) {
             const cached = this.data.get(key);
             if (cached && Date.now() - cached.time < this.ttl) {
+                console.log(`[Cache] Hit: ${key}`);
                 return cached.value;
             }
         }
+        console.log(`[Cache] Miss: ${key}`);
         try {
             const value = await fetcher();
             this.data.set(key, { value, time: Date.now() });
@@ -103,7 +105,7 @@ const DashboardCache = {
         } catch (error) {
             const staleCached = this.data.get(key);
             if (staleCached) {
-                console.warn('[Cache] 使用过期缓存:', key, error.message);
+                console.warn(`[Cache] 使用过期缓存: ${key}`, error.message);
                 return staleCached.value;
             }
             throw error;
@@ -113,8 +115,10 @@ const DashboardCache = {
     invalidate(key) {
         if (key) {
             this.data.delete(key);
+            console.log(`[Cache] Invalidated: ${key}`);
         } else {
             this.data.clear();
+            console.log(`[Cache] Cleared all`);
         }
     }
 };
@@ -353,50 +357,28 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ==================== 简化版 URL Hash 状态管理 ====================
-    
     saveCurrentPageState: function() {
         try {
-            // 仅保存当前页面名到 sessionStorage（极简方案）
-            sessionStorage.setItem('jf_page', this.currentPage || 'dashboard');
-            if (this.currentOrderId) {
-                sessionStorage.setItem('jf_oid', this.currentOrderId);
-            } else {
-                sessionStorage.removeItem('jf_oid');
-            }
-            if (this.currentCustomerId) {
-                sessionStorage.setItem('jf_cid', this.currentCustomerId);
-            } else {
-                sessionStorage.removeItem('jf_cid');
-            }
+            sessionStorage.setItem('jf_current_page', this.currentPage || '');
+            sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
         } catch(e) {}
     },
-
+    
     restorePageState: function() {
         try {
-            var page = sessionStorage.getItem('jf_page');
-            var orderId = sessionStorage.getItem('jf_oid');
-            var customerId = sessionStorage.getItem('jf_cid');
-            
-            // 排除登录页
-            if (page && page !== 'login') {
-                return {
-                    page: page,
-                    filter: 'all',
-                    orderId: orderId || null,
-                    customerId: customerId || null
-                };
-            }
-        } catch(e) {}
-        
-        return { page: null, filter: 'all', orderId: null, customerId: null };
+            return {
+                page: sessionStorage.getItem('jf_current_page'),
+                filter: sessionStorage.getItem('jf_current_filter') || "all"
+            };
+        } catch(e) {
+            return { page: null, filter: "all" };
+        }
     },
-
+    
     clearPageState: function() {
         try {
-            sessionStorage.removeItem('jf_page');
-            sessionStorage.removeItem('jf_oid');
-            sessionStorage.removeItem('jf_cid');
+            sessionStorage.removeItem('jf_current_page');
+            sessionStorage.removeItem('jf_current_filter');
         } catch(e) {}
         this.currentOrderId = null;
         this.currentCustomerId = null;
@@ -407,18 +389,23 @@ const DashboardCore = {
         if (_overdueUpdateInterval) {
             clearInterval(_overdueUpdateInterval);
             _overdueUpdateInterval = null;
+            console.log('[逾期更新] 定时器已清理');
         }
     },
 
     // ========== 启动逾期更新定时器 ==========
     _startOverdueUpdateInterval: function() {
+        // 先清理已有的定时器
         this._clearOverdueUpdateInterval();
         
         if (!AUTH.isLoggedIn()) return;
         
+        // 每30分钟自动更新一次
         _overdueUpdateInterval = setInterval(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
+                console.log('[逾期更新] 自动更新完成', new Date().toLocaleTimeString());
+                // 如果当前在仪表盘或异常页面，刷新数据
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
@@ -427,9 +414,11 @@ const DashboardCore = {
             }
         }, 30 * 60 * 1000);
         
+        // 页面加载后5秒首次更新
         setTimeout(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
+                console.log('[逾期更新] 初始化更新完成');
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
@@ -478,25 +467,18 @@ const DashboardCore = {
                 }
             }, 15000);
             
-            // 【核心逻辑】登录后决定跳转
-            if (AUTH.isLoggedIn()) {
-                var saved = this.restorePageState();
-                
-                if (saved.page) {
-                    // 恢复保存的页面
-                    this.currentPage = saved.page;
-                    this.currentOrderId = saved.orderId;
-                    this.currentCustomerId = saved.customerId;
-                } else {
-                    // 无保存状态，显示首页
-                    this.currentPage = 'dashboard';
-                    this.currentOrderId = null;
-                    this.currentCustomerId = null;
-                }
-                
+            var savedState = this.restorePageState();
+            var savedPage = savedState.page;
+            var savedFilter = savedState.filter;
+            
+            if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
+                this.currentPage = savedPage;
+                this.currentFilter = savedFilter || "all";
+                this.currentOrderId = null;
+                this.currentCustomerId = null;
                 await this.refreshCurrentPage();
             } else {
-                await this.renderLogin();
+                await this.router();
             }
             
             clearTimeout(initTimeout);
@@ -541,7 +523,7 @@ const DashboardCore = {
         
         document.getElementById("app").innerHTML = Utils.renderSkeleton(skeletonType);
         
-        await new Promise(function(resolve) { setTimeout(resolve, 50); });
+        await new Promise(function(resolve) { setTimeout(resolve, 100); });
         
         var handlers = {
             dashboard: async () => {
@@ -627,11 +609,11 @@ const DashboardCore = {
         });
         this.currentPage = page;
         
-        if (params.orderId)    this.currentOrderId    = params.orderId;
+        if (params.orderId) this.currentOrderId = params.orderId;
         if (params.customerId) this.currentCustomerId = params.customerId;
-
+        
         this.saveCurrentPageState();
-
+        
         var self = this;
         var moduleMap = {
             'orderTable':       { fn: window.APP.showOrderTable,       name: 'Daftar Pesanan' },
@@ -888,6 +870,7 @@ const DashboardCore = {
     },
 
     logout: async function() {
+        // 清理逾期更新定时器
         this._clearOverdueUpdateInterval();
         
         var confirmMsg = Utils.t('save_exit_confirm');
