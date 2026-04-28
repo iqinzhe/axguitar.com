@@ -1,4 +1,8 @@
-// app-dashboard-orders.js - v1.0 
+// app-dashboard-orders.js - v1.1
+// 修改内容：
+// 1. 简化 Toast 调用，统一使用 Utils.toast
+// 2. 优化订单管理中的确认框逻辑
+
 window.APP = window.APP || {};
 
 const DashboardOrders = {
@@ -166,7 +170,7 @@ const DashboardOrders = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody id="orderTableBody"></tbody>' +
-                        '</table>' +
+                        '<table>' +
                     '</div>' +
                 '</div>';
             
@@ -186,11 +190,7 @@ const DashboardOrders = {
         } catch (err) {
             console.error("showOrderTable error:", err);
             Utils.ErrorHandler.capture(err, 'showOrderTable');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
         }
     },
     
@@ -224,11 +224,7 @@ const DashboardOrders = {
                 loadMoreBtn.disabled = false;
                 loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多');
             }
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
         }
     },
     
@@ -255,11 +251,7 @@ const DashboardOrders = {
             var order = result.order;
             var payments = result.payments;
             if (!order) { 
-                if (window.Toast) {
-                    window.Toast.error(Utils.t('order_not_found'));
-                } else {
-                    alert(Utils.t('order_not_found'));
-                }
+                Utils.toast.error(Utils.t('order_not_found'));
                 APP.goBack(); 
                 return; 
             }
@@ -294,7 +286,7 @@ const DashboardOrders = {
                     var p = payments[i];
                     var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    payRows += '<tr>' +
+                    payRows += '<table>' +
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
                         '<td>' + typeText + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
@@ -304,7 +296,7 @@ const DashboardOrders = {
                     '</tr>';
                 }
             } else {
-                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
+                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + 'NonNull';
             }
 
             document.getElementById("app").innerHTML = '' +
@@ -380,11 +372,7 @@ const DashboardOrders = {
         } catch (error) {
             console.error("viewOrder error:", error);
             Utils.ErrorHandler.capture(error, 'viewOrder');
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
-            } else {
-                alert(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
             APP.goBack();
         }
     },
@@ -392,17 +380,13 @@ const DashboardOrders = {
     deleteOrder: async function(orderId) {
         var lang = Utils.lang;
         
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(Utils.t('confirm_delete')) : confirm(Utils.t('confirm_delete'));
+        var confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
         if (!confirmed) return;
         
         try {
             const order = await SUPABASE.getOrder(orderId);
             if (!order) {
-                if (window.Toast) {
-                    window.Toast.error(Utils.t('order_not_found'));
-                } else {
-                    alert(Utils.t('order_not_found'));
-                }
+                Utils.toast.error(Utils.t('order_not_found'));
                 return;
             }
             
@@ -418,20 +402,12 @@ const DashboardOrders = {
                 }));
             }
             
-            if (window.Toast) {
-                window.Toast.success(Utils.t('order_deleted'));
-            } else {
-                alert(Utils.t('order_deleted'));
-            }
+            Utils.toast.success(Utils.t('order_deleted'));
             await APP.showOrderTable();
         } catch (error) {
             console.error("deleteOrder error:", error);
             Utils.ErrorHandler.capture(error, 'deleteOrder');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
         }
     },
 
@@ -442,11 +418,7 @@ const DashboardOrders = {
             var order = result.order;
             var payments = result.payments;
             if (!order) { 
-                if (window.Toast) {
-                    window.Toast.error(Utils.t('order_not_found'));
-                } else {
-                    alert(Utils.t('order_not_found'));
-                }
+                Utils.toast.error(Utils.t('order_not_found'));
                 return; 
             }
             var lang = Utils.lang;
@@ -478,7 +450,7 @@ const DashboardOrders = {
                 var safeDate = Utils.formatDate(p.date);
                 var safeAmount = Utils.formatCurrency(p.amount);
                 
-                paymentRows += '<td>' +
+                paymentRows += '<tr>' +
                     '<td class="col-date">' + safeDate + '</td>' +
                     '<td>' + typeText + '</td>' +
                     '<td class="text-right">' + safeAmount + '</td>' +
@@ -487,7 +459,7 @@ const DashboardOrders = {
             }
             
             if (paymentRows === '') {
-                paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + 'NonNull';
+                paymentRows = '<td><td colspan="4" class="text-center">' + t('no_data') + 'NonNull';
             }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
@@ -541,7 +513,7 @@ const DashboardOrders = {
                     '</div>' +
                     '<div class="section">' +
                         '<h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
-                        '<table>' +
+                        '</table>' +
                             '<thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '支付方式') + '</th></tr></thead>' +
                             '<tbody>' + paymentRows + '</tbody>' +
                         '</table>' +
@@ -559,11 +531,7 @@ const DashboardOrders = {
         } catch (error) {
             console.error("printOrder error:", error);
             Utils.ErrorHandler.capture(error, 'printOrder');
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
-            } else {
-                alert(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
         }
     },
 
@@ -592,7 +560,7 @@ const DashboardOrders = {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
                     var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    rows += '<table>' +
+                    rows += '<tr>' +
                         '<td class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(p.orders?.customer_name || '-') + '</td>' +
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
@@ -635,7 +603,7 @@ const DashboardOrders = {
                                     '<th class="col-amount amount">' + t('amount') + '</th>' +
                                     '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th class="col-desc">' + t('description') + '</th>' +
-'</table>' +
+                                '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
@@ -645,11 +613,7 @@ const DashboardOrders = {
         } catch (error) {
             console.error("showPaymentHistory error:", error);
             Utils.ErrorHandler.capture(error, 'showPaymentHistory');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
         }
     }
 };
