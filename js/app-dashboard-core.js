@@ -1,9 +1,4 @@
-// app-dashboard-core.js - v1.2
-// 修改内容：
-//   1. 强化 saveCurrentPageState / restorePageState（刷新保位）
-//   2. logout 使用 UI.showConfirm 替代 confirm
-//   3. refreshCurrentPage 失败使用 UI.showToast 替代 alert
-//   4. 监听 popstate 实现浏览器前进/后退
+// app-dashboard-core.js - v1.2.1（修复：刷新后保留在当前页面）
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -366,83 +361,102 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ==================== URL Hash 状态管理（刷新保位 - 增强版） ====================
+    // ========== 【核心修复1】URL Hash 状态管理 ==========
     
     /**
-     * 【核心增强】统一的保存当前状态方法
-     * 将页面状态写入 URL hash 和 sessionStorage（双重保险）
+     * 把当前页面状态写入 URL hash 和 sessionStorage
      */
     saveCurrentPageState: function() {
         try {
-            var params = { page: this.currentPage || 'dashboard' };
-            if (this.currentFilter && this.currentFilter !== 'all') params.filter = this.currentFilter;
-            if (this.currentOrderId)    params.orderId    = this.currentOrderId;
-            if (this.currentCustomerId) params.customerId = this.currentCustomerId;
+            var params = {};
+            params.page = this.currentPage || 'dashboard';
+            if (this.currentFilter && this.currentFilter !== 'all') {
+                params.filter = this.currentFilter;
+            }
+            if (this.currentOrderId) {
+                params.orderId = this.currentOrderId;
+            }
+            if (this.currentCustomerId) {
+                params.customerId = this.currentCustomerId;
+            }
 
-            // 1. 更新 URL hash
+            // 写入 URL hash（刷新后唯一能保留的东西）
             var hash = '#' + Object.keys(params).map(function(k) {
                 return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
             }).join('&');
+            
             if (location.hash !== hash) {
                 history.replaceState(null, '', hash);
             }
 
-            // 2. 同步 sessionStorage（降级备份）
-            sessionStorage.setItem('jf_current_page', this.currentPage || '');
+            // 同时也写入 sessionStorage（双重保险）
+            sessionStorage.setItem('jf_current_page', params.page);
             sessionStorage.setItem('jf_current_filter', this.currentFilter || 'all');
-            if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
-            else sessionStorage.removeItem('jf_current_order_id');
-            if (this.currentCustomerId) sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
-            else sessionStorage.removeItem('jf_current_customer_id');
+            if (this.currentOrderId) {
+                sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
+            } else {
+                sessionStorage.removeItem('jf_current_order_id');
+            }
+            if (this.currentCustomerId) {
+                sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
+            } else {
+                sessionStorage.removeItem('jf_current_customer_id');
+            }
+
+            console.log('[路由] 已保存页面状态:', params.page, 'hash:', hash);
         } catch(e) {
-            console.warn('[状态保存] 失败:', e);
+            console.warn('[路由] 保存页面状态失败:', e);
         }
     },
 
     /**
-     * 【核心增强】从 URL hash 或 sessionStorage 恢复页面状态
+     * 【核心修复2】从 URL hash 恢复页面状态
      * 返回 { page, filter, orderId, customerId }
      */
     restorePageState: function() {
         try {
-            // 1. 优先从 URL hash 中恢复（刷新后 hash 仍在）
+            // 第1优先级：URL hash
             var hash = location.hash.replace(/^#/, '');
-            if (hash) {
-                var state = {};
-                hash.split('&').forEach(function(pair) {
-                    var kv = pair.split('=');
+            if (hash && hash.length > 0) {
+                var params = {};
+                var pairs = hash.split('&');
+                for (var i = 0; i < pairs.length; i++) {
+                    var kv = pairs[i].split('=');
                     if (kv.length === 2) {
-                        state[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+                        var key = decodeURIComponent(kv[0]);
+                        var value = decodeURIComponent(kv[1]);
+                        params[key] = value;
                     }
-                });
-                if (state.page) {
-                    console.log('[路由恢复] 从 URL 恢复页面:', state.page);
+                }
+                if (params.page) {
+                    console.log('[路由] ✅ 从 URL hash 恢复:', params.page, JSON.stringify(params));
                     return {
-                        page:       state.page       || null,
-                        filter:     state.filter     || 'all',
-                        orderId:    state.orderId    || null,
-                        customerId: state.customerId || null
+                        page: params.page,
+                        filter: params.filter || 'all',
+                        orderId: params.orderId || null,
+                        customerId: params.customerId || null
                     };
                 }
             }
 
-            // 2. 降级：从 sessionStorage 恢复
+            // 第2优先级：sessionStorage
             var savedPage = sessionStorage.getItem('jf_current_page');
-            if (savedPage) {
-                console.log('[路由恢复] 从 SessionStorage 恢复页面:', savedPage);
+            if (savedPage && savedPage !== 'login') {
+                console.log('[路由] ✅ 从 sessionStorage 恢复:', savedPage);
                 return {
-                    page:       savedPage,
-                    filter:     sessionStorage.getItem('jf_current_filter') || 'all',
-                    orderId:    sessionStorage.getItem('jf_current_order_id') || null,
+                    page: savedPage,
+                    filter: sessionStorage.getItem('jf_current_filter') || 'all',
+                    orderId: sessionStorage.getItem('jf_current_order_id') || null,
                     customerId: sessionStorage.getItem('jf_current_customer_id') || null
                 };
             }
-        } catch(e) {
-            console.warn('[路由恢复] 失败:', e);
-        }
 
-        // 3. 最终降级
-        return { page: null, filter: 'all', orderId: null, customerId: null };
+            console.log('[路由] ℹ️ 未找到保存的页面状态，将显示首页');
+            return { page: null, filter: 'all', orderId: null, customerId: null };
+        } catch(e) {
+            console.warn('[路由] 恢复页面状态异常:', e);
+            return { page: null, filter: 'all', orderId: null, customerId: null };
+        }
     },
 
     clearPageState: function() {
@@ -451,7 +465,9 @@ const DashboardCore = {
             sessionStorage.removeItem('jf_current_filter');
             sessionStorage.removeItem('jf_current_order_id');
             sessionStorage.removeItem('jf_current_customer_id');
-            if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+            if (location.hash) {
+                history.replaceState(null, '', location.pathname + location.search);
+            }
         } catch(e) {}
         this.currentOrderId = null;
         this.currentCustomerId = null;
@@ -497,6 +513,7 @@ const DashboardCore = {
         }, 5000);
     },
 
+    // ========== 【核心修复3】init 方法中的恢复逻辑 ==========
     init: async function() {
         var lang = Utils.lang || 'zh';
         
@@ -536,17 +553,25 @@ const DashboardCore = {
                 }
             }, 15000);
             
-            var savedState = this.restorePageState();
-            var savedPage = savedState.page;
-            var savedFilter = savedState.filter;
-
-            if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
-                this.currentPage = savedPage;
-                this.currentFilter = savedFilter || "all";
-                this.currentOrderId    = savedState.orderId    || null;
-                this.currentCustomerId = savedState.customerId || null;
-                await this.refreshCurrentPage();
+            // 【核心修复3】从 URL hash / sessionStorage 恢复页面状态
+            // 只有在已登录并且不是登录页时才恢复
+            if (AUTH.isLoggedIn()) {
+                var savedState = this.restorePageState();
+                console.log('[路由] 恢复的状态:', JSON.stringify(savedState));
+                
+                if (savedState.page && savedState.page !== 'login') {
+                    console.log('[路由] 🎯 恢复到页面:', savedState.page);
+                    this.currentPage = savedState.page;
+                    this.currentFilter = savedState.filter || 'all';
+                    this.currentOrderId = savedState.orderId || null;
+                    this.currentCustomerId = savedState.customerId || null;
+                    await this.refreshCurrentPage();
+                } else {
+                    console.log('[路由] ℹ️ 无保存状态，显示首页');
+                    await this.router();
+                }
             } else {
+                console.log('[路由] ℹ️ 未登录，显示登录页');
                 await this.router();
             }
             
@@ -554,12 +579,13 @@ const DashboardCore = {
             var timeoutEl = document.getElementById('initTimeout');
             if (timeoutEl) timeoutEl.remove();
             
-            // ========== 监听浏览器前进/后退（URL hash 恢复） ==========
+            // ========== 监听浏览器前进/后退 ==========
             var self_init = this;
             window.removeEventListener('popstate', window._jfPopstateHandler);
             window._jfPopstateHandler = function() {
                 if (!AUTH.isLoggedIn()) return;
                 var s = self_init.restorePageState();
+                console.log('[路由] popstate 恢复:', JSON.stringify(s));
                 if (s.page && s.page !== 'login') {
                     self_init.currentPage      = s.page;
                     self_init.currentFilter    = s.filter    || 'all';
@@ -618,7 +644,6 @@ const DashboardCore = {
                     await self.renderDashboard();
                 } catch (e) {
                     console.error("renderDashboard failed:", e);
-                    // 【修改】使用 Toast 替代 alert
                     var errMsg = (Utils.lang === 'id' ? '⚠️ Gagal memuat dashboard. Silakan muat ulang.' : '⚠️ 加载仪表盘失败，请刷新页面。');
                     if (window.UI && window.UI.showToast) {
                         window.UI.showToast(errMsg, 'error', 8000);
@@ -706,7 +731,7 @@ const DashboardCore = {
         if (params.orderId)    this.currentOrderId    = params.orderId;
         if (params.customerId) this.currentCustomerId = params.customerId;
 
-        // 【增强】写入 URL hash
+        // 【核心修复】每次导航都保存状态到 URL hash
         this.saveCurrentPageState();
 
         // 同时 pushState 让浏览器后退键可用
@@ -805,7 +830,7 @@ const DashboardCore = {
             this.currentCustomerId = prev.customerId;
             this.currentFilter = prev.filter || "all";
             
-            // 【增强】同步 URL hash
+            // 【核心修复】每次返回也保存状态
             this.saveCurrentPageState();
             
             var backMap = {
@@ -977,14 +1002,12 @@ const DashboardCore = {
         if (errorDiv) errorDiv.style.display = 'none';
     },
 
-    // 【修改】使用 UI.showConfirm 替代 confirm
     logout: async function() {
         this._clearOverdueUpdateInterval();
         
         var lang = Utils.lang;
         var confirmMsg = Utils.t('save_exit_confirm');
         
-        // 使用新的 UI.showConfirm（如果可用），否则降级到原生 confirm
         var confirmed = false;
         if (window.UI && window.UI.showConfirm) {
             confirmed = await window.UI.showConfirm({
