@@ -105,8 +105,8 @@ const CustomersModule = {
                         '.customer-list-table .col-ktp { width: 14%; }' +
                         '.customer-list-table .col-phone { width: 12%; white-space: nowrap; }' +
                         '.customer-list-table .col-occupation { width: 12%; }' +
-                        '.customer-list-table td:nth-child(6) { width: 13%; }' +  // 创建订单按钮列
-                        '.customer-list-table td:nth-child(7) { width: 8%; }' +   // 操作列
+                        '.customer-list-table td:nth-child(6) { width: 13%; }' +
+                        '.customer-list-table td:nth-child(7) { width: 8%; }' +
                         '.customer-list-table .col-address-ktp,' +
                         '.customer-list-table .col-address-living,' +
                         '.customer-list-table .col-store,' +
@@ -198,7 +198,7 @@ const CustomersModule = {
         }
     },
 
-    // ========== 新增：详情卡片弹窗 ==========
+    // ========== 详情卡片弹窗（只显示列表中没有的字段：注册日期、KTP地址、居住地址） ==========
     showCustomerDetailCard: async function(customerId) {
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
@@ -236,9 +236,9 @@ const CustomersModule = {
             if (ordersError) throw ordersError;
             
             // 统计订单状态
-            let activeCount = 0;      // 进行中
-            let completedCount = 0;   // 已结清
-            let abnormalCount = 0;    // 异常：逾期30天+ 或 已变卖(liquidated)
+            let activeCount = 0;
+            let completedCount = 0;
+            let abnormalCount = 0;
             
             for (var i = 0; i < (orders || []).length; i++) {
                 var o = orders[i];
@@ -259,20 +259,17 @@ const CustomersModule = {
                     .eq('customer_id', customerId)
                     .eq('status', 'active')
                     .gte('overdue_days', 30);
-                // 逾期30天以上的订单也算异常
                 abnormalCount += (overdueCount || 0);
             } catch(e) {
                 console.warn('获取逾期订单失败:', e);
             }
             
-            // 权限控制：编辑按钮仅管理员可见
+            // 权限控制
             var canEdit = isAdmin;
-            // 拉黑按钮：门店操作员和管理员均可操作（未拉黑时显示）
             var canBlacklist = !isBlacklisted;
-            // 解除拉黑按钮：仅管理员可见且已拉黑时显示
             var canUnblacklist = isAdmin && isBlacklisted;
             
-            // 获取注册日期、KTP地址、居住地址
+            // 获取注册日期、KTP地址、居住地址（列表中没有的补充信息）
             var registeredDate = Utils.formatDate(customer.registered_date);
             var ktpAddress = Utils.escapeHtml(customer.ktp_address || customer.address || '-');
             var livingAddress = Utils.escapeHtml(
@@ -317,19 +314,19 @@ const CustomersModule = {
                         
                         '<div class="form-section">' +
                             '<div class="info-display">' +
-    '<div class="info-display-item">' +
-        '<span class="info-label">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + ':</span>' +
-        '<span class="info-value">' + registeredDate + '</span>' +
-    '</div>' +
-    '<div class="info-display-item">' +
-        '<span class="info-label">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + ':</span>' +
-        '<span class="info-value">' + ktpAddress + '</span>' +
-    '</div>' +
-    '<div class="info-display-item">' +
-        '<span class="info-label">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</span>' +
-        '<span class="info-value">' + livingAddress + '</span>' +
-    '</div>' +
-'</div>'
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + ':</span>' +
+                                    '<span class="info-value">' + registeredDate + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + ':</span>' +
+                                    '<span class="info-value">' + ktpAddress + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</span>' +
+                                    '<span class="info-value">' + livingAddress + '</span>' +
+                                '</div>' +
+                            '</div>' +
                         '</div>' +
                         
                         '<div class="form-section">' +
@@ -465,18 +462,15 @@ const CustomersModule = {
             } else if (statusType === 'completed') {
                 query = query.eq('status', 'completed');
             } else if (statusType === 'abnormal') {
-                // 异常订单：状态为 liquidated 或 逾期>=30天
                 query = query.or('status.eq.liquidated,and(status.eq.active,overdue_days.gte.30)');
             }
             
             const { data: orders, error } = await query;
             if (error) throw error;
             
-            // 关闭详情卡片
             var modal = document.getElementById('customerDetailCard');
             if (modal) modal.remove();
             
-            // 跳转到客户订单列表页面
             APP.currentCustomerId = customerId;
             APP.showCustomerOrders(customerId);
             
@@ -1594,7 +1588,7 @@ const CustomersModule = {
             
             var rows = '';
             if (allPayments.length === 0) {
-                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + 'NonNull';
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
@@ -1638,7 +1632,7 @@ const CustomersModule = {
                                     '<th class="col-amount amount">' + t('amount') + '</th>' +
                                     '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th class="col-desc">' + t('description') + '</th>' +
-                                '</table>' +
+                                '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
