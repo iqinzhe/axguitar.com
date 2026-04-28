@@ -1,10 +1,9 @@
-// store.js - v1.4（修复：门店WA号码更新方法 + 门店状态同步 + 错误处理增强）
+// store.js - v1.5（修复：alert 替换为 Toast + 门店状态同步）
 
 const StoreManager = {
     stores: [],
     _loaded: false,
 
-    // 使用 StoreManager. 而不是 this.
     loadStores: async function(force = false) {
         console.log('[StoreManager] loadStores 被调用, force:', force);
         if (!force && StoreManager._loaded && StoreManager.stores.length > 0) {
@@ -69,11 +68,12 @@ const StoreManager = {
     suspendStore: async function(storeId) {
         var lang = Utils.lang;
         
-        if (!confirm(lang === 'id' 
+        var confirmMsg = lang === 'id' 
             ? '⚠️ Yakin akan menonaktifkan toko ini?\n\nOperator toko tidak akan bisa login.\nData toko tetap tersimpan.'
-            : '⚠️ 确认暂停此门店？\n\n门店操作员将无法登录。\n门店数据将继续保留。')) {
-            return;
-        }
+            : '⚠️ 确认暂停此门店？\n\n门店操作员将无法登录。\n门店数据将继续保留。';
+        
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return;
         
         try {
             const { error } = await supabaseClient
@@ -86,20 +86,29 @@ const StoreManager = {
             var store = StoreManager.stores.find(function(s) { return s.id === storeId; });
             if (store) store.is_active = false;
             
-            // 清除缓存
             SUPABASE.clearCache();
             
-            alert(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
+            } else {
+                alert(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
+            }
             await StoreManager.renderStoreManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
+            }
         }
     },
 
     resumeStore: async function(storeId) {
         var lang = Utils.lang;
         
-        if (!confirm(lang === 'id' ? 'Aktifkan kembali toko ini?' : '恢复此门店营业？')) return;
+        var confirmMsg = lang === 'id' ? 'Aktifkan kembali toko ini?' : '恢复此门店营业？';
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return;
         
         try {
             const { error } = await supabaseClient
@@ -112,13 +121,20 @@ const StoreManager = {
             var store = StoreManager.stores.find(function(s) { return s.id === storeId; });
             if (store) store.is_active = true;
             
-            // 清除缓存
             SUPABASE.clearCache();
             
-            alert(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
+            } else {
+                alert(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
+            }
             await StoreManager.renderStoreManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
+            }
         }
     },
 
@@ -181,7 +197,11 @@ const StoreManager = {
                 '</div>';
             document.body.appendChild(modal);
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal memuat data toko' : '加载门店数据失败');
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat data toko' : '加载门店数据失败');
+            } else {
+                alert(lang === 'id' ? 'Gagal memuat data toko' : '加载门店数据失败');
+            }
         }
     },
 
@@ -193,7 +213,11 @@ const StoreManager = {
         var waNumber = document.getElementById('editStoreWA')?.value.trim();
         
         if (!name) {
-            alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            } else {
+                alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            }
             return;
         }
         
@@ -215,21 +239,28 @@ const StoreManager = {
             
             if (error) throw error;
             
-            // 更新本地缓存
             const idx = StoreManager.stores.findIndex(s => s.id === storeId);
             if (idx !== -1) {
                 StoreManager.stores[idx] = { ...StoreManager.stores[idx], ...updates };
             }
             
             document.getElementById('editStoreModal')?.remove();
-            alert(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
+            if (window.Toast) {
+                window.Toast.success(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
+            } else {
+                alert(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
+            }
             await StoreManager.renderStoreManagement();
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            }
         }
     },
 
-    // ========== 问题 #7：门店WA号码更新方法 ==========
+    // ========== 门店WA号码更新方法 ==========
     updateStoreWANumber: async function(storeId, waNumber) {
         var lang = Utils.lang;
         
@@ -249,7 +280,6 @@ const StoreManager = {
             
             if (error) throw error;
             
-            // 更新本地缓存
             const idx = StoreManager.stores.findIndex(s => s.id === storeId);
             if (idx !== -1) {
                 StoreManager.stores[idx].wa_number = waNumber || null;
@@ -257,13 +287,20 @@ const StoreManager = {
             
             console.log(`[StoreManager] WA号码已更新: ${storeId} -> ${waNumber}`);
             
-            // 可选：显示成功提示（静默更新，不弹窗）
             if (window._debugStoreWA) {
-                alert(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
+                if (window.Toast) {
+                    window.Toast.success(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
+                } else {
+                    alert(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
+                }
             }
         } catch (error) {
             console.error('updateStoreWANumber 失败:', error);
-            alert(lang === 'id' ? 'Gagal memperbarui nomor WA: ' + error.message : '更新WA号码失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memperbarui nomor WA: ' + error.message : '更新WA号码失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal memperbarui nomor WA: ' + error.message : '更新WA号码失败：' + error.message);
+            }
         }
     },
 
@@ -470,7 +507,7 @@ const StoreManager = {
                 '<td class="store-name-cell"><strong>' + (lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计') + '</strong></td>' +
                 '<td class="text-center"><strong>' + grandTotal.orders + '</strong></td>' +
                 '<td class="text-center"><strong>' + grandTotal.active + '</strong></td>' +
-                '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.loan) + '</strong></td>' +
+                '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.loan) + '</strong></tr>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.adminFee) + '</strong></td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.serviceFee) + '</strong></td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.interest) + '</strong></td>' +
@@ -492,7 +529,7 @@ const StoreManager = {
                         ? '<span class="status-badge active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
                         : '<span class="status-badge liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
                     
-                    storeRows += '<tr>' +
+                    storeRows += '<table>' +
                         '<td class="store-code">' + Utils.escapeHtml(store.code) + '</td>' +
                         '<td class="store-name">' + Utils.escapeHtml(store.name) + '</td>' +
                         '<td class="store-address desc-cell">' + Utils.escapeHtml(store.address || '-') + '</td>' +
@@ -521,7 +558,7 @@ const StoreManager = {
                         '<td colspan="5">' +
                             '<div class="action-buttons">' + actionButtons + '</div>' +
                         '</td>' +
-                    '</td>';
+                    '</tr>';
                 }
             }
             
@@ -650,5 +687,5 @@ const StoreManager = {
 // 挂载到 window
 window.StoreManager = StoreManager;
 
-// 挂载 WA 号码更新方法到 APP（方便页面调用）
+// 挂载 WA 号码更新方法到 APP
 window.APP.updateStoreWANumber = StoreManager.updateStoreWANumber.bind(StoreManager);
