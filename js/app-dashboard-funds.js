@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.1（修复：alert 替换为 Toast）
+// app-dashboard-funds.js - v1.0
 window.APP = window.APP || {};
 
 const DashboardFunds = {
