@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.3（修复：alert 替换为 Toast + 内存缓存清理机制）
+// app-dashboard-anomaly.js - v1.0
 
 window.APP = window.APP || {};
 
