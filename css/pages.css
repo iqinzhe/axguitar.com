@@ -1,571 +1,75 @@
 /* ============================================================
-   pages.css - 第5层：只在特定页面出现的零散样式
+   P16. 客户页面 - 表格列宽
    ============================================================ */
 
-/* ============================================================
-   P1. 异常状况页面
-   ============================================================ */
-.anomaly-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-5);
-    align-items: stretch;
+/* 电脑端：固定列宽，隐藏地址列 */
+@media (min-width: 769px) {
+    .customer-list-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+    .customer-list-table .col-id { width: 10%; }
+    .customer-list-table .col-name { width: 12%; padding-left: 12px; }
+    .customer-list-table .col-ktp { width: 14%; }
+    .customer-list-table .col-phone { width: 12%; white-space: nowrap; }
+    .customer-list-table .col-occupation { width: 12%; }
+    .customer-list-table td:nth-child(6) { width: 13%; }
+    .customer-list-table td:nth-child(7) { width: 8%; }
+    .customer-list-table .col-address-ktp,
+    .customer-list-table .col-address-living,
+    .customer-list-table .col-store,
+    .customer-list-table .date-cell {
+        display: none;
+    }
 }
 
-.anomaly-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-light);
-    overflow: hidden;
-    transition: var(--transition);
+/* 手机端：显示地址列 */
+@media (max-width: 768px) {
+    .customer-list-table .col-address-ktp,
+    .customer-list-table .col-address-living {
+        display: table-cell;
+    }
+}
+
+
+/* ============================================================
+   P17. 客户详情卡片 - 订单统计
+   ============================================================ */
+.customer-detail-card .order-stats {
     display: flex;
-    flex-direction: column;
-    min-height: 380px;
-}
-
-.anomaly-card:hover {
-    box-shadow: var(--shadow-md);
-}
-
-.anomaly-card-header {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-3);
-    padding: var(--spacing-4) var(--spacing-5);
-    border-bottom: 1px solid var(--border-light);
-    flex-shrink: 0;
-}
-
-.anomaly-icon {
-    font-size: var(--font-xl);
-    line-height: 1;
-}
-
-.anomaly-card-header h3 {
-    flex: 1;
-    margin: 0;
-    font-size: var(--font-md);
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.anomaly-badge {
-    background: var(--primary-soft);
-    color: var(--primary-dark);
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: var(--font-xs);
-    font-weight: 600;
-}
-
-.anomaly-card-danger  .anomaly-badge { background: #fee2e2; color: #dc2626; }
-.anomaly-card-warning .anomaly-badge { background: #fef3c7; color: #d97706; }
-.anomaly-card-info    .anomaly-badge { background: #e0f2fe; color: #0284c7; }
-
-.anomaly-card-body {
-    padding: var(--spacing-4) var(--spacing-5);
-    flex: 1;
-    overflow-y: auto;
-}
-
-.anomaly-card-footer {
-    padding: var(--spacing-3) var(--spacing-5);
-    background: var(--bg-hover);
-    border-top: 1px solid var(--border-light);
-    font-size: var(--font-xxs);
-    flex-shrink: 0;
-}
-
-.anomaly-card-footer .warning-text {
-    color: #dc2626;
-}
-
-.anomaly-card-footer .info-text {
-    color: var(--text-muted);
-}
-
-/* 异常表格 */
-.anomaly-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--font-xs);
-}
-
-.anomaly-table th,
-.anomaly-table td {
-    padding: var(--spacing-2);
-    border-bottom: 1px solid var(--border-light);
-    text-align: left;
-}
-
-.anomaly-table th {
-    font-weight: 600;
-    color: var(--text-secondary);
-    background: var(--bg-hover);
-}
-
-
-/* ============================================================
-   P2. 异常页面 - 门店列表 / 排名列表
-   ============================================================ */
-.store-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-2);
-}
-
-.store-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-2) var(--spacing-3);
-    background: var(--bg-hover);
-    border-radius: var(--radius-md);
-}
-
-.store-item-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.store-item-name {
-    font-weight: 600;
-    font-size: var(--font-sm);
-}
-
-.store-item-code {
-    font-size: var(--font-xxs);
-    color: var(--text-muted);
-}
-
-.store-item-count {
-    font-size: var(--font-md);
-    font-weight: 700;
-}
-
-.store-item-count.lowest {
-    color: #dc2626;
-}
-
-/* 排名 */
-.ranking-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.ranking-item {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-3);
-    padding: var(--spacing-2) var(--spacing-3);
-    background: var(--bg-hover);
-    border-radius: var(--radius-md);
-}
-
-.ranking-number {
-    font-size: var(--font-md);
-    min-width: 45px;
-    font-weight: 700;
-}
-
-.ranking-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.ranking-name {
-    font-weight: 600;
-    font-size: var(--font-sm);
-}
-
-.ranking-code {
-    font-size: var(--font-xxs);
-    color: var(--text-muted);
-}
-
-.ranking-count {
-    font-size: var(--font-sm);
-    font-weight: 700;
-    text-align: right;
-}
-
-.ranking-item.first {
-    background: #fef3c7;
-    border-left: 3px solid #f59e0b;
-}
-
-.ranking-item.last {
-    background: #fee2e2;
-    border-left: 3px solid #ef4444;
-}
-
-
-/* ============================================================
-   P3. 订单详情 - 双列布局
-   ============================================================ */
-.order-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-5);
-    margin-bottom: var(--spacing-4);
-}
-
-.order-detail-grid .info-column {
-    min-width: 0;
-}
-
-.order-detail-grid .info-column h3 {
-    margin-top: 0;
-}
-
-
-/* ============================================================
-   P4. 缴费页面 - 固定还款卡片
-   ============================================================ */
-.fixed-repayment-card {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border-left: 4px solid #10b981;
-}
-
-
-/* ============================================================
-   P5. 缴费页面 - 历史表格
-   ============================================================ */
-.history-table {
-    width: 100%;
-    font-size: var(--font-xs);
-    border-collapse: collapse;
-}
-
-.history-table th,
-.history-table td {
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--border-light);
-}
-
-.history-table th {
-    background: var(--bg-hover);
-    font-weight: 600;
-    font-size: var(--font-xxs);
-}
-
-
-/* ============================================================
-   P6. 资金流水页面 - 表格微调
-   ============================================================ */
-.cashflow-table .date-cell,
-.capital-table .date-cell {
-    white-space: nowrap;
-}
-
-.cashflow-table .flow-desc,
-.capital-table .flow-desc {
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.cashflow-table .income,
-.capital-table .income {
-    color: var(--success);
-}
-
-.cashflow-table .expense,
-.capital-table .expense {
-    color: var(--danger);
-}
-
-
-/* ============================================================
-   P7. 支出页面 - 表格微调
-   ============================================================ */
-.expense-table .date-cell {
-    white-space: nowrap;
-}
-
-.expense-table .expense-category {
-    font-weight: 500;
-}
-
-.expense-table .expense-desc {
-    max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.expense-table .action-cell {
-    white-space: nowrap;
-}
-
-
-/* ============================================================
-   P8. 备份恢复页面
-   ============================================================ */
-.backup-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-5);
-}
-
-.backup-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-5);
-    border: 1px solid var(--border-light);
-    transition: var(--transition);
-}
-
-.backup-card h3 {
-    font-size: var(--font-md);
-    margin-bottom: var(--spacing-3);
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.backup-card p {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-3);
-    line-height: 1.5;
-}
-
-.backup-card-primary {
-    background: linear-gradient(135deg, #e8f4e8 0%, #d4ecd4 100%);
-    border-left: 4px solid #10b981;
-}
-
-.backup-card-primary h3 {
-    color: #065f46;
-}
-
-.backup-card-primary p {
-    color: #065f46;
-}
-
-.btn-backup-primary {
-    background: #10b981;
-    color: white;
-    border: none;
-    padding: var(--spacing-3) var(--spacing-5);
-    border-radius: var(--radius-md);
-    font-size: var(--font-md);
-    font-weight: 600;
-    cursor: pointer;
-    width: 100%;
-    transition: var(--transition);
-}
-
-.btn-backup-primary:hover {
-    background: #059669;
-    transform: translateY(-1px);
-}
-
-.warning-text-small {
-    font-size: var(--font-xxs);
-    color: #dc2626;
-    background: #fee2e2;
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    margin-bottom: var(--spacing-3);
-}
-
-.btn-restore {
-    background: #f59e0b;
-    color: white;
-    border: none;
-    padding: var(--spacing-2) var(--spacing-4);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-sm);
-    cursor: pointer;
-    width: 100%;
-    transition: var(--transition);
-}
-
-.btn-restore:hover {
-    background: #d97706;
-}
-
-
-/* ============================================================
-   P9. 门店管理 - 门店统计表
-   ============================================================ */
-.store-stats-table .store-name-cell {
-    font-weight: 500;
-    background: var(--bg-hover);
-}
-
-.store-stats-table tbody tr:last-child {
-    border-top: 2px solid var(--border-medium);
-    background: var(--bg-hover);
-    font-weight: 600;
-}
-
-
-/* ============================================================
-   P10. 门店管理 - 现金流卡片
-   ============================================================ */
-.cashflow-card {
-    margin-bottom: var(--spacing-4);
-}
-
-.cashflow-card .cashflow-stats {
-    display: flex;
-    gap: var(--spacing-4);
+    gap: 16px;
     flex-wrap: wrap;
-}
-
-.cashflow-card .cashflow-item-card {
-    flex: 1;
-    min-width: 180px;
+    margin: 16px 0;
+    padding: 12px;
     background: var(--bg-hover);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-3);
-    transition: var(--transition);
-    border: 1px solid var(--border-light);
-    text-align: center;
-}
-
-.cashflow-card .cashflow-item-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.cashflow-card .cashflow-note {
-    font-size: var(--font-xs);
-    color: var(--text-secondary);
-    margin-top: var(--spacing-3);
-    padding-top: var(--spacing-2);
-    border-top: 1px solid var(--border-light);
-}
-
-
-/* ============================================================
-   P11. 黑名单页面
-   ============================================================ */
-.blacklist-info-card {
-    background: #fef3c7;
-    border-left: 4px solid #f59e0b;
-}
-
-.blacklist-info-card .info-text {
-    color: #92400e;
-}
-
-.blacklist-info-card .info-text strong {
-    color: #b45309;
-}
-
-
-/* ============================================================
-   P12. 用户管理 - 角色下拉
-   ============================================================ */
-.user-table .role-select {
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-medium);
-    font-size: var(--font-xs);
-    margin-right: var(--spacing-2);
-    background: var(--bg-card);
-}
-
-
-/* ============================================================
-   P13. 黑名单按钮
-   ============================================================ */
-.btn-blacklist {
-    background: #f97316 !important;
-    color: #fff !important;
-    border-color: #ea580c !important;
-}
-
-.btn-blacklist:hover {
-    background: #ea580c !important;
-}
-
-
-/* ============================================================
-   P14. 转账记录日期
-   ============================================================ */
-.transfer-table .date-cell {
-    white-space: nowrap;
-}
-
-/* ============================================================
-   P15. 门店备份恢复页面 - 统一卡片样式
-   ============================================================ */
-
-/* 门店备份页面 - 2列网格布局 */
-.backup-grid-store {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-5);
-}
-
-/* 门店备份卡片 - 统一背景色（柔和蓝色系） */
-.backup-card-store-primary,
-.backup-card-store-secondary {
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-5);
-    border: 1px solid #bae6fd;
-    transition: var(--transition);
-    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.08);
-}
-
-.backup-card-store-primary:hover,
-.backup-card-store-secondary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.12);
-}
-
-.backup-card-store-primary h3,
-.backup-card-store-secondary h3 {
-    font-size: var(--font-md);
-    margin-bottom: var(--spacing-3);
-    border-bottom: none;
-    padding-bottom: 0;
-    color: var(--primary-dark);
-}
-
-.backup-card-store-primary p,
-.backup-card-store-secondary p {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-4);
-    line-height: 1.5;
-}
-
-/* 门店备份按钮 - 统一绿色主题 */
-.btn-backup-store-primary {
-    background: var(--success-dark);
-    color: white;
-    border: none;
-    padding: var(--spacing-3) var(--spacing-5);
     border-radius: var(--radius-md);
-    font-size: var(--font-md);
-    font-weight: 600;
+}
+
+.customer-detail-card .stat-item {
+    flex: 1;
+    text-align: center;
     cursor: pointer;
-    width: 100%;
-    transition: var(--transition);
+    transition: transform 0.2s;
+    padding: 8px;
+    border-radius: var(--radius-sm);
 }
 
-.btn-backup-store-primary:hover {
-    background: var(--success);
-    transform: translateY(-1px);
+.customer-detail-card .stat-item:hover {
+    background: var(--border-light);
+    transform: translateY(-2px);
 }
 
-/* 门店导出卡片内的按钮样式调整 */
-.backup-card-store-secondary .btn-small {
-    background: white;
-    border: 1px solid #bae6fd;
-    color: var(--primary-dark);
+.customer-detail-card .stat-number {
+    font-size: 24px;
+    font-weight: 700;
+    display: block;
 }
 
-.backup-card-store-secondary .btn-small:hover {
-    background: var(--primary-soft);
-    transform: translateY(-1px);
+.customer-detail-card .stat-label {
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
 }
+
+.customer-detail-card .stat-item.active .stat-number { color: var(--primary); }
+.customer-detail-card .stat-item.completed .stat-number { color: var(--success-dark); }
+.customer-detail-card .stat-item.abnormal .stat-number { color: var(--danger); }
