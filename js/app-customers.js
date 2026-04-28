@@ -1159,6 +1159,20 @@ const CustomersModule = {
         }
         
         try {
+            // 获取当前用户的 profile，确保 store_id 正确赋值
+            const profile = await SUPABASE.getCurrentProfile();
+            const storeId = profile?.store_id;
+            
+            if (!storeId) {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan' : '保存'); }
+                if (window.Toast) {
+                    window.Toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
+                } else {
+                    alert(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
+                }
+                return;
+            }
+            
             const { data: customer } = await supabaseClient
                 .from('customers')
                 .select('*')
@@ -1192,7 +1206,7 @@ const CustomersModule = {
                 loan_amount: amount,
                 notes: notes,
                 customer_id: customerId,
-                store_id: null,
+                store_id: storeId,
                 admin_fee: adminFee,
                 service_fee_percent: serviceFeePercent,
                 service_fee_amount: serviceFee,
@@ -1572,20 +1586,9 @@ const CustomersModule = {
     }
 };
 
-// 挂载到 window.APP
+// 统一挂载到 window.APP（仅通过 for-in 遍历自身可枚举属性）
 for (var key in CustomersModule) {
-    if (typeof CustomersModule[key] === 'function') {
+    if (CustomersModule.hasOwnProperty(key) && typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
     }
 }
-
-window.APP.recalculateAllFees = CustomersModule.recalculateAllFees;
-window.APP.onAdminFeeManualChange = CustomersModule.onAdminFeeManualChange;
-window.APP.recalculateServiceFee = CustomersModule.recalculateServiceFee;
-window.APP.onServiceFeeManualChange = CustomersModule.onServiceFeeManualChange;
-window.APP.onMonthlyPaymentManualChange = CustomersModule.onMonthlyPaymentManualChange;
-window.APP.toggleRepaymentForm = CustomersModule.toggleRepaymentForm;
-window.APP.toggleLivingAddress = CustomersModule.toggleLivingAddress;
-window.APP._toggleEditLiving = CustomersModule._toggleEditLiving;
-window.APP._saveEditCustomer = CustomersModule._saveEditCustomer;
-window.APP.saveOrderForCustomer = CustomersModule.saveOrderForCustomer;
