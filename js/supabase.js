@@ -1,4 +1,4 @@
-// supabase.js - v1.2（修复并发ID生成竞态条件 + 指数退避重试）
+// supabase.js - v1.3（整合：黑名单ID修复 + 并发ID生成 + 时区统一）
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
@@ -595,7 +595,7 @@ const SupabaseAPI = {
         return fallbackId;
     },
 
-    // ========== 修复：创建客户（增强重试和指数退避） ==========
+    // ========== 修复：创建客户（增强重试和指数退避 + 时区统一） ==========
     async createCustomer(customerData) {
         const profile = await this.getCurrentProfile();
         const storeId = customerData.store_id || profile.store_id;
@@ -621,9 +621,9 @@ const SupabaseAPI = {
                         living_same_as_ktp: customerData.living_same_as_ktp,
                         living_address: customerData.living_address || null,
                         occupation: customerData.occupation || null,
-                        registered_date: customerData.registered_date || new Date().toISOString().split('T')[0],
+                        registered_date: customerData.registered_date || Utils.getLocalToday(),
                         created_by: profile.id,
-                        updated_at: new Date().toISOString()
+                        updated_at: Utils.getLocalDateTime()
                     })
                     .select()
                     .single();
@@ -656,7 +656,6 @@ const SupabaseAPI = {
         throw lastError || new Error('无法创建客户，请重试');
     },
 
-    // ========== 更新客户 ==========
     async updateCustomer(customerId, customerData) {
         const profile = await this.getCurrentProfile();
         
@@ -669,7 +668,7 @@ const SupabaseAPI = {
             living_same_as_ktp: customerData.living_same_as_ktp,
             living_address: customerData.living_address || null,
             occupation: customerData.occupation || null,
-            updated_at: new Date().toISOString()
+            updated_at: Utils.getLocalDateTime()
         };
         
         const { error } = await supabaseClient
@@ -682,7 +681,6 @@ const SupabaseAPI = {
         return true;
     },
 
-    // ========== 获取客户列表 ==========
     async getCustomers(filters) {
         if (filters === undefined) filters = {};
         const profile = await this.getCurrentProfile();
@@ -720,24 +718,7 @@ const SupabaseAPI = {
     },
 
     calculateNextDueDate: function(startDate, paidMonths) {
-        if (!startDate) {
-            startDate = new Date().toISOString().split('T')[0];
-        }
-        
-        let date = new Date(startDate);
-        if (isNaN(date.getTime())) {
-            console.warn("calculateNextDueDate: 无效的日期", startDate);
-            date = new Date();
-        }
-        
-        const originalDay = date.getDate();
-        date.setMonth(date.getMonth() + paidMonths + 1);
-        
-        if (date.getDate() !== originalDay) {
-            date.setDate(0);
-        }
-        
-        return date.toISOString().split('T')[0];
+        return Utils.calculateNextDueDate(startDate, paidMonths);
     },
 
     // ==================== 资金流水记录 ====================
@@ -760,7 +741,7 @@ const SupabaseAPI = {
             customer_id: flowData.customer_id || null,
             description: flowData.description || '',
             recorded_by: profile?.id,
-            recorded_at: new Date().toISOString(),
+            recorded_at: Utils.getLocalDateTime(),
             reference_id: flowData.reference_id || null,
             is_voided: false,
             void_reason: null,
@@ -793,7 +774,7 @@ const SupabaseAPI = {
             .update({
                 is_voided: true,
                 void_reason: reason,
-                voided_at: new Date().toISOString(),
+                voided_at: Utils.getLocalDateTime(),
                 voided_by: profile?.id
             })
             .eq('id', originalFlowId);
@@ -910,10 +891,10 @@ const SupabaseAPI = {
         return { order: order, payments: data };
     },
 
-    // ========== 修复：创建订单（增强重试和指数退避） ==========
+    // ========== 修复：创建订单（增强重试和指数退避 + 时区统一） ==========
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
-        const nowDate = new Date().toISOString().split('T')[0];
+        const nowDate = Utils.getLocalToday();
         
         const adminFee = orderData.admin_fee || Utils.calculateAdminFee(orderData.loan_amount);
         const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
@@ -978,7 +959,7 @@ const SupabaseAPI = {
                     notes: orderData.notes || '',
                     customer_id: orderData.customer_id || null,
                     is_locked: true,
-                    locked_at: new Date().toISOString(),
+                    locked_at: Utils.getLocalDateTime(),
                     locked_by: profile.id,
                     repayment_type: repaymentType,
                     repayment_term: repaymentTerm,
@@ -988,7 +969,9 @@ const SupabaseAPI = {
                     fixed_paid_months: 0,
                     overdue_days: 0,
                     liquidation_status: 'normal',
-                    max_extension_months: orderData.max_extension_months || 10
+                    max_extension_months: orderData.max_extension_months || 10,
+                    created_at: Utils.getLocalDateTime(),
+                    updated_at: Utils.getLocalDateTime()
                 };
 
                 const { data, error } = await supabaseClient
@@ -1042,14 +1025,15 @@ const SupabaseAPI = {
         
         const { error: e1 } = await supabaseClient.from('orders').update({
             admin_fee_paid: true,
-            admin_fee_paid_date: new Date().toISOString().split('T')[0],
-            admin_fee: feeAmount
+            admin_fee_paid_date: Utils.getLocalToday(),
+            admin_fee: feeAmount,
+            updated_at: Utils.getLocalDateTime()
         }).eq('order_id', orderId);
         if (e1) throw e1;
         
         const paymentData = {
             order_id: order.id,
-            date: new Date().toISOString().split('T')[0],
+            date: Utils.getLocalToday(),
             type: 'admin_fee',
             amount: feeAmount,
             description: Utils.t('admin_fee'),
@@ -1097,13 +1081,14 @@ const SupabaseAPI = {
         if (totalServiceFee <= 0) return true;
         
         const { error: e1 } = await supabaseClient.from('orders').update({
-            service_fee_paid: totalServiceFee
+            service_fee_paid: totalServiceFee,
+            updated_at: Utils.getLocalDateTime()
         }).eq('order_id', orderId);
         if (e1) throw e1;
         
         const paymentData = {
             order_id: order.id,
-            date: new Date().toISOString().split('T')[0],
+            date: Utils.getLocalToday(),
             type: 'service_fee',
             months: 1,
             amount: totalServiceFee,
@@ -1171,7 +1156,7 @@ const SupabaseAPI = {
                 interest_paid_total: newInterestPaidTotal,
                 next_interest_due_date: nextDueDate,
                 monthly_interest: monthlyInterest,
-                updated_at: new Date().toISOString()
+                updated_at: Utils.getLocalDateTime()
             })
             .eq('order_id', orderId);
         
@@ -1179,7 +1164,7 @@ const SupabaseAPI = {
         
         const paymentData = {
             order_id: currentOrder.id,
-            date: new Date().toISOString().split('T')[0],
+            date: Utils.getLocalToday(),
             type: 'interest',
             months: months,
             amount: totalInterest,
@@ -1243,14 +1228,14 @@ const SupabaseAPI = {
         let updates = { 
             principal_paid: newPrincipalPaid, 
             principal_remaining: newPrincipalRemaining,
-            updated_at: new Date().toISOString()
+            updated_at: Utils.getLocalDateTime()
         };
         
         const isFullRepayment = newPrincipalRemaining <= 0;
         if (isFullRepayment) {
             updates.status = 'completed';
             updates.monthly_interest = 0;
-            updates.completed_at = new Date().toISOString();
+            updates.completed_at = Utils.getLocalDateTime();
         } else {
             updates.monthly_interest = newPrincipalRemaining * monthlyRate;
         }
@@ -1264,7 +1249,7 @@ const SupabaseAPI = {
         
         const paymentData = {
             order_id: currentOrder.id,
-            date: new Date().toISOString().split('T')[0],
+            date: Utils.getLocalToday(),
             type: 'principal',
             amount: paidAmount,
             description: isFullRepayment ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
@@ -1349,12 +1334,12 @@ const SupabaseAPI = {
             interest_paid_months: (order.interest_paid_months || 0) + 1,
             interest_paid_total: (order.interest_paid_total || 0) + interestAmount,
             next_interest_due_date: nextDueDate,
-            updated_at: new Date().toISOString()
+            updated_at: Utils.getLocalDateTime()
         };
         
         if (isCompleted) {
             updates.status = 'completed';
-            updates.completed_at = new Date().toISOString();
+            updates.completed_at = Utils.getLocalDateTime();
         }
         
         const { error: updateError } = await supabaseClient
@@ -1367,7 +1352,7 @@ const SupabaseAPI = {
         if (interestAmount > 0) {
             const interestPayment = {
                 order_id: order.id,
-                date: new Date().toISOString().split('T')[0],
+                date: Utils.getLocalToday(),
                 type: 'interest',
                 months: 1,
                 amount: interestAmount,
@@ -1393,7 +1378,7 @@ const SupabaseAPI = {
         if (principalAmount > 0) {
             const principalPayment = {
                 order_id: order.id,
-                date: new Date().toISOString().split('T')[0],
+                date: Utils.getLocalToday(),
                 type: 'principal',
                 amount: principalAmount,
                 description: (Utils.lang === 'id' ? 'Cicilan tetap - Pokok' : '固定还款-本金') + ' ' + newFixedPaidMonths,
@@ -1451,7 +1436,7 @@ const SupabaseAPI = {
         
         const finalPayment = {
             order_id: order.id,
-            date: new Date().toISOString().split('T')[0],
+            date: Utils.getLocalToday(),
             type: 'principal',
             amount: settlementAmount,
             description: Utils.lang === 'id' ? 'Pelunasan dipercepat - hemat bunga' : '提前结清 - 减免剩余利息',
@@ -1478,8 +1463,8 @@ const SupabaseAPI = {
                 status: 'completed',
                 principal_paid: order.loan_amount,
                 principal_remaining: 0,
-                completed_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                completed_at: Utils.getLocalDateTime(),
+                updated_at: Utils.getLocalDateTime()
             })
             .eq('order_id', orderId);
         
@@ -1501,8 +1486,8 @@ const SupabaseAPI = {
         
         if (error) throw error;
         
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const todayLocal = new Date();
+        todayLocal.setHours(0, 0, 0, 0);
         
         for (var i = 0; i < activeOrders.length; i++) {
             var order = activeOrders[i];
@@ -1513,8 +1498,8 @@ const SupabaseAPI = {
             due.setHours(0, 0, 0, 0);
             
             let overdueDays = 0;
-            if (today > due) {
-                overdueDays = Math.floor((today - due) / (1000 * 60 * 60 * 24));
+            if (todayLocal > due) {
+                overdueDays = Math.floor((todayLocal - due) / (1000 * 60 * 60 * 24));
             }
             
             let liquidationStatus = order.liquidation_status || 'normal';
@@ -1529,7 +1514,7 @@ const SupabaseAPI = {
             if (overdueDays !== order.overdue_days || liquidationStatus !== order.liquidation_status) {
                 await supabaseClient
                     .from('orders')
-                    .update({ overdue_days: overdueDays, liquidation_status: liquidationStatus })
+                    .update({ overdue_days: overdueDays, liquidation_status: liquidationStatus, updated_at: Utils.getLocalDateTime() })
                     .eq('id', order.id);
             }
         }
@@ -1556,6 +1541,8 @@ const SupabaseAPI = {
         if (currentOrder.is_locked && isUpdatingSensitive) {
             throw new Error(Utils.t('order_locked'));
         }
+        
+        updateData.updated_at = Utils.getLocalDateTime();
         
         const { data, error } = await supabaseClient
             .from('orders').update(updateData).eq('order_id', orderId).select().single();
@@ -1584,7 +1571,8 @@ const SupabaseAPI = {
             throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat membuka kunci' : '需管理员权限');
         }
         const { error } = await supabaseClient.from('orders').update({
-            is_locked: false, locked_at: null, locked_by: null
+            is_locked: false, locked_at: null, locked_by: null,
+            updated_at: Utils.getLocalDateTime()
         }).eq('order_id', orderId);
         if (error) throw error;
         return true;
@@ -1594,8 +1582,9 @@ const SupabaseAPI = {
         const profile = await this.getCurrentProfile();
         const { error } = await supabaseClient.from('orders').update({
             is_locked: true,
-            locked_at: new Date().toISOString(),
-            locked_by: profile.id
+            locked_at: Utils.getLocalDateTime(),
+            locked_by: profile.id,
+            updated_at: Utils.getLocalDateTime()
         }).eq('order_id', orderId);
         if (error) throw error;
         return true;
@@ -1987,14 +1976,16 @@ const SupabaseAPI = {
             .from('expenses')
             .insert({
                 store_id: expenseData.store_id || profile?.store_id,
-                expense_date: expenseData.expense_date,
+                expense_date: expenseData.expense_date || Utils.getLocalToday(),
                 category: expenseData.category,
                 amount: expenseData.amount,
                 description: expenseData.description || null,
                 payment_method: expenseData.payment_method,
                 created_by: profile?.id,
                 is_locked: true,
-                is_reconciled: false
+                is_reconciled: false,
+                created_at: Utils.getLocalDateTime(),
+                updated_at: Utils.getLocalDateTime()
             })
             .select()
             .single();
@@ -2035,14 +2026,14 @@ const SupabaseAPI = {
     async updateStoreWANumber(storeId, waNumber) {
         const { error } = await supabaseClient
             .from('stores')
-            .update({ wa_number: waNumber || null })
+            .update({ wa_number: waNumber || null, updated_at: Utils.getLocalDateTime() })
             .eq('id', storeId);
         if (error) throw error;
         return true;
     },
 
     async hasReminderSentToday(orderId) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = Utils.getLocalToday();
         const { data, error } = await supabaseClient
             .from('reminder_logs')
             .select('id')
@@ -2055,13 +2046,14 @@ const SupabaseAPI = {
 
     async logReminder(orderId) {
         const profile = await this.getCurrentProfile();
-        const today = new Date().toISOString().split('T')[0];
+        const today = Utils.getLocalToday();
         const { error } = await supabaseClient
             .from('reminder_logs')
             .insert({
                 order_id: orderId,
                 reminder_date: today,
-                sent_by: profile?.id || null
+                sent_by: profile?.id || null,
+                created_at: Utils.getLocalDateTime()
             });
         if (error) throw error;
         return true;
@@ -2143,14 +2135,15 @@ const SupabaseAPI = {
         const { data, error } = await supabaseClient
             .from('internal_transfers')
             .insert({
-                transfer_date: transferData.transfer_date || new Date().toISOString().split('T')[0],
+                transfer_date: transferData.transfer_date || Utils.getLocalToday(),
                 transfer_type: transferData.transfer_type,
                 from_account: transferData.from_account,
                 to_account: transferData.to_account,
                 amount: transferData.amount,
                 description: transferData.description || '',
                 store_id: transferData.store_id || profile?.store_id,
-                created_by: profile?.id
+                created_by: profile?.id,
+                created_at: Utils.getLocalDateTime()
             })
             .select()
             .single();
