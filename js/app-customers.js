@@ -37,8 +37,8 @@ const CustomersModule = {
                     rows += '<tr class="data-row">' +
                         '<td class="col-id">' + customerId + '</td>' +
                         '<td class="col-name">' + name + '</td>' +
-                        '<td class="col-ktp">' + ktpNumber + '</td>' +
                         '<td class="col-phone">' + phone + '</td>' +
+                        '<td class="col-ktp">' + ktpNumber + '</td>' +
                         '<td class="col-occupation">' + occupation + '</td>' +
                         '<td class="text-center">' +
                             '<button onclick="APP.createOrderForCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small success" style="background:var(--success-dark);color:white;white-space:nowrap;">➕ ' + (lang === 'id' ? 'Buat Pesanan' : '创建订单') + '</button>' +
