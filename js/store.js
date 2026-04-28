@@ -1,4 +1,4 @@
-// store.js - v1.5（修复：alert 替换为 Toast + 门店状态同步）
+// store.js - v1.5（修复：返回键统一右上角 + 门店状态同步）
 
 const StoreManager = {
     stores: [],
@@ -369,11 +369,9 @@ const StoreManager = {
         
         document.getElementById("app").innerHTML = '' +
             '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
-                '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-                    '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                    '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
-                '</div>' +
+                '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
                 '<div class="header-actions">' +
+                    '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                 '</div>' +
             '</div>' +
@@ -507,9 +505,9 @@ const StoreManager = {
                 '<td class="store-name-cell"><strong>' + (lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计') + '</strong></td>' +
                 '<td class="text-center"><strong>' + grandTotal.orders + '</strong></td>' +
                 '<td class="text-center"><strong>' + grandTotal.active + '</strong></td>' +
-                '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.loan) + '</strong></tr>' +
+                '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.loan) + '</strong></td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.adminFee) + '</strong></td>' +
-                '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.serviceFee) + '</strong></td>' +
+                '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.serviceFee) + '</strong><td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.interest) + '</strong></td>' +
                 '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.principal) + '</strong></td>' +
                 '<td class="amount income"><strong>' + Utils.formatCurrency(grandTotal.income) + '</strong></td>' +
@@ -529,7 +527,7 @@ const StoreManager = {
                         ? '<span class="status-badge active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
                         : '<span class="status-badge liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
                     
-                    storeRows += '<table>' +
+                    storeRows += '<tr>' +
                         '<td class="store-code">' + Utils.escapeHtml(store.code) + '</td>' +
                         '<td class="store-name">' + Utils.escapeHtml(store.name) + '</td>' +
                         '<td class="store-address desc-cell">' + Utils.escapeHtml(store.address || '-') + '</td>' +
@@ -564,11 +562,9 @@ const StoreManager = {
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
-                    '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
-                    '</div>' +
+                    '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
                     '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                         '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                     '</div>' +
                 '</div>' +
@@ -609,7 +605,7 @@ const StoreManager = {
                                     '<th class="amount">' + (lang === 'id' ? 'Pengeluaran' : '运营支出') + '</th>' +
                                     '<th class="amount">🏦 ' + (lang === 'id' ? 'Brankas' : '保险柜') + '</th>' +
                                     '<th class="amount">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行BNI') + '</th>' +
-                                '</tr>' +
+                                '<tr>' +
                             '</thead>' +
                             '<tbody>' + storeStatsRows + summaryRow + '</tbody>' +
                         '</table>' +
@@ -663,11 +659,9 @@ const StoreManager = {
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
-                    '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
-                    '</div>' +
+                    '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
                     '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                         '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                     '</div>' +
                 '</div>' +
