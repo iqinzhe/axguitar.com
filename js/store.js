@@ -1,4 +1,4 @@
-// store.js - v1.5（修复：返回键统一右上角 + 门店状态同步）
+// store.js - v1.0
 
 const StoreManager = {
     stores: [],
