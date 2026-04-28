@@ -1,4 +1,4 @@
-// storage.js - v1.0
+// storage.js - v1.1（修复：alert 替换为 Toast）
 const Storage = {
 
     // ==================== 备份功能 ====================
@@ -36,11 +36,7 @@ const Storage = {
             const paymentsResult = await SUPABASE.getAllPayments();
             const cashFlowsResult = await SUPABASE.getCashFlowRecords();
             
-            // 黑名单：门店也备份全部门店的黑名单（因为需要共享）
             let blacklistQuery = supabaseClient.from('blacklist').select('*');
-            // 门店备份时，黑名单只备份涉及本门店客户的记录
-            // 但为了数据完整性，还是备份全部黑名单
-            
             const blacklistResult = await blacklistQuery;
             
             const backupData = {
@@ -82,11 +78,20 @@ const Storage = {
             const successMsg = t('backup_complete')
                 .replace('{orders}', backupData.stats.orders_count)
                 .replace('{customers}', backupData.stats.customers_count);
-            alert(successMsg);
+            
+            if (window.Toast) {
+                window.Toast.success(successMsg, 5000);
+            } else {
+                alert(successMsg);
+            }
         } catch (err) {
             console.error("备份失败:", err);
             Utils.ErrorHandler.capture(err, 'Storage.backup');
-            alert(lang === 'id' ? '❌ Cadangan gagal: ' + err.message : '❌ 备份失败：' + err.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? '❌ Cadangan gagal: ' + err.message : '❌ 备份失败：' + err.message);
+            } else {
+                alert(lang === 'id' ? '❌ Cadangan gagal: ' + err.message : '❌ 备份失败：' + err.message);
+            }
         }
     },
     
@@ -98,14 +103,21 @@ const Storage = {
         
         const profile = await SUPABASE.getCurrentProfile();
         if (profile?.role !== 'admin') {
-            alert(lang === 'id' 
-                ? '⚠️ Hanya administrator yang dapat melakukan pemulihan data.'
-                : '⚠️ 只有管理员可以执行数据恢复操作。');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' 
+                    ? '⚠️ Hanya administrator yang dapat melakukan pemulihan data.'
+                    : '⚠️ 只有管理员可以执行数据恢复操作。');
+            } else {
+                alert(lang === 'id' 
+                    ? '⚠️ Hanya administrator yang dapat melakukan pemulihan data.'
+                    : '⚠️ 只有管理员可以执行数据恢复操作。');
+            }
             return false;
         }
         
         const confirmMsg = t('restore_confirm');
-        if (!confirm(confirmMsg)) return false;
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return false;
         
         const confirmCode = lang === 'id' ? 'KONFIRMASI' : '确认恢复';
         const codeInput = prompt(lang === 'id'
@@ -113,7 +125,11 @@ const Storage = {
             : `请输入 "${confirmCode}" 以确认恢复操作：`);
         
         if (codeInput !== confirmCode) {
-            alert(lang === 'id' ? 'Pemulihan data dibatalkan.' : '恢复操作已取消。');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Pemulihan data dibatalkan.' : '恢复操作已取消。');
+            } else {
+                alert(lang === 'id' ? 'Pemulihan data dibatalkan.' : '恢复操作已取消。');
+            }
             return false;
         }
         
@@ -127,9 +143,11 @@ const Storage = {
             }
             
             if (data.version !== '2.0' && data.version !== '3.0' && data.version !== '3.1' && data.version !== '3.2') {
-                if (!confirm(lang === 'id'
+                var confirmVersion = lang === 'id'
                     ? `Versi file cadangan (${data.version}) tidak kompatibel dengan sistem saat ini. Lanjutkan?`
-                    : `备份文件版本 (${data.version}) 与当前系统不兼容，继续恢复可能导致问题。是否继续？`)) {
+                    : `备份文件版本 (${data.version}) 与当前系统不兼容，继续恢复可能导致问题。是否继续？`;
+                var versionConfirmed = window.Toast ? await window.Toast.confirmPromise(confirmVersion) : confirm(confirmVersion);
+                if (!versionConfirmed) {
                     this._hideLoading(loadingMsg);
                     return false;
                 }
@@ -149,7 +167,11 @@ const Storage = {
                 ? `✅ Pemulihan selesai!\n\n📊 Statistik pemulihan:\n• Toko: ${results.stores}\n• Nasabah: ${results.customers}\n• Pesanan: ${results.orders}\n• Pengeluaran: ${results.expenses}\n• Pembayaran: ${results.payments}\n• Arus kas: ${results.cashFlows}\n• Daftar hitam: ${results.blacklist}\n\nSegarkan halaman untuk melihat data.`
                 : `✅ 恢复完成！\n\n📊 恢复统计：\n• 门店: ${results.stores}\n• 客户: ${results.customers}\n• 订单: ${results.orders}\n• 支出: ${results.expenses}\n• 缴费记录: ${results.payments}\n• 资金流水: ${results.cashFlows}\n• 黑名单: ${results.blacklist}\n\n请刷新页面查看数据。`;
             
-            alert(resultMsg);
+            if (window.Toast) {
+                window.Toast.success(resultMsg, 8000);
+            } else {
+                alert(resultMsg);
+            }
             window.location.reload();
             return true;
             
@@ -157,7 +179,11 @@ const Storage = {
             console.error("恢复失败:", err);
             Utils.ErrorHandler.capture(err, 'Storage.restore');
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' ? '❌ Pemulihan gagal: ' + err.message : '❌ 恢复失败：' + err.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? '❌ Pemulihan gagal: ' + err.message : '❌ 恢复失败：' + err.message);
+            } else {
+                alert(lang === 'id' ? '❌ Pemulihan gagal: ' + err.message : '❌ 恢复失败：' + err.message);
+            }
             return false;
         }
     },
@@ -447,11 +473,17 @@ const Storage = {
         const profile = await SUPABASE.getCurrentProfile();
         
         if (profile?.role !== 'admin') {
-            alert(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
+            } else {
+                alert(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
+            }
             return;
         }
         
-        if (!confirm(lang === 'id' ? '⚠️ Pulihkan hanya data pesanan? Pesanan yang ada akan ditimpa.' : '⚠️ 仅恢复订单数据？现有订单将被覆盖。')) return;
+        var confirmMsg = lang === 'id' ? '⚠️ Pulihkan hanya data pesanan? Pesanan yang ada akan ditimpa.' : '⚠️ 仅恢复订单数据？现有订单将被覆盖。';
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return;
         
         const loadingMsg = this._showLoading(lang === 'id' ? 'Memulihkan pesanan...' : '正在恢复订单...');
         
@@ -479,13 +511,22 @@ const Storage = {
             }
             
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' 
+            var msg = lang === 'id' 
                 ? `✅ Pemulihan selesai! Berhasil memulihkan ${successCount}/${orders.length} pesanan.`
-                : `✅ 恢复完成！成功恢复 ${successCount}/${orders.length} 条订单。`);
+                : `✅ 恢复完成！成功恢复 ${successCount}/${orders.length} 条订单。`;
+            if (window.Toast) {
+                window.Toast.success(msg, 5000);
+            } else {
+                alert(msg);
+            }
             window.location.reload();
         } catch (err) {
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
+            } else {
+                alert(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
+            }
         }
     },
     
@@ -494,11 +535,17 @@ const Storage = {
         const profile = await SUPABASE.getCurrentProfile();
         
         if (profile?.role !== 'admin') {
-            alert(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
+            } else {
+                alert(lang === 'id' ? 'Hanya administrator yang dapat melakukan operasi ini' : '只有管理员可以执行此操作');
+            }
             return;
         }
         
-        if (!confirm(lang === 'id' ? '⚠️ Pulihkan hanya data nasabah? Nasabah yang ada akan ditimpa.' : '⚠️ 仅恢复客户数据？现有客户将被覆盖。')) return;
+        var confirmMsg = lang === 'id' ? '⚠️ Pulihkan hanya data nasabah? Nasabah yang ada akan ditimpa.' : '⚠️ 仅恢复客户数据？现有客户将被覆盖。';
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return;
         
         const loadingMsg = this._showLoading(lang === 'id' ? 'Memulihkan nasabah...' : '正在恢复客户...');
         
@@ -537,13 +584,22 @@ const Storage = {
             }
             
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' 
+            var msg = lang === 'id' 
                 ? `✅ Pemulihan selesai! Berhasil memulihkan ${successCount} nasabah baru, ${skippedCount} nasabah diperbarui.`
-                : `✅ 恢复完成！成功恢复 ${successCount} 条新客户记录，${skippedCount} 条已存在记录已更新。`);
+                : `✅ 恢复完成！成功恢复 ${successCount} 条新客户记录，${skippedCount} 条已存在记录已更新。`;
+            if (window.Toast) {
+                window.Toast.success(msg, 5000);
+            } else {
+                alert(msg);
+            }
             window.location.reload();
         } catch (err) {
             this._hideLoading(loadingMsg);
-            alert(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
+            } else {
+                alert(lang === 'id' ? 'Pemulihan gagal: ' + err.message : '恢复失败：' + err.message);
+            }
         }
     },
     
@@ -556,10 +612,18 @@ const Storage = {
             if (window.Audit) {
                 await window.Audit.logExport('orders', `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
             }
-            alert(Utils.t('export_success'));
+            if (window.Toast) {
+                window.Toast.success(Utils.t('export_success'));
+            } else {
+                alert(Utils.t('export_success'));
+            }
         } catch (err) {
             Utils.ErrorHandler.capture(err, 'Storage.exportOrdersToCSV');
-            alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            } else {
+                alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            }
         }
     },
 
@@ -570,10 +634,18 @@ const Storage = {
             if (window.Audit) {
                 await window.Audit.logExport('payments', `jf_gadai_payments_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
             }
-            alert(Utils.t('export_success'));
+            if (window.Toast) {
+                window.Toast.success(Utils.t('export_success'));
+            } else {
+                alert(Utils.t('export_success'));
+            }
         } catch (err) {
             Utils.ErrorHandler.capture(err, 'Storage.exportPaymentsToCSV');
-            alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            } else {
+                alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            }
         }
     },
     
@@ -607,10 +679,18 @@ const Storage = {
             if (window.Audit) {
                 await window.Audit.logExport('customers', `jf_gadai_customers_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
             }
-            alert(Utils.t('export_success'));
+            if (window.Toast) {
+                window.Toast.success(Utils.t('export_success'));
+            } else {
+                alert(Utils.t('export_success'));
+            }
         } catch (err) {
             Utils.ErrorHandler.capture(err, 'Storage.exportCustomersToCSV');
-            alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            if (window.Toast) {
+                window.Toast.error(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            } else {
+                alert(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+            }
         }
     },
     
@@ -641,31 +721,81 @@ const Storage = {
     },
     
     // ==================== 备份恢复 UI ====================
-renderBackupUI: async function() {
-    const lang = Utils.lang;
-    const profile = await SUPABASE.getCurrentProfile();
-    const isAdmin = profile?.role === 'admin';
-    
-    var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
-    var backText = lang === 'id' ? 'Kembali' : '返回';
-    
-    var exportTitle = lang === 'id' ? '📊 Ekspor CSV' : '📊 导出 CSV';
-    var exportDesc = lang === 'id' 
-        ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
-        : '导出为 CSV 格式，可在 Excel 中打开。';
-    var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
-    var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
-    var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
-    
-    // ========== 门店视图：只显示备份本门店数据和导出本门店数据 ==========
-    if (!isAdmin) {
-        var backupTitle = lang === 'id' ? '📤 Cadangkan Data Toko' : '📤 备份本门店数据';
+    renderBackupUI: async function() {
+        const lang = Utils.lang;
+        const profile = await SUPABASE.getCurrentProfile();
+        const isAdmin = profile?.role === 'admin';
+        
+        var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
+        var backText = lang === 'id' ? 'Kembali' : '返回';
+        
+        var exportTitle = lang === 'id' ? '📊 Ekspor CSV' : '📊 导出 CSV';
+        var exportDesc = lang === 'id' 
+            ? 'Ekspor ke format CSV, dapat dibuka di Excel.'
+            : '导出为 CSV 格式，可在 Excel 中打开。';
+        var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
+        var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
+        var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
+        
+        // ========== 门店视图：只显示备份本门店数据和导出本门店数据 ==========
+        if (!isAdmin) {
+            var backupTitle = lang === 'id' ? '📤 Cadangkan Data Toko' : '📤 备份本门店数据';
+            var backupDesc = lang === 'id' 
+                ? 'Cadangkan data toko Anda (pesanan, nasabah, pengeluaran, pembayaran) ke file JSON.'
+                : '备份本门店数据（订单、客户、支出、缴费记录）为 JSON 文件。';
+            var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
+            
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header">' +
+                    '<h2>💾 ' + pageTitle + '</h2>' +
+                    '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + backText + '</button>' +
+                    '</div>' +
+                '</div>' +
+                
+                '<div class="backup-grid backup-grid-store">' +
+                    '<div class="backup-card backup-card-store-primary">' +
+                        '<h3>' + backupTitle + '</h3>' +
+                        '<p>' + backupDesc + '</p>' +
+                        '<button onclick="Storage.backup()" class="btn-backup-store-primary">' + backupBtnText + '</button>' +
+                    '</div>' +
+                    
+                    '<div class="backup-card backup-card-store-secondary">' +
+                        '<h3>' + exportTitle + '</h3>' +
+                        '<p>' + exportDesc + '</p>' +
+                        '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+                            '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
+                            '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
+                            '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            return;
+        }
+        
+        // ========== 管理员视图：完整功能 ==========
+        var backupTitle = lang === 'id' ? '📤 Cadangkan Data' : '📤 备份数据';
         var backupDesc = lang === 'id' 
-            ? 'Cadangkan data toko Anda (pesanan, nasabah, pengeluaran, pembayaran) ke file JSON.'
-            : '备份本门店数据（订单、客户、支出、缴费记录）为 JSON 文件。';
+            ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
+            : '备份所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
         var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
         
-        document.getElementById("app").innerHTML = '' +
+        var restoreTitle = lang === 'id' ? '📥 Pemulihan Data' : '📥 恢复数据';
+        var restoreDesc = lang === 'id' 
+            ? 'Pulihkan data dari file cadangan.'
+            : '从备份文件恢复数据。';
+        var restoreWarning = lang === 'id' 
+            ? '⚠️ PERINGATAN: Akan menimpa data yang ada!'
+            : '⚠️ 警告：将覆盖现有数据！';
+        var restoreBtnText = lang === 'id' ? '🔄 Pulihkan Data' : '🔄 恢复数据';
+        
+        var auditTitle = lang === 'id' ? '📝 Log Audit' : '📝 审计日志';
+        var auditDesc = lang === 'id'
+            ? 'Lihat riwayat operasi sistem: login, pembayaran, penghapusan, dll.'
+            : '查看系统操作记录：登录、缴费、删除等。';
+        var auditViewBtnText = lang === 'id' ? '🔍 Lihat Log Audit' : '🔍 查看审计日志';
+        
+        var html = '' +
             '<div class="page-header">' +
                 '<h2>💾 ' + pageTitle + '</h2>' +
                 '<div class="header-actions">' +
@@ -673,16 +803,14 @@ renderBackupUI: async function() {
                 '</div>' +
             '</div>' +
             
-            '<div class="backup-grid backup-grid-store">' +
-                '<!-- 卡片1：备份本门店数据 -->' +
-                '<div class="backup-card backup-card-store-primary">' +
+            '<div class="backup-grid">' +
+                '<div class="backup-card backup-card-primary">' +
                     '<h3>' + backupTitle + '</h3>' +
                     '<p>' + backupDesc + '</p>' +
-                    '<button onclick="Storage.backup()" class="btn-backup-store-primary">' + backupBtnText + '</button>' +
+                    '<button onclick="Storage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
                 '</div>' +
                 
-                '<!-- 卡片2：导出本门店数据 -->' +
-                '<div class="backup-card backup-card-store-secondary">' +
+                '<div class="backup-card backup-card-secondary">' +
                     '<h3>' + exportTitle + '</h3>' +
                     '<p>' + exportDesc + '</p>' +
                     '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
@@ -691,83 +819,33 @@ renderBackupUI: async function() {
                         '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
                     '</div>' +
                 '</div>' +
-            '</div>';
-        return;
-    }
-    
-    // ========== 管理员视图：完整功能（保持不变） ==========
-    var backupTitle = lang === 'id' ? '📤 Cadangkan Data' : '📤 备份数据';
-    var backupDesc = lang === 'id' 
-        ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
-        : '备份所有数据（订单、客户、支出、缴费记录等）为 JSON 文件。';
-    var backupBtnText = lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份';
-    
-    var restoreTitle = lang === 'id' ? '📥 Pemulihan Data' : '📥 恢复数据';
-    var restoreDesc = lang === 'id' 
-        ? 'Pulihkan data dari file cadangan.'
-        : '从备份文件恢复数据。';
-    var restoreWarning = lang === 'id' 
-        ? '⚠️ PERINGATAN: Akan menimpa data yang ada!'
-        : '⚠️ 警告：将覆盖现有数据！';
-    var restoreBtnText = lang === 'id' ? '🔄 Pulihkan Data' : '🔄 恢复数据';
-    
-    var auditTitle = lang === 'id' ? '📝 Log Audit' : '📝 审计日志';
-    var auditDesc = lang === 'id'
-        ? 'Lihat riwayat operasi sistem: login, pembayaran, penghapusan, dll.'
-        : '查看系统操作记录：登录、缴费、删除等。';
-    var auditViewBtnText = lang === 'id' ? '🔍 Lihat Log Audit' : '🔍 查看审计日志';
-    
-    var html = '' +
-        '<div class="page-header">' +
-            '<h2>💾 ' + pageTitle + '</h2>' +
-            '<div class="header-actions">' +
-                '<button onclick="APP.goBack()" class="btn-back">↩️ ' + backText + '</button>' +
-            '</div>' +
-        '</div>' +
-        
-        '<div class="backup-grid">' +
-            '<!-- 备份数据 -->' +
-            '<div class="backup-card backup-card-primary">' +
-                '<h3>' + backupTitle + '</h3>' +
-                '<p>' + backupDesc + '</p>' +
-                '<button onclick="Storage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
-            '</div>' +
-            
-            '<!-- 导出 CSV -->' +
-            '<div class="backup-card backup-card-secondary">' +
-                '<h3>' + exportTitle + '</h3>' +
-                '<p>' + exportDesc + '</p>' +
-                '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
-                    '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
-                    '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
-                    '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                
+                '<div class="backup-card backup-card-secondary">' +
+                    '<h3>' + restoreTitle + '</h3>' +
+                    '<p>' + restoreDesc + '</p>' +
+                    '<p class="warning-text-small">' + restoreWarning + '</p>' +
+                    '<input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">' +
+                    '<button onclick="Storage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
                 '</div>' +
-            '</div>' +
-            
-            '<!-- 恢复数据 -->' +
-            '<div class="backup-card backup-card-secondary">' +
-                '<h3>' + restoreTitle + '</h3>' +
-                '<p>' + restoreDesc + '</p>' +
-                '<p class="warning-text-small">' + restoreWarning + '</p>' +
-                '<input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">' +
-                '<button onclick="Storage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
-            '</div>' +
-            
-            '<!-- 审计日志 -->' +
-            '<div class="backup-card backup-card-secondary">' +
-                '<h3>' + auditTitle + '</h3>' +
-                '<p>' + auditDesc + '</p>' +
-                '<button onclick="Storage.showAuditLog()" class="btn-small primary">' + auditViewBtnText + '</button>' +
-            '</div>' +
-        '</div>';
-    
-    document.getElementById("app").innerHTML = html;
-},
+                
+                '<div class="backup-card backup-card-secondary">' +
+                    '<h3>' + auditTitle + '</h3>' +
+                    '<p>' + auditDesc + '</p>' +
+                    '<button onclick="Storage.showAuditLog()" class="btn-small primary">' + auditViewBtnText + '</button>' +
+                '</div>' +
+            '</div>';
+        
+        document.getElementById("app").innerHTML = html;
+    },
 
     restoreFromFile: async function() {
         const fileInput = document.getElementById('restoreFile');
         if (!fileInput || !fileInput.files[0]) {
-            alert(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
+            if (window.Toast) {
+                window.Toast.warning(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
+            } else {
+                alert(Utils.lang === 'id' ? 'Pilih file cadangan terlebih dahulu' : '请选择备份文件');
+            }
             return;
         }
         await this.restore(fileInput.files[0]);
@@ -899,7 +977,11 @@ renderBackupUI: async function() {
         } catch (error) {
             console.error("showAuditLog error:", error);
             Utils.ErrorHandler.capture(error, 'Storage.showAuditLog');
-            alert(lang === 'id' ? 'Gagal memuat log audit: ' + error.message : '加载审计日志失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat log audit: ' + error.message : '加载审计日志失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal memuat log audit: ' + error.message : '加载审计日志失败：' + error.message);
+            }
         }
     },
 
@@ -987,7 +1069,7 @@ renderBackupUI: async function() {
                 }
                 
                 rows += '<tr>' +
-                    '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</td>' +
+                    '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</table>' +
                     '<td>' + (actionMap[log.action] || log.action) + '</td>' +
                     '<td>' + Utils.escapeHtml(log.user_name || '-') + '</td>' +
                     '<td class="desc-cell">' + detailsText + '</td>' +
@@ -1029,7 +1111,11 @@ renderBackupUI: async function() {
         if (window.Audit) {
             window.Audit.logExport('audit_log', 'jf_audit_log_' + new Date().toISOString().split('T')[0] + '.csv', AUTH.user?.name);
         }
-        alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
+        if (window.Toast) {
+            window.Toast.success(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
+        } else {
+            alert(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
+        }
     }
 };
 
