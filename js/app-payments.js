@@ -1,4 +1,4 @@
-// app-payments.js - v1.0
+// app-payments.js - v1.1（修复事务缺失 + 幂等性检查 + 补偿事务）
 window.APP = window.APP || {};
 
 // ========== 防重复提交全局锁 ==========
@@ -12,6 +12,26 @@ window.APP._acquirePaymentLock = function(lockKey) {
 
 window.APP._releasePaymentLock = function(lockKey) {
     delete window.APP._paymentLock[lockKey];
+};
+
+// ========== 幂等性检查：防止重复处理同一笔交易 ==========
+window.APP._checkIdempotency = async function(orderId, type, amount, paymentMethod) {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabaseClient
+        .from('payment_history')
+        .select('id')
+        .eq('order_id', (await supabaseClient.from('orders').select('id').eq('order_id', orderId).single()).data?.id)
+        .eq('type', type)
+        .eq('amount', amount)
+        .eq('payment_method', paymentMethod)
+        .gte('date', today)
+        .maybeSingle();
+    
+    if (error) {
+        console.warn('幂等性检查失败:', error);
+        return false;
+    }
+    return !!data;
 };
 
 const PaymentsModule = {
@@ -59,7 +79,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 根据订单ID查找对应的确认按钮 ==========
+    // ========== 辅助：查找确认按钮 ==========
     _findConfirmButton: function(type) {
         var lang = Utils.lang;
         var buttons = document.querySelectorAll('button.btn-action.success');
@@ -74,7 +94,6 @@ const PaymentsModule = {
         for (var i = 0; i < buttons.length; i++) {
             for (var j = 0; j < targets.length; j++) {
                 if (buttons[i].textContent.indexOf(targets[j]) !== -1) {
-                    // 进一步确认上下文
                     var card = buttons[i].closest('.card-body');
                     if (type === 'principal' && card && 
                         (card.textContent.indexOf('Kembalikan Pokok') !== -1 || 
@@ -95,6 +114,71 @@ const PaymentsModule = {
         return null;
     },
 
+    // ========== 补偿事务：回滚订单更新 ==========
+    _rollbackOrder: async function(orderId, originalState) {
+        console.warn('[补偿事务] 开始回滚订单:', orderId);
+        try {
+            const { error } = await supabaseClient
+                .from('orders')
+                .update(originalState)
+                .eq('order_id', orderId);
+            if (error) {
+                console.error('[补偿事务] 回滚失败:', error);
+                // 记录到错误日志表
+                if (window.Audit) {
+                    await window.Audit.log('rollback_failed', JSON.stringify({
+                        order_id: orderId,
+                        original_state: originalState,
+                        error: error.message
+                    }));
+                }
+            } else {
+                console.log('[补偿事务] 回滚成功:', orderId);
+            }
+        } catch (err) {
+            console.error('[补偿事务] 回滚异常:', err);
+        }
+    },
+
+    // ========== 补偿事务：删除已插入的付款记录 ==========
+    _rollbackPaymentHistory: async function(orderInternalId, type, amount, date) {
+        console.warn('[补偿事务] 删除付款记录:', orderInternalId, type);
+        try {
+            const { error } = await supabaseClient
+                .from('payment_history')
+                .delete()
+                .eq('order_id', orderInternalId)
+                .eq('type', type)
+                .eq('amount', amount)
+                .eq('date', date);
+            if (error) {
+                console.error('[补偿事务] 删除付款记录失败:', error);
+            }
+        } catch (err) {
+            console.error('[补偿事务] 删除付款记录异常:', err);
+        }
+    },
+
+    // ========== 补偿事务：删除已插入的资金流水 ==========
+    _rollbackCashFlow: async function(orderInternalId, flowType, amount) {
+        console.warn('[补偿事务] 删除资金流水:', orderInternalId, flowType);
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { error } = await supabaseClient
+                .from('cash_flow_records')
+                .delete()
+                .eq('order_id', orderInternalId)
+                .eq('flow_type', flowType)
+                .eq('amount', amount)
+                .gte('recorded_at', today);
+            if (error) {
+                console.error('[补偿事务] 删除资金流水失败:', error);
+            }
+        } catch (err) {
+            console.error('[补偿事务] 删除资金流水异常:', err);
+        }
+    },
+
     showPayment: async function(orderId) {
         var lang = Utils.lang;
 
@@ -106,13 +190,16 @@ const PaymentsModule = {
             return;
         }
 
-        // 管理员禁止操作订单 - 友好提示页面
+        // 管理员禁止操作订单
         if (profile.role === 'admin') {
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '<div style="display:flex; align-items:center; gap:12px;">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                        '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card" style="text-align:center; padding:40px 20px;">' +
@@ -132,7 +219,7 @@ const PaymentsModule = {
                             ? 'Silakan gunakan akun operator toko untuk mengakses halaman pembayaran.' 
                             : '请使用门店操作员账号访问缴费页面。') +
                     '</p>' +
-                    '<button onclick="APP.goBack()" class="btn-back no-print" style="padding:10px 24px; font-size:14px;">↩️ ' + 
+                    '<button onclick="APP.goBack()" class="btn-back" style="padding:10px 24px; font-size:14px;">↩️ ' + 
                         (lang === 'id' ? 'Kembali ke Dashboard' : '返回仪表盘') + 
                     '</button>' +
                 '</div>';
@@ -163,7 +250,6 @@ const PaymentsModule = {
                 return;
             }
 
-            // ========== 审计：查看缴费页面 ==========
             if (window.Audit) {
                 await window.Audit.log('payment_page_view', JSON.stringify({
                     order_id: order.order_id,
@@ -367,7 +453,7 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
+                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></table></thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -415,10 +501,12 @@ const PaymentsModule = {
             // ========== 组装页面 ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '<div style="display:flex; align-items:center; gap:12px;">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
-                        '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-detail no-print">📄 ' + t('order_details') + '</button>' +
+                        '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-detail">📄 ' + t('order_details') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
@@ -453,7 +541,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 利息收款（防重复提交 + 审计） ==========
+    // ========== 利息收款（防重复提交 + 幂等性 + 补偿事务） ==========
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
@@ -473,12 +561,23 @@ const PaymentsModule = {
         try {
             var order = await SUPABASE.getOrder(orderId);
             
+            // ========== 幂等性检查 ==========
+            var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
             var loanAmount = order.loan_amount || 0;
             var principalPaid = order.principal_paid || 0;
             var remainingPrincipal = loanAmount - principalPaid;
-            var monthlyRate = order.agreed_interest_rate || 0.08;
-            var currentMonthlyInterest = remainingPrincipal * monthlyRate;
-            var totalInterest = currentMonthlyInterest * months;
+            var monthlyInterest = remainingPrincipal * monthlyRate;
+            var totalInterest = monthlyInterest * months;
+            
+            var isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', totalInterest, method);
+            if (isDuplicate) {
+                alert(lang === 'id' 
+                    ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔付款已记录，无需重复处理。');
+                await PaymentsModule.showPayment(orderId);
+                return;
+            }
+            
             var nextInterestNumber = (order.interest_paid_months || 0) + 1;
             var endNumber = nextInterestNumber + months - 1;
             
@@ -504,16 +603,89 @@ const PaymentsModule = {
                   '入账方式: ' + methodName + '\n' +
                   '确认收款？';
 
-            if (confirm(previewMsg)) {
-                await Order.recordInterestPayment(orderId, months, method);
+            if (!confirm(previewMsg)) return;
+            
+            // 保存原始状态用于补偿回滚
+            var originalOrderState = {
+                interest_paid_months: order.interest_paid_months,
+                interest_paid_total: order.interest_paid_total,
+                next_interest_due_date: order.next_interest_due_date,
+                monthly_interest: order.monthly_interest,
+                updated_at: order.updated_at
+            };
+            
+            var orderInternalId = order.id;
+            var paymentDate = new Date().toISOString().split('T')[0];
+            
+            try {
+                // 步骤1：更新订单（利息支付）
+                var newInterestPaidMonths = (order.interest_paid_months || 0) + months;
+                var newInterestPaidTotal = (order.interest_paid_total || 0) + totalInterest;
+                var nextDueDate = SUPABASE.calculateNextDueDate(order.created_at, newInterestPaidMonths);
                 
-                // ========== 审计：利息收款 ==========
+                const { error: updateError } = await supabaseClient
+                    .from('orders')
+                    .update({
+                        interest_paid_months: newInterestPaidMonths,
+                        interest_paid_total: newInterestPaidTotal,
+                        next_interest_due_date: nextDueDate,
+                        monthly_interest: monthlyInterest,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('order_id', orderId);
+                
+                if (updateError) throw new Error('更新订单失败: ' + updateError.message);
+                
+                // 步骤2：插入付款记录
+                const paymentData = {
+                    order_id: orderInternalId,
+                    date: paymentDate,
+                    type: 'interest',
+                    months: months,
+                    amount: totalInterest,
+                    description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(1) + '%)',
+                    recorded_by: (await SUPABASE.getCurrentProfile())?.id,
+                    payment_method: method
+                };
+                
+                const { error: paymentError } = await supabaseClient
+                    .from('payment_history')
+                    .insert(paymentData);
+                
+                if (paymentError) {
+                    // 补偿：回滚订单更新
+                    await this._rollbackOrder(orderId, originalOrderState);
+                    throw new Error('插入付款记录失败: ' + paymentError.message);
+                }
+                
+                // 步骤3：记录资金流水
+                await SUPABASE.recordCashFlow({
+                    store_id: order.store_id,
+                    flow_type: 'interest',
+                    direction: 'inflow',
+                    amount: totalInterest,
+                    source_target: method,
+                    order_id: orderInternalId,
+                    customer_id: order.customer_id,
+                    description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(1) + '%)',
+                    reference_id: order.order_id
+                });
+                
+                // 审计
                 if (window.Audit) {
                     await window.Audit.logPayment(order.order_id, 'interest', totalInterest, method);
                 }
                 
+                alert(lang === 'id' ? '✅ Pembayaran bunga berhasil!' : '✅ 利息收款成功！');
                 await PaymentsModule.showPayment(orderId);
+                
+            } catch (error) {
+                console.error('payInterestWithMethod 事务失败:', error);
+                // 尝试回滚付款记录
+                await this._rollbackPaymentHistory(orderInternalId, 'interest', totalInterest, paymentDate);
+                alert(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
+            
         } catch (error) {
             console.error('payInterestWithMethod error:', error);
             Utils.ErrorHandler.capture(error, 'payInterestWithMethod');
@@ -525,7 +697,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 本金收款（防重复提交 + 审计） ==========
+    // ========== 本金收款（防重复提交 + 幂等性 + 补偿事务） ==========
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -558,6 +730,16 @@ const PaymentsModule = {
             var remainingAfter = remainingPrincipal - actualAmount;
             var isFullSettlement = remainingAfter <= 0;
             
+            // ========== 幂等性检查 ==========
+            var isDuplicate = await window.APP._checkIdempotency(orderId, 'principal', actualAmount, target);
+            if (isDuplicate) {
+                alert(lang === 'id' 
+                    ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔付款已记录，无需重复处理。');
+                await PaymentsModule.showPayment(orderId);
+                return;
+            }
+            
             var previewMsg = lang === 'id'
                 ? '📋 Konfirmasi Pembayaran Pokok\n' +
                   'Pesanan: ' + order.order_id + '\n' +
@@ -582,10 +764,82 @@ const PaymentsModule = {
                   (isFullSettlement ? '🎉 全额结清' : '部分还款') + '\n' +
                   '确认收款？';
 
-            if (confirm(previewMsg)) {
-                await Order.recordPrincipalPayment(orderId, actualAmount, target);
+            if (!confirm(previewMsg)) return;
+            
+            // 保存原始状态用于补偿回滚
+            var originalOrderState = {
+                principal_paid: order.principal_paid,
+                principal_remaining: order.principal_remaining,
+                status: order.status,
+                monthly_interest: order.monthly_interest,
+                completed_at: order.completed_at,
+                updated_at: order.updated_at
+            };
+            
+            var orderInternalId = order.id;
+            var paymentDate = new Date().toISOString().split('T')[0];
+            var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
+            
+            try {
+                // 步骤1：更新订单
+                var newPrincipalPaid = principalPaid + actualAmount;
+                var newPrincipalRemaining = loanAmount - newPrincipalPaid;
                 
-                // ========== 审计：本金还款 ==========
+                var updates = { 
+                    principal_paid: newPrincipalPaid, 
+                    principal_remaining: newPrincipalRemaining,
+                    updated_at: new Date().toISOString()
+                };
+                
+                if (isFullSettlement) {
+                    updates.status = 'completed';
+                    updates.monthly_interest = 0;
+                    updates.completed_at = new Date().toISOString();
+                } else {
+                    updates.monthly_interest = newPrincipalRemaining * monthlyRate;
+                }
+                
+                const { error: updateError } = await supabaseClient
+                    .from('orders')
+                    .update(updates)
+                    .eq('order_id', orderId);
+                
+                if (updateError) throw new Error('更新订单失败: ' + updateError.message);
+                
+                // 步骤2：插入付款记录
+                const paymentData = {
+                    order_id: orderInternalId,
+                    date: paymentDate,
+                    type: 'principal',
+                    amount: actualAmount,
+                    description: isFullSettlement ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
+                    recorded_by: (await SUPABASE.getCurrentProfile())?.id,
+                    payment_method: target
+                };
+                
+                const { error: paymentError } = await supabaseClient
+                    .from('payment_history')
+                    .insert(paymentData);
+                
+                if (paymentError) {
+                    await this._rollbackOrder(orderId, originalOrderState);
+                    throw new Error('插入付款记录失败: ' + paymentError.message);
+                }
+                
+                // 步骤3：记录资金流水
+                await SUPABASE.recordCashFlow({
+                    store_id: order.store_id,
+                    flow_type: 'principal',
+                    direction: 'inflow',
+                    amount: actualAmount,
+                    source_target: target,
+                    order_id: orderInternalId,
+                    customer_id: order.customer_id,
+                    description: isFullSettlement ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
+                    reference_id: order.order_id
+                });
+                
+                // 审计
                 if (window.Audit) {
                     await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
                 }
@@ -600,8 +854,15 @@ const PaymentsModule = {
                     }
                 }
                 
+                alert(lang === 'id' ? '✅ Pembayaran pokok berhasil!' : '✅ 本金还款成功！');
                 await PaymentsModule.showPayment(orderId);
+                
+            } catch (error) {
+                console.error('payPrincipalWithMethod 事务失败:', error);
+                await this._rollbackPaymentHistory(orderInternalId, 'principal', actualAmount, paymentDate);
+                alert(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
+            
         } catch (error) {
             console.error('payPrincipalWithMethod error:', error);
             Utils.ErrorHandler.capture(error, 'payPrincipalWithMethod');
@@ -613,7 +874,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 固定还款（防重复提交 + 审计） ==========
+    // ========== 固定还款（防重复提交 + 幂等性 + 补偿事务） ==========
     payFixedInstallment: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
@@ -632,14 +893,37 @@ const PaymentsModule = {
             var orderBefore = await SUPABASE.getOrder(orderId);
             var fixedPaymentBefore = orderBefore.monthly_fixed_payment || 0;
             
+            // ========== 幂等性检查 ==========
+            var isDuplicate = await window.APP._checkIdempotency(orderId, 'fixed_installment', fixedPaymentBefore, method);
+            if (isDuplicate) {
+                alert(lang === 'id' 
+                    ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔付款已记录，无需重复处理。');
+                await PaymentsModule.showPayment(orderId);
+                return;
+            }
+            
+            // 保存原始状态
+            var originalOrderState = {
+                principal_paid: orderBefore.principal_paid,
+                principal_remaining: orderBefore.principal_remaining,
+                fixed_paid_months: orderBefore.fixed_paid_months,
+                monthly_interest: orderBefore.monthly_interest,
+                interest_paid_months: orderBefore.interest_paid_months,
+                interest_paid_total: orderBefore.interest_paid_total,
+                next_interest_due_date: orderBefore.next_interest_due_date,
+                status: orderBefore.status,
+                updated_at: orderBefore.updated_at
+            };
+            
             await SUPABASE.recordFixedPayment(orderId, method);
             
-            // ========== 审计：固定还款 ==========
             if (window.Audit) {
                 await window.Audit.logPayment(orderBefore.order_id, 'fixed_installment', fixedPaymentBefore, method);
             }
             
             await PaymentsModule.showPayment(orderId);
+            
         } catch (error) {
             console.error('payFixedInstallment error:', error);
             Utils.ErrorHandler.capture(error, 'payFixedInstallment');
@@ -651,12 +935,11 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 提前结清（防重复提交 + 审计） ==========
+    // ========== 提前结清（防重复提交 + 幂等性 + 补偿事务） ==========
     earlySettleFixedOrder: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
         
-        // ========== 防重复提交检查 ==========
         if (!window.APP._acquirePaymentLock(orderId + '_early_settle')) {
             alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
@@ -670,14 +953,24 @@ const PaymentsModule = {
             var orderBefore = await SUPABASE.getOrder(orderId);
             var remainingPrincipal = orderBefore.principal_remaining || orderBefore.loan_amount || 0;
             
+            // ========== 幂等性检查 ==========
+            var isDuplicate = await window.APP._checkIdempotency(orderId, 'early_settlement', remainingPrincipal, method);
+            if (isDuplicate) {
+                alert(lang === 'id' 
+                    ? '⚠️ Pelunasan ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔结清已记录，无需重复处理。');
+                await PaymentsModule.showPayment(orderId);
+                return;
+            }
+            
             await SUPABASE.earlySettleFixedOrder(orderId, method);
             
-            // ========== 审计：提前结清 ==========
             if (window.Audit) {
                 await window.Audit.logPayment(orderBefore.order_id, 'early_settlement', remainingPrincipal, method);
             }
             
             await PaymentsModule.showPayment(orderId);
+            
         } catch (error) {
             console.error('earlySettleFixedOrder error:', error);
             Utils.ErrorHandler.capture(error, 'earlySettleFixedOrder');
@@ -689,7 +982,7 @@ const PaymentsModule = {
         }
     },
 
-    // ==================== 打印结清凭证（XSS 修复版） ====================
+    // ==================== 打印结清凭证 ====================
     printSettlementReceipt: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -713,7 +1006,6 @@ const PaymentsModule = {
                 ? Utils.formatDate(order.completed_at)
                 : new Date().toLocaleDateString(lang === 'id' ? 'id-ID' : 'zh-CN');
 
-            // ========== XSS 修复：对所有用户输入进行转义 ==========
             var safeOrderId = Utils.escapeHtml(order.order_id);
             var safeCustomer = Utils.escapeHtml(order.customer_name);
             var safeKtp = Utils.escapeHtml(order.customer_ktp || '-');
@@ -728,7 +1020,6 @@ const PaymentsModule = {
             var safeGrandTotal = Utils.formatCurrency(grandTotal);
             var safeInterestPaidMonths = order.interest_paid_months || 0;
 
-            // ========== 审计：打印结清凭证 ==========
             if (window.Audit) {
                 await window.Audit.log('print_settlement_receipt', JSON.stringify({
                     order_id: order.order_id,
@@ -821,7 +1112,6 @@ const PaymentsModule = {
     }
 };
 
-// 合并到 window.APP
 for (var key in PaymentsModule) {
     if (typeof PaymentsModule[key] === 'function') window.APP[key] = PaymentsModule[key];
 }
