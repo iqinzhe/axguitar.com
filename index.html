@@ -114,6 +114,8 @@
     
     if (!navigator.onLine) showOfflineBanner();
 })();
+</script>
+
 <!-- ==================== 初始化脚本 ==================== -->
 <script>
 (function() {
@@ -160,6 +162,8 @@
             if (!page) {
                 page = localStorage.getItem('jf_last_page');
                 filter = localStorage.getItem('jf_last_filter') || 'all';
+                orderId = localStorage.getItem('jf_last_order_id');
+                customerId = localStorage.getItem('jf_last_customer_id');
             }
             
             // 验证页面是否有效（不能是登录页）
