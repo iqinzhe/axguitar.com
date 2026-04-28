@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.0
+// app-dashboard-orders.js - v1.0 (修复：返回键统一右上角)
 window.APP = window.APP || {};
 
 const DashboardOrders = {
@@ -128,8 +128,8 @@ const DashboardOrders = {
                 '<div class="page-header">' +
                     '<h2>📋 ' + t('order_list') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="toolbar no-print">' +
@@ -166,7 +166,7 @@ const DashboardOrders = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody id="orderTableBody"></tbody>' +
-                        '<table>' +
+                        '</table>' +
                     '</div>' +
                 '</div>';
             
@@ -304,15 +304,15 @@ const DashboardOrders = {
                     '</tr>';
                 }
             } else {
-                payRows = '</table><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
+                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
             }
 
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>📄 ' + t('order_details') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-print">🖨️ ' + t('print') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card">' +
@@ -478,7 +478,7 @@ const DashboardOrders = {
                 var safeDate = Utils.formatDate(p.date);
                 var safeAmount = Utils.formatCurrency(p.amount);
                 
-                paymentRows += '<tr>' +
+                paymentRows += '<td>' +
                     '<td class="col-date">' + safeDate + '</td>' +
                     '<td>' + typeText + '</td>' +
                     '<td class="text-right">' + safeAmount + '</td>' +
@@ -487,7 +487,7 @@ const DashboardOrders = {
             }
             
             if (paymentRows === '') {
-                paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + '</td></tr>';
+                paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + 'NonNull';
             }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
@@ -587,12 +587,12 @@ const DashboardOrders = {
 
             var rows = '';
             if (allPayments.length === 0) {
-                rows = '<table><td colspan="8" class="text-center">' + t('no_data') + '</td></tr>';
+                rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + 'NonNull';
             } else {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
                     var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    rows += '<tr>' +
+                    rows += '<table>' +
                         '<td class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(p.orders?.customer_name || '-') + '</td>' +
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
@@ -609,8 +609,8 @@ const DashboardOrders = {
                 '<div class="page-header">' +
                     '<h2>💰 ' + t('payment_history') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
@@ -635,7 +635,7 @@ const DashboardOrders = {
                                     '<th class="col-amount amount">' + t('amount') + '</th>' +
                                     '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th class="col-desc">' + t('description') + '</th>' +
-'</tr>' +
+'</table>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
