@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Toast + 内联确认演示</title>
+<style>
+  body { font-family: Arial; padding: 40px; }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #333;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .toast.show {
+    opacity: 1;
+  }
+
+  .confirm-box {
+    margin-top: 10px;
+  }
+
+  button {
+    margin: 5px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h2>删除商品</h2>
+
+<button onclick="showConfirm()">删除</button>
+
+<div id="confirmBox" class="confirm-box" style="display:none;">
+  确认删除？ 
+  <button onclick="confirmDelete()">确认</button>
+  <button onclick="cancelDelete()">取消</button>
+</div>
+
+<div id="toast" class="toast">操作成功</div>
+
+<script>
+function showConfirm() {
+  document.getElementById("confirmBox").style.display = "block";
+}
+
+function cancelDelete() {
+  document.getElementById("confirmBox").style.display = "none";
+}
+
+function confirmDelete() {
+  document.getElementById("confirmBox").style.display = "none";
+  showToast("删除成功");
+}
+
+function showToast(msg) {
+  const toast = document.getElementById("toast");
+  toast.innerText = msg;
+  toast.classList.add("show");
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2000);
+}
+</script>
+
+</body>
+</html>
