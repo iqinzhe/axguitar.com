@@ -158,15 +158,13 @@ const CustomersModule = {
                 '</style>';
             
             document.getElementById("app").innerHTML = inlineStyles + '' +
-                '<div class="page-header">' +
-                    '<div style="display:flex; align-items:center; gap:12px;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
-                    '</div>' +
-                    '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
-                    '</div>' +
-                '</div>' +
+    '<div class="page-header">' +
+        '<h2>👥 ' + (lang === 'id' ? 'Data Nasabah' : '客户信息') + '</h2>' +
+        '<div class="header-actions">' +
+            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+            '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
+        '</div>' +
+    '</div>' +
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Daftar Nasabah' : '客户列表') + '</h3>' +
                     '<div class="table-container">' +
