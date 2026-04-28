@@ -19,50 +19,80 @@
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/pages.css">
 <link rel="stylesheet" href="css/responsive.css">
+
+<!-- 预加载关键资源 -->
+<link rel="preconnect" href="https://hiupsvsbcdsgoyiieqiv.supabase.co">
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 </head>
 <body>
 <div id="app">
     <div class="loading-container">
         <div class="loader"></div>
-        <p class="loading-text">Memuat sistem...</p>
+        <p class="loading-text" id="loadingStatus">Memuat sistem...</p>
     </div>
 </div>
 
-<!-- ===== 第三方库 ====== -->
+<!-- ===== 第三方库 ===== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ====== 基础模块（按依赖顺序加载） ====== -->
-<!-- utils.js - 必须最先加载（定义 Utils、语言、格式化等） -->
+<!-- ====== 核心模块（按依赖顺序加载） ====== -->
+
+<!-- 
+  加载顺序说明：
+  1. toast.js        - 通知系统（最先加载，提供 Toast 全局对象）
+  2. utils.js        - 工具函数（依赖语言、格式化等）
+  3. supabase.js     - 数据库客户端（依赖 Utils）
+  4. auth.js         - 认证模块（依赖 Utils, SUPABASE）
+  5. permission.js   - 权限管理（依赖 AUTH）
+  6. order.js        - 订单模块（依赖 SUPABASE, Utils）
+  7. store.js        - 门店管理（依赖 SUPABASE, Utils）
+  8. storage.js      - 备份恢复（依赖 SUPABASE, Utils, Audit）
+  9. audit.js        - 审计日志（依赖 AUTH, SUPABASE）
+  10. migration.js   - 数据迁移（依赖 SUPABASE, Utils）
+-->
+
+<!-- 第一层：基础工具（同步加载，确保立即可用） -->
+<script src="js/toast.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/supabase.js"></script>
+
+<!-- 第二层：认证与权限 -->
 <script src="js/auth.js"></script>
 <script src="js/permission.js"></script>
+
+<!-- 第三层：业务核心模块 -->
 <script src="js/order.js"></script>
 <script src="js/store.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/audit.js"></script>
 <script src="js/migration.js"></script>
 
-<!-- ======= 功能模块 ======= -->
+<!-- 第四层：功能模块 -->
 <script src="js/app-blacklist.js"></script>
 <script src="js/app-customers.js"></script>
 <script src="js/app-payments.js"></script>
 
-<!-- ===== 仪表盘子模块（必须在 core 之前加载）===== -->
-<script src="js/app-dashboard-anomaly.js"></script>
-<script src="js/app-dashboard-funds.js"></script>
-<script src="js/app-dashboard-users.js"></script>
-<script src="js/app-dashboard-wa.js"></script>
-<script src="js/app-dashboard-print.js"></script>
-<script src="js/app-dashboard-orders.js"></script>
-<script src="js/app-dashboard-expenses.js"></script>
+<!-- 第五层：仪表盘子模块（使用 defer 延迟执行，不阻塞页面渲染） -->
+<script src="js/app-dashboard-anomaly.js" defer></script>
+<script src="js/app-dashboard-funds.js" defer></script>
+<script src="js/app-dashboard-users.js" defer></script>
+<script src="js/app-dashboard-wa.js" defer></script>
+<script src="js/app-dashboard-print.js" defer></script>
+<script src="js/app-dashboard-orders.js" defer></script>
+<script src="js/app-dashboard-expenses.js" defer></script>
 
-<!-- ===== 仪表盘核心模块（最后加载） ===== -->
-<script src="js/app-dashboard-core.js"></script>
+<!-- 第六层：仪表盘核心模块（最后加载） -->
+<script src="js/app-dashboard-core.js" defer></script>
 
-<!-- ===== 网络断开提醒（极简版，不依赖任何模块） ===== -->
+<!-- ===== 网络断开提醒 ===== -->
 <script>
 (function() {
+    'use strict';
+    
+    function getLang() {
+        return (navigator.language && navigator.language.startsWith('id')) ? 'id' : 'zh';
+    }
+    
     function showOfflineBanner() {
         var existing = document.getElementById('offlineBanner');
         if (existing) return;
@@ -70,7 +100,7 @@
         var banner = document.createElement('div');
         banner.id = 'offlineBanner';
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:10px;z-index:10000;font-size:14px;';
-        banner.innerHTML = '⚠️ ' + (navigator.language.startsWith('id') ? 'Koneksi terputus. Data mungkin tidak tersimpan.' : '网络连接已断开，数据可能无法保存。');
+        banner.innerHTML = '⚠️ ' + (getLang() === 'id' ? 'Koneksi terputus. Data mungkin tidak tersimpan.' : '网络连接已断开，数据可能无法保存。');
         document.body.insertBefore(banner, document.body.firstChild);
     }
     
@@ -88,47 +118,30 @@
 
 <!-- ==================== 初始化脚本 ==================== -->
 <script>
-// 全局错误捕获
-window.addEventListener('error', function(e) {
-    console.error('Global error:', e.error || e.message);
-});
-
-// 初始化超时处理（15秒）
-var initTimeout = setTimeout(function() {
-    showError(
-        (navigator.language && navigator.language.startsWith('id'))
-            ? '⏳ Memuat terlalu lama. Silakan periksa koneksi internet Anda dan muat ulang halaman.'
-            : '⏳ 加载超时，请检查网络连接后刷新页面重试。'
-    );
-}, 15000);
-
-// DOM 加载完成后初始化 APP
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
-        clearTimeout(initTimeout);
-        try {
-            if (!window.APP) {
-                throw new Error('APP module not loaded - check if app-dashboard-core.js exists');
-            }
-            if (typeof window.APP.init !== 'function') {
-                throw new Error('APP.init is not a function - check app-dashboard-core.js exports');
-            }
-            console.log('✅ 所有模块加载完成，初始化 APP...');
-            window.APP.init();
-        } catch (err) {
-            console.error('Init error:', err);
-            var langMsg = (navigator.language && navigator.language.startsWith('id'))
-                ? 'Gagal memuat aplikasi: ' + err.message
-                : '应用加载失败: ' + err.message;
-            showError(langMsg);
-        }
-    }, 200); // 增加到 200ms，确保所有脚本执行完毕
-});
-
-function showError(message) {
-    var app = document.getElementById('app');
-    if (app) {
-        var isId = navigator.language && navigator.language.startsWith('id');
+(function() {
+    'use strict';
+    
+    var loadingTimeout = null;
+    var startTime = Date.now();
+    var maxLoadingTime = 20000; // 20秒超时
+    
+    // 获取语言
+    function getLang() {
+        return (navigator.language && navigator.language.startsWith('id')) ? 'id' : 'zh';
+    }
+    
+    // 更新加载状态文字
+    function updateLoadingStatus(message) {
+        var statusEl = document.getElementById('loadingStatus');
+        if (statusEl) statusEl.textContent = message;
+    }
+    
+    // 显示错误页面
+    function showError(message) {
+        var app = document.getElementById('app');
+        if (!app) return;
+        
+        var isId = getLang() === 'id';
         app.innerHTML = '' +
             '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8fafc;padding:20px;">' +
                 '<div style="max-width:420px;width:100%;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);padding:32px;text-align:center;">' +
@@ -138,20 +151,159 @@ function showError(message) {
                     '<button onclick="location.reload()" style="padding:10px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">' +
                         (isId ? '🔄 Muat Ulang' : '🔄 刷新页面') +
                     '</button>' +
+                    '<details style="margin-top:16px;text-align:left;">' +
+                        '<summary style="cursor:pointer;color:#64748b;font-size:12px;">' + (isId ? 'Detail Teknis' : '技术详情') + '</summary>' +
+                        '<pre style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;font-size:11px;overflow:auto;">' + escapeHtml(navigator.userAgent) + '\n\nLoaded modules: ' + Object.keys(window).filter(function(k) { return ['APP', 'AUTH', 'SUPABASE', 'Utils', 'Toast', 'Order', 'StoreManager', 'Storage', 'Audit', 'Migration', 'PERMISSION'].indexOf(k) !== -1; }).join(', ') + '</pre>' +
+                    '</details>' +
                 '</div>' +
             '</div>';
     }
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+    
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+    
+    // 检查核心模块是否加载
+    function checkCoreModules() {
+        var required = ['Toast', 'Utils', 'SUPABASE', 'AUTH', 'PERMISSION'];
+        var missing = [];
+        for (var i = 0; i < required.length; i++) {
+            if (typeof window[required[i]] === 'undefined') {
+                missing.push(required[i]);
+            }
+        }
+        return { allLoaded: missing.length === 0, missing: missing };
+    }
+    
+    // 等待核心模块加载完成
+    function waitForCoreModules() {
+        return new Promise(function(resolve) {
+            var maxAttempts = 100; // 最多等待 10 秒
+            var attempt = 0;
+            
+            function check() {
+                var status = checkCoreModules();
+                if (status.allLoaded) {
+                    console.log('✅ 核心模块加载完成:', Object.keys(window).filter(function(k) {
+                        return ['Toast', 'Utils', 'SUPABASE', 'AUTH', 'PERMISSION', 'Order', 'StoreManager', 'Storage', 'Audit', 'Migration'].indexOf(k) !== -1;
+                    }).join(', '));
+                    resolve(true);
+                    return;
+                }
+                
+                attempt++;
+                if (attempt >= maxAttempts) {
+                    console.warn('⚠️ 核心模块加载超时:', status.missing);
+                    resolve(false);
+                    return;
+                }
+                
+                setTimeout(check, 100);
+            }
+            
+            check();
+        });
+    }
+    
+    // 初始化应用
+    async function initApp() {
+        // 更新加载状态
+        updateLoadingStatus(getLang() === 'id' ? 'Memuat modul...' : '加载模块中...');
+        
+        // 等待核心模块
+        var modulesReady = await waitForCoreModules();
+        
+        if (!modulesReady) {
+            var missingMsg = getLang() === 'id' 
+                ? 'Modul inti gagal dimuat: ' + checkCoreModules().missing.join(', ')
+                : '核心模块加载失败: ' + checkCoreModules().missing.join(', ');
+            showError(missingMsg);
+            return;
+        }
+        
+        // 检查 APP 模块
+        if (typeof window.APP === 'undefined') {
+            console.error('APP module not loaded - checking if app-dashboard-core.js exists');
+            showError(getLang() === 'id' 
+                ? 'Modul utama APP tidak ditemukan. Periksa apakah file app-dashboard-core.js ada.'
+                : '主模块 APP 未找到，请检查 app-dashboard-core.js 文件是否存在。');
+            return;
+        }
+        
+        if (typeof window.APP.init !== 'function') {
+            console.error('APP.init is not a function - check app-dashboard-core.js exports');
+            showError(getLang() === 'id'
+                ? 'Fungsi init APP tidak tersedia. Periksa file app-dashboard-core.js.'
+                : 'APP.init 函数不可用，请检查 app-dashboard-core.js 文件。');
+            return;
+        }
+        
+        // 清除超时
+        if (loadingTimeout) {
+            clearTimeout(loadingTimeout);
+            loadingTimeout = null;
+        }
+        
+        updateLoadingStatus(getLang() === 'id' ? 'Memulai sistem...' : '启动系统中...');
+        
+        // 延迟启动，确保所有 defer 脚本执行完毕
+        setTimeout(function() {
+            try {
+                console.log('✅ 所有模块加载完成，初始化 APP...');
+                window.APP.init();
+            } catch (err) {
+                console.error('Init error:', err);
+                showError(getLang() === 'id'
+                    ? 'Gagal memulai aplikasi: ' + err.message
+                    : '启动应用失败: ' + err.message);
+            }
+        }, 100);
+    }
+    
+    // 设置超时处理
+    function setupTimeout() {
+        loadingTimeout = setTimeout(function() {
+            var elapsed = Date.now() - startTime;
+            if (elapsed >= maxLoadingTime) {
+                console.error('Loading timeout after ' + elapsed + 'ms');
+                var status = checkCoreModules();
+                if (!status.allLoaded) {
+                    showError(getLang() === 'id'
+                        ? '⏳ Waktu muat habis. Modul yang belum dimuat: ' + status.missing.join(', ') + '\n\nSilakan periksa koneksi internet dan muat ulang halaman.'
+                        : '⏳ 加载超时。未加载的模块: ' + status.missing.join(', ') + '\n\n请检查网络连接后刷新页面重试。');
+                } else if (typeof window.APP === 'undefined') {
+                    showError(getLang() === 'id'
+                        ? '⏳ Waktu muat habis. Modul APP tidak ditemukan. Periksa file app-dashboard-core.js.'
+                        : '⏳ 加载超时。APP 模块未找到。请检查 app-dashboard-core.js 文件。');
+                } else {
+                    showError(getLang() === 'id'
+                        ? '⏳ Waktu muat habis. Silakan muat ulang halaman.'
+                        : '⏳ 加载超时，请刷新页面重试。');
+                }
+            }
+        }, maxLoadingTime);
+    }
+    
+    // DOM 加载完成后启动
+    document.addEventListener('DOMContentLoaded', function() {
+        setupTimeout();
+        initApp();
+    });
+    
+    // 如果 DOM 已经加载完成
+    if (document.readyState === 'loading') {
+        // 等待 DOMContentLoaded
+    } else {
+        setupTimeout();
+        initApp();
+    }
+})();
 </script>
 </body>
 </html>
