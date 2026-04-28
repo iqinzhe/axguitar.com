@@ -1,4 +1,9 @@
-// app-dashboard-core.js - v1.1（整合逾期天数自动更新 + 页面卸载清理）
+// app-dashboard-core.js - v1.2
+// 修改内容：
+//   1. 强化 saveCurrentPageState / restorePageState（刷新保位）
+//   2. logout 使用 UI.showConfirm 替代 confirm
+//   3. refreshCurrentPage 失败使用 UI.showToast 替代 alert
+//   4. 监听 popstate 实现浏览器前进/后退
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -30,7 +35,11 @@ const ModuleFallback = {
                         : '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message + '\n\n请刷新页面后重试。';
                 }
                 
-                setTimeout(function() { alert(msg); }, 300);
+                if (window.UI && window.UI.showToast) {
+                    window.UI.showToast(msg, 'warning', 8000);
+                } else {
+                    setTimeout(function() { alert(msg); }, 300);
+                }
                 ModuleFallback._showBanner(moduleName, error.message);
             }
             
@@ -357,37 +366,57 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ========== URL Hash 状态管理（刷新保位） ==========
-    // hash 格式: #page=orderTable&orderId=xxx&customerId=yyy&filter=all
+    // ==================== URL Hash 状态管理（刷新保位 - 增强版） ====================
+    
+    /**
+     * 【核心增强】统一的保存当前状态方法
+     * 将页面状态写入 URL hash 和 sessionStorage（双重保险）
+     */
     saveCurrentPageState: function() {
         try {
             var params = { page: this.currentPage || 'dashboard' };
             if (this.currentFilter && this.currentFilter !== 'all') params.filter = this.currentFilter;
             if (this.currentOrderId)    params.orderId    = this.currentOrderId;
             if (this.currentCustomerId) params.customerId = this.currentCustomerId;
+
+            // 1. 更新 URL hash
             var hash = '#' + Object.keys(params).map(function(k) {
                 return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
             }).join('&');
             if (location.hash !== hash) {
                 history.replaceState(null, '', hash);
             }
-            // sessionStorage 保留作兼容备用
+
+            // 2. 同步 sessionStorage（降级备份）
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
-            sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
-        } catch(e) {}
+            sessionStorage.setItem('jf_current_filter', this.currentFilter || 'all');
+            if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
+            else sessionStorage.removeItem('jf_current_order_id');
+            if (this.currentCustomerId) sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
+            else sessionStorage.removeItem('jf_current_customer_id');
+        } catch(e) {
+            console.warn('[状态保存] 失败:', e);
+        }
     },
 
+    /**
+     * 【核心增强】从 URL hash 或 sessionStorage 恢复页面状态
+     * 返回 { page, filter, orderId, customerId }
+     */
     restorePageState: function() {
         try {
-            // 优先从 URL hash 读取（刷新后 hash 仍在）
+            // 1. 优先从 URL hash 中恢复（刷新后 hash 仍在）
             var hash = location.hash.replace(/^#/, '');
             if (hash) {
                 var state = {};
                 hash.split('&').forEach(function(pair) {
                     var kv = pair.split('=');
-                    if (kv.length === 2) state[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+                    if (kv.length === 2) {
+                        state[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+                    }
                 });
                 if (state.page) {
+                    console.log('[路由恢复] 从 URL 恢复页面:', state.page);
                     return {
                         page:       state.page       || null,
                         filter:     state.filter     || 'all',
@@ -396,22 +425,32 @@ const DashboardCore = {
                     };
                 }
             }
-            // 降级到 sessionStorage
-            return {
-                page:       sessionStorage.getItem('jf_current_page') || null,
-                filter:     sessionStorage.getItem('jf_current_filter') || 'all',
-                orderId:    null,
-                customerId: null
-            };
+
+            // 2. 降级：从 sessionStorage 恢复
+            var savedPage = sessionStorage.getItem('jf_current_page');
+            if (savedPage) {
+                console.log('[路由恢复] 从 SessionStorage 恢复页面:', savedPage);
+                return {
+                    page:       savedPage,
+                    filter:     sessionStorage.getItem('jf_current_filter') || 'all',
+                    orderId:    sessionStorage.getItem('jf_current_order_id') || null,
+                    customerId: sessionStorage.getItem('jf_current_customer_id') || null
+                };
+            }
         } catch(e) {
-            return { page: null, filter: 'all', orderId: null, customerId: null };
+            console.warn('[路由恢复] 失败:', e);
         }
+
+        // 3. 最终降级
+        return { page: null, filter: 'all', orderId: null, customerId: null };
     },
 
     clearPageState: function() {
         try {
             sessionStorage.removeItem('jf_current_page');
             sessionStorage.removeItem('jf_current_filter');
+            sessionStorage.removeItem('jf_current_order_id');
+            sessionStorage.removeItem('jf_current_customer_id');
             if (location.hash) history.replaceState(null, '', location.pathname + location.search);
         } catch(e) {}
         this.currentOrderId = null;
@@ -429,17 +468,14 @@ const DashboardCore = {
 
     // ========== 启动逾期更新定时器 ==========
     _startOverdueUpdateInterval: function() {
-        // 先清理已有的定时器
         this._clearOverdueUpdateInterval();
         
         if (!AUTH.isLoggedIn()) return;
         
-        // 每30分钟自动更新一次
         _overdueUpdateInterval = setInterval(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
                 console.log('[逾期更新] 自动更新完成', new Date().toLocaleTimeString());
-                // 如果当前在仪表盘或异常页面，刷新数据
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
@@ -448,7 +484,6 @@ const DashboardCore = {
             }
         }, 30 * 60 * 1000);
         
-        // 页面加载后5秒首次更新
         setTimeout(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
@@ -583,9 +618,16 @@ const DashboardCore = {
                     await self.renderDashboard();
                 } catch (e) {
                     console.error("renderDashboard failed:", e);
+                    // 【修改】使用 Toast 替代 alert
+                    var errMsg = (Utils.lang === 'id' ? '⚠️ Gagal memuat dashboard. Silakan muat ulang.' : '⚠️ 加载仪表盘失败，请刷新页面。');
+                    if (window.UI && window.UI.showToast) {
+                        window.UI.showToast(errMsg, 'error', 8000);
+                    } else {
+                        alert(errMsg);
+                    }
                     document.getElementById("app").innerHTML = '' +
                         '<div class="card" style="text-align:center;padding:40px;">' +
-                            '<p>' + (Utils.lang === 'id' ? '⚠️ Gagal memuat dashboard. Silakan muat ulang.' : '⚠️ 加载仪表盘失败，请刷新页面。') + '</p>' +
+                            '<p>' + errMsg + '</p>' +
                             '<button onclick="location.reload()">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button>' +
                         '</div>';
                 }
@@ -664,7 +706,10 @@ const DashboardCore = {
         if (params.orderId)    this.currentOrderId    = params.orderId;
         if (params.customerId) this.currentCustomerId = params.customerId;
 
-        // 写入 URL hash（pushState 让浏览器后退键也可用）
+        // 【增强】写入 URL hash
+        this.saveCurrentPageState();
+
+        // 同时 pushState 让浏览器后退键可用
         try {
             var hp = { page: page };
             if (this.currentFilter && this.currentFilter !== 'all') hp.filter = this.currentFilter;
@@ -676,8 +721,6 @@ const DashboardCore = {
             history.pushState(null, '', newHash);
         } catch(e) {}
 
-        this.saveCurrentPageState();
-        
         var self = this;
         var moduleMap = {
             'orderTable':       { fn: window.APP.showOrderTable,       name: 'Daftar Pesanan' },
@@ -762,6 +805,7 @@ const DashboardCore = {
             this.currentCustomerId = prev.customerId;
             this.currentFilter = prev.filter || "all";
             
+            // 【增强】同步 URL hash
             this.saveCurrentPageState();
             
             var backMap = {
@@ -933,12 +977,28 @@ const DashboardCore = {
         if (errorDiv) errorDiv.style.display = 'none';
     },
 
+    // 【修改】使用 UI.showConfirm 替代 confirm
     logout: async function() {
-        // 清理逾期更新定时器
         this._clearOverdueUpdateInterval();
         
+        var lang = Utils.lang;
         var confirmMsg = Utils.t('save_exit_confirm');
-        if (!confirm(confirmMsg)) return;
+        
+        // 使用新的 UI.showConfirm（如果可用），否则降级到原生 confirm
+        var confirmed = false;
+        if (window.UI && window.UI.showConfirm) {
+            confirmed = await window.UI.showConfirm({
+                title: Utils.t('save_exit'),
+                message: confirmMsg,
+                confirmText: Utils.t('save_exit'),
+                cancelText: Utils.t('cancel'),
+                type: 'warning'
+            });
+        } else {
+            confirmed = confirm(confirmMsg);
+        }
+        
+        if (!confirmed) return;
         
         this.clearPageState();
         sessionStorage.clear();
@@ -1210,9 +1270,10 @@ const DashboardCore = {
         } catch (err) {
             console.error("renderDashboard error:", err);
             Utils.ErrorHandler.capture(err, 'renderDashboard');
+            var errMsg = (Utils.lang === 'id' ? '⚠️ Gagal memuat dashboard: ' + err.message : '⚠️ 加载仪表盘失败: ' + err.message);
             document.getElementById("app").innerHTML = '' +
                 '<div class="card" style="padding:40px;text-align:center;">' +
-                    '<p style="margin-bottom:16px;">⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '加载仪表盘失败: ' + err.message) + '</p>' +
+                    '<p style="margin-bottom:16px;">' + errMsg + '</p>' +
                     '<button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button>' +
                     '<button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
                 '</div>';
@@ -1244,7 +1305,12 @@ const DashboardCore = {
     },
 
     showCreateOrder: function() { 
-        alert(Utils.lang === 'id' ? 'Silakan pilih nasabah terlebih dahulu' : '请先选择客户'); 
+        var msg = Utils.lang === 'id' ? 'Silakan pilih nasabah terlebih dahulu' : '请先选择客户';
+        if (window.UI && window.UI.showToast) {
+            window.UI.showToast(msg, 'info');
+        } else {
+            alert(msg);
+        }
         this.navigateTo('customers'); 
     },
     
@@ -1259,18 +1325,24 @@ const DashboardCore = {
         var phone = document.getElementById("newStorePhone")?.value.trim();
         
         if (!name) {
-            alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            var errMsg = lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写';
+            if (window.UI && window.UI.showToast) window.UI.showToast(errMsg, 'warning');
+            else alert(errMsg);
             return;
         }
         
         try {
             if (typeof StoreManager !== 'undefined') {
                 await StoreManager.createStore(name, address, phone);
-                alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+                var okMsg = lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功';
+                if (window.UI && window.UI.showToast) window.UI.showToast(okMsg, 'success');
+                else alert(okMsg);
                 await StoreManager.renderStoreManagement();
             }
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
+            var failMsg = lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message;
+            if (window.UI && window.UI.showToast) window.UI.showToast(failMsg, 'error');
+            else alert(failMsg);
         }
     },
     
@@ -1280,15 +1352,34 @@ const DashboardCore = {
     
     deleteStore: async function(storeId) {
         var lang = Utils.lang;
-        if (!confirm(Utils.t('confirm_delete'))) return;
+        var confirmed = false;
+        
+        if (window.UI && window.UI.showConfirm) {
+            confirmed = await window.UI.showConfirm({
+                title: Utils.t('confirm_delete'),
+                message: Utils.t('confirm_delete'),
+                confirmText: lang === 'id' ? 'Hapus' : '删除',
+                type: 'danger',
+                icon: '🗑️'
+            });
+        } else {
+            confirmed = confirm(Utils.t('confirm_delete'));
+        }
+        
+        if (!confirmed) return;
+        
         try {
             if (typeof StoreManager !== 'undefined') {
                 await StoreManager.deleteStore(storeId);
-                alert(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
+                var okMsg = lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除';
+                if (window.UI && window.UI.showToast) window.UI.showToast(okMsg, 'success');
+                else alert(okMsg);
                 await StoreManager.renderStoreManagement();
             }
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            var failMsg = lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message;
+            if (window.UI && window.UI.showToast) window.UI.showToast(failMsg, 'error');
+            else alert(failMsg);
         }
     },
     
