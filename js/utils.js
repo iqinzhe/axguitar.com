@@ -1,4 +1,4 @@
-// utils.js - v1.1（整合时区统一 + 所有工具函数）
+// utils.js - v1.2（添加 Toast 工具方法 + 错误处理优化）
 window.Utils = window.Utils || {};
 
 (function() {
@@ -14,6 +14,45 @@ window.Utils = window.Utils || {};
     Utils.DEFAULT_MAX_EXTENSION_MONTHS = 10;
     Utils.CURRENCY_SYMBOL = 'Rp';
     Utils.ADMIN_FEE_RATE = 0.02;  // 2%
+
+    // ==================== Toast 快捷方法 ====================
+    Utils.toast = {
+        success: function(msg, duration) {
+            if (window.Toast) {
+                window.Toast.success(msg, duration);
+            } else {
+                alert(msg);
+            }
+        },
+        error: function(msg, duration) {
+            if (window.Toast) {
+                window.Toast.error(msg, duration);
+            } else {
+                alert(msg);
+            }
+        },
+        warning: function(msg, duration) {
+            if (window.Toast) {
+                window.Toast.warning(msg, duration);
+            } else {
+                alert(msg);
+            }
+        },
+        info: function(msg, duration) {
+            if (window.Toast) {
+                window.Toast.info(msg, duration);
+            } else {
+                alert(msg);
+            }
+        },
+        confirm: function(msg, title) {
+            if (window.Toast) {
+                return window.Toast.confirmPromise(msg, title);
+            } else {
+                return Promise.resolve(confirm(msg));
+            }
+        }
+    };
 
     // ==================== 语言管理 ====================
     Object.defineProperty(Utils, 'lang', {
@@ -726,14 +765,18 @@ window.Utils = window.Utils || {};
         },
 
         _showToast: function(message) {
-            var toast = document.createElement('div');
-            toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 20px;border-radius:20px;z-index:10001;font-size:14px;transition:opacity 0.5s;';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(function() {
-                toast.style.opacity = '0';
-                setTimeout(function() { toast.remove(); }, 500);
-            }, 2000);
+            if (window.Toast) {
+                window.Toast.info(message, 2000);
+            } else {
+                var toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 20px;border-radius:20px;z-index:10001;font-size:14px;transition:opacity 0.5s;';
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(function() {
+                    toast.style.opacity = '0';
+                    setTimeout(function() { toast.remove(); }, 500);
+                }, 2000);
+            }
         }
     };
 
@@ -770,6 +813,11 @@ window.Utils = window.Utils || {};
             });
             this._persist();
             console.log('[OfflineQueue] 操作已入队:', operation.name);
+            if (window.Toast) {
+                window.Toast.info(_lang === 'id' 
+                    ? '📡 Tidak ada koneksi, data akan diproses nanti' 
+                    : '📡 无网络连接，数据将在恢复后处理', 3000);
+            }
             return true;
         },
 
@@ -804,6 +852,9 @@ window.Utils = window.Utils || {};
             this._processing = false;
             if (this._queue.length === 0) {
                 console.log('[OfflineQueue] 队列已清空');
+                if (window.Toast) {
+                    window.Toast.success(_lang === 'id' ? '✅ Data offline berhasil diproses' : '✅ 离线数据处理完成', 3000);
+                }
             }
         },
 
@@ -872,6 +923,11 @@ window.Utils = window.Utils || {};
                 this._errors.pop();
             }
             console.error('[ErrorHandler]', context + ':', entry.message, entry.stack ? '\n' + entry.stack : '');
+            
+            // 可选：显示 Toast 错误提示
+            if (window.Toast && context !== 'uncaught' && context !== 'unhandled_promise') {
+                window.Toast.error('错误: ' + (error.message || String(error)).substring(0, 100), 4000);
+            }
         },
 
         getRecentErrors: function(count) {
