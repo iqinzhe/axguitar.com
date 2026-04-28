@@ -1,4 +1,6 @@
-// order.js - v1.0
+// order.js - v1.1
+// 修改内容：无 Toast 调用，保持原有订单业务逻辑不变
+
 const Order = {
     // ==================== 创建订单 ====================
     async create(data) {
@@ -25,11 +27,7 @@ const Order = {
             return await SUPABASE.createOrder(orderData);
         } catch (error) {
             console.error("Order.create error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal membuat pesanan: ' + error.message : '创建订单失败：' + error.message);
-            } else {
-                alert(Utils.lang === 'id' ? 'Gagal membuat pesanan: ' + error.message : '创建订单失败：' + error.message);
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal membuat pesanan: ' + error.message : '创建订单失败：' + error.message);
             throw error;
         }
     },
@@ -40,9 +38,7 @@ const Order = {
             return await SUPABASE.recordAdminFee(orderId, paymentMethod, adminFeeAmount);
         } catch (error) {
             console.error("recordAdminFee error:", error);
-            if (window.Toast) {
-                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya admin' : '管理费记录失败');
-            }
+            Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya admin' : '管理费记录失败');
             throw error;
         }
     },
@@ -53,9 +49,7 @@ const Order = {
             return await SUPABASE.recordServiceFee(orderId, monthsPaid, paymentMethod);
         } catch (error) {
             console.error("recordServiceFee error:", error);
-            if (window.Toast) {
-                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya layanan' : '服务费记录失败');
-            }
+            Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya layanan' : '服务费记录失败');
             throw error;
         }
     },
@@ -66,9 +60,7 @@ const Order = {
             return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod);
         } catch (error) {
             console.error("recordInterestPayment error:", error);
-            if (window.Toast) {
-                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran bunga' : '利息记录失败');
-            }
+            Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran bunga' : '利息记录失败');
             throw error;
         }
     },
@@ -79,9 +71,7 @@ const Order = {
             return await SUPABASE.recordPrincipalPayment(orderId, amount, paymentMethod);
         } catch (error) {
             console.error("recordPrincipalPayment error:", error);
-            if (window.Toast) {
-                window.Toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran pokok' : '本金记录失败');
-            }
+            Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran pokok' : '本金记录失败');
             throw error;
         }
     },
@@ -93,13 +83,9 @@ const Order = {
         } catch (error) {
             console.error("recordLoanDisbursement error:", error);
             if (error.message === Utils.t('loan_already_disbursed')) {
-                if (window.Toast) {
-                    window.Toast.warning(error.message);
-                } else {
-                    alert(error.message);
-                }
-            } else if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal mencatat pencairan pinjaman' : '贷款发放记录失败');
+                Utils.toast.warning(error.message);
+            } else {
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencatat pencairan pinjaman' : '贷款发放记录失败');
             }
             throw error;
         }
@@ -111,9 +97,7 @@ const Order = {
             return await SUPABASE.recordFixedPayment(orderId, paymentMethod);
         } catch (error) {
             console.error("recordFixedPayment error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memproses pembayaran cicilan tetap' : '固定还款处理失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memproses pembayaran cicilan tetap' : '固定还款处理失败');
             throw error;
         }
     },
@@ -124,9 +108,7 @@ const Order = {
             return await SUPABASE.earlySettleFixedOrder(orderId, paymentMethod);
         } catch (error) {
             console.error("earlySettleFixedOrder error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memproses pelunasan dipercepat' : '提前结清处理失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memproses pelunasan dipercepat' : '提前结清处理失败');
             throw error;
         }
     },
@@ -190,9 +172,7 @@ const Order = {
             return payments;
         } catch (error) {
             console.error("getPaymentHistory error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
             throw error;
         }
     },
@@ -203,9 +183,7 @@ const Order = {
             return await SUPABASE.deleteOrder(orderId);
         } catch (error) {
             console.error("deleteOrder error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal menghapus pesanan' : '删除订单失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal menghapus pesanan' : '删除订单失败');
             throw error;
         }
     },
@@ -230,9 +208,7 @@ const Order = {
             return await SUPABASE.updateOrder(orderId, updateData, customerId);
         } catch (error) {
             console.error("updateOrder error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal mengupdate pesanan' : '更新订单失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal mengupdate pesanan' : '更新订单失败');
             throw error;
         }
     },
@@ -243,9 +219,7 @@ const Order = {
             return await SUPABASE.getReport();
         } catch (error) {
             console.error("getReport error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报表失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat laporan' : '加载报表失败');
             throw error;
         }
     },
@@ -256,9 +230,7 @@ const Order = {
             return await SUPABASE.unlockOrder(orderId);
         } catch (error) {
             console.error("unlockOrder error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal membuka kunci pesanan' : '解锁订单失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal membuka kunci pesanan' : '解锁订单失败');
             throw error;
         }
     },
@@ -269,9 +241,7 @@ const Order = {
             return await SUPABASE.relockOrder(orderId);
         } catch (error) {
             console.error("relockOrder error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal mengunci pesanan' : '锁定订单失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal mengunci pesanan' : '锁定订单失败');
             throw error;
         }
     },
@@ -304,8 +274,8 @@ const Order = {
             return await SUPABASE.getOrder(orderId);
         } catch (error) {
             console.error("getOrder error:", error);
-            if (window.Toast && error.message !== Utils.t('unauthorized')) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
+            if (error.message !== Utils.t('unauthorized')) {
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
             }
             throw error;
         }
@@ -317,9 +287,7 @@ const Order = {
             return await SUPABASE.getOrders(filters);
         } catch (error) {
             console.error("getOrders error:", error);
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
             throw error;
         }
     },
