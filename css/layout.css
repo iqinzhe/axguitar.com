@@ -92,6 +92,8 @@ button:disabled {
     background: var(--bg-hover);
     border: 1px solid var(--border-medium);
     color: var(--text-secondary);
+    padding: var(--spacing-2) var(--spacing-3);  /* 上下8px，左右12px */
+    font-size: var(--font-md);  /* 字体稍微增大 */
 }
 
 .btn-back:hover {
@@ -104,6 +106,8 @@ button:disabled {
     background: var(--text-secondary);
     color: white;
     border: none;
+    padding: var(--spacing-2) var(--spacing-3);  /* 上下8px，左右12px */
+    font-size: var(--font-md);  /* 字体稍微增大 */
 }
 
 .btn-print:hover {
