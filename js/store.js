@@ -1,4 +1,5 @@
-// store.js - v1.3（完全避免 this 绑定问题）
+// store.js - v1.4（修复：门店WA号码更新方法 + 门店状态同步 + 错误处理增强）
+
 const StoreManager = {
     stores: [],
     _loaded: false,
@@ -77,13 +78,16 @@ const StoreManager = {
         try {
             const { error } = await supabaseClient
                 .from('stores')
-                .update({ is_active: false })
+                .update({ is_active: false, updated_at: Utils.getLocalDateTime() })
                 .eq('id', storeId);
             
             if (error) throw error;
             
             var store = StoreManager.stores.find(function(s) { return s.id === storeId; });
             if (store) store.is_active = false;
+            
+            // 清除缓存
+            SUPABASE.clearCache();
             
             alert(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
             await StoreManager.renderStoreManagement();
@@ -100,13 +104,16 @@ const StoreManager = {
         try {
             const { error } = await supabaseClient
                 .from('stores')
-                .update({ is_active: true })
+                .update({ is_active: true, updated_at: Utils.getLocalDateTime() })
                 .eq('id', storeId);
             
             if (error) throw error;
             
             var store = StoreManager.stores.find(function(s) { return s.id === storeId; });
             if (store) store.is_active = true;
+            
+            // 清除缓存
+            SUPABASE.clearCache();
             
             alert(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
             await StoreManager.renderStoreManagement();
@@ -194,7 +201,8 @@ const StoreManager = {
             var updates = { 
                 name: name, 
                 address: address || null, 
-                phone: phone || null 
+                phone: phone || null,
+                updated_at: Utils.getLocalDateTime()
             };
             if (waNumber) {
                 updates.wa_number = waNumber;
@@ -207,11 +215,55 @@ const StoreManager = {
             
             if (error) throw error;
             
+            // 更新本地缓存
+            const idx = StoreManager.stores.findIndex(s => s.id === storeId);
+            if (idx !== -1) {
+                StoreManager.stores[idx] = { ...StoreManager.stores[idx], ...updates };
+            }
+            
             document.getElementById('editStoreModal')?.remove();
             alert(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
             await StoreManager.renderStoreManagement();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+        }
+    },
+
+    // ========== 问题 #7：门店WA号码更新方法 ==========
+    updateStoreWANumber: async function(storeId, waNumber) {
+        var lang = Utils.lang;
+        
+        if (!storeId) {
+            console.error('updateStoreWANumber: storeId 缺失');
+            return;
+        }
+        
+        try {
+            const { error } = await supabaseClient
+                .from('stores')
+                .update({ 
+                    wa_number: waNumber || null,
+                    updated_at: Utils.getLocalDateTime()
+                })
+                .eq('id', storeId);
+            
+            if (error) throw error;
+            
+            // 更新本地缓存
+            const idx = StoreManager.stores.findIndex(s => s.id === storeId);
+            if (idx !== -1) {
+                StoreManager.stores[idx].wa_number = waNumber || null;
+            }
+            
+            console.log(`[StoreManager] WA号码已更新: ${storeId} -> ${waNumber}`);
+            
+            // 可选：显示成功提示（静默更新，不弹窗）
+            if (window._debugStoreWA) {
+                alert(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
+            }
+        } catch (error) {
+            console.error('updateStoreWANumber 失败:', error);
+            alert(lang === 'id' ? 'Gagal memperbarui nomor WA: ' + error.message : '更新WA号码失败：' + error.message);
         }
     },
 
@@ -256,7 +308,6 @@ const StoreManager = {
                 }
             }
             
-            // 确保所有门店都有余额对象
             if (StoreManager.stores && StoreManager.stores.length > 0) {
                 for (var j = 0; j < StoreManager.stores.length; j++) {
                     var s = StoreManager.stores[j];
@@ -279,15 +330,14 @@ const StoreManager = {
         const lang = Utils.lang;
         const t = function(key) { return Utils.t(key); };
         
-        // 显示加载状态
         document.getElementById("app").innerHTML = '' +
             '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
                 '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-                    '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                    '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
                 '</div>' +
                 '<div class="header-actions">' +
-                    '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
+                    '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                 '</div>' +
             '</div>' +
             '<div class="card" style="text-align:center; padding:40px;">' +
@@ -296,13 +346,9 @@ const StoreManager = {
             '</div>';
         
         try {
-            // 关键修复：使用 StoreManager.loadStores 而不是 this.loadStores
-            console.log('[StoreManager] 调用 StoreManager.loadStores...');
             await StoreManager.loadStores(true);
             console.log('[StoreManager] 门店列表加载完成:', StoreManager.stores.length, '个门店');
             
-            // 并行获取数据
-            console.log('[StoreManager] 获取订单、支出、付款数据...');
             const [allOrdersResult, allExpensesResult, allPaymentsResult] = await Promise.all([
                 supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid'),
                 supabaseClient.from('expenses').select('id, store_id, amount, payment_method'),
@@ -313,21 +359,16 @@ const StoreManager = {
             const allExpenses = allExpensesResult.data || [];
             const allPayments = allPaymentsResult.data || [];
             
-            console.log('[StoreManager] 订单数量:', allOrders.length, '支出数量:', allExpenses.length, '付款数量:', allPayments.length);
-            
-            // 构建订单门店映射
             const orderStoreMap = {};
             for (var i = 0; i < allOrders.length; i++) {
                 orderStoreMap[allOrders[i].id] = allOrders[i].store_id;
             }
             
-            // 初始化门店统计
             const storeStats = {};
             for (var i = 0; i < StoreManager.stores.length; i++) {
                 storeStats[StoreManager.stores[i].id] = { orders: [], expenses: [], payments: [] };
             }
             
-            // 统计订单
             for (var i = 0; i < allOrders.length; i++) {
                 var orderStoreId = allOrders[i].store_id;
                 if (storeStats[orderStoreId]) {
@@ -335,7 +376,6 @@ const StoreManager = {
                 }
             }
             
-            // 统计支出
             for (var i = 0; i < allExpenses.length; i++) {
                 var expenseStoreId = allExpenses[i].store_id;
                 if (storeStats[expenseStoreId]) {
@@ -343,7 +383,6 @@ const StoreManager = {
                 }
             }
             
-            // 统计付款
             for (var i = 0; i < allPayments.length; i++) {
                 var paymentStoreId = orderStoreMap[allPayments[i].order_id];
                 if (paymentStoreId && storeStats[paymentStoreId]) {
@@ -351,11 +390,8 @@ const StoreManager = {
                 }
             }
             
-            // 获取门店余额
-            console.log('[StoreManager] 获取门店余额...');
             const storeBalances = await StoreManager._getAllStoreCashFlowBalances();
             
-            // 计算汇总
             var grandTotal = { 
                 orders: 0, active: 0, loan: 0, adminFee: 0, serviceFee: 0, interest: 0, 
                 principal: 0, expenses: 0, income: 0, cashBalance: 0, bankBalance: 0 
@@ -445,10 +481,9 @@ const StoreManager = {
                 '<td class="amount"><strong>' + Utils.formatCurrency(grandTotal.bankBalance) + '</strong></td>' +
             '</tr>';
             
-            // 生成门店列表行
             var storeRows = '';
             if (StoreManager.stores.length === 0) {
-                storeRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
+                storeRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + 'NonNull';
             } else {
                 for (var i = 0; i < StoreManager.stores.length; i++) {
                     var store = StoreManager.stores[i];
@@ -465,7 +500,7 @@ const StoreManager = {
                         '<td>' +
                             '<input type="text" id="wa_' + store.id + '" value="' + Utils.escapeHtml(store.wa_number || '') + '" ' +
                                    'placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" ' +
-                                   'onchange="APP.updateStoreWANumber(\'' + store.id + '\', this.value)">' +
+                                   'onchange="StoreManager.updateStoreWANumber(\'' + store.id + '\', this.value)">' +
                         '</td>' +
                         '<td class="text-center">' + statusBadge + '</td>' +
                     '</tr>';
@@ -486,19 +521,18 @@ const StoreManager = {
                         '<td colspan="5">' +
                             '<div class="action-buttons">' + actionButtons + '</div>' +
                         '</td>' +
-                    '</tr>';
+                    '</td>';
                 }
             }
             
-            // 渲染完整页面
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
                     '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                         '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
                     '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
@@ -593,11 +627,11 @@ const StoreManager = {
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
                     '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                         '<h2>🏪 ' + (lang === 'id' ? 'Manajemen Toko' : '门店管理') + '</h2>' +
                     '</div>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card" style="text-align:center; padding:40px;">' +
@@ -615,3 +649,6 @@ const StoreManager = {
 
 // 挂载到 window
 window.StoreManager = StoreManager;
+
+// 挂载 WA 号码更新方法到 APP（方便页面调用）
+window.APP.updateStoreWANumber = StoreManager.updateStoreWANumber.bind(StoreManager);
