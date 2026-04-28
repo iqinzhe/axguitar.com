@@ -1,4 +1,9 @@
-// app-payments.js - v1.0 
+// app-payments.js - v1.1
+// 修改内容：
+// 1. 简化 Toast.confirmPromise 调用（移除 fallback）
+// 2. 统一使用 Utils.toast 方法
+// 3. 优化防重复提交逻辑
+
 window.APP = window.APP || {};
 
 // ========== 防重复提交全局锁 ==========
@@ -198,11 +203,7 @@ const PaymentsModule = {
         const profile = await SUPABASE.getCurrentProfile();
 
         if (!profile) {
-            if (window.Toast) {
-                window.Toast.error(Utils.t('login_required'));
-            } else {
-                alert(Utils.t('login_required'));
-            }
+            Utils.toast.error(Utils.t('login_required'));
             APP.goBack();
             return;
         }
@@ -241,11 +242,7 @@ const PaymentsModule = {
         }
 
         if (!profile.store_id) {
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Akun tidak terhubung ke toko' : '账号未关联门店');
-            } else {
-                alert(Utils.lang === 'id' ? 'Akun tidak terhubung ke toko' : '账号未关联门店');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Akun tidak terhubung ke toko' : '账号未关联门店');
             APP.goBack();
             return;
         }
@@ -257,21 +254,13 @@ const PaymentsModule = {
         try {
             var order = await SUPABASE.getOrder(orderId);
             if (!order) {
-                if (window.Toast) {
-                    window.Toast.error(Utils.t('order_not_found'));
-                } else {
-                    alert(Utils.t('order_not_found'));
-                }
+                Utils.toast.error(Utils.t('order_not_found'));
                 APP.goBack();
                 return;
             }
             
             if (order.store_id !== profile.store_id) {
-                if (window.Toast) {
-                    window.Toast.error(Utils.t('unauthorized'));
-                } else {
-                    alert(Utils.t('unauthorized'));
-                }
+                Utils.toast.error(Utils.t('unauthorized'));
                 APP.goBack();
                 return;
             }
@@ -313,7 +302,7 @@ const PaymentsModule = {
             // ========== 利息历史行 ==========
             var interestRows = '';
             if (interestPayments.length === 0) {
-                interestRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td></table>';
+                interestRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < interestPayments.length; i++) {
                     var p = interestPayments[i];
@@ -481,7 +470,7 @@ const PaymentsModule = {
                                     '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th> vain</thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
-                                    '</table>' +
+                                    '</tr>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -560,16 +549,12 @@ const PaymentsModule = {
         } catch (error) {
             console.error("showPayment error:", error);
             Utils.ErrorHandler.capture(error, 'showPayment');
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal memuat data: ' + error.message : '加载失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal memuat data: ' + error.message : '加载失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat data: ' + error.message : '加载失败：' + error.message);
             APP.goBack();
         }
     },
 
-    // ========== 利息收款（防重复提交 + 幂等性 + 补偿事务 + 时区统一） ==========
+    // ========== 利息收款（防重复提交 + 幂等性 + 补偿事务） ==========
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
@@ -577,11 +562,7 @@ const PaymentsModule = {
         var lang = Utils.lang;
         
         if (!window.APP._acquirePaymentLock(orderId + '_interest')) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            } else {
-                alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            }
+            Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
         }
         
@@ -601,15 +582,9 @@ const PaymentsModule = {
             
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', totalInterest, method);
             if (isDuplicate) {
-                if (window.Toast) {
-                    window.Toast.warning(lang === 'id' 
-                        ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔付款已记录，无需重复处理。');
-                } else {
-                    alert(lang === 'id' 
-                        ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔付款已记录，无需重复处理。');
-                }
+                Utils.toast.warning(lang === 'id' 
+                    ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔付款已记录，无需重复处理。');
                 await PaymentsModule.showPayment(orderId);
                 return;
             }
@@ -639,7 +614,7 @@ const PaymentsModule = {
                   '入账方式: ' + methodName + '\n' +
                   '确认收款？';
 
-            var confirmed = window.Toast ? await window.Toast.confirmPromise(previewMsg) : confirm(previewMsg);
+            var confirmed = await Utils.toast.confirm(previewMsg);
             if (!confirmed) return;
             
             var originalOrderState = {
@@ -707,31 +682,19 @@ const PaymentsModule = {
                     await window.Audit.logPayment(order.order_id, 'interest', totalInterest, method);
                 }
                 
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? '✅ Pembayaran bunga berhasil!' : '✅ 利息收款成功！');
-                } else {
-                    alert(lang === 'id' ? '✅ Pembayaran bunga berhasil!' : '✅ 利息收款成功！');
-                }
+                Utils.toast.success(lang === 'id' ? '✅ Pembayaran bunga berhasil!' : '✅ 利息收款成功！');
                 await PaymentsModule.showPayment(orderId);
                 
             } catch (error) {
                 console.error('payInterestWithMethod 事务失败:', error);
                 await window.APP._rollbackPaymentHistory(orderInternalId, 'interest', totalInterest, paymentDate);
-                if (window.Toast) {
-                    window.Toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
-                } else {
-                    alert(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
-                }
+                Utils.toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
             
         } catch (error) {
             console.error('payInterestWithMethod error:', error);
             Utils.ErrorHandler.capture(error, 'payInterestWithMethod');
-            if (window.Toast) {
-                window.Toast.error(error.message);
-            } else {
-                alert(error.message);
-            }
+            Utils.toast.error(error.message);
         } finally {
             window.APP._releasePaymentLock(orderId + '_interest');
             this._setButtonLoading(confirmBtn, false);
@@ -739,7 +702,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 本金收款（防重复提交 + 幂等性 + 补偿事务 + 时区统一） ==========
+    // ========== 本金收款（防重复提交 + 幂等性 + 补偿事务） ==========
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -748,20 +711,12 @@ const PaymentsModule = {
         var lang = Utils.lang;
         
         if (isNaN(amount) || amount <= 0) {
-            if (window.Toast) {
-                window.Toast.warning(Utils.t('invalid_amount'));
-            } else {
-                alert(Utils.t('invalid_amount'));
-            }
+            Utils.toast.warning(Utils.t('invalid_amount'));
             return;
         }
         
         if (!window.APP._acquirePaymentLock(orderId + '_principal')) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            } else {
-                alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            }
+            Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
         }
         
@@ -781,15 +736,9 @@ const PaymentsModule = {
             
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'principal', actualAmount, target);
             if (isDuplicate) {
-                if (window.Toast) {
-                    window.Toast.warning(lang === 'id' 
-                        ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔付款已记录，无需重复处理。');
-                } else {
-                    alert(lang === 'id' 
-                        ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔付款已记录，无需重复处理。');
-                }
+                Utils.toast.warning(lang === 'id' 
+                    ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔付款已记录，无需重复处理。');
                 await PaymentsModule.showPayment(orderId);
                 return;
             }
@@ -818,7 +767,7 @@ const PaymentsModule = {
                   (isFullSettlement ? '🎉 全额结清' : '部分还款') + '\n' +
                   '确认收款？';
 
-            var confirmed = window.Toast ? await window.Toast.confirmPromise(previewMsg) : confirm(previewMsg);
+            var confirmed = await Utils.toast.confirm(previewMsg);
             if (!confirmed) return;
             
             var originalOrderState = {
@@ -898,38 +847,26 @@ const PaymentsModule = {
                     var printConfirm = lang === 'id'
                         ? '✅ LUNAS!\n\nCetak tanda terima pelunasan?'
                         : '✅ 结清成功！\n\n是否打印结清凭证？';
-                    var printConfirmed = window.Toast ? await window.Toast.confirmPromise(printConfirm) : confirm(printConfirm);
+                    var printConfirmed = await Utils.toast.confirm(printConfirm);
                     if (printConfirmed) {
                         APP.printSettlementReceipt(orderId);
                         return;
                     }
                 }
                 
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? '✅ Pembayaran pokok berhasil!' : '✅ 本金还款成功！');
-                } else {
-                    alert(lang === 'id' ? '✅ Pembayaran pokok berhasil!' : '✅ 本金还款成功！');
-                }
+                Utils.toast.success(lang === 'id' ? '✅ Pembayaran pokok berhasil!' : '✅ 本金还款成功！');
                 await PaymentsModule.showPayment(orderId);
                 
             } catch (error) {
                 console.error('payPrincipalWithMethod 事务失败:', error);
                 await window.APP._rollbackPaymentHistory(orderInternalId, 'principal', actualAmount, paymentDate);
-                if (window.Toast) {
-                    window.Toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
-                } else {
-                    alert(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
-                }
+                Utils.toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
             
         } catch (error) {
             console.error('payPrincipalWithMethod error:', error);
             Utils.ErrorHandler.capture(error, 'payPrincipalWithMethod');
-            if (window.Toast) {
-                window.Toast.error(error.message);
-            } else {
-                alert(error.message);
-            }
+            Utils.toast.error(error.message);
         } finally {
             window.APP._releasePaymentLock(orderId + '_principal');
             this._setButtonLoading(confirmBtn, false);
@@ -943,11 +880,7 @@ const PaymentsModule = {
         var lang = Utils.lang;
         
         if (!window.APP._acquirePaymentLock(orderId + '_fixed')) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            } else {
-                alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            }
+            Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
         }
         
@@ -961,15 +894,9 @@ const PaymentsModule = {
             
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'fixed_installment', fixedPaymentBefore, method);
             if (isDuplicate) {
-                if (window.Toast) {
-                    window.Toast.warning(lang === 'id' 
-                        ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔付款已记录，无需重复处理。');
-                } else {
-                    alert(lang === 'id' 
-                        ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔付款已记录，无需重复处理。');
-                }
+                Utils.toast.warning(lang === 'id' 
+                    ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔付款已记录，无需重复处理。');
                 await PaymentsModule.showPayment(orderId);
                 return;
             }
@@ -997,11 +924,7 @@ const PaymentsModule = {
         } catch (error) {
             console.error('payFixedInstallment error:', error);
             Utils.ErrorHandler.capture(error, 'payFixedInstallment');
-            if (window.Toast) {
-                window.Toast.error(error.message);
-            } else {
-                alert(error.message);
-            }
+            Utils.toast.error(error.message);
         } finally {
             window.APP._releasePaymentLock(orderId + '_fixed');
             this._setButtonLoading(confirmBtn, false);
@@ -1015,11 +938,7 @@ const PaymentsModule = {
         var lang = Utils.lang;
         
         if (!window.APP._acquirePaymentLock(orderId + '_early_settle')) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            } else {
-                alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
-            }
+            Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
         }
         
@@ -1033,15 +952,9 @@ const PaymentsModule = {
             
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'early_settlement', remainingPrincipal, method);
             if (isDuplicate) {
-                if (window.Toast) {
-                    window.Toast.warning(lang === 'id' 
-                        ? '⚠️ Pelunasan ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔结清已记录，无需重复处理。');
-                } else {
-                    alert(lang === 'id' 
-                        ? '⚠️ Pelunasan ini sudah tercatat, tidak perlu diproses ulang.' 
-                        : '⚠️ 此笔结清已记录，无需重复处理。');
-                }
+                Utils.toast.warning(lang === 'id' 
+                    ? '⚠️ Pelunasan ini sudah tercatat, tidak perlu diproses ulang.' 
+                    : '⚠️ 此笔结清已记录，无需重复处理。');
                 await PaymentsModule.showPayment(orderId);
                 return;
             }
@@ -1057,11 +970,7 @@ const PaymentsModule = {
         } catch (error) {
             console.error('earlySettleFixedOrder error:', error);
             Utils.ErrorHandler.capture(error, 'earlySettleFixedOrder');
-            if (window.Toast) {
-                window.Toast.error(error.message);
-            } else {
-                alert(error.message);
-            }
+            Utils.toast.error(error.message);
         } finally {
             window.APP._releasePaymentLock(orderId + '_early_settle');
             this._setButtonLoading(confirmBtn, false);
@@ -1193,11 +1102,7 @@ const PaymentsModule = {
         } catch (error) {
             console.error('printSettlementReceipt error:', error);
             Utils.ErrorHandler.capture(error, 'printSettlementReceipt');
-            if (window.Toast) {
-                window.Toast.error(Utils.lang === 'id' ? 'Gagal mencetak' : '打印失败');
-            } else {
-                alert(Utils.lang === 'id' ? 'Gagal mencetak' : '打印失败');
-            }
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak' : '打印失败');
             APP.navigateTo('orderTable');
         }
     }
