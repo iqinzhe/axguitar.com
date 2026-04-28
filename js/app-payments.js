@@ -1,4 +1,4 @@
-// app-payments.js - v1.3（修复：alert 替换为 Toast + 事务补偿 + 幂等性检查）
+// app-payments.js - v1.0
 window.APP = window.APP || {};
 
 // ========== 防重复提交全局锁 ==========
