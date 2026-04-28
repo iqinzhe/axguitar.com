@@ -1,4 +1,4 @@
-// auth.js - v1.0
+// auth.js - v1.1（修复：alert 替换为 Toast）
 const AUTH = {
     user: null,
 
@@ -38,7 +38,11 @@ const AUTH = {
             const msg = lang === 'id' 
                 ? '⚠️ Akun telah dikunci. Silakan coba lagi setelah ' + remainingMinutes + ' menit.'
                 : '⚠️ 账号已锁定，请 ' + remainingMinutes + ' 分钟后重试。';
-            alert(msg);
+            if (window.Toast) {
+                window.Toast.warning(msg, 5000);
+            } else {
+                alert(msg);
+            }
             return true;
         }
         
@@ -73,7 +77,11 @@ const AUTH = {
             const msg = lang === 'id' 
                 ? '⚠️ Terlalu banyak percobaan login. Akun dikunci selama 15 menit.'
                 : '⚠️ 登录尝试次数过多，账号已锁定15分钟。';
-            alert(msg);
+            if (window.Toast) {
+                window.Toast.warning(msg, 8000);
+            } else {
+                alert(msg);
+            }
             return true;
         }
         
@@ -117,7 +125,7 @@ const AUTH = {
         }
     },
 
-    // ==================== 网络状态监听（委托给 Utils.NetworkMonitor） ====================
+    // ==================== 网络状态监听 ====================
     
     // ==================== 初始化 ====================
     async init() {
@@ -246,9 +254,15 @@ const AUTH = {
             
             if (!isNetworkAvailable) {
                 const lang = Utils.lang;
-                alert(lang === 'id' 
-                    ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
-                    : '❌ 无网络连接，请检查网络设置。');
+                if (window.Toast) {
+                    window.Toast.error(lang === 'id' 
+                        ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
+                        : '❌ 无网络连接，请检查网络设置。', 4000);
+                } else {
+                    alert(lang === 'id' 
+                        ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
+                        : '❌ 无网络连接，请检查网络设置。');
+                }
                 return null;
             }
 
@@ -259,9 +273,15 @@ const AUTH = {
                 console.error('Login error:', result?.error);
                 this._recordLoginFailure(usernameOrEmail);
                 const lang = Utils.lang;
-                alert(lang === 'id' 
-                    ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') 
-                    : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
+                if (window.Toast) {
+                    window.Toast.error(lang === 'id' 
+                        ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') 
+                        : '登录失败：' + (result?.error?.message || '用户名或密码错误'), 4000);
+                } else {
+                    alert(lang === 'id' 
+                        ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah') 
+                        : '登录失败：' + (result?.error?.message || '用户名或密码错误'));
+                }
                 if (window.Audit) {
                     await window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials');
                 }
@@ -277,20 +297,30 @@ const AUTH = {
             if (!this.user) {
                 console.error('Failed to load user profile after login');
                 const lang = Utils.lang;
-                alert(lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败');
+                if (window.Toast) {
+                    window.Toast.error(lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败', 4000);
+                } else {
+                    alert(lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败');
+                }
                 return null;
             }
 
-            // 6. 检查门店状态（已移到 SUPABASE 层）
+            // 6. 检查门店状态
             if (this.user && this.user.store_id) {
                 try {
                     const storeStatus = await SUPABASE.checkStoreStatus(this.user.store_id);
                     if (!storeStatus.is_active) {
                         await this.logout();
                         var lang = Utils.lang;
-                        alert(lang === 'id' 
-                            ? '⚠️ Toko "' + storeStatus.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
-                            : '⚠️ 门店 "' + storeStatus.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。');
+                        if (window.Toast) {
+                            window.Toast.warning(lang === 'id' 
+                                ? '⚠️ Toko "' + storeStatus.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
+                                : '⚠️ 门店 "' + storeStatus.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。', 6000);
+                        } else {
+                            alert(lang === 'id' 
+                                ? '⚠️ Toko "' + storeStatus.name + '" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.'
+                                : '⚠️ 门店 "' + storeStatus.name + '" 已暂停营业。\n\n请联系管理员获取更多信息。');
+                        }
                         return null;
                     }
                 } catch (e) {
@@ -308,14 +338,17 @@ const AUTH = {
             console.error('LOGIN ERROR:', error);
             this._recordLoginFailure(usernameOrEmail);
             const lang = Utils.lang;
-            alert(lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误');
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误', 4000);
+            } else {
+                alert(lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误');
+            }
             return null;
         }
     },
 
     async loadCurrentUser() {
         try {
-            // 统一使用 SUPABASE.getCurrentProfile()
             this.user = (await SUPABASE.getCurrentProfile()) || null;
         } catch (e) {
             console.warn('loadCurrentUser error:', e.message);
@@ -341,7 +374,15 @@ const AUTH = {
         const { data: existing } = await client
             .from('user_profiles').select('username').eq('username', username).single();
 
-        if (existing) throw new Error(Utils.lang === 'id' ? 'Username sudah digunakan' : '用户名已存在');
+        if (existing) {
+            const msg = Utils.lang === 'id' ? 'Username sudah digunakan' : '用户名已存在';
+            if (window.Toast) {
+                window.Toast.error(msg);
+            } else {
+                throw new Error(msg);
+            }
+            throw new Error(msg);
+        }
 
         const { data: authUser, error: signUpError } = await client.auth.signUp({
             email: username,
@@ -350,7 +391,13 @@ const AUTH = {
         });
 
         if (signUpError) throw signUpError;
-        if (!authUser.user) throw new Error(Utils.lang === 'id' ? 'Gagal membuat pengguna' : '创建用户失败');
+        if (!authUser.user) {
+            const msg = Utils.lang === 'id' ? 'Gagal membuat pengguna' : '创建用户失败';
+            if (window.Toast) {
+                window.Toast.error(msg);
+            }
+            throw new Error(msg);
+        }
 
         const { error: profileError } = await client.from('user_profiles').insert({
             id: authUser.user.id, username, email: username, name, role, store_id: storeId || null
@@ -367,7 +414,11 @@ const AUTH = {
 
     async deleteUser(userId) {
         if (userId === this.user?.id) {
-            throw new Error(Utils.lang === 'id' ? 'Tidak dapat menghapus akun sendiri' : '不能删除自己的账号');
+            const msg = Utils.lang === 'id' ? 'Tidak dapat menghapus akun sendiri' : '不能删除自己的账号';
+            if (window.Toast) {
+                window.Toast.error(msg);
+            }
+            throw new Error(msg);
         }
 
         const client = SUPABASE.getClient();
@@ -419,7 +470,11 @@ const AUTH = {
             const warningMsg = lang === 'id'
                 ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.\n\nHubungi administrator untuk pembersihan manual.'
                 : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。\n\n请联系管理员进行手动清理。';
-            alert(warningMsg);
+            if (window.Toast) {
+                window.Toast.warning(warningMsg, 8000);
+            } else {
+                alert(warningMsg);
+            }
         }
 
         const { error } = await client.from('user_profiles').delete().eq('id', userId);
@@ -452,11 +507,19 @@ const AUTH = {
         const client = SUPABASE.getClient();
         
         if (this.user?.role !== 'admin') {
-            throw new Error(lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码');
+            const msg = lang === 'id' ? 'Hanya admin yang dapat mereset password' : '只有管理员可以重置密码';
+            if (window.Toast) {
+                window.Toast.error(msg);
+            }
+            throw new Error(msg);
         }
         
         if (!newPassword || newPassword.length < 6) {
-            throw new Error(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
+            const msg = lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符';
+            if (window.Toast) {
+                window.Toast.warning(msg);
+            }
+            throw new Error(msg);
         }
         
         // 优先使用 Edge Function
@@ -484,12 +547,19 @@ const AUTH = {
             const errorMsg = lang === 'id'
                 ? '❌ Fungsi reset password tidak tersedia. Hubungi administrator untuk mengaktifkan Edge Function atau lakukan reset manual di Supabase Dashboard.'
                 : '❌ 密码重置功能不可用。请联系管理员部署 Edge Function，或在 Supabase 后台手动重置密码。';
+            if (window.Toast) {
+                window.Toast.error(errorMsg, 8000);
+            }
             throw new Error(errorMsg);
         }
         
         // 审计：重置密码
         if (window.Audit) {
             await window.Audit.logPasswordReset(userId, this.user?.id);
+        }
+        
+        if (window.Toast) {
+            window.Toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
         }
         
         return true;
