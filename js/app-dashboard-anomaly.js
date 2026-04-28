@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.1 (修复 var 变量提升问题)
+// app-dashboard-anomaly.js - v1.0
 window.APP = window.APP || {};
 
 // ==================== 异常检测缓存模块（增强版：自动清理 + LRU） ====================
