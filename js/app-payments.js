@@ -1,4 +1,4 @@
-// app-payments.js - v1.1（修复事务缺失 + 幂等性检查 + 补偿事务）
+// app-payments.js - v1.2（整合：事务补偿 + 幂等性检查 + 时区统一）
 window.APP = window.APP || {};
 
 // ========== 防重复提交全局锁 ==========
@@ -16,22 +16,100 @@ window.APP._releasePaymentLock = function(lockKey) {
 
 // ========== 幂等性检查：防止重复处理同一笔交易 ==========
 window.APP._checkIdempotency = async function(orderId, type, amount, paymentMethod) {
-    const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabaseClient
-        .from('payment_history')
-        .select('id')
-        .eq('order_id', (await supabaseClient.from('orders').select('id').eq('order_id', orderId).single()).data?.id)
-        .eq('type', type)
-        .eq('amount', amount)
-        .eq('payment_method', paymentMethod)
-        .gte('date', today)
-        .maybeSingle();
-    
-    if (error) {
-        console.warn('幂等性检查失败:', error);
+    try {
+        // 获取订单内部ID
+        const { data: order, error: orderError } = await supabaseClient
+            .from('orders')
+            .select('id')
+            .eq('order_id', orderId)
+            .single();
+        
+        if (orderError || !order) return false;
+        
+        const today = Utils.getLocalToday();
+        const { data, error } = await supabaseClient
+            .from('payment_history')
+            .select('id')
+            .eq('order_id', order.id)
+            .eq('type', type)
+            .eq('amount', amount)
+            .eq('payment_method', paymentMethod)
+            .gte('date', today)
+            .maybeSingle();
+        
+        if (error) {
+            console.warn('幂等性检查失败:', error);
+            return false;
+        }
+        return !!data;
+    } catch (err) {
+        console.warn('幂等性检查异常:', err);
         return false;
     }
-    return !!data;
+};
+
+// ========== 补偿事务：回滚订单更新 ==========
+window.APP._rollbackOrder = async function(orderId, originalState) {
+    console.warn('[补偿事务] 开始回滚订单:', orderId);
+    try {
+        const { error } = await supabaseClient
+            .from('orders')
+            .update(originalState)
+            .eq('order_id', orderId);
+        if (error) {
+            console.error('[补偿事务] 回滚失败:', error);
+            if (window.Audit) {
+                await window.Audit.log('rollback_failed', JSON.stringify({
+                    order_id: orderId,
+                    original_state: originalState,
+                    error: error.message
+                }));
+            }
+        } else {
+            console.log('[补偿事务] 回滚成功:', orderId);
+        }
+    } catch (err) {
+        console.error('[补偿事务] 回滚异常:', err);
+    }
+};
+
+// ========== 补偿事务：删除已插入的付款记录 ==========
+window.APP._rollbackPaymentHistory = async function(orderInternalId, type, amount, date) {
+    console.warn('[补偿事务] 删除付款记录:', orderInternalId, type);
+    try {
+        const { error } = await supabaseClient
+            .from('payment_history')
+            .delete()
+            .eq('order_id', orderInternalId)
+            .eq('type', type)
+            .eq('amount', amount)
+            .eq('date', date);
+        if (error) {
+            console.error('[补偿事务] 删除付款记录失败:', error);
+        }
+    } catch (err) {
+        console.error('[补偿事务] 删除付款记录异常:', err);
+    }
+};
+
+// ========== 补偿事务：删除已插入的资金流水 ==========
+window.APP._rollbackCashFlow = async function(orderInternalId, flowType, amount) {
+    console.warn('[补偿事务] 删除资金流水:', orderInternalId, flowType);
+    try {
+        const today = Utils.getLocalToday();
+        const { error } = await supabaseClient
+            .from('cash_flow_records')
+            .delete()
+            .eq('order_id', orderInternalId)
+            .eq('flow_type', flowType)
+            .eq('amount', amount)
+            .gte('recorded_at', today);
+        if (error) {
+            console.error('[补偿事务] 删除资金流水失败:', error);
+        }
+    } catch (err) {
+        console.error('[补偿事务] 删除资金流水异常:', err);
+    }
 };
 
 const PaymentsModule = {
@@ -112,71 +190,6 @@ const PaymentsModule = {
             }
         }
         return null;
-    },
-
-    // ========== 补偿事务：回滚订单更新 ==========
-    _rollbackOrder: async function(orderId, originalState) {
-        console.warn('[补偿事务] 开始回滚订单:', orderId);
-        try {
-            const { error } = await supabaseClient
-                .from('orders')
-                .update(originalState)
-                .eq('order_id', orderId);
-            if (error) {
-                console.error('[补偿事务] 回滚失败:', error);
-                // 记录到错误日志表
-                if (window.Audit) {
-                    await window.Audit.log('rollback_failed', JSON.stringify({
-                        order_id: orderId,
-                        original_state: originalState,
-                        error: error.message
-                    }));
-                }
-            } else {
-                console.log('[补偿事务] 回滚成功:', orderId);
-            }
-        } catch (err) {
-            console.error('[补偿事务] 回滚异常:', err);
-        }
-    },
-
-    // ========== 补偿事务：删除已插入的付款记录 ==========
-    _rollbackPaymentHistory: async function(orderInternalId, type, amount, date) {
-        console.warn('[补偿事务] 删除付款记录:', orderInternalId, type);
-        try {
-            const { error } = await supabaseClient
-                .from('payment_history')
-                .delete()
-                .eq('order_id', orderInternalId)
-                .eq('type', type)
-                .eq('amount', amount)
-                .eq('date', date);
-            if (error) {
-                console.error('[补偿事务] 删除付款记录失败:', error);
-            }
-        } catch (err) {
-            console.error('[补偿事务] 删除付款记录异常:', err);
-        }
-    },
-
-    // ========== 补偿事务：删除已插入的资金流水 ==========
-    _rollbackCashFlow: async function(orderInternalId, flowType, amount) {
-        console.warn('[补偿事务] 删除资金流水:', orderInternalId, flowType);
-        try {
-            const today = new Date().toISOString().split('T')[0];
-            const { error } = await supabaseClient
-                .from('cash_flow_records')
-                .delete()
-                .eq('order_id', orderInternalId)
-                .eq('flow_type', flowType)
-                .eq('amount', amount)
-                .gte('recorded_at', today);
-            if (error) {
-                console.error('[补偿事务] 删除资金流水失败:', error);
-            }
-        } catch (err) {
-            console.error('[补偿事务] 删除资金流水异常:', err);
-        }
     },
 
     showPayment: async function(orderId) {
@@ -307,7 +320,7 @@ const PaymentsModule = {
             var principalRows = '';
             var cumulativePaid = 0;
             if (principalPayments.length === 0) {
-                principalRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td></tr>';
+                principalRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + 'NonNull';
             } else {
                 for (var i = 0; i < principalPayments.length; i++) {
                     var p = principalPayments[i];
@@ -453,7 +466,7 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></table></thead>' +
+                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -541,14 +554,13 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 利息收款（防重复提交 + 幂等性 + 补偿事务） ==========
+    // ========== 利息收款（防重复提交 + 幂等性 + 补偿事务 + 时区统一） ==========
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
         
-        // ========== 防重复提交检查 ==========
         if (!window.APP._acquirePaymentLock(orderId + '_interest')) {
             alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
@@ -561,7 +573,6 @@ const PaymentsModule = {
         try {
             var order = await SUPABASE.getOrder(orderId);
             
-            // ========== 幂等性检查 ==========
             var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
             var loanAmount = order.loan_amount || 0;
             var principalPaid = order.principal_paid || 0;
@@ -605,7 +616,6 @@ const PaymentsModule = {
 
             if (!confirm(previewMsg)) return;
             
-            // 保存原始状态用于补偿回滚
             var originalOrderState = {
                 interest_paid_months: order.interest_paid_months,
                 interest_paid_total: order.interest_paid_total,
@@ -615,10 +625,9 @@ const PaymentsModule = {
             };
             
             var orderInternalId = order.id;
-            var paymentDate = new Date().toISOString().split('T')[0];
+            var paymentDate = Utils.getLocalToday();
             
             try {
-                // 步骤1：更新订单（利息支付）
                 var newInterestPaidMonths = (order.interest_paid_months || 0) + months;
                 var newInterestPaidTotal = (order.interest_paid_total || 0) + totalInterest;
                 var nextDueDate = SUPABASE.calculateNextDueDate(order.created_at, newInterestPaidMonths);
@@ -630,13 +639,12 @@ const PaymentsModule = {
                         interest_paid_total: newInterestPaidTotal,
                         next_interest_due_date: nextDueDate,
                         monthly_interest: monthlyInterest,
-                        updated_at: new Date().toISOString()
+                        updated_at: Utils.getLocalDateTime()
                     })
                     .eq('order_id', orderId);
                 
                 if (updateError) throw new Error('更新订单失败: ' + updateError.message);
                 
-                // 步骤2：插入付款记录
                 const paymentData = {
                     order_id: orderInternalId,
                     date: paymentDate,
@@ -653,12 +661,10 @@ const PaymentsModule = {
                     .insert(paymentData);
                 
                 if (paymentError) {
-                    // 补偿：回滚订单更新
-                    await this._rollbackOrder(orderId, originalOrderState);
+                    await window.APP._rollbackOrder(orderId, originalOrderState);
                     throw new Error('插入付款记录失败: ' + paymentError.message);
                 }
                 
-                // 步骤3：记录资金流水
                 await SUPABASE.recordCashFlow({
                     store_id: order.store_id,
                     flow_type: 'interest',
@@ -671,7 +677,6 @@ const PaymentsModule = {
                     reference_id: order.order_id
                 });
                 
-                // 审计
                 if (window.Audit) {
                     await window.Audit.logPayment(order.order_id, 'interest', totalInterest, method);
                 }
@@ -681,8 +686,7 @@ const PaymentsModule = {
                 
             } catch (error) {
                 console.error('payInterestWithMethod 事务失败:', error);
-                // 尝试回滚付款记录
-                await this._rollbackPaymentHistory(orderInternalId, 'interest', totalInterest, paymentDate);
+                await window.APP._rollbackPaymentHistory(orderInternalId, 'interest', totalInterest, paymentDate);
                 alert(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
             
@@ -697,7 +701,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 本金收款（防重复提交 + 幂等性 + 补偿事务） ==========
+    // ========== 本金收款（防重复提交 + 幂等性 + 补偿事务 + 时区统一） ==========
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -710,7 +714,6 @@ const PaymentsModule = {
             return;
         }
         
-        // ========== 防重复提交检查 ==========
         if (!window.APP._acquirePaymentLock(orderId + '_principal')) {
             alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
@@ -730,7 +733,6 @@ const PaymentsModule = {
             var remainingAfter = remainingPrincipal - actualAmount;
             var isFullSettlement = remainingAfter <= 0;
             
-            // ========== 幂等性检查 ==========
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'principal', actualAmount, target);
             if (isDuplicate) {
                 alert(lang === 'id' 
@@ -766,7 +768,6 @@ const PaymentsModule = {
 
             if (!confirm(previewMsg)) return;
             
-            // 保存原始状态用于补偿回滚
             var originalOrderState = {
                 principal_paid: order.principal_paid,
                 principal_remaining: order.principal_remaining,
@@ -777,24 +778,23 @@ const PaymentsModule = {
             };
             
             var orderInternalId = order.id;
-            var paymentDate = new Date().toISOString().split('T')[0];
+            var paymentDate = Utils.getLocalToday();
             var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
             
             try {
-                // 步骤1：更新订单
                 var newPrincipalPaid = principalPaid + actualAmount;
                 var newPrincipalRemaining = loanAmount - newPrincipalPaid;
                 
                 var updates = { 
                     principal_paid: newPrincipalPaid, 
                     principal_remaining: newPrincipalRemaining,
-                    updated_at: new Date().toISOString()
+                    updated_at: Utils.getLocalDateTime()
                 };
                 
                 if (isFullSettlement) {
                     updates.status = 'completed';
                     updates.monthly_interest = 0;
-                    updates.completed_at = new Date().toISOString();
+                    updates.completed_at = Utils.getLocalDateTime();
                 } else {
                     updates.monthly_interest = newPrincipalRemaining * monthlyRate;
                 }
@@ -806,7 +806,6 @@ const PaymentsModule = {
                 
                 if (updateError) throw new Error('更新订单失败: ' + updateError.message);
                 
-                // 步骤2：插入付款记录
                 const paymentData = {
                     order_id: orderInternalId,
                     date: paymentDate,
@@ -822,11 +821,10 @@ const PaymentsModule = {
                     .insert(paymentData);
                 
                 if (paymentError) {
-                    await this._rollbackOrder(orderId, originalOrderState);
+                    await window.APP._rollbackOrder(orderId, originalOrderState);
                     throw new Error('插入付款记录失败: ' + paymentError.message);
                 }
                 
-                // 步骤3：记录资金流水
                 await SUPABASE.recordCashFlow({
                     store_id: order.store_id,
                     flow_type: 'principal',
@@ -839,7 +837,6 @@ const PaymentsModule = {
                     reference_id: order.order_id
                 });
                 
-                // 审计
                 if (window.Audit) {
                     await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
                 }
@@ -859,7 +856,7 @@ const PaymentsModule = {
                 
             } catch (error) {
                 console.error('payPrincipalWithMethod 事务失败:', error);
-                await this._rollbackPaymentHistory(orderInternalId, 'principal', actualAmount, paymentDate);
+                await window.APP._rollbackPaymentHistory(orderInternalId, 'principal', actualAmount, paymentDate);
                 alert(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
             
@@ -874,12 +871,11 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 固定还款（防重复提交 + 幂等性 + 补偿事务） ==========
+    // ========== 固定还款（防重复提交 + 幂等性 + 时区统一） ==========
     payFixedInstallment: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
         
-        // ========== 防重复提交检查 ==========
         if (!window.APP._acquirePaymentLock(orderId + '_fixed')) {
             alert(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
@@ -893,7 +889,6 @@ const PaymentsModule = {
             var orderBefore = await SUPABASE.getOrder(orderId);
             var fixedPaymentBefore = orderBefore.monthly_fixed_payment || 0;
             
-            // ========== 幂等性检查 ==========
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'fixed_installment', fixedPaymentBefore, method);
             if (isDuplicate) {
                 alert(lang === 'id' 
@@ -903,7 +898,6 @@ const PaymentsModule = {
                 return;
             }
             
-            // 保存原始状态
             var originalOrderState = {
                 principal_paid: orderBefore.principal_paid,
                 principal_remaining: orderBefore.principal_remaining,
@@ -935,7 +929,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 提前结清（防重复提交 + 幂等性 + 补偿事务） ==========
+    // ========== 提前结清（防重复提交 + 幂等性 + 时区统一） ==========
     earlySettleFixedOrder: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
@@ -953,7 +947,6 @@ const PaymentsModule = {
             var orderBefore = await SUPABASE.getOrder(orderId);
             var remainingPrincipal = orderBefore.principal_remaining || orderBefore.loan_amount || 0;
             
-            // ========== 幂等性检查 ==========
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'early_settlement', remainingPrincipal, method);
             if (isDuplicate) {
                 alert(lang === 'id' 
@@ -1004,7 +997,7 @@ const PaymentsModule = {
 
             var completedAt = order.completed_at
                 ? Utils.formatDate(order.completed_at)
-                : new Date().toLocaleDateString(lang === 'id' ? 'id-ID' : 'zh-CN');
+                : Utils.formatDate(Utils.getLocalToday());
 
             var safeOrderId = Utils.escapeHtml(order.order_id);
             var safeCustomer = Utils.escapeHtml(order.customer_name);
