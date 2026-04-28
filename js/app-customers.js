@@ -1,4 +1,4 @@
-// app-customers.js - v3.0（客户列表重构：新表格结构 + 详情弹窗卡片）
+// app-customers.js - v1.0
 window.APP = window.APP || {};
 
 const CustomersModule = {
@@ -30,8 +30,8 @@ const CustomersModule = {
                     var c = customers[i];
                     var customerId = Utils.escapeHtml(c.customer_id || '-');
                     var name = Utils.escapeHtml(c.name);
-                    var ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
                     var phone = Utils.escapeHtml(c.phone || '-');
+                    var ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
                     var occupation = Utils.escapeHtml(c.occupation || '-');
                     
                     rows += '<tr class="data-row">' +
