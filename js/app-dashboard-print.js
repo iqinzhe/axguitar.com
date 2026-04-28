@@ -1,4 +1,6 @@
-// app-dashboard-print.js - v1.0
+// app-dashboard-print.js - v1.1
+// 修改内容：简化 Toast 调用，统一使用 Utils.toast
+
 window.APP = window.APP || {};
 
 const DashboardPrint = {
