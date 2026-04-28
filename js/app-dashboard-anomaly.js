@@ -1,5 +1,4 @@
-// app-dashboard-anomaly.js - v1.0 
-
+// app-dashboard-anomaly.js - v1.1 (修复 var 变量提升问题)
 window.APP = window.APP || {};
 
 // ==================== 异常检测缓存模块（增强版：自动清理 + LRU） ====================
@@ -271,32 +270,32 @@ const AnomalyHelper = {
             return { top3: [], bottom3: [] };
         }
         
-        for (const s of eligibleStores) {
-            s.rankSum = 0;
+        for (let idx = 0; idx < eligibleStores.length; idx++) {
+            eligibleStores[idx].rankSum = 0;
         }
         
         eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankOrderCount = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
+        for (let idx = 0; idx < eligibleStores.length; idx++) {
+            eligibleStores[idx].rankOrderCount = idx + 1;
+            eligibleStores[idx].rankSum += (idx + 1);
         }
         
         eligibleStores.sort((a, b) => a.totalLoanOutflow - b.totalLoanOutflow);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankLoanOutflow = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
+        for (let idx = 0; idx < eligibleStores.length; idx++) {
+            eligibleStores[idx].rankLoanOutflow = idx + 1;
+            eligibleStores[idx].rankSum += (idx + 1);
         }
         
         eligibleStores.sort((a, b) => a.badOrders - b.badOrders);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankBadOrders = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
+        for (let idx = 0; idx < eligibleStores.length; idx++) {
+            eligibleStores[idx].rankBadOrders = idx + 1;
+            eligibleStores[idx].rankSum += (idx + 1);
         }
         
         eligibleStores.sort((a, b) => b.totalRecovery - a.totalRecovery);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankRecovery = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
+        for (let idx = 0; idx < eligibleStores.length; idx++) {
+            eligibleStores[idx].rankRecovery = idx + 1;
+            eligibleStores[idx].rankSum += (idx + 1);
         }
         
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
@@ -358,8 +357,8 @@ const DashboardAnomaly = {
                     '</div>';
             } else {
                 var overdueRows = '';
-                for (var i = 0; i < overdueOrders.length; i++) {
-                    var o = overdueOrders[i];
+                for (let overdueIdx = 0; overdueIdx < overdueOrders.length; overdueIdx++) {
+                    var o = overdueOrders[overdueIdx];
                     var customerName = o.customer_name || '-';
                     overdueRows += '<tr>' +
                         '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
@@ -410,8 +409,8 @@ const DashboardAnomaly = {
                     '</div>';
             } else {
                 var blacklistRows = '';
-                for (var i = 0; i < blacklist.length; i++) {
-                    var b = blacklist[i];
+                for (let blIdx = 0; blIdx < blacklist.length; blIdx++) {
+                    var b = blacklist[blIdx];
                     blacklistRows += '<tr>' +
                         '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
@@ -501,7 +500,9 @@ const DashboardAnomaly = {
                 return;
             }
             
-            // ========== 总部视图 ==========
+            // ========== 总部视图：门店排名渲染 ==========
+            
+            // top3 渲染 —— 使用 let 避免变量提升混淆
             var top3Html = '';
             if (top3.length === 0) {
                 top3Html = '' +
@@ -511,11 +512,11 @@ const DashboardAnomaly = {
                     '</div>';
             } else {
                 var top3Items = '';
-                for (var i = 0; i < top3.length; i++) {
-                    var s = top3[i];
-                    var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+                for (let topIdx = 0; topIdx < top3.length; topIdx++) {
+                    var s = top3[topIdx];
+                    var medal = topIdx === 0 ? '🥇' : topIdx === 1 ? '🥈' : '🥉';
                     top3Items += '' +
-                        '<div class="ranking-item ' + (i === 0 ? 'first' : '') + '">' +
+                        '<div class="ranking-item ' + (topIdx === 0 ? 'first' : '') + '">' +
                             '<div class="ranking-number">' + medal + '</div>' +
                             '<div class="ranking-info">' +
                                 '<span class="ranking-name">' + Utils.escapeHtml(s.name) + '</span>' +
@@ -532,6 +533,7 @@ const DashboardAnomaly = {
                 top3Html = '<div class="ranking-list">' + top3Items + '</div>';
             }
             
+            // bottom3 渲染 —— 使用独立的 let 变量，与 top3 循环完全隔离
             var bottom3Html = '';
             if (bottom3.length === 0) {
                 bottom3Html = '' +
@@ -541,21 +543,21 @@ const DashboardAnomaly = {
                     '</div>';
             } else {
                 var bottom3Items = '';
-                for (var i = 0; i < bottom3.length; i++) {
-                    var s = bottom3[i];
-                    var mark = i === 0 ? '🔴' : i === 1 ? '🟡' : '🟠';
+                for (let bottomIdx = 0; bottomIdx < bottom3.length; bottomIdx++) {
+                    var store = bottom3[bottomIdx];
+                    var mark = bottomIdx === 0 ? '🔴' : bottomIdx === 1 ? '🟡' : '🟠';
                     bottom3Items += '' +
-                        '<div class="ranking-item ' + (i === 0 ? 'last' : '') + '">' +
+                        '<div class="ranking-item ' + (bottomIdx === 0 ? 'last' : '') + '">' +
                             '<div class="ranking-number">' + mark + '</div>' +
                             '<div class="ranking-info">' +
-                                '<span class="ranking-name">' + Utils.escapeHtml(s.name) + '</span>' +
-                                '<span class="ranking-code">' + Utils.escapeHtml(s.code) + '</span>' +
+                                '<span class="ranking-name">' + Utils.escapeHtml(store.name) + '</span>' +
+                                '<span class="ranking-code">' + Utils.escapeHtml(store.code) + '</span>' +
                             '</div>' +
                             '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
-                                (lang === 'id' ? '订单: ' : '订单: ') + s.orderCount + '<br>' +
-                                (lang === 'id' ? '放款: ' : '放款: ') + Utils.formatCurrency(s.totalLoanOutflow) + '<br>' +
-                                (lang === 'id' ? '不良: ' : '不良: ') + s.badOrders + '<br>' +
-                                (lang === 'id' ? '回收: ' : '回收: ') + Utils.formatCurrency(s.totalRecovery) +
+                                (lang === 'id' ? '订单: ' : '订单: ') + store.orderCount + '<br>' +
+                                (lang === 'id' ? '放款: ' : '放款: ') + Utils.formatCurrency(store.totalLoanOutflow) + '<br>' +
+                                (lang === 'id' ? '不良: ' : '不良: ') + store.badOrders + '<br>' +
+                                (lang === 'id' ? '回收: ' : '回收: ') + Utils.formatCurrency(store.totalRecovery) +
                             '</div>' +
                         '</div>';
                 }
@@ -666,8 +668,8 @@ const DashboardAnomaly = {
             var result = await AnomalyHelper.getOverdueOrders(state.profile, nextPage, state.pageSize);
             
             var newRows = '';
-            for (var i = 0; i < result.data.length; i++) {
-                var o = result.data[i];
+            for (let loadIdx = 0; loadIdx < result.data.length; loadIdx++) {
+                var o = result.data[loadIdx];
                 var customerName = o.customer_name || '-';
                 newRows += '<tr>' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
@@ -742,8 +744,8 @@ const DashboardAnomaly = {
             var result = await AnomalyHelper.getBlacklistCustomers(nextPage, state.pageSize);
             
             var newRows = '';
-            for (var i = 0; i < result.data.length; i++) {
-                var b = result.data[i];
+            for (let loadIdx = 0; loadIdx < result.data.length; loadIdx++) {
+                var b = result.data[loadIdx];
                 newRows += '<tr>' +
                     '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
                     '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
