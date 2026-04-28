@@ -850,3 +850,128 @@ window.Utils = window.Utils || {};
 async function createOrderWithOfflineSupport(orderData) {
     return Utils.wrapWithOfflineSupport(Order.create, 'createOrder')(orderData);
 }
+
+// ==================== 时区统一的日期函数（印尼 UTC+7） ====================
+
+/**
+ * 获取当前本地日期（印尼时区 UTC+7）
+ * @returns {string} YYYY-MM-DD 格式的本地日期
+ */
+Utils.getLocalToday = function() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+/**
+ * 获取当前本地日期时间（印尼时区 UTC+7）
+ * @returns {string} ISO 格式的本地日期时间字符串
+ */
+Utils.getLocalDateTime = function() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000+07:00`;
+};
+
+/**
+ * 将任意日期字符串转换为本地日期 YYYY-MM-DD
+ * @param {string|Date} dateInput - 日期输入
+ * @returns {string} YYYY-MM-DD 格式的本地日期
+ */
+Utils.toLocalDate = function(dateInput) {
+    if (!dateInput) return Utils.getLocalToday();
+    
+    let date;
+    if (typeof dateInput === 'string') {
+        // 处理 ISO 格式字符串
+        if (dateInput.includes('T')) {
+            // 提取日期部分，避免时区转换
+            const parts = dateInput.split('T')[0].split('-');
+            if (parts.length === 3) {
+                return `${parts[0]}-${parts[1]}-${parts[2]}`;
+            }
+        }
+        date = new Date(dateInput);
+    } else {
+        date = dateInput;
+    }
+    
+    if (isNaN(date.getTime())) {
+        console.warn('Utils.toLocalDate: 无效日期', dateInput);
+        return Utils.getLocalToday();
+    }
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+/**
+ * 格式化日期显示（根据语言）
+ * @param {string} dateStr - 日期字符串
+ * @returns {string} 格式化后的日期
+ */
+Utils.formatDate = function(dateStr) {
+    if (!dateStr) return '-';
+    
+    // 尝试解析为本地日期
+    const localDate = Utils.toLocalDate(dateStr);
+    if (localDate === '-') return '-';
+    
+    const parts = localDate.split('-');
+    if (parts.length !== 3) return dateStr;
+    
+    const year = parts[0];
+    const month = parts[1];
+    const day = parts[2];
+    
+    if (Utils.lang === 'id') {
+        return `${day}/${month}/${year}`;
+    }
+    return `${year}-${month}-${day}`;
+};
+
+/**
+ * 计算下一个到期日（基于本地时区）
+ * @param {string} startDate - 开始日期 YYYY-MM-DD
+ * @param {number} paidMonths - 已付月数
+ * @returns {string} 下一个到期日 YYYY-MM-DD
+ */
+Utils.calculateNextDueDate = function(startDate, paidMonths) {
+    let start = startDate || Utils.getLocalToday();
+    
+    // 确保日期是本地格式
+    const parts = start.split('-');
+    if (parts.length !== 3) {
+        start = Utils.getLocalToday();
+    }
+    
+    let date = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+    if (isNaN(date.getTime())) {
+        date = new Date();
+    }
+    
+    const originalDay = date.getUTCDate();
+    date.setUTCMonth(date.getUTCMonth() + paidMonths + 1);
+    
+    if (date.getUTCDate() !== originalDay) {
+        date.setUTCDate(0);
+    }
+    
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+};
+
+// 覆盖原有的 Utils.formatDate
+Utils.formatDate = Utils.formatDate.bind(Utils);
