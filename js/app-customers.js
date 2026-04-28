@@ -1,4 +1,4 @@
-// app-customers.js - v1.0 (修复：返回键统一右上角)
+// app-customers.js - v1.0 
 window.APP = window.APP || {};
 
 const CustomersModule = {
