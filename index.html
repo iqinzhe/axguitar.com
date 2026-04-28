@@ -32,350 +32,87 @@
     </div>
 </div>
 
-<!-- ===== 第三方库 ===== -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- ========== 脚本加载顺序（重要！请勿调整） ========== -->
+    <!-- 1. 基础库（同步） -->
+    <script src="lib/supabase-js@2.js"></script>
 
-<!-- ====== 核心模块（按依赖顺序加载） ====== -->
+    <!-- 2. 核心模块（defer，按依赖顺序排列） -->
+    <script defer src="js/utils.js"></script>           <!-- 工具类，无依赖 -->
+    <script defer src="js/toast.js"></script>          <!-- Toast 通知，依赖 utils -->
+    <script defer src="js/auth.js"></script>           <!-- 认证模块，依赖 utils -->
+    <script defer src="js/supabase.js"></script>       <!-- 数据层，依赖 auth, utils -->
+    <script defer src="js/permission.js"></script>     <!-- 权限模块，依赖 auth -->
+    <script defer src="js/audit.js"></script>          <!-- 审计日志，依赖 auth, supabase -->
+    <script defer src="js/order.js"></script>          <!-- 订单模块，依赖 supabase, utils -->
+    <script defer src="js/store.js"></script>          <!-- 门店管理，依赖 supabase -->
+    <script defer src="js/storage.js"></script>        <!-- 备份恢复，依赖 supabase, audit -->
+    <script defer src="js/migration.js"></script>      <!-- 数据迁移，依赖 supabase -->
 
-<!-- 
-  加载顺序说明：
-  1. toast.js        - 通知系统（最先加载，提供 Toast 全局对象）
-  2. utils.js        - 工具函数（依赖语言、格式化等）
-  3. supabase.js     - 数据库客户端（依赖 Utils）
-  4. auth.js         - 认证模块（依赖 Utils, SUPABASE）
-  5. permission.js   - 权限管理（依赖 AUTH）
-  6. order.js        - 订单模块（依赖 SUPABASE, Utils）
-  7. store.js        - 门店管理（依赖 SUPABASE, Utils）
-  8. storage.js      - 备份恢复（依赖 SUPABASE, Utils, Audit）
-  9. audit.js        - 审计日志（依赖 AUTH, SUPABASE）
-  10. migration.js   - 数据迁移（依赖 SUPABASE, Utils）
--->
+    <!-- 3. 页面组件模块（defer，依赖核心模块） -->
+    <script defer src="js/app-dashboard-core.js"></script>     <!-- 核心仪表盘 -->
+    <script defer src="js/app-dashboard-anomaly.js"></script>  <!-- 异常检测 -->
+    <script defer src="js/app-dashboard-expenses.js"></script> <!-- 支出管理 -->
+    <script defer src="js/app-dashboard-funds.js"></script>    <!-- 资金管理 -->
+    <script defer src="js/app-dashboard-orders.js"></script>   <!-- 订单管理 -->
+    <script defer src="js/app-dashboard-print.js"></script>    <!-- 打印功能 -->
+    <script defer src="js/app-dashboard-users.js"></script>    <!-- 用户管理 -->
+    <script defer src="js/app-dashboard-wa.js"></script>       <!-- WA提醒 -->
+    <script defer src="js/app-customers.js"></script>          <!-- 客户管理 -->
+    <script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
+    <script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
+    <script defer src="js/cache.js"></script>                  <!-- 统一缓存模块 -->
 
-<!-- 第一层：基础工具（同步加载，确保立即可用） -->
-<script src="js/toast.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/supabase.js"></script>
-
-<!-- 第二层：认证与权限 -->
-<script src="js/auth.js"></script>
-<script src="js/permission.js"></script>
-
-<!-- 第三层：业务核心模块 -->
-<script src="js/order.js"></script>
-<script src="js/store.js"></script>
-<script src="js/storage.js"></script>
-<script src="js/audit.js"></script>
-<script src="js/migration.js"></script>
-
-<!-- 第四层：功能模块 -->
-<script src="js/app-blacklist.js"></script>
-<script src="js/app-customers.js"></script>
-<script src="js/app-payments.js"></script>
-
-<!-- 第五层：仪表盘子模块（使用 defer 延迟执行，不阻塞页面渲染） -->
-<script src="js/app-dashboard-anomaly.js" defer></script>
-<script src="js/app-dashboard-funds.js" defer></script>
-<script src="js/app-dashboard-users.js" defer></script>
-<script src="js/app-dashboard-wa.js" defer></script>
-<script src="js/app-dashboard-print.js" defer></script>
-<script src="js/app-dashboard-orders.js" defer></script>
-<script src="js/app-dashboard-expenses.js" defer></script>
-
-<!-- 第六层：仪表盘核心模块（最后加载） -->
-<script src="js/app-dashboard-core.js" defer></script>
-
-<!-- ===== 网络断开提醒 ===== -->
-<script>
-(function() {
-    'use strict';
-    
-    function getLang() {
-        return (navigator.language && navigator.language.startsWith('id')) ? 'id' : 'zh';
-    }
-    
-    function showOfflineBanner() {
-        var existing = document.getElementById('offlineBanner');
-        if (existing) return;
-        
-        var banner = document.createElement('div');
-        banner.id = 'offlineBanner';
-        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:10px;z-index:10000;font-size:14px;';
-        banner.innerHTML = '⚠️ ' + (getLang() === 'id' ? 'Koneksi terputus. Data mungkin tidak tersimpan.' : '网络连接已断开，数据可能无法保存。');
-        document.body.insertBefore(banner, document.body.firstChild);
-    }
-    
-    function hideOfflineBanner() {
-        var banner = document.getElementById('offlineBanner');
-        if (banner) banner.remove();
-    }
-    
-    window.addEventListener('offline', showOfflineBanner);
-    window.addEventListener('online', hideOfflineBanner);
-    
-    if (!navigator.onLine) showOfflineBanner();
-})();
-</script>
-
-<!-- ==================== 初始化脚本 ==================== -->
-<script>
-(function() {
-    'use strict';
-    
-    var loadingTimeout = null;
-    var startTime = Date.now();
-    var maxLoadingTime = 20000; // 20秒超时
-    
-    // 获取语言
-    function getLang() {
-        return (navigator.language && navigator.language.startsWith('id')) ? 'id' : 'zh';
-    }
-    
-    // ========== 关键修复：刷新前保存当前页面状态 ==========
-    // 在页面关闭/刷新前保存当前状态
-    function saveStateBeforeUnload() {
-        try {
-            // 如果 APP 已初始化，保存当前页面
-            if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
-                window.APP.saveCurrentPageState();
-                console.log('[State] 页面关闭前已保存状态');
-            }
-        } catch(e) {
-            console.warn('[State] 保存状态失败:', e);
-        }
-    }
-    
-    // 监听页面关闭/刷新事件（beforeunload + visibilitychange 双保险）
-    window.addEventListener('beforeunload', function() {
-        saveStateBeforeUnload();
-    });
-    
-    // visibilitychange：在移动端或某些浏览器中 beforeunload 不触发时的备用保存机制
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'hidden') {
-            saveStateBeforeUnload();
-        }
-    });
-    
-    // pagehide：Safari/iOS 的 beforeunload 替代方案
-    window.addEventListener('pagehide', function() {
-        saveStateBeforeUnload();
-    });
-    
-    // ========== 恢复上次浏览的页面 ==========
-    function getStoredPageState() {
-        try {
-            // 优先从 sessionStorage 读取
-            var page = sessionStorage.getItem('jf_current_page');
-            var filter = sessionStorage.getItem('jf_current_filter') || 'all';
-            var orderId = sessionStorage.getItem('jf_current_order_id');
-            var customerId = sessionStorage.getItem('jf_current_customer_id');
-            
-            // 如果 sessionStorage 没有，从 localStorage 读取（备份）
-            if (!page) {
-                page = localStorage.getItem('jf_last_page');
-                filter = localStorage.getItem('jf_last_filter') || 'all';
-                orderId = localStorage.getItem('jf_last_order_id');
-                customerId = localStorage.getItem('jf_last_customer_id');
-            }
-            
-            // 验证页面是否有效（不能是登录页）
-            var validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
-                              'anomaly', 'userManagement', 'storeManagement', 'expenses', 
-                              'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
-                              'customerPaymentHistory', 'blacklist'];
-            
-            if (page && validPages.includes(page) && page !== 'login') {
-                console.log('[State] 恢复页面:', page, '订单ID:', orderId, '客户ID:', customerId);
-                return { page: page, filter: filter, orderId: orderId, customerId: customerId };
-            }
-        } catch(e) {
-            console.warn('[State] 读取存储状态失败:', e);
-        }
-        return { page: null, filter: 'all', orderId: null, customerId: null };
-    }
-    
-    // 将恢复的状态存储到全局变量，供 APP 使用
-    window._RESTORED_STATE = getStoredPageState();
-    
-    // 更新加载状态文字
-    function updateLoadingStatus(message) {
-        var statusEl = document.getElementById('loadingStatus');
-        if (statusEl) statusEl.textContent = message;
-    }
-    
-    // 显示错误页面
-    function showError(message) {
-        var app = document.getElementById('app');
-        if (!app) return;
-        
-        var isId = getLang() === 'id';
-        app.innerHTML = '' +
-            '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8fafc;padding:20px;">' +
-                '<div style="max-width:420px;width:100%;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.1);padding:32px;text-align:center;">' +
-                    '<div style="font-size:48px;margin-bottom:16px;">⚠️</div>' +
-                    '<h3 style="margin:0 0 12px 0;font-size:18px;color:#1e293b;">' + (isId ? 'Error Sistem' : '系统错误') + '</h3>' +
-                    '<p style="margin:0 0 20px 0;color:#64748b;font-size:14px;line-height:1.5;white-space:pre-wrap;">' + escapeHtml(message) + '</p>' +
-                    '<button onclick="location.reload()" style="padding:10px 24px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">' +
-                        (isId ? '🔄 Muat Ulang' : '🔄 刷新页面') +
-                    '</button>' +
-                    '<details style="margin-top:16px;text-align:left;">' +
-                        '<summary style="cursor:pointer;color:#64748b;font-size:12px;">' + (isId ? 'Detail Teknis' : '技术详情') + '</summary>' +
-                        '<pre style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;font-size:11px;overflow:auto;">' + escapeHtml(navigator.userAgent) + '\n\nStored page: ' + (window._RESTORED_STATE?.page || 'none') + '</pre>' +
-                    '</details>' +
-                '</div>' +
-            '</div>';
-    }
-    
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    
-    // 检查核心模块是否加载
-    function checkCoreModules() {
-        var required = ['Toast', 'Utils', 'SUPABASE', 'AUTH', 'PERMISSION'];
-        var missing = [];
-        for (var i = 0; i < required.length; i++) {
-            if (typeof window[required[i]] === 'undefined') {
-                missing.push(required[i]);
-            }
-        }
-        return { allLoaded: missing.length === 0, missing: missing };
-    }
-    
-    // 等待核心模块加载完成
-    function waitForCoreModules() {
-        return new Promise(function(resolve) {
-            var maxAttempts = 100;
-            var attempt = 0;
-            
-            function check() {
-                var status = checkCoreModules();
-                if (status.allLoaded) {
-                    console.log('✅ 核心模块加载完成');
-                    resolve(true);
-                    return;
-                }
-                
-                attempt++;
-                if (attempt >= maxAttempts) {
-                    console.warn('⚠️ 核心模块加载超时:', status.missing);
-                    resolve(false);
-                    return;
-                }
-                
-                setTimeout(check, 100);
-            }
-            
-            check();
-        });
-    }
-    
-    // 初始化应用
-    async function initApp() {
-        updateLoadingStatus(getLang() === 'id' ? 'Memuat modul...' : '加载模块中...');
-        
-        var modulesReady = await waitForCoreModules();
-        
-        if (!modulesReady) {
-            var missingMsg = getLang() === 'id' 
-                ? 'Modul inti gagal dimuat: ' + checkCoreModules().missing.join(', ')
-                : '核心模块加载失败: ' + checkCoreModules().missing.join(', ');
-            showError(missingMsg);
-            return;
-        }
-        
-        if (typeof window.APP === 'undefined') {
-            console.error('APP module not loaded');
-            showError(getLang() === 'id' 
-                ? 'Modul utama APP tidak ditemukan.'
-                : '主模块 APP 未找到。');
-            return;
-        }
-        
-        if (typeof window.APP.init !== 'function') {
-            console.error('APP.init is not a function');
-            showError(getLang() === 'id'
-                ? 'Fungsi init APP tidak tersedia.'
-                : 'APP.init 函数不可用。');
-            return;
-        }
-        
-        if (loadingTimeout) {
-            clearTimeout(loadingTimeout);
-            loadingTimeout = null;
-        }
-        
-        updateLoadingStatus(getLang() === 'id' ? 'Memulai sistem...' : '启动系统中...');
-        
-        // 延迟启动，确保所有 defer 脚本执行完毕
-        setTimeout(function() {
+    <!-- 4. 主入口（defer，在所有模块之后） -->
+    <script defer>
+        // 页面恢复状态存储（在 APP 加载前设置）
+        (function() {
             try {
-                console.log('✅ 所有模块加载完成，初始化 APP...');
-                console.log('[State] 恢复的状态:', window._RESTORED_STATE);
+                var savedPage = sessionStorage.getItem('jf_current_page');
+                var savedFilter = sessionStorage.getItem('jf_current_filter') || "all";
+                var savedOrderId = sessionStorage.getItem('jf_current_order_id');
+                var savedCustomerId = sessionStorage.getItem('jf_current_customer_id');
                 
-                // 将恢复的状态传递给 APP
-                if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
-                    // 设置 APP 的初始状态
-                    if (window.APP) {
-                        window.APP.currentPage = window._RESTORED_STATE.page;
-                        window.APP.currentFilter = window._RESTORED_STATE.filter || 'all';
-                        window.APP.currentOrderId = window._RESTORED_STATE.orderId || null;
-                        window.APP.currentCustomerId = window._RESTORED_STATE.customerId || null;
-                        console.log('[State] 已设置 APP 初始状态:', window.APP.currentPage);
-                    }
+                // 如果 sessionStorage 没有，从 localStorage 恢复
+                if (!savedPage) {
+                    savedPage = localStorage.getItem('jf_last_page');
+                    savedFilter = localStorage.getItem('jf_last_filter') || "all";
+                    savedOrderId = localStorage.getItem('jf_last_order_id');
+                    savedCustomerId = localStorage.getItem('jf_last_customer_id');
                 }
                 
+                // 验证页面是否有效
+                var validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
+                                  'anomaly', 'userManagement', 'storeManagement', 'expenses', 
+                                  'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
+                                  'customerPaymentHistory', 'blacklist'];
+                
+                if (savedPage && validPages.includes(savedPage) && savedPage !== 'login') {
+                    window._RESTORED_STATE = {
+                        page: savedPage,
+                        filter: savedFilter,
+                        orderId: savedOrderId,
+                        customerId: savedCustomerId
+                    };
+                    console.log('[Init] 页面恢复状态已设置:', savedPage);
+                }
+            } catch(e) {
+                console.warn('[Init] 读取恢复状态失败:', e);
+            }
+        })();
+        
+        // 启动应用（等待所有模块加载完成后）
+        document.addEventListener('DOMContentLoaded', function() {
+            // 确保 APP 对象存在
+            if (typeof window.APP === 'undefined') {
+                window.APP = {};
+            }
+            // 启动应用
+            if (typeof window.APP.init === 'function') {
                 window.APP.init();
-            } catch (err) {
-                console.error('Init error:', err);
-                showError(getLang() === 'id'
-                    ? 'Gagal memulai aplikasi: ' + err.message
-                    : '启动应用失败: ' + err.message);
+            } else {
+                console.error('[Init] APP.init 未定义，请检查模块加载顺序');
             }
-        }, 100);
-    }
-    
-    // 设置超时处理
-    function setupTimeout() {
-        loadingTimeout = setTimeout(function() {
-            var elapsed = Date.now() - startTime;
-            if (elapsed >= maxLoadingTime) {
-                console.error('Loading timeout after ' + elapsed + 'ms');
-                var status = checkCoreModules();
-                if (!status.allLoaded) {
-                    showError(getLang() === 'id'
-                        ? '⏳ Waktu muat habis. Modul yang belum dimuat: ' + status.missing.join(', ')
-                        : '⏳ 加载超时。未加载的模块: ' + status.missing.join(', '));
-                } else if (typeof window.APP === 'undefined') {
-                    showError(getLang() === 'id'
-                        ? '⏳ Waktu muat habis. Modul APP tidak ditemukan.'
-                        : '⏳ 加载超时。APP 模块未找到。');
-                } else {
-                    showError(getLang() === 'id'
-                        ? '⏳ Waktu muat habis. Silakan muat ulang halaman.'
-                        : '⏳ 加载超时，请刷新页面重试。');
-                }
-            }
-        }, maxLoadingTime);
-    }
-    
-    // DOM 加载完成后启动
-    document.addEventListener('DOMContentLoaded', function() {
-        setupTimeout();
-        initApp();
-    });
-    
-    if (document.readyState !== 'loading') {
-        setupTimeout();
-        initApp();
-    }
-})();
-</script>
+        });
+    </script>
 </body>
 </html>
