@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.4（修复：刷新后停留当前页面 + Toast 集成 + 状态持久化增强）
+// app-dashboard-core.js - v1.5（修复：刷新后停留当前页面 + Toast 集成 + 状态持久化增强）
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -364,6 +364,7 @@ const DashboardCore = {
     // ========== 页面状态持久化（刷新后停留当前页面） ==========
     saveCurrentPageState: function() {
         try {
+            // 保存到 sessionStorage（当前会话）
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
             sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
             if (this.currentOrderId) {
@@ -376,7 +377,8 @@ const DashboardCore = {
             } else {
                 sessionStorage.removeItem('jf_current_customer_id');
             }
-            // 额外保存到 localStorage 作为备份
+            
+            // 保存到 localStorage（持久化，跨会话）
             localStorage.setItem('jf_last_page', this.currentPage);
             localStorage.setItem('jf_last_filter', this.currentFilter);
             if (this.currentOrderId) {
@@ -389,7 +391,12 @@ const DashboardCore = {
             } else {
                 localStorage.removeItem('jf_last_customer_id');
             }
-            console.log('[State] 已保存页面状态:', this.currentPage);
+            
+            localStorage.setItem('jf_last_save_time', Date.now().toString());
+            
+            console.log('[State] 已保存页面状态:', this.currentPage, 
+                        '订单ID:', this.currentOrderId, 
+                        '客户ID:', this.currentCustomerId);
         } catch(e) {
             console.warn('[State] 保存状态失败:', e);
         }
@@ -397,6 +404,7 @@ const DashboardCore = {
     
     restorePageState: function() {
         try {
+            // 优先从 sessionStorage 读取
             let page = sessionStorage.getItem('jf_current_page');
             let filter = sessionStorage.getItem('jf_current_filter') || "all";
             let orderId = sessionStorage.getItem('jf_current_order_id');
@@ -478,7 +486,7 @@ const DashboardCore = {
         }, 5000);
     },
 
-    // ========== 修复：init 方法 - 优先使用 HTML 传递的状态 ==========
+    // ========== init 方法 - 修复：刷新后停留当前页面 ==========
     init: async function() {
         var lang = Utils.lang || 'zh';
         
@@ -491,6 +499,7 @@ const DashboardCore = {
         Utils.ErrorHandler.init();
         ModuleFallback.clearAll();
         
+        // 显示加载界面
         document.getElementById("app").innerHTML = '' +
             '<div class="loading-container">' +
                 '<div class="loader"></div>' +
@@ -499,83 +508,118 @@ const DashboardCore = {
                 '</p>' +
             '</div>';
         
+        // 设置超时
+        var initTimeout = setTimeout(function() {
+            var currentLang = Utils.lang || 'zh';
+            var timeoutDiv = document.getElementById('initTimeout');
+            if (!timeoutDiv) {
+                var div = document.createElement('div');
+                div.id = 'initTimeout';
+                div.className = 'info-bar warning';
+                div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;max-width:400px;text-align:center;';
+                div.innerHTML = '' +
+                    '<div class="info-bar-content">' +
+                        '<strong>' + (currentLang === 'id' ? '⏳ Memuat terlalu lama' : '⏳ 加载超时') + '</strong>' +
+                        '<p>' + (currentLang === 'id' 
+                            ? 'Sistem membutuhkan waktu lebih lama dari biasanya. Silakan periksa koneksi internet Anda dan muat ulang halaman.'
+                            : '系统加载时间超过预期，请检查网络连接后刷新页面重试。') + '</p>' +
+                        '<button onclick="location.reload()" style="margin-top:8px;padding:6px 16px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer;">' +
+                            (currentLang === 'id' ? '🔄 Muat Ulang' : '🔄 刷新页面') +
+                        '</button>' +
+                    '</div>';
+                document.getElementById("app").appendChild(div);
+            }
+        }, 15000);
+        
         try {
-            await AUTH.init();
+            // ========== 关键：在 AUTH.init 之前读取要恢复的页面 ==========
+            let targetPage = null;
+            let targetFilter = 'all';
+            let targetOrderId = null;
+            let targetCustomerId = null;
             
-            var initTimeout = setTimeout(function() {
-                var currentLang = Utils.lang || 'zh';
-                var timeoutDiv = document.getElementById('initTimeout');
-                if (!timeoutDiv) {
-                    var div = document.createElement('div');
-                    div.id = 'initTimeout';
-                    div.className = 'info-bar warning';
-                    div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;max-width:400px;text-align:center;';
-                    div.innerHTML = '' +
-                        '<div class="info-bar-content">' +
-                            '<strong>' + (currentLang === 'id' ? '⏳ Memuat terlalu lama' : '⏳ 加载超时') + '</strong>' +
-                            '<p>' + (currentLang === 'id' 
-                                ? 'Sistem membutuhkan waktu lebih lama dari biasanya. Silakan periksa koneksi internet Anda dan muat ulang halaman.'
-                                : '系统加载时间超过预期，请检查网络连接后刷新页面重试。') + '</p>' +
-                            '<button onclick="location.reload()" style="margin-top:8px;padding:6px 16px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer;">' +
-                                (currentLang === 'id' ? '🔄 Muat Ulang' : '🔄 刷新页面') +
-                            '</button>' +
-                        '</div>';
-                    document.getElementById("app").appendChild(div);
-                }
-            }, 15000);
-            
-            // ========== 关键修复：刷新后停留当前页面 ==========
-            // 优先使用从 HTML 传递过来的恢复状态（由 index.html 在 APP 加载前设置）
-            var savedState = null;
-            
+            // 优先使用 HTML 传递的状态（从 index.html 的 window._RESTORED_STATE）
             if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
-                // 使用 HTML 传递的状态（最可靠）
-                savedState = window._RESTORED_STATE;
-                console.log('[状态恢复] 使用 HTML 传递的状态:', savedState.page);
+                targetPage = window._RESTORED_STATE.page;
+                targetFilter = window._RESTORED_STATE.filter || 'all';
+                targetOrderId = window._RESTORED_STATE.orderId || null;
+                targetCustomerId = window._RESTORED_STATE.customerId || null;
+                console.log('[State] 从 HTML 获取目标页面:', targetPage);
                 // 清除全局变量，避免重复使用
                 delete window._RESTORED_STATE;
             } else {
-                // 降级：从存储中恢复
-                savedState = this.restorePageState();
-                console.log('[状态恢复] 从存储恢复:', savedState.page);
+                // 从存储中恢复
+                const savedState = this.restorePageState();
+                targetPage = savedState.page;
+                targetFilter = savedState.filter;
+                targetOrderId = savedState.orderId;
+                targetCustomerId = savedState.customerId;
+                if (targetPage) {
+                    console.log('[State] 从存储获取目标页面:', targetPage);
+                } else {
+                    console.log('[State] 无保存的页面状态');
+                }
             }
             
-            var savedPage = savedState.page;
-            var savedFilter = savedState.filter;
-            var savedOrderId = savedState.orderId;
-            var savedCustomerId = savedState.customerId;
+            // 保存目标页面到临时变量
+            this._targetPage = targetPage;
+            this._targetFilter = targetFilter;
+            this._targetOrderId = targetOrderId;
+            this._targetCustomerId = targetCustomerId;
+            
+            // 初始化认证（这会加载用户信息）
+            await AUTH.init();
             
             // 检查用户是否已登录
             const isLoggedIn = AUTH.isLoggedIn();
+            console.log('[State] 用户登录状态:', isLoggedIn);
             
-            if (savedPage && savedPage !== 'login' && isLoggedIn) {
-                // 恢复保存的页面状态
-                this.currentPage = savedPage;
-                this.currentFilter = savedFilter || "all";
-                this.currentOrderId = savedOrderId || null;
-                this.currentCustomerId = savedCustomerId || null;
-                console.log('[状态恢复] 最终恢复页面:', savedPage, '订单ID:', savedOrderId, '客户ID:', savedCustomerId);
-                await this.refreshCurrentPage();
-            } else if (isLoggedIn) {
-                // 已登录但没有保存的页面，显示仪表盘
-                console.log('[状态恢复] 无保存状态，显示仪表盘');
-                await this.renderDashboard();
+            if (isLoggedIn) {
+                // ========== 应用恢复的页面状态 ==========
+                if (this._targetPage && this._targetPage !== 'login') {
+                    // 恢复保存的页面
+                    this.currentPage = this._targetPage;
+                    this.currentFilter = this._targetFilter || "all";
+                    this.currentOrderId = this._targetOrderId || null;
+                    this.currentCustomerId = this._targetCustomerId || null;
+                    console.log('[State] 恢复页面到:', this.currentPage, 
+                                '订单ID:', this.currentOrderId, 
+                                '客户ID:', this.currentCustomerId);
+                    
+                    // 保存恢复的状态（确保下次刷新能恢复）
+                    this.saveCurrentPageState();
+                    
+                    // 直接刷新当前页面
+                    await this.refreshCurrentPage();
+                } else {
+                    // 没有保存的页面，显示仪表盘
+                    console.log('[State] 无保存状态，显示仪表盘');
+                    await this.renderDashboard();
+                }
             } else {
                 // 未登录，显示登录页
-                console.log('[状态恢复] 未登录，显示登录页');
+                console.log('[State] 未登录，显示登录页');
                 await this.router();
             }
+            
+            // 清除临时变量
+            this._targetPage = null;
+            this._targetFilter = null;
+            this._targetOrderId = null;
+            this._targetCustomerId = null;
             
             clearTimeout(initTimeout);
             var timeoutEl = document.getElementById('initTimeout');
             if (timeoutEl) timeoutEl.remove();
             
+            // 启动逾期更新定时器
             if (AUTH.isLoggedIn()) {
                 this._startOverdueUpdateInterval();
             }
             
         } catch (error) {
             console.error("Init error:", error);
+            clearTimeout(initTimeout);
             var timeoutEl2 = document.getElementById('initTimeout');
             if (timeoutEl2) timeoutEl2.remove();
             
@@ -585,6 +629,8 @@ const DashboardCore = {
             
             if (window.Toast) {
                 window.Toast.error(errorMsg, 5000);
+            } else {
+                alert(errorMsg);
             }
             
             document.getElementById("app").innerHTML = '' +
@@ -601,8 +647,35 @@ const DashboardCore = {
         else await this.renderDashboard();
     },
 
-    refreshCurrentPage: async function() {
+    // ========== refreshCurrentPage 方法 - 增强版 ==========
+    refreshCurrentPage: async function(retryCount = 0) {
         var self = this;
+        var maxRetries = 5;
+        
+        // 检查当前页面对应的模块是否已加载
+        var moduleCheck = {
+            'orderTable': function() { return typeof window.APP.showOrderTable === 'function'; },
+            'createOrder': function() { return typeof window.APP.showCreateOrder === 'function'; },
+            'viewOrder': function() { return typeof window.APP.viewOrder === 'function'; },
+            'payment': function() { return typeof window.APP.showPayment === 'function'; },
+            'anomaly': function() { return typeof window.APP.showAnomaly === 'function'; },
+            'userManagement': function() { return typeof window.APP.showUserManagement === 'function'; },
+            'storeManagement': function() { return typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function'; },
+            'expenses': function() { return typeof window.APP.showExpenses === 'function'; },
+            'customers': function() { return typeof window.APP.showCustomers === 'function'; },
+            'paymentHistory': function() { return typeof window.APP.showCashFlowPage === 'function' || typeof window.APP.showPaymentHistory === 'function'; },
+            'backupRestore': function() { return typeof Storage !== 'undefined' && typeof Storage.renderBackupUI === 'function'; },
+            'customerOrders': function() { return typeof window.APP.showCustomerOrders === 'function'; },
+            'customerPaymentHistory': function() { return typeof window.APP.showCustomerPaymentHistory === 'function'; },
+            'blacklist': function() { return typeof window.APP.showBlacklist === 'function'; }
+        };
+        
+        var check = moduleCheck[this.currentPage];
+        if (check && !check() && retryCount < maxRetries) {
+            console.log(`[Refresh] 模块 ${this.currentPage} 未加载，等待重试 ${retryCount + 1}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            return this.refreshCurrentPage(retryCount + 1);
+        }
         
         var skeletonType = 'default';
         if (this.currentPage === 'dashboard') skeletonType = 'dashboard';
