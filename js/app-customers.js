@@ -318,6 +318,25 @@ const CustomersModule = {
                         '<div class="form-section">' +
                             '<div class="info-display">' +
                                 '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.customer_id || '-') + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + t('customer_name') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.name) + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + t('ktp_number') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.ktp_number || '-') + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + t('phone') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.phone) + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Pekerjaan' : '职业') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.occupation || '-') + '</span>' +
+                                '</div>' +
                                 '<div class="info-display-item">' +
                                     '<span class="info-label">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + ':</span>' +
                                     '<span class="info-value">' + registeredDate + '</span>' +
