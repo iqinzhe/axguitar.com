@@ -1,5 +1,8 @@
-// app-dashboard-core.js - v1.0
+// app-dashboard-core.js - v1.1（整合逾期天数自动更新 + 页面卸载清理）
 window.APP = window.APP || {};
+
+// ========== 逾期更新定时器 ==========
+let _overdueUpdateInterval = null;
 
 // ==================== 模块降级通知 ====================
 const ModuleFallback = {
@@ -122,23 +125,10 @@ const DashboardCache = {
 
 // ==================== 聚合查询辅助方法 ====================
 const DashboardStatsHelper = {
-    /**
-     * 修复：每个查询使用独立的 QueryBuilder，避免共享状态冲突
-     */
     async getDashboardStats(profile) {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
-        // 构建基础过滤条件
-        const buildFilteredQuery = () => {
-            let query = supabaseClient.from('orders').select('*');
-            if (!isAdmin && storeId) {
-                query = query.eq('store_id', storeId);
-            }
-            return query;
-        };
-        
-        // 每个 Promise 使用独立的查询链
         const totalCountPromise = (() => {
             let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
@@ -371,9 +361,7 @@ const DashboardCore = {
         try {
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
             sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
-        } catch(e) {
-            // sessionStorage 不可用时静默失败
-        }
+        } catch(e) {}
     },
     
     restorePageState: function() {
@@ -394,6 +382,50 @@ const DashboardCore = {
         } catch(e) {}
         this.currentOrderId = null;
         this.currentCustomerId = null;
+    },
+
+    // ========== 清理逾期更新定时器 ==========
+    _clearOverdueUpdateInterval: function() {
+        if (_overdueUpdateInterval) {
+            clearInterval(_overdueUpdateInterval);
+            _overdueUpdateInterval = null;
+            console.log('[逾期更新] 定时器已清理');
+        }
+    },
+
+    // ========== 启动逾期更新定时器 ==========
+    _startOverdueUpdateInterval: function() {
+        // 先清理已有的定时器
+        this._clearOverdueUpdateInterval();
+        
+        if (!AUTH.isLoggedIn()) return;
+        
+        // 每30分钟自动更新一次
+        _overdueUpdateInterval = setInterval(async () => {
+            try {
+                await SUPABASE.updateOverdueDays();
+                console.log('[逾期更新] 自动更新完成', new Date().toLocaleTimeString());
+                // 如果当前在仪表盘或异常页面，刷新数据
+                if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
+                    await this.refreshCurrentPage();
+                }
+            } catch (err) {
+                console.warn('[逾期更新] 失败:', err.message);
+            }
+        }, 30 * 60 * 1000);
+        
+        // 页面加载后5秒首次更新
+        setTimeout(async () => {
+            try {
+                await SUPABASE.updateOverdueDays();
+                console.log('[逾期更新] 初始化更新完成');
+                if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
+                    await this.refreshCurrentPage();
+                }
+            } catch (err) {
+                console.warn('[逾期更新] 初始化失败:', err.message);
+            }
+        }, 5000);
     },
 
     init: async function() {
@@ -452,6 +484,11 @@ const DashboardCore = {
             clearTimeout(initTimeout);
             var timeoutEl = document.getElementById('initTimeout');
             if (timeoutEl) timeoutEl.remove();
+            
+            // ========== 启动逾期天数自动更新 ==========
+            if (AUTH.isLoggedIn()) {
+                this._startOverdueUpdateInterval();
+            }
             
         } catch (error) {
             console.error("Init error:", error);
@@ -833,6 +870,9 @@ const DashboardCore = {
     },
 
     logout: async function() {
+        // 清理逾期更新定时器
+        this._clearOverdueUpdateInterval();
+        
         var confirmMsg = Utils.t('save_exit_confirm');
         if (!confirm(confirmMsg)) return;
         
@@ -863,13 +903,11 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 使用修复后的 getDashboardStats
             const cacheKey = DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId);
             const report = await DashboardCache.get(cacheKey, 
                 () => DashboardStatsHelper.getDashboardStats(profile)
             );
             
-            // 现金流汇总
             const cashFlowCacheKey = DashboardCache.getKey('cashflow', isAdmin ? 'admin' : storeId);
             const cashFlow = await DashboardCache.get(cashFlowCacheKey,
                 async () => {
@@ -878,7 +916,6 @@ const DashboardCore = {
                 }
             );
             
-            // 总支出
             const expensesCacheKey = DashboardCache.getKey('expenses', isAdmin ? 'admin' : storeId);
             const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
                 let query = supabaseClient.from('expenses').select('amount');
@@ -889,7 +926,6 @@ const DashboardCore = {
                 return sum;
             });
             
-            // 本月订单数
             const today = new Date();
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
@@ -904,7 +940,6 @@ const DashboardCore = {
                 return count || 0;
             });
             
-            // 提醒相关
             const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             const hasReminders = needRemindOrders.length > 0;
             let hasSentToday = false;
@@ -919,7 +954,6 @@ const DashboardCore = {
             const overdueOrdersCount = report.overdue_orders || 0;
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
             
-            // 计算赤字
             const flowsForDeficit = await DashboardCache.get(DashboardCache.getKey('flows_for_deficit', isAdmin ? 'admin' : storeId), async () => {
                 let q = supabaseClient.from('cash_flow_records').select('direction, amount, flow_type').eq('is_voided', false);
                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
@@ -1085,13 +1119,16 @@ const DashboardCore = {
             var backButtonHtml = (this.historyStack.length > 0) ? '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' : '';
 
             document.getElementById("app").innerHTML = '' +
-                '<div class="page-header">' +
-                    '<div style="display:flex;align-items:center;gap:12px;">' +
+                '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
+                    '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
+                        backButtonHtml +
                         '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
                         '<h1 style="margin:0;">JF! by Gadai</h1>' +
                     '</div>' +
                     '<div class="header-actions">' +
-                        backButtonHtml +
+                        (this.currentPage !== 'dashboard' ? 
+                            '<button onclick="APP.navigateTo(\'dashboard\')" class="btn-back" style="background:var(--primary);color:white;">🏠 ' + (lang === 'id' ? 'Beranda' : '首页') + '</button>' : 
+                            '') +
                         '<button onclick="APP.toggleLanguage()" class="lang-btn" style="margin-left:8px;">🌐 ' + (lang === 'id' ? '中文' : 'Bahasa Indonesia') + '</button>' +
                     '</div>' +
                 '</div>' +
