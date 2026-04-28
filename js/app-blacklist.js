@@ -1,10 +1,17 @@
-// app-blacklist.js - v1.0
+// app-blacklist.js - v1.1 (修复表格结构、安全性问题)
 window.APP = window.APP || {};
 
 // 辅助函数：安全过滤输入
 function sanitizeInput(str) {
     if (!str) return '';
     return String(str).replace(/[^\p{L}\p{N}\s\-\.]/gu, '');
+}
+
+// 辅助函数：转义 PostgREST 过滤字符串中的特殊字符
+function escapePostgRESTValue(str) {
+    if (!str) return '';
+    // 转义逗号、括号、点号（PostgREST 语法特殊字符）
+    return String(str).replace(/[,()\.\[\]]/g, '\\$&');
 }
 
 const BlacklistModule = {
@@ -189,24 +196,35 @@ const BlacklistModule = {
     },
     
     checkDuplicateCustomer: async function(name, ktpNumber, phone, excludeCustomerId = null) {
-        const safeName = sanitizeInput(name);
-        const safeKtp = sanitizeInput(ktpNumber);
-        const safePhone = sanitizeInput(phone);
+        // 使用安全的方式构建查询，避免 PostgREST 注入
+        const filters = [];
         
-        let query = supabaseClient
-            .from('customers')
-            .select('id, customer_id, name, ktp_number, phone');
+        if (name) {
+            filters.push({ column: 'name', value: name });
+        }
+        if (ktpNumber) {
+            filters.push({ column: 'ktp_number', value: ktpNumber });
+        }
+        if (phone) {
+            filters.push({ column: 'phone', value: phone });
+        }
         
-        const conditions = [];
-        if (safeName) conditions.push(`name.eq.${safeName}`);
-        if (safeKtp) conditions.push(`ktp_number.eq.${safeKtp}`);
-        if (safePhone) conditions.push(`phone.eq.${safePhone}`);
-        
-        if (conditions.length === 0) {
+        if (filters.length === 0) {
             return null;
         }
         
-        query = query.or(conditions.join(','));
+        // 使用 .or() 的参数化形式：用逗号分隔的 column.eq.value 格式
+        // PostgREST 支持 .or() 接收类似 "name.eq.John,ktp_number.eq.12345" 的字符串
+        // 但我们需要确保 value 中的特殊字符被正确转义
+        const orConditions = filters.map(function(f) {
+            const escapedValue = escapePostgRESTValue(f.value);
+            return f.column + '.eq.' + escapedValue;
+        }).join(',');
+        
+        let query = supabaseClient
+            .from('customers')
+            .select('id, customer_id, name, ktp_number, phone')
+            .or(orConditions);
         
         if (excludeCustomerId) {
             query = query.neq('id', excludeCustomerId);
@@ -224,7 +242,8 @@ const BlacklistModule = {
             phone: null
         };
         
-        for (var existing of data) {
+        for (var i = 0; i < data.length; i++) {
+            var existing = data[i];
             if (existing.name === name && !duplicateInfo.name) {
                 duplicateFields.push('name');
                 duplicateInfo.name = existing;
@@ -239,10 +258,16 @@ const BlacklistModule = {
             }
         }
         
-        const uniqueFields = [...new Set(duplicateFields)];
+        const uniqueFields = [];
+        for (var j = 0; j < duplicateFields.length; j++) {
+            if (uniqueFields.indexOf(duplicateFields[j]) === -1) {
+                uniqueFields.push(duplicateFields[j]);
+            }
+        }
         
         let bestMatch = data[0];
-        for (var customer of data) {
+        for (var k = 0; k < data.length; k++) {
+            var customer = data[k];
             if (customer.name === name && customer.ktp_number === ktpNumber && customer.phone === phone) {
                 bestMatch = customer;
                 break;
@@ -270,40 +295,47 @@ const BlacklistModule = {
         try {
             const blacklist = await this.getBlacklist();
             
-            // 总列数：ID, 姓名, 职业, 电话, 原因, 日期, 操作
+            // 总列数：ID, 姓名, 职业, 电话, 原因, 日期, 操作(仅admin)
             var totalCols = isAdmin ? 7 : 6;
+            
+            var headerHtml = '<tr>' +
+                '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
+                '<th class="col-name">' + t('customer_name') + '</th>' +
+                '<th class="col-name">' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</th>' +
+                '<th class="col-phone">' + t('phone') + '</th>' +
+                '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
+                '<th class="col-date">' + (lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期') + '</th>';
+            
+            if (isAdmin) {
+                headerHtml += '<th class="col-action">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>';
+            }
+            headerHtml += '</tr>';
             
             var rows = '';
             if (!blacklist || blacklist.length === 0) {
                 rows = '<tr><td colspan="' + totalCols + '" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
-                for (var item of blacklist) {
+                for (var i = 0; i < blacklist.length; i++) {
+                    var item = blacklist[i];
                     var customer = item.customers;
                     if (!customer) continue;
                     
                     var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
                     
-                    var actionHtml = '';
-                    if (isAdmin) {
-                        actionHtml = '<button onclick="APP.removeFromBlacklist(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small danger">🚫 ' + (lang === 'id' ? 'Hapus' : '解除') + '</button>';
-                    } else {
-                        actionHtml = '<span class="locked-badge">🔒 ' + (lang === 'id' ? 'Terkunci' : '已锁定') + '</span>';
-                    }
-                    
+                    // 修复1：日期单元格使用正确的结束标签
                     rows += '<tr>' +
                         '<td class="col-id">' + Utils.escapeHtml(customer.customer_id || '-') + '</td>' +
                         '<td class="col-name">' + Utils.escapeHtml(customer.name) + '</td>' +
-                        '<td class="col-name">' + occupationDisplay + '</td>' +  // 新增职业列
+                        '<td class="col-name">' + occupationDisplay + '</td>' +
                         '<td class="col-phone">' + Utils.escapeHtml(customer.phone || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(item.reason) + '</td>' +
-                        '<td class="col-date">' + Utils.formatDate(item.blacklisted_at) + '</tr>' +
-                    '</tr>' +
-                    '<tr class="action-row">' +
-                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
-                        '<td colspan="' + (totalCols - 1) + '">' +
-                            '<div class="action-buttons">' + actionHtml + '</div>' +
-                        '</td>' +
-                    '</tr>';
+                        '<td class="col-date">' + Utils.formatDate(item.blacklisted_at) + '</td>';
+                    
+                    if (isAdmin) {
+                        rows += '<td><button onclick="APP.removeFromBlacklist(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small danger">🚫 ' + (lang === 'id' ? 'Hapus' : '解除') + '</button></td>';
+                    }
+                    
+                    rows += '</tr>';
                 }
             }
             
@@ -331,15 +363,7 @@ const BlacklistModule = {
                     '<div class="table-container">' +
                         '<table class="data-table">' +
                             '<thead>' +
-                                '<tr>' +
-                                    '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
-                                    '<th class="col-name">' + t('customer_name') + '</th>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</th>' +  // 新增职业列头
-                                    '<th class="col-phone">' + t('phone') + '</th>' +
-                                    '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
-                                    '<th class="col-date">' + (lang === 'id' ? 'Tanggal Blacklist' : '拉黑日期') + '</th>' +
-                                    (isAdmin ? '<th class="col-action">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' : '') +
-                                '</td>' +
+                                headerHtml +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
