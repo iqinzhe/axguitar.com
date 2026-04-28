@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.1（增加职业列）
+// app-blacklist.js - v1.0
 window.APP = window.APP || {};
 
 // 辅助函数：安全过滤输入
