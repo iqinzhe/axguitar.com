@@ -114,8 +114,6 @@
     
     if (!navigator.onLine) showOfflineBanner();
 })();
-</script>
-
 <!-- ==================== 初始化脚本 ==================== -->
 <script>
 (function() {
@@ -129,6 +127,59 @@
     function getLang() {
         return (navigator.language && navigator.language.startsWith('id')) ? 'id' : 'zh';
     }
+    
+    // ========== 关键修复：刷新前保存当前页面状态 ==========
+    // 在页面关闭/刷新前保存当前状态
+    function saveStateBeforeUnload() {
+        try {
+            // 如果 APP 已初始化，保存当前页面
+            if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
+                window.APP.saveCurrentPageState();
+                console.log('[State] 页面关闭前已保存状态');
+            }
+        } catch(e) {
+            console.warn('[State] 保存状态失败:', e);
+        }
+    }
+    
+    // 监听页面关闭/刷新事件
+    window.addEventListener('beforeunload', function() {
+        saveStateBeforeUnload();
+    });
+    
+    // ========== 恢复上次浏览的页面 ==========
+    function getStoredPageState() {
+        try {
+            // 优先从 sessionStorage 读取
+            var page = sessionStorage.getItem('jf_current_page');
+            var filter = sessionStorage.getItem('jf_current_filter') || 'all';
+            var orderId = sessionStorage.getItem('jf_current_order_id');
+            var customerId = sessionStorage.getItem('jf_current_customer_id');
+            
+            // 如果 sessionStorage 没有，从 localStorage 读取（备份）
+            if (!page) {
+                page = localStorage.getItem('jf_last_page');
+                filter = localStorage.getItem('jf_last_filter') || 'all';
+            }
+            
+            // 验证页面是否有效（不能是登录页）
+            var validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
+                              'anomaly', 'userManagement', 'storeManagement', 'expenses', 
+                              'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
+                              'customerPaymentHistory', 'blacklist'];
+            
+            if (page && validPages.includes(page) && page !== 'login') {
+                console.log('[State] 恢复页面:', page, '订单ID:', orderId, '客户ID:', customerId);
+                return { page: page, filter: filter, orderId: orderId, customerId: customerId };
+            }
+        } catch(e) {
+            console.warn('[State] 读取存储状态失败:', e);
+        }
+        return { page: null, filter: 'all', orderId: null, customerId: null };
+    }
+    
+    // 将恢复的状态存储到全局变量，供 APP 使用
+    window._RESTORED_STATE = getStoredPageState();
     
     // 更新加载状态文字
     function updateLoadingStatus(message) {
@@ -153,7 +204,7 @@
                     '</button>' +
                     '<details style="margin-top:16px;text-align:left;">' +
                         '<summary style="cursor:pointer;color:#64748b;font-size:12px;">' + (isId ? 'Detail Teknis' : '技术详情') + '</summary>' +
-                        '<pre style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;font-size:11px;overflow:auto;">' + escapeHtml(navigator.userAgent) + '\n\nLoaded modules: ' + Object.keys(window).filter(function(k) { return ['APP', 'AUTH', 'SUPABASE', 'Utils', 'Toast', 'Order', 'StoreManager', 'Storage', 'Audit', 'Migration', 'PERMISSION'].indexOf(k) !== -1; }).join(', ') + '</pre>' +
+                        '<pre style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;font-size:11px;overflow:auto;">' + escapeHtml(navigator.userAgent) + '\n\nStored page: ' + (window._RESTORED_STATE?.page || 'none') + '</pre>' +
                     '</details>' +
                 '</div>' +
             '</div>';
@@ -184,15 +235,13 @@
     // 等待核心模块加载完成
     function waitForCoreModules() {
         return new Promise(function(resolve) {
-            var maxAttempts = 100; // 最多等待 10 秒
+            var maxAttempts = 100;
             var attempt = 0;
             
             function check() {
                 var status = checkCoreModules();
                 if (status.allLoaded) {
-                    console.log('✅ 核心模块加载完成:', Object.keys(window).filter(function(k) {
-                        return ['Toast', 'Utils', 'SUPABASE', 'AUTH', 'PERMISSION', 'Order', 'StoreManager', 'Storage', 'Audit', 'Migration'].indexOf(k) !== -1;
-                    }).join(', '));
+                    console.log('✅ 核心模块加载完成');
                     resolve(true);
                     return;
                 }
@@ -213,10 +262,8 @@
     
     // 初始化应用
     async function initApp() {
-        // 更新加载状态
         updateLoadingStatus(getLang() === 'id' ? 'Memuat modul...' : '加载模块中...');
         
-        // 等待核心模块
         var modulesReady = await waitForCoreModules();
         
         if (!modulesReady) {
@@ -227,24 +274,22 @@
             return;
         }
         
-        // 检查 APP 模块
         if (typeof window.APP === 'undefined') {
-            console.error('APP module not loaded - checking if app-dashboard-core.js exists');
+            console.error('APP module not loaded');
             showError(getLang() === 'id' 
-                ? 'Modul utama APP tidak ditemukan. Periksa apakah file app-dashboard-core.js ada.'
-                : '主模块 APP 未找到，请检查 app-dashboard-core.js 文件是否存在。');
+                ? 'Modul utama APP tidak ditemukan.'
+                : '主模块 APP 未找到。');
             return;
         }
         
         if (typeof window.APP.init !== 'function') {
-            console.error('APP.init is not a function - check app-dashboard-core.js exports');
+            console.error('APP.init is not a function');
             showError(getLang() === 'id'
-                ? 'Fungsi init APP tidak tersedia. Periksa file app-dashboard-core.js.'
-                : 'APP.init 函数不可用，请检查 app-dashboard-core.js 文件。');
+                ? 'Fungsi init APP tidak tersedia.'
+                : 'APP.init 函数不可用。');
             return;
         }
         
-        // 清除超时
         if (loadingTimeout) {
             clearTimeout(loadingTimeout);
             loadingTimeout = null;
@@ -256,6 +301,20 @@
         setTimeout(function() {
             try {
                 console.log('✅ 所有模块加载完成，初始化 APP...');
+                console.log('[State] 恢复的状态:', window._RESTORED_STATE);
+                
+                // 将恢复的状态传递给 APP
+                if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
+                    // 设置 APP 的初始状态
+                    if (window.APP) {
+                        window.APP.currentPage = window._RESTORED_STATE.page;
+                        window.APP.currentFilter = window._RESTORED_STATE.filter || 'all';
+                        window.APP.currentOrderId = window._RESTORED_STATE.orderId || null;
+                        window.APP.currentCustomerId = window._RESTORED_STATE.customerId || null;
+                        console.log('[State] 已设置 APP 初始状态:', window.APP.currentPage);
+                    }
+                }
+                
                 window.APP.init();
             } catch (err) {
                 console.error('Init error:', err);
@@ -275,12 +334,12 @@
                 var status = checkCoreModules();
                 if (!status.allLoaded) {
                     showError(getLang() === 'id'
-                        ? '⏳ Waktu muat habis. Modul yang belum dimuat: ' + status.missing.join(', ') + '\n\nSilakan periksa koneksi internet dan muat ulang halaman.'
-                        : '⏳ 加载超时。未加载的模块: ' + status.missing.join(', ') + '\n\n请检查网络连接后刷新页面重试。');
+                        ? '⏳ Waktu muat habis. Modul yang belum dimuat: ' + status.missing.join(', ')
+                        : '⏳ 加载超时。未加载的模块: ' + status.missing.join(', '));
                 } else if (typeof window.APP === 'undefined') {
                     showError(getLang() === 'id'
-                        ? '⏳ Waktu muat habis. Modul APP tidak ditemukan. Periksa file app-dashboard-core.js.'
-                        : '⏳ 加载超时。APP 模块未找到。请检查 app-dashboard-core.js 文件。');
+                        ? '⏳ Waktu muat habis. Modul APP tidak ditemukan.'
+                        : '⏳ 加载超时。APP 模块未找到。');
                 } else {
                     showError(getLang() === 'id'
                         ? '⏳ Waktu muat habis. Silakan muat ulang halaman.'
@@ -296,10 +355,7 @@
         initApp();
     });
     
-    // 如果 DOM 已经加载完成
-    if (document.readyState === 'loading') {
-        // 等待 DOMContentLoaded
-    } else {
+    if (document.readyState !== 'loading') {
         setupTimeout();
         initApp();
     }
