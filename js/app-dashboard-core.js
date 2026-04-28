@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.5（修复：safeCall 懒执行 fallback，彻底解决 F5 刷新跳回仪表盘问题）
+// app-dashboard-core.js - v1.0
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
