@@ -963,15 +963,12 @@ const CustomersModule = {
             var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
             
             document.getElementById("app").innerHTML = '' +
-                '<div class="page-header">' +
-                    '<div style="display:flex; align-items:center; gap:12px;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<h2>📝 ' + t('create_order') + '</h2>' +
-                    '</div>' +
-                    '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                    '</div>' +
-                '</div>' +
+    '<div class="page-header">' +
+        '<h2>📋 ' + (lang === 'id' ? 'Order Nasabah' : '客户订单') + ' - ' + Utils.escapeHtml(customer.name) + '</h2>' +
+        '<div class="header-actions">' +
+            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+        '</div>' +
+    '</div>' +
                 
                 '<div class="card">' +
                     '<div class="form-section">' +
