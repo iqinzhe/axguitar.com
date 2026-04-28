@@ -1,4 +1,4 @@
-// app-payments.js - v1.0
+// app-payments.js - v1.0 (修复：返回键统一右上角)
 window.APP = window.APP || {};
 
 // ========== 防重复提交全局锁 ==========
@@ -211,10 +211,7 @@ const PaymentsModule = {
         if (profile.role === 'admin') {
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<div style="display:flex; align-items:center; gap:12px;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
-                        '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
-                    '</div>' +
+                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
                     '<div class="header-actions">' +
                         '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
                     '</div>' +
@@ -316,7 +313,7 @@ const PaymentsModule = {
             // ========== 利息历史行 ==========
             var interestRows = '';
             if (interestPayments.length === 0) {
-                interestRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td></tr>';
+                interestRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td></table>';
             } else {
                 for (var i = 0; i < interestPayments.length; i++) {
                     var p = interestPayments[i];
@@ -482,7 +479,7 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
+                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th> vain</thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -518,7 +515,7 @@ const PaymentsModule = {
                                 '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('return_principal') : t('return_principal') + '历史') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
+                                        '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th> vain</thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -530,11 +527,9 @@ const PaymentsModule = {
             // ========== 组装页面 ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<div style="display:flex; align-items:center; gap:12px;">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
-                        '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
-                    '</div>' +
+                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
                     '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                         '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-detail">📄 ' + t('order_details') + '</button>' +
                     '</div>' +
                 '</div>' +
