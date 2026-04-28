@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v1.0
+// app-dashboard-users.js - v1.0 (修复：返回键统一右上角)
 window.APP = window.APP || {};
 
 const DashboardUsers = {
@@ -79,8 +79,8 @@ const DashboardUsers = {
                 '<div class="page-header">' +
                     '<h2>👥 ' + (lang === 'id' ? 'Manajemen Peran' : '角色管理') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
