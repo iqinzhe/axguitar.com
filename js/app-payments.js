@@ -1,4 +1,4 @@
-// app-payments.js - v1.0 (修复：返回键统一右上角)
+// app-payments.js - v1.0 
 window.APP = window.APP || {};
 
 // ========== 防重复提交全局锁 ==========
