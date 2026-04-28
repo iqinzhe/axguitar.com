@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.1（整合逾期天数自动更新 + 页面卸载清理）
+// app-dashboard-core.js - v1.3（修复：刷新后停留当前页面 + Toast 集成）
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -22,15 +22,20 @@ const ModuleFallback = {
                 var msg = '';
                 if (error.message === 'module_not_loaded') {
                     msg = lang === 'id'
-                        ? '⚠️ Modul "' + moduleName + '" gagal dimuat.\n\nBeberapa fitur mungkin tidak tersedia.\nSilakan muat ulang halaman.'
-                        : '⚠️ 模块 "' + moduleName + '" 加载失败。\n\n部分功能可能不可用。\n请刷新页面后重试。';
+                        ? '⚠️ 模块 "' + moduleName + '" 加载失败，部分功能可能不可用。'
+                        : '⚠️ Module "' + moduleName + '" failed to load.';
                 } else {
                     msg = lang === 'id'
-                        ? '⚠️ Modul "' + moduleName + '" mengalami kesalahan: ' + error.message + '\n\nSilakan muat ulang halaman.'
-                        : '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message + '\n\n请刷新页面后重试。';
+                        ? '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message
+                        : '⚠️ Module "' + moduleName + '" error: ' + error.message;
                 }
                 
-                setTimeout(function() { alert(msg); }, 300);
+                // 使用 Toast 替代 alert
+                if (window.Toast) {
+                    window.Toast.warning(msg, 5000);
+                } else {
+                    setTimeout(function() { alert(msg); }, 300);
+                }
                 ModuleFallback._showBanner(moduleName, error.message);
             }
             
@@ -60,12 +65,12 @@ const ModuleFallback = {
         banner.innerHTML = '' +
             '<span class="info-bar-icon">⚠️</span>' +
             '<div class="info-bar-content">' +
-                '<strong>' + (lang === 'id' ? 'Fitur Tidak Tersedia' : '功能降级通知') + '</strong> — ' +
+                '<strong>' + (lang === 'id' ? '功能降级通知' : 'Feature Degraded') + '</strong> — ' +
                 (lang === 'id' 
-                    ? 'Modul "' + moduleName + '" gagal dimuat. Silakan muat ulang halaman.'
-                    : '模块 "' + moduleName + '" 加载失败，请刷新页面。') +
+                    ? '模块 "' + moduleName + '" 加载失败，请刷新页面。'
+                    : 'Module "' + moduleName + '" failed to load.') +
             '</div>' +
-            '<button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 8px;" title="' + (lang === 'id' ? 'Tutup' : '关闭') + '">✖</button>';
+            '<button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 8px;" title="' + (lang === 'id' ? '关闭' : 'Close') + '">✖</button>';
         
         var app = document.getElementById('app');
         if (app && app.firstChild) {
@@ -357,21 +362,53 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
+    // ========== 修复：页面状态持久化（刷新后停留当前页面） ==========
     saveCurrentPageState: function() {
         try {
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
             sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
+            if (this.currentOrderId) {
+                sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
+            } else {
+                sessionStorage.removeItem('jf_current_order_id');
+            }
+            if (this.currentCustomerId) {
+                sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
+            } else {
+                sessionStorage.removeItem('jf_current_customer_id');
+            }
+            // 额外保存到 localStorage 作为备份（刷新时更可靠）
+            localStorage.setItem('jf_last_page', this.currentPage);
+            localStorage.setItem('jf_last_filter', this.currentFilter);
         } catch(e) {}
     },
     
     restorePageState: function() {
         try {
-            return {
-                page: sessionStorage.getItem('jf_current_page'),
-                filter: sessionStorage.getItem('jf_current_filter') || "all"
-            };
+            // 优先从 sessionStorage 读取
+            let page = sessionStorage.getItem('jf_current_page');
+            let filter = sessionStorage.getItem('jf_current_filter') || "all";
+            let orderId = sessionStorage.getItem('jf_current_order_id');
+            let customerId = sessionStorage.getItem('jf_current_customer_id');
+            
+            // 如果 sessionStorage 没有，从 localStorage 恢复
+            if (!page) {
+                page = localStorage.getItem('jf_last_page');
+                filter = localStorage.getItem('jf_last_filter') || "all";
+            }
+            
+            // 验证页面是否有效（不能是登录页）
+            const validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
+                                'anomaly', 'userManagement', 'storeManagement', 'expenses', 
+                                'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
+                                'customerPaymentHistory', 'blacklist'];
+            
+            if (page && validPages.includes(page) && page !== 'login') {
+                return { page, filter, orderId, customerId };
+            }
+            return { page: null, filter: "all", orderId: null, customerId: null };
         } catch(e) {
-            return { page: null, filter: "all" };
+            return { page: null, filter: "all", orderId: null, customerId: null };
         }
     },
     
@@ -379,6 +416,9 @@ const DashboardCore = {
         try {
             sessionStorage.removeItem('jf_current_page');
             sessionStorage.removeItem('jf_current_filter');
+            sessionStorage.removeItem('jf_current_order_id');
+            sessionStorage.removeItem('jf_current_customer_id');
+            // 注意：不清除 localStorage 的 jf_last_page，因为那是备份
         } catch(e) {}
         this.currentOrderId = null;
         this.currentCustomerId = null;
@@ -395,17 +435,14 @@ const DashboardCore = {
 
     // ========== 启动逾期更新定时器 ==========
     _startOverdueUpdateInterval: function() {
-        // 先清理已有的定时器
         this._clearOverdueUpdateInterval();
         
         if (!AUTH.isLoggedIn()) return;
         
-        // 每30分钟自动更新一次
         _overdueUpdateInterval = setInterval(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
                 console.log('[逾期更新] 自动更新完成', new Date().toLocaleTimeString());
-                // 如果当前在仪表盘或异常页面，刷新数据
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
@@ -414,7 +451,6 @@ const DashboardCore = {
             }
         }, 30 * 60 * 1000);
         
-        // 页面加载后5秒首次更新
         setTimeout(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
@@ -430,6 +466,12 @@ const DashboardCore = {
 
     init: async function() {
         var lang = Utils.lang || 'zh';
+        
+        // 初始化 Toast 系统
+        if (window.Toast && !window.Toast._initialized) {
+            window.Toast._initialized = true;
+            console.log('✅ Toast 通知系统已初始化');
+        }
         
         Utils.ErrorHandler.init();
         ModuleFallback.clearAll();
@@ -467,15 +509,19 @@ const DashboardCore = {
                 }
             }, 15000);
             
+            // ========== 修复：刷新后停留当前页面 ==========
             var savedState = this.restorePageState();
             var savedPage = savedState.page;
             var savedFilter = savedState.filter;
+            var savedOrderId = savedState.orderId;
+            var savedCustomerId = savedState.customerId;
             
             if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
                 this.currentPage = savedPage;
                 this.currentFilter = savedFilter || "all";
-                this.currentOrderId = null;
-                this.currentCustomerId = null;
+                this.currentOrderId = savedOrderId || null;
+                this.currentCustomerId = savedCustomerId || null;
+                console.log('[状态恢复] 恢复页面:', savedPage, '订单ID:', savedOrderId);
                 await this.refreshCurrentPage();
             } else {
                 await this.router();
@@ -485,7 +531,6 @@ const DashboardCore = {
             var timeoutEl = document.getElementById('initTimeout');
             if (timeoutEl) timeoutEl.remove();
             
-            // ========== 启动逾期天数自动更新 ==========
             if (AUTH.isLoggedIn()) {
                 this._startOverdueUpdateInterval();
             }
@@ -496,8 +541,13 @@ const DashboardCore = {
             if (timeoutEl2) timeoutEl2.remove();
             
             var errorMsg = (Utils.lang === 'id'
-                ? '⚠️ Gagal memuat sistem: ' + error.message + '\n\nSilakan muat ulang halaman.'
-                : '⚠️ 系统加载失败: ' + error.message + '\n\n请刷新页面重试。');
+                ? '⚠️ 系统加载失败: ' + error.message + '\n\n请刷新页面重试。'
+                : '⚠️ System load failed: ' + error.message + '\n\nPlease refresh the page.');
+            
+            if (window.Toast) {
+                window.Toast.error(errorMsg, 5000);
+            }
+            
             document.getElementById("app").innerHTML = '' +
                 '<div class="card" style="text-align:center;padding:40px;">' +
                     '<p style="white-space:pre-line;">' + errorMsg + '</p>' +
@@ -531,9 +581,10 @@ const DashboardCore = {
                     await self.renderDashboard();
                 } catch (e) {
                     console.error("renderDashboard failed:", e);
+                    if (window.Toast) window.Toast.error('加载仪表盘失败，请刷新页面', 4000);
                     document.getElementById("app").innerHTML = '' +
                         '<div class="card" style="text-align:center;padding:40px;">' +
-                            '<p>' + (Utils.lang === 'id' ? '⚠️ Gagal memuat dashboard. Silakan muat ulang.' : '⚠️ 加载仪表盘失败，请刷新页面。') + '</p>' +
+                            '<p>' + (Utils.lang === 'id' ? '⚠️ 加载仪表盘失败，请刷新页面。' : '⚠️ Dashboard load failed.') + '</p>' +
                             '<button onclick="location.reload()">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button>' +
                         '</div>';
                 }
@@ -870,11 +921,12 @@ const DashboardCore = {
     },
 
     logout: async function() {
-        // 清理逾期更新定时器
         this._clearOverdueUpdateInterval();
         
         var confirmMsg = Utils.t('save_exit_confirm');
-        if (!confirm(confirmMsg)) return;
+        // 使用 Toast 确认框替代 confirm
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        if (!confirmed) return;
         
         this.clearPageState();
         sessionStorage.clear();
@@ -1146,9 +1198,10 @@ const DashboardCore = {
         } catch (err) {
             console.error("renderDashboard error:", err);
             Utils.ErrorHandler.capture(err, 'renderDashboard');
+            if (window.Toast) window.Toast.error('加载仪表盘失败: ' + err.message, 5000);
             document.getElementById("app").innerHTML = '' +
                 '<div class="card" style="padding:40px;text-align:center;">' +
-                    '<p style="margin-bottom:16px;">⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '加载仪表盘失败: ' + err.message) + '</p>' +
+                    '<p style="margin-bottom:16px;">⚠️ ' + (Utils.lang === 'id' ? '加载仪表盘失败: ' + err.message : 'Dashboard load failed: ' + err.message) + '</p>' +
                     '<button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button>' +
                     '<button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
                 '</div>';
@@ -1180,7 +1233,11 @@ const DashboardCore = {
     },
 
     showCreateOrder: function() { 
-        alert(Utils.lang === 'id' ? 'Silakan pilih nasabah terlebih dahulu' : '请先选择客户'); 
+        if (window.Toast) {
+            window.Toast.info(Utils.lang === 'id' ? '请先选择客户' : 'Please select a customer first', 3000);
+        } else {
+            alert(Utils.lang === 'id' ? 'Silakan pilih nasabah terlebih dahulu' : '请先选择客户');
+        }
         this.navigateTo('customers'); 
     },
     
@@ -1195,18 +1252,30 @@ const DashboardCore = {
         var phone = document.getElementById("newStorePhone")?.value.trim();
         
         if (!name) {
-            alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            if (window.Toast) {
+                window.Toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            } else {
+                alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            }
             return;
         }
         
         try {
             if (typeof StoreManager !== 'undefined') {
                 await StoreManager.createStore(name, address, phone);
-                alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+                if (window.Toast) {
+                    window.Toast.success(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+                } else {
+                    alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+                }
                 await StoreManager.renderStoreManagement();
             }
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
+            }
         }
     },
     
@@ -1216,15 +1285,25 @@ const DashboardCore = {
     
     deleteStore: async function(storeId) {
         var lang = Utils.lang;
-        if (!confirm(Utils.t('confirm_delete'))) return;
+        // 使用 Toast 确认框
+        var confirmed = window.Toast ? await window.Toast.confirmPromise(Utils.t('confirm_delete')) : confirm(Utils.t('confirm_delete'));
+        if (!confirmed) return;
         try {
             if (typeof StoreManager !== 'undefined') {
                 await StoreManager.deleteStore(storeId);
-                alert(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
+                if (window.Toast) {
+                    window.Toast.success(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
+                } else {
+                    alert(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
+                }
                 await StoreManager.renderStoreManagement();
             }
         } catch (error) {
-            alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            } else {
+                alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            }
         }
     },
     
@@ -1250,3 +1329,10 @@ window.APP.currentPage = DashboardCore.currentPage;
 window.APP.currentOrderId = DashboardCore.currentOrderId;
 window.APP.currentCustomerId = DashboardCore.currentCustomerId;
 window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
+
+// 页面关闭前保存状态
+window.addEventListener('beforeunload', function() {
+    if (window.APP && window.APP.saveCurrentPageState) {
+        window.APP.saveCurrentPageState();
+    }
+});
