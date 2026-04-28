@@ -87,22 +87,8 @@ button:disabled {
     transform: none;
 }
 
-/* 返回按钮 */
+/* 返回按钮 - 深色 */
 .btn-back {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-medium);
-    color: var(--text-secondary);
-    padding: var(--spacing-2) var(--spacing-4);  /* 上下8px，左右16px */
-    font-size: var(--font-md);  /* 字体稍微增大 */
-}
-
-.btn-back:hover {
-    background: var(--border-light);
-    color: var(--text-primary);
-}
-
-/* 打印按钮 */
-.btn-print {
     background: var(--text-secondary);
     color: white;
     border: none;
@@ -110,8 +96,22 @@ button:disabled {
     font-size: var(--font-md);  /* 字体稍微增大 */
 }
 
-.btn-print:hover {
+.btn-back:hover {
     background: var(--text-primary);
+}
+
+/* 打印按钮 - 浅色 */
+.btn-print {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-medium);
+    color: var(--text-secondary);
+    padding: var(--spacing-2) var(--spacing-4);  /* 上下8px，左右16px */
+    font-size: var(--font-md);  /* 字体稍微增大 */
+}
+
+.btn-print:hover {
+    background: var(--border-light);
+    color: var(--text-primary);
 }
 
 /* 导出按钮 */
