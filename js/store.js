@@ -1,20 +1,20 @@
-// store.js - v1.2（修复 this 绑定问题）
+// store.js - v1.3（完全避免 this 绑定问题）
 const StoreManager = {
     stores: [],
     _loaded: false,
 
-    // 修复：使用普通函数确保 this 正确
+    // 使用 StoreManager. 而不是 this.
     loadStores: async function(force = false) {
         console.log('[StoreManager] loadStores 被调用, force:', force);
-        if (!force && this._loaded && this.stores.length > 0) {
-            console.log('[StoreManager] 使用缓存的门店数据:', this.stores.length);
-            return this.stores;
+        if (!force && StoreManager._loaded && StoreManager.stores.length > 0) {
+            console.log('[StoreManager] 使用缓存的门店数据:', StoreManager.stores.length);
+            return StoreManager.stores;
         }
         try {
-            this.stores = await SUPABASE.getAllStores();
-            this._loaded = true;
-            console.log('[StoreManager] 门店数据加载完成:', this.stores.length);
-            return this.stores;
+            StoreManager.stores = await SUPABASE.getAllStores();
+            StoreManager._loaded = true;
+            console.log('[StoreManager] 门店数据加载完成:', StoreManager.stores.length);
+            return StoreManager.stores;
         } catch (err) {
             console.error('[StoreManager] loadStores 失败:', err);
             throw err;
@@ -22,7 +22,7 @@ const StoreManager = {
     },
 
     _generateStoreCode: async function(name) {
-        await this.loadStores(true);
+        await StoreManager.loadStores(true);
         
         const nameLower = name.toLowerCase();
         if (nameLower.includes('kantor') || nameLower.includes('pusat') || nameLower.includes('总部')) {
@@ -30,8 +30,8 @@ const StoreManager = {
         }
         
         let maxNumber = 0;
-        for (var i = 0; i < this.stores.length; i++) {
-            var store = this.stores[i];
+        for (var i = 0; i < StoreManager.stores.length; i++) {
+            var store = StoreManager.stores[i];
             const match = store.code?.match(/STORE_(\d+)/);
             if (match) {
                 const num = parseInt(match[1], 10);
@@ -46,23 +46,23 @@ const StoreManager = {
     },
 
     createStore: async function(name, address, phone) {
-        const code = await this._generateStoreCode(name);
+        const code = await StoreManager._generateStoreCode(name);
         const newStore = await SUPABASE.createStore(code, name, address, phone);
-        this.stores.push(newStore);
-        this.stores.sort(function(a, b) { return a.code.localeCompare(b.code); });
+        StoreManager.stores.push(newStore);
+        StoreManager.stores.sort(function(a, b) { return a.code.localeCompare(b.code); });
         return newStore;
     },
 
     updateStore: async function(id, updates) {
         const updated = await SUPABASE.updateStore(id, updates);
-        const idx = this.stores.findIndex(function(s) { return s.id === id; });
-        if (idx !== -1) this.stores[idx] = Object.assign({}, this.stores[idx], updated);
+        const idx = StoreManager.stores.findIndex(function(s) { return s.id === id; });
+        if (idx !== -1) StoreManager.stores[idx] = Object.assign({}, StoreManager.stores[idx], updated);
         return updated;
     },
 
     deleteStore: async function(id) {
         await SUPABASE.deleteStore(id);
-        this.stores = this.stores.filter(function(s) { return s.id !== id; });
+        StoreManager.stores = StoreManager.stores.filter(function(s) { return s.id !== id; });
     },
 
     suspendStore: async function(storeId) {
@@ -82,11 +82,11 @@ const StoreManager = {
             
             if (error) throw error;
             
-            var store = this.stores.find(function(s) { return s.id === storeId; });
+            var store = StoreManager.stores.find(function(s) { return s.id === storeId; });
             if (store) store.is_active = false;
             
             alert(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
-            await this.renderStoreManagement();
+            await StoreManager.renderStoreManagement();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
         }
@@ -105,11 +105,11 @@ const StoreManager = {
             
             if (error) throw error;
             
-            var store = this.stores.find(function(s) { return s.id === storeId; });
+            var store = StoreManager.stores.find(function(s) { return s.id === storeId; });
             if (store) store.is_active = true;
             
             alert(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
-            await this.renderStoreManagement();
+            await StoreManager.renderStoreManagement();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
         }
@@ -209,7 +209,7 @@ const StoreManager = {
             
             document.getElementById('editStoreModal')?.remove();
             alert(lang === 'id' ? 'Toko berhasil diperbarui' : '门店已更新');
-            await this.renderStoreManagement();
+            await StoreManager.renderStoreManagement();
         } catch (error) {
             alert(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
@@ -257,9 +257,9 @@ const StoreManager = {
             }
             
             // 确保所有门店都有余额对象
-            if (this.stores && this.stores.length > 0) {
-                for (var j = 0; j < this.stores.length; j++) {
-                    var s = this.stores[j];
+            if (StoreManager.stores && StoreManager.stores.length > 0) {
+                for (var j = 0; j < StoreManager.stores.length; j++) {
+                    var s = StoreManager.stores[j];
                     if (!balances[s.id]) {
                         balances[s.id] = { cashBalance: 0, bankBalance: 0 };
                     }
@@ -296,10 +296,10 @@ const StoreManager = {
             '</div>';
         
         try {
-            // 加载门店数据（使用 bind 确保 this 正确）
-            console.log('[StoreManager] 调用 loadStores...');
-            await this.loadStores(true);
-            console.log('[StoreManager] 门店列表加载完成:', this.stores.length, '个门店');
+            // 关键修复：使用 StoreManager.loadStores 而不是 this.loadStores
+            console.log('[StoreManager] 调用 StoreManager.loadStores...');
+            await StoreManager.loadStores(true);
+            console.log('[StoreManager] 门店列表加载完成:', StoreManager.stores.length, '个门店');
             
             // 并行获取数据
             console.log('[StoreManager] 获取订单、支出、付款数据...');
@@ -313,6 +313,8 @@ const StoreManager = {
             const allExpenses = allExpensesResult.data || [];
             const allPayments = allPaymentsResult.data || [];
             
+            console.log('[StoreManager] 订单数量:', allOrders.length, '支出数量:', allExpenses.length, '付款数量:', allPayments.length);
+            
             // 构建订单门店映射
             const orderStoreMap = {};
             for (var i = 0; i < allOrders.length; i++) {
@@ -321,8 +323,8 @@ const StoreManager = {
             
             // 初始化门店统计
             const storeStats = {};
-            for (var i = 0; i < this.stores.length; i++) {
-                storeStats[this.stores[i].id] = { orders: [], expenses: [], payments: [] };
+            for (var i = 0; i < StoreManager.stores.length; i++) {
+                storeStats[StoreManager.stores[i].id] = { orders: [], expenses: [], payments: [] };
             }
             
             // 统计订单
@@ -351,7 +353,7 @@ const StoreManager = {
             
             // 获取门店余额
             console.log('[StoreManager] 获取门店余额...');
-            const storeBalances = await this._getAllStoreCashFlowBalances();
+            const storeBalances = await StoreManager._getAllStoreCashFlowBalances();
             
             // 计算汇总
             var grandTotal = { 
@@ -361,8 +363,8 @@ const StoreManager = {
             
             var storeStatsRows = '';
             
-            for (var i = 0; i < this.stores.length; i++) {
-                var store = this.stores[i];
+            for (var i = 0; i < StoreManager.stores.length; i++) {
+                var store = StoreManager.stores[i];
                 var stats = storeStats[store.id] || { orders: [], expenses: [], payments: [] };
                 var orders = stats.orders;
                 var expenses = stats.expenses;
@@ -445,11 +447,11 @@ const StoreManager = {
             
             // 生成门店列表行
             var storeRows = '';
-            if (this.stores.length === 0) {
+            if (StoreManager.stores.length === 0) {
                 storeRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
-                for (var i = 0; i < this.stores.length; i++) {
-                    var store = this.stores[i];
+                for (var i = 0; i < StoreManager.stores.length; i++) {
+                    var store = StoreManager.stores[i];
                     var isActive = store.is_active !== false;
                     var statusBadge = isActive 
                         ? '<span class="status-badge active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
@@ -600,12 +602,12 @@ const StoreManager = {
                 '</div>' +
                 '<div class="card" style="text-align:center; padding:40px;">' +
                     '<p style="color:var(--danger);">❌ ' + (lang === 'id' ? 'Gagal memuat data: ' : '加载失败：') + error.message + '</p>' +
-                    '<button onclick="StoreManager.renderStoreManagement()" class="btn-small" style="margin-top:16px;">🔄 ' + (lang === 'id' ? 'Coba Lagi' : '重试') + '</button>' +
-                    '<button onclick="APP.goBack()" class="btn-small" style="margin-top:16px; margin-left:8px;">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
                     '<details style="margin-top:16px; text-align:left;">' +
                         '<summary style="cursor:pointer;">' + (lang === 'id' ? 'Detail Error' : '错误详情') + '</summary>' +
                         '<pre style="margin-top:8px; padding:8px; background:#f1f5f9; border-radius:4px; overflow:auto; font-size:11px;">' + Utils.escapeHtml(error.stack || error.message) + '</pre>' +
                     '</details>' +
+                    '<button onclick="StoreManager.renderStoreManagement()" class="btn-small" style="margin-top:16px;">🔄 ' + (lang === 'id' ? 'Coba Lagi' : '重试') + '</button>' +
+                    '<button onclick="APP.goBack()" class="btn-small" style="margin-top:16px; margin-left:8px;">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
                 '</div>';
         }
     }
