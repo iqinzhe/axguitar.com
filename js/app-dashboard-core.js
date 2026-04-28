@@ -357,28 +357,62 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
+    // ========== URL Hash 状态管理（刷新保位） ==========
+    // hash 格式: #page=orderTable&orderId=xxx&customerId=yyy&filter=all
     saveCurrentPageState: function() {
         try {
+            var params = { page: this.currentPage || 'dashboard' };
+            if (this.currentFilter && this.currentFilter !== 'all') params.filter = this.currentFilter;
+            if (this.currentOrderId)    params.orderId    = this.currentOrderId;
+            if (this.currentCustomerId) params.customerId = this.currentCustomerId;
+            var hash = '#' + Object.keys(params).map(function(k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+            }).join('&');
+            if (location.hash !== hash) {
+                history.replaceState(null, '', hash);
+            }
+            // sessionStorage 保留作兼容备用
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
             sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
         } catch(e) {}
     },
-    
+
     restorePageState: function() {
         try {
+            // 优先从 URL hash 读取（刷新后 hash 仍在）
+            var hash = location.hash.replace(/^#/, '');
+            if (hash) {
+                var state = {};
+                hash.split('&').forEach(function(pair) {
+                    var kv = pair.split('=');
+                    if (kv.length === 2) state[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+                });
+                if (state.page) {
+                    return {
+                        page:       state.page       || null,
+                        filter:     state.filter     || 'all',
+                        orderId:    state.orderId    || null,
+                        customerId: state.customerId || null
+                    };
+                }
+            }
+            // 降级到 sessionStorage
             return {
-                page: sessionStorage.getItem('jf_current_page'),
-                filter: sessionStorage.getItem('jf_current_filter') || "all"
+                page:       sessionStorage.getItem('jf_current_page') || null,
+                filter:     sessionStorage.getItem('jf_current_filter') || 'all',
+                orderId:    null,
+                customerId: null
             };
         } catch(e) {
-            return { page: null, filter: "all" };
+            return { page: null, filter: 'all', orderId: null, customerId: null };
         }
     },
-    
+
     clearPageState: function() {
         try {
             sessionStorage.removeItem('jf_current_page');
             sessionStorage.removeItem('jf_current_filter');
+            if (location.hash) history.replaceState(null, '', location.pathname + location.search);
         } catch(e) {}
         this.currentOrderId = null;
         this.currentCustomerId = null;
@@ -470,12 +504,12 @@ const DashboardCore = {
             var savedState = this.restorePageState();
             var savedPage = savedState.page;
             var savedFilter = savedState.filter;
-            
+
             if (savedPage && savedPage !== 'login' && AUTH.isLoggedIn()) {
                 this.currentPage = savedPage;
                 this.currentFilter = savedFilter || "all";
-                this.currentOrderId = null;
-                this.currentCustomerId = null;
+                this.currentOrderId    = savedState.orderId    || null;
+                this.currentCustomerId = savedState.customerId || null;
                 await this.refreshCurrentPage();
             } else {
                 await this.router();
@@ -485,6 +519,24 @@ const DashboardCore = {
             var timeoutEl = document.getElementById('initTimeout');
             if (timeoutEl) timeoutEl.remove();
             
+            // ========== 监听浏览器前进/后退（URL hash 恢复） ==========
+            var self_init = this;
+            window.removeEventListener('popstate', window._jfPopstateHandler);
+            window._jfPopstateHandler = function() {
+                if (!AUTH.isLoggedIn()) return;
+                var s = self_init.restorePageState();
+                if (s.page && s.page !== 'login') {
+                    self_init.currentPage      = s.page;
+                    self_init.currentFilter    = s.filter    || 'all';
+                    self_init.currentOrderId   = s.orderId   || null;
+                    self_init.currentCustomerId= s.customerId|| null;
+                    self_init.refreshCurrentPage();
+                } else {
+                    self_init.renderDashboard();
+                }
+            };
+            window.addEventListener('popstate', window._jfPopstateHandler);
+
             // ========== 启动逾期天数自动更新 ==========
             if (AUTH.isLoggedIn()) {
                 this._startOverdueUpdateInterval();
@@ -609,9 +661,21 @@ const DashboardCore = {
         });
         this.currentPage = page;
         
-        if (params.orderId) this.currentOrderId = params.orderId;
+        if (params.orderId)    this.currentOrderId    = params.orderId;
         if (params.customerId) this.currentCustomerId = params.customerId;
-        
+
+        // 写入 URL hash（pushState 让浏览器后退键也可用）
+        try {
+            var hp = { page: page };
+            if (this.currentFilter && this.currentFilter !== 'all') hp.filter = this.currentFilter;
+            if (this.currentOrderId)    hp.orderId    = this.currentOrderId;
+            if (this.currentCustomerId) hp.customerId = this.currentCustomerId;
+            var newHash = '#' + Object.keys(hp).map(function(k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(hp[k]);
+            }).join('&');
+            history.pushState(null, '', newHash);
+        } catch(e) {}
+
         this.saveCurrentPageState();
         
         var self = this;
