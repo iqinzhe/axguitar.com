@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.0
+// app-dashboard-funds.js - v1.0 (修复：返回键统一右上角)
 window.APP = window.APP || {};
 
 const DashboardFunds = {
@@ -94,7 +94,7 @@ const DashboardFunds = {
                                     '</tr>' +
                                 '</thead>' +
                                 '<tbody id="capitalTransactionsBody">' + rows + '</tbody>' +
-                            '</table>' +
+                            '<tr>' +
                         '</div>' +
                         '<div class="modal-actions">' +
                             '<button onclick="APP.printCapitalTransactions()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
@@ -175,7 +175,7 @@ const DashboardFunds = {
                         '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                         '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
-                    '</td>';
+                    '</tr>';
                 }
             }
             
@@ -183,8 +183,8 @@ const DashboardFunds = {
                 '<div class="page-header">' +
                     '<h2>💰 ' + (lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + translate('print') + '</button>' +
-                        '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + translate('back') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + translate('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + translate('print') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card">' +
@@ -205,7 +205,7 @@ const DashboardFunds = {
                                     '<th class="col-amount amount">' + (lang === 'id' ? 'Jumlah' : '金额') + '</th>' +
                                     '<th class="col-desc">' + (lang === 'id' ? 'Deskripsi' : '描述') + '</th>' +
                                     (isAdmin ? '<th class="col-store text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
-                                '</td>' +
+                                '</tr>' +
                             '</thead>' +
                             '<tbody id="cashFlowPageBody">' + rows + '</tbody>' +
                         '</table>' +
