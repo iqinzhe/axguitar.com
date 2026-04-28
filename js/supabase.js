@@ -1,4 +1,10 @@
-// supabase.js - v1.0
+// supabase.js - v1.1
+// 修改内容：
+// 1. 新增黑名单相关方法（checkBlacklist, addToBlacklist, removeFromBlacklist, getBlacklist）
+// 2. 新增客户重复检查方法（checkDuplicateCustomer, checkBlacklistDuplicate）
+// 3. 新增订单统计方法（getCustomerOrdersStats, getCustomerOrdersByStatus）
+// 4. 新增黑名单重复检查（isKtpOrPhoneBlacklisted）
+
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
 
@@ -330,6 +336,9 @@ const SupabaseAPI = {
         _storePrefixCache.clear();
         _storesCache = null;
         _storesCacheTime = 0;
+        if (window.JFCache) {
+            window.JFCache.clear();
+        }
     },
 
     async checkStoreStatus(storeId) {
@@ -715,6 +724,268 @@ const SupabaseAPI = {
         
         if (error) throw error;
         return data;
+    },
+
+    // ==================== 黑名单相关方法（新增） ====================
+    
+    async checkBlacklist(customerId) {
+        const { data, error } = await supabaseClient
+            .from('blacklist')
+            .select('id, reason')
+            .eq('customer_id', customerId)
+            .maybeSingle();
+        
+        if (error && error.code === '22P02') {
+            // UUID 格式错误，尝试通过 customer_id 字段查找
+            const { data: customer } = await supabaseClient
+                .from('customers')
+                .select('id')
+                .eq('customer_id', customerId)
+                .single();
+            
+            if (customer) {
+                const { data: retryData } = await supabaseClient
+                    .from('blacklist')
+                    .select('id, reason')
+                    .eq('customer_id', customer.id)
+                    .maybeSingle();
+                return retryData ? { isBlacklisted: true, reason: retryData.reason } : { isBlacklisted: false };
+            }
+            return { isBlacklisted: false };
+        }
+        
+        if (error) throw error;
+        return data ? { isBlacklisted: true, reason: data.reason } : { isBlacklisted: false };
+    },
+
+    async addToBlacklist(customerId, reason, blacklistedBy) {
+        // 获取客户信息
+        const { data: customer, error: customerError } = await supabaseClient
+            .from('customers')
+            .select('id, store_id, customer_id, name, occupation')
+            .eq('id', customerId)
+            .single();
+        
+        if (customerError) throw customerError;
+        
+        // 检查是否已在黑名单
+        const { data: existing } = await supabaseClient
+            .from('blacklist')
+            .select('id')
+            .eq('customer_id', customer.id)
+            .maybeSingle();
+        
+        if (existing) {
+            throw new Error(Utils.lang === 'id' ? 'Nasabah sudah ada di blacklist' : '客户已在黑名单中');
+        }
+        
+        const { error: insertError } = await supabaseClient
+            .from('blacklist')
+            .insert({
+                customer_id: customer.id,
+                reason: reason.trim(),
+                blacklisted_by: blacklistedBy,
+                store_id: customer.store_id
+            });
+        
+        if (insertError) throw insertError;
+        
+        return { customer_id: customer.id, reason: reason.trim() };
+    },
+
+    async removeFromBlacklist(customerId) {
+        let deleteError = null;
+        
+        const { error: directError } = await supabaseClient
+            .from('blacklist')
+            .delete()
+            .eq('customer_id', customerId);
+        
+        if (directError && directError.code === '22P02') {
+            const { data: customer } = await supabaseClient
+                .from('customers')
+                .select('id')
+                .eq('customer_id', customerId)
+                .single();
+            
+            if (customer) {
+                const { error: retryError } = await supabaseClient
+                    .from('blacklist')
+                    .delete()
+                    .eq('customer_id', customer.id);
+                deleteError = retryError;
+            } else {
+                deleteError = directError;
+            }
+        } else {
+            deleteError = directError;
+        }
+        
+        if (deleteError) throw deleteError;
+        return true;
+    },
+
+    async getBlacklist(filterStoreId = null, profile = null) {
+        let query = supabaseClient
+            .from('blacklist')
+            .select(`
+                *,
+                customers:customer_id (
+                    id, customer_id, name, ktp_number, phone, occupation, ktp_address, store_id,
+                    stores:store_id (name, code)
+                ),
+                blacklisted_by_profile:blacklisted_by (name)
+            `)
+            .order('blacklisted_at', { ascending: false });
+        
+        if (profile?.role !== 'admin' && filterStoreId) {
+            query = query.eq('customers.store_id', filterStoreId);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    // ==================== 客户重复检查（安全版本，新增） ====================
+    
+    escapePostgRESTValue(str) {
+        if (!str) return '';
+        return String(str).replace(/[,()\.\[\]]/g, '\\$&');
+    },
+
+    async checkDuplicateCustomer(name, ktpNumber, phone, excludeCustomerId = null) {
+        const filters = [];
+        if (name) filters.push({ column: 'name', value: name });
+        if (ktpNumber) filters.push({ column: 'ktp_number', value: ktpNumber });
+        if (phone) filters.push({ column: 'phone', value: phone });
+        
+        if (filters.length === 0) return null;
+        
+        const orConditions = filters.map(f => f.column + '.eq.' + this.escapePostgRESTValue(f.value)).join(',');
+        
+        let query = supabaseClient
+            .from('customers')
+            .select('id, customer_id, name, ktp_number, phone')
+            .or(orConditions);
+        
+        if (excludeCustomerId) {
+            query = query.neq('id', excludeCustomerId);
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        if (!data || data.length === 0) return null;
+        
+        const duplicateInfo = { name: null, ktp: null, phone: null };
+        const duplicateFields = [];
+        
+        for (const existing of data) {
+            if (existing.name === name && !duplicateInfo.name) {
+                duplicateFields.push('name');
+                duplicateInfo.name = existing;
+            }
+            if (existing.ktp_number === ktpNumber && !duplicateInfo.ktp) {
+                duplicateFields.push('ktp');
+                duplicateInfo.ktp = existing;
+            }
+            if (existing.phone === phone && !duplicateInfo.phone) {
+                duplicateFields.push('phone');
+                duplicateInfo.phone = existing;
+            }
+        }
+        
+        const uniqueFields = [...new Set(duplicateFields)];
+        let bestMatch = data[0];
+        for (const customer of data) {
+            if (customer.name === name && customer.ktp_number === ktpNumber && customer.phone === phone) {
+                bestMatch = customer;
+                break;
+            }
+        }
+        
+        return {
+            isDuplicate: true,
+            duplicateFields: uniqueFields,
+            existingCustomer: bestMatch,
+            duplicateInfo: duplicateInfo
+        };
+    },
+
+    async checkBlacklistDuplicate(ktp, phone) {
+        if (!ktp && !phone) return null;
+        
+        let query = supabaseClient
+            .from('blacklist')
+            .select('customers!blacklist_customer_id_fkey(id, name, ktp_number, phone, customer_id)');
+        
+        const conditions = [];
+        if (ktp) conditions.push(`customers.ktp_number.eq.${ktp}`);
+        if (phone) conditions.push(`customers.phone.eq.${phone}`);
+        
+        if (conditions.length === 0) return null;
+        
+        query = query.or(conditions.join(','));
+        const { data, error } = await query;
+        
+        if (error || !data || data.length === 0) return null;
+        return data[0]?.customers || null;
+    },
+
+    async isKtpOrPhoneBlacklisted(ktp, phone) {
+        return await this.checkBlacklistDuplicate(ktp, phone);
+    },
+
+    // ==================== 订单统计方法（新增） ====================
+    
+    async getCustomerOrdersStats(customerId) {
+        const { data: orders, error } = await supabaseClient
+            .from('orders')
+            .select('id, order_id, status, created_at')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        let activeCount = 0, completedCount = 0, abnormalCount = 0;
+        
+        for (const o of orders || []) {
+            if (o.status === 'active') activeCount++;
+            else if (o.status === 'completed') completedCount++;
+            else if (o.status === 'liquidated') abnormalCount++;
+        }
+        
+        // 查询逾期30天以上的活跃订单
+        const { count: overdueCount } = await supabaseClient
+            .from('orders')
+            .select('id', { count: 'exact', head: true })
+            .eq('customer_id', customerId)
+            .eq('status', 'active')
+            .gte('overdue_days', 30);
+        
+        abnormalCount += (overdueCount || 0);
+        
+        return { activeCount, completedCount, abnormalCount, orders: orders || [] };
+    },
+
+    async getCustomerOrdersByStatus(customerId, statusType) {
+        let query = supabaseClient
+            .from('orders')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+        
+        if (statusType === 'active') {
+            query = query.eq('status', 'active');
+        } else if (statusType === 'completed') {
+            query = query.eq('status', 'completed');
+        } else if (statusType === 'abnormal') {
+            query = query.or('status.eq.liquidated,and(status.eq.active,overdue_days.gte.30)');
+        }
+        
+        const { data, error } = await query;
+        if (error) throw error;
+        return data || [];
     },
 
     calculateNextDueDate: function(startDate, paidMonths) {
@@ -1277,12 +1548,6 @@ const SupabaseAPI = {
         
         if (window.Audit) {
             await window.Audit.logPayment(currentOrder.order_id, 'principal', paidAmount, paymentMethod);
-        }
-        
-        if (isFullRepayment) {
-            alert(Utils.lang === 'id' ? '✅ Pesanan lunas' : '✅ 订单已结清');
-        } else {
-            alert((Utils.lang === 'id' ? '✅ Pembayaran pokok ' : '✅ 还款 ') + this.formatCurrency(paidAmount) + (Utils.lang === 'id' ? ' telah dicatat' : ' 已记录'));
         }
         
         return true;
