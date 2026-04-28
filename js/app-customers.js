@@ -1,4 +1,4 @@
-// app-customers.js - v2.2（修复：alert 替换为 Toast + 黑名单检查优化）
+// app-customers.js - v3.0（客户列表重构：新表格结构 + 详情弹窗卡片）
 window.APP = window.APP || {};
 
 const CustomersModule = {
@@ -19,7 +19,8 @@ const CustomersModule = {
                 storeMap[stores[i].id] = stores[i].name;
             }
             
-            var totalCols = isAdmin ? 9 : 8;
+            // 列数：ID,姓名,身份证,手机号,职业,创建订单按钮,操作 = 7列
+            var totalCols = 7;
             
             var rows = '';
             if (!customers || customers.length === 0) {
@@ -28,33 +29,22 @@ const CustomersModule = {
                 for (var i = 0; i < customers.length; i++) {
                     var c = customers[i];
                     var customerId = Utils.escapeHtml(c.customer_id || '-');
-                    var registeredDate = Utils.formatDate(c.registered_date);
                     var name = Utils.escapeHtml(c.name);
                     var ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
                     var phone = Utils.escapeHtml(c.phone || '-');
                     var occupation = Utils.escapeHtml(c.occupation || '-');
-                    var ktpAddress = Utils.escapeHtml(c.ktp_address || c.address || '-');
-                    var livingAddress = Utils.escapeHtml(c.living_address || (c.living_same_as_ktp ? (lang === 'id' ? 'Sama KTP' : '同KTP') : '-'));
-                    var storeName = isAdmin ? Utils.escapeHtml(storeMap[c.store_id] || '-') : '';
                     
-                    rows += '<tr>' +
+                    rows += '<tr class="data-row">' +
                         '<td class="col-id">' + customerId + '</td>' +
                         '<td class="col-name">' + name + '</td>' +
                         '<td class="col-ktp">' + ktpNumber + '</td>' +
                         '<td class="col-phone">' + phone + '</td>' +
-                        '<td class="col-name">' + occupation + '</td>' +
-                        '<td class="col-address">' + ktpAddress + '</td>' +
-                        '<td class="col-address">' + livingAddress + '</td>' +
-                        '<td class="date-cell text-center">' + registeredDate + '</td>' +
-                        (isAdmin ? '<td class="text-center">' + storeName + '</td>' : '') +
-                    '</tr>';
-                    
-                    rows += '<tr class="action-row">' +
-                        '<td class="action-label">' + (lang === 'id' ? 'Aksi' : '操作') + '</td>' +
-                        '<td colspan="' + (totalCols - 1) + '">' +
-                            '<div class="action-buttons">' +
-                                '<button onclick="APP.showCustomerDetailModal(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small">👁️ ' + (lang === 'id' ? 'Detail' : '详情') + '</button>' +
-                            '</div>' +
+                        '<td class="col-occupation">' + occupation + '</td>' +
+                        '<td class="text-center">' +
+                            '<button onclick="APP.createOrderForCustomer(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small success" style="background:var(--success-dark);color:white;white-space:nowrap;">➕ ' + (lang === 'id' ? 'Buat Pesanan' : '创建订单') + '</button>' +
+                        '</td>' +
+                        '<td class="text-center">' +
+                            '<button onclick="APP.showCustomerDetailCard(\'' + Utils.escapeAttr(c.id) + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Detail' : '详情') + '</button>' +
                         '</td>' +
                     '</tr>';
                 }
@@ -101,7 +91,73 @@ const CustomersModule = {
                 '</div>';
             }
 
-            document.getElementById("app").innerHTML = '' +
+            // 添加内联样式优化表格
+            var inlineStyles = '' +
+                '<style>' +
+                    '/* 客户列表表格 - 电脑端优化 */' +
+                    '@media (min-width: 769px) {' +
+                        '.customer-list-table {' +
+                            'table-layout: fixed;' +
+                            'width: 100%;' +
+                        '}' +
+                        '.customer-list-table .col-id { width: 10%; }' +
+                        '.customer-list-table .col-name { width: 12%; padding-left: 12px; }' +
+                        '.customer-list-table .col-ktp { width: 14%; }' +
+                        '.customer-list-table .col-phone { width: 12%; white-space: nowrap; }' +
+                        '.customer-list-table .col-occupation { width: 12%; }' +
+                        '.customer-list-table td:nth-child(6) { width: 13%; }' +  // 创建订单按钮列
+                        '.customer-list-table td:nth-child(7) { width: 8%; }' +   // 操作列
+                        '.customer-list-table .col-address-ktp,' +
+                        '.customer-list-table .col-address-living,' +
+                        '.customer-list-table .col-store,' +
+                        '.customer-list-table .date-cell {' +
+                            'display: none;' +
+                        '}' +
+                    '}' +
+                    '/* 手机端保持原有样式 */' +
+                    '@media (max-width: 768px) {' +
+                        '.customer-list-table .col-address-ktp,' +
+                        '.customer-list-table .col-address-living {' +
+                            'display: table-cell;' +
+                        '}' +
+                    '}' +
+                    '/* 详情卡片样式 */' +
+                    '.customer-detail-card .order-stats {' +
+                        'display: flex;' +
+                        'gap: 16px;' +
+                        'flex-wrap: wrap;' +
+                        'margin: 16px 0;' +
+                        'padding: 12px;' +
+                        'background: var(--bg-hover);' +
+                        'border-radius: var(--radius-md);' +
+                    '}' +
+                    '.customer-detail-card .stat-item {' +
+                        'flex: 1;' +
+                        'text-align: center;' +
+                        'cursor: pointer;' +
+                        'transition: transform 0.2s;' +
+                        'padding: 8px;' +
+                        'border-radius: var(--radius-sm);' +
+                    '}' +
+                    '.customer-detail-card .stat-item:hover {' +
+                        'background: var(--border-light);' +
+                        'transform: translateY(-2px);' +
+                    '}' +
+                    '.customer-detail-card .stat-number {' +
+                        'font-size: 24px;' +
+                        'font-weight: 700;' +
+                        'display: block;' +
+                    '}' +
+                    '.customer-detail-card .stat-label {' +
+                        'font-size: var(--font-xs);' +
+                        'color: var(--text-secondary);' +
+                    '}' +
+                    '.customer-detail-card .stat-item.active .stat-number { color: var(--primary); }' +
+                    '.customer-detail-card .stat-item.completed .stat-number { color: var(--success-dark); }' +
+                    '.customer-detail-card .stat-item.abnormal .stat-number { color: var(--danger); }' +
+                '</style>';
+            
+            document.getElementById("app").innerHTML = inlineStyles + '' +
                 '<div class="page-header">' +
                     '<div style="display:flex; align-items:center; gap:12px;">' +
                         '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
@@ -114,18 +170,16 @@ const CustomersModule = {
                 '<div class="card">' +
                     '<h3>' + (lang === 'id' ? 'Daftar Nasabah' : '客户列表') + '</h3>' +
                     '<div class="table-container">' +
-                        '<table class="data-table customer-table">' +
+                        '<table class="data-table customer-list-table">' +
                             '<thead>' +
                                 '<tr>' +
                                     '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
                                     '<th class="col-name">' + t('customer_name') + '</th>' +
                                     '<th class="col-ktp">' + t('ktp_number') + '</th>' +
                                     '<th class="col-phone">' + t('phone') + '</th>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</th>' +
-                                    '<th class="col-address">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + '</th>' +
-                                    '<th class="col-address">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + '</th>' +
-                                    '<th class="col-date text-center">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + '</th>' +
-                                    (isAdmin ? '<th class="col-store text-center">' + (lang === 'id' ? 'Toko' : '门店') + '</th>' : '') +
+                                    '<th class="col-occupation">' + (lang === 'id' ? 'Pekerjaan' : '职业') + '</th>' +
+                                    '<th class="text-center">' + (lang === 'id' ? 'Buat Pesanan' : '创建订单') + '</th>' +
+                                    '<th class="text-center">' + t('action') + '</th>' +
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
@@ -144,8 +198,8 @@ const CustomersModule = {
         }
     },
 
-    // ========== 客户详情弹窗（修复：编辑后刷新黑名单状态） ==========
-    showCustomerDetailModal: async function(customerId) {
+    // ========== 新增：详情卡片弹窗 ==========
+    showCustomerDetailCard: async function(customerId) {
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
         var isAdmin = AUTH.isAdmin();
@@ -155,7 +209,7 @@ const CustomersModule = {
             const customer = await SUPABASE.getCustomer(customerId);
             if (!customer) throw new Error(lang === 'id' ? 'Nasabah tidak ditemukan' : '客户不存在');
             
-            // 检查黑名单状态 - 使用 customer.id
+            // 检查黑名单状态
             let isBlacklisted = false;
             let blacklistReason = '';
             try {
@@ -172,116 +226,153 @@ const CustomersModule = {
                 console.warn('黑名单检查失败:', blErr.message);
             }
             
+            // 获取客户的所有订单
             const { data: orders, error: ordersError } = await supabaseClient
                 .from('orders')
-                .select('order_id, loan_amount, status, created_at')
+                .select('id, order_id, status, created_at')
                 .eq('customer_id', customerId)
-                .order('created_at', { ascending: false })
-                .limit(5);
+                .order('created_at', { ascending: false });
             
             if (ordersError) throw ordersError;
             
-            var statusMap = {
-                active: lang === 'id' ? '🟢 Aktif' : '🟢 进行中',
-                completed: lang === 'id' ? '✅ Lunas' : '✅ 已结清',
-                liquidated: lang === 'id' ? '⚠️ Likuidasi' : '⚠️ 已变卖'
-            };
+            // 统计订单状态
+            let activeCount = 0;      // 进行中
+            let completedCount = 0;   // 已结清
+            let abnormalCount = 0;    // 异常：逾期30天+ 或 已变卖(liquidated)
             
-            var ordersHtml = '';
-            if (!orders || orders.length === 0) {
-                ordersHtml = '<div class="empty-state" style="padding:var(--spacing-2);"><span class="empty-state-text">' + (lang === 'id' ? 'Belum ada pesanan' : '暂无订单') + '</span></div>';
-            } else {
-                ordersHtml = '<div style="max-height:200px; overflow-y:auto;">';
-                for (var i = 0; i < orders.length; i++) {
-                    var o = orders[i];
-                    var statusClass = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
-                    ordersHtml += '' +
-                        '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-light);">' +
-                            '<div>' +
-                                '<strong>' + Utils.escapeHtml(o.order_id) + '</strong><br>' +
-                                '<small>' + Utils.formatCurrency(o.loan_amount) + '</small>' +
-                            '</div>' +
-                            '<div style="display:flex; align-items:center; gap:8px;">' +
-                                '<span class="status-badge ' + statusClass + '">' + (statusMap[o.status] || o.status) + '</span>' +
-                                '<button onclick="APP.viewOrderFromModal(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small" style="padding:2px 8px;">👁️ ' + t('view') + '</button>' +
-                            '</div>' +
-                        '</div>';
-                }
-                ordersHtml += '</div>';
-                if (orders.length >= 5) {
-                    ordersHtml += '<div style="text-align:center; margin-top:8px;"><button onclick="APP.showCustomerOrders(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small">📋 ' + (lang === 'id' ? 'Lihat semua pesanan' : '查看全部订单') + '</button></div>';
+            for (var i = 0; i < (orders || []).length; i++) {
+                var o = orders[i];
+                if (o.status === 'active') {
+                    activeCount++;
+                } else if (o.status === 'completed') {
+                    completedCount++;
+                } else if (o.status === 'liquidated') {
+                    abnormalCount++;
                 }
             }
             
-            var canBlacklist = !isAdmin && !isBlacklisted && profile?.store_id === customer.store_id;
+            // 获取逾期订单数量（额外查询逾期>=30天的活跃订单）
+            try {
+                const { count: overdueCount } = await supabaseClient
+                    .from('orders')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('customer_id', customerId)
+                    .eq('status', 'active')
+                    .gte('overdue_days', 30);
+                // 逾期30天以上的订单也算异常
+                abnormalCount += (overdueCount || 0);
+            } catch(e) {
+                console.warn('获取逾期订单失败:', e);
+            }
+            
+            // 权限控制：编辑按钮仅管理员可见
+            var canEdit = isAdmin;
+            // 拉黑按钮：门店操作员和管理员均可操作（未拉黑时显示）
+            var canBlacklist = !isBlacklisted;
+            // 解除拉黑按钮：仅管理员可见且已拉黑时显示
             var canUnblacklist = isAdmin && isBlacklisted;
             
-            var blacklistButtonHtml = '';
-            if (canBlacklist) {
-                blacklistButtonHtml = '<button onclick="APP.blacklistFromModal(\'' + Utils.escapeAttr(customer.id) + '\', \'' + Utils.escapeAttr(customer.name) + '\')" class="btn-small btn-blacklist" style="background:#f97316;color:#fff;">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>';
-            } else if (canUnblacklist) {
-                blacklistButtonHtml = '<button onclick="APP.unblacklistFromModal(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>';
+            // 获取注册日期、KTP地址、居住地址
+            var registeredDate = Utils.formatDate(customer.registered_date);
+            var ktpAddress = Utils.escapeHtml(customer.ktp_address || customer.address || '-');
+            var livingAddress = Utils.escapeHtml(
+                customer.living_same_as_ktp !== false 
+                    ? (lang === 'id' ? 'Sama KTP' : '同KTP') 
+                    : (customer.living_address || '-')
+            );
+            
+            // 构建订单统计HTML（可点击跳转）
+            var orderStatsHtml = '' +
+                '<div class="order-stats">' +
+                    '<div class="stat-item active" onclick="APP.showCustomerOrdersByStatus(\'' + Utils.escapeAttr(customerId) + '\', \'active\')" style="cursor:pointer;">' +
+                        '<span class="stat-number">' + activeCount + '</span>' +
+                        '<span class="stat-label">' + (lang === 'id' ? 'Berjalan' : '进行中') + '</span>' +
+                    '</div>' +
+                    '<div class="stat-item completed" onclick="APP.showCustomerOrdersByStatus(\'' + Utils.escapeAttr(customerId) + '\', \'completed\')" style="cursor:pointer;">' +
+                        '<span class="stat-number">' + completedCount + '</span>' +
+                        '<span class="stat-label">' + (lang === 'id' ? 'Lunas' : '已结清') + '</span>' +
+                    '</div>' +
+                    '<div class="stat-item abnormal" onclick="APP.showCustomerOrdersByStatus(\'' + Utils.escapeAttr(customerId) + '\', \'abnormal\')" style="cursor:pointer;">' +
+                        '<span class="stat-number">' + abnormalCount + '</span>' +
+                        '<span class="stat-label">' + (lang === 'id' ? 'Abnormal' : '异常订单') + '</span>' +
+                    '</div>' +
+                '</div>';
+            
+            // 黑名单状态徽章
+            var blacklistBadge = '';
+            if (isBlacklisted) {
+                blacklistBadge = '<div class="info-bar warning" style="margin:0 0 12px 0; padding:6px 12px;"><small>⚠️ ' + Utils.escapeHtml(blacklistReason) + '</small></div>';
             }
             
-            var statusBadgeHtml = isBlacklisted 
-                ? '<span class="status-badge liquidated">🚫 ' + (lang === 'id' ? 'Diblacklist' : '已拉黑') + '</span>'
-                : '<span class="status-badge active">✅ ' + (lang === 'id' ? 'Normal' : '正常') + '</span>';
-            
-            var canEdit = isAdmin || profile?.store_id === customer.store_id;
-            var editButtonHtml = canEdit 
-                ? '<button onclick="APP.editCustomerFromModal(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small">✏️ ' + (lang === 'id' ? 'Edit' : '编辑') + '</button>'
-                : '';
-            
-            var occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
-            
+            // 构建弹窗卡片HTML
             var modalHtml = '' +
-                '<div id="customerDetailModal" class="modal-overlay">' +
-                    '<div class="modal-content" style="max-width:600px; max-height:85vh; overflow-y:auto;">' +
+                '<div id="customerDetailCard" class="modal-overlay customer-detail-card">' +
+                    '<div class="modal-content" style="max-width:500px;">' +
                         '<h3 style="display:flex; justify-content:space-between; align-items:center;">' +
-                            '<span>👤 ' + (lang === 'id' ? 'Detail Nasabah' : '客户详情') + '</span>' +
-                            '<button onclick="document.getElementById(\'customerDetailModal\').remove()" style="background:none; border:none; font-size:20px; cursor:pointer;">✖</button>' +
+                            '<span>📋 ' + (lang === 'id' ? 'Detail Nasabah' : '客户详情') + ' - ' + Utils.escapeHtml(customer.name) + '</span>' +
+                            '<button onclick="document.getElementById(\'customerDetailCard\').remove()" style="background:none; border:none; font-size:20px; cursor:pointer;">✖</button>' +
                         '</h3>' +
                         
-                        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid var(--border-light);">' +
-                            '<div>' + statusBadgeHtml + '</div>' +
-                            (isBlacklisted ? '<div class="info-bar warning" style="margin:0; padding:4px 8px;"><small>⚠️ ' + Utils.escapeHtml(blacklistReason) + '</small></div>' : '') +
-                        '</div>' +
+                        blacklistBadge +
                         
                         '<div class="form-section">' +
-                            '<div class="form-section-title">📋 ' + (lang === 'id' ? 'Informasi Dasar' : '基本信息') + '</div>' +
                             '<div class="info-display">' +
-                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.customer_id || '-') + '</span></div>' +
-                                '<div class="info-display-item"><span class="info-label">' + t('customer_name') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.name) + '</span></div>' +
-                                '<div class="info-display-item"><span class="info-label">' + t('ktp_number') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.ktp_number || '-') + '</span></div>' +
-                                '<div class="info-display-item"><span class="info-label">' + t('phone') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.phone) + '</span></div>' +
-                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Pekerjaan' : '职业') + ':</span><span class="info-value">' + occupationDisplay + '</span></div>' +
-                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + ':</span><span class="info-value">' + Utils.escapeHtml(customer.ktp_address || customer.address || '-') + '</span></div>' +
-                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</span><span class="info-value">' + (customer.living_same_as_ktp !== false ? (lang === 'id' ? 'Sama KTP' : '同KTP') : Utils.escapeHtml(customer.living_address || '-')) + '</span></div>' +
-                                '<div class="info-display-item"><span class="info-label">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + ':</span><span class="info-value">' + Utils.formatDate(customer.registered_date) + '</span></div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.customer_id || '-') + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + t('customer_name') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.name) + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + t('ktp_number') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.ktp_number || '-') + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + t('phone') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.phone) + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Pekerjaan' : '职业') + ':</span>' +
+                                    '<span class="info-value">' + Utils.escapeHtml(customer.occupation || '-') + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Tanggal Daftar' : '注册日期') + ':</span>' +
+                                    '<span class="info-value">' + registeredDate + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Alamat KTP' : 'KTP地址') + ':</span>' +
+                                    '<span class="info-value">' + ktpAddress + '</span>' +
+                                '</div>' +
+                                '<div class="info-display-item">' +
+                                    '<span class="info-label">' + (lang === 'id' ? 'Alamat Tinggal' : '居住地址') + ':</span>' +
+                                    '<span class="info-value">' + livingAddress + '</span>' +
+                                '</div>' +
                             '</div>' +
                         '</div>' +
                         
                         '<div class="form-section">' +
-                            '<div class="form-section-title">📋 ' + (lang === 'id' ? 'Pesanan Terkait' : '关联订单') + '</div>' +
-                            ordersHtml +
+                            '<div class="form-section-title">📋 ' + (lang === 'id' ? 'Statistik Pesanan' : '订单统计') + '</div>' +
+                            orderStatsHtml +
                         '</div>' +
                         
                         '<div style="display:flex; gap:12px; justify-content:flex-end; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-light); flex-wrap:wrap;">' +
-                            '<button onclick="APP.createOrderForCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small success" style="background:var(--success-dark);color:white;">➕ ' + (lang === 'id' ? 'Buat Pesanan' : '创建订单') + '</button>' +
-                            editButtonHtml +
-                            blacklistButtonHtml +
-                            '<button onclick="document.getElementById(\'customerDetailModal\').remove()" class="btn-back">✖ ' + t('cancel') + '</button>' +
+                            (canEdit ? '<button onclick="APP.editCustomerFromCard(\'' + Utils.escapeAttr(customerId) + '\')" class="btn-small" style="background:var(--primary-dark);color:white;">✏️ ' + (lang === 'id' ? 'Edit' : '编辑') + '</button>' : '') +
+                            (canBlacklist ? '<button onclick="APP.blacklistFromCard(\'' + Utils.escapeAttr(customer.id) + '\', \'' + Utils.escapeAttr(customer.name) + '\')" class="btn-small btn-blacklist" style="background:#f97316;color:#fff;">🚫 ' + (lang === 'id' ? 'Blacklist' : '拉黑') + '</button>' : '') +
+                            (canUnblacklist ? '<button onclick="APP.unblacklistFromCard(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small warning">🔓 ' + (lang === 'id' ? 'Buka Blacklist' : '解除拉黑') + '</button>' : '') +
+                            '<button onclick="document.getElementById(\'customerDetailCard\').remove()" class="btn-back">✖ ' + t('cancel') + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
             
-            var oldModal = document.getElementById('customerDetailModal');
+            var oldModal = document.getElementById('customerDetailCard');
             if (oldModal) oldModal.remove();
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
         } catch (error) {
-            console.error("showCustomerDetailModal error:", error);
+            console.error("showCustomerDetailCard error:", error);
             if (window.Toast) {
                 window.Toast.error(lang === 'id' ? '加载客户详情失败：' + error.message : 'Gagal memuat detail nasabah: ' + error.message);
             } else {
@@ -290,21 +381,20 @@ const CustomersModule = {
         }
     },
     
-    // ========== 从弹窗编辑客户 ==========
-    editCustomerFromModal: async function(customerId) {
-        var modal = document.getElementById('customerDetailModal');
+    // ========== 从卡片编辑客户 ==========
+    editCustomerFromCard: async function(customerId) {
+        var modal = document.getElementById('customerDetailCard');
         if (modal) modal.remove();
         await this.editCustomer(customerId);
     },
     
-    // ========== 从弹窗拉黑客户 ==========
-    blacklistFromModal: async function(customerUuid, customerName) {
+    // ========== 从卡片拉黑客户 ==========
+    blacklistFromCard: async function(customerUuid, customerName) {
         var lang = Utils.lang;
         
-        var modal = document.getElementById('customerDetailModal');
+        var modal = document.getElementById('customerDetailCard');
         if (modal) modal.remove();
         
-        // 使用 prompt 替换为内联输入？（暂时保留 prompt 但使用 Toast 提示）
         var reason = prompt(
             lang === 'id' 
                 ? 'Masukkan alasan blacklist untuk nasabah "' + customerName + '":\n\nContoh: Telat bayar, Penipuan, dll.'
@@ -321,7 +411,6 @@ const CustomersModule = {
             return;
         }
         
-        // 使用 Toast 确认框
         var confirmMsg = lang === 'id' 
             ? '⚠️ Yakin akan blacklist nasabah ini?\n\nNama: ' + customerName + '\nAlasan: ' + reason + '\n\nNasabah yang di-blacklist tidak dapat membuat order baru.'
             : '⚠️ 确认拉黑此客户？\n\n客户名: ' + customerName + '\n原因: ' + reason + '\n\n被拉黑的客户将无法创建新订单。';
@@ -347,8 +436,8 @@ const CustomersModule = {
         }
     },
     
-    // ========== 从弹窗解除拉黑 ==========
-    unblacklistFromModal: async function(customerUuid) {
+    // ========== 从卡片解除拉黑 ==========
+    unblacklistFromCard: async function(customerUuid) {
         var lang = Utils.lang;
         
         var confirmMsg = lang === 'id' ? 'Yakin ingin membuka blacklist nasabah ini?' : '确认解除此客户的拉黑？';
@@ -363,7 +452,7 @@ const CustomersModule = {
                 alert(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
             }
             
-            var modal = document.getElementById('customerDetailModal');
+            var modal = document.getElementById('customerDetailCard');
             if (modal) modal.remove();
             
             await APP.showCustomers();
@@ -377,20 +466,55 @@ const CustomersModule = {
         }
     },
     
-    // ========== 从弹窗查看订单 ==========
-    viewOrderFromModal: function(orderId) {
-        var modal = document.getElementById('customerDetailModal');
-        if (modal) modal.remove();
-        APP.navigateTo('viewOrder', { orderId: orderId });
+    // ========== 按状态查看客户订单 ==========
+    showCustomerOrdersByStatus: async function(customerId, statusType) {
+        var lang = Utils.lang;
+        
+        try {
+            const customer = await SUPABASE.getCustomer(customerId);
+            if (!customer) return;
+            
+            let query = supabaseClient
+                .from('orders')
+                .select('*')
+                .eq('customer_id', customerId)
+                .order('created_at', { ascending: false });
+            
+            if (statusType === 'active') {
+                query = query.eq('status', 'active');
+            } else if (statusType === 'completed') {
+                query = query.eq('status', 'completed');
+            } else if (statusType === 'abnormal') {
+                // 异常订单：状态为 liquidated 或 逾期>=30天
+                query = query.or('status.eq.liquidated,and(status.eq.active,overdue_days.gte.30)');
+            }
+            
+            const { data: orders, error } = await query;
+            if (error) throw error;
+            
+            // 关闭详情卡片
+            var modal = document.getElementById('customerDetailCard');
+            if (modal) modal.remove();
+            
+            // 跳转到客户订单列表页面
+            APP.currentCustomerId = customerId;
+            APP.showCustomerOrders(customerId);
+            
+        } catch (error) {
+            console.error("showCustomerOrdersByStatus error:", error);
+            if (window.Toast) {
+                window.Toast.error(lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
+            }
+        }
     },
 
-    // ========== 切换居住地址显示 ==========
+    // ========== 保留原有方法 ==========
+    
     toggleLivingAddress: function(value) {
         var el = document.getElementById('customerLivingAddress');
         if (el) el.style.display = value === 'different' ? 'block' : 'none';
     },
 
-    // ========== 新增客户（增加黑名单重复检查） ==========
     addCustomer: async function() {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -601,7 +725,6 @@ const CustomersModule = {
         }
     },
 
-    // ========== 编辑客户 ==========
     editCustomer: async function(customerId) {
         var isAdmin = AUTH.isAdmin();
         var lang = Utils.lang;
@@ -732,7 +855,6 @@ const CustomersModule = {
         }
     },
 
-    // ========== 删除客户 ==========
     deleteCustomer: async function(customerId) {
         var lang = Utils.lang;
         var confirmed = window.Toast ? await window.Toast.confirmPromise(Utils.t('confirm_delete')) : confirm(Utils.t('confirm_delete'));
@@ -1452,7 +1574,7 @@ const CustomersModule = {
                     '<h3>📋 ' + t('order_list') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th class="col-id">ID</th><th class="col-date">' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="col-amount amount">' + t('loan_amount') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></tr></thead>' +
+                            '<thead><tr><th class="col-id">ID</th><th class="col-date">' + (lang === 'id' ? 'Tanggal' : '日期') + '</th><th class="col-amount amount">' + t('loan_amount') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Jenis' : '方式') + '</th><th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th></td></thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
                     '</div>' +
@@ -1536,7 +1658,7 @@ const CustomersModule = {
                                     '<th class="col-amount amount">' + t('amount') + '</th>' +
                                     '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
                                     '<th class="col-desc">' + t('description') + '</th>' +
-                                '</tr>' +
+                                '</table>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
