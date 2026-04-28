@@ -1,4 +1,10 @@
-// app-dashboard-core.js - v1.0
+// app-dashboard-core.js - v1.1
+// 修改内容：
+// 1. 移除独立的 DashboardCache，改用统一 JFCache 模块
+// 2. 添加模块加载防御检查
+// 3. 将 alert 改为 Utils.toast 统一调用
+// 4. 优化 refreshCurrentPage 中的模块存在性检查
+
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
@@ -89,46 +95,9 @@ const ModuleFallback = {
 
 window.ModuleFallback = ModuleFallback;
 
-// ==================== 仪表盘缓存模块 ====================
-const DashboardCache = {
-    data: new Map(),
-    ttl: 5 * 60 * 1000,
-    
-    getKey(...parts) { return parts.join(':'); },
-    
-    async get(key, fetcher, forceRefresh = false) {
-        if (!forceRefresh) {
-            const cached = this.data.get(key);
-            if (cached && Date.now() - cached.time < this.ttl) {
-                console.log(`[Cache] Hit: ${key}`);
-                return cached.value;
-            }
-        }
-        console.log(`[Cache] Miss: ${key}`);
-        try {
-            const value = await fetcher();
-            this.data.set(key, { value, time: Date.now() });
-            return value;
-        } catch (error) {
-            const staleCached = this.data.get(key);
-            if (staleCached) {
-                console.warn(`[Cache] 使用过期缓存: ${key}`, error.message);
-                return staleCached.value;
-            }
-            throw error;
-        }
-    },
-    
-    invalidate(key) {
-        if (key) {
-            this.data.delete(key);
-            console.log(`[Cache] Invalidated: ${key}`);
-        } else {
-            this.data.clear();
-            console.log(`[Cache] Cleared all`);
-        }
-    }
-};
+// ==================== 使用统一缓存模块 ====================
+// DashboardCache 现在指向 JFCache，保持向后兼容
+const DashboardCache = JFCache;
 
 // ==================== 聚合查询辅助方法 ====================
 const DashboardStatsHelper = {
@@ -481,7 +450,16 @@ const DashboardCore = {
         }, 5000);
     },
 
-    // ========== 修复：init 方法 - 优先使用 HTML 传递的状态 ==========
+    // ========== 防御性模块检查 ==========
+    _ensureModuleLoaded: function(moduleName, moduleFn) {
+        if (typeof moduleFn !== 'function') {
+            console.warn(`[ModuleCheck] ${moduleName} 未加载，将使用降级方案`);
+            return false;
+        }
+        return true;
+    },
+
+    // ========== init 方法 ==========
     init: async function() {
         var lang = Utils.lang || 'zh';
         
@@ -528,17 +506,13 @@ const DashboardCore = {
             }, 15000);
             
             // ========== 关键修复：刷新后停留当前页面 ==========
-            // 优先使用从 HTML 传递过来的恢复状态（由 index.html 在 APP 加载前设置）
             var savedState = null;
             
             if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
-                // 使用 HTML 传递的状态（最可靠）
                 savedState = window._RESTORED_STATE;
                 console.log('[状态恢复] 使用 HTML 传递的状态:', savedState.page);
-                // 清除全局变量，避免重复使用
                 delete window._RESTORED_STATE;
             } else {
-                // 降级：从存储中恢复
                 savedState = this.restorePageState();
                 console.log('[状态恢复] 从存储恢复:', savedState.page);
             }
@@ -548,11 +522,9 @@ const DashboardCore = {
             var savedOrderId = savedState.orderId;
             var savedCustomerId = savedState.customerId;
             
-            // 检查用户是否已登录
             const isLoggedIn = AUTH.isLoggedIn();
             
             if (savedPage && savedPage !== 'login' && isLoggedIn) {
-                // 恢复保存的页面状态
                 this.currentPage = savedPage;
                 this.currentFilter = savedFilter || "all";
                 this.currentOrderId = savedOrderId || null;
@@ -560,11 +532,9 @@ const DashboardCore = {
                 console.log('[状态恢复] 最终恢复页面:', savedPage, '订单ID:', savedOrderId, '客户ID:', savedCustomerId);
                 await this.refreshCurrentPage();
             } else if (isLoggedIn) {
-                // 已登录但没有保存的页面，显示仪表盘
                 console.log('[状态恢复] 无保存状态，显示仪表盘');
                 await this.renderDashboard();
             } else {
-                // 未登录，显示登录页
                 console.log('[状态恢复] 未登录，显示登录页');
                 await this.router();
             }
@@ -586,9 +556,7 @@ const DashboardCore = {
                 ? '⚠️ 系统加载失败: ' + error.message + '\n\n请刷新页面重试。'
                 : '⚠️ System load failed: ' + error.message + '\n\nPlease refresh the page.');
             
-            if (window.Toast) {
-                window.Toast.error(errorMsg, 5000);
-            }
+            Utils.toast.error(errorMsg, 5000);
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="card" style="text-align:center;padding:40px;">' +
@@ -617,13 +585,14 @@ const DashboardCore = {
         
         await new Promise(function(resolve) { setTimeout(resolve, 100); });
         
+        // 防御性模块检查
         var handlers = {
             dashboard: async () => {
                 try {
                     await self.renderDashboard();
                 } catch (e) {
                     console.error("renderDashboard failed:", e);
-                    if (window.Toast) window.Toast.error('加载仪表盘失败，请刷新页面', 4000);
+                    Utils.toast.error('加载仪表盘失败，请刷新页面', 4000);
                     document.getElementById("app").innerHTML = '' +
                         '<div class="card" style="text-align:center;padding:40px;">' +
                             '<p>' + (Utils.lang === 'id' ? '⚠️ 加载仪表盘失败，请刷新页面。' : '⚠️ Dashboard load failed.') + '</p>' +
@@ -634,27 +603,47 @@ const DashboardCore = {
             orderTable: () => ModuleFallback.safeCall('Daftar Pesanan', window.APP.showOrderTable, [], () => self.renderDashboard()),
             createOrder: () => ModuleFallback.safeCall('Buat Pesanan', window.APP.showCreateOrder, [], null),
             viewOrder: async () => { 
-                if (self.currentOrderId) {
+                if (self.currentOrderId && self._ensureModuleLoaded('viewOrder', window.APP.viewOrder)) {
                     return await ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [self.currentOrderId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
             payment: async () => { 
-                if (self.currentOrderId) {
+                if (self.currentOrderId && self._ensureModuleLoaded('showPayment', window.APP.showPayment)) {
                     return await ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [self.currentOrderId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
-            anomaly: () => ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], () => self.renderDashboard()),
-            userManagement: () => ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], () => self.renderDashboard()),
+            anomaly: () => {
+                if (self._ensureModuleLoaded('showAnomaly', window.APP.showAnomaly)) {
+                    return ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], () => self.renderDashboard());
+                }
+                return self.renderDashboard();
+            },
+            userManagement: () => {
+                if (self._ensureModuleLoaded('showUserManagement', window.APP.showUserManagement)) {
+                    return ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], () => self.renderDashboard());
+                }
+                return self.renderDashboard();
+            },
             storeManagement: () => {
                 if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') {
                     return ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], () => self.renderDashboard());
                 }
                 return self.renderDashboard();
             },
-            expenses: () => ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], () => self.renderDashboard()),
-            customers: () => ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], () => self.renderDashboard()),
+            expenses: () => {
+                if (self._ensureModuleLoaded('showExpenses', window.APP.showExpenses)) {
+                    return ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], () => self.renderDashboard());
+                }
+                return self.renderDashboard();
+            },
+            customers: () => {
+                if (self._ensureModuleLoaded('showCustomers', window.APP.showCustomers)) {
+                    return ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], () => self.renderDashboard());
+                }
+                return self.renderDashboard();
+            },
             paymentHistory: async () => {
                 if (typeof window.APP.showCashFlowPage === 'function') {
                     return await ModuleFallback.safeCall('Arus Kas', window.APP.showCashFlowPage, [], () => self.renderDashboard());
@@ -671,18 +660,23 @@ const DashboardCore = {
                 return self.renderDashboard();
             },
             customerOrders: async () => { 
-                if (self.currentCustomerId && typeof window.APP.showCustomerOrders === 'function') {
+                if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerOrders', window.APP.showCustomerOrders)) {
                     return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
             customerPaymentHistory: async () => { 
-                if (self.currentCustomerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
+                if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerPaymentHistory', window.APP.showCustomerPaymentHistory)) {
                     return await ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [self.currentCustomerId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
-            blacklist: () => ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], () => self.renderDashboard())
+            blacklist: () => {
+                if (self._ensureModuleLoaded('showBlacklist', window.APP.showBlacklist)) {
+                    return ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], () => self.renderDashboard());
+                }
+                return self.renderDashboard();
+            }
         };
         
         var handler = handlers[this.currentPage];
@@ -731,10 +725,12 @@ const DashboardCore = {
         if (mapped) {
             if (mapped.isCore) {
                 mapped.fn.call(self);
-            } else {
+            } else if (mapped.fn && typeof mapped.fn === 'function') {
                 ModuleFallback.safeCall(mapped.name, mapped.fn, [], null).then(function(result) {
                     if (result === null) self.renderDashboard();
                 });
+            } else {
+                self.renderDashboard();
             }
             return;
         }
@@ -761,14 +757,14 @@ const DashboardCore = {
                 } else self.renderDashboard();
             },
             'viewOrder': function() {
-                if (params.orderId) {
+                if (params.orderId && typeof window.APP.viewOrder === 'function') {
                     ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [params.orderId], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
                 } else self.renderDashboard();
             },
             'payment': function() {
-                if (params.orderId) {
+                if (params.orderId && typeof window.APP.showPayment === 'function') {
                     ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [params.orderId], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
@@ -816,14 +812,16 @@ const DashboardCore = {
             if (back) {
                 if (back.isCore) {
                     back.fn.call(self);
-                } else if (back.param) {
+                } else if (back.param && back.fn && typeof back.fn === 'function') {
                     ModuleFallback.safeCall(back.name, back.fn, [back.param], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
-                } else {
+                } else if (back.fn && typeof back.fn === 'function') {
                     ModuleFallback.safeCall(back.name, back.fn, [], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
+                } else {
+                    self.renderDashboard();
                 }
                 return;
             }
@@ -836,7 +834,7 @@ const DashboardCore = {
                     });
                     break;
                 case 'payment':
-                    if (prev.orderId) {
+                    if (prev.orderId && typeof window.APP.showPayment === 'function') {
                         ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [prev.orderId], null).then(function(r) {
                             if (r === null) self.renderDashboard();
                         });
@@ -966,7 +964,7 @@ const DashboardCore = {
         this._clearOverdueUpdateInterval();
         
         var confirmMsg = Utils.t('save_exit_confirm');
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(confirmMsg) : confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
         
         this.clearPageState();
@@ -996,20 +994,23 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            const cacheKey = DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId);
+            // 使用统一缓存模块
+            const cacheKey = DashboardCache.getKey ? DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId) : 'dashboard_stats_' + (isAdmin ? 'admin' : storeId);
             const report = await DashboardCache.get(cacheKey, 
-                () => DashboardStatsHelper.getDashboardStats(profile)
+                () => DashboardStatsHelper.getDashboardStats(profile),
+                { ttl: 5 * 60 * 1000 }
             );
             
-            const cashFlowCacheKey = DashboardCache.getKey('cashflow', isAdmin ? 'admin' : storeId);
+            const cashFlowCacheKey = 'cashflow_' + (isAdmin ? 'admin' : storeId);
             const cashFlow = await DashboardCache.get(cashFlowCacheKey,
                 async () => {
                     const allCashFlows = await SUPABASE.getCashFlowRecords();
                     return this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId);
-                }
+                },
+                { ttl: 5 * 60 * 1000 }
             );
             
-            const expensesCacheKey = DashboardCache.getKey('expenses', isAdmin ? 'admin' : storeId);
+            const expensesCacheKey = 'expenses_' + (isAdmin ? 'admin' : storeId);
             const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
                 let query = supabaseClient.from('expenses').select('amount');
                 if (!isAdmin && storeId) query = query.eq('store_id', storeId);
@@ -1017,21 +1018,21 @@ const DashboardCore = {
                 let sum = 0;
                 for (const ex of (data || [])) sum += (ex.amount || 0);
                 return sum;
-            });
+            }, { ttl: 5 * 60 * 1000 });
             
             const today = new Date();
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
             const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
             
-            const monthOrdersCacheKey = DashboardCache.getKey('month_orders', isAdmin ? 'admin' : storeId, currentYear, currentMonth);
+            const monthOrdersCacheKey = 'month_orders_' + (isAdmin ? 'admin' : storeId) + '_' + currentYear + '_' + currentMonth;
             let thisMonthOrderCount = await DashboardCache.get(monthOrdersCacheKey, async () => {
                 let query = supabaseClient.from('orders').select('created_at', { count: 'exact', head: true });
                 if (!isAdmin && storeId) query = query.eq('store_id', storeId);
                 query = query.gte('created_at', monthStart);
                 const { count } = await query;
                 return count || 0;
-            });
+            }, { ttl: 10 * 60 * 1000 });
             
             const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             const hasReminders = needRemindOrders.length > 0;
@@ -1047,12 +1048,12 @@ const DashboardCore = {
             const overdueOrdersCount = report.overdue_orders || 0;
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
             
-            const flowsForDeficit = await DashboardCache.get(DashboardCache.getKey('flows_for_deficit', isAdmin ? 'admin' : storeId), async () => {
+            const flowsForDeficit = await DashboardCache.get('flows_for_deficit_' + (isAdmin ? 'admin' : storeId), async () => {
                 let q = supabaseClient.from('cash_flow_records').select('direction, amount, flow_type').eq('is_voided', false);
                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                 const { data } = await q;
                 return data || [];
-            });
+            }, { ttl: 3 * 60 * 1000 });
             
             let totalInflowExcludingPrincipal = 0;
             let totalOutflow = 0;
@@ -1239,7 +1240,7 @@ const DashboardCore = {
         } catch (err) {
             console.error("renderDashboard error:", err);
             Utils.ErrorHandler.capture(err, 'renderDashboard');
-            if (window.Toast) window.Toast.error('加载仪表盘失败: ' + err.message, 5000);
+            Utils.toast.error('加载仪表盘失败: ' + err.message, 5000);
             document.getElementById("app").innerHTML = '' +
                 '<div class="card" style="padding:40px;text-align:center;">' +
                     '<p style="margin-bottom:16px;">⚠️ ' + (Utils.lang === 'id' ? '加载仪表盘失败: ' + err.message : 'Dashboard load failed: ' + err.message) + '</p>' +
@@ -1274,16 +1275,17 @@ const DashboardCore = {
     },
 
     showCreateOrder: function() { 
-        if (window.Toast) {
-            window.Toast.info(Utils.lang === 'id' ? '请先选择客户' : 'Please select a customer first', 3000);
-        } else {
-            alert(Utils.lang === 'id' ? 'Silakan pilih nasabah terlebih dahulu' : '请先选择客户');
-        }
+        Utils.toast.info(Utils.lang === 'id' ? '请先选择客户' : 'Please select a customer first', 3000);
         this.navigateTo('customers'); 
     },
     
     showBlacklist: async function() {
-        await ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], null);
+        if (window.APP.showBlacklist && typeof window.APP.showBlacklist === 'function') {
+            await ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], null);
+        } else {
+            Utils.toast.warning(Utils.lang === 'id' ? '黑名单模块加载中，请稍后重试' : 'Blacklist module loading, please try again later');
+            this.renderDashboard();
+        }
     },
 
     addStore: async function() {
@@ -1293,30 +1295,18 @@ const DashboardCore = {
         var phone = document.getElementById("newStorePhone")?.value.trim();
         
         if (!name) {
-            if (window.Toast) {
-                window.Toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
-            } else {
-                alert(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
-            }
+            Utils.toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
             return;
         }
         
         try {
             if (typeof StoreManager !== 'undefined') {
                 await StoreManager.createStore(name, address, phone);
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
-                } else {
-                    alert(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
-                }
+                Utils.toast.success(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
                 await StoreManager.renderStoreManagement();
             }
         } catch (error) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
         }
     },
     
@@ -1326,29 +1316,22 @@ const DashboardCore = {
     
     deleteStore: async function(storeId) {
         var lang = Utils.lang;
-        var confirmed = window.Toast ? await window.Toast.confirmPromise(Utils.t('confirm_delete')) : confirm(Utils.t('confirm_delete'));
+        var confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
         if (!confirmed) return;
         try {
             if (typeof StoreManager !== 'undefined') {
                 await StoreManager.deleteStore(storeId);
-                if (window.Toast) {
-                    window.Toast.success(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
-                } else {
-                    alert(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
-                }
+                Utils.toast.success(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
                 await StoreManager.renderStoreManagement();
             }
         } catch (error) {
-            if (window.Toast) {
-                window.Toast.error(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
-            } else {
-                alert(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
-            }
+            Utils.toast.error(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
         }
     },
     
     invalidateDashboardCache: function() {
-        DashboardCache.invalidate();
+        JFCache.clear();
+        Utils.toast.info(Utils.lang === 'id' ? '缓存已清除' : 'Cache cleared', 2000);
     }
 };
 
