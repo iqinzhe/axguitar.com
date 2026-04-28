@@ -149,6 +149,12 @@
         font-size: var(--font-md);
     }
 
+   /* 返回按钮 & 打印按钮：手机端更小的内边距 + 外边距 */
+    .btn-back,
+    .btn-print {
+        padding: 6px 12px;      /* 手机端缩小内边距 */
+        margin: 4px 0;          /* 上下外边距，左右不额外加 */
+
     /* --- 统计卡片：保持 2 列 --- */
     .stats-grid,
     .stats-grid.stats-grid-2,
