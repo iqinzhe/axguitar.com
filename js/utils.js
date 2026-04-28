@@ -1,4 +1,4 @@
-// utils.js - v1.2（添加 Toast 工具方法 + 错误处理优化）
+// utils.js - v1.0
 window.Utils = window.Utils || {};
 
 (function() {
