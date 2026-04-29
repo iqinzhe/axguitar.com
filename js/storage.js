@@ -1,6 +1,6 @@
-// storage.js - v1.0
+// storage.js - v1.0 (修复：重命名为 BackupStorage 避免与原生 Storage 冲突)
 
-const Storage = {
+const BackupStorage = {
 
     // ==================== 备份功能 ====================
     
@@ -83,7 +83,7 @@ const Storage = {
             Utils.toast.success(successMsg, 5000);
         } catch (err) {
             console.error("备份失败:", err);
-            Utils.ErrorHandler.capture(err, 'Storage.backup');
+            Utils.ErrorHandler.capture(err, 'BackupStorage.backup');
             Utils.toast.error(lang === 'id' ? '❌ Cadangan gagal: ' + err.message : '❌ 备份失败：' + err.message);
         }
     },
@@ -156,7 +156,7 @@ const Storage = {
             
         } catch (err) {
             console.error("恢复失败:", err);
-            Utils.ErrorHandler.capture(err, 'Storage.restore');
+            Utils.ErrorHandler.capture(err, 'BackupStorage.restore');
             this._hideLoading(loadingMsg);
             Utils.toast.error(lang === 'id' ? '❌ Pemulihan gagal: ' + err.message : '❌ 恢复失败：' + err.message);
             return false;
@@ -565,7 +565,7 @@ const Storage = {
             }
             Utils.toast.success(Utils.t('export_success'));
         } catch (err) {
-            Utils.ErrorHandler.capture(err, 'Storage.exportOrdersToCSV');
+            Utils.ErrorHandler.capture(err, 'BackupStorage.exportOrdersToCSV');
             Utils.toast.error(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
     },
@@ -579,7 +579,7 @@ const Storage = {
             }
             Utils.toast.success(Utils.t('export_success'));
         } catch (err) {
-            Utils.ErrorHandler.capture(err, 'Storage.exportPaymentsToCSV');
+            Utils.ErrorHandler.capture(err, 'BackupStorage.exportPaymentsToCSV');
             Utils.toast.error(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
     },
@@ -612,16 +612,15 @@ const Storage = {
             URL.revokeObjectURL(url);
             
             if (window.Audit) {
-                await window.Audit.logExport('customers', `jf_gadai_customers_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
+                await window.Audit.logExport('customers', a.download, AUTH.user?.name);
             }
             Utils.toast.success(Utils.t('export_success'));
         } catch (err) {
-            Utils.ErrorHandler.capture(err, 'Storage.exportCustomersToCSV');
+            Utils.ErrorHandler.capture(err, 'BackupStorage.exportCustomersToCSV');
             Utils.toast.error(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
         }
     },
 
-    // ========== 导出资金流水（新增） ==========
     async exportCashFlowToCSV() {
         const lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
@@ -703,7 +702,6 @@ const Storage = {
         }
     },
 
-    // ========== 导出运营支出（新增） ==========
     async exportExpensesToCSV() {
         const lang = Utils.lang;
         const profile = await SUPABASE.getCurrentProfile();
@@ -798,21 +796,17 @@ const Storage = {
         var pageTitle = lang === 'id' ? 'Cadangan & Pemulihan' : '备份恢复';
         var backText = lang === 'id' ? 'Kembali' : '返回';
         
-        // ========== 方式A：分组展示 ==========
         var exportTitle = lang === 'id' ? '📊 Ekspor Data' : '📊 导出数据';
         
-        // 业务数据组
         var businessDataTitle = lang === 'id' ? '📁 Data Bisnis' : '📁 业务数据';
         var exportOrdersText = lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单';
         var exportPaymentsText = lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费';
         var exportCustomersText = lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户';
         
-        // 财务数据组
         var financialDataTitle = lang === 'id' ? '💰 Data Keuangan' : '💰 财务数据';
         var exportCashFlowText = lang === 'id' ? '💸 Ekspor Arus Kas' : '💸 导出资金流水';
         var exportExpensesText = lang === 'id' ? '📝 Ekspor Pengeluaran' : '📝 导出运营支出';
         
-        // ========== 门店视图：只显示备份本门店数据和导出本门店数据 ==========
         if (!isAdmin) {
             var backupTitle = lang === 'id' ? '📤 Cadangkan Data Toko' : '📤 备份本门店数据';
             var backupDesc = lang === 'id' 
@@ -832,7 +826,7 @@ const Storage = {
                     '<div class="backup-card backup-card-store-primary">' +
                         '<h3>' + backupTitle + '</h3>' +
                         '<p>' + backupDesc + '</p>' +
-                        '<button onclick="Storage.backup()" class="btn-backup-store-primary">' + backupBtnText + '</button>' +
+                        '<button onclick="BackupStorage.backup()" class="btn-backup-store-primary">' + backupBtnText + '</button>' +
                     '</div>' +
                     
                     '<div class="backup-card backup-card-store-secondary">' +
@@ -842,17 +836,17 @@ const Storage = {
                         '<div style="margin-bottom: 12px;">' +
                             '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary);">' + businessDataTitle + '</div>' +
                             '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
-                                '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
-                                '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
-                                '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                                '<button onclick="BackupStorage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
+                                '<button onclick="BackupStorage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
+                                '<button onclick="BackupStorage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
                             '</div>' +
                         '</div>' +
                         
                         '<div>' +
                             '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary);">' + financialDataTitle + '</div>' +
                             '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
-                                '<button onclick="Storage.exportCashFlowToCSV()" class="btn-small">' + exportCashFlowText + '</button>' +
-                                '<button onclick="Storage.exportExpensesToCSV()" class="btn-small">' + exportExpensesText + '</button>' +
+                                '<button onclick="BackupStorage.exportCashFlowToCSV()" class="btn-small">' + exportCashFlowText + '</button>' +
+                                '<button onclick="BackupStorage.exportExpensesToCSV()" class="btn-small">' + exportExpensesText + '</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -860,7 +854,6 @@ const Storage = {
             return;
         }
         
-        // ========== 管理员视图：完整功能 ==========
         var backupTitle = lang === 'id' ? '📤 Cadangkan Data' : '📤 备份数据';
         var backupDesc = lang === 'id' 
             ? 'Cadangkan semua data (pesanan, nasabah, pengeluaran, pembayaran, dll.) ke file JSON.'
@@ -894,7 +887,7 @@ const Storage = {
                 '<div class="backup-card backup-card-primary">' +
                     '<h3>' + backupTitle + '</h3>' +
                     '<p>' + backupDesc + '</p>' +
-                    '<button onclick="Storage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
+                    '<button onclick="BackupStorage.backup()" class="btn-backup-primary">' + backupBtnText + '</button>' +
                 '</div>' +
                 
                 '<div class="backup-card backup-card-secondary">' +
@@ -904,17 +897,17 @@ const Storage = {
                     '<div style="margin-bottom: 16px;">' +
                         '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary); border-left: 3px solid var(--primary); padding-left: 8px;">' + businessDataTitle + '</div>' +
                         '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
-                            '<button onclick="Storage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
-                            '<button onclick="Storage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
-                            '<button onclick="Storage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
+                            '<button onclick="BackupStorage.exportOrdersToCSV()" class="btn-small">' + exportOrdersText + '</button>' +
+                            '<button onclick="BackupStorage.exportPaymentsToCSV()" class="btn-small">' + exportPaymentsText + '</button>' +
+                            '<button onclick="BackupStorage.exportCustomersToCSV()" class="btn-small">' + exportCustomersText + '</button>' +
                         '</div>' +
                     '</div>' +
                     
                     '<div>' +
                         '<div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: var(--text-secondary); border-left: 3px solid var(--success); padding-left: 8px;">' + financialDataTitle + '</div>' +
                         '<div style="display: flex; gap: 8px; flex-wrap: wrap;">' +
-                            '<button onclick="Storage.exportCashFlowToCSV()" class="btn-small">' + exportCashFlowText + '</button>' +
-                            '<button onclick="Storage.exportExpensesToCSV()" class="btn-small">' + exportExpensesText + '</button>' +
+                            '<button onclick="BackupStorage.exportCashFlowToCSV()" class="btn-small">' + exportCashFlowText + '</button>' +
+                            '<button onclick="BackupStorage.exportExpensesToCSV()" class="btn-small">' + exportExpensesText + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
@@ -924,13 +917,13 @@ const Storage = {
                     '<p>' + restoreDesc + '</p>' +
                     '<p class="warning-text-small">' + restoreWarning + '</p>' +
                     '<input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">' +
-                    '<button onclick="Storage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
+                    '<button onclick="BackupStorage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
                 '</div>' +
                 
                 '<div class="backup-card backup-card-secondary">' +
                     '<h3>' + auditTitle + '</h3>' +
                     '<p>' + auditDesc + '</p>' +
-                    '<button onclick="Storage.showAuditLog()" class="btn-small primary">' + auditViewBtnText + '</button>' +
+                    '<button onclick="BackupStorage.showAuditLog()" class="btn-small primary">' + auditViewBtnText + '</button>' +
                 '</div>' +
             '</div>';
         
@@ -981,7 +974,7 @@ const Storage = {
             
             var rows = '';
             if (logs.length === 0) {
-                rows = '<tr><td colspan="4" class="text-center">' + (lang === 'id' ? 'Tidak ada log' : '暂无记录') + 'NonNull';
+                rows = '<tr><td colspan="4" class="text-center">' + (lang === 'id' ? 'Tidak ada log' : '暂无记录') + '</tr>';
             } else {
                 for (var i = 0; i < logs.length; i++) {
                     var log = logs[i];
@@ -1011,7 +1004,7 @@ const Storage = {
                     
                     rows += '<tr>' +
                         '<td class="date-cell">' + Utils.formatDate(log.created_at) + '</td>' +
-                        '</table>' + actionText + '</td>' +
+                        '<td>' + actionText + '</td>' +
                         '<td>' + Utils.escapeHtml(log.user_name || '-') + '</td>' +
                         '<td class="desc-cell">' + detailsText + '</td>' +
                     '</tr>';
@@ -1039,8 +1032,8 @@ const Storage = {
                             '<select id="auditFilterUser">' + userOptions + '</select>' +
                             '<input type="date" id="auditFilterStart" placeholder="' + (lang === 'id' ? 'Dari tanggal' : '开始日期') + '">' +
                             '<input type="date" id="auditFilterEnd" placeholder="' + (lang === 'id' ? 'Sampai tanggal' : '结束日期') + '">' +
-                            '<button onclick="Storage.filterAuditLog()" class="btn-small">🔍 ' + (lang === 'id' ? 'Filter' : '筛选') + '</button>' +
-                            '<button onclick="Storage.resetAuditFilter()" class="btn-small">🔄 ' + (lang === 'id' ? 'Reset' : '重置') + '</button>' +
+                            '<button onclick="BackupStorage.filterAuditLog()" class="btn-small">🔍 ' + (lang === 'id' ? 'Filter' : '筛选') + '</button>' +
+                            '<button onclick="BackupStorage.resetAuditFilter()" class="btn-small">🔄 ' + (lang === 'id' ? 'Reset' : '重置') + '</button>' +
                         '</div>' +
                         
                         '<div class="table-container" style="max-height:450px; overflow-y:auto;">' +
@@ -1058,7 +1051,7 @@ const Storage = {
                         '</div>' +
                         
                         '<div class="modal-actions">' +
-                            '<button onclick="Storage.exportAuditLogCSV()" class="btn-small">📎 ' + (lang === 'id' ? 'Ekspor CSV' : '导出CSV') + '</button>' +
+                            '<button onclick="BackupStorage.exportAuditLogCSV()" class="btn-small">📎 ' + (lang === 'id' ? 'Ekspor CSV' : '导出CSV') + '</button>' +
                             '<button onclick="document.getElementById(\'auditLogModal\').remove()" class="btn-small">✖ ' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
                         '</div>' +
                     '</div>' +
@@ -1071,7 +1064,7 @@ const Storage = {
             
         } catch (error) {
             console.error("showAuditLog error:", error);
-            Utils.ErrorHandler.capture(error, 'Storage.showAuditLog');
+            Utils.ErrorHandler.capture(error, 'BackupStorage.showAuditLog');
             Utils.toast.error(lang === 'id' ? 'Gagal memuat log audit: ' + error.message : '加载审计日志失败：' + error.message);
         }
     },
@@ -1090,7 +1083,7 @@ const Storage = {
             if (endDate && log.created_at > endDate + 'T23:59:59') return false;
             return true;
         });
-        Storage._renderAuditLogTable(filtered);
+        BackupStorage._renderAuditLogTable(filtered);
     },
 
     resetAuditFilter: function() {
@@ -1102,7 +1095,7 @@ const Storage = {
         if (userEl) userEl.value = '';
         if (startEl) startEl.value = '';
         if (endEl) endEl.value = '';
-        Storage.filterAuditLog();
+        BackupStorage.filterAuditLog();
     },
 
     _renderAuditLogTable: function(logs) {
@@ -1133,7 +1126,7 @@ const Storage = {
         
         var rows = '';
         if (logs.length === 0) {
-            rows = '<tr><td colspan="4" class="text-center">' + (lang === 'id' ? 'Tidak ada log' : '暂无记录') + 'NonNull';
+            rows = '<tr><td colspan="4" class="text-center">' + (lang === 'id' ? 'Tidak ada log' : '暂无记录') + '</tr>';
         } else {
             for (var i = 0; i < logs.length; i++) {
                 var log = logs[i];
@@ -1206,4 +1199,5 @@ const Storage = {
     }
 };
 
-window.Storage = Storage;
+// 重命名避免与浏览器原生 Storage 接口冲突
+window.BackupStorage = BackupStorage;
