@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.0
+// app-dashboard-core.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -100,42 +100,44 @@ const DashboardStatsHelper = {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
+        const client = SUPABASE.getClient();
+        
         const totalCountPromise = (() => {
-            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             return q;
         })();
         
         const activeCountPromise = (() => {
-            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'active');
             return q;
         })();
         
         const completedCountPromise = (() => {
-            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'completed');
             return q;
         })();
         
         const overdueCountPromise = (() => {
-            let q = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+            let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'active').gte('overdue_days', 1);
             return q;
         })();
         
         const activeOrdersPromise = (() => {
-            let q = supabaseClient.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount');
+            let q = client.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount');
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'active');
             return q;
         })();
         
         const allOrdersLoanPromise = (() => {
-            let q = supabaseClient.from('orders').select('loan_amount');
+            let q = client.from('orders').select('loan_amount');
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             return q;
         })();
@@ -195,11 +197,13 @@ const DashboardStatsHelper = {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
-        let overdueQuery = supabaseClient.from('orders').select('*', { count: 'exact', head: true });
+        const client = SUPABASE.getClient();
+        
+        let overdueQuery = client.from('orders').select('*', { count: 'exact', head: true });
         if (!isAdmin && storeId) overdueQuery = overdueQuery.eq('store_id', storeId);
         overdueQuery = overdueQuery.eq('status', 'active').gte('overdue_days', 30);
         
-        let blacklistQuery = supabaseClient.from('blacklist').select('*', { count: 'exact', head: true });
+        let blacklistQuery = client.from('blacklist').select('*', { count: 'exact', head: true });
         
         const [overdue30Result, blacklistResult] = await Promise.all([
             overdueQuery,
@@ -222,7 +226,9 @@ const DashboardStatsHelper = {
         const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
         const monthEnd = today.toISOString().split('T')[0];
         
-        const { data: monthlyOrders, error } = await supabaseClient
+        const client = SUPABASE.getClient();
+        
+        const { data: monthlyOrders, error } = await client
             .from('orders')
             .select('id, store_id, loan_amount, status, created_at, overdue_days')
             .gte('created_at', monthStart)
@@ -230,7 +236,7 @@ const DashboardStatsHelper = {
         
         if (error) throw error;
         
-        const { data: monthlyFlows } = await supabaseClient
+        const { data: monthlyFlows } = await client
             .from('cash_flow_records')
             .select('store_id, amount, order_id')
             .eq('direction', 'inflow')
@@ -664,11 +670,11 @@ const DashboardCore = {
                 return await self.renderDashboard();
             },
             backupRestore: () => {
-    if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') {
-        return ModuleFallback.safeCall('Cadangan', BackupStorage.renderBackupUI, [], () => self.renderDashboard());
-    }
-    return self.renderDashboard();
-},
+                if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') {
+                    return ModuleFallback.safeCall('Cadangan', BackupStorage.renderBackupUI, [], () => self.renderDashboard());
+                }
+                return self.renderDashboard();
+            },
             customerOrders: async () => { 
                 if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerOrders', window.APP.showCustomerOrders)) {
                     return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], () => self.renderDashboard());
@@ -725,9 +731,9 @@ const DashboardCore = {
             'expenses':         { fn: window.APP.showExpenses,         name: 'Pengeluaran' },
             'customers':        { fn: window.APP.showCustomers,        name: 'Nasabah' },
             'backupRestore': { 
-    fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
-    name: 'Cadangan' 
-},
+                fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
+                name: 'Cadangan' 
+            },
             'blacklist':        { fn: window.APP.showBlacklist,        name: 'Daftar Hitam' }
         };
         
@@ -800,23 +806,23 @@ const DashboardCore = {
             this.saveCurrentPageState();
             
             var backMap = {
-    'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
-    'dashboard':     { fn: self.renderDashboard,          name: 'Dashboard', isCore: true },
-    'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
-    'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
-    'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
-    'storeManagement':{ 
-        fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
-        name: 'Manajemen Toko' 
-    },
-    'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
-    'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
-    'backupRestore': { 
-    fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
-    name: 'Cadangan' 
-},
-    'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
-};
+                'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
+                'dashboard':     { fn: self.renderDashboard,          name: 'Dashboard', isCore: true },
+                'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
+                'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
+                'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
+                'storeManagement':{ 
+                    fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
+                    name: 'Manajemen Toko' 
+                },
+                'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
+                'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
+                'backupRestore': { 
+                    fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
+                    name: 'Cadangan' 
+                },
+                'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
+            };
             
             var back = backMap[prev.page];
             if (back) {
@@ -1022,7 +1028,8 @@ const DashboardCore = {
             
             const expensesCacheKey = 'expenses_' + (isAdmin ? 'admin' : storeId);
             const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
-                let query = supabaseClient.from('expenses').select('amount');
+                const client = SUPABASE.getClient();
+                let query = client.from('expenses').select('amount');
                 if (!isAdmin && storeId) query = query.eq('store_id', storeId);
                 const { data } = await query;
                 let sum = 0;
@@ -1037,7 +1044,8 @@ const DashboardCore = {
             
             const monthOrdersCacheKey = 'month_orders_' + (isAdmin ? 'admin' : storeId) + '_' + currentYear + '_' + currentMonth;
             let thisMonthOrderCount = await DashboardCache.get(monthOrdersCacheKey, async () => {
-                let query = supabaseClient.from('orders').select('created_at', { count: 'exact', head: true });
+                const client = SUPABASE.getClient();
+                let query = client.from('orders').select('created_at', { count: 'exact', head: true });
                 if (!isAdmin && storeId) query = query.eq('store_id', storeId);
                 query = query.gte('created_at', monthStart);
                 const { count } = await query;
@@ -1059,7 +1067,8 @@ const DashboardCore = {
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
             
             const flowsForDeficit = await DashboardCache.get('flows_for_deficit_' + (isAdmin ? 'admin' : storeId), async () => {
-                let q = supabaseClient.from('cash_flow_records').select('direction, amount, flow_type').eq('is_voided', false);
+                const client = SUPABASE.getClient();
+                let q = client.from('cash_flow_records').select('direction, amount, flow_type').eq('is_voided', false);
                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                 const { data } = await q;
                 return data || [];
