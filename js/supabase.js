@@ -1,4 +1,4 @@
-// supabase.js - v1.0
+// supabase.js - v2.0 (修复：移除原始客户端暴露)
 
 // 从 config.js 读取配置
 const SUPABASE_URL = window.APP_CONFIG.SUPABASE.URL;
@@ -253,6 +253,7 @@ let _storesCacheTime = 0;
 const STORES_CACHE_TTL = 5 * 60 * 1000;
 
 const SupabaseAPI = {
+    // ========== 获取底层客户端（仅供内部或特殊情况使用） ==========
     getClient() { return supabaseClient; },
 
     getSafeStorage() { return SafeStorage; },
@@ -479,7 +480,7 @@ const SupabaseAPI = {
         }
     },
 
-    // ========== 修复：订单ID生成（防并发 + 指数退避 + 备用方案） ==========
+    // ========== 订单ID生成 ==========
     _generateOrderId: async function(role, storeId, maxRetries = 10) {
         let prefix = 'AD';
         if (role !== 'admin') {
@@ -542,7 +543,7 @@ const SupabaseAPI = {
         return fallbackId;
     },
 
-    // ========== 修复：客户ID生成（防并发 + 指数退避 + 备用方案） ==========
+    // ========== 客户ID生成 ==========
     _generateCustomerId: async function(storeId, maxRetries = 10) {
         const prefix = await this._getStorePrefix(storeId);
         
@@ -600,7 +601,7 @@ const SupabaseAPI = {
         return fallbackId;
     },
 
-    // ========== 修复：创建客户（增强重试和指数退避 + 时区统一） ==========
+    // ========== 创建客户 ==========
     async createCustomer(customerData) {
         const profile = await this.getCurrentProfile();
         const storeId = customerData.store_id || profile.store_id;
@@ -722,7 +723,7 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 黑名单相关方法（新增） ====================
+    // ==================== 黑名单相关方法 ====================
     
     async checkBlacklist(customerId) {
         const { data, error } = await supabaseClient
@@ -732,7 +733,6 @@ const SupabaseAPI = {
             .maybeSingle();
         
         if (error && error.code === '22P02') {
-            // UUID 格式错误，尝试通过 customer_id 字段查找
             const { data: customer } = await supabaseClient
                 .from('customers')
                 .select('id')
@@ -755,7 +755,6 @@ const SupabaseAPI = {
     },
 
     async addToBlacklist(customerId, reason, blacklistedBy) {
-        // 获取客户信息
         const { data: customer, error: customerError } = await supabaseClient
             .from('customers')
             .select('id, store_id, customer_id, name, occupation')
@@ -764,7 +763,6 @@ const SupabaseAPI = {
         
         if (customerError) throw customerError;
         
-        // 检查是否已在黑名单
         const { data: existing } = await supabaseClient
             .from('blacklist')
             .select('id')
@@ -843,7 +841,7 @@ const SupabaseAPI = {
         return data;
     },
 
-    // ==================== 客户重复检查（安全版本，新增） ====================
+    // ==================== 客户重复检查 ====================
     
     escapePostgRESTValue(str) {
         if (!str) return '';
@@ -932,7 +930,7 @@ const SupabaseAPI = {
         return await this.checkBlacklistDuplicate(ktp, phone);
     },
 
-    // ==================== 订单统计方法（新增） ====================
+    // ==================== 订单统计方法 ====================
     
     async getCustomerOrdersStats(customerId) {
         const { data: orders, error } = await supabaseClient
@@ -951,7 +949,6 @@ const SupabaseAPI = {
             else if (o.status === 'liquidated') abnormalCount++;
         }
         
-        // 查询逾期30天以上的活跃订单
         const { count: overdueCount } = await supabaseClient
             .from('orders')
             .select('id', { count: 'exact', head: true })
@@ -1158,7 +1155,7 @@ const SupabaseAPI = {
         return { order: order, payments: data };
     },
 
-    // ========== 修复：创建订单（增强重试和指数退避 + 时区统一） ==========
+    // ========== 创建订单 ==========
     async createOrder(orderData) {
         const profile = await this.getCurrentProfile();
         const nowDate = Utils.getLocalToday();
@@ -2500,8 +2497,5 @@ const SupabaseAPI = {
     }
 };
 
+// ========== 只暴露封装的 API，不暴露原始客户端 ==========
 window.SUPABASE = SupabaseAPI;
-window.supabaseClient = supabaseClient;
-window.SafeStorage = SafeStorage;
-window.SafeSessionStorage = SafeSessionStorage;
-//window.SUPABASE_URL = SUPABASE_URL; //避免暴露
