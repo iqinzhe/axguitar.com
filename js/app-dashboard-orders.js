@@ -75,7 +75,7 @@ const DashboardOrders = {
                     // 操作行
                     var actionButtons = '';
                     if (o.status === 'active' && !isAdmin) {
-                        actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💸 ' + (lang === 'id' ? '续费' : '缴费') + '</button>';
+                        actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>';
                     }
                     actionButtons += '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>';
                     actionButtons += '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">🖨️ ' + t('print') + '</button>';
@@ -360,7 +360,7 @@ const DashboardOrders = {
                     
                     '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
                         '<button onclick="APP.goBack()">↩️ ' + t('back') + '</button>' +
-                        (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(order.order_id) + '\'})" class="success">💸 ' + (lang === 'id' ? '续费缴费' : '缴纳费用') + '</button>' : '') +
+                        (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(order.order_id) + '\'})" class="success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>' : '') +
                         (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeAttr(order.order_id) + '\')" class="success">🧾 ' + (lang === 'id' ? '结清凭证' : '结清凭证') + '</button>' : '') +
                         '<button onclick="APP.sendWAReminder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="warning">📱 ' + (lang === 'id' ? 'WA提醒' : 'WA提醒') + '</button>' +
                     '</div>' +
