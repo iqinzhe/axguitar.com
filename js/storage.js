@@ -1,4 +1,4 @@
-// storage.js - v1.0 (修复：重命名为 BackupStorage 避免与原生 Storage 冲突)
+// storage.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 const BackupStorage = {
 
@@ -17,7 +17,8 @@ const BackupStorage = {
             const orders = await SUPABASE.getOrdersLegacy();
             const customers = await SUPABASE.getCustomers();
             
-            let expensesQuery = supabaseClient.from('expenses').select('*');
+            const client = SUPABASE.getClient();
+            let expensesQuery = client.from('expenses').select('*');
             if (!isAdmin && currentStoreId) {
                 expensesQuery = expensesQuery.eq('store_id', currentStoreId);
             }
@@ -27,7 +28,7 @@ const BackupStorage = {
             if (isAdmin) {
                 storesResult = await SUPABASE.getAllStores();
             } else if (currentStoreId) {
-                const { data: storeData } = await supabaseClient
+                const { data: storeData } = await client
                     .from('stores')
                     .select('*')
                     .eq('id', currentStoreId);
@@ -37,7 +38,7 @@ const BackupStorage = {
             const paymentsResult = await SUPABASE.getAllPayments();
             const cashFlowsResult = await SUPABASE.getCashFlowRecords();
             
-            let blacklistQuery = supabaseClient.from('blacklist').select('*');
+            let blacklistQuery = client.from('blacklist').select('*');
             const blacklistResult = await blacklistQuery;
             
             const backupData = {
@@ -169,6 +170,8 @@ const BackupStorage = {
             expenses: 0, payments: 0, cashFlows: 0, blacklist: 0
         };
         
+        const client = SUPABASE.getClient();
+        
         if (backupData.stores && backupData.stores.length > 0) {
             const existingStores = await SUPABASE.getAllStores();
             const existingIds = new Set(existingStores.map(s => s.id));
@@ -177,7 +180,7 @@ const BackupStorage = {
                 if (store.code === 'STORE_000') continue;
                 
                 if (existingIds.has(store.id)) {
-                    await supabaseClient
+                    await client
                         .from('stores')
                         .update({
                             name: store.name,
@@ -187,7 +190,7 @@ const BackupStorage = {
                         })
                         .eq('id', store.id);
                 } else {
-                    const { error } = await supabaseClient
+                    const { error } = await client
                         .from('stores')
                         .insert({
                             code: store.code,
@@ -204,14 +207,14 @@ const BackupStorage = {
         
         if (backupData.customers && backupData.customers.length > 0) {
             for (const customer of backupData.customers) {
-                const { data: existing } = await supabaseClient
+                const { data: existing } = await client
                     .from('customers')
                     .select('id')
                     .eq('customer_id', customer.customer_id)
                     .maybeSingle();
                 
                 if (existing) {
-                    await supabaseClient
+                    await client
                         .from('customers')
                         .update({
                             name: customer.name,
@@ -224,7 +227,7 @@ const BackupStorage = {
                         })
                         .eq('id', existing.id);
                 } else {
-                    const { error } = await supabaseClient
+                    const { error } = await client
                         .from('customers')
                         .insert({
                             customer_id: customer.customer_id,
@@ -245,14 +248,14 @@ const BackupStorage = {
         
         if (backupData.orders && backupData.orders.length > 0) {
             for (const order of backupData.orders) {
-                const { data: existing } = await supabaseClient
+                const { data: existing } = await client
                     .from('orders')
                     .select('id')
                     .eq('order_id', order.order_id)
                     .maybeSingle();
                 
                 if (existing) {
-                    await supabaseClient
+                    await client
                         .from('orders')
                         .update({
                             customer_name: order.customer_name,
@@ -287,7 +290,7 @@ const BackupStorage = {
                 } else {
                     let customerId = null;
                     if (order.customer_id) {
-                        const { data: customer } = await supabaseClient
+                        const { data: customer } = await client
                             .from('customers')
                             .select('id')
                             .eq('customer_id', order.customer_id)
@@ -295,7 +298,7 @@ const BackupStorage = {
                         if (customer) customerId = customer.id;
                     }
                     
-                    const { error } = await supabaseClient
+                    const { error } = await client
                         .from('orders')
                         .insert({
                             order_id: order.order_id,
@@ -337,14 +340,14 @@ const BackupStorage = {
         
         if (backupData.payments && backupData.payments.length > 0) {
             for (const payment of backupData.payments) {
-                const { data: order } = await supabaseClient
+                const { data: order } = await client
                     .from('orders')
                     .select('id')
                     .eq('order_id', payment.orders?.order_id)
                     .maybeSingle();
                 
                 if (order) {
-                    const { data: existing } = await supabaseClient
+                    const { data: existing } = await client
                         .from('payment_history')
                         .select('id')
                         .eq('order_id', order.id)
@@ -354,7 +357,7 @@ const BackupStorage = {
                         .maybeSingle();
                     
                     if (!existing) {
-                        await supabaseClient
+                        await client
                             .from('payment_history')
                             .insert({
                                 order_id: order.id,
@@ -374,7 +377,7 @@ const BackupStorage = {
         
         if (backupData.expenses && backupData.expenses.length > 0) {
             for (const expense of backupData.expenses) {
-                const { data: existing } = await supabaseClient
+                const { data: existing } = await client
                     .from('expenses')
                     .select('id')
                     .eq('store_id', expense.store_id)
@@ -384,7 +387,7 @@ const BackupStorage = {
                     .maybeSingle();
                 
                 if (!existing) {
-                    const { error } = await supabaseClient
+                    const { error } = await client
                         .from('expenses')
                         .insert({
                             store_id: expense.store_id,
@@ -403,7 +406,7 @@ const BackupStorage = {
         
         if (backupData.cash_flows && backupData.cash_flows.length > 0) {
             for (const flow of backupData.cash_flows) {
-                const { error } = await supabaseClient
+                const { error } = await client
                     .from('cash_flow_records')
                     .insert({
                         store_id: flow.store_id,
@@ -425,7 +428,7 @@ const BackupStorage = {
         
         if (backupData.blacklist && backupData.blacklist.length > 0) {
             for (const blacklist of backupData.blacklist) {
-                const { error } = await supabaseClient
+                const { error } = await client
                     .from('blacklist')
                     .insert({
                         customer_id: blacklist.customer_id,
@@ -462,21 +465,22 @@ const BackupStorage = {
             const data = await Utils.importFromJSON(file);
             const orders = data.data?.orders || [];
             
+            const client = SUPABASE.getClient();
             let successCount = 0;
             for (const order of orders) {
-                const { data: existing } = await supabaseClient
+                const { data: existing } = await client
                     .from('orders')
                     .select('id')
                     .eq('order_id', order.order_id)
                     .maybeSingle();
                 
                 if (existing) {
-                    await supabaseClient
+                    await client
                         .from('orders')
                         .update(order)
                         .eq('order_id', order.order_id);
                 } else {
-                    const { error } = await supabaseClient.from('orders').insert(order);
+                    const { error } = await client.from('orders').insert(order);
                     if (!error) successCount++;
                 }
             }
@@ -512,18 +516,19 @@ const BackupStorage = {
             const data = await Utils.importFromJSON(file);
             const customers = data.data?.customers || [];
             
+            const client = SUPABASE.getClient();
             var successCount = 0;
             var skippedCount = 0;
             
             for (const customer of customers) {
-                const { data: existing } = await supabaseClient
+                const { data: existing } = await client
                     .from('customers')
                     .select('id')
                     .eq('customer_id', customer.customer_id)
                     .maybeSingle();
                 
                 if (existing) {
-                    const { error: updateError } = await supabaseClient
+                    const { error: updateError } = await client
                         .from('customers')
                         .update({
                             name: customer.name,
@@ -537,7 +542,7 @@ const BackupStorage = {
                         .eq('id', existing.id);
                     if (!updateError) skippedCount++;
                 } else {
-                    const { error } = await supabaseClient.from('customers').insert(customer);
+                    const { error } = await client.from('customers').insert(customer);
                     if (!error) successCount++;
                 }
             }
@@ -627,7 +632,8 @@ const BackupStorage = {
         const isAdmin = profile?.role === 'admin';
         
         try {
-            let query = supabaseClient
+            const client = SUPABASE.getClient();
+            let query = client
                 .from('cash_flow_records')
                 .select('*, stores(name)')
                 .eq('is_voided', false)
@@ -708,7 +714,8 @@ const BackupStorage = {
         const isAdmin = profile?.role === 'admin';
         
         try {
-            let query = supabaseClient
+            const client = SUPABASE.getClient();
+            let query = client
                 .from('expenses')
                 .select('*, stores(name)')
                 .order('expense_date', { ascending: false });
