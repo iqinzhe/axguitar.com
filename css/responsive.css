@@ -616,29 +616,40 @@
         height: auto !important;
         min-height: auto !important;
         text-align: left !important;
+        white-space: normal !important;
+        word-break: break-word !important;
     }
 
-    .data-table thead th {
-        background: #f0f0f0 !important;
-        font-weight: 700 !important;
-    }
+    /* 打印时列宽恢复百分比 */
+    .col-id       { width: 8% !important; }
+    .col-name     { width: 14% !important; }
+    .col-ktp      { width: 12% !important; }
+    .col-phone    { width: 11% !important; }
+    .col-address  { width: 18% !important; }
+    .col-date     { width: 10% !important; }
+    .col-status   { width: 8% !important; }
+    .col-store    { width: 9% !important; }
+    .col-amount   { width: 12% !important; }
+    .col-type     { width: 12% !important; }
+    .col-months   { width: 7% !important; }
+    .col-method   { width: 9% !important; }
+    .col-desc     { width: auto !important; }
+    .col-action   { width: auto !important; }
 
-    .data-table tbody tr:hover {
-        background: transparent !important;
+    /* 打印时资金流水/缴费表格 */
+    .cashflow-table .col-date,
+    .payment-table .col-date {
+        width: 10% !important;
     }
-
-    .data-table.striped tbody tr:nth-child(even) {
-        background: #fafafa !important;
+    .cashflow-table .col-type,
+    .payment-table .col-type {
+        width: 15% !important;
     }
-
-    .data-table .text-right,
-    .data-table .amount {
-        text-align: right !important;
+    .cashflow-table .col-amount,
+    .payment-table .col-amount {
+        width: 15% !important;
     }
-
-    .data-table .text-center {
-        text-align: center !important;
-    }
+}
 
     /* --- 徽章 --- */
     .status-badge,
