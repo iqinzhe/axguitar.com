@@ -1,10 +1,12 @@
-// app-dashboard-core.js - v1.2
+// app-dashboard-core.js - v1.3
 // 修改内容：
 // 1. 移除独立的 DashboardCache，改用统一 JFCache 模块
 // 2. 添加模块加载防御检查
 // 3. 将 alert 改为 Utils.toast 统一调用
 // 4. 优化 refreshCurrentPage 中的模块存在性检查
 // 5. 修复 getMonthlyStoreRanking：当 eligibleStores < 4 时 top3 和 bottom3 不应重复
+// 6. 仪表盘文本修改：操作面板→管理中心，订单列表→订单管理，缴费记录→资金流水，财务指标→业务指标
+// 7. 内部转账按钮文本修改：使用双箭头→→加粗
 
 window.APP = window.APP || {};
 
@@ -1134,8 +1136,8 @@ const DashboardCore = {
                         '<div class="cashflow-item">' +
                             '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
                             '<div class="transfer-buttons">' +
-                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦→🏧 ' + t('cash_to_bank') + '</button>' +
-                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧→🏦 ' + t('bank_to_cash') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦' + (lang === 'id' ? 'Brankas→→🏧 Bank BNI' : '保险柜→→🏧 银行BNI') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧 ' + (lang === 'id' ? 'Bank BNI→→🏦Brankas' : '银行BNI→→🏦保险柜') + '</button>' +
                                 '<button onclick="APP.showTransferModal(\'store_to_hq\')" class="transfer-btn store-to-hq">🏢 ' + t('submit_to_hq') + '</button>' +
                             '</div>' +
                         '</div>' +
@@ -1165,8 +1167,8 @@ const DashboardCore = {
                         '<div class="cashflow-item">' +
                             '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
                             '<div class="transfer-buttons">' +
-                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦→🏧 ' + t('cash_to_bank') + '</button>' +
-                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧→🏦 ' + t('bank_to_cash') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦' + (lang === 'id' ? 'Brankas→→🏧 Bank BNI' : '保险柜→→🏧 银行BNI') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧 ' + (lang === 'id' ? 'Bank BNI→→🏦Brankas' : '银行BNI→→🏦保险柜') + '</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -1178,8 +1180,8 @@ const DashboardCore = {
                 toolbarHtml = '' +
                 '<div class="toolbar admin-grid no-print">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
-                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + (lang === 'id' ? 'Manajemen Pesanan' : '订单管理') + '</button>' +
+                    '<button onclick="APP.showCashFlowPage()">💰 ' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</button>' +
                     '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
                     '<button onclick="APP.navigateTo(\'backupRestore\')">📦 ' + t('backup_restore') + '</button>' +
                     '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
@@ -1192,8 +1194,8 @@ const DashboardCore = {
                 toolbarHtml = '' +
                 '<div class="toolbar store-grid no-print">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
-                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + (lang === 'id' ? 'Manajemen Pesanan' : '订单管理') + '</button>' +
+                    '<button onclick="APP.showCashFlowPage()">💰 ' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</button>' +
                     '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
                     '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
                     '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
@@ -1243,11 +1245,11 @@ const DashboardCore = {
                     '</div>' +
                 '</div>' +
                 '<div style="margin:0 0 12px 0;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + t('operation') + '</h3>' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + (lang === 'id' ? 'Pusat Manajemen' : '管理中心') + '</h3>' +
                 '</div>' +
                 toolbarHtml +
                 '<div style="margin:0 0 12px 0;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + t('financial_indicators') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + (lang === 'id' ? 'Indikator Bisnis' : '业务指标') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
                 '</div>' +
                 '<div class="stats-grid">' + cardsHtml + '</div>' +
                 cashFlowHtml +
