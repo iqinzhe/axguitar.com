@@ -1,14 +1,10 @@
 /* ============================================================
    components.css - 第3层：全系统可复用 UI 组件库
    职责：所有可复用的组件 + 表格系统 + 徽章 + 空状态
-   原则：一个组件 = 一种写法，全系统复用
    ============================================================ */
 
 /* ============================================================
    C1. 支付方式选择器
-   用途：资金来源、入账方式、支付方式
-   结构：横向排列的单选项，带 emoji 图标
-   使用场景：全系统任何需要选择 现金/银行 的地方
    ============================================================ */
 .payment-method-selector {
     display: flex;
@@ -27,7 +23,7 @@
     white-space: nowrap;
     padding: var(--spacing-1) var(--spacing-2);
     border-radius: var(--radius-md);
-    transition: var(--transition);
+    transition: var(--transition-fast);
 }
 
 .payment-method-selector label:hover {
@@ -42,7 +38,6 @@
     margin: 0;
 }
 
-/* 紧凑版：用于卡片内部 */
 .payment-method-selector.compact {
     gap: var(--spacing-2);
     padding: 0;
@@ -56,8 +51,6 @@
 
 /* ============================================================
    C2. 提示信息条
-   用途：页面顶部的操作提示/警告
-   变体：info（蓝）、warning（黄）、danger（红）、success（绿）
    ============================================================ */
 .info-bar {
     display: flex;
@@ -84,55 +77,37 @@
     font-weight: 600;
 }
 
-/* 蓝色：信息提示 */
 .info-bar.info {
     background: #e0f2fe;
     border-left: 4px solid #0284c7;
     color: #0c4a6e;
 }
+.info-bar.info strong { color: #0369a1; }
 
-.info-bar.info strong {
-    color: #0369a1;
-}
-
-/* 黄色：警告提示 */
 .info-bar.warning {
     background: #fef3c7;
     border-left: 4px solid #f59e0b;
     color: #92400e;
 }
+.info-bar.warning strong { color: #b45309; }
 
-.info-bar.warning strong {
-    color: #b45309;
-}
-
-/* 红色：危险提示 */
 .info-bar.danger {
     background: #fee2e2;
     border-left: 4px solid #ef4444;
     color: #991b1b;
 }
+.info-bar.danger strong { color: #dc2626; }
 
-.info-bar.danger strong {
-    color: #dc2626;
-}
-
-/* 绿色：成功提示 */
 .info-bar.success {
     background: #ecfdf5;
     border-left: 4px solid #10b981;
     color: #065f46;
 }
-
-.info-bar.success strong {
-    color: #059669;
-}
+.info-bar.success strong { color: #059669; }
 
 
 /* ============================================================
-   C3. 统计卡片（小号，用于网格排列）
-   用途：仪表盘统计数字、缴费汇总
-   结构：值在上（大字体），标签在下（小字体）
+   C3. 统计卡片（小号）- 层级：次级卡片
    ============================================================ */
 .stat-card {
     background: var(--bg-card);
@@ -140,7 +115,7 @@
     border: 1px solid var(--border-medium);
     padding: var(--spacing-3) var(--spacing-4);
     text-align: center;
-    transition: var(--transition);
+    transition: var(--transition-fast);
     min-height: 72px;
     display: flex;
     flex-direction: column;
@@ -168,7 +143,6 @@
     line-height: 1.3;
 }
 
-/* 颜色变体 */
 .stat-card .stat-value.income  { color: var(--success-dark); }
 .stat-card .stat-value.expense { color: var(--danger-dark); }
 .stat-card .stat-value.warning { color: var(--warning-dark); }
@@ -180,26 +154,13 @@
     gap: var(--spacing-3);
     margin-bottom: var(--spacing-4);
 }
-
-/* 2列变体 */
-.stats-grid.stats-grid-2 {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-/* 3列变体 */
-.stats-grid.stats-grid-3 {
-    grid-template-columns: repeat(3, 1fr);
-}
-
-/* 自适应变体 */
-.stats-grid.stats-grid-auto {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-}
+.stats-grid.stats-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.stats-grid.stats-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.stats-grid.stats-grid-auto { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 
 
 /* ============================================================
-   C4. 信息项卡片（大号，用于展示详情）
-   用途：现金流汇总、门店余额展示
+   C4. 信息项卡片（大号）- 层级：次级卡片
    ============================================================ */
 .info-item-card {
     background: var(--bg-hover);
@@ -207,7 +168,7 @@
     border: 1px solid var(--border-light);
     padding: var(--spacing-3) var(--spacing-4);
     text-align: center;
-    transition: all 0.2s ease;
+    transition: var(--transition-slow);
 }
 
 .info-item-card:hover {
@@ -243,13 +204,11 @@
     border-top: 1px solid var(--border-light);
 }
 
-/* 信息卡片网格 */
 .info-cards-row {
     display: flex;
     gap: var(--spacing-4);
     flex-wrap: wrap;
 }
-
 .info-cards-row .info-item-card {
     flex: 1;
     min-width: 160px;
@@ -257,15 +216,14 @@
 
 
 /* ============================================================
-   C5. 费用卡片（中等，用于展示费用金额）
-   用途：新建订单的管理费/服务费展示
+   C5. 费用卡片 - 层级：内嵌面板
    ============================================================ */
 .fee-card {
     background: var(--bg-hover);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
     padding: var(--spacing-3) var(--spacing-4);
-    transition: var(--transition);
+    transition: var(--transition-fast);
 }
 
 .fee-card:hover {
@@ -309,7 +267,7 @@
     background: var(--bg-card);
     font-family: inherit;
     cursor: pointer;
-    transition: var(--transition);
+    transition: var(--transition-fast);
 }
 
 .fee-card .fee-card-body select:focus {
@@ -319,13 +277,12 @@
 }
 
 .fee-card .fee-card-hint {
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     color: var(--text-muted);
     margin-top: var(--spacing-2);
     text-align: right;
 }
 
-/* 费用卡片双列 */
 .fee-cards-row {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -336,18 +293,15 @@
 
 /* ============================================================
    C6. 操作行（表格内的操作按钮行）
-   用途：所有表格的操作按钮统一容器
    ============================================================ */
 .action-row {
     background: var(--bg-hover);
     border-bottom: 2px solid var(--border-medium);
 }
-
 .action-row td {
     padding: 6px 8px !important;
     vertical-align: middle;
 }
-
 .action-row .action-label {
     font-size: var(--font-xs);
     font-weight: 600;
@@ -356,7 +310,6 @@
     width: 50px;
     padding-right: var(--spacing-2);
 }
-
 .action-row .action-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -364,128 +317,126 @@
     align-items: center;
 }
 
-/* 标准小按钮 */
+/* 标准小按钮（保留原类名，内部统一）*/
 .action-buttons .btn-small {
     white-space: nowrap;
     flex-shrink: 0;
     padding: 4px 12px;
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-medium);
     background: var(--bg-card);
     color: var(--text-primary);
     cursor: pointer;
-    transition: var(--transition);
+    transition: var(--transition-fast);
     font-weight: 500;
     line-height: 1.4;
 }
-
 .action-buttons .btn-small:hover {
     background: var(--bg-hover);
     transform: translateY(-1px);
 }
-
 .action-buttons .btn-small.success {
-    background: var(--success);
-    color: white;
-    border-color: var(--success);
-}
-
-.action-buttons .btn-small.success:hover {
     background: var(--success-dark);
+    color: white;
+    border-color: var(--success-dark);
 }
-
+.action-buttons .btn-small.success:hover {
+    background: var(--success);
+}
 .action-buttons .btn-small.danger {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
-}
-
-.action-buttons .btn-small.danger:hover {
     background: var(--danger-dark);
+    color: white;
+    border-color: var(--danger-dark);
 }
-
+.action-buttons .btn-small.danger:hover {
+    background: var(--danger);
+}
 .action-buttons .btn-small.warning {
-    background: var(--warning);
-    color: white;
-    border-color: var(--warning);
-}
-
-.action-buttons .btn-small.warning:hover {
     background: var(--warning-dark);
-}
-
-.action-buttons .btn-small.primary {
-    background: var(--primary);
     color: white;
-    border-color: var(--primary);
+    border-color: var(--warning-dark);
 }
-
-.action-buttons .btn-small.primary:hover {
+.action-buttons .btn-small.warning:hover {
+    background: var(--warning);
+}
+.action-buttons .btn-small.primary {
     background: var(--primary-dark);
+    color: white;
+    border-color: var(--primary-dark);
+}
+.action-buttons .btn-small.primary:hover {
+    background: var(--primary);
 }
 
 
 /* ============================================================
-   C7. 状态徽章
+   C7-C10. 统一的徽章系统（合并为一套 Base）
    ============================================================ */
-.status-badge {
+.badge {
     display: inline-block;
     padding: 2px 10px;
-    border-radius: 12px;
-    font-size: var(--font-xxs);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-xs);
     font-weight: 600;
     white-space: nowrap;
     line-height: 1.6;
 }
 
+/* 语义颜色修饰符 */
+.badge-active     { background: #dcfce7; color: #16a34a; }
+.badge-completed  { background: #dbeafe; color: #2563eb; }
+.badge-liquidated { background: #fee2e2; color: #dc2626; }
+.badge-fixed      { background: #d1fae5; color: #065f46; }
+.badge-flexible   { background: #fed7aa; color: #9a3412; }
+.badge-cash       { background: #fef3c7; color: #92400e; }
+.badge-bank       { background: #e0f2fe; color: #0369a1; }
+.badge-locked     { background: #f1f5f9; color: #64748b; }
+.badge-reconciled { background: #ecfdf5; color: #065f46; }
+
+/* 保留旧类名（指向统一样式）*/
+.status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.6;
+}
 .status-badge.active     { background: #dcfce7; color: #16a34a; }
 .status-badge.completed  { background: #dbeafe; color: #2563eb; }
 .status-badge.liquidated { background: #fee2e2; color: #dc2626; }
 
-
-/* ============================================================
-   C8. 还款方式徽章
-   ============================================================ */
 .repayment-badge {
     display: inline-block;
     padding: 2px 10px;
-    border-radius: 12px;
-    font-size: var(--font-xxs);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-xs);
     font-weight: 600;
     white-space: nowrap;
 }
-
 .repayment-badge.fixed    { background: #d1fae5; color: #065f46; }
 .repayment-badge.flexible { background: #fed7aa; color: #9a3412; }
 
-
-/* ============================================================
-   C9. 支付方式徽章
-   ============================================================ */
 .payment-method-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 12px;
-    font-size: var(--font-xxs);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-xs);
     font-weight: 600;
     white-space: nowrap;
 }
-
 .payment-method-badge.cash { background: #fef3c7; color: #92400e; }
 .payment-method-badge.bank { background: #e0f2fe; color: #0369a1; }
 
-
-/* ============================================================
-   C10. 锁定/已平账徽章
-   ============================================================ */
 .locked-badge {
     display: inline-block;
     padding: 4px 12px;
     background: #f1f5f9;
     color: #64748b;
     border-radius: 20px;
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     font-weight: 600;
     white-space: nowrap;
 }
@@ -496,7 +447,7 @@
     background: #ecfdf5;
     color: #065f46;
     border-radius: 20px;
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     font-weight: 600;
     white-space: nowrap;
 }
@@ -514,13 +465,11 @@
     text-align: center;
     color: var(--text-muted);
 }
-
 .empty-state .empty-state-icon {
     font-size: 48px;
     margin-bottom: var(--spacing-3);
     opacity: 0.4;
 }
-
 .empty-state .empty-state-text {
     font-size: var(--font-sm);
     font-weight: 500;
@@ -537,12 +486,11 @@
     border-radius: 4px;
     overflow: hidden;
 }
-
 .progress-bar .progress-fill {
     height: 100%;
-    background: var(--success);
+    background: var(--success-dark);
     border-radius: 4px;
-    transition: width 0.3s ease;
+    transition: width var(--transition-slow);
 }
 
 
@@ -556,12 +504,10 @@
     font-weight: 600;
     margin-top: var(--spacing-2);
 }
-
 .overdue-warning.mild {
     background: var(--warning-light);
     color: var(--warning-dark);
 }
-
 .overdue-warning.severe {
     background: var(--danger-light);
     color: var(--danger-dark);
@@ -571,8 +517,6 @@
 /* ============================================================
    表格系统
    ============================================================ */
-
-/* 表格容器 */
 .table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -581,7 +525,6 @@
     border-radius: var(--radius-md);
 }
 
-/* 统一表格基础 */
 .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -590,7 +533,6 @@
     table-layout: fixed;
 }
 
-/* 表头 */
 .data-table thead th {
     background: var(--bg-hover);
     font-weight: 600;
@@ -605,7 +547,6 @@
     vertical-align: middle;
 }
 
-/* 表体 */
 .data-table tbody td {
     padding: 8px;
     border-bottom: 1px solid var(--border-light);
@@ -617,45 +558,33 @@
     word-break: break-word;
 }
 
-/* 行悬停 */
 .data-table tbody tr:hover {
     background: var(--bg-hover);
 }
 
-/* 斑马纹 */
 .data-table.striped tbody tr:nth-child(even) {
     background: var(--bg-page);
 }
-
 .data-table.striped tbody tr:hover {
     background: var(--bg-hover);
 }
 
-/* 列对齐 */
 .data-table .text-left   { text-align: left; }
 .data-table .text-center { text-align: center; }
 .data-table .text-right  { text-align: right; }
-
-/* 金额列 */
 .data-table .amount {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
-
-/* 日期列 */
 .data-table .date-cell {
     white-space: nowrap;
 }
-
-/* 描述列 */
 .data-table .desc-cell {
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
-/* 订单ID */
 .data-table .order-id {
     font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
     font-weight: 600;
@@ -664,7 +593,7 @@
 
 
 /* ============================================================
-   C14. 订单统计（客户详情弹窗）- 新增
+   C14. 订单统计（客户详情弹窗）
    ============================================================ */
 .order-stats {
     display: flex;
@@ -672,7 +601,6 @@
     justify-content: center;
     padding: var(--spacing-3);
 }
-
 .stat-item {
     flex: 1;
     text-align: center;
@@ -680,62 +608,45 @@
     border-radius: var(--radius-lg);
     background: var(--bg-hover);
     cursor: pointer;
-    transition: var(--transition);
+    transition: var(--transition-fast);
     min-width: 80px;
 }
-
 .stat-item:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-sm);
 }
-
 .stat-item .stat-number {
     font-size: var(--font-2xl);
     font-weight: 700;
     display: block;
     line-height: 1.2;
 }
-
 .stat-item .stat-label {
     font-size: var(--font-xs);
     color: var(--text-secondary);
     display: block;
     margin-top: var(--spacing-1);
 }
-
-/* 进行中 - 蓝色 */
 .stat-item.active {
     background: #e0f2fe;
     border-left: 3px solid #0284c7;
 }
-.stat-item.active .stat-number {
-    color: #0369a1;
-}
-
-/* 已结清 - 绿色 */
+.stat-item.active .stat-number { color: #0369a1; }
 .stat-item.completed {
     background: #ecfdf5;
     border-left: 3px solid #10b981;
 }
-.stat-item.completed .stat-number {
-    color: #059669;
-}
-
-/* 异常 - 橙色 */
+.stat-item.completed .stat-number { color: #059669; }
 .stat-item.abnormal {
     background: #fef3c7;
     border-left: 3px solid #f59e0b;
 }
-.stat-item.abnormal .stat-number {
-    color: #d97706;
-}
+.stat-item.abnormal .stat-number { color: #d97706; }
 
 
 /* ============================================================
-   列宽系统（统一规范）- 替换原有列宽定义
+   列宽系统
    ============================================================ */
-
-/* 基础列宽 - 所有表格通用 */
 .col-id       { width: 8%;  }
 .col-name     { width: 14%; }
 .col-ktp      { width: 12%; }
@@ -750,34 +661,17 @@
 .col-method   { width: 9%;  }
 .col-desc     { width: auto; }
 .col-action   { width: 100px; }
-
-/* 窄列变体 */
 .col-id-narrow    { width: 6%; }
 .col-status-wide  { width: 10%; }
 
-/* 确保表格列宽生效 */
 .data-table {
     table-layout: fixed;
 }
 
-/* 表格容器 - 确保滚动 */
-.table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: var(--spacing-3) 0;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-}
-
-
-/* ============================================================
-   手机端表格列宽（像素固定，确保滚动）
-   ============================================================ */
 @media (max-width: 768px) {
     .data-table {
         min-width: 700px;
     }
-    
     .col-id       { width: 75px; }
     .col-name     { width: 100px; }
     .col-ktp      { width: 110px; }
