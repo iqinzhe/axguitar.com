@@ -1,8 +1,9 @@
-// app-dashboard-anomaly.js - v1.1
+// app-dashboard-anomaly.js - v1.2
 // 修改内容：
 // 1. 移除独立的 AnomalyCache，改用统一 JFCache 模块
 // 2. 将直接调用 supabaseClient 的地方改为使用 SUPABASE 封装方法
 // 3. 将 alert 改为 Utils.toast 统一调用
+// 4. 修复 getMonthlyStoreRanking：当 eligibleStores < 4 时，top3 和 bottom3 不应重复
 
 window.APP = window.APP || {};
 
@@ -174,8 +175,31 @@ const AnomalyHelper = {
         
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
         
-        const top3 = eligibleStores.slice(0, Math.min(3, eligibleStores.length));
-        const bottom3 = eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse();
+        // ========== 修复：当门店数量不足时，top3 和 bottom3 不应重叠 ==========
+        const totalCount = eligibleStores.length;
+        
+        if (totalCount === 1) {
+            // 只有1家门店：top3 显示它，bottom3 为空
+            const top3 = eligibleStores.slice(0, 1);
+            return { top3, bottom3: [] };
+        }
+        
+        if (totalCount === 2) {
+            // 只有2家门店：top3 显示全部2家，bottom3 为空
+            const top3 = eligibleStores.slice(0, 2);
+            return { top3, bottom3: [] };
+        }
+        
+        if (totalCount === 3) {
+            // 只有3家门店：top3 显示全部3家，bottom3 显示第3名（最后1家）
+            const top3 = eligibleStores.slice(0, 3);
+            const bottom3 = eligibleStores.slice(-1).reverse();
+            return { top3, bottom3 };
+        }
+        
+        // 4家及以上：正常取 top3 和 bottom3
+        const top3 = eligibleStores.slice(0, Math.min(3, totalCount));
+        const bottom3 = eligibleStores.slice(-Math.min(3, totalCount)).reverse();
         
         return { top3, bottom3 };
     }
@@ -256,7 +280,7 @@ const DashboardAnomaly = {
                                     ' (' + (overdueTotalCount - overdueOrders.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '</td>';
+                        '</tr>';
                 }
                 
                 overdueTableHtml = '' +
