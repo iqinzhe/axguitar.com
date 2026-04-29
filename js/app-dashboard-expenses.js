@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v1.0
+// app-dashboard-expenses.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -22,7 +22,8 @@ const DashboardExpenses = {
             var finalExpenses = [];
             
             try {
-                var query = supabaseClient
+                const client = SUPABASE.getClient();
+                var query = client
                     .from('expenses')
                     .select('*')
                     .order('expense_date', { ascending: false });
@@ -229,7 +230,8 @@ const DashboardExpenses = {
         }
         
         try {
-            const { data: expense, error } = await supabaseClient.from('expenses').select('*').eq('id', expenseId).single();
+            const client = SUPABASE.getClient();
+            const { data: expense, error } = await client.from('expenses').select('*').eq('id', expenseId).single();
             if (error) throw error;
             if (expense.is_reconciled) {
                 Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
@@ -239,7 +241,7 @@ const DashboardExpenses = {
             if (newAmount && !isNaN(parseFloat(newAmount))) {
                 const newAmountNum = parseFloat(newAmount);
                 
-                await supabaseClient.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
+                await client.from('expenses').update({ amount: newAmountNum }).eq('id', expenseId);
                 
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
                 await APP.showExpenses();
@@ -267,7 +269,8 @@ const DashboardExpenses = {
         if (!confirmed) return;
         
         try {
-            await supabaseClient.from('expenses').delete().eq('id', expenseId);
+            const client = SUPABASE.getClient();
+            await client.from('expenses').delete().eq('id', expenseId);
             Utils.toast.success(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
             await APP.showExpenses();
         } catch (error) {
@@ -325,7 +328,8 @@ const DashboardExpenses = {
         if (!confirmed) return;
         
         try {
-            const { data: expensesToUpdate, error: fetchError } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { data: expensesToUpdate, error: fetchError } = await client
                 .from('expenses')
                 .select('id')
                 .gte('expense_date', startDate)
@@ -341,7 +345,7 @@ const DashboardExpenses = {
                 return;
             }
             
-            await supabaseClient
+            await client
                 .from('expenses')
                 .update({ 
                     is_reconciled: true, 
