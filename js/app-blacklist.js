@@ -1,4 +1,4 @@
-// app-blacklist.js - v1.0
+// app-blacklist.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -39,7 +39,8 @@ const BlacklistModule = {
         // 权限检查：门店操作员只能拉黑自己门店的客户
         if (profile?.role !== 'admin') {
             // 先获取客户信息进行门店校验
-            const { data: customer, error: customerError } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { data: customer, error: customerError } = await client
                 .from('customers')
                 .select('store_id')
                 .eq('id', customerId)
@@ -121,7 +122,7 @@ const BlacklistModule = {
             if (isAdmin) {
                 headerHtml += '<th class="col-action">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>';
             }
-            headerHtml += '</tr>';
+            headerHtml += '</table>';
             
             var rows = '';
             if (!blacklist || blacklist.length === 0) {
@@ -139,11 +140,11 @@ const BlacklistModule = {
                         '<td class="col-name">' + Utils.escapeHtml(customer.name) + '</td>' +
                         '<td class="col-name">' + occupationDisplay + '</td>' +
                         '<td class="col-phone">' + Utils.escapeHtml(customer.phone || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(item.reason) + '</td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(item.reason) + '</td>' +
                         '<td class="col-date">' + Utils.formatDate(item.blacklisted_at) + '</td>';
                     
                     if (isAdmin) {
-                        rows += '<td><button onclick="APP.removeFromBlacklist(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small danger">🚫 ' + (lang === 'id' ? 'Hapus' : '解除') + '</button></td>';
+                        rows += '<td class="text-center"><button onclick="APP.removeFromBlacklist(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small danger">🚫 ' + (lang === 'id' ? 'Hapus' : '解除') + '</button></td>';
                     }
                     
                     rows += '</tr>';
