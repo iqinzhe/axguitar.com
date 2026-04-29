@@ -664,11 +664,11 @@ const DashboardCore = {
                 return await self.renderDashboard();
             },
             backupRestore: () => {
-                if (typeof Storage !== 'undefined' && typeof Storage.renderBackupUI === 'function') {
-                    return ModuleFallback.safeCall('Cadangan', Storage.renderBackupUI, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
+    if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') {
+        return ModuleFallback.safeCall('Cadangan', BackupStorage.renderBackupUI, [], () => self.renderDashboard());
+    }
+    return self.renderDashboard();
+},
             customerOrders: async () => { 
                 if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerOrders', window.APP.showCustomerOrders)) {
                     return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], () => self.renderDashboard());
@@ -724,10 +724,10 @@ const DashboardCore = {
             },
             'expenses':         { fn: window.APP.showExpenses,         name: 'Pengeluaran' },
             'customers':        { fn: window.APP.showCustomers,        name: 'Nasabah' },
-            'backupRestore':    { 
-                fn: typeof Storage !== 'undefined' ? Storage.renderBackupUI : null, 
-                name: 'Cadangan' 
-            },
+            'backupRestore': { 
+    fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
+    name: 'Cadangan' 
+},
             'blacklist':        { fn: window.APP.showBlacklist,        name: 'Daftar Hitam' }
         };
         
