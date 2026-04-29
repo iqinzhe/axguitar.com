@@ -1,8 +1,10 @@
-// utils.js - v1.1
+// utils.js - v1.2
 // 修改内容：
 // 1. 强化语言初始化，统一通过 Utils.lang 访问
 // 2. 添加 forceSyncLanguage 方法确保语言同步
 // 3. 添加 toastConfirm 辅助方法，简化确认框调用
+// 4. 更新翻译字典：操作面板→管理中心，订单列表→订单管理，缴费记录→资金流水，财务指标→业务指标
+// 5. 更新内部转账翻译：使用双箭头→→
 
 window.Utils = window.Utils || {};
 
@@ -157,14 +159,14 @@ window.Utils = window.Utils || {};
                 'ktp_number': 'No. KTP',
                 'address': 'Alamat',
                 'order_id': 'ID Pesanan',
-                'order_list': 'Daftar Pesanan',
+                'order_list': 'Manajemen Pesanan',
                 'order_details': 'Detail Pesanan',
                 'create_order': 'Buat Pesanan',
-                'payment_history': 'Riwayat Pembayaran',
+                'payment_history': 'Arus Kas',
                 'fund_management': 'Manajemen Dana',
                 'internal_transfer': 'Transfer Internal',
-                'cash_to_bank': 'Kas ke Bank',
-                'bank_to_cash': 'Bank ke Kas',
+                'cash_to_bank': 'Brankas→→🏧 Bank BNI',
+                'bank_to_cash': '🏧 Bank BNI→→🏦Brankas',
                 'submit_to_hq': 'Setor ke Pusat',
                 'cash': 'Kas',
                 'bank': 'Bank',
@@ -188,8 +190,8 @@ window.Utils = window.Utils || {};
                 'more_pawn_higher_fee': 'Semakin besar gadai, semakin besar biaya admin',
                 'order_saved_locked': 'Order tersimpan otomatis terkunci',
                 'contract_pay_info': 'Bayar bunga sebelum tanggal jatuh tempo',
-                'financial_indicators': 'Indikator Keuangan',
-                'operation': 'Panel Operasi',
+                'financial_indicators': 'Indikator Bisnis',
+                'operation': 'Pusat Manajemen',
                 'filter': 'Filter',
                 'reset': 'Reset',
                 'all': 'Semua'
@@ -256,14 +258,14 @@ window.Utils = window.Utils || {};
                 'ktp_number': '身份证号',
                 'address': '地址',
                 'order_id': '订单号',
-                'order_list': '订单列表',
+                'order_list': '订单管理',
                 'order_details': '订单详情',
                 'create_order': '创建订单',
-                'payment_history': '缴费记录',
+                'payment_history': '资金流水',
                 'fund_management': '资金管理',
                 'internal_transfer': '内部转账',
-                'cash_to_bank': '现金存银行',
-                'bank_to_cash': '银行取现',
+                'cash_to_bank': '保险柜→→🏧 银行BNI',
+                'bank_to_cash': '🏧 银行BNI→→🏦保险柜',
                 'submit_to_hq': '上缴总部',
                 'cash': '现金',
                 'bank': '银行',
@@ -287,8 +289,8 @@ window.Utils = window.Utils || {};
                 'more_pawn_higher_fee': '典当金额越大，管理费越高',
                 'order_saved_locked': '订单保存后自动锁定',
                 'contract_pay_info': '请在到期日前支付利息',
-                'financial_indicators': '财务指标',
-                'operation': '操作面板',
+                'financial_indicators': '业务指标',
+                'operation': '管理中心',
                 'filter': '筛选',
                 'reset': '重置',
                 'all': '全部'
