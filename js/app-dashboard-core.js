@@ -1,12 +1,4 @@
 // app-dashboard-core.js - v1.3
-// 修改内容：
-// 1. 移除独立的 DashboardCache，改用统一 JFCache 模块
-// 2. 添加模块加载防御检查
-// 3. 将 alert 改为 Utils.toast 统一调用
-// 4. 优化 refreshCurrentPage 中的模块存在性检查
-// 5. 修复 getMonthlyStoreRanking：当 eligibleStores < 4 时 top3 和 bottom3 不应重复
-// 6. 仪表盘文本修改：操作面板→管理中心，订单列表→订单管理，缴费记录→资金流水，财务指标→业务指标
-// 7. 内部转账按钮文本修改：使用双箭头→→加粗
 
 window.APP = window.APP || {};
 
