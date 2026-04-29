@@ -73,3 +73,316 @@
 .customer-detail-card .stat-item.active .stat-number { color: var(--primary); }
 .customer-detail-card .stat-item.completed .stat-number { color: var(--success-dark); }
 .customer-detail-card .stat-item.abnormal .stat-number { color: var(--danger); }
+
+/* ============================================================
+   异常状况页面样式（Anomaly Page）
+   ============================================================ */
+
+/* 异常状况网格布局 */
+.anomaly-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-4);
+    margin-bottom: var(--spacing-4);
+}
+
+@media (max-width: 1024px) {
+    .anomaly-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 异常状况卡片 */
+.anomaly-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+    border: 1px solid var(--border-light);
+}
+
+.anomaly-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* 卡片头部 */
+.anomaly-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-3) var(--spacing-4);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.anomaly-card-header h3 {
+    margin: 0;
+    font-size: var(--font-md);
+    font-weight: 600;
+}
+
+.anomaly-icon {
+    font-size: 1.5rem;
+}
+
+.anomaly-badge {
+    background: var(--danger);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: var(--font-xxs);
+    font-weight: 600;
+}
+
+/* 卡片主体 */
+.anomaly-card-body {
+    padding: var(--spacing-3) var(--spacing-4);
+}
+
+/* 卡片底部 */
+.anomaly-card-footer {
+    padding: var(--spacing-2) var(--spacing-4);
+    background: var(--warning-light);
+    border-top: 1px solid var(--border-light);
+    font-size: var(--font-xxs);
+}
+
+/* 卡片颜色变体 */
+.anomaly-card-danger .anomaly-card-header {
+    background: var(--danger-light);
+    border-bottom-color: #fecaca;
+}
+
+.anomaly-card-warning .anomaly-card-header {
+    background: var(--warning-light);
+    border-bottom-color: #fde68a;
+}
+
+.anomaly-card-info .anomaly-card-header {
+    background: var(--primary-soft);
+    border-bottom-color: #bfdbfe;
+}
+
+/* 排名列表 */
+.ranking-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.ranking-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    padding: var(--spacing-2) var(--spacing-3);
+    background: var(--bg-hover);
+    border-radius: var(--radius-md);
+    transition: transform 0.2s;
+}
+
+.ranking-item:hover {
+    transform: translateX(4px);
+}
+
+.ranking-item.first {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-left: 4px solid var(--warning);
+}
+
+.ranking-item.last {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    border-left: 4px solid var(--danger);
+}
+
+.ranking-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    min-width: 48px;
+    text-align: center;
+}
+
+.ranking-info {
+    flex: 1;
+}
+
+.ranking-name {
+    font-weight: 600;
+    display: block;
+    font-size: var(--font-sm);
+}
+
+.ranking-code {
+    font-size: var(--font-xxs);
+    color: var(--text-muted);
+}
+
+.ranking-count {
+    text-align: right;
+    font-size: var(--font-xxs);
+    line-height: 1.4;
+}
+
+/* 异常表格 */
+.anomaly-table {
+    width: 100%;
+    font-size: var(--font-xs);
+}
+
+.anomaly-table th,
+.anomaly-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.anomaly-table th {
+    background: var(--bg-hover);
+    font-weight: 600;
+}
+
+/* 空状态 */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-6);
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: var(--spacing-2);
+    opacity: 0.5;
+}
+
+.empty-state-text {
+    font-size: var(--font-sm);
+}
+
+.warning-text {
+    color: var(--warning-dark);
+}
+
+.info-text {
+    color: var(--primary);
+}
+
+
+/* ============================================================
+   备份恢复页面样式（Backup & Restore）
+   ============================================================ */
+
+/* 备份网格 */
+.backup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--spacing-4);
+    margin-bottom: var(--spacing-4);
+}
+
+/* 备份卡片 */
+.backup-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-4);
+    box-shadow: var(--shadow-md);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--border-light);
+}
+
+.backup-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.backup-card h3 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-2);
+    font-size: var(--font-md);
+    font-weight: 600;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.backup-card p {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-3);
+    font-size: var(--font-sm);
+    line-height: 1.5;
+}
+
+/* 卡片顶部边框变体 */
+.backup-card-primary {
+    border-top: 4px solid var(--primary);
+}
+
+.backup-card-secondary {
+    border-top: 4px solid var(--success);
+}
+
+.backup-card-store-primary {
+    border-top: 4px solid var(--primary);
+}
+
+.backup-card-store-secondary {
+    border-top: 4px solid var(--warning);
+}
+
+/* 备份按钮 */
+.btn-backup-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 500;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.btn-backup-primary:hover {
+    background: var(--primary-dark);
+}
+
+.btn-backup-store-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 500;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.btn-backup-store-primary:hover {
+    background: var(--primary-dark);
+}
+
+/* 恢复按钮 */
+.btn-restore {
+    background: var(--warning);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 500;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.btn-restore:hover {
+    background: var(--warning-dark);
+}
+
+/* 警告小文本 */
+.warning-text-small {
+    color: var(--danger);
+    font-size: var(--font-xxs);
+    margin-bottom: var(--spacing-2);
+}
