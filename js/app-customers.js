@@ -1,4 +1,4 @@
-// app-customers.js - v1.0
+// app-customers.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -421,7 +421,8 @@ const CustomersModule = {
                 try {
                     const prefix = await SUPABASE._getStorePrefix(storeId);
                     
-                    const { data: customers, error: queryError } = await supabaseClient
+                    const client = SUPABASE.getClient();
+                    const { data: customers, error: queryError } = await client
                         .from('customers')
                         .select('customer_id')
                         .like('customer_id', prefix + '%')
@@ -459,7 +460,7 @@ const CustomersModule = {
                         created_by: profile.id
                     };
                     
-                    const { data, error } = await supabaseClient
+                    const { data, error } = await client
                         .from('customers')
                         .insert(customerData)
                         .select()
@@ -519,7 +520,8 @@ const CustomersModule = {
         }
         
         try {
-            const { data: c, error } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
+            const client = SUPABASE.getClient();
+            const { data: c, error } = await client.from('customers').select('*').eq('id', customerId).single();
             if (error) throw error;
             var livingSame = c.living_same_as_ktp !== false;
             var occupation = c.occupation || '';
@@ -587,7 +589,8 @@ const CustomersModule = {
         }
 
         try {
-            const { error } = await supabaseClient.from('customers').update({
+            const client = SUPABASE.getClient();
+            const { error } = await client.from('customers').update({
                 name: name,
                 phone: phone,
                 ktp_number: ktp || null,
@@ -620,19 +623,20 @@ const CustomersModule = {
         if (!confirmed) return;
         
         try {
-            const { data: orders, error: ordersError } = await supabaseClient.from('orders').select('id').eq('customer_id', customerId);
+            const client = SUPABASE.getClient();
+            const { data: orders, error: ordersError } = await client.from('orders').select('id').eq('customer_id', customerId);
             if (ordersError) throw ordersError;
             
             if (orders && orders.length > 0) {
                 for (var i = 0; i < orders.length; i++) {
-                    await supabaseClient.from('payment_history').delete().eq('order_id', orders[i].id);
+                    await client.from('payment_history').delete().eq('order_id', orders[i].id);
                 }
-                await supabaseClient.from('orders').delete().eq('customer_id', customerId);
+                await client.from('orders').delete().eq('customer_id', customerId);
             }
             
-            await supabaseClient.from('blacklist').delete().eq('customer_id', customerId);
+            await client.from('blacklist').delete().eq('customer_id', customerId);
             
-            const { error: customerError } = await supabaseClient.from('customers').delete().eq('id', customerId);
+            const { error: customerError } = await client.from('customers').delete().eq('id', customerId);
             if (customerError) throw customerError;
             
             Utils.toast.success(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
@@ -695,7 +699,8 @@ const CustomersModule = {
 
             // 检查活跃订单
             try {
-                const { data: existingOrders } = await supabaseClient
+                const client = SUPABASE.getClient();
+                const { data: existingOrders } = await client
                     .from('orders')
                     .select('status')
                     .eq('customer_id', customerId)
@@ -1209,7 +1214,8 @@ const CustomersModule = {
         var t = function(key) { return Utils.t(key); };
         try {
             const customer = await SUPABASE.getCustomer(customerId);
-            const { data: orders, error } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { data: orders, error } = await client
                 .from('orders')
                 .select('*')
                 .eq('customer_id', customerId)
@@ -1220,7 +1226,7 @@ const CustomersModule = {
             
             var rows = '';
             if (!orders || orders.length === 0) {
-                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + 'NonNull';
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</tr>';
             } else {
                 for (var i = 0; i < orders.length; i++) {
                     var o = orders[i];
@@ -1293,7 +1299,8 @@ const CustomersModule = {
         var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
         try {
             const customer = await SUPABASE.getCustomer(customerId);
-            const { data: orders } = await supabaseClient.from('orders').select('id, order_id').eq('customer_id', customerId);
+            const client = SUPABASE.getClient();
+            const { data: orders } = await client.from('orders').select('id, order_id').eq('customer_id', customerId);
             var orderIds = [];
             if (orders) {
                 for (var i = 0; i < orders.length; i++) {
@@ -1302,14 +1309,14 @@ const CustomersModule = {
             }
             var allPayments = [];
             if (orderIds.length > 0) {
-                const { data } = await supabaseClient.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false });
+                const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false });
                 allPayments = data || [];
             }
             var typeMap = { admin_fee: lang === 'id' ? 'Admin Fee' : '管理费', service_fee: lang === 'id' ? 'Service Fee' : '服务费', interest: lang === 'id' ? 'Bunga' : '利息', principal: lang === 'id' ? 'Pokok' : '本金' };
             
             var rows = '';
             if (allPayments.length === 0) {
-                rows = '<td><td colspan="7" class="text-center">' + t('no_data') + 'NonNull';
+                rows = '<tr><td colspan="7" class="text-center">' + t('no_data') + '</td>';
             } else {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
@@ -1317,7 +1324,7 @@ const CustomersModule = {
                     rows += '<tr>' +
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
                         '<td class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '</td>' +
-                        '<td>' + (typeMap[p.type] || p.type) + '</td>' +
+                        '<td class="col-type">' + (typeMap[p.type] || p.type) + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
                         '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
