@@ -1,4 +1,4 @@
-// app-payments.js - v1.0
+// app-payments.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -18,8 +18,9 @@ window.APP._releasePaymentLock = function(lockKey) {
 // ========== 幂等性检查：防止重复处理同一笔交易 ==========
 window.APP._checkIdempotency = async function(orderId, type, amount, paymentMethod) {
     try {
+        const client = SUPABASE.getClient();
         // 获取订单内部ID
-        const { data: order, error: orderError } = await supabaseClient
+        const { data: order, error: orderError } = await client
             .from('orders')
             .select('id')
             .eq('order_id', orderId)
@@ -28,7 +29,7 @@ window.APP._checkIdempotency = async function(orderId, type, amount, paymentMeth
         if (orderError || !order) return false;
         
         const today = Utils.getLocalToday();
-        const { data, error } = await supabaseClient
+        const { data, error } = await client
             .from('payment_history')
             .select('id')
             .eq('order_id', order.id)
@@ -53,7 +54,8 @@ window.APP._checkIdempotency = async function(orderId, type, amount, paymentMeth
 window.APP._rollbackOrder = async function(orderId, originalState) {
     console.warn('[补偿事务] 开始回滚订单:', orderId);
     try {
-        const { error } = await supabaseClient
+        const client = SUPABASE.getClient();
+        const { error } = await client
             .from('orders')
             .update(originalState)
             .eq('order_id', orderId);
@@ -78,7 +80,8 @@ window.APP._rollbackOrder = async function(orderId, originalState) {
 window.APP._rollbackPaymentHistory = async function(orderInternalId, type, amount, date) {
     console.warn('[补偿事务] 删除付款记录:', orderInternalId, type);
     try {
-        const { error } = await supabaseClient
+        const client = SUPABASE.getClient();
+        const { error } = await client
             .from('payment_history')
             .delete()
             .eq('order_id', orderInternalId)
@@ -97,8 +100,9 @@ window.APP._rollbackPaymentHistory = async function(orderInternalId, type, amoun
 window.APP._rollbackCashFlow = async function(orderInternalId, flowType, amount) {
     console.warn('[补偿事务] 删除资金流水:', orderInternalId, flowType);
     try {
+        const client = SUPABASE.getClient();
         const today = Utils.getLocalToday();
-        const { error } = await supabaseClient
+        const { error } = await client
             .from('cash_flow_records')
             .delete()
             .eq('order_id', orderInternalId)
@@ -298,7 +302,7 @@ const PaymentsModule = {
             // ========== 利息历史行 ==========
             var interestRows = '';
             if (interestPayments.length === 0) {
-                interestRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td></tr>';
+                interestRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td>';
             } else {
                 for (var i = 0; i < interestPayments.length; i++) {
                     var p = interestPayments[i];
@@ -318,7 +322,7 @@ const PaymentsModule = {
             var principalRows = '';
             var cumulativePaid = 0;
             if (principalPayments.length === 0) {
-                principalRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + 'NonNull';
+                principalRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td>';
             } else {
                 for (var i = 0; i < principalPayments.length; i++) {
                     var p = principalPayments[i];
@@ -466,7 +470,7 @@ const PaymentsModule = {
                                     '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th> vain</thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
-                                    '</tr>' +
+                                    '</table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -629,7 +633,8 @@ const PaymentsModule = {
                 var newInterestPaidTotal = (order.interest_paid_total || 0) + totalInterest;
                 var nextDueDate = SUPABASE.calculateNextDueDate(order.created_at, newInterestPaidMonths);
                 
-                const { error: updateError } = await supabaseClient
+                const client = SUPABASE.getClient();
+                const { error: updateError } = await client
                     .from('orders')
                     .update({
                         interest_paid_months: newInterestPaidMonths,
@@ -653,7 +658,7 @@ const PaymentsModule = {
                     payment_method: method
                 };
                 
-                const { error: paymentError } = await supabaseClient
+                const { error: paymentError } = await client
                     .from('payment_history')
                     .insert(paymentData);
                 
@@ -797,7 +802,8 @@ const PaymentsModule = {
                     updates.monthly_interest = newPrincipalRemaining * monthlyRate;
                 }
                 
-                const { error: updateError } = await supabaseClient
+                const client = SUPABASE.getClient();
+                const { error: updateError } = await client
                     .from('orders')
                     .update(updates)
                     .eq('order_id', orderId);
@@ -814,7 +820,7 @@ const PaymentsModule = {
                     payment_method: target
                 };
                 
-                const { error: paymentError } = await supabaseClient
+                const { error: paymentError } = await client
                     .from('payment_history')
                     .insert(paymentData);
                 
