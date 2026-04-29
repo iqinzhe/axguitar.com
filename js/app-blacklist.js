@@ -1,5 +1,4 @@
-// app-blacklist.js - v1.1
-// 修改内容：将所有直接调用 supabaseClient 的地方改为使用 SUPABASE 封装方法
+// app-blacklist.js - v1.0
 
 window.APP = window.APP || {};
 
