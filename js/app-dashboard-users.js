@@ -1,5 +1,7 @@
-// app-dashboard-users.js - v1.1
-// 修改内容：简化 Toast 调用，统一使用 Utils.toast
+// app-dashboard-users.js - v1.2
+// 修改内容：
+// 1. 简化 Toast 调用，统一使用 Utils.toast
+// 2. 修复操作行 HTML 中错误的 </table> 闭合标签（应为 </tr>）
 
 window.APP = window.APP || {};
 
@@ -23,7 +25,7 @@ const DashboardUsers = {
             
             var rows = '';
             if (users.length === 0) {
-                rows = '<tr><td colspan="5" class="text-center">' + t('no_data') + 'NonNull';
+                rows = '<tr><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
             } else {
                 for (var i = 0; i < users.length; i++) {
                     var u = users[i];
@@ -67,7 +69,7 @@ const DashboardUsers = {
                         '<td colspan="4">' +
                             '<div class="action-buttons">' + actionButtons + '</div>' +
                         '</td>' +
-                    '</table>';
+                    '</tr>';
                 }
             }
             
