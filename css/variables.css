@@ -38,10 +38,12 @@
     --border-light: #e2e8f0;
     --border-medium: #cbd5e1;
 
-    /* --- 阴影 --- */
+    /* --- 阴影（三层卡片层级）--- */
+    --shadow-none: none;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.08);
     --shadow-lg: 0 4px 8px -1px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 8px 16px -2px rgb(0 0 0 / 0.12);
 
     /* --- 圆角 --- */
     --radius-sm: 6px;
@@ -61,15 +63,15 @@
     --spacing-7: 28px;
     --spacing-8: 32px;
 
-    /* --- 过渡 --- */
-    --transition: all 0.2s ease;
+    /* --- 过渡（两档：快速0.15s，慢速0.3s）--- */
+    --transition-fast: 0.15s ease;
+    --transition-slow: 0.3s ease;
 
-    /* --- 字体大小 --- */
-    --font-xxs: 0.75rem;
-    --font-xs: 0.8rem;
-    --font-sm: 0.9rem;
-    --font-md: 1rem;
-    --font-lg: 1.1rem;
-    --font-xl: 1.25rem;
-    --font-2xl: 1.35rem;
+    /* --- 字体大小（精简为 6 档，移除 font-xxs）--- */
+    --font-xs: 0.75rem;      /* 12px */
+    --font-sm: 0.875rem;     /* 14px */
+    --font-md: 1rem;         /* 16px */
+    --font-lg: 1.125rem;     /* 18px */
+    --font-xl: 1.25rem;      /* 20px */
+    --font-2xl: 1.5rem;      /* 24px */
 }
