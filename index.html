@@ -33,34 +33,36 @@
 </div>
 
 <!-- ========== 脚本加载顺序（重要！请勿调整） ========== -->
-    <!-- 1. 基础库（同步） -->
-    <script src="lib/supabase-js@2.js"></script>
+<!-- 1. 基础库（同步） -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- 2. 核心模块（defer，按依赖顺序排列） -->
-    <script defer src="js/utils.js"></script>           <!-- 工具类，无依赖 -->
-    <script defer src="js/toast.js"></script>          <!-- Toast 通知，依赖 utils -->
-    <script defer src="js/auth.js"></script>           <!-- 认证模块，依赖 utils -->
-    <script defer src="js/supabase.js"></script>       <!-- 数据层，依赖 auth, utils -->
-    <script defer src="js/permission.js"></script>     <!-- 权限模块，依赖 auth -->
-    <script defer src="js/audit.js"></script>          <!-- 审计日志，依赖 auth, supabase -->
-    <script defer src="js/order.js"></script>          <!-- 订单模块，依赖 supabase, utils -->
-    <script defer src="js/store.js"></script>          <!-- 门店管理，依赖 supabase -->
-    <script defer src="js/storage.js"></script>        <!-- 备份恢复，依赖 supabase, audit -->
-    <script defer src="js/migration.js"></script>      <!-- 数据迁移，依赖 supabase -->
+<!-- 2. 核心模块（defer，按依赖顺序排列） -->
+<script defer src="js/utils.js"></script>           <!-- 工具类，无依赖 -->
+<script defer src="js/toast.js"></script>          <!-- Toast 通知，依赖 utils -->
+<script defer src="js/auth.js"></script>           <!-- 认证模块，依赖 utils -->
+<script defer src="js/supabase.js"></script>       <!-- 数据层，依赖 auth, utils -->
+<script defer src="js/permission.js"></script>     <!-- 权限模块，依赖 auth -->
+<script defer src="js/audit.js"></script>          <!-- 审计日志，依赖 auth, supabase -->
+<script defer src="js/order.js"></script>          <!-- 订单模块，依赖 supabase, utils -->
+<script defer src="js/store.js"></script>          <!-- 门店管理，依赖 supabase -->
+<script defer src="js/storage.js"></script>        <!-- 备份恢复，依赖 supabase, audit -->
+<script defer src="js/migration.js"></script>      <!-- 数据迁移，依赖 supabase -->
 
-    <!-- 3. 页面组件模块（defer，依赖核心模块） -->
-    <script defer src="js/app-dashboard-core.js"></script>     <!-- 核心仪表盘 -->
-    <script defer src="js/app-dashboard-anomaly.js"></script>  <!-- 异常检测 -->
-    <script defer src="js/app-dashboard-expenses.js"></script> <!-- 支出管理 -->
-    <script defer src="js/app-dashboard-funds.js"></script>    <!-- 资金管理 -->
-    <script defer src="js/app-dashboard-orders.js"></script>   <!-- 订单管理 -->
-    <script defer src="js/app-dashboard-print.js"></script>    <!-- 打印功能 -->
-    <script defer src="js/app-dashboard-users.js"></script>    <!-- 用户管理 -->
-    <script defer src="js/app-dashboard-wa.js"></script>       <!-- WA提醒 -->
-    <script defer src="js/app-customers.js"></script>          <!-- 客户管理 -->
-    <script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
-    <script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
-    <script defer src="js/cache.js"></script>                  <!-- 统一缓存模块 -->
+<!-- 3. 统一缓存模块（必须在所有使用它的模块之前） -->
+<script defer src="js/cache.js"></script>                  <!-- 统一缓存模块 -->
+
+<!-- 4. 页面组件模块（defer，依赖核心模块和缓存模块） -->
+<script defer src="js/app-dashboard-core.js"></script>     <!-- 核心仪表盘 -->
+<script defer src="js/app-dashboard-anomaly.js"></script>  <!-- 异常检测 -->
+<script defer src="js/app-dashboard-expenses.js"></script> <!-- 支出管理 -->
+<script defer src="js/app-dashboard-funds.js"></script>    <!-- 资金管理 -->
+<script defer src="js/app-dashboard-orders.js"></script>   <!-- 订单管理 -->
+<script defer src="js/app-dashboard-print.js"></script>    <!-- 打印功能 -->
+<script defer src="js/app-dashboard-users.js"></script>    <!-- 用户管理 -->
+<script defer src="js/app-dashboard-wa.js"></script>       <!-- WA提醒 -->
+<script defer src="js/app-customers.js"></script>          <!-- 客户管理 -->
+<script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
+<script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
 
     <!-- 4. 主入口（defer，在所有模块之后） -->
     <script defer>
