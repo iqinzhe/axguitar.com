@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v1.0
+// app-dashboard-funds.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -10,8 +10,10 @@ const DashboardFunds = {
         
         try {
             var transactions = [];
+            const client = SUPABASE.getClient();
+            
             if (isAdmin) {
-                const { data: allFlows } = await supabaseClient
+                const { data: allFlows } = await client
                     .from('cash_flow_records')
                     .select('*, stores(name)')
                     .eq('is_voided', false)
@@ -19,7 +21,7 @@ const DashboardFunds = {
                 transactions = allFlows || [];
             } else {
                 const profile = await SUPABASE.getCurrentProfile();
-                const { data: storeFlows } = await supabaseClient
+                const { data: storeFlows } = await client
                     .from('cash_flow_records')
                     .select('*, stores(name)')
                     .eq('store_id', profile?.store_id)
@@ -42,7 +44,7 @@ const DashboardFunds = {
             
             var rows = '';
             if (transactions.length === 0) {
-                rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + 'NonNull';
+                rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '</td>';
             } else {
                 for (var i = 0; i < transactions.length; i++) {
                     var t = transactions[i];
@@ -128,16 +130,17 @@ const DashboardFunds = {
         
         try {
             var transactions = [];
+            const client = SUPABASE.getClient();
             
             if (isAdmin) {
-                const { data: allFlows } = await supabaseClient
+                const { data: allFlows } = await client
                     .from('cash_flow_records')
                     .select('*, stores(name)')
                     .eq('is_voided', false)
                     .order('recorded_at', { ascending: false });
                 transactions = allFlows || [];
             } else {
-                const { data: storeFlows } = await supabaseClient
+                const { data: storeFlows } = await client
                     .from('cash_flow_records')
                     .select('*, stores(name)')
                     .eq('store_id', profile?.store_id)
@@ -160,12 +163,12 @@ const DashboardFunds = {
             
             var rows = '';
             if (transactions.length === 0) {
-                rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + 'NonNull';
+                rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '</td>';
             } else {
                 for (var i = 0; i < transactions.length; i++) {
                     var t = transactions[i];
                     rows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '</tr>' +
+                        '<td class="date-cell">' + Utils.formatDate(t.recorded_at) + '</td>' +
                         '<td>' + (typeMap[t.flow_type] || t.flow_type) + '</td>' +
                         '<td class="text-center">' + (directionMap[t.direction] || t.direction) + '</td>' +
                         '<td class="text-center">' + (sourceMap[t.source_target] || t.source_target) + '</td>' +
@@ -253,7 +256,7 @@ const DashboardFunds = {
         };
         var rows = '';
         if (transactions.length === 0) {
-            rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + 'NonNull';
+            rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '</td>';
         } else {
             for (var i = 0; i < transactions.length; i++) {
                 var t = transactions[i];
@@ -265,7 +268,7 @@ const DashboardFunds = {
                     '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                     '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(t.stores?.name || '-') + '</td>' : '') +
-                '<tr>';
+                '</tr>';
             }
         }
         tbody.innerHTML = rows;
@@ -316,7 +319,7 @@ const DashboardFunds = {
         };
         var rows = '';
         if (transactions.length === 0) {
-            rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + 'NonNull';
+            rows = '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录') + '</td>';
         } else {
             for (var i = 0; i < transactions.length; i++) {
                 var t = transactions[i];
@@ -541,13 +544,13 @@ const DashboardFunds = {
             
             var rows = '';
             if (transfers.length === 0) {
-                rows = '<tr><td colspan="' + (isAdmin ? 6 : 5) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + 'NonNull';
+                rows = '<tr><td colspan="' + (isAdmin ? 6 : 5) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + '</tr>';
             } else {
                 for (var i = 0; i < transfers.length; i++) {
                     var t = transfers[i];
                     rows += '<tr>' +
                         '<td class="date-cell">' + Utils.formatDate(t.transfer_date) + '</td>' +
-                        '<td>' + (typeMap[t.transfer_type] || t.transfer_type) + '</td>' +
+                        '<td>' + (typeMap[t.transfer_type] || t.transfer_type) + '<td>' +
                         '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                         '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                         '<td>' + Utils.escapeHtml(t.created_by_profile?.name || '-') + '</td>' +
@@ -636,13 +639,13 @@ const DashboardFunds = {
         };
         var rows = '';
         if (transfers.length === 0) {
-            rows = '<tr><td colspan="' + (isAdmin ? 6 : 5) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + 'NonNull';
+            rows = '<tr><td colspan="' + (isAdmin ? 6 : 5) + '" class="text-center">' + (lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录') + '</td>';
         } else {
             for (var i = 0; i < transfers.length; i++) {
                 var t = transfers[i];
                 rows += '<tr>' +
                     '<td class="date-cell">' + Utils.formatDate(t.transfer_date) + '</td>' +
-                    '<td>' + (typeMap[t.transfer_type] || t.transfer_type) + '</td>' +
+                    '<td>' + (typeMap[t.transfer_type] || t.transfer_type) + '<td>' +
                     '<td class="amount">' + Utils.formatCurrency(t.amount) + '</td>' +
                     '<td class="desc-cell">' + Utils.escapeHtml(t.description || '-') + '</td>' +
                     '<td>' + Utils.escapeHtml(t.created_by_profile?.name || '-') + '</td>' +
