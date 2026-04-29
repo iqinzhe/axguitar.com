@@ -794,6 +794,18 @@ const BackupStorage = {
         if (element && element.remove) element.remove();
     },
     
+    // ==================== 文件选择处理 ====================
+    onFileSelected: function(input) {
+        var fileNameSpan = document.getElementById('restoreFileName');
+        if (!fileNameSpan) return;
+        var lang = Utils.lang;
+        if (input.files && input.files.length > 0) {
+            fileNameSpan.textContent = '📄 ' + input.files[0].name;
+        } else {
+            fileNameSpan.textContent = lang === 'id' ? 'Tidak ada file dipilih' : '未选择文件';
+        }
+    },
+    
     // ==================== 备份恢复 UI ====================
     renderBackupUI: async function() {
         const lang = Utils.lang;
@@ -923,7 +935,15 @@ const BackupStorage = {
                     '<h3>' + restoreTitle + '</h3>' +
                     '<p>' + restoreDesc + '</p>' +
                     '<p class="warning-text-small">' + restoreWarning + '</p>' +
-                    '<input type="file" id="restoreFile" accept=".json" style="margin-bottom:10px; width:100%;">' +
+                    '<div class="file-upload-wrapper" style="margin-bottom:10px;">' +
+                        '<input type="file" id="restoreFile" accept=".json" style="display:none;" onchange="BackupStorage.onFileSelected(this)">' +
+                        '<button onclick="document.getElementById(\'restoreFile\').click()" class="btn-small" style="width:100%;">' +
+                            (lang === 'id' ? '📂 Pilih File Cadangan' : '📂 选择备份文件') +
+                        '</button>' +
+                        '<span id="restoreFileName" style="display:block;margin-top:4px;font-size:12px;color:#64748b;">' +
+                            (lang === 'id' ? 'Tidak ada file dipilih' : '未选择文件') +
+                        '</span>' +
+                    '</div>' +
                     '<button onclick="BackupStorage.restoreFromFile()" class="btn-restore">' + restoreBtnText + '</button>' +
                 '</div>' +
                 
