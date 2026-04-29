@@ -1,7 +1,4 @@
-// storage.js - v1.1
-// 修改内容：
-// 1. 简化 Toast 调用，统一使用 Utils.toast
-// 2. 优化备份恢复逻辑中的确认框
+// storage.js - v1.0
 
 const Storage = {
 
