@@ -1,10 +1,4 @@
-// utils.js - v1.2
-// 修改内容：
-// 1. 强化语言初始化，统一通过 Utils.lang 访问
-// 2. 添加 forceSyncLanguage 方法确保语言同步
-// 3. 添加 toastConfirm 辅助方法，简化确认框调用
-// 4. 更新翻译字典：操作面板→管理中心，订单列表→订单管理，缴费记录→资金流水，财务指标→业务指标
-// 5. 更新内部转账翻译：使用双箭头→→
+// utils.js - v1.0
 
 window.Utils = window.Utils || {};
 
