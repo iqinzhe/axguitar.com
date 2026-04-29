@@ -55,7 +55,7 @@ a:hover {
 }
 
 small {
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     color: var(--text-muted);
 }
 
