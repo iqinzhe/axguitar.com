@@ -1,9 +1,4 @@
-// app-dashboard-anomaly.js - v1.2
-// 修改内容：
-// 1. 移除独立的 AnomalyCache，改用统一 JFCache 模块
-// 2. 将直接调用 supabaseClient 的地方改为使用 SUPABASE 封装方法
-// 3. 将 alert 改为 Utils.toast 统一调用
-// 4. 修复 getMonthlyStoreRanking：当 eligibleStores < 4 时，top3 和 bottom3 不应重复
+// app-dashboard-anomaly.js - v1.0
 
 window.APP = window.APP || {};
 
