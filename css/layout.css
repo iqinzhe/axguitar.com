@@ -60,7 +60,7 @@
    L3. 按钮系统（页面级操作按钮）
    ============================================================ */
 button {
-    padding: var(--spacing-3) var(--spacing-2); /* 上下 12px，左右 8px */
+    padding: var(--spacing-3) var(--spacing-2);
     border-radius: var(--radius-md);
     border: 1px solid transparent;
     font-size: var(--font-sm);
@@ -92,8 +92,8 @@ button:disabled {
     background: var(--text-secondary);
     color: white;
     border: none;
-    padding: var(--spacing-2) var(--spacing-4);  /* 上下8px，左右16px */
-    font-size: var(--font-md);  /* 字体稍微增大 */
+    padding: var(--spacing-2) var(--spacing-4);
+    font-size: var(--font-md);
 }
 
 .btn-back:hover {
@@ -105,8 +105,8 @@ button:disabled {
     background: var(--bg-hover);
     border: 1px solid var(--border-medium);
     color: var(--text-secondary);
-    padding: var(--spacing-2) var(--spacing-4);  /* 上下8px，左右16px */
-    font-size: var(--font-md);  /* 字体稍微增大 */
+    padding: var(--spacing-2) var(--spacing-4);
+    font-size: var(--font-md);
 }
 
 .btn-print:hover {
