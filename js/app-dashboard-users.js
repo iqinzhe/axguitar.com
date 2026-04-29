@@ -1,7 +1,4 @@
-// app-dashboard-users.js - v1.2
-// 修改内容：
-// 1. 简化 Toast 调用，统一使用 Utils.toast
-// 2. 修复操作行 HTML 中错误的 </table> 闭合标签（应为 </tr>）
+// app-dashboard-users.js - v1.0
 
 window.APP = window.APP || {};
 
