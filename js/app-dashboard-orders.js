@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.0
+// app-dashboard-orders.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -67,8 +67,8 @@ const DashboardOrders = {
                         '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterestForList) + '</td>' +
                         '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                         '<td class="date-cell text-center">' + formattedDueDate + '</td>' +
-                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
-                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
+                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span><td>' +
+                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span><tr>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
                     
@@ -167,7 +167,7 @@ const DashboardOrders = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody id="orderTableBody"></tbody>' +
-                        '<table>' +
+                        '</table>' +
                     '</div>' +
                 '</div>';
             
@@ -283,7 +283,7 @@ const DashboardOrders = {
                     var p = payments[i];
                     var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    payRows += '<table>' +
+                    payRows += '<tr>' +
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
                         '<td>' + typeText + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
@@ -293,7 +293,7 @@ const DashboardOrders = {
                     '</tr>';
                 }
             } else {
-                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + 'NonNull';
+                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td>';
             }
 
             document.getElementById("app").innerHTML = '' +
@@ -408,7 +408,7 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 打印订单（XSS 修复版） ====================
+    // ==================== 打印订单 ====================
     printOrder: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
@@ -456,7 +456,7 @@ const DashboardOrders = {
             }
             
             if (paymentRows === '') {
-                paymentRows = '<td><td colspan="4" class="text-center">' + t('no_data') + 'NonNull';
+                paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + '</td>';
             }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
@@ -510,8 +510,8 @@ const DashboardOrders = {
                     '</div>' +
                     '<div class="section">' +
                         '<h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
-                        '</table>' +
-                            '<thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '支付方式') + '</th></tr></thead>' +
+                        '<table>' +
+                            '<thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '支付方式') + '</th></td></thead>' +
                             '<tbody>' + paymentRows + '</tbody>' +
                         '</table>' +
                     '</div>' +
@@ -552,7 +552,7 @@ const DashboardOrders = {
 
             var rows = '';
             if (allPayments.length === 0) {
-                rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + 'NonNull';
+                rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td>';
             } else {
                 for (var i = 0; i < allPayments.length; i++) {
                     var p = allPayments[i];
@@ -603,7 +603,7 @@ const DashboardOrders = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
-                        '</table>' +
+                        '<tr>' +
                     '</div>' +
                 '</div>';
             
