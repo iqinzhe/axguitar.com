@@ -60,7 +60,7 @@
    L3. 按钮系统（页面级操作按钮）
    ============================================================ */
 button {
-    padding: var(--spacing-3) var(--spacing-2);
+    padding: var(--spacing-2) var(--spacing-3);
     border-radius: var(--radius-md);
     border: 1px solid transparent;
     font-size: var(--font-sm);
