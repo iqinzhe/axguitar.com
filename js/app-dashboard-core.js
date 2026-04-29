@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.3
+// app-dashboard-core.js - v1.0
 
 window.APP = window.APP || {};
 
