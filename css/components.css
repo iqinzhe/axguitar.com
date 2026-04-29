@@ -664,22 +664,131 @@
 
 
 /* ============================================================
-   列宽系统（百分比，屏幕与打印比例一致）
+   C14. 订单统计（客户详情弹窗）- 新增
    ============================================================ */
+.order-stats {
+    display: flex;
+    gap: var(--spacing-3);
+    justify-content: center;
+    padding: var(--spacing-3);
+}
+
+.stat-item {
+    flex: 1;
+    text-align: center;
+    padding: var(--spacing-3) var(--spacing-2);
+    border-radius: var(--radius-lg);
+    background: var(--bg-hover);
+    cursor: pointer;
+    transition: var(--transition);
+    min-width: 80px;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-item .stat-number {
+    font-size: var(--font-2xl);
+    font-weight: 700;
+    display: block;
+    line-height: 1.2;
+}
+
+.stat-item .stat-label {
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
+    display: block;
+    margin-top: var(--spacing-1);
+}
+
+/* 进行中 - 蓝色 */
+.stat-item.active {
+    background: #e0f2fe;
+    border-left: 3px solid #0284c7;
+}
+.stat-item.active .stat-number {
+    color: #0369a1;
+}
+
+/* 已结清 - 绿色 */
+.stat-item.completed {
+    background: #ecfdf5;
+    border-left: 3px solid #10b981;
+}
+.stat-item.completed .stat-number {
+    color: #059669;
+}
+
+/* 异常 - 橙色 */
+.stat-item.abnormal {
+    background: #fef3c7;
+    border-left: 3px solid #f59e0b;
+}
+.stat-item.abnormal .stat-number {
+    color: #d97706;
+}
+
+
+/* ============================================================
+   列宽系统（统一规范）- 替换原有列宽定义
+   ============================================================ */
+
+/* 基础列宽 - 所有表格通用 */
 .col-id       { width: 8%;  }
 .col-name     { width: 14%; }
-.col-ktp      { width: 16%; }
+.col-ktp      { width: 12%; }
 .col-phone    { width: 11%; }
 .col-address  { width: 18%; }
 .col-date     { width: 10%; }
-.col-status   { width: 7%;  }
+.col-status   { width: 8%;  }
 .col-store    { width: 9%;  }
-.col-amount   { width: 11%; }
-.col-type     { width: 10%; }
+.col-amount   { width: 12%; }
+.col-type     { width: 12%; }
 .col-months   { width: 7%;  }
 .col-method   { width: 9%;  }
 .col-desc     { width: auto; }
-.col-action   { width: 140px; }
+.col-action   { width: 100px; }
 
-.col-id-narrow   { width: 6%; }
-.col-status-wide { width: 10%; }
+/* 窄列变体 */
+.col-id-narrow    { width: 6%; }
+.col-status-wide  { width: 10%; }
+
+/* 确保表格列宽生效 */
+.data-table {
+    table-layout: fixed;
+}
+
+/* 表格容器 - 确保滚动 */
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: var(--spacing-3) 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+}
+
+
+/* ============================================================
+   手机端表格列宽（像素固定，确保滚动）
+   ============================================================ */
+@media (max-width: 768px) {
+    .data-table {
+        min-width: 700px;
+    }
+    
+    .col-id       { width: 75px; }
+    .col-name     { width: 100px; }
+    .col-ktp      { width: 110px; }
+    .col-phone    { width: 90px; }
+    .col-address  { width: 130px; }
+    .col-date     { width: 80px; }
+    .col-status   { width: 70px; }
+    .col-store    { width: 80px; }
+    .col-amount   { width: 100px; }
+    .col-type     { width: 90px; }
+    .col-months   { width: 60px; }
+    .col-method   { width: 80px; }
+    .col-action   { width: 100px; }
+}
