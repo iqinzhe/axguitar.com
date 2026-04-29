@@ -1,5 +1,4 @@
-// migration.js - v1.2
-// 修改内容：简化 Toast 调用，统一使用 Utils.toast
+// migration.js - v1.0
 
 const Migration = {
     isMigrating: false,
