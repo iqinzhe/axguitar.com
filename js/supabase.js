@@ -2504,4 +2504,4 @@ window.SUPABASE = SupabaseAPI;
 window.supabaseClient = supabaseClient;
 window.SafeStorage = SafeStorage;
 window.SafeSessionStorage = SafeSessionStorage;
-window.SUPABASE_URL = SUPABASE_URL;
+//window.SUPABASE_URL = SUPABASE_URL; //避免暴露
