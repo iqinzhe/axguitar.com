@@ -1,5 +1,4 @@
-// permission.js - v1.1
-// 修改内容：无 Toast 调用，仅添加版本注释，保持原有逻辑不变
+// permission.js - v1.0
 
 const PERMISSION = {
 
