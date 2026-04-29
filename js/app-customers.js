@@ -1,8 +1,4 @@
-// app-customers.js - v1.1
-// 修改内容：
-// 1. 将所有直接调用 supabaseClient 的地方改为使用 SUPABASE 封装方法
-// 2. 将 alert/confirm 改为 Utils.toast 统一调用
-// 3. 优化黑名单检查逻辑
+// app-customers.js - v1.0
 
 window.APP = window.APP || {};
 
