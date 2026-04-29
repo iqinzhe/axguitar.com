@@ -1,5 +1,6 @@
 /* ============================================================
    pages.css - 第5层：只在特定页面出现的零散样式
+   职责：异常状况、订单详情、备份恢复、黑名单等页面专属样式
    ============================================================ */
 
 /* ============================================================
@@ -17,7 +18,7 @@
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
     overflow: hidden;
-    transition: var(--transition);
+    transition: var(--transition-fast);
     display: flex;
     flex-direction: column;
     min-height: 380px;
@@ -72,7 +73,7 @@
     padding: var(--spacing-3) var(--spacing-5);
     background: var(--bg-hover);
     border-top: 1px solid var(--border-light);
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     flex-shrink: 0;
 }
 
@@ -134,7 +135,7 @@
 }
 
 .store-item-code {
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     color: var(--text-muted);
 }
 
@@ -181,7 +182,7 @@
 }
 
 .ranking-code {
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     color: var(--text-muted);
 }
 
@@ -248,7 +249,7 @@
 .history-table th {
     background: var(--bg-hover);
     font-weight: 600;
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
 }
 
 
@@ -316,7 +317,7 @@
     border-radius: var(--radius-lg);
     padding: var(--spacing-5);
     border: 1px solid var(--border-light);
-    transition: var(--transition);
+    transition: var(--transition-fast);
 }
 
 .backup-card h3 {
@@ -356,7 +357,7 @@
     font-weight: 600;
     cursor: pointer;
     width: 100%;
-    transition: var(--transition);
+    transition: var(--transition-fast);
 }
 
 .btn-backup-primary:hover {
@@ -365,7 +366,7 @@
 }
 
 .warning-text-small {
-    font-size: var(--font-xxs);
+    font-size: var(--font-xs);
     color: #dc2626;
     background: #fee2e2;
     padding: 6px 10px;
@@ -382,7 +383,7 @@
     font-size: var(--font-sm);
     cursor: pointer;
     width: 100%;
-    transition: var(--transition);
+    transition: var(--transition-fast);
 }
 
 .btn-restore:hover {
@@ -424,7 +425,7 @@
     background: var(--bg-hover);
     border-radius: var(--radius-lg);
     padding: var(--spacing-3);
-    transition: var(--transition);
+    transition: var(--transition-fast);
     border: 1px solid var(--border-light);
     text-align: center;
 }
@@ -494,25 +495,23 @@
     white-space: nowrap;
 }
 
+
 /* ============================================================
    P15. 门店备份恢复页面 - 统一卡片样式
    ============================================================ */
-
-/* 门店备份页面 - 2列网格布局 */
 .backup-grid-store {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-5);
 }
 
-/* 门店备份卡片 - 统一背景色（柔和蓝色系） */
 .backup-card-store-primary,
 .backup-card-store-secondary {
     background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
     border-radius: var(--radius-lg);
     padding: var(--spacing-5);
     border: 1px solid #bae6fd;
-    transition: var(--transition);
+    transition: var(--transition-fast);
     box-shadow: 0 2px 8px rgba(14, 165, 233, 0.08);
 }
 
@@ -539,7 +538,6 @@
     line-height: 1.5;
 }
 
-/* 门店备份按钮 - 统一绿色主题 */
 .btn-backup-store-primary {
     background: var(--success-dark);
     color: white;
@@ -550,7 +548,7 @@
     font-weight: 600;
     cursor: pointer;
     width: 100%;
-    transition: var(--transition);
+    transition: var(--transition-fast);
 }
 
 .btn-backup-store-primary:hover {
@@ -558,7 +556,6 @@
     transform: translateY(-1px);
 }
 
-/* 门店导出卡片内的按钮样式调整 */
 .backup-card-store-secondary .btn-small {
     background: white;
     border: 1px solid #bae6fd;
@@ -570,8 +567,9 @@
     transform: translateY(-1px);
 }
 
+
 /* ============================================================
-   P16. 资金流水表格（Riwayat Arus Kas）列宽修复
+   P16. 资金流水表格列宽修复
    ============================================================ */
 .cashflow-table {
     width: 100%;
