@@ -1,4 +1,4 @@
-// store.js - v1.0
+// store.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 const StoreManager = {
     stores: [],
@@ -76,7 +76,8 @@ const StoreManager = {
         if (!confirmed) return;
         
         try {
-            const { error } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { error } = await client
                 .from('stores')
                 .update({ is_active: false, updated_at: Utils.getLocalDateTime() })
                 .eq('id', storeId);
@@ -103,7 +104,8 @@ const StoreManager = {
         if (!confirmed) return;
         
         try {
-            const { error } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { error } = await client
                 .from('stores')
                 .update({ is_active: true, updated_at: Utils.getLocalDateTime() })
                 .eq('id', storeId);
@@ -127,7 +129,8 @@ const StoreManager = {
         var t = function(key) { return Utils.t(key); };
         
         try {
-            const { data: store, error } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { data: store, error } = await client
                 .from('stores')
                 .select('*')
                 .eq('id', storeId)
@@ -208,7 +211,8 @@ const StoreManager = {
                 updates.wa_number = waNumber;
             }
             
-            const { error } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { error } = await client
                 .from('stores')
                 .update(updates)
                 .eq('id', storeId);
@@ -238,7 +242,8 @@ const StoreManager = {
         }
         
         try {
-            const { error } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { error } = await client
                 .from('stores')
                 .update({ 
                     wa_number: waNumber || null,
@@ -266,7 +271,8 @@ const StoreManager = {
 
     _getAllStoreCashFlowBalances: async function() {
         try {
-            const { data: allFlows, error } = await supabaseClient
+            const client = SUPABASE.getClient();
+            const { data: allFlows, error } = await client
                 .from('cash_flow_records')
                 .select('store_id, direction, amount, source_target')
                 .eq('is_voided', false);
@@ -344,10 +350,11 @@ const StoreManager = {
             await StoreManager.loadStores(true);
             console.log('[StoreManager] 门店列表加载完成:', StoreManager.stores.length, '个门店');
             
+            const client = SUPABASE.getClient();
             const [allOrdersResult, allExpensesResult, allPaymentsResult] = await Promise.all([
-                supabaseClient.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid'),
-                supabaseClient.from('expenses').select('id, store_id, amount, payment_method'),
-                supabaseClient.from('payment_history').select('id, order_id, type, amount, payment_method')
+                client.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid'),
+                client.from('expenses').select('id, store_id, amount, payment_method'),
+                client.from('payment_history').select('id, order_id, type, amount, payment_method')
             ]);
             
             const allOrders = allOrdersResult.data || [];
@@ -478,7 +485,7 @@ const StoreManager = {
             
             var storeRows = '';
             if (StoreManager.stores.length === 0) {
-                storeRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + 'NonNull';
+                storeRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td>';
             } else {
                 for (var i = 0; i < StoreManager.stores.length; i++) {
                     var store = StoreManager.stores[i];
@@ -584,7 +591,7 @@ const StoreManager = {
                                     '<th class="col-phone">' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
                                     '<th class="col-phone">📱 WA</th>' +
                                     '<th class="col-status text-center">' + (lang === 'id' ? 'Status' : '状态') + '</th>' +
-                                '<tr>' +
+                                '</tr>' +
                             '</thead>' +
                             '<tbody>' + storeRows + '</tbody>' +
                         '</table>' +
