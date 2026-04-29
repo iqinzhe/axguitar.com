@@ -1,15 +1,3 @@
 # 敏感配置 - 不要上传！
 config.js
 
-# 环境变量
-.env
-.env.*.local
-
-# 系统文件
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE配置（可选）
-.vscode/
-.idea/
