@@ -421,10 +421,10 @@ const DashboardAnomaly = {
                                 '<span class="ranking-code">' + Utils.escapeHtml(s.code) + '</span>' +
                             '</div>' +
                             '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
-                                (lang === 'id' ? '订单: ' : '订单: ') + s.orderCount + '<br>' +
-                                (lang === 'id' ? '放款: ' : '放款: ') + Utils.formatCurrency(s.totalLoanOutflow) + '<br>' +
-                                (lang === 'id' ? '不良: ' : '不良: ') + s.badOrders + '<br>' +
-                                (lang === 'id' ? '回收: ' : '回收: ') + Utils.formatCurrency(s.totalRecovery) +
+                                (lang === 'id' ? 'Pesanan: ' : '订单: ') + s.orderCount + '<br>' +
+                                (lang === 'id' ? 'Pinjaman: ' : '放款: ') + Utils.formatCurrency(s.totalLoanOutflow) + '<br>' +
+                                (lang === 'id' ? 'Buruk: ' : '不良: ') + s.badOrders + '<br>' +
+                                (lang === 'id' ? 'Pemulihan: ' : '回收: ') + Utils.formatCurrency(s.totalRecovery) +
                             '</div>' +
                         '</div>';
                 }
@@ -451,10 +451,10 @@ const DashboardAnomaly = {
                                 '<span class="ranking-code">' + Utils.escapeHtml(store.code) + '</span>' +
                             '</div>' +
                             '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
-                                (lang === 'id' ? '订单: ' : '订单: ') + store.orderCount + '<br>' +
-                                (lang === 'id' ? '放款: ' : '放款: ') + Utils.formatCurrency(store.totalLoanOutflow) + '<br>' +
-                                (lang === 'id' ? '不良: ' : '不良: ') + store.badOrders + '<br>' +
-                                (lang === 'id' ? '回收: ' : '回收: ') + Utils.formatCurrency(store.totalRecovery) +
+                                (lang === 'id' ? 'Pesanan: ' : '订单: ') + store.orderCount + '<br>' +
+                                (lang === 'id' ? 'Pinjaman: ' : '放款: ') + Utils.formatCurrency(store.totalLoanOutflow) + '<br>' +
+                                (lang === 'id' ? 'Buruk: ' : '不良: ') + store.badOrders + '<br>' +
+                                (lang === 'id' ? 'Pemulihan: ' : '回收: ') + Utils.formatCurrency(store.totalRecovery) +
                             '</div>' +
                         '</div>';
                 }
