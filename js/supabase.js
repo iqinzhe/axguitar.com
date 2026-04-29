@@ -1,9 +1,4 @@
-// supabase.js - v1.1
-// 修改内容：
-// 1. 新增黑名单相关方法（checkBlacklist, addToBlacklist, removeFromBlacklist, getBlacklist）
-// 2. 新增客户重复检查方法（checkDuplicateCustomer, checkBlacklistDuplicate）
-// 3. 新增订单统计方法（getCustomerOrdersStats, getCustomerOrdersByStatus）
-// 4. 新增黑名单重复检查（isKtpOrPhoneBlacklisted）
+// supabase.js - v1.0
 
 const SUPABASE_URL = "https://hiupsvsbcdsgoyiieqiv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdXBzdnNiY2RzZ295aWllcWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5ODA3NjYsImV4cCI6MjA5MTU1Njc2Nn0.qL7Qw0I7Ogws_kMoOAae_fCzkhVm-c7NhLPu8rxaJpU";
