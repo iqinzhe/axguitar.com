@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.0
+// app-dashboard-anomaly.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.APP = window.APP || {};
 
@@ -11,7 +11,8 @@ const AnomalyHelper = {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
-        let query = supabaseClient
+        const client = SUPABASE.getClient();
+        let query = client
             .from('orders')
             .select('order_id, customer_name, overdue_days, loan_amount, status', { count: 'exact' })
             .eq('status', 'active')
@@ -46,7 +47,8 @@ const AnomalyHelper = {
         const from = page * pageSize;
         const to = from + pageSize - 1;
         
-        const { data, error, count } = await supabaseClient
+        const client = SUPABASE.getClient();
+        const { data, error, count } = await client
             .from('blacklist')
             .select('*, customers!blacklist_customer_id_fkey(name, phone, customer_id)', { count: 'exact' })
             .order('blacklisted_at', { ascending: false })
@@ -70,7 +72,8 @@ const AnomalyHelper = {
         const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
         const monthEnd = today.toISOString().split('T')[0];
         
-        const { data: monthlyOrders, error } = await supabaseClient
+        const client = SUPABASE.getClient();
+        const { data: monthlyOrders, error } = await client
             .from('orders')
             .select('id, store_id, loan_amount, status, overdue_days')
             .gte('created_at', monthStart)
@@ -81,7 +84,7 @@ const AnomalyHelper = {
             return { top3: [], bottom3: [] };
         }
         
-        const { data: monthlyFlows } = await supabaseClient
+        const { data: monthlyFlows } = await client
             .from('cash_flow_records')
             .select('store_id, amount, order_id')
             .eq('direction', 'inflow')
@@ -275,7 +278,7 @@ const DashboardAnomaly = {
                                     ' (' + (overdueTotalCount - overdueOrders.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '</tr>';
+                        '</td>';
                 }
                 
                 overdueTableHtml = '' +
