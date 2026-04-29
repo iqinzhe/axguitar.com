@@ -92,7 +92,7 @@ button:disabled {
     background: var(--text-secondary);
     color: white;
     border: none;
-    padding: var(--spacing-2) var(--spacing-4);
+    padding: var(--spacing-1) var(--spacing-4);
     font-size: var(--font-md);
 }
 
@@ -105,7 +105,7 @@ button:disabled {
     background: var(--bg-hover);
     border: 1px solid var(--border-medium);
     color: var(--text-secondary);
-    padding: var(--spacing-2) var(--spacing-4);
+    padding: var(--spacing-1) var(--spacing-4);
     font-size: var(--font-md);
 }
 
