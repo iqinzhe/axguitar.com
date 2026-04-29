@@ -1,8 +1,4 @@
-// app-payments.js - v1.1
-// 修改内容：
-// 1. 简化 Toast.confirmPromise 调用（移除 fallback）
-// 2. 统一使用 Utils.toast 方法
-// 3. 优化防重复提交逻辑
+// app-payments.js - v1.0
 
 window.APP = window.APP || {};
 
