@@ -1,4 +1,4 @@
-// audit.js - v1.0
+// audit.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 window.Audit = {
     
@@ -10,7 +10,8 @@ window.Audit = {
     async log(action, details) {
         try {
             const user = AUTH.user;
-            await supabaseClient.from('audit_logs').insert({
+            const client = SUPABASE.getClient();
+            await client.from('audit_logs').insert({
                 action: action,
                 details: typeof details === 'string' ? details : JSON.stringify(details),
                 user_id: user?.id || null,
@@ -217,10 +218,8 @@ window.Audit = {
     async getLogs(filters) {
         if (filters === undefined) filters = {};
         
-        let query = supabaseClient
-            .from('audit_logs')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const client = SUPABASE.getClient();
+        let query = client.from('audit_logs').select('*').order('created_at', { ascending: false });
 
         if (filters.action) {
             query = query.eq('action', filters.action);
