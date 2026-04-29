@@ -1,9 +1,10 @@
-// app-dashboard-core.js - v1.1
+// app-dashboard-core.js - v1.2
 // 修改内容：
 // 1. 移除独立的 DashboardCache，改用统一 JFCache 模块
 // 2. 添加模块加载防御检查
 // 3. 将 alert 改为 Utils.toast 统一调用
 // 4. 优化 refreshCurrentPage 中的模块存在性检查
+// 5. 修复 getMonthlyStoreRanking：当 eligibleStores < 4 时 top3 和 bottom3 不应重复
 
 window.APP = window.APP || {};
 
@@ -318,6 +319,21 @@ const DashboardStatsHelper = {
         }
         
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
+        
+        // ========== 修复：当门店数量不足时，top3 和 bottom3 不应重叠 ==========
+        const totalCount = eligibleStores.length;
+        
+        if (totalCount === 1) {
+            return { top3: eligibleStores.slice(0, 1), bottom3: [] };
+        }
+        
+        if (totalCount === 2) {
+            return { top3: eligibleStores.slice(0, 2), bottom3: [] };
+        }
+        
+        if (totalCount === 3) {
+            return { top3: eligibleStores.slice(0, 3), bottom3: eligibleStores.slice(-1).reverse() };
+        }
         
         return {
             top3: eligibleStores.slice(0, Math.min(3, eligibleStores.length)),
