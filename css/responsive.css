@@ -1,5 +1,6 @@
 /* ============================================================
    responsive.css - 第6层：响应式与打印中心
+   职责：桌面端/手机端响应式适配、打印样式
    ============================================================ */
 
 /* ============================================================
@@ -67,7 +68,7 @@
         font-size: var(--font-sm);
     }
 
-    /* ========== 关键修复：覆盖手机端的表格强制设置 ========== */
+    /* 关键修复：覆盖手机端的表格强制设置 */
     .table-container {
         overflow-x: visible;
     }
@@ -78,7 +79,7 @@
         width: 100%;
     }
 
-    /* ========== 黑名单表格/异常表格列宽修复 ========== */
+    /* 黑名单表格/异常表格列宽修复 */
     .anomaly-table,
     .blacklist-table {
         table-layout: fixed;
@@ -130,7 +131,7 @@
    R2. 手机端响应式（≤768px）
    ============================================================ */
 @media (max-width: 768px) {
-    /* --- 根字体 --- */
+    /* 根字体 */
     html {
         font-size: 15px;
     }
@@ -139,7 +140,7 @@
         padding: var(--spacing-2);
     }
 
-    /* --- 页面头部 --- */
+    /* 页面头部 */
     .page-header h1,
     .page-header h2 {
         font-size: var(--font-lg);
@@ -149,7 +150,7 @@
         font-size: var(--font-md);
     }
 
-    /* --- 统计卡片：保持 2 列 --- */
+    /* 统计卡片：保持 2 列 */
     .stats-grid,
     .stats-grid.stats-grid-2,
     .stats-grid.stats-grid-3,
@@ -168,10 +169,10 @@
     }
 
     .stat-card .stat-label {
-        font-size: var(--font-xxs);
+        font-size: var(--font-xs);
     }
 
-    /* --- 信息卡片：堆叠 --- */
+    /* 信息卡片：堆叠 */
     .info-cards-row {
         flex-direction: column;
     }
@@ -180,7 +181,7 @@
         min-width: auto;
     }
 
-    /* --- 费用卡片：堆叠 + 内部元素纵向排列 --- */
+    /* 费用卡片：堆叠 + 内部元素纵向排列 */
     .fee-cards-row {
         grid-template-columns: 1fr;
         gap: var(--spacing-3);
@@ -202,7 +203,7 @@
         text-align: right;
     }
 
-    /* --- 按钮 --- */
+    /* 按钮 */
     button,
     .btn-small {
         font-size: var(--font-xs);
@@ -221,7 +222,7 @@
         text-align: center;
     }
 
-    /* --- 表格：水平滚动，不换行（手机端保持原有设计）--- */
+    /* 表格：水平滚动，不换行 */
     .table-container {
         border: 1px solid var(--border-light);
         border-radius: var(--radius-md);
@@ -233,7 +234,7 @@
     }
 
     .data-table {
-        font-size: var(--font-xxs);
+        font-size: var(--font-xs);
         table-layout: fixed;
         min-width: 700px;
         width: max-content;
@@ -242,7 +243,7 @@
     .data-table thead th,
     .data-table tbody td {
         padding: 6px 5px;
-        font-size: var(--font-xxs);
+        font-size: var(--font-xs);
         line-height: 1.3;
         height: auto;
         min-height: 32px;
@@ -264,13 +265,13 @@
         min-width: 500px;
     }
 
-    /* --- 操作行按钮：单行显示 --- */
+    /* 操作行按钮：单行显示 */
     .action-row td {
         padding: 6px 5px !important;
     }
 
     .action-row .action-label {
-        font-size: var(--font-xxs);
+        font-size: var(--font-xs);
         width: 40px;
         min-width: 40px;
         padding-right: var(--spacing-1);
@@ -324,7 +325,7 @@
         padding: 8px 16px;
     }
 
-    /* --- 徽章缩小 --- */
+    /* 徽章缩小 */
     .status-badge,
     .repayment-badge,
     .payment-method-badge,
@@ -336,7 +337,7 @@
         flex-shrink: 0;
     }
 
-    /* --- 资金管理：单列 --- */
+    /* 资金管理：单列 */
     .cashflow-stats {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
@@ -356,13 +357,13 @@
         padding: var(--spacing-2) var(--spacing-3);
     }
 
-    /* --- 工具栏：2列 --- */
+    /* 工具栏：2列 */
     .toolbar.admin-grid,
     .toolbar.store-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    /* --- 摘要网格：2列 --- */
+    /* 摘要网格：2列 */
     .summary-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: var(--spacing-1);
@@ -381,7 +382,7 @@
         font-size: var(--font-xs);
     }
 
-    /* --- 缴费双列：单列 --- */
+    /* 缴费双列：单列 */
     .payment-double-column {
         flex-direction: column;
         gap: var(--spacing-2);
@@ -396,12 +397,12 @@
         overflow-x: hidden;
     }
 
-    /* --- 底部卡片 --- */
+    /* 底部卡片 */
     .dashboard-footer-card p {
         font-size: var(--font-xs);
     }
 
-    /* --- 表单：单列 --- */
+    /* 表单：单列 */
     .form-grid,
     .form-grid.form-grid-3,
     .form-grid.form-grid-4 {
@@ -460,13 +461,13 @@
         font-size: var(--font-sm);
     }
 
-    /* --- 订单详情 --- */
+    /* 订单详情 */
     .order-detail-grid {
         grid-template-columns: 1fr;
         gap: 0;
     }
 
-    /* --- 异常页面 --- */
+    /* 异常页面 */
     .anomaly-grid {
         grid-template-columns: 1fr;
         gap: var(--spacing-4);
@@ -476,13 +477,13 @@
         min-height: auto;
     }
 
-    /* --- 备份页面 --- */
+    /* 备份页面 */
     .backup-grid {
         grid-template-columns: 1fr !important;
         gap: var(--spacing-4);
     }
 
-    /* --- 门店现金流 --- */
+    /* 门店现金流 */
     .cashflow-card .cashflow-stats {
         flex-direction: column;
     }
@@ -491,7 +492,7 @@
         min-width: auto;
     }
 
-    /* --- 资金流水 --- */
+    /* 资金流水 */
     .cashflow-table .flow-desc,
     .capital-table .flow-desc {
         max-width: 150px;
@@ -501,12 +502,12 @@
         max-width: 100px;
     }
 
-    /* --- 隐藏次要列 --- */
+    /* 隐藏次要列 */
     .mobile-hide {
         display: none;
     }
 
-    /* --- 模态框筛选 --- */
+    /* 模态框筛选 */
     .modal-content > div:first-of-type {
         flex-wrap: nowrap;
         overflow-x: auto;
@@ -535,7 +536,7 @@
         margin: 0 !important;
     }
 
-    /* --- 隐藏所有交互元素 --- */
+    /* 隐藏所有交互元素 */
     .no-print,
     .page-header .header-actions,
     .toolbar,
@@ -554,18 +555,18 @@
         display: none !important;
     }
 
-    /* --- 显示仅打印元素 --- */
+    /* 显示仅打印元素 */
     .print-only {
         display: block !important;
     }
 
-    /* --- 链接 --- */
+    /* 链接 */
     a {
         color: #000 !important;
         text-decoration: none !important;
     }
 
-    /* --- 卡片 --- */
+    /* 卡片 */
     .card,
     .cashflow-summary,
     .dashboard-footer-card {
@@ -589,13 +590,13 @@
         text-align: left !important;
     }
 
-    /* --- 页面头部 --- */
+    /* 页面头部 */
     .page-header h1,
     .page-header h2 {
         text-align: left !important;
     }
 
-    /* --- 表格 --- */
+    /* 表格 */
     .table-container {
         border: none;
         overflow: visible;
@@ -650,7 +651,7 @@
         width: 15% !important;
     }
 
-    /* --- 徽章 --- */
+    /* 徽章 */
     .status-badge,
     .repayment-badge,
     .payment-method-badge {
@@ -658,7 +659,7 @@
         background: none !important;
     }
 
-    /* --- 描述列 --- */
+    /* 描述列 */
     .data-table .desc-cell,
     .cashflow-table .flow-desc,
     .capital-table .flow-desc,
@@ -670,7 +671,7 @@
         word-break: break-word !important;
     }
 
-    /* --- 统计卡片 --- */
+    /* 统计卡片 */
     .stats-grid {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -701,7 +702,7 @@
         transform: none !important;
     }
 
-    /* --- 资金管理 --- */
+    /* 资金管理 */
     .cashflow-stats {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -723,7 +724,7 @@
         text-align: left !important;
     }
 
-    /* --- 表单 --- */
+    /* 表单 */
     .form-grid,
     .form-grid.form-grid-3,
     .form-grid.form-grid-4 {
@@ -799,7 +800,7 @@
         appearance: radio !important;
     }
 
-    /* --- 异常页面 --- */
+    /* 异常页面 */
     .anomaly-grid {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 8px !important;
@@ -816,12 +817,12 @@
         box-shadow: none !important;
     }
 
-    /* --- 订单详情 --- */
+    /* 订单详情 */
     .order-detail-grid {
         grid-template-columns: 1fr 1fr !important;
     }
 
-    /* --- 备份页面 --- */
+    /* 备份页面 */
     .backup-grid {
         grid-template-columns: repeat(2, 1fr) !important;
     }
@@ -847,7 +848,7 @@
         display: none !important;
     }
 
-    /* --- 底部 --- */
+    /* 底部 */
     .dashboard-footer-card {
         margin-top: 4px !important;
         padding-top: 4px !important;
