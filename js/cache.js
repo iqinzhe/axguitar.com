@@ -1,6 +1,4 @@
 // cache.js - v1.0
-// 统一缓存模块：合并 AnomalyCache 与 DashboardCache 的功能
-// 特性：TTL过期、LRU淘汰、自动清理、支持强制刷新
 
 window.JFCache = (function() {
     'use strict';
