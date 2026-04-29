@@ -1,4 +1,4 @@
-// migration.js - v1.0
+// migration.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 const Migration = {
     isMigrating: false,
@@ -74,6 +74,7 @@ const Migration = {
         const storeId = (oldOrder.branch && storeMap[oldOrder.branch]) ? storeMap[oldOrder.branch] : defaultStoreId;
         if (!storeId) throw Object.assign(new Error('No store available'), { orderId: oldOrder.order_id });
 
+        const client = SUPABASE.getClient();
         const orderData = {
             order_id: oldOrder.order_id,
             customer_name:    oldOrder.customer?.name    || 'Unknown',
@@ -102,7 +103,7 @@ const Migration = {
             notes: oldOrder.notes || ''
         };
 
-        const { data: newOrder, error: orderError } = await SUPABASE.getClient()
+        const { data: newOrder, error: orderError } = await client
             .from('orders').insert(orderData).select().single();
         if (orderError) throw Object.assign(orderError, { orderId: oldOrder.order_id });
 
@@ -116,7 +117,7 @@ const Migration = {
                 description: payment.description || '',
                 recorded_by: adminUserId
             }));
-            const { error: paymentError } = await SUPABASE.getClient().from('payment_history').insert(paymentRows);
+            const { error: paymentError } = await client.from('payment_history').insert(paymentRows);
             if (paymentError) console.warn('付款记录迁移失败:', oldOrder.order_id, paymentError);
         }
 
