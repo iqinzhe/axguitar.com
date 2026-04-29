@@ -800,23 +800,23 @@ const DashboardCore = {
             this.saveCurrentPageState();
             
             var backMap = {
-                'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
-                'dashboard':     { fn: self.renderDashboard,          name: 'Dashboard', isCore: true },
-                'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
-                'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
-                'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
-                'storeManagement':{ 
-                    fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
-                    name: 'Manajemen Toko' 
-                },
-                'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
-                'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
-                'backupRestore': { 
-                    fn: typeof Storage !== 'undefined' ? Storage.renderBackupUI : null, 
-                    name: 'Cadangan' 
-                },
-                'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
-            };
+    'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
+    'dashboard':     { fn: self.renderDashboard,          name: 'Dashboard', isCore: true },
+    'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
+    'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
+    'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
+    'storeManagement':{ 
+        fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
+        name: 'Manajemen Toko' 
+    },
+    'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
+    'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
+    'backupRestore': { 
+    fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
+    name: 'Cadangan' 
+},
+    'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
+};
             
             var back = backMap[prev.page];
             if (back) {
