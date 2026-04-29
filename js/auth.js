@@ -1,4 +1,4 @@
-// auth.js - v1.0
+// auth.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
 
 const AUTH = {
     user: null,
@@ -225,7 +225,7 @@ const AUTH = {
         return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
     },
 
-    // ==================== 登录逻辑（修复版）====================
+    // ==================== 登录逻辑 ====================
     async login(usernameOrEmail, password) {
         try {
             // 1. 检查锁定状态
