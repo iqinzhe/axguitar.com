@@ -569,3 +569,218 @@
     background: var(--primary-soft);
     transform: translateY(-1px);
 }
+
+/* ============================================================
+   P16. 资金流水表格（Riwayat Arus Kas）列宽修复
+   ============================================================ */
+.cashflow-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.cashflow-table .col-date {
+    width: 10%;
+}
+.cashflow-table .col-type {
+    width: 15%;
+}
+.cashflow-table .col-status {
+    width: 8%;
+}
+.cashflow-table .col-method {
+    width: 12%;
+}
+.cashflow-table .col-amount {
+    width: 15%;
+}
+.cashflow-table .col-desc {
+    width: 30%;
+}
+.cashflow-table .col-store {
+    width: 10%;
+}
+
+@media (max-width: 768px) {
+    .cashflow-table {
+        min-width: 650px;
+    }
+    .cashflow-table .col-date {
+        width: 12%;
+    }
+    .cashflow-table .col-type {
+        width: 18%;
+    }
+    .cashflow-table .col-amount {
+        width: 18%;
+    }
+}
+
+
+/* ============================================================
+   P17. 缴费记录表格（订单详情内）列宽修复
+   ============================================================ */
+.payment-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.payment-table .col-date {
+    width: 12%;
+}
+.payment-table .col-type {
+    width: 18%;
+}
+.payment-table .col-months {
+    width: 8%;
+}
+.payment-table .col-amount {
+    width: 18%;
+}
+.payment-table .col-method {
+    width: 12%;
+}
+.payment-table .col-desc {
+    width: 32%;
+}
+
+@media (max-width: 768px) {
+    .payment-table {
+        min-width: 550px;
+    }
+}
+
+
+/* ============================================================
+   P18. 客户列表表格列宽修复
+   ============================================================ */
+.customer-list-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.customer-list-table .col-id {
+    width: 10%;
+}
+.customer-list-table .col-name {
+    width: 18%;
+}
+.customer-list-table .col-ktp {
+    width: 15%;
+}
+.customer-list-table .col-phone {
+    width: 12%;
+}
+.customer-list-table .col-occupation {
+    width: 12%;
+}
+
+@media (max-width: 768px) {
+    .customer-list-table {
+        min-width: 600px;
+    }
+    .customer-list-table .col-id {
+        width: 80px;
+    }
+    .customer-list-table .col-name {
+        width: 100px;
+    }
+    .customer-list-table .col-ktp {
+        width: 110px;
+    }
+    .customer-list-table .col-phone {
+        width: 90px;
+    }
+    .customer-list-table .col-occupation {
+        width: 80px;
+    }
+}
+
+
+/* ============================================================
+   P19. 订单列表表格列宽修复
+   ============================================================ */
+.order-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.order-table .col-id {
+    width: 9%;
+}
+.order-table .col-name {
+    width: 12%;
+}
+.order-table .col-amount {
+    width: 11%;
+}
+.order-table .col-months {
+    width: 8%;
+}
+.order-table .col-date {
+    width: 10%;
+}
+.order-table .col-status {
+    width: 8%;
+}
+
+@media (max-width: 768px) {
+    .order-table {
+        min-width: 800px;
+    }
+}
+
+
+/* ============================================================
+   P20. 黑名单表格列宽修复
+   ============================================================ */
+.blacklist-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.blacklist-table .col-id {
+    width: 12%;
+}
+.blacklist-table .col-name {
+    width: 18%;
+}
+.blacklist-table .col-phone {
+    width: 15%;
+}
+
+@media (max-width: 768px) {
+    .blacklist-table {
+        min-width: 500px;
+    }
+}
+
+
+/* ============================================================
+   P21. 异常表格列宽修复
+   ============================================================ */
+.anomaly-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.anomaly-table .col-id {
+    width: 12%;
+}
+.anomaly-table .col-name {
+    width: 18%;
+}
+.anomaly-table .col-phone {
+    width: 15%;
+}
+.anomaly-table .col-months {
+    width: 10%;
+}
+.anomaly-table .col-amount {
+    width: 15%;
+}
+
+@media (max-width: 768px) {
+    .anomaly-table {
+        min-width: 550px;
+    }
+}
