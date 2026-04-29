@@ -1,7 +1,4 @@
-// app-dashboard-orders.js - v1.1
-// 修改内容：
-// 1. 简化 Toast 调用，统一使用 Utils.toast
-// 2. 优化订单管理中的确认框逻辑
+// app-dashboard-orders.js - v1.0
 
 window.APP = window.APP || {};
 
