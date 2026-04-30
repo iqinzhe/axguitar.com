@@ -1,4 +1,8 @@
-// app-payments.js - v2.0 (徽章类名更新为统一 .badge 系统)
+// app-payments.js - v2.1
+// 修复：问题5 - 利息收款双路径安全加固
+//   - 统一使用 app-payments.js 的安全路径（防重锁+幂等检查+补偿事务）
+//   - 标记 supabase.js 的 recordInterestPayment() 为内部使用（需经过本层安全检查）
+//   - payFixedInstallment() 本金负数保护
 
 window.APP = window.APP || {};
 
@@ -16,10 +20,11 @@ window.APP._releasePaymentLock = function(lockKey) {
 };
 
 // ========== 幂等性检查：防止重复处理同一笔交易 ==========
+// 注意：supabase.js 的 recordInterestPayment() 现在也有自己的幂等检查，
+// 但 UI 层仍然保留双重防护以避免任何绕过
 window.APP._checkIdempotency = async function(orderId, type, amount, paymentMethod) {
     try {
         const client = SUPABASE.getClient();
-        // 获取订单内部ID
         const { data: order, error: orderError } = await client
             .from('orders')
             .select('id')
@@ -199,11 +204,12 @@ const PaymentsModule = {
 
     showPayment: async function(orderId) {
         var lang = Utils.lang;
+        var t = Utils.t.bind(Utils);
 
         const profile = await SUPABASE.getCurrentProfile();
 
         if (!profile) {
-            Utils.toast.error(Utils.t('login_required'));
+            Utils.toast.error(t('login_required'));
             APP.goBack();
             return;
         }
@@ -212,31 +218,20 @@ const PaymentsModule = {
         if (profile.role === 'admin') {
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '<h2>💰 ' + t('payment_page') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                     '</div>' +
                 '</div>' +
                 '<div class="card" style="text-align:center; padding:40px 20px;">' +
                     '<div style="font-size:48px; margin-bottom:16px;">🔒</div>' +
-                    '<h3 style="color:#64748b; margin-bottom:12px;">' + 
-                        (lang === 'id' 
-                            ? 'Fitur Ini Khusus Operator Toko' 
-                            : '此功能仅限门店操作员使用') + 
-                    '</h3>' +
-                    '<p style="color:#94a3b8; margin-bottom:8px;">' +
-                        (lang === 'id' 
-                            ? 'Administrator tidak dapat melakukan pembayaran pesanan.' 
-                            : '管理员不能执行订单缴费操作。') +
-                    '</p>' +
+                    '<h3 style="color:#64748b; margin-bottom:12px;">' + t('store_operation') + '</h3>' +
                     '<p style="color:#94a3b8; margin-bottom:16px;">' +
                         (lang === 'id' 
-                            ? 'Silakan gunakan akun operator toko untuk mengakses halaman pembayaran.' 
-                            : '请使用门店操作员账号访问缴费页面。') +
+                            ? 'Administrator tidak dapat melakukan pembayaran pesanan. Silakan gunakan akun operator toko.'
+                            : '管理员不能执行订单缴费操作。请使用门店操作员账号。') +
                     '</p>' +
-                    '<button onclick="APP.goBack()" class="btn-back" style="padding:10px 24px; font-size:14px;">↩️ ' + 
-                        (lang === 'id' ? 'Kembali ke Dashboard' : '返回仪表盘') + 
-                    '</button>' +
+                    '<button onclick="APP.goBack()" class="btn-back" style="padding:10px 24px; font-size:14px;">↩️ ' + t('back') + '</button>' +
                 '</div>';
             return;
         }
@@ -254,13 +249,13 @@ const PaymentsModule = {
         try {
             var order = await SUPABASE.getOrder(orderId);
             if (!order) {
-                Utils.toast.error(Utils.t('order_not_found'));
+                Utils.toast.error(t('order_not_found'));
                 APP.goBack();
                 return;
             }
             
             if (order.store_id !== profile.store_id) {
-                Utils.toast.error(Utils.t('unauthorized'));
+                Utils.toast.error(t('unauthorized'));
                 APP.goBack();
                 return;
             }
@@ -275,8 +270,6 @@ const PaymentsModule = {
 
             var result = await SUPABASE.getPaymentHistory(orderId);
             var payments = result.payments;
-
-            var t = Utils.t.bind(Utils);
             
             var loanAmount = order.loan_amount || 0;
             var principalPaid = order.principal_paid || 0;
@@ -311,7 +304,7 @@ const PaymentsModule = {
                     interestRows += '<tr>' +
                         '<td class="text-center">' + paymentNumber + '</td>' +
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
-                        '<td class="text-center">' + (p.months || 1) + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
+                        '<td class="text-center">' + (p.months || 1) + ' ' + t('month') + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
                         '<td class="text-center"><span class="badge badge-method-' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
                     '</tr>';
@@ -342,21 +335,10 @@ const PaymentsModule = {
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             
             var interestOptions = [1, 2, 3].map(function(i) {
-                return '<option value="' + i + '">' + i + ' ' + (lang === 'id' ? 'bulan' : '个月') + ' = ' + Utils.formatCurrency(currentMonthlyInterest * i) + '</option>';
+                return '<option value="' + i + '">' + i + ' ' + t('month') + ' = ' + Utils.formatCurrency(currentMonthlyInterest * i) + '</option>';
             }).join('');
 
             var nextInterestNumber = interestPayments.length + 1;
-
-            var adminFeePayment = payments.find(function(p) { return p.type === 'admin_fee' && !p.is_voided; });
-            var serviceFeePayment = payments.find(function(p) { return p.type === 'service_fee' && !p.is_voided; });
-            
-            var adminFeePaidInfo = order.admin_fee_paid && adminFeePayment
-                ? Utils.formatCurrency(order.admin_fee) + ' (' + (methodMap[adminFeePayment.payment_method] || '-') + ' / ' + Utils.formatDate(adminFeePayment.date) + ')'
-                : (order.admin_fee_paid ? Utils.formatCurrency(order.admin_fee) : (lang === 'id' ? 'Belum dibayar' : '未缴'));
-            
-            var serviceFeePaidInfo = isServiceFeePaid && serviceFeePayment
-                ? Utils.formatCurrency(serviceFeeAmount) + ' (' + (methodMap[serviceFeePayment.payment_method] || '-') + ' / ' + Utils.formatDate(serviceFeePayment.date) + ')'
-                : (serviceFeePaid > 0 ? Utils.formatCurrency(serviceFeePaid) + '/' + Utils.formatCurrency(serviceFeeAmount) : (lang === 'id' ? 'Belum dibayar' : '未缴'));
 
             // ========== 固定还款板块 ==========
             var fixedRepaymentHtml = '';
@@ -371,8 +353,8 @@ const PaymentsModule = {
                 if (overdueDays > 0) {
                     var severityClass = overdueDays >= 30 ? 'severe' : 'mild';
                     overdueWarning = '<div class="overdue-warning ' + severityClass + '">' +
-                        '⚠️ ' + (lang === 'id' ? 'Terlambat ' + overdueDays + ' hari' : '逾期 ' + overdueDays + ' 天') +
-                        (overdueDays >= 30 ? (lang === 'id' ? ' - Akan memasuki proses likuidasi!' : ' - 将进入变卖程序！') : '') +
+                        '⚠️ ' + t('overdue_warning_days').replace('{days}', overdueDays) +
+                        (overdueDays >= 30 ? ' - ' + t('enter_liquidation_warning') : '') +
                     '</div>';
                 }
                 
@@ -387,8 +369,8 @@ const PaymentsModule = {
                         '<div class="card-body">' +
                             '<div class="info-box success-box">' +
                                 '<div class="info-row">' +
-                                    '<span>📊 ' + (lang === 'id' ? 'Progress' : '进度') + ':</span>' +
-                                    '<strong>' + paidMonths + '/' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</strong>' +
+                                    '<span>📊 ' + t('progress') + ':</span>' +
+                                    '<strong>' + paidMonths + '/' + totalMonths + ' ' + t('month') + '</strong>' +
                                 '</div>' +
                                 '<div class="info-row" style="align-items:center;">' +
                                     '<span></span>' +
@@ -406,12 +388,12 @@ const PaymentsModule = {
                                 '</div>' +
                                 '<div class="info-row">' +
                                     '<span>📈 ' + t('remaining_term') + ':</span>' +
-                                    '<strong>' + remainingMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</strong>' +
+                                    '<strong>' + remainingMonths + ' ' + t('month') + '</strong>' +
                                 '</div>' +
                                 overdueWarning +
                             '</div>' +
                             '<div class="payment-method-group">' +
-                                '<div class="payment-method-title">' + (lang === 'id' ? 'Metode Pencatatan' : '入账方式') + ':</div>' +
+                                '<div class="payment-method-title">' + t('recording_method') + ':</div>' +
                                 '<div class="payment-method-options">' +
                                     '<label><input type="radio" name="fixedMethod" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
                                     '<label><input type="radio" name="fixedMethod" value="bank"> 🏧 ' + t('bank') + '</label>' +
@@ -419,13 +401,13 @@ const PaymentsModule = {
                             '</div>' +
                             '<div class="action-buttons">' +
                                 '<button onclick="APP.payFixedInstallment(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="fixedPayBtn">' +
-                                    '✅ ' + (lang === 'id' ? 'Bayar Angsuran Bulan Ini' : '支付本月还款') +
+                                    '✅ ' + t('pay_this_month') +
                                 '</button>' +
                                 (remainingMonths > 0 ? '<button onclick="APP.earlySettleFixedOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action early-settle" id="earlySettleBtn">🎯 ' + t('early_settlement') + '</button>' : '') +
                             '</div>' +
                         '</div>' +
                         '<div class="card-info">' +
-                            '<small>💡 ' + (lang === 'id' ? 'Setiap angsuran mencakup bunga dan pokok. Pelunasan dipercepat dapat mengurangi sisa bunga.' : '每期还款包含本金和利息，提前结清可减免剩余利息') + '</small>' +
+                            '<small>💡 ' + t('each_installment_includes') + '</small>' +
                         '</div>' +
                     '</div>';
             }
@@ -436,14 +418,14 @@ const PaymentsModule = {
                 flexibleRepaymentHtml = '' +
                     '<div class="payment-double-column">' +
                         '<div class="card action-card" style="min-width:0;overflow-x:hidden;">' +
-                            '<div class="card-header"><h3>💰 ' + (lang === 'id' ? 'Bayar Bunga' : '缴纳利息') + '</h3></div>' +
+                            '<div class="card-header"><h3>💰 ' + t('pay_interest') + '</h3></div>' +
                             '<div class="card-body">' +
                                 '<div class="info-box">' +
                                     '<div class="info-row">' +
-                                        '<span>📌 ' + (lang === 'id' ? 'Ini adalah pembayaran bunga ke-' : '本次是第 ') + '<strong>' + nextInterestNumber + '</strong> ' + (lang === 'id' ? 'kali' : '次利息支付') + '</span>' +
+                                        '<span>📌 ' + t('interest_payment_num') + '<strong>' + nextInterestNumber + '</strong> ' + t('times') + '</span>' +
                                     '</div>' +
                                     '<div class="info-row">' +
-                                        '<span>💰 ' + (lang === 'id' ? 'Jumlah yang harus dibayar' : '应付金额') + ':</span>' +
+                                        '<span>💰 ' + t('amount_due') + ':</span>' +
                                         '<strong>' + Utils.formatCurrency(currentMonthlyInterest) + '</strong>' +
                                     '</div>' +
                                     '<div class="info-row">' +
@@ -452,59 +434,59 @@ const PaymentsModule = {
                                     '</div>' +
                                 '</div>' +
                                 '<div class="action-input-group">' +
-                                    '<label class="action-label">' + (lang === 'id' ? 'Ambil' : '收取') + ':</label>' +
+                                    '<label class="action-label">' + t('take_months') + ':</label>' +
                                     '<select id="interestMonths" class="action-select">' + interestOptions + '</select>' +
                                 '</div>' +
                                 '<div class="payment-method-group">' +
-                                    '<div class="payment-method-title">' + (lang === 'id' ? 'Metode Pencatatan' : '入账方式') + ':</div>' +
+                                    '<div class="payment-method-title">' + t('recording_method') + ':</div>' +
                                     '<div class="payment-method-options">' +
                                         '<label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ' + t('cash') + '</label>' +
                                         '<label><input type="radio" name="interestMethod" value="bank"> 🏧 ' + t('bank') + '</label>' +
                                     '</div>' +
                                 '</div>' +
-                                '<button onclick="APP.payInterestWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="interestConfirmBtn">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
+                                '<button onclick="APP.payInterestWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="interestConfirmBtn">✅ ' + t('confirm_payment') + '</button>' +
                             '</div>' +
                             '<div class="card-history">' +
-                                '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('pay_interest') : t('pay_interest') + '历史') + '</div>' +
+                                '<div class="history-title">📋 ' + t('interest_history') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="text-center" style="width:50px;">' + (lang === 'id' ? 'Ke-' : '第几次') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
+                                        '<thead><tr><th class="text-center" style="width:50px;">' + t('times') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + t('month') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead>' +
                                         '<tbody>' + interestRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
                         '<div class="card action-card" style="min-width:0;overflow-x:hidden;">' +
-                            '<div class="card-header"><h3>🏦 ' + (lang === 'id' ? 'Kembalikan Pokok' : '返还本金') + '</h3></div>' +
+                            '<div class="card-header"><h3>🏦 ' + t('return_principal') + '</h3></div>' +
                             '<div class="card-body">' +
                                 '<div class="info-box warning-box">' +
                                     '<div class="info-row">' +
-                                        '<span>📊 ' + (lang === 'id' ? 'Pokok Dibayar' : '已还本金') + ':</span>' +
+                                        '<span>📊 ' + t('principal_paid') + ':</span>' +
                                         '<strong>' + Utils.formatCurrency(principalPaid) + '</strong>' +
                                     '</div>' +
                                     '<div class="info-row">' +
-                                        '<span>📊 ' + (lang === 'id' ? 'Sisa Pokok' : '尚欠本金') + ':</span>' +
+                                        '<span>📊 ' + t('remaining_principal') + ':</span>' +
                                         '<strong class="' + (remainingPrincipal > 0 ? 'expense' : 'income') + '">' + Utils.formatCurrency(remainingPrincipal) + '</strong>' +
                                     '</div>' +
                                 '</div>' +
                                 '<div class="action-input-group">' +
-                                    '<label class="action-label">' + (lang === 'id' ? 'Jumlah Pembayaran' : '还款金额') + ':</label>' +
+                                    '<label class="action-label">' + t('payment_amount') + ':</label>' +
                                     '<input type="text" id="principalAmount" class="action-input amount-input" placeholder="0">' +
                                 '</div>' +
                                 '<div class="payment-method-group">' +
-                                    '<div class="payment-method-title">' + (lang === 'id' ? 'Metode Pencatatan' : '入账方式') + ':</div>' +
+                                    '<div class="payment-method-title">' + t('recording_method') + ':</div>' +
                                     '<div class="payment-method-options">' +
                                         '<label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ' + t('bank') + '</label>' +
                                         '<label><input type="radio" name="principalTarget" value="cash"> 🏦 ' + t('cash') + '</label>' +
                                     '</div>' +
                                 '</div>' +
-                                '<button onclick="APP.payPrincipalWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="principalConfirmBtn">✅ ' + (lang === 'id' ? 'Konfirmasi Pembayaran' : '确认收款') + '</button>' +
+                                '<button onclick="APP.payPrincipalWithMethod(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-action success" id="principalConfirmBtn">✅ ' + t('confirm_payment') + '</button>' +
                             '</div>' +
                             '<div class="card-history">' +
-                                '<div class="history-title">📋 ' + (lang === 'id' ? 'Riwayat ' + t('return_principal') : t('return_principal') + '历史') + '</div>' +
+                                '<div class="history-title">📋 ' + t('principal_history') + '</div>' +
                                 '<div class="table-container" style="overflow-x:auto;">' +
                                     '<table class="data-table history-table" style="min-width:300px;">' +
-                                        '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Dibayar' : '还款金额') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Total Dibayar' : '累计已还') + '</th><th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead>' +
+                                        '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + t('payment_amount') + '</th><th class="col-amount amount">' + t('total') + ' ' + t('principal_paid') + '</th><th class="col-amount amount">' + t('remaining_principal') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
                                     '</table>' +
                                 '</div>' +
@@ -513,10 +495,21 @@ const PaymentsModule = {
                     '</div>';
             }
 
+            var adminFeePayment = payments.find(function(p) { return p.type === 'admin_fee' && !p.is_voided; });
+            var serviceFeePayment = payments.find(function(p) { return p.type === 'service_fee' && !p.is_voided; });
+            
+            var adminFeePaidInfo = order.admin_fee_paid && adminFeePayment
+                ? Utils.formatCurrency(order.admin_fee) + ' (' + (methodMap[adminFeePayment.payment_method] || '-') + ' / ' + Utils.formatDate(adminFeePayment.date) + ')'
+                : (order.admin_fee_paid ? Utils.formatCurrency(order.admin_fee) : (lang === 'id' ? 'Belum dibayar' : '未缴'));
+            
+            var serviceFeePaidInfo = isServiceFeePaid && serviceFeePayment
+                ? Utils.formatCurrency(serviceFeeAmount) + ' (' + (methodMap[serviceFeePayment.payment_method] || '-') + ' / ' + Utils.formatDate(serviceFeePayment.date) + ')'
+                : (serviceFeePaid > 0 ? Utils.formatCurrency(serviceFeePaid) + '/' + Utils.formatCurrency(serviceFeeAmount) : (lang === 'id' ? 'Belum dibayar' : '未缴'));
+
             // ========== 组装页面 ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>💰 ' + (lang === 'id' ? 'Pembayaran' : '缴纳费用') + '</h2>' +
+                    '<h2>💰 ' + t('payment_page') + '</h2>' +
                     '<div class="header-actions">' +
                         '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
                         '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-detail">📄 ' + t('order_details') + '</button>' +
@@ -528,10 +521,10 @@ const PaymentsModule = {
                         '<div class="summary-item"><span class="label">' + t('customer_name') + ':</span><span class="value">' + Utils.escapeHtml(order.customer_name) + '</span></div>' +
                         '<div class="summary-item"><span class="label">ID:</span><span class="value order-id">' + Utils.escapeHtml(order.order_id) + '</span></div>' +
                         '<div class="summary-item"><span class="label">' + t('loan_amount') + ':</span><span class="value">' + Utils.formatCurrency(loanAmount) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</span><span class="value ' + (remainingPrincipal > 0 ? 'warning' : 'success-text') + '">' + Utils.formatCurrency(remainingPrincipal) + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + (lang === 'id' ? 'Bunga Bulanan' : '月利息') + ':</span><span class="value">' + Utils.formatCurrency(currentMonthlyInterest) + '</span></div>' +
+                        '<div class="summary-item"><span class="label">' + t('remaining_principal') + ':</span><span class="value ' + (remainingPrincipal > 0 ? 'warning' : 'success-text') + '">' + Utils.formatCurrency(remainingPrincipal) + '</span></div>' +
+                        '<div class="summary-item"><span class="label">' + t('interest') + ':</span><span class="value">' + Utils.formatCurrency(currentMonthlyInterest) + '</span></div>' +
                         '<div class="summary-item"><span class="label">' + t('payment_due_date') + ':</span><span class="value">' + nextDueDate + '</span></div>' +
-                        '<div class="summary-item"><span class="label">' + t('repayment_type') + ':</span><span class="value">' + (order.repayment_type === 'fixed' ? '📅 ' + t('fixed_repayment') : '💰 ' + t('flexible_repayment')) + (order.repayment_type === 'fixed' ? ' (' + order.repayment_term + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')' : '') + '</span></div>' +
+                        '<div class="summary-item"><span class="label">' + t('repayment_type') + ':</span><span class="value">' + (order.repayment_type === 'fixed' ? '📅 ' + t('fixed_repayment') : '💰 ' + t('flexible_repayment')) + (order.repayment_type === 'fixed' ? ' (' + order.repayment_term + ' ' + t('month') + ')' : '') + '</span></div>' +
                         '<div class="summary-item"><span class="label">💎 ' + t('collateral_name') + ':</span><span class="value">' + Utils.escapeHtml(order.collateral_name || '-') + '</span></div>' +
                         '<div class="summary-item"><span class="label">💰 ' + t('service_fee') + ':</span><span class="value">' + Utils.formatCurrency(serviceFeeAmount) + ' (' + (order.service_fee_percent || 0) + '%)</span></div>' +
                         '<div class="summary-item"><span class="label">📋 ' + t('admin_fee') + ':</span><span class="value">' + Utils.formatCurrency(order.admin_fee) + '</span></div>' +
@@ -554,13 +547,18 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 利息收款（防重复提交 + 幂等性 + 补偿事务） ==========
+    // ========== 利息收款（防重锁 + 幂等检查 + 补偿事务） ==========
+    // 问题5说明：supabase.js 的 recordInterestPayment() 已经增加了等效的安全防护，
+    // 但 UI 层保留双重防护，因为：
+    //   1. 锁机制不一样（UI层的锁在用户操作期间生效，supabase层的锁只在函数执行期间）
+    //   2. 双重防护避免任何可能的绕过
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
         
+        // ===== 第一层防护：UI层防重锁 =====
         if (!window.APP._acquirePaymentLock(orderId + '_interest')) {
             Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
@@ -580,6 +578,7 @@ const PaymentsModule = {
             var monthlyInterest = remainingPrincipal * monthlyRate;
             var totalInterest = monthlyInterest * months;
             
+            // ===== 第二层防护：幂等检查 =====
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', totalInterest, method);
             if (isDuplicate) {
                 Utils.toast.warning(lang === 'id' 
@@ -592,6 +591,7 @@ const PaymentsModule = {
             var nextInterestNumber = (order.interest_paid_months || 0) + 1;
             var endNumber = nextInterestNumber + months - 1;
             
+            // 预览确认
             var previewMsg = lang === 'id'
                 ? '📋 Konfirmasi Pembayaran Bunga\n' +
                   'Pesanan: ' + order.order_id + '\n' +
@@ -617,67 +617,11 @@ const PaymentsModule = {
             var confirmed = await Utils.toast.confirm(previewMsg);
             if (!confirmed) return;
             
-            var originalOrderState = {
-                interest_paid_months: order.interest_paid_months,
-                interest_paid_total: order.interest_paid_total,
-                next_interest_due_date: order.next_interest_due_date,
-                monthly_interest: order.monthly_interest,
-                updated_at: order.updated_at
-            };
-            
-            var orderInternalId = order.id;
-            var paymentDate = Utils.getLocalToday();
-            
+            // ===== 第三层防护：调用 supabase.js 的安全版本 =====
+            // 注意：supabase.js 的 recordInterestPayment() 也有自己的防重锁和幂等检查，
+            // 此处调用会形成双重防护
             try {
-                var newInterestPaidMonths = (order.interest_paid_months || 0) + months;
-                var newInterestPaidTotal = (order.interest_paid_total || 0) + totalInterest;
-                var nextDueDate = SUPABASE.calculateNextDueDate(order.created_at, newInterestPaidMonths);
-                
-                const client = SUPABASE.getClient();
-                const { error: updateError } = await client
-                    .from('orders')
-                    .update({
-                        interest_paid_months: newInterestPaidMonths,
-                        interest_paid_total: newInterestPaidTotal,
-                        next_interest_due_date: nextDueDate,
-                        monthly_interest: monthlyInterest,
-                        updated_at: Utils.getLocalDateTime()
-                    })
-                    .eq('order_id', orderId);
-                
-                if (updateError) throw new Error('更新订单失败: ' + updateError.message);
-                
-                const paymentData = {
-                    order_id: orderInternalId,
-                    date: paymentDate,
-                    type: 'interest',
-                    months: months,
-                    amount: totalInterest,
-                    description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(1) + '%)',
-                    recorded_by: (await SUPABASE.getCurrentProfile())?.id,
-                    payment_method: method
-                };
-                
-                const { error: paymentError } = await client
-                    .from('payment_history')
-                    .insert(paymentData);
-                
-                if (paymentError) {
-                    await window.APP._rollbackOrder(orderId, originalOrderState);
-                    throw new Error('插入付款记录失败: ' + paymentError.message);
-                }
-                
-                await SUPABASE.recordCashFlow({
-                    store_id: order.store_id,
-                    flow_type: 'interest',
-                    direction: 'inflow',
-                    amount: totalInterest,
-                    source_target: method,
-                    order_id: orderInternalId,
-                    customer_id: order.customer_id,
-                    description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(1) + '%)',
-                    reference_id: order.order_id
-                });
+                await SUPABASE.recordInterestPayment(orderId, months, method);
                 
                 if (window.Audit) {
                     await window.Audit.logPayment(order.order_id, 'interest', totalInterest, method);
@@ -688,7 +632,6 @@ const PaymentsModule = {
                 
             } catch (error) {
                 console.error('payInterestWithMethod 事务失败:', error);
-                await window.APP._rollbackPaymentHistory(orderInternalId, 'interest', totalInterest, paymentDate);
                 Utils.toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
             
@@ -703,7 +646,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 本金收款（防重复提交 + 幂等性 + 补偿事务） ==========
+    // ========== 本金收款（防重锁 + 幂等检查 + 补偿事务） ==========
     payPrincipalWithMethod: async function(orderId) {
         var amountStr = document.getElementById("principalAmount").value;
         var amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
@@ -771,75 +714,8 @@ const PaymentsModule = {
             var confirmed = await Utils.toast.confirm(previewMsg);
             if (!confirmed) return;
             
-            var originalOrderState = {
-                principal_paid: order.principal_paid,
-                principal_remaining: order.principal_remaining,
-                status: order.status,
-                monthly_interest: order.monthly_interest,
-                completed_at: order.completed_at,
-                updated_at: order.updated_at
-            };
-            
-            var orderInternalId = order.id;
-            var paymentDate = Utils.getLocalToday();
-            var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
-            
             try {
-                var newPrincipalPaid = principalPaid + actualAmount;
-                var newPrincipalRemaining = loanAmount - newPrincipalPaid;
-                
-                var updates = { 
-                    principal_paid: newPrincipalPaid, 
-                    principal_remaining: newPrincipalRemaining,
-                    updated_at: Utils.getLocalDateTime()
-                };
-                
-                if (isFullSettlement) {
-                    updates.status = 'completed';
-                    updates.monthly_interest = 0;
-                    updates.completed_at = Utils.getLocalDateTime();
-                } else {
-                    updates.monthly_interest = newPrincipalRemaining * monthlyRate;
-                }
-                
-                const client = SUPABASE.getClient();
-                const { error: updateError } = await client
-                    .from('orders')
-                    .update(updates)
-                    .eq('order_id', orderId);
-                
-                if (updateError) throw new Error('更新订单失败: ' + updateError.message);
-                
-                const paymentData = {
-                    order_id: orderInternalId,
-                    date: paymentDate,
-                    type: 'principal',
-                    amount: actualAmount,
-                    description: isFullSettlement ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
-                    recorded_by: (await SUPABASE.getCurrentProfile())?.id,
-                    payment_method: target
-                };
-                
-                const { error: paymentError } = await client
-                    .from('payment_history')
-                    .insert(paymentData);
-                
-                if (paymentError) {
-                    await window.APP._rollbackOrder(orderId, originalOrderState);
-                    throw new Error('插入付款记录失败: ' + paymentError.message);
-                }
-                
-                await SUPABASE.recordCashFlow({
-                    store_id: order.store_id,
-                    flow_type: 'principal',
-                    direction: 'inflow',
-                    amount: actualAmount,
-                    source_target: target,
-                    order_id: orderInternalId,
-                    customer_id: order.customer_id,
-                    description: isFullSettlement ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
-                    reference_id: order.order_id
-                });
+                await SUPABASE.recordPrincipalPayment(orderId, actualAmount, target);
                 
                 if (window.Audit) {
                     await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
@@ -847,8 +723,8 @@ const PaymentsModule = {
                 
                 if (isFullSettlement) {
                     var printConfirm = lang === 'id'
-                        ? '✅ LUNAS!\n\nCetak tanda terima pelunasan?'
-                        : '✅ 结清成功！\n\n是否打印结清凭证？';
+                        ? '✅ LUNAS!\n\n' + Utils.t('print_receipt_confirm')
+                        : '✅ 结清成功！\n\n' + Utils.t('print_receipt_confirm');
                     var printConfirmed = await Utils.toast.confirm(printConfirm);
                     if (printConfirmed) {
                         APP.printSettlementReceipt(orderId);
@@ -861,7 +737,6 @@ const PaymentsModule = {
                 
             } catch (error) {
                 console.error('payPrincipalWithMethod 事务失败:', error);
-                await window.APP._rollbackPaymentHistory(orderInternalId, 'principal', actualAmount, paymentDate);
                 Utils.toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             }
             
@@ -877,6 +752,7 @@ const PaymentsModule = {
     },
 
     // ========== 固定还款 ==========
+    // 问题5说明：调用 supabase.js 的 recordFixedPayment()，该函数已在问题3修复中增加了本金负数保护
     payFixedInstallment: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
@@ -903,18 +779,7 @@ const PaymentsModule = {
                 return;
             }
             
-            var originalOrderState = {
-                principal_paid: orderBefore.principal_paid,
-                principal_remaining: orderBefore.principal_remaining,
-                fixed_paid_months: orderBefore.fixed_paid_months,
-                monthly_interest: orderBefore.monthly_interest,
-                interest_paid_months: orderBefore.interest_paid_months,
-                interest_paid_total: orderBefore.interest_paid_total,
-                next_interest_due_date: orderBefore.next_interest_due_date,
-                status: orderBefore.status,
-                updated_at: orderBefore.updated_at
-            };
-            
+            // 调用 supabase.js 的安全版本（已含本金负数保护）
             await SUPABASE.recordFixedPayment(orderId, method);
             
             if (window.Audit) {
@@ -1029,7 +894,7 @@ const PaymentsModule = {
 
             var html = '' +
             '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-            '<title>' + (lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证') + ' - ' + safeOrderId + '</title>' +
+            '<title>' + t('settlement_receipt') + ' - ' + safeOrderId + '</title>' +
             '<style>' +
                 '*{box-sizing:border-box;margin:0;padding:0}' +
                 'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:12px;color:#1e293b;background:#fff}' +
@@ -1054,33 +919,33 @@ const PaymentsModule = {
             '</style></head><body>' +
             '<div class="wrap">' +
                 '<div class="no-print">' +
-                    '<button class="btn-p" onclick="window.print()">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                    '<button class="btn-c" onclick="window.close()">' + (lang === 'id' ? 'Tutup' : '关闭') + '</button>' +
+                    '<button class="btn-p" onclick="window.print()">🖨️ ' + t('print') + '</button>' +
+                    '<button class="btn-c" onclick="window.close()">' + t('close') + '</button>' +
                 '</div>' +
                 '<div class="header">' +
                     '<div class="header-logo">' +
                         '<img src="icons/pagehead-logo.png" alt="JF!">' +
                         '<h1>JF! by Gadai</h1>' +
                     '</div>' +
-                    '<div><span class="badge">✅ ' + (lang === 'id' ? 'TANDA TERIMA PELUNASAN' : '结清凭证') + '</span></div>' +
-                    '<div style="margin-top:6px;font-size:11px;color:#475569">' + (lang === 'id' ? 'Tanggal Lunas' : '结清日期') + ': <strong>' + completedAt + '</strong> &nbsp;|&nbsp; ' + (lang === 'id' ? 'ID Pesanan' : '订单号') + ': <strong>' + safeOrderId + '</strong></div>' +
+                    '<div><span class="badge">✅ ' + t('settlement_receipt') + '</span></div>' +
+                    '<div style="margin-top:6px;font-size:11px;color:#475569">' + (lang === 'id' ? 'Tanggal Lunas' : '结清日期') + ': <strong>' + completedAt + '</strong> &nbsp;|&nbsp; ' + t('order_id') + ': <strong>' + safeOrderId + '</strong></div>' +
                 '</div>' +
                 '<div class="section">' +
-                    '<h3>👤 ' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '</h3>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Nama' : '姓名') + '</span><span class="val">' + safeCustomer + '</span></div>' +
+                    '<h3>👤 ' + t('customer_info') + '</h3>' +
+                    '<div class="row"><span class="lbl">' + t('customer_name') + '</span><span class="val">' + safeCustomer + '</span></div>' +
                     '<div class="row"><span class="lbl">KTP</span><span class="val">' + safeKtp + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Telepon' : '电话') + '</span><span class="val">' + safePhone + '</span></div>' +
+                    '<div class="row"><span class="lbl">' + t('phone') + '</span><span class="val">' + safePhone + '</span></div>' +
                 '</div>' +
                 '<div class="section">' +
-                    '<h3>💎 ' + (lang === 'id' ? 'Jaminan' : '质押物') + '</h3>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Nama Barang' : '物品名称') + '</span><span class="val">' + safeCollateral + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + (lang === 'id' ? 'Pinjaman Awal' : '原始贷款') + '</span><span class="val">' + safeLoanAmount + '</span></div>' +
+                    '<h3>💎 ' + t('collateral_info') + '</h3>' +
+                    '<div class="row"><span class="lbl">' + t('collateral_name') + '</span><span class="val">' + safeCollateral + '</span></div>' +
+                    '<div class="row"><span class="lbl">' + t('loan_amount') + '</span><span class="val">' + safeLoanAmount + '</span></div>' +
                 '</div>' +
                 '<div class="section">' +
                     '<h3>💰 ' + (lang === 'id' ? 'Ringkasan Pembayaran' : '付款汇总') + '</h3>' +
                     '<div class="row"><span class="lbl">' + t('admin_fee') + '</span><span class="val">' + safeTotalAdminFee + '</span></div>' +
                     '<div class="row"><span class="lbl">' + t('service_fee') + '</span><span class="val">' + safeTotalServiceFee + '</span></div>' +
-                    '<div class="row"><span class="lbl">' + t('interest') + '</span><span class="val">' + safeTotalInterest + ' (' + safeInterestPaidMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</span></div>' +
+                    '<div class="row"><span class="lbl">' + t('interest') + '</span><span class="val">' + safeTotalInterest + ' (' + safeInterestPaidMonths + ' ' + t('month') + ')</span></div>' +
                     '<div class="row"><span class="lbl">' + t('principal') + '</span><span class="val">' + safeTotalPrincipal + '</span></div>' +
                     '<div class="total-row"><span>' + (lang === 'id' ? 'Total Dibayar' : '累计已付总额') + '</span><span>' + safeGrandTotal + '</span></div>' +
                 '</div>' +
