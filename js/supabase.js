@@ -1,8 +1,10 @@
-// supabase.js - v2.1
+// supabase.js - v2.2
 // 修复：
 //   问题3: recordFixedPayment() 本金负数污染数据库
 //   问题5: recordInterestPayment() 添加防重锁/幂等检查/补偿事务
 //   问题6: getCashFlowSummary() 净利润公式排除本金进出
+//   新增: formatCurrency 引用修复，使用 Utils.formatCurrency
+//   新增: hasSentRemindersToday 方法供 DashboardCore 使用
 
 // 从 config.js 读取配置
 const SUPABASE_URL = window.APP_CONFIG.SUPABASE.URL;
@@ -918,7 +920,6 @@ const SupabaseAPI = {
 
     // ======================================================================
     // 问题5修复：recordInterestPayment() 添加防重锁、幂等检查、补偿事务
-    // 使其与 app-payments.js 的 payInterestWithMethod() 达到同等安全级别
     // ======================================================================
     async recordInterestPayment(orderId, months, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
@@ -947,12 +948,11 @@ const SupabaseAPI = {
             const monthlyInterest = remainingPrincipal * monthlyRate;
             const totalInterest = monthlyInterest * months;
 
-            // ===== 幂等检查：同一天同类型同金额的付款是否已存在 =====
+            // ===== 幂等检查 =====
             var isDuplicate = false;
             if (window.APP && window.APP._checkIdempotency) {
                 isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', totalInterest, paymentMethod);
             } else {
-                // 降级：自己检查
                 const today = Utils.getLocalToday();
                 const { data: existingPayment } = await supabaseClient
                     .from('payment_history')
@@ -982,8 +982,7 @@ const SupabaseAPI = {
                     : '❌ 已达到最大延期期限 (' + maxMonths + '个月)，请尽快结清本金');
             }
 
-            // ===== 保存原始状态用于补偿事务 =====
-            var originalOrderState = {
+            const originalOrderState = {
                 interest_paid_months: currentOrder.interest_paid_months,
                 interest_paid_total: currentOrder.interest_paid_total,
                 next_interest_due_date: currentOrder.next_interest_due_date,
@@ -993,7 +992,6 @@ const SupabaseAPI = {
 
             const nextDueDate = this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths);
 
-            // 步骤1：更新订单
             const { error: updateError } = await supabaseClient
                 .from('orders')
                 .update({
@@ -1007,7 +1005,6 @@ const SupabaseAPI = {
 
             if (updateError) throw updateError;
 
-            // 步骤2：插入付款记录（如果失败，回滚步骤1）
             const paymentData = {
                 order_id: currentOrder.id,
                 date: Utils.getLocalToday(),
@@ -1024,7 +1021,6 @@ const SupabaseAPI = {
                 .insert(paymentData);
 
             if (paymentError) {
-                // ===== 补偿事务：回滚订单更新 =====
                 console.warn('[补偿事务] 付款记录插入失败，回滚订单更新:', paymentError.message);
                 await supabaseClient
                     .from('orders')
@@ -1033,7 +1029,6 @@ const SupabaseAPI = {
                 throw paymentError;
             }
 
-            // 步骤3：记录资金流水（失败不影响主流程，仅记录错误）
             try {
                 await this.recordCashFlow({
                     store_id: currentOrder.store_id,
@@ -1048,7 +1043,6 @@ const SupabaseAPI = {
                 });
             } catch (cashFlowError) {
                 console.error('[补偿事务] 资金流水记录失败（订单和付款记录已保存）:', cashFlowError.message);
-                // 不抛出，不阻塞主流程
                 if (window.Audit) {
                     await window.Audit.log('cash_flow_record_failed', JSON.stringify({
                         order_id: currentOrder.order_id,
@@ -1066,7 +1060,6 @@ const SupabaseAPI = {
             return true;
 
         } finally {
-            // 释放防重锁
             if (window.APP && window.APP._releasePaymentLock) {
                 window.APP._releasePaymentLock(lockKey);
             }
@@ -1122,8 +1115,6 @@ const SupabaseAPI = {
 
     // ======================================================================
     // 问题3修复：recordFixedPayment() 本金负数污染数据库
-    // 原问题：principalAmount = fixedPayment - interestAmount 可能为负，
-    // 虽跳过了 payment_history 插入，但 newPrincipalPaid 仍加上了负数
     // ======================================================================
     async recordFixedPayment(orderId, paymentMethod) {
         if (paymentMethod === undefined) paymentMethod = 'cash';
@@ -1138,7 +1129,6 @@ const SupabaseAPI = {
         const remainingMonths = order.repayment_term - paidMonths;
 
         if (remainingMonths <= 0) throw new Error(Utils.lang === 'id' ? '❌ Pesanan sudah lunas' : '❌ 订单已结清');
-
         if (fixedPayment <= 0) throw new Error(Utils.lang === 'id' ? '❌ Jumlah angsuran tidak valid' : '❌ 还款金额无效');
 
         const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
@@ -1146,9 +1136,7 @@ const SupabaseAPI = {
         const interestAmount = remainingPrincipal * monthlyRate;
         var principalAmount = fixedPayment - interestAmount;
 
-        // ===== 问题3修复：防止本金负数 =====
-        // 如果月供不足以覆盖利息（利率过高导致的极端情况），
-        // 则本金部分为0，全部还款视为利息
+        // 修复：防止本金负数
         if (principalAmount < 0) {
             console.warn('[recordFixedPayment] 月供不足覆盖利息，本金部分调整为0',
                 'fixedPayment:', fixedPayment,
@@ -1157,7 +1145,6 @@ const SupabaseAPI = {
             principalAmount = 0;
         }
 
-        // 使用修正后的值计算
         var actualPrincipalPaid = (order.principal_paid || 0) + principalAmount;
         var actualPrincipalRemaining = order.loan_amount - actualPrincipalPaid;
         var newFixedPaidMonths = paidMonths + 1;
@@ -1186,7 +1173,6 @@ const SupabaseAPI = {
             .from('orders').update(updates).eq('order_id', orderId);
         if (updateError) throw updateError;
 
-        // 利息记录总是插入（因为每月利息必然 > 0）
         if (interestAmount > 0) {
             const interestPayment = {
                 order_id: order.id, date: Utils.getLocalToday(), type: 'interest',
@@ -1205,7 +1191,6 @@ const SupabaseAPI = {
             });
         }
 
-        // 只有本金部分 > 0 时才插入本金记录
         if (principalAmount > 0) {
             const principalPayment = {
                 order_id: order.id, date: Utils.getLocalToday(), type: 'principal',
@@ -1240,10 +1225,15 @@ const SupabaseAPI = {
         const remainingMonths = order.repayment_term - paidMonths;
         const settlementAmount = remainingPrincipal;
         const savedInterest = remainingPrincipal * monthlyRate * remainingMonths;
+        
+        // 修复：使用 Utils.toast.confirm 替代 confirm
         const confirmMsg = Utils.lang === 'id'
-            ? '⚠️ Konfirmasi Pelunasan Dipercepat\n\nPesanan: ' + order.order_id + '\nNasabah: ' + order.customer_name + '\nAngsuran terbayar: ' + paidMonths + '/' + order.repayment_term + '\nSisa Pokok: ' + this.formatCurrency(remainingPrincipal) + '\nBunga yang dihemat: ' + this.formatCurrency(savedInterest) + '\nJumlah Pelunasan: ' + this.formatCurrency(settlementAmount) + '\n\nLanjutkan?'
-            : '⚠️ 提前结清确认\n\n订单号: ' + order.order_id + '\n客户: ' + order.customer_name + '\n已还期数: ' + paidMonths + '/' + order.repayment_term + '\n剩余本金: ' + this.formatCurrency(remainingPrincipal) + '\n减免利息: ' + this.formatCurrency(savedInterest) + '\n结清金额: ' + this.formatCurrency(settlementAmount) + '\n\n确认结清？';
-        if (!confirm(confirmMsg)) return false;
+            ? '⚠️ Konfirmasi Pelunasan Dipercepat\n\nPesanan: ' + order.order_id + '\nNasabah: ' + order.customer_name + '\nAngsuran terbayar: ' + paidMonths + '/' + order.repayment_term + '\nSisa Pokok: ' + Utils.formatCurrency(remainingPrincipal) + '\nBunga yang dihemat: ' + Utils.formatCurrency(savedInterest) + '\nJumlah Pelunasan: ' + Utils.formatCurrency(settlementAmount) + '\n\nLanjutkan?'
+            : '⚠️ 提前结清确认\n\n订单号: ' + order.order_id + '\n客户: ' + order.customer_name + '\n已还期数: ' + paidMonths + '/' + order.repayment_term + '\n剩余本金: ' + Utils.formatCurrency(remainingPrincipal) + '\n减免利息: ' + Utils.formatCurrency(savedInterest) + '\n结清金额: ' + Utils.formatCurrency(settlementAmount) + '\n\n确认结清？';
+        
+        const confirmed = await Utils.toast.confirm(confirmMsg);
+        if (!confirmed) return false;
+        
         const finalPayment = {
             order_id: order.id, date: Utils.getLocalToday(), type: 'principal',
             amount: settlementAmount,
@@ -1265,7 +1255,9 @@ const SupabaseAPI = {
         }).eq('order_id', orderId);
         if (error) throw error;
         if (window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', settlementAmount, paymentMethod);
-        alert((Utils.lang === 'id' ? '✅ Pelunasan dipercepat berhasil!\nJumlah: ' : '✅ 提前结清成功！\n结清金额: ') + this.formatCurrency(settlementAmount));
+        
+        // 修复：使用 Utils.formatCurrency 替代 this.formatCurrency
+        Utils.toast.success(Utils.lang === 'id' ? '✅ Pelunasan dipercepat berhasil!\nJumlah: ' : '✅ 提前结清成功！\n结清金额: ' + Utils.formatCurrency(settlementAmount));
         return true;
     },
 
@@ -1525,8 +1517,6 @@ const SupabaseAPI = {
 
     // ======================================================================
     // 问题6修复：getCashFlowSummary() 净利润公式排除本金进出
-    // 原问题：netProfit = 非本金收入 - 全部支出（包含放贷本金 loan_disbursement）
-    // 导致净利润严重偏低。修复：分母只计息、费、运营支出，本金是资产负债表项
     // ======================================================================
     async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
@@ -1545,20 +1535,13 @@ const SupabaseAPI = {
         let cashInflow = 0, cashOutflow = 0;
         let bankInflow = 0, bankOutflow = 0;
         let totalIncome = 0, totalExpense = 0;
-
-        // 问题6修复：用于正确计算净利润的变量
-        // 收入类：管理费、服务费、利息
-        // 支出类：运营支出（expense）
-        // 本金、贷款发放、内部转账 属于资产负债表项，不计入损益
-        let operatingIncome = 0;   // 营业收入（管理费+服务费+利息）
-        let operatingExpense = 0;  // 运营支出
-        let loanDisbursementTotal = 0;  // 放贷本金总额（仅日志用）
+        let operatingIncome = 0;
+        let operatingExpense = 0;
 
         for (var i = 0; i < (flows || []).length; i++) {
             var flow = flows[i];
             const amount = flow.amount || 0;
 
-            // 现金/银行余额统计（保留原有逻辑）
             if (flow.direction === 'inflow') {
                 totalIncome += amount;
                 if (flow.source_target === 'cash') cashInflow += amount;
@@ -1569,36 +1552,19 @@ const SupabaseAPI = {
                 else if (flow.source_target === 'bank') bankOutflow += amount;
             }
 
-            // 问题6修复：按业务类型分类，正确计算损益
-            if (flow.flow_type === 'loan_disbursement') {
-                // 放贷本金 → 资产负债表项，不计入损益
-                loanDisbursementTotal += amount;
-            } else if (flow.flow_type === 'expense') {
-                // 运营支出 → 计入损益表的费用
+            if (flow.flow_type === 'expense') {
                 operatingExpense += amount;
-            } else if (flow.flow_type === 'principal') {
-                // 本金还款 → 资产负债表项，不计入损益
-                // （本金回来是 inflow，放出去是 outflow，净额为零才对）
-            } else if (flow.flow_type === 'internal_transfer_out' || flow.flow_type === 'internal_transfer_in') {
-                // 内部转账 → 资产负债表项
             } else if (flow.flow_type && (
                 flow.flow_type === 'admin_fee' ||
                 flow.flow_type === 'service_fee' ||
                 flow.flow_type === 'interest'
             )) {
-                // 管理费、服务费、利息 → 营业收入
                 operatingIncome += amount;
-            } else if (flow.flow_type && flow.flow_type.endsWith('_reversal')) {
-                // 冲销项 → 根据原始类型归入对应类别
-                // 简化处理：冲销不改变净额（因为 reversal 是反方向记录）
             }
         }
 
         const cashBalance = cashInflow - cashOutflow;
         const bankBalance = bankInflow - bankOutflow;
-
-        // 问题6修复：净利润 = 营业收入 - 运营支出
-        // 不再包含本金和放贷资金
         const netProfit = operatingIncome - operatingExpense;
 
         return {
@@ -1675,6 +1641,22 @@ const SupabaseAPI = {
             .from('reminder_logs').select('id').eq('order_id', orderId).eq('reminder_date', today).maybeSingle();
         if (error) throw error;
         return !!data;
+    },
+
+    // ==================== 新增：检查今天是否已发送过任何提醒 ====================
+    async hasSentRemindersToday() {
+        try {
+            const today = Utils.getLocalToday();
+            const { data, error } = await supabaseClient
+                .from('reminder_logs')
+                .select('id', { count: 'exact' })
+                .eq('reminder_date', today);
+            if (error) return false;
+            return (data?.length || 0) > 0;
+        } catch (e) {
+            console.warn('hasSentRemindersToday 检查失败:', e);
+            return false;
+        }
     },
 
     async logReminder(orderId) {
