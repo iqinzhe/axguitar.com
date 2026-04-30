@@ -1,4 +1,4 @@
-// store.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
+// store.js - v2.0 (徽章类名更新为统一 .badge 系统)
 
 const StoreManager = {
     stores: [],
@@ -152,7 +152,7 @@ const StoreManager = {
                     '<h3>✏️ ' + (lang === 'id' ? 'Edit Toko' : '编辑门店') + '</h3>' +
                     
                     '<div style="margin-bottom:16px;">' +
-                        '<span class="status-badge ' + statusBadgeClass + '">' + statusText + '</span>' +
+                        '<span class="badge badge-' + statusBadgeClass + '">' + statusText + '</span>' +
                     '</div>' +
                     
                     '<div class="form-group">' +
@@ -498,10 +498,10 @@ const StoreManager = {
                 
                 var storeStatusBadge = '';
                 if (store.is_active === false) {
-                    storeStatusBadge = ' <span class="status-badge liquidated">' + (lang === 'id' ? 'DITUTUP' : '已暂停') + '</span>';
+                    storeStatusBadge = ' <span class="badge badge-liquidated">' + (lang === 'id' ? 'DITUTUP' : '已暂停') + '</span>';
                 }
                 if (isPracticeStore) {
-                    storeStatusBadge += ' <span class="status-badge" style="background:#a78bfa;color:#fff;">' + (lang === 'id' ? 'LATIHAN' : '练习') + '</span>';
+                    storeStatusBadge += ' <span class="badge" style="background:#a78bfa;color:#fff;">' + (lang === 'id' ? 'LATIHAN' : '练习') + '</span>';
                 }
                 
                 storeStatsRows += '<tr>' +
@@ -543,11 +543,15 @@ const StoreManager = {
                     var store = StoreManager.stores[i];
                     var isActive = store.is_active !== false;
                     var isStorePractice = store.is_practice === true;
-                    var statusBadge = isActive 
-                        ? '<span class="status-badge active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
-                        : '<span class="status-badge liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
+                    
+                    var statusBadgeHtml = '';
+                    if (isActive) {
+                        statusBadgeHtml = '<span class="badge badge-active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>';
+                    } else {
+                        statusBadgeHtml = '<span class="badge badge-liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
+                    }
                     if (isStorePractice) {
-                        statusBadge += ' <span class="status-badge" style="background:#a78bfa;color:#fff;">🎓 ' + (lang === 'id' ? 'Latihan' : '练习') + '</span>';
+                        statusBadgeHtml += ' <span class="badge" style="background:#a78bfa;color:#fff;">🎓 ' + (lang === 'id' ? 'Latihan' : '练习') + '</span>';
                     }
                     
                     storeRows += '<tr>' +
@@ -560,14 +564,13 @@ const StoreManager = {
                                    'placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" ' +
                                    'onchange="StoreManager.updateStoreWANumber(\'' + store.id + '\', this.value)">' +
                         '</td>' +
-                        '<td class="text-center">' + statusBadge + '</td>' +
+                        '<td class="text-center">' + statusBadgeHtml + '</td>' +
                     '</tr>';
                     
                     var isPractice = store.is_practice === true;
                     var practiceLabel = isPractice
                         ? (lang === 'id' ? '✅ Mode Latihan (Aktif)' : '✅ 练习模式 (已开启)')
                         : (lang === 'id' ? '🎓 Jadikan Toko Latihan' : '🎓 设为练习门店');
-                    var practiceBtnClass = isPractice ? 'btn-small' : 'btn-small';
                     var practiceBtnStyle = isPractice ? 'style="background:#a78bfa;color:#fff;"' : 'style="background:#ede9fe;color:#6d28d9;"';
                     
                     var actionButtons = '' +
@@ -579,7 +582,7 @@ const StoreManager = {
                         actionButtons += '<button onclick="StoreManager.resumeStore(\'' + store.id + '\')" class="btn-small success">▶️ ' + (lang === 'id' ? 'Buka Kembali' : '恢复营业') + '</button>';
                     }
                     
-                    actionButtons += '<button onclick="StoreManager.togglePracticeMode(\'' + store.id + '\', ' + isPractice + ')" class="' + practiceBtnClass + '" ' + practiceBtnStyle + '>' + practiceLabel + '</button>';
+                    actionButtons += '<button onclick="StoreManager.togglePracticeMode(\'' + store.id + '\', ' + isPractice + ')" class="btn-small" ' + practiceBtnStyle + '>' + practiceLabel + '</button>';
                     actionButtons += '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
                     
                     storeRows += '<tr class="action-row">' +
