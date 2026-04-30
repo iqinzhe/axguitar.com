@@ -1,5 +1,5 @@
-// app.js - 主入口文件 (v1.1)
-// 修复：问题1 - 迁移内联三元到 t() 体系，删除与 app-dashboard-core.js 重复的冗余代码
+// app.js - 主入口文件 (v1.2)
+// 修复：仪表盘卡片功能错误 - 银行卡图标应跳转到 paymentHistory
 
 window.APP = window.APP || {};
 
@@ -40,7 +40,6 @@ APP.toggleLanguage = function() {
     Utils.setLanguage(newLang);
     Utils.forceSyncLanguage();
     if (APP.isLoggedIn && APP.isLoggedIn()) {
-        // 委托给 DashboardCore 的 refreshCurrentPage
         if (typeof window.DashboardCore !== 'undefined' && DashboardCore.refreshCurrentPage) {
             DashboardCore.refreshCurrentPage();
         } else if (APP.currentPage === 'dashboard') {
@@ -70,7 +69,6 @@ APP.navigateTo = function(page, params) {
         DashboardCore.navigateTo(page, params);
         return;
     }
-    // 降级方案（DashboardCore 未加载时）
     console.log('[APP] navigateTo (fallback):', page, params);
     if (params) {
         if (params.orderId) APP.currentOrderId = params.orderId;
@@ -170,7 +168,6 @@ APP.showLogin = function() {
             '</div>' +
         '</div>';
     
-    // 绑定回车键
     var passwordInput = document.getElementById('loginPassword');
     if (passwordInput) {
         passwordInput.addEventListener('keypress', function(e) {
@@ -180,7 +177,6 @@ APP.showLogin = function() {
         });
     }
     
-    // 恢复记住的用户名
     if (AUTH.isRememberMe && AUTH.isRememberMe()) {
         var rememberedUser = localStorage.getItem('jf_remembered_user');
         if (rememberedUser) {
@@ -224,7 +220,6 @@ APP.login = async function() {
             
             Utils.toast.success(lang === 'id' ? '✅ Login berhasil' : '✅ 登录成功');
             
-            // 委托给 DashboardCore.init 处理页面路由
             if (typeof window.DashboardCore !== 'undefined' && DashboardCore.router) {
                 await DashboardCore.router();
             } else {
@@ -256,12 +251,10 @@ APP.logout = async function() {
 
 // 渲染仪表盘
 APP.renderDashboard = async function() {
-    // 委托给 DashboardCore
     if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
         return await DashboardCore.renderDashboard();
     }
     
-    // 降级方案：简单仪表盘
     APP.currentPage = 'dashboard';
     APP.saveCurrentPageState();
     
@@ -300,8 +293,10 @@ APP.renderDashboard = async function() {
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'orderTable\')"><div class="card-icon">📋</div><div class="card-title">' + t('order_list') + '</div><div class="card-desc">' + t('manage_orders') + '</div></div>' +
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'customers\')"><div class="card-icon">👥</div><div class="card-title">' + t('customers') + '</div><div class="card-desc">' + t('manage_customers') + '</div></div>' +
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'expenses\')"><div class="card-icon">📝</div><div class="card-title">' + t('expenses') + '</div><div class="card-desc">' + t('manage_expenses') + '</div></div>' +
+                    // 修复：银行卡卡片应跳转到 paymentHistory 页面
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'paymentHistory\')"><div class="card-icon">💰</div><div class="card-title">' + t('payment_history') + '</div><div class="card-desc">' + t('view_cashflow') + '</div></div>' +
-                    '<div class="dashboard-card" onclick="APP.showCapitalModal()"><div class="card-icon">🏦</div><div class="card-title">' + t('payment_history') + '</div><div class="card-desc">' + t('view_transactions') + '</div></div>' +
+                    // 删除重复的银行卡卡片，添加资金流水查看
+                    '<div class="dashboard-card" onclick="APP.showCashFlowPage()"><div class="card-icon">🏦</div><div class="card-title">' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</div><div class="card-desc">' + t('view_transactions') + '</div></div>' +
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'anomaly\')"><div class="card-icon">⚠️</div><div class="card-title">' + t('anomaly_title') + '</div><div class="card-desc">' + t('abnormal_status') + '</div></div>';
         
         if (isAdmin) {
