@@ -1,8 +1,9 @@
-// app-payments.js - v2.1
+// app-payments.js - v2.2
 // 修复：问题5 - 利息收款双路径安全加固
 //   - 统一使用 app-payments.js 的安全路径（防重锁+幂等检查+补偿事务）
 //   - 标记 supabase.js 的 recordInterestPayment() 为内部使用（需经过本层安全检查）
 //   - payFixedInstallment() 本金负数保护
+//   - 修复：earlySettleFixedOrder 中的 confirm 改为异步 Utils.toast.confirm
 
 window.APP = window.APP || {};
 
@@ -20,8 +21,6 @@ window.APP._releasePaymentLock = function(lockKey) {
 };
 
 // ========== 幂等性检查：防止重复处理同一笔交易 ==========
-// 注意：supabase.js 的 recordInterestPayment() 现在也有自己的幂等检查，
-// 但 UI 层仍然保留双重防护以避免任何绕过
 window.APP._checkIdempotency = async function(orderId, type, amount, paymentMethod) {
     try {
         const client = SUPABASE.getClient();
@@ -214,7 +213,6 @@ const PaymentsModule = {
             return;
         }
 
-        // 管理员禁止操作订单
         if (profile.role === 'admin') {
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
@@ -292,7 +290,6 @@ const PaymentsModule = {
             var serviceFeePaid = order.service_fee_paid || 0;
             var isServiceFeePaid = serviceFeePaid >= serviceFeeAmount;
 
-            // ========== 利息历史行 ==========
             var interestRows = '';
             if (interestPayments.length === 0) {
                 interestRows = '<tr><td colspan="5" class="text-center text-muted">' + t('no_data') + '</td>';
@@ -311,7 +308,6 @@ const PaymentsModule = {
                 }
             }
 
-            // ========== 本金历史行 ==========
             var principalRows = '';
             var cumulativePaid = 0;
             if (principalPayments.length === 0) {
@@ -340,7 +336,6 @@ const PaymentsModule = {
 
             var nextInterestNumber = interestPayments.length + 1;
 
-            // ========== 固定还款板块 ==========
             var fixedRepaymentHtml = '';
             if (order.repayment_type === 'fixed') {
                 var paidMonths = order.fixed_paid_months || 0;
@@ -412,7 +407,6 @@ const PaymentsModule = {
                     '</div>';
             }
 
-            // ========== 灵活还款板块 ==========
             var flexibleRepaymentHtml = '';
             if (order.repayment_type !== 'fixed') {
                 flexibleRepaymentHtml = '' +
@@ -488,7 +482,7 @@ const PaymentsModule = {
                                     '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + t('payment_amount') + '</th><th class="col-amount amount">' + t('total') + ' ' + t('principal_paid') + '</th><th class="col-amount amount">' + t('remaining_principal') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
-                                    '</table>' +
+                                    '</tr>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -506,7 +500,6 @@ const PaymentsModule = {
                 ? Utils.formatCurrency(serviceFeeAmount) + ' (' + (methodMap[serviceFeePayment.payment_method] || '-') + ' / ' + Utils.formatDate(serviceFeePayment.date) + ')'
                 : (serviceFeePaid > 0 ? Utils.formatCurrency(serviceFeePaid) + '/' + Utils.formatCurrency(serviceFeeAmount) : (lang === 'id' ? 'Belum dibayar' : '未缴'));
 
-            // ========== 组装页面 ==========
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
                     '<h2>💰 ' + t('payment_page') + '</h2>' +
@@ -548,17 +541,12 @@ const PaymentsModule = {
     },
 
     // ========== 利息收款（防重锁 + 幂等检查 + 补偿事务） ==========
-    // 问题5说明：supabase.js 的 recordInterestPayment() 已经增加了等效的安全防护，
-    // 但 UI 层保留双重防护，因为：
-    //   1. 锁机制不一样（UI层的锁在用户操作期间生效，supabase层的锁只在函数执行期间）
-    //   2. 双重防护避免任何可能的绕过
     payInterestWithMethod: async function(orderId) {
         var months = parseInt(document.getElementById("interestMonths").value);
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
         
-        // ===== 第一层防护：UI层防重锁 =====
         if (!window.APP._acquirePaymentLock(orderId + '_interest')) {
             Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
             return;
@@ -578,7 +566,6 @@ const PaymentsModule = {
             var monthlyInterest = remainingPrincipal * monthlyRate;
             var totalInterest = monthlyInterest * months;
             
-            // ===== 第二层防护：幂等检查 =====
             var isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', totalInterest, method);
             if (isDuplicate) {
                 Utils.toast.warning(lang === 'id' 
@@ -591,7 +578,6 @@ const PaymentsModule = {
             var nextInterestNumber = (order.interest_paid_months || 0) + 1;
             var endNumber = nextInterestNumber + months - 1;
             
-            // 预览确认
             var previewMsg = lang === 'id'
                 ? '📋 Konfirmasi Pembayaran Bunga\n' +
                   'Pesanan: ' + order.order_id + '\n' +
@@ -617,9 +603,6 @@ const PaymentsModule = {
             var confirmed = await Utils.toast.confirm(previewMsg);
             if (!confirmed) return;
             
-            // ===== 第三层防护：调用 supabase.js 的安全版本 =====
-            // 注意：supabase.js 的 recordInterestPayment() 也有自己的防重锁和幂等检查，
-            // 此处调用会形成双重防护
             try {
                 await SUPABASE.recordInterestPayment(orderId, months, method);
                 
@@ -752,7 +735,6 @@ const PaymentsModule = {
     },
 
     // ========== 固定还款 ==========
-    // 问题5说明：调用 supabase.js 的 recordFixedPayment()，该函数已在问题3修复中增加了本金负数保护
     payFixedInstallment: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
@@ -779,7 +761,6 @@ const PaymentsModule = {
                 return;
             }
             
-            // 调用 supabase.js 的安全版本（已含本金负数保护）
             await SUPABASE.recordFixedPayment(orderId, method);
             
             if (window.Audit) {
@@ -799,7 +780,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 提前结清 ==========
+    // ========== 提前结清（修复：将 confirm 改为异步 Utils.toast.confirm） ==========
     earlySettleFixedOrder: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
