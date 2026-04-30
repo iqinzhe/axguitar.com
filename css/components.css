@@ -371,8 +371,10 @@
 
 
 /* ============================================================
-   C7-C10. 统一的徽章系统（合并为一套 Base）
+   C7. 统一徽章系统（所有徽章合并为一个基础类 + 修饰符）
    ============================================================ */
+
+/* --- 基础徽章：所有徽章共用 --- */
 .badge {
     display: inline-block;
     padding: 2px 10px;
@@ -383,19 +385,10 @@
     line-height: 1.6;
 }
 
-/* 语义颜色修饰符 */
-.badge-active     { background: #dcfce7; color: #16a34a; }
-.badge-completed  { background: #dbeafe; color: #2563eb; }
-.badge-liquidated { background: #fee2e2; color: #dc2626; }
-.badge-fixed      { background: #d1fae5; color: #065f46; }
-.badge-flexible   { background: #fed7aa; color: #9a3412; }
-.badge-cash       { background: #fef3c7; color: #92400e; }
-.badge-bank       { background: #e0f2fe; color: #0369a1; }
-.badge-locked     { background: #f1f5f9; color: #64748b; }
-.badge-reconciled { background: #ecfdf5; color: #065f46; }
-
-/* 保留旧类名（指向统一样式）*/
-.status-badge {
+/* --- 向后兼容别名（指向同一基础类）--- */
+.status-badge,
+.repayment-badge,
+.payment-method-badge {
     display: inline-block;
     padding: 2px 10px;
     border-radius: var(--radius-sm);
@@ -404,32 +397,53 @@
     white-space: nowrap;
     line-height: 1.6;
 }
-.status-badge.active     { background: #dcfce7; color: #16a34a; }
-.status-badge.completed  { background: #dbeafe; color: #2563eb; }
-.status-badge.liquidated { background: #fee2e2; color: #dc2626; }
 
-.repayment-badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-xs);
-    font-weight: 600;
-    white-space: nowrap;
+/* --- 状态徽章颜色 --- */
+.badge-active,
+.status-badge.active {
+    background: #dcfce7;
+    color: #16a34a;
 }
-.repayment-badge.fixed    { background: #d1fae5; color: #065f46; }
-.repayment-badge.flexible { background: #fed7aa; color: #9a3412; }
 
-.payment-method-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-xs);
-    font-weight: 600;
-    white-space: nowrap;
+.badge-completed,
+.status-badge.completed {
+    background: #dbeafe;
+    color: #2563eb;
 }
-.payment-method-badge.cash { background: #fef3c7; color: #92400e; }
-.payment-method-badge.bank { background: #e0f2fe; color: #0369a1; }
 
+.badge-liquidated,
+.status-badge.liquidated {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* --- 还款方式徽章颜色 --- */
+.badge-repayment-fixed,
+.repayment-badge.fixed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge-repayment-flexible,
+.repayment-badge.flexible {
+    background: #fed7aa;
+    color: #9a3412;
+}
+
+/* --- 支付方式徽章颜色 --- */
+.badge-method-cash,
+.payment-method-badge.cash {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-method-bank,
+.payment-method-badge.bank {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+/* --- 锁定徽章 --- */
 .locked-badge {
     display: inline-block;
     padding: 4px 12px;
@@ -441,6 +455,7 @@
     white-space: nowrap;
 }
 
+/* --- 已平账徽章 --- */
 .reconciled-badge {
     display: inline-block;
     padding: 4px 12px;
@@ -454,7 +469,7 @@
 
 
 /* ============================================================
-   C11. 空状态
+   C8. 空状态
    ============================================================ */
 .empty-state {
     display: flex;
@@ -477,7 +492,7 @@
 
 
 /* ============================================================
-   C12. 进度条
+   C9. 进度条
    ============================================================ */
 .progress-bar {
     width: 100%;
@@ -495,7 +510,7 @@
 
 
 /* ============================================================
-   C13. 逾期警告条
+   C10. 逾期警告条
    ============================================================ */
 .overdue-warning {
     padding: var(--spacing-2) var(--spacing-3);
@@ -593,7 +608,7 @@
 
 
 /* ============================================================
-   C14. 订单统计（客户详情弹窗）
+   C11. 订单统计（客户详情弹窗）
    ============================================================ */
 .order-stats {
     display: flex;
