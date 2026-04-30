@@ -1,4 +1,4 @@
-// utils.js - v1.0
+// utils.js - v1.1 (修复时区Bug：统一使用印尼UTC+7时间)
 
 window.Utils = window.Utils || {};
 
@@ -10,12 +10,11 @@ window.Utils = window.Utils || {};
         var stored = localStorage.getItem('jf_lang');
         if (stored === 'id' || stored === 'zh') return stored;
         
-        // 降级：检测浏览器语言
         try {
             var browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
             if (browserLang.startsWith('id')) return 'id';
         } catch(e) {}
-        return 'zh';  // 默认中文
+        return 'zh';
     };
     
     var _lang = getInitialLang();
@@ -23,43 +22,144 @@ window.Utils = window.Utils || {};
     var _listeners = {};
 
     // ==================== 常量 ====================
-    Utils.DEFAULT_AGREED_INTEREST_RATE = 0.08;  // 8%
+    Utils.DEFAULT_AGREED_INTEREST_RATE = 0.08;
     Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = 8;
     Utils.DEFAULT_MAX_EXTENSION_MONTHS = 10;
     Utils.CURRENCY_SYMBOL = 'Rp';
-    Utils.ADMIN_FEE_RATE = 0.02;  // 2%
+    Utils.ADMIN_FEE_RATE = 0.02;
+    Utils.JAKARTA_UTC_OFFSET = 7 * 60; // UTC+7 偏移量（分钟）
 
-    // ==================== Toast 快捷方法（统一入口） ====================
+    // ==================== 核心：获取印尼雅加达时间（UTC+7） ====================
+    // 修复前：直接使用 new Date() 取本地时间，导致 UTC+8 地区 0:00-1:00 差一天
+    // 修复后：统一计算 UTC+7 时间，确保印尼服务器/用户在任何时区都得到正确的"今天"
+    
+    Utils._getJakartaDate = function() {
+        var now = new Date();
+        // 获取 UTC 时间戳，加上 7 小时偏移得到雅加达时间
+        var utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+        var jakartaMs = utcMs + (7 * 3600000); // UTC+7
+        return new Date(jakartaMs);
+    };
+
+    // 获取雅加达今天的日期字符串 YYYY-MM-DD
+    Utils.getLocalToday = function() {
+        var d = Utils._getJakartaDate();
+        var year = d.getUTCFullYear();
+        var month = String(d.getUTCMonth() + 1).padStart(2, '0');
+        var day = String(d.getUTCDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    };
+
+    // 获取雅加达当前日期时间字符串 YYYY-MM-DDTHH:mm:ss.000+07:00
+    Utils.getLocalDateTime = function() {
+        var d = Utils._getJakartaDate();
+        var year = d.getUTCFullYear();
+        var month = String(d.getUTCMonth() + 1).padStart(2, '0');
+        var day = String(d.getUTCDate()).padStart(2, '0');
+        var hours = String(d.getUTCHours()).padStart(2, '0');
+        var minutes = String(d.getUTCMinutes()).padStart(2, '0');
+        var seconds = String(d.getUTCSeconds()).padStart(2, '0');
+        return year + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds + '.000+07:00';
+    };
+
+    // 将任意日期输入转换为雅加达日期字符串 YYYY-MM-DD
+    Utils.toLocalDate = function(dateInput) {
+        if (!dateInput) return Utils.getLocalToday();
+        
+        var date;
+        if (typeof dateInput === 'string') {
+            if (dateInput.includes('T')) {
+                var parts = dateInput.split('T')[0].split('-');
+                if (parts.length === 3) {
+                    return parts[0] + '-' + parts[1] + '-' + parts[2];
+                }
+            }
+            date = new Date(dateInput);
+        } else {
+            date = dateInput;
+        }
+        
+        if (isNaN(date.getTime())) {
+            console.warn('Utils.toLocalDate: 无效日期', dateInput);
+            return Utils.getLocalToday();
+        }
+        
+        // 转换为雅加达时间再取日期
+        var utcMs = date.getTime() + (date.getTimezoneOffset() * 60000);
+        var jakartaMs = utcMs + (7 * 3600000);
+        var jakartaDate = new Date(jakartaMs);
+        
+        var year = jakartaDate.getUTCFullYear();
+        var month = String(jakartaDate.getUTCMonth() + 1).padStart(2, '0');
+        var day = String(jakartaDate.getUTCDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+    };
+
+    // 格式化日期为显示字符串
+    Utils.formatDate = function(dateStr) {
+        if (!dateStr) return '-';
+        
+        var localDate = Utils.toLocalDate(dateStr);
+        if (localDate === '-') return '-';
+        
+        var parts = localDate.split('-');
+        if (parts.length !== 3) return dateStr;
+        
+        var year = parts[0];
+        var month = parts[1];
+        var day = parts[2];
+        
+        if (Utils.lang === 'id') {
+            return day + '/' + month + '/' + year;
+        }
+        return year + '-' + month + '-' + day;
+    };
+
+    // 计算下一个到期日（基于雅加达时间）
+    Utils.calculateNextDueDate = function(startDate, paidMonths) {
+        var start = startDate || Utils.getLocalToday();
+        
+        var parts = start.split('-');
+        if (parts.length !== 3) {
+            start = Utils.getLocalToday();
+            parts = start.split('-');
+        }
+        
+        // 使用 UTC 方法避免本地时区干扰，手动加月份
+        var year = parseInt(parts[0], 10);
+        var month = parseInt(parts[1], 10) - 1; // JS 月份从0开始
+        var day = parseInt(parts[2], 10);
+        
+        // 目标月份 = 当前月份 + 已付月数 + 1（下个月到期）
+        var totalMonths = month + paidMonths + 1;
+        var newYear = year + Math.floor(totalMonths / 12);
+        var newMonth = totalMonths % 12;
+        
+        // 处理月末日期边界（如1月31日 + 1个月 = 2月28/29日）
+        var daysInNewMonth = new Date(Date.UTC(newYear, newMonth + 1, 0)).getUTCDate();
+        var newDay = Math.min(day, daysInNewMonth);
+        
+        var resultYear = newYear;
+        var resultMonth = String(newMonth + 1).padStart(2, '0');
+        var resultDay = String(newDay).padStart(2, '0');
+        
+        return resultYear + '-' + resultMonth + '-' + resultDay;
+    };
+
+    // ==================== Toast 快捷方法 ====================
     Utils.toast = {
         success: function(msg, duration) {
-            if (window.Toast) {
-                window.Toast.success(msg, duration);
-            } else {
-                alert(msg);
-            }
+            if (window.Toast) { window.Toast.success(msg, duration); } else { alert(msg); }
         },
         error: function(msg, duration) {
-            if (window.Toast) {
-                window.Toast.error(msg, duration);
-            } else {
-                alert(msg);
-            }
+            if (window.Toast) { window.Toast.error(msg, duration); } else { alert(msg); }
         },
         warning: function(msg, duration) {
-            if (window.Toast) {
-                window.Toast.warning(msg, duration);
-            } else {
-                alert(msg);
-            }
+            if (window.Toast) { window.Toast.warning(msg, duration); } else { alert(msg); }
         },
         info: function(msg, duration) {
-            if (window.Toast) {
-                window.Toast.info(msg, duration);
-            } else {
-                alert(msg);
-            }
+            if (window.Toast) { window.Toast.info(msg, duration); } else { alert(msg); }
         },
-        // 统一确认框方法（简化调用，无需 fallback）
         confirm: async function(msg, title) {
             if (window.Toast && window.Toast.confirmPromise) {
                 return await window.Toast.confirmPromise(msg, title);
@@ -69,7 +169,6 @@ window.Utils = window.Utils || {};
         }
     };
 
-    // 快捷导出，方便直接调用
     Utils.confirm = Utils.toast.confirm;
 
     // ==================== 语言管理 ====================
@@ -79,7 +178,6 @@ window.Utils = window.Utils || {};
         configurable: false
     });
 
-    // 强制同步语言（用于页面初始化后确保语言正确）
     Utils.forceSyncLanguage = function() {
         var newLang = localStorage.getItem('jf_lang');
         if (newLang === 'id' || newLang === 'zh') {
@@ -90,8 +188,10 @@ window.Utils = window.Utils || {};
 
     Utils.initLanguage = function() {
         _lang = getInitialLang();
+        // 翻译字典 — 统一使用 t('key') 的单一真相来源
         _translations = {
             'id': {
+                // ===== 通用 =====
                 'login': 'Masuk',
                 'password': 'Kata Sandi',
                 'login_required': 'Silakan login terlebih dahulu',
@@ -159,8 +259,8 @@ window.Utils = window.Utils || {};
                 'payment_history': 'Arus Kas',
                 'fund_management': 'Manajemen Dana',
                 'internal_transfer': 'Transfer Internal',
-                'cash_to_bank': 'Brankas→→🏧 Bank BNI',
-                'bank_to_cash': '🏧 Bank BNI→→🏦Brankas',
+                'cash_to_bank': 'Brankas→🏧 Bank BNI',
+                'bank_to_cash': '🏧 Bank BNI→🏦Brankas',
                 'submit_to_hq': 'Setor ke Pusat',
                 'cash': 'Kas',
                 'bank': 'Bank',
@@ -188,9 +288,169 @@ window.Utils = window.Utils || {};
                 'operation': 'Pusat Manajemen',
                 'filter': 'Filter',
                 'reset': 'Reset',
-                'all': 'Semua'
+                'all': 'Semua',
+                'close': 'Tutup',
+                'detail': 'Detail',
+                'total': 'Total',
+                'month': 'bulan',
+                'months': 'bulan',
+                'payment_method': 'Metode Pembayaran',
+                // ===== 异常页面 (问题1补充) =====
+                'anomaly_title': 'Situasi Abnormal',
+                'overdue_30_days': 'Pesanan Terlambat 30+ Hari',
+                'blacklist_title': 'Daftar Hitam Nasabah',
+                'all_good': 'Semua pesanan dalam keadaan baik',
+                'no_blacklist': 'Tidak ada nasabah di blacklist',
+                'load_more': 'Muat Lebih Banyak',
+                'remaining': 'tersisa',
+                'all_loaded': 'Semua {count} pesanan telah dimuat',
+                'enter_liquidation': 'Pesanan ini akan memasuki proses likuidasi',
+                'overdue_days': 'Hari Terlambat',
+                'blacklist_reason': 'Alasan',
+                'blacklist_date': 'Tanggal Blacklist',
+                'remove_blacklist': 'Hapus dari Blacklist',
+                'blacklist_info': 'Nasabah yang di-blacklist tidak dapat membuat pesanan baru. Hanya administrator yang dapat menghapus dari daftar hitam.',
+                'best_performance': 'Kinerja Terbaik Bulan Ini (3 Besar)',
+                'worst_performance': 'Kinerja Terendah Bulan Ini (3 Besar)',
+                'no_store_data': 'Belum ada data toko bulan ini',
+                'ranking_based_on': 'Peringkat berdasarkan data bulan ini',
+                // ===== 客户页面补充 =====
+                'customer_id': 'ID Nasabah',
+                'occupation': 'Pekerjaan',
+                'add_customer': 'Tambah Nasabah Baru',
+                'save_customer': 'Simpan Nasabah',
+                'ktp_address': 'Alamat KTP',
+                'living_address': 'Alamat Tinggal',
+                'same_as_ktp': 'Sama dengan KTP',
+                'different_from_ktp': 'Berbeda (isi manual)',
+                'customer_detail': 'Detail Nasabah',
+                'registered_date': 'Tanggal Daftar',
+                'order_stats': 'Statistik Pesanan',
+                'active_orders': 'Berjalan',
+                'completed_orders': 'Lunas',
+                'abnormal_orders': 'Abnormal',
+                'blacklist_customer': 'Blacklist',
+                'unblacklist_customer': 'Buka Blacklist',
+                'edit_customer': 'Edit Nasabah',
+                'customer_orders': 'Order Nasabah',
+                'create_order_for': 'Buat Pesanan',
+                // ===== 订单页面补充 =====
+                'collateral_note': 'Keterangan Barang',
+                'loan_source': 'Sumber Dana',
+                'fee_details': 'Rincian Biaya',
+                'admin_fee_auto': 'Dihitung otomatis',
+                'service_fee_auto': 'Dihitung otomatis berdasarkan jumlah gadai',
+                'fee_payment_method': 'Metode Pemasukan',
+                'fee_payment_hint': 'Admin Fee & Service Fee akan dicatat bersama',
+                'interest_rate_select': 'Suku Bunga (Pilih)',
+                'repayment_method': 'Metode Cicilan',
+                'flexible_desc': 'Bayar bunga dulu, pokok bisa kapan saja',
+                'fixed_desc': 'Angsuran tetap per bulan (bunga + pokok)',
+                'max_tenor': 'Maksimal 10 bulan',
+                'max_extension': 'Maksimal Perpanjangan',
+                'extension_limit': 'Batas maksimal perpanjangan bunga sebelum harus lunasi pokok',
+                'term_months': 'Jangka Waktu',
+                'monthly_payment_rounded': 'Dibulatkan ke Rp 10.000, bisa disesuaikan',
+                // ===== 黑名单页面补充 =====
+                'blacklist_page_title': 'Daftar Hitam Nasabah',
+                'blacklist_list_title': 'Daftar Nasabah Blacklist',
+                // ===== 仪表盘补充 =====
+                'dashboard_title': 'Dashboard',
+                'welcome': 'Selamat datang',
+                'net_profit': 'Laba Bersih',
+                'manage_orders': 'Kelola semua pesanan',
+                'manage_customers': 'Data nasabah',
+                'manage_expenses': 'Pengeluaran operasional',
+                'view_cashflow': 'Riwayat arus kas',
+                'view_transactions': 'Lihat transaksi kas',
+                'abnormal_status': 'Pesanan terlambat & blacklist',
+                'manage_users': 'Kelola pengguna',
+                'manage_stores': 'Kelola toko',
+                'backup_restore_data': 'Cadangkan & pulihkan',
+                'manage_blacklist': 'Kelola blacklist',
+                'view_blacklist': 'Lihat blacklist',
+                // ===== 支出页面补充 =====
+                'total_expenses': 'Total Pengeluaran',
+                'expense_list': 'Daftar Pengeluaran',
+                'add_expense': 'Tambah Pengeluaran Baru',
+                'save_expense': 'Simpan Pengeluaran',
+                'expense_category': 'Kategori / Penyebab',
+                'select_category': 'Pilih kategori',
+                'expense_method': 'Metode Pembayaran',
+                'expense_desc': 'Deskripsi',
+                'expense_note': 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.',
+                'reconciled': 'Direkonsiliasi',
+                'reconcile': 'Rekonsiliasi',
+                'locked': 'Terkunci',
+                // ===== 支付页面补充 =====
+                'pay_fee': 'Bayar Biaya',
+                'payment_page': 'Pembayaran',
+                'interest_payment_num': 'Ini adalah pembayaran bunga ke-',
+                'times': 'kali',
+                'amount_due': 'Jumlah yang harus dibayar',
+                'take_months': 'Ambil',
+                'confirm_payment': 'Konfirmasi Pembayaran',
+                'interest_history': 'Riwayat Pembayaran Bunga',
+                'principal_history': 'Riwayat Pengembalian Pokok',
+                'principal_paid': 'Pokok Dibayar',
+                'remaining_principal': 'Sisa Pokok',
+                'payment_amount': 'Jumlah Pembayaran',
+                'recording_method': 'Metode Pencatatan',
+                'pay_this_month': 'Bayar Angsuran Bulan Ini',
+                'progress': 'Progress',
+                'this_month': 'Bulan ini',
+                'overdue_warning_days': 'Terlambat {days} hari',
+                'enter_liquidation_warning': 'Akan memasuki proses likuidasi!',
+                'each_installment_includes': 'Setiap angsuran mencakup bunga dan pokok. Pelunasan dipercepat dapat mengurangi sisa bunga.',
+                'tip_pay_on_time': 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pembayaran pokok lebih awal dapat mengurangi beban bunga. Setelah lunas, sistem akan membuat tanda terima pelunasan secara otomatis.',
+                'settlement_receipt': 'Tanda Terima Pelunasan',
+                'print_receipt_confirm': 'Cetak tanda terima pelunasan?',
+                // ===== 用户管理补充 =====
+                'user_list': 'Daftar Peran',
+                'add_user': 'Tambah Peran Baru',
+                'login_account': 'Akun Login (Email)',
+                'full_name': 'Nama Lengkap',
+                'identity_info': 'Informasi Identitas',
+                'role': 'Role',
+                'current_user': 'Pengguna saat ini',
+                'reset_password': 'Reset Password',
+                'select_store': 'Pilih toko',
+                'unknown_store': 'Toko tidak diketahui',
+                'headquarters': 'Kantor Pusat',
+                // ===== 门店管理补充 =====
+                'store_list': 'Daftar Toko',
+                'add_store': 'Tambah Toko Baru',
+                'store_code': 'Kode Toko',
+                'store_name': 'Nama Toko',
+                'store_address': 'Alamat',
+                'store_phone': 'Telepon',
+                'store_wa': 'Nomor WhatsApp',
+                'store_status': 'Status',
+                'suspend_store': 'Tutup Sementara',
+                'resume_store': 'Buka Kembali',
+                'practice_mode': 'Toko Latihan',
+                'set_practice': 'Jadikan Toko Latihan',
+                'practice_active': 'Mode Latihan (Aktif)',
+                'store_summary': 'Ringkasan Keuangan Toko',
+                'cashflow_summary': 'Ringkasan Arus Kas',
+                'total_all_stores': 'Total Semua Toko',
+                // ===== 备份恢复补充 =====
+                'backup_data': 'Cadangkan Data',
+                'backup_now': 'Cadangkan Sekarang',
+                'restore_data': 'Pemulihan Data',
+                'restore_now': 'Pulihkan Data',
+                'audit_log': 'Log Audit',
+                'view_audit': 'Lihat Log Audit',
+                'export_orders': 'Ekspor Pesanan',
+                'export_payments': 'Ekspor Pembayaran',
+                'export_customers': 'Ekspor Nasabah',
+                'export_cashflow': 'Ekspor Arus Kas',
+                'export_expenses': 'Ekspor Pengeluaran',
+                'select_backup_file': 'Pilih File Cadangan',
+                'no_file_selected': 'Tidak ada file dipilih',
             },
             'zh': {
+                // ===== 通用 =====
                 'login': '登录',
                 'password': '密码',
                 'login_required': '请先登录',
@@ -258,8 +518,8 @@ window.Utils = window.Utils || {};
                 'payment_history': '资金流水',
                 'fund_management': '资金管理',
                 'internal_transfer': '内部转账',
-                'cash_to_bank': '保险柜→→🏧 银行BNI',
-                'bank_to_cash': '🏧 银行BNI→→🏦保险柜',
+                'cash_to_bank': '保险柜→🏧 银行BNI',
+                'bank_to_cash': '🏧 银行BNI→🏦保险柜',
                 'submit_to_hq': '上缴总部',
                 'cash': '现金',
                 'bank': '银行',
@@ -287,7 +547,166 @@ window.Utils = window.Utils || {};
                 'operation': '管理中心',
                 'filter': '筛选',
                 'reset': '重置',
-                'all': '全部'
+                'all': '全部',
+                'close': '关闭',
+                'detail': '详情',
+                'total': '总计',
+                'month': '个月',
+                'months': '个月',
+                'payment_method': '支付方式',
+                // ===== 异常页面补充 =====
+                'anomaly_title': '异常状况',
+                'overdue_30_days': '逾期30天以上订单',
+                'blacklist_title': '客户黑名单',
+                'all_good': '所有订单状态良好',
+                'no_blacklist': '暂无黑名单客户',
+                'load_more': '加载更多',
+                'remaining': '剩余',
+                'all_loaded': '已加载全部 {count} 条订单',
+                'enter_liquidation': '这些订单即将进入变卖程序',
+                'overdue_days': '逾期天数',
+                'blacklist_reason': '原因',
+                'blacklist_date': '拉黑日期',
+                'remove_blacklist': '解除黑名单',
+                'blacklist_info': '被拉黑的客户无法创建新订单。只有管理员可以解除黑名单。',
+                'best_performance': '本月业绩前三排行',
+                'worst_performance': '本月业绩后三排行',
+                'no_store_data': '本月暂无门店数据',
+                'ranking_based_on': '排名基于当月数据',
+                // ===== 客户页面补充 =====
+                'customer_id': '客户ID',
+                'occupation': '职业',
+                'add_customer': '新增客户',
+                'save_customer': '保存客户',
+                'ktp_address': 'KTP地址',
+                'living_address': '居住地址',
+                'same_as_ktp': '同上KTP',
+                'different_from_ktp': '不同（手动填写）',
+                'customer_detail': '客户详情',
+                'registered_date': '注册日期',
+                'order_stats': '订单统计',
+                'active_orders': '进行中',
+                'completed_orders': '已结清',
+                'abnormal_orders': '异常订单',
+                'blacklist_customer': '拉黑',
+                'unblacklist_customer': '解除拉黑',
+                'edit_customer': '编辑客户',
+                'customer_orders': '客户订单',
+                'create_order_for': '创建订单',
+                // ===== 订单页面补充 =====
+                'collateral_note': '物品备注',
+                'loan_source': '资金来源',
+                'fee_details': '费用明细',
+                'admin_fee_auto': '自动计算',
+                'service_fee_auto': '根据当金金额自动计算',
+                'fee_payment_method': '入账方式',
+                'fee_payment_hint': '管理费和服务费将一起入账',
+                'interest_rate_select': '利率（可选）',
+                'repayment_method': '还款方式',
+                'flexible_desc': '先付利息，本金随时可还',
+                'fixed_desc': '每月固定还款（本金+利息）',
+                'max_tenor': '最长10个月',
+                'max_extension': '最大展期',
+                'extension_limit': '利息延期上限，超出后须结清本金',
+                'term_months': '还款期限',
+                'monthly_payment_rounded': '取整到Rp 10,000，可手动调整',
+                // ===== 黑名单页面补充 =====
+                'blacklist_page_title': '客户黑名单',
+                'blacklist_list_title': '黑名单客户列表',
+                // ===== 仪表盘补充 =====
+                'dashboard_title': '仪表盘',
+                'welcome': '欢迎',
+                'net_profit': '净利润',
+                'manage_orders': '管理所有订单',
+                'manage_customers': '客户信息管理',
+                'manage_expenses': '运营支出管理',
+                'view_cashflow': '资金流水记录',
+                'view_transactions': '查看现金交易记录',
+                'abnormal_status': '逾期订单和黑名单',
+                'manage_users': '用户管理',
+                'manage_stores': '门店管理',
+                'backup_restore_data': '备份与恢复',
+                'manage_blacklist': '黑名单管理',
+                'view_blacklist': '查看黑名单',
+                // ===== 支出页面补充 =====
+                'total_expenses': '支出总额',
+                'expense_list': '支出列表',
+                'add_expense': '新增运营支出',
+                'save_expense': '保存支出',
+                'expense_category': '类别/原因',
+                'select_category': '选择类别',
+                'expense_method': '支付方式',
+                'expense_desc': '描述',
+                'expense_note': '支出将记录为从保险柜或银行流出的资金（流出）。',
+                'reconciled': '已平账',
+                'reconcile': '平账',
+                'locked': '已锁定',
+                // ===== 支付页面补充 =====
+                'pay_fee': '缴纳费用',
+                'payment_page': '缴费',
+                'interest_payment_num': '本次是第 ',
+                'times': '次利息支付',
+                'amount_due': '应付金额',
+                'take_months': '收取',
+                'confirm_payment': '确认收款',
+                'interest_history': '利息缴费历史',
+                'principal_history': '本金返还历史',
+                'principal_paid': '已还本金',
+                'remaining_principal': '剩余本金',
+                'payment_amount': '还款金额',
+                'recording_method': '入账方式',
+                'pay_this_month': '支付本月还款',
+                'progress': '进度',
+                'this_month': '本月新增',
+                'overdue_warning_days': '逾期 {days} 天',
+                'enter_liquidation_warning': '将进入变卖程序！',
+                'each_installment_includes': '每期还款包含本金和利息，提前结清可减免剩余利息',
+                'tip_pay_on_time': '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。',
+                'settlement_receipt': '结清凭证',
+                'print_receipt_confirm': '是否打印结清凭证？',
+                // ===== 用户管理补充 =====
+                'user_list': '角色列表',
+                'add_user': '新增角色',
+                'login_account': '登录账户（邮箱）',
+                'full_name': '姓名',
+                'identity_info': '身份信息',
+                'role': '角色',
+                'current_user': '当前用户',
+                'reset_password': '重置密码',
+                'select_store': '选择门店',
+                'unknown_store': '未知门店',
+                'headquarters': '总部',
+                // ===== 门店管理补充 =====
+                'store_list': '门店列表',
+                'add_store': '新增门店',
+                'store_code': '门店编码',
+                'store_name': '门店名称',
+                'store_address': '地址',
+                'store_phone': '电话',
+                'store_wa': 'WhatsApp 号码',
+                'store_status': '状态',
+                'suspend_store': '暂停营业',
+                'resume_store': '恢复营业',
+                'practice_mode': '练习门店',
+                'set_practice': '设为练习门店',
+                'practice_active': '练习模式 (已开启)',
+                'store_summary': '门店财务汇总',
+                'cashflow_summary': '现金流汇总',
+                'total_all_stores': '全部门店合计',
+                // ===== 备份恢复补充 =====
+                'backup_data': '备份数据',
+                'backup_now': '立即备份',
+                'restore_data': '恢复数据',
+                'restore_now': '恢复数据',
+                'audit_log': '审计日志',
+                'view_audit': '查看审计日志',
+                'export_orders': '导出订单',
+                'export_payments': '导出缴费',
+                'export_customers': '导出客户',
+                'export_cashflow': '导出资金流水',
+                'export_expenses': '导出运营支出',
+                'select_backup_file': '选择备份文件',
+                'no_file_selected': '未选择文件',
             }
         };
     };
@@ -339,100 +758,6 @@ window.Utils = window.Utils || {};
         var cleaned = String(str).replace(/[^\d\-]/g, '');
         var num = parseInt(cleaned, 10);
         return isNaN(num) ? 0 : num;
-    };
-
-    // ==================== 时区统一的日期函数（印尼 UTC+7） ====================
-
-    Utils.getLocalToday = function() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    Utils.getLocalDateTime = function() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000+07:00`;
-    };
-
-    Utils.toLocalDate = function(dateInput) {
-        if (!dateInput) return Utils.getLocalToday();
-        
-        let date;
-        if (typeof dateInput === 'string') {
-            if (dateInput.includes('T')) {
-                const parts = dateInput.split('T')[0].split('-');
-                if (parts.length === 3) {
-                    return `${parts[0]}-${parts[1]}-${parts[2]}`;
-                }
-            }
-            date = new Date(dateInput);
-        } else {
-            date = dateInput;
-        }
-        
-        if (isNaN(date.getTime())) {
-            console.warn('Utils.toLocalDate: 无效日期', dateInput);
-            return Utils.getLocalToday();
-        }
-        
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    Utils.formatDate = function(dateStr) {
-        if (!dateStr) return '-';
-        
-        const localDate = Utils.toLocalDate(dateStr);
-        if (localDate === '-') return '-';
-        
-        const parts = localDate.split('-');
-        if (parts.length !== 3) return dateStr;
-        
-        const year = parts[0];
-        const month = parts[1];
-        const day = parts[2];
-        
-        if (Utils.lang === 'id') {
-            return `${day}/${month}/${year}`;
-        }
-        return `${year}-${month}-${day}`;
-    };
-
-    Utils.calculateNextDueDate = function(startDate, paidMonths) {
-        let start = startDate || Utils.getLocalToday();
-        
-        const parts = start.split('-');
-        if (parts.length !== 3) {
-            start = Utils.getLocalToday();
-        }
-        
-        let date = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
-        if (isNaN(date.getTime())) {
-            date = new Date();
-        }
-        
-        const originalDay = date.getUTCDate();
-        date.setUTCMonth(date.getUTCMonth() + paidMonths + 1);
-        
-        if (date.getUTCDate() !== originalDay) {
-            date.setUTCDate(0);
-        }
-        
-        const year = date.getUTCFullYear();
-        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(date.getUTCDate()).padStart(2, '0');
-        
-        return `${year}-${month}-${day}`;
     };
 
     // ==================== 金额格式化绑定到 input ====================
@@ -688,7 +1013,7 @@ window.Utils = window.Utils || {};
         return skeletonHtml;
     };
 
-    // ==================== 网络监控（增强版） ====================
+    // ==================== 网络监控 ====================
     Utils.NetworkMonitor = {
         _initialized: false,
         _isOnline: true,
@@ -752,7 +1077,6 @@ window.Utils = window.Utils || {};
 
         async _checkRealConnectivity() {
             if (!navigator.onLine) return false;
-            
             try {
                 var controller = new AbortController();
                 var timeout = setTimeout(function() { controller.abort(); }, 3000);
@@ -990,6 +1314,5 @@ window.Utils = window.Utils || {};
     Utils.initLanguage();
     Utils.OfflineQueue.init();
 
-    // 导出到 window 确保可用
     window.Utils = Utils;
 })();
