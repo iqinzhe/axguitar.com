@@ -1,4 +1,4 @@
-// app-customers.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
+// app-customers.js - v2.0 (徽章类名更新为统一 .badge 系统)
 
 window.APP = window.APP || {};
 
@@ -1242,8 +1242,8 @@ const CustomersModule = {
                         '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(o.principal_paid) + '</td>' +
                         '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
-                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
-                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-repayment-' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
                     '</tr>';
                     
                     var actionButtons = '';
@@ -1327,7 +1327,7 @@ const CustomersModule = {
                         '<td class="col-type">' + (typeMap[p.type] || p.type) + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
-                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-method-' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
                         '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
                     '</tr>';
                 }
