@@ -4,12 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#3b82f6">
 <title>JF! by Gadai - Sistem Manajemen Gadai</title>
+
+<!-- PWA / 移动端适配 -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JF! Gadai">
 
 <!-- Favicon -->
 <link rel="icon" href="icons/favicon-192x192.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icons/favicon-192x192.png">
 <link rel="manifest" href="/site.webmanifest?v=1">
 
 <!-- CSS 样式 -->
@@ -41,51 +47,57 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- 2. 核心模块（defer，按依赖顺序排列） -->
-    <script defer src="js/utils.js"></script>           <!-- 工具类，无依赖 -->
-    <script defer src="js/toast.js"></script>          <!-- Toast 通知，依赖 utils -->
-    <script defer src="js/auth.js"></script>           <!-- 认证模块，依赖 utils -->
-    <script defer src="js/supabase.js"></script>       <!-- 数据层，依赖 auth, utils -->
-    <script defer src="js/permission.js"></script>     <!-- 权限模块，依赖 auth -->
-    <script defer src="js/audit.js"></script>          <!-- 审计日志，依赖 auth, supabase -->
-    <script defer src="js/order.js"></script>          <!-- 订单模块，依赖 supabase, utils -->
-    <script defer src="js/store.js"></script>          <!-- 门店管理，依赖 supabase -->
-    <script defer src="js/storage.js"></script>        <!-- 备份恢复，依赖 supabase, audit -->
-    <script defer src="js/migration.js"></script>      <!-- 数据迁移，依赖 supabase -->
+    <script defer src="js/utils.js"></script>
+    <script defer src="js/toast.js"></script>
+    <script defer src="js/auth.js"></script>
+    <script defer src="js/supabase.js"></script>
+    <script defer src="js/permission.js"></script>
+    <script defer src="js/audit.js"></script>
+    <script defer src="js/order.js"></script>
+    <script defer src="js/store.js"></script>
+    <script defer src="js/storage.js"></script>
+    <script defer src="js/migration.js"></script>
 
-    <!-- 3. 统一缓存模块（必须在所有使用它的模块之前） -->
-    <script defer src="js/cache.js"></script>          <!-- 统一缓存模块 -->
+    <!-- 3. 统一缓存模块 -->
+    <script defer src="js/cache.js"></script>
 
-    <!-- 4. 页面组件模块（defer，依赖核心模块和缓存模块） -->
-    <script defer src="js/app-dashboard-core.js"></script>     <!-- 核心仪表盘 -->
-    <script defer src="js/app-dashboard-anomaly.js"></script>  <!-- 异常检测 -->
-    <script defer src="js/app-dashboard-expenses.js"></script> <!-- 支出管理 -->
-    <script defer src="js/app-dashboard-funds.js"></script>    <!-- 资金管理 -->
-    <script defer src="js/app-dashboard-orders.js"></script>   <!-- 订单管理 -->
-    <script defer src="js/app-dashboard-print.js"></script>    <!-- 打印功能 -->
-    <script defer src="js/app-dashboard-users.js"></script>    <!-- 用户管理 -->
-    <script defer src="js/app-dashboard-wa.js"></script>       <!-- WA提醒 -->
-    <script defer src="js/app-customers.js"></script>          <!-- 客户管理 -->
-    <script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
-    <script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
+    <!-- 4. 页面组件模块 -->
+    <script defer src="js/app-dashboard-core.js"></script>
+    <script defer src="js/app-dashboard-anomaly.js"></script>
+    <script defer src="js/app-dashboard-expenses.js"></script>
+    <script defer src="js/app-dashboard-funds.js"></script>
+    <script defer src="js/app-dashboard-orders.js"></script>
+    <script defer src="js/app-dashboard-print.js"></script>
+    <script defer src="js/app-dashboard-users.js"></script>
+    <script defer src="js/app-dashboard-wa.js"></script>
+    <script defer src="js/app-customers.js"></script>
+    <script defer src="js/app-blacklist.js"></script>
+    <script defer src="js/app-payments.js"></script>
 
-    <!-- 5. 状态初始化模块（页面恢复状态预加载） -->
+    <!-- 5. 状态初始化模块 -->
     <script defer src="js/app-state-init.js"></script>
 
-    <!-- 6. 主入口（defer，在所有模块之后） -->
+    <!-- 6. 主入口 -->
     <script defer>
-        // 启动应用（等待所有模块加载完成后）
         document.addEventListener('DOMContentLoaded', function() {
-            // 确保 APP 对象存在
             if (typeof window.APP === 'undefined') {
                 window.APP = {};
             }
-            // 启动应用
             if (typeof window.APP.init === 'function') {
                 window.APP.init();
             } else {
                 console.error('[Init] APP.init 未定义，请检查模块加载顺序');
             }
         });
+    </script>
+
+    <!-- 7. Service Worker 注册（PWA离线支持） -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(function() { console.log('✅ Service Worker 已注册'); })
+            .catch(function(err) { console.log('Service Worker 注册失败:', err); });
+    }
     </script>
 
 </body>
