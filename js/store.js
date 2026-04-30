@@ -1,4 +1,4 @@
-// store.js - v2.0 (徽章类名更新为统一 .badge 系统)
+// store.js - v2.1 (修复：移除不存在的 updated_at 列引用)
 
 const StoreManager = {
     stores: [],
@@ -79,7 +79,7 @@ const StoreManager = {
             const client = SUPABASE.getClient();
             const { error } = await client
                 .from('stores')
-                .update({ is_active: false, updated_at: Utils.getLocalDateTime() })
+                .update({ is_active: false })
                 .eq('id', storeId);
             
             if (error) throw error;
@@ -107,7 +107,7 @@ const StoreManager = {
             const client = SUPABASE.getClient();
             const { error } = await client
                 .from('stores')
-                .update({ is_active: true, updated_at: Utils.getLocalDateTime() })
+                .update({ is_active: true })
                 .eq('id', storeId);
             
             if (error) throw error;
@@ -204,8 +204,7 @@ const StoreManager = {
             var updates = { 
                 name: name, 
                 address: address || null, 
-                phone: phone || null,
-                updated_at: Utils.getLocalDateTime()
+                phone: phone || null
             };
             if (waNumber) {
                 updates.wa_number = waNumber;
@@ -245,10 +244,7 @@ const StoreManager = {
             const client = SUPABASE.getClient();
             const { error } = await client
                 .from('stores')
-                .update({ 
-                    wa_number: waNumber || null,
-                    updated_at: Utils.getLocalDateTime()
-                })
+                .update({ wa_number: waNumber || null })
                 .eq('id', storeId);
             
             if (error) throw error;
@@ -350,7 +346,7 @@ const StoreManager = {
             const client = SUPABASE.getClient();
             const { error } = await client
                 .from('stores')
-                .update({ is_practice: newValue, updated_at: Utils.getLocalDateTime() })
+                .update({ is_practice: newValue })
                 .eq('id', storeId);
             
             if (error) throw error;
