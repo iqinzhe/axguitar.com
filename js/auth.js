@@ -272,6 +272,9 @@ const AUTH = {
                 return null;
             }
 
+            // ========== 新增：标记练习身份 ==========
+this.user._isPractice = this.user?.stores?.is_practice || false;
+            
             // 6. 检查门店状态
             if (this.user && this.user.store_id) {
                 try {
