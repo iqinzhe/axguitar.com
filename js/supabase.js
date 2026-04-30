@@ -1234,6 +1234,7 @@ const SupabaseAPI = {
                     overdue_days: 0,
                     liquidation_status: 'normal',
                     max_extension_months: orderData.max_extension_months || 10,
+                    is_practice: profile?._isPractice || false,
                     created_at: Utils.getLocalDateTime(),
                     updated_at: Utils.getLocalDateTime()
                 };
@@ -1303,6 +1304,7 @@ const SupabaseAPI = {
             description: Utils.t('admin_fee'),
             recorded_by: profile.id,
             payment_method: paymentMethod
+            is_practice: profile?._isPractice || false
         };
         
         const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
@@ -1359,6 +1361,7 @@ const SupabaseAPI = {
             description: Utils.t('service_fee'),
             recorded_by: profile.id,
             payment_method: paymentMethod
+            is_practice: profile?._isPractice || false
         };
         
         const { error: e2 } = await supabaseClient.from('payment_history').insert(paymentData);
@@ -1435,6 +1438,7 @@ const SupabaseAPI = {
             description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(1) + '%)',
             recorded_by: profile.id,
             payment_method: paymentMethod
+            is_practice: profile?._isPractice || false
         };
         
         const { error: paymentError } = await supabaseClient
@@ -1519,6 +1523,7 @@ const SupabaseAPI = {
             description: isFullRepayment ? (Utils.lang === 'id' ? 'LUNAS' : '结清') : (Utils.lang === 'id' ? 'Pembayaran pokok' : '还款'),
             recorded_by: profile.id,
             payment_method: paymentMethod
+            is_practice: profile?._isPractice || false
         };
         
         const { error: paymentError } = await supabaseClient
@@ -1617,6 +1622,7 @@ const SupabaseAPI = {
                 description: (Utils.lang === 'id' ? 'Cicilan tetap - Bunga' : '固定还款-利息') + ' ' + newFixedPaidMonths,
                 recorded_by: profile.id,
                 payment_method: paymentMethod
+                is_practice: profile?._isPractice || false
             };
             await supabaseClient.from('payment_history').insert(interestPayment);
             
@@ -1642,6 +1648,7 @@ const SupabaseAPI = {
                 description: (Utils.lang === 'id' ? 'Cicilan tetap - Pokok' : '固定还款-本金') + ' ' + newFixedPaidMonths,
                 recorded_by: profile.id,
                 payment_method: paymentMethod
+                is_practice: profile?._isPractice || false
             };
             await supabaseClient.from('payment_history').insert(principalPayment);
             
