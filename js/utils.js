@@ -1,4 +1,5 @@
-// utils.js - v1.3 (最终版)
+// utils.js - v1.4 (最终版)
+// 修复：删除残留的 getMonthlyInterest/getMonthlyPayment 未定义方法引用
 // 管理费：阶梯定价
 //   ≤ 500,000 → Rp 20,000
 //   500,001 ~ 3,000,000 → Rp 30,000
@@ -127,6 +128,12 @@ window.Utils = window.Utils || {};
         get: function() { return _lang; },
         enumerable: true, configurable: false
     });
+
+    Utils.setLanguage = function(lang) {
+        if (lang !== 'id' && lang !== 'zh') return;
+        _lang = lang;
+        localStorage.setItem('jf_lang', lang);
+    };
 
     Utils.forceSyncLanguage = function() {
         var newLang = localStorage.getItem('jf_lang');
