@@ -70,21 +70,24 @@
 <script src="migration.js"></script>
 
     <!-- 6. 主入口（defer，在所有模块之后） -->
-    <script defer>
-        // 启动应用（等待所有模块加载完成后）
-        document.addEventListener('DOMContentLoaded', function() {
-            // 确保 APP 对象存在
-            if (typeof window.APP === 'undefined') {
-                window.APP = {};
-            }
-            // 启动应用
-            if (typeof window.APP.init === 'function') {
-                window.APP.init();
-            } else {
-                console.error('[Init] APP.init 未定义，请检查模块加载顺序');
-            }
-        });
-    </script>
+<script>
+    // 等待所有脚本加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof APP !== 'undefined' && typeof APP.init === 'function') {
+            APP.init();
+        } else {
+            console.error('[Init] APP.init 未定义，请检查模块加载顺序');
+            // 延迟重试
+            setTimeout(function() {
+                if (typeof APP !== 'undefined' && typeof APP.init === 'function') {
+                    APP.init();
+                } else {
+                    console.error('[Init] 重试失败，APP 对象未正确加载');
+                }
+            }, 500);
+        }
+    });
+</script>
 
 </body>
 </html>
