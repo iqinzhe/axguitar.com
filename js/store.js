@@ -579,7 +579,7 @@ const StoreManager = {
                         actionButtons += '<button onclick="StoreManager.resumeStore(\'' + store.id + '\')" class="btn-small success">▶️ ' + (lang === 'id' ? 'Buka Kembali' : '恢复营业') + '</button>';
                     }
                     
-                    actionButtons += '<button onclick="StoreManager.togglePracticeMode(\'' + store.id + '\', ' + isPractice + ')" class="' + practiceBtnClass + '" ' + practiceBtnStyle + '>🎓 ' + practiceLabel + '</button>';
+                    actionButtons += '<button onclick="StoreManager.togglePracticeMode(\'' + store.id + '\', ' + isPractice + ')" class="' + practiceBtnClass + '" ' + practiceBtnStyle + '>' + practiceLabel + '</button>';
                     actionButtons += '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
                     
                     storeRows += '<tr class="action-row">' +
