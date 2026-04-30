@@ -421,8 +421,7 @@ const SupabaseAPI = {
             return _storesCache;
         }
         
-        const { data, error } = await supabaseClient.from('stores').select('*').order('code');
-        if (error) throw error;
+        const { data, error } = await supabaseClient.from('stores').select('*').neq('code', 'STORE_000').order('code');
         
         _storesCache = data;
         _storesCacheTime = now;
