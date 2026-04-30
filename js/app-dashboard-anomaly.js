@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
+// app-dashboard-anomaly.js - v2.0 (徽章类名更新为统一 .badge 系统)
 
 window.APP = window.APP || {};
 
@@ -173,29 +173,24 @@ const AnomalyHelper = {
         
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
         
-        // ========== 修复：当门店数量不足时，top3 和 bottom3 不应重叠 ==========
         const totalCount = eligibleStores.length;
         
         if (totalCount === 1) {
-            // 只有1家门店：top3 显示它，bottom3 为空
             const top3 = eligibleStores.slice(0, 1);
             return { top3, bottom3: [] };
         }
         
         if (totalCount === 2) {
-            // 只有2家门店：top3 显示全部2家，bottom3 为空
             const top3 = eligibleStores.slice(0, 2);
             return { top3, bottom3: [] };
         }
         
         if (totalCount === 3) {
-            // 只有3家门店：top3 显示全部3家，bottom3 显示第3名（最后1家）
             const top3 = eligibleStores.slice(0, 3);
             const bottom3 = eligibleStores.slice(-1).reverse();
             return { top3, bottom3 };
         }
         
-        // 4家及以上：正常取 top3 和 bottom3
         const top3 = eligibleStores.slice(0, Math.min(3, totalCount));
         const bottom3 = eligibleStores.slice(-Math.min(3, totalCount)).reverse();
         
@@ -215,7 +210,6 @@ const DashboardAnomaly = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 逾期30天订单（分页加载，初始50条）- 使用统一缓存
             const overdueCacheKey = 'overdue_orders_' + (isAdmin ? 'admin' : storeId) + '_0';
             const overdueResult = await JFCache.get(overdueCacheKey, 
                 () => AnomalyHelper.getOverdueOrders(profile, 0, 50),
@@ -224,7 +218,6 @@ const DashboardAnomaly = {
             var overdueOrders = overdueResult.data;
             var overdueTotalCount = overdueResult.totalCount;
             
-            // 黑名单客户（分页加载，初始50条）- 使用统一缓存
             const blacklistCacheKey = 'blacklist_customers_0';
             const blacklistResult = await JFCache.get(blacklistCacheKey,
                 () => AnomalyHelper.getBlacklistCustomers(0, 50),
@@ -233,7 +226,6 @@ const DashboardAnomaly = {
             var blacklist = blacklistResult.data;
             var blacklistTotalCount = blacklistResult.totalCount;
             
-            // 门店排名（仅总部需要）- 使用统一缓存
             var top3 = [], bottom3 = [];
             if (isAdmin) {
                 const stores = await SUPABASE.getAllStores();
@@ -278,7 +270,7 @@ const DashboardAnomaly = {
                                     ' (' + (overdueTotalCount - overdueOrders.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
                                 '</button>' +
                             '</td>' +
-                        '</td>';
+                        '</tr>';
                 }
                 
                 overdueTableHtml = '' +
@@ -420,7 +412,7 @@ const DashboardAnomaly = {
                                 '<span class="ranking-name">' + Utils.escapeHtml(s.name) + '</span>' +
                                 '<span class="ranking-code">' + Utils.escapeHtml(s.code) + '</span>' +
                             '</div>' +
-                            '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
+                            '<div class="ranking-count" style="font-size:var(--font-xs);text-align:right;line-height:1.6;">' +
                                 (lang === 'id' ? 'Pesanan: ' : '订单: ') + s.orderCount + '<br>' +
                                 (lang === 'id' ? 'Pinjaman: ' : '放款: ') + Utils.formatCurrency(s.totalLoanOutflow) + '<br>' +
                                 (lang === 'id' ? 'Buruk: ' : '不良: ') + s.badOrders + '<br>' +
@@ -450,7 +442,7 @@ const DashboardAnomaly = {
                                 '<span class="ranking-name">' + Utils.escapeHtml(store.name) + '</span>' +
                                 '<span class="ranking-code">' + Utils.escapeHtml(store.code) + '</span>' +
                             '</div>' +
-                            '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
+                            '<div class="ranking-count" style="font-size:var(--font-xs);text-align:right;line-height:1.6;">' +
                                 (lang === 'id' ? 'Pesanan: ' : '订单: ') + store.orderCount + '<br>' +
                                 (lang === 'id' ? 'Pinjaman: ' : '放款: ') + Utils.formatCurrency(store.totalLoanOutflow) + '<br>' +
                                 (lang === 'id' ? 'Buruk: ' : '不良: ') + store.badOrders + '<br>' +
