@@ -1,4 +1,7 @@
-// app-dashboard-core.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
+// app-dashboard-core.js - v1.1
+// 修复：
+//   问题6: 仪表盘净利润展示修复，使用 getCashFlowSummary() 新返回值
+//   问题1: 逐步迁移内联三元到 t() 体系
 
 window.APP = window.APP || {};
 
@@ -10,7 +13,6 @@ const ModuleFallback = {
     _degradedModules: {},
     
     async safeCall(moduleName, fn, args, fallbackFn) {
-        // fallbackFn 必须是函数（懒执行），防止调用时立即执行 renderDashboard 等副作用
         try {
             if (typeof fn !== 'function') throw new Error('module_not_loaded');
             return await fn.apply(null, args || []);
@@ -44,7 +46,6 @@ const ModuleFallback = {
                 delete ModuleFallback._degradedModules[moduleKey];
             }, 10 * 60 * 1000);
             
-            // 只有在 fallbackFn 是函数时才调用，否则直接返回 null
             if (typeof fallbackFn === 'function') return await fallbackFn();
             return null;
         }
@@ -91,7 +92,6 @@ const ModuleFallback = {
 window.ModuleFallback = ModuleFallback;
 
 // ==================== 使用统一缓存模块 ====================
-// DashboardCache 现在指向 JFCache，保持向后兼容
 const DashboardCache = JFCache;
 
 // ==================== 聚合查询辅助方法 ====================
@@ -102,7 +102,6 @@ const DashboardStatsHelper = {
         
         const client = SUPABASE.getClient();
         
-        // 管理员统计时排除练习门店
         const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
         const applyPracticeFilter = function(q) {
             if (isAdmin && practiceIds.length > 0) {
@@ -335,20 +334,11 @@ const DashboardStatsHelper = {
         
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
         
-        // ========== 修复：当门店数量不足时，top3 和 bottom3 不应重叠 ==========
         const totalCount = eligibleStores.length;
         
-        if (totalCount === 1) {
-            return { top3: eligibleStores.slice(0, 1), bottom3: [] };
-        }
-        
-        if (totalCount === 2) {
-            return { top3: eligibleStores.slice(0, 2), bottom3: [] };
-        }
-        
-        if (totalCount === 3) {
-            return { top3: eligibleStores.slice(0, 3), bottom3: eligibleStores.slice(-1).reverse() };
-        }
+        if (totalCount === 1) return { top3: eligibleStores.slice(0, 1), bottom3: [] };
+        if (totalCount === 2) return { top3: eligibleStores.slice(0, 2), bottom3: [] };
+        if (totalCount === 3) return { top3: eligibleStores.slice(0, 3), bottom3: eligibleStores.slice(-1).reverse() };
         
         return {
             top3: eligibleStores.slice(0, Math.min(3, eligibleStores.length)),
@@ -364,7 +354,6 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ========== 页面状态持久化（刷新后停留当前页面） ==========
     saveCurrentPageState: function() {
         try {
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
@@ -379,7 +368,6 @@ const DashboardCore = {
             } else {
                 sessionStorage.removeItem('jf_current_customer_id');
             }
-            // 额外保存到 localStorage 作为备份
             localStorage.setItem('jf_last_page', this.currentPage);
             localStorage.setItem('jf_last_filter', this.currentFilter);
             if (this.currentOrderId) {
@@ -405,7 +393,6 @@ const DashboardCore = {
             let orderId = sessionStorage.getItem('jf_current_order_id');
             let customerId = sessionStorage.getItem('jf_current_customer_id');
             
-            // 如果 sessionStorage 没有，从 localStorage 恢复
             if (!page) {
                 page = localStorage.getItem('jf_last_page');
                 filter = localStorage.getItem('jf_last_filter') || "all";
@@ -413,7 +400,6 @@ const DashboardCore = {
                 customerId = localStorage.getItem('jf_last_customer_id');
             }
             
-            // 验证页面是否有效
             const validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
                                 'anomaly', 'userManagement', 'storeManagement', 'expenses', 
                                 'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
@@ -441,7 +427,6 @@ const DashboardCore = {
         this.currentCustomerId = null;
     },
 
-    // ========== 清理逾期更新定时器 ==========
     _clearOverdueUpdateInterval: function() {
         if (_overdueUpdateInterval) {
             clearInterval(_overdueUpdateInterval);
@@ -450,7 +435,6 @@ const DashboardCore = {
         }
     },
 
-    // ========== 启动逾期更新定时器 ==========
     _startOverdueUpdateInterval: function() {
         this._clearOverdueUpdateInterval();
         
@@ -481,7 +465,6 @@ const DashboardCore = {
         }, 5000);
     },
 
-    // ========== 防御性模块检查 ==========
     _ensureModuleLoaded: function(moduleName, moduleFn) {
         if (typeof moduleFn !== 'function') {
             console.warn(`[ModuleCheck] ${moduleName} 未加载，将使用降级方案`);
@@ -490,11 +473,9 @@ const DashboardCore = {
         return true;
     },
 
-    // ========== init 方法 ==========
     init: async function() {
         var lang = Utils.lang || 'zh';
         
-        // 初始化 Toast 系统
         if (window.Toast && !window.Toast._initialized) {
             window.Toast._initialized = true;
             console.log('✅ Toast 通知系统已初始化');
@@ -536,7 +517,6 @@ const DashboardCore = {
                 }
             }, 15000);
             
-            // ========== 关键修复：刷新后停留当前页面 ==========
             var savedState = null;
             
             if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
@@ -616,7 +596,6 @@ const DashboardCore = {
         
         await new Promise(function(resolve) { setTimeout(resolve, 100); });
         
-        // 防御性模块检查
         var handlers = {
             dashboard: async () => {
                 try {
@@ -1025,18 +1004,17 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 使用统一缓存模块
             const cacheKey = DashboardCache.getKey ? DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId) : 'dashboard_stats_' + (isAdmin ? 'admin' : storeId);
             const report = await DashboardCache.get(cacheKey, 
                 () => DashboardStatsHelper.getDashboardStats(profile),
                 { ttl: 5 * 60 * 1000 }
             );
             
-            const cashFlowCacheKey = 'cashflow_' + (isAdmin ? 'admin' : storeId);
+            const cashFlowCacheKey = 'cashflow_v2_' + (isAdmin ? 'admin' : storeId);
             const cashFlow = await DashboardCache.get(cashFlowCacheKey,
                 async () => {
-                    const allCashFlows = await SUPABASE.getCashFlowRecords();
-                    return this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId);
+                    // 问题6修复：使用新版 getCashFlowSummary()，它返回正确的 netProfit
+                    return await SUPABASE.getCashFlowSummary();
                 },
                 { ttl: 5 * 60 * 1000 }
             );
@@ -1081,42 +1059,36 @@ const DashboardCore = {
             const overdueOrdersCount = report.overdue_orders || 0;
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
             
-            const flowsForDeficit = await DashboardCache.get('flows_for_deficit_' + (isAdmin ? 'admin' : storeId), async () => {
-                const client = SUPABASE.getClient();
-                let q = client.from('cash_flow_records').select('direction, amount, flow_type').eq('is_voided', false);
-                if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-                const { data } = await q;
-                return data || [];
-            }, { ttl: 3 * 60 * 1000 });
-            
-            let totalInflowExcludingPrincipal = 0;
-            let totalOutflow = 0;
-            for (const f of flowsForDeficit) {
-                const amount = f.amount || 0;
-                if (f.direction === 'inflow' && f.flow_type !== 'principal') {
-                    totalInflowExcludingPrincipal += amount;
-                } else if (f.direction === 'outflow') {
-                    totalOutflow += amount;
-                }
-            }
-            const deficit = totalOutflow - totalInflowExcludingPrincipal;
+            // 问题6修复：使用正确的净利润值
+            const netProfitBalance = cashFlow.netProfit?.balance || 0;
+            const operatingIncome = cashFlow.netProfit?.operatingIncome || 0;
+            const operatingExpense = cashFlow.netProfit?.operatingExpense || 0;
             
             const cards = [
-                { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, class: '' },
-                { label: lang === 'id' ? 'Berjalan / Jatuh Tempo' : '进行中 / 逾期单', value: activeDisplay, class: '' },
-                { label: (lang === 'id' ? 'Lunas' : '已结清'), value: report.completed_orders, class: '' },
-                { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), class: deficit >= 0 ? 'expense' : 'income' },
+                { label: t('this_month') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, class: '' },
+                { label: t('active') + ' / ' + t('overdue_days'), value: activeDisplay, class: '' },
+                { label: t('completed'), value: report.completed_orders, class: '' },
+                { label: t('net_profit'), value: Utils.formatCurrency(netProfitBalance), class: netProfitBalance >= 0 ? 'income' : 'expense' },
                 { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), class: 'income' },
                 { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), class: 'income' },
-                { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), class: 'income' },
-                { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), class: 'expense' }
+                { label: t('interest'), value: Utils.formatCurrency(report.total_interest), class: 'income' },
+                { label: t('total_expenses'), value: Utils.formatCurrency(totalExpenses), class: 'expense' }
             ];
             
             var cardsHtml = '';
             for (var i = 0; i < cards.length; i++) {
+                // 问题6：净利润卡片添加子标题提示
+                var subtitleHtml = '';
+                if (cards[i].label === t('net_profit') && (operatingIncome > 0 || operatingExpense > 0)) {
+                    subtitleHtml = '<div class="stat-subtitle" style="font-size:10px;color:var(--text-muted);margin-top:2px;">' +
+                        (lang === 'id' ? 'Pendapatan' : '收入') + ': ' + Utils.formatCurrency(operatingIncome) +
+                        ' | ' + (lang === 'id' ? 'Biaya' : '支出') + ': ' + Utils.formatCurrency(operatingExpense) +
+                        '</div>';
+                }
                 cardsHtml += '<div class="stat-card">' +
                     '<div class="stat-value ' + cards[i].class + '">' + cards[i].value + '</div>' +
                     '<div class="stat-label">' + cards[i].label + '</div>' +
+                    subtitleHtml +
                 '</div>';
             }
             
@@ -1152,8 +1124,8 @@ const DashboardCore = {
                         '<div class="cashflow-item">' +
                             '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
                             '<div class="transfer-buttons">' +
-                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦' + (lang === 'id' ? 'Brankas→→🏧 Bank BNI' : '保险柜→→🏧 银行BNI') + '</button>' +
-                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧 ' + (lang === 'id' ? 'Bank BNI→→🏦Brankas' : '银行BNI→→🏦保险柜') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">' + t('cash_to_bank') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">' + t('bank_to_cash') + '</button>' +
                                 '<button onclick="APP.showTransferModal(\'store_to_hq\')" class="transfer-btn store-to-hq">🏢 ' + t('submit_to_hq') + '</button>' +
                             '</div>' +
                         '</div>' +
@@ -1183,8 +1155,8 @@ const DashboardCore = {
                         '<div class="cashflow-item">' +
                             '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
                             '<div class="transfer-buttons">' +
-                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦' + (lang === 'id' ? 'Brankas→→🏧 Bank BNI' : '保险柜→→🏧 银行BNI') + '</button>' +
-                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧 ' + (lang === 'id' ? 'Bank BNI→→🏦Brankas' : '银行BNI→→🏦保险柜') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">' + t('cash_to_bank') + '</button>' +
+                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">' + t('bank_to_cash') + '</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -1196,12 +1168,12 @@ const DashboardCore = {
                 toolbarHtml = '' +
                 '<div class="toolbar admin-grid no-print">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + (lang === 'id' ? 'Manajemen Pesanan' : '订单管理') + '</button>' +
-                    '<button onclick="APP.showCashFlowPage()">💰 ' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
+                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
                     '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
                     '<button onclick="APP.navigateTo(\'backupRestore\')">📦 ' + t('backup_restore') + '</button>' +
                     '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + t('anomaly_title') + '</button>' +
                     '<button onclick="APP.navigateTo(\'userManagement\')">👤 ' + t('user_management') + '</button>' +
                     '<button onclick="APP.navigateTo(\'storeManagement\')">🏪 ' + t('store_management') + '</button>' +
                     '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
@@ -1210,11 +1182,11 @@ const DashboardCore = {
                 toolbarHtml = '' +
                 '<div class="toolbar store-grid no-print">' +
                     '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + (lang === 'id' ? 'Manajemen Pesanan' : '订单管理') + '</button>' +
-                    '<button onclick="APP.showCashFlowPage()">💰 ' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + t('order_list') + '</button>' +
+                    '<button onclick="APP.showCashFlowPage()">💰 ' + t('payment_history') + '</button>' +
                     '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
                     '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
+                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + t('anomaly_title') + '</button>' +
                     '<button onclick="APP.navigateTo(\'backupRestore\')">📦 ' + t('backup_restore') + '</button>' +
                     '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
                 '</div>';
@@ -1230,7 +1202,7 @@ const DashboardCore = {
                 bottomHtml = '' +
                 '<div class="card dashboard-footer-card">' +
                     '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(AUTH.user?.name || '') + ' (' + userRoleText + ')</p>' +
-                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
+                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + t('headquarters') + '</p>' +
                     '<p>📌 ' + t('more_pawn_higher_fee') + '</p>' +
                     '<p>🔒 ' + t('order_saved_locked') + '</p>' +
                 '</div>';
@@ -1261,11 +1233,11 @@ const DashboardCore = {
                     '</div>' +
                 '</div>' +
                 '<div style="margin:0 0 12px 0;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + (lang === 'id' ? 'Pusat Manajemen' : '管理中心') + '</h3>' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + t('operation') + '</h3>' +
                 '</div>' +
                 toolbarHtml +
                 '<div style="margin:0 0 12px 0;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + (lang === 'id' ? 'Indikator Bisnis' : '业务指标') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
+                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + t('financial_indicators') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
                 '</div>' +
                 '<div class="stats-grid">' + cardsHtml + '</div>' +
                 cashFlowHtml +
@@ -1285,8 +1257,11 @@ const DashboardCore = {
     },
 
     _calculateCashFlowSummary: function(allFlows, isAdmin, storeId) {
+        // 问题6修复：排除本金进出，正确计算损益
         var cashInflow = 0, cashOutflow = 0;
         var bankInflow = 0, bankOutflow = 0;
+        var operatingIncome = 0;
+        var operatingExpense = 0;
         
         var flowsToUse = allFlows || [];
         
@@ -1296,15 +1271,30 @@ const DashboardCore = {
             if (flow.direction === 'inflow') {
                 if (flow.source_target === 'cash') cashInflow += amount;
                 else if (flow.source_target === 'bank') bankInflow += amount;
+                
+                // 营业收入
+                if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') {
+                    operatingIncome += amount;
+                }
             } else if (flow.direction === 'outflow') {
                 if (flow.source_target === 'cash') cashOutflow += amount;
                 else if (flow.source_target === 'bank') bankOutflow += amount;
+                
+                // 运营支出
+                if (flow.flow_type === 'expense') {
+                    operatingExpense += amount;
+                }
             }
         }
         
         return {
             cash: { income: cashInflow, expense: cashOutflow, balance: cashInflow - cashOutflow },
-            bank: { income: bankInflow, expense: bankOutflow, balance: bankInflow - bankOutflow }
+            bank: { income: bankInflow, expense: bankOutflow, balance: bankInflow - bankOutflow },
+            netProfit: { 
+                balance: operatingIncome - operatingExpense,
+                operatingIncome: operatingIncome,
+                operatingExpense: operatingExpense
+            }
         };
     },
 
@@ -1387,7 +1377,6 @@ window.APP.currentOrderId = DashboardCore.currentOrderId;
 window.APP.currentCustomerId = DashboardCore.currentCustomerId;
 window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
 
-// 页面关闭前保存状态
 window.addEventListener('beforeunload', function() {
     if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
         window.APP.saveCurrentPageState();
