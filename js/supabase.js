@@ -1105,7 +1105,14 @@ const SupabaseAPI = {
         let query = supabaseClient.from('orders').select('*', { count: 'exact' });
         
         if (profile?.role !== 'admin' && profile?.store_id) {
+            // 非管理员：只看自己门店
             query = query.eq('store_id', profile.store_id);
+        } else if (profile?.role === 'admin' && !filters.includePractice) {
+            // 管理员：默认排除练习门店的订单
+            const practiceIds = await this._getPracticeStoreIds();
+            if (practiceIds.length > 0) {
+                query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
         }
         
         if (filters.status && filters.status !== 'all') {
@@ -1122,6 +1129,12 @@ const SupabaseAPI = {
         if (error) throw error;
         
         return { data: data || [], totalCount: count || 0 };
+    },
+
+    // 获取所有练习门店的 ID 列表（复用 getAllStores 缓存）
+    async _getPracticeStoreIds() {
+        const stores = await this.getAllStores();
+        return stores.filter(function(s) { return s.is_practice === true; }).map(function(s) { return s.id; });
     },
 
     async getOrdersLegacy(filters) {
@@ -2053,10 +2066,19 @@ const SupabaseAPI = {
     },
 
     async getAllStoreBalances() {
-        const { data: allFlows, error } = await supabaseClient
+        // 排除练习门店的现金流
+        const practiceIds = await this._getPracticeStoreIds();
+        
+        let query = supabaseClient
             .from('cash_flow_records')
             .select('store_id, direction, amount, source_target')
             .eq('is_voided', false);
+        
+        if (practiceIds.length > 0) {
+            query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+        }
+        
+        const { data: allFlows, error } = await query;
         
         if (error) {
             console.warn('批量获取门店现金流失败:', error);
@@ -2092,18 +2114,22 @@ const SupabaseAPI = {
     },
 
     async getAllOrdersSummary() {
+        // 排除练习门店的订单（is_practice = true 的门店不计入总部统计）
         const { data, error } = await supabaseClient
             .from('orders')
-            .select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid');
+            .select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, stores!inner(is_practice)')
+            .neq('stores.is_practice', true);
         
         if (error) throw error;
         return data || [];
     },
 
     async getAllExpensesSummary() {
+        // 排除练习门店的支出
         const { data, error } = await supabaseClient
             .from('expenses')
-            .select('id, store_id, amount, payment_method');
+            .select('id, store_id, amount, payment_method, stores!inner(is_practice)')
+            .neq('stores.is_practice', true);
         
         if (error) throw error;
         return data || [];

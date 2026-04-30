@@ -327,6 +327,51 @@ const StoreManager = {
         }
     },
 
+    // ==================== 练习模式切换 ====================
+    togglePracticeMode: async function(storeId, currentIsPractice) {
+        var lang = Utils.lang;
+        var newValue = !currentIsPractice;
+        
+        var confirmMsg;
+        if (newValue) {
+            confirmMsg = lang === 'id'
+                ? '🎓 Jadikan toko ini sebagai Toko Latihan?\n\nData dari toko latihan TIDAK akan dihitung dalam statistik pusat.\nCocok untuk akun simulasi / pelatihan staff.'
+                : '🎓 将此门店设为练习门店？\n\n练习门店的数据不会计入总部统计报表。\n适合用于模拟操作/员工培训账号。';
+        } else {
+            confirmMsg = lang === 'id'
+                ? '⚠️ Kembalikan toko ini ke mode normal?\n\nData toko akan dihitung kembali dalam statistik pusat.'
+                : '⚠️ 将此门店恢复为正常门店？\n\n该门店数据将重新计入总部统计报表。';
+        }
+        
+        var confirmed = await Utils.toast.confirm(confirmMsg);
+        if (!confirmed) return;
+        
+        try {
+            const client = SUPABASE.getClient();
+            const { error } = await client
+                .from('stores')
+                .update({ is_practice: newValue, updated_at: Utils.getLocalDateTime() })
+                .eq('id', storeId);
+            
+            if (error) throw error;
+            
+            var store = StoreManager.stores.find(function(s) { return s.id === storeId; });
+            if (store) store.is_practice = newValue;
+            
+            // 清除缓存，确保统计立即生效
+            SUPABASE.clearCache();
+            
+            var successMsg = newValue
+                ? (lang === 'id' ? '✅ Toko berhasil dijadikan Toko Latihan' : '✅ 已设为练习门店，数据不再计入总部统计')
+                : (lang === 'id' ? '✅ Toko kembali ke mode normal' : '✅ 已恢复为正常门店，数据重新计入总部统计');
+            Utils.toast.success(successMsg);
+            
+            await StoreManager.renderStoreManagement();
+        } catch (error) {
+            Utils.toast.error(lang === 'id' ? 'Gagal mengubah mode: ' + error.message : '切换模式失败：' + error.message);
+        }
+    },
+
     // 核心方法：渲染门店管理页面
     renderStoreManagement: async function() {
         console.log('[StoreManager] 开始加载门店管理页面');
@@ -403,6 +448,7 @@ const StoreManager = {
             
             for (var i = 0; i < StoreManager.stores.length; i++) {
                 var store = StoreManager.stores[i];
+                var isPracticeStore = store.is_practice === true;
                 var stats = storeStats[store.id] || { orders: [], expenses: [], payments: [] };
                 var orders = stats.orders;
                 var expenses = stats.expenses;
@@ -435,21 +481,27 @@ const StoreManager = {
                 var cashBalance = balance.cashBalance;
                 var bankBalance = balance.bankBalance;
                 
-                grandTotal.orders += ordsCount;
-                grandTotal.active += activeCount;
-                grandTotal.loan += totalLoan;
-                grandTotal.adminFee += totalAdminFee;
-                grandTotal.serviceFee += totalServiceFee;
-                grandTotal.interest += totalInterest;
-                grandTotal.principal += totalPrincipal;
-                grandTotal.expenses += totalExpenses;
-                grandTotal.income += totalIncome;
-                grandTotal.cashBalance += cashBalance;
-                grandTotal.bankBalance += bankBalance;
+                // 练习门店不计入合计
+                if (!isPracticeStore) {
+                    grandTotal.orders += ordsCount;
+                    grandTotal.active += activeCount;
+                    grandTotal.loan += totalLoan;
+                    grandTotal.adminFee += totalAdminFee;
+                    grandTotal.serviceFee += totalServiceFee;
+                    grandTotal.interest += totalInterest;
+                    grandTotal.principal += totalPrincipal;
+                    grandTotal.expenses += totalExpenses;
+                    grandTotal.income += totalIncome;
+                    grandTotal.cashBalance += cashBalance;
+                    grandTotal.bankBalance += bankBalance;
+                }
                 
                 var storeStatusBadge = '';
                 if (store.is_active === false) {
                     storeStatusBadge = ' <span class="status-badge liquidated">' + (lang === 'id' ? 'DITUTUP' : '已暂停') + '</span>';
+                }
+                if (isPracticeStore) {
+                    storeStatusBadge += ' <span class="status-badge" style="background:#a78bfa;color:#fff;">' + (lang === 'id' ? 'LATIHAN' : '练习') + '</span>';
                 }
                 
                 storeStatsRows += '<tr>' +
@@ -490,9 +542,13 @@ const StoreManager = {
                 for (var i = 0; i < StoreManager.stores.length; i++) {
                     var store = StoreManager.stores[i];
                     var isActive = store.is_active !== false;
+                    var isStorePractice = store.is_practice === true;
                     var statusBadge = isActive 
                         ? '<span class="status-badge active">' + (lang === 'id' ? 'Aktif' : '营业中') + '</span>'
                         : '<span class="status-badge liquidated">' + (lang === 'id' ? 'Ditutup' : '已暂停') + '</span>';
+                    if (isStorePractice) {
+                        statusBadge += ' <span class="status-badge" style="background:#a78bfa;color:#fff;">🎓 ' + (lang === 'id' ? 'Latihan' : '练习') + '</span>';
+                    }
                     
                     storeRows += '<tr>' +
                         '<td class="store-code">' + Utils.escapeHtml(store.code) + '</td>' +
@@ -507,6 +563,13 @@ const StoreManager = {
                         '<td class="text-center">' + statusBadge + '</td>' +
                     '</tr>';
                     
+                    var isPractice = store.is_practice === true;
+                    var practiceLabel = isPractice
+                        ? (lang === 'id' ? '✅ Mode Latihan (Aktif)' : '✅ 练习模式 (已开启)')
+                        : (lang === 'id' ? '🎓 Jadikan Toko Latihan' : '🎓 设为练习门店');
+                    var practiceBtnClass = isPractice ? 'btn-small' : 'btn-small';
+                    var practiceBtnStyle = isPractice ? 'style="background:#a78bfa;color:#fff;"' : 'style="background:#ede9fe;color:#6d28d9;"';
+                    
                     var actionButtons = '' +
                         '<button onclick="StoreManager.editStore(\'' + store.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
                     
@@ -516,6 +579,7 @@ const StoreManager = {
                         actionButtons += '<button onclick="StoreManager.resumeStore(\'' + store.id + '\')" class="btn-small success">▶️ ' + (lang === 'id' ? 'Buka Kembali' : '恢复营业') + '</button>';
                     }
                     
+                    actionButtons += '<button onclick="StoreManager.togglePracticeMode(\'' + store.id + '\', ' + isPractice + ')" class="' + practiceBtnClass + '" ' + practiceBtnStyle + '>🎓 ' + practiceLabel + '</button>';
                     actionButtons += '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
                     
                     storeRows += '<tr class="action-row">' +

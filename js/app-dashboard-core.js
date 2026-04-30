@@ -102,15 +102,26 @@ const DashboardStatsHelper = {
         
         const client = SUPABASE.getClient();
         
+        // 管理员统计时排除练习门店
+        const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
+        const applyPracticeFilter = function(q) {
+            if (isAdmin && practiceIds.length > 0) {
+                q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
+            return q;
+        };
+        
         const totalCountPromise = (() => {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            else q = applyPracticeFilter(q);
             return q;
         })();
         
         const activeCountPromise = (() => {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            else q = applyPracticeFilter(q);
             q = q.eq('status', 'active');
             return q;
         })();
@@ -118,6 +129,7 @@ const DashboardStatsHelper = {
         const completedCountPromise = (() => {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            else q = applyPracticeFilter(q);
             q = q.eq('status', 'completed');
             return q;
         })();
@@ -125,6 +137,7 @@ const DashboardStatsHelper = {
         const overdueCountPromise = (() => {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            else q = applyPracticeFilter(q);
             q = q.eq('status', 'active').gte('overdue_days', 1);
             return q;
         })();
@@ -132,6 +145,7 @@ const DashboardStatsHelper = {
         const activeOrdersPromise = (() => {
             let q = client.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount');
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            else q = applyPracticeFilter(q);
             q = q.eq('status', 'active');
             return q;
         })();
@@ -139,6 +153,7 @@ const DashboardStatsHelper = {
         const allOrdersLoanPromise = (() => {
             let q = client.from('orders').select('loan_amount');
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            else q = applyPracticeFilter(q);
             return q;
         })();
         
