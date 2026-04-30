@@ -1,580 +1,464 @@
-// app-dashboard-orders.js - v1.1
+// app-dashboard-orders.js - v1.1 (过滤练习数据)
+
 window.APP = window.APP || {};
+
 const DashboardOrders = {
-
-const AnomalyHelper = {
-    async getOverdueOrders(profile, page, pageSize) {
-        if (page === undefined) page = 0;
-        if (pageSize === undefined) pageSize = 50;
-        
-        const isAdmin = profile?.role === 'admin';
-        const storeId = profile?.store_id;
-        
-        const client = SUPABASE.getClient();
-        let query = client
-            .from('orders')
-            .select('order_id, customer_name, overdue_days, loan_amount, status', { count: 'exact' })
-            .eq('status', 'active')
-            .eq('is_practice', false)
-            .gte('overdue_days', 30)
-            .order('overdue_days', { ascending: false });
-        
-        if (!isAdmin && storeId) {
-            query = query.eq('store_id', storeId);
-        }
-        
-        const from = page * pageSize;
-        const to = from + pageSize - 1;
-        query = query.range(from, to);
-        
-        const { data, error, count } = await query;
-        
-        if (error) {
-            console.warn('获取逾期订单失败:', error);
-            return { data: [], totalCount: 0 };
-        }
-        
-        return { 
-            data: data || [], 
-            totalCount: count || 0 
-        };
-    },
-
-    async getBlacklistCustomers(page, pageSize) {
-        if (page === undefined) page = 0;
-        if (pageSize === undefined) pageSize = 50;
-        
-        const from = page * pageSize;
-        const to = from + pageSize - 1;
-        
-        const client = SUPABASE.getClient();
-        const { data, error, count } = await client
-            .from('blacklist')
-            .select('*, customers!blacklist_customer_id_fkey(name, phone, customer_id)', { count: 'exact' })
-            .order('blacklisted_at', { ascending: false })
-            .range(from, to);
-        
-        if (error) {
-            console.warn('获取黑名单失败:', error);
-            return { data: [], totalCount: 0 };
-        }
-        
-        return {
-            data: data || [],
-            totalCount: count || 0
-        };
-    },
-
-    async getMonthlyStoreRanking(stores) {
-        const today = new Date();
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-        const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-        const monthEnd = today.toISOString().split('T')[0];
-        
-        const client = SUPABASE.getClient();
-        const { data: monthlyOrders, error } = await client
-            .from('orders')
-            .select('id, store_id, loan_amount, status, overdue_days')
-            .eq('is_practice', false)
-            .gte('created_at', monthStart)
-            .lte('created_at', monthEnd);
-        
-        if (error) {
-            console.warn('获取本月订单失败:', error);
-            return { top3: [], bottom3: [] };
-        }
-        
-        const { data: monthlyFlows } = await client
-            .from('cash_flow_records')
-            .select('store_id, amount, order_id')
-            .eq('direction', 'inflow')
-            .eq('is_voided', false)
-            .gte('recorded_at', monthStart);
-        
-        const flowAmountByOrder = {};
-        if (monthlyFlows) {
-            for (const flow of monthlyFlows) {
-                if (flow.order_id) {
-                    flowAmountByOrder[flow.order_id] = (flowAmountByOrder[flow.order_id] || 0) + (flow.amount || 0);
-                }
-            }
-        }
-        
-        const storeInfoMap = {};
-        for (const store of stores) {
-            storeInfoMap[store.id] = {
-                id: store.id,
-                name: store.name,
-                code: store.code,
-                isActive: store.is_active !== false
-            };
-        }
-        
-        const storeStats = {};
-        for (const order of (monthlyOrders || [])) {
-            const s = storeInfoMap[order.store_id];
-            if (!s || !s.isActive || s.code === 'STORE_000') continue;
-            
-            if (!storeStats[order.store_id]) {
-                storeStats[order.store_id] = {
-                    id: order.store_id,
-                    name: s.name,
-                    code: s.code,
-                    orderCount: 0,
-                    totalLoanOutflow: 0,
-                    badOrders: 0,
-                    totalRecovery: 0
-                };
-            }
-            
-            storeStats[order.store_id].orderCount++;
-            storeStats[order.store_id].totalLoanOutflow += (order.loan_amount || 0);
-            
-            if ((order.overdue_days || 0) >= 15 && order.status === 'active') {
-                storeStats[order.store_id].badOrders++;
-            }
-            
-            storeStats[order.store_id].totalRecovery += (flowAmountByOrder[order.id] || 0);
-        }
-        
-        let eligibleStores = Object.values(storeStats);
-        
-        if (eligibleStores.length === 0) {
-            return { top3: [], bottom3: [] };
-        }
-        
-        for (let idx = 0; idx < eligibleStores.length; idx++) {
-            eligibleStores[idx].rankSum = 0;
-        }
-        
-        eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
-        for (let idx = 0; idx < eligibleStores.length; idx++) {
-            eligibleStores[idx].rankOrderCount = idx + 1;
-            eligibleStores[idx].rankSum += (idx + 1);
-        }
-        
-        eligibleStores.sort((a, b) => a.totalLoanOutflow - b.totalLoanOutflow);
-        for (let idx = 0; idx < eligibleStores.length; idx++) {
-            eligibleStores[idx].rankLoanOutflow = idx + 1;
-            eligibleStores[idx].rankSum += (idx + 1);
-        }
-        
-        eligibleStores.sort((a, b) => a.badOrders - b.badOrders);
-        for (let idx = 0; idx < eligibleStores.length; idx++) {
-            eligibleStores[idx].rankBadOrders = idx + 1;
-            eligibleStores[idx].rankSum += (idx + 1);
-        }
-        
-        eligibleStores.sort((a, b) => b.totalRecovery - a.totalRecovery);
-        for (let idx = 0; idx < eligibleStores.length; idx++) {
-            eligibleStores[idx].rankRecovery = idx + 1;
-            eligibleStores[idx].rankSum += (idx + 1);
-        }
-        
-        eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
-        
-        const totalCount = eligibleStores.length;
-        
-        if (totalCount === 1) {
-            const top3 = eligibleStores.slice(0, 1);
-            return { top3, bottom3: [] };
-        }
-        
-        if (totalCount === 2) {
-            const top3 = eligibleStores.slice(0, 2);
-            return { top3, bottom3: [] };
-        }
-        
-        if (totalCount === 3) {
-            const top3 = eligibleStores.slice(0, 3);
-            const bottom3 = eligibleStores.slice(-1).reverse();
-            return { top3, bottom3 };
-        }
-        
-        const top3 = eligibleStores.slice(0, Math.min(3, totalCount));
-        const bottom3 = eligibleStores.slice(-Math.min(3, totalCount)).reverse();
-        
-        return { top3, bottom3 };
-    }
-};
-
-const DashboardAnomaly = {
-
-    showAnomaly: async function() {
-        APP.currentPage = 'anomaly';
+    showOrderTable: async function() {
+        APP.currentPage = 'orderTable';
         APP.saveCurrentPageState();
         var lang = Utils.lang;
+        var t = function(key) { return Utils.t(key); };
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
+        
+        var PAGE_SIZE = 50;
+        var currentFrom = 0;
+        var totalCount = 0;
+        var allOrders = [];
         
         try {
-            const profile = await SUPABASE.getCurrentProfile();
-            const isAdmin = profile?.role === 'admin';
-            const storeId = profile?.store_id;
+            var filters = { status: APP.currentFilter, search: '', is_practice: false };
             
-            const overdueCacheKey = 'overdue_orders_' + (isAdmin ? 'admin' : storeId) + '_0';
-            const overdueResult = await JFCache.get(overdueCacheKey, 
-                () => AnomalyHelper.getOverdueOrders(profile, 0, 50),
-                { ttl: 3 * 60 * 1000 }
-            );
-            var overdueOrders = overdueResult.data;
-            var overdueTotalCount = overdueResult.totalCount;
+            var result = await SUPABASE.getOrders(filters, currentFrom, currentFrom + PAGE_SIZE - 1);
+            allOrders = result.data;
+            totalCount = result.totalCount;
+            currentFrom += PAGE_SIZE;
             
-            const blacklistCacheKey = 'blacklist_customers_0';
-            const blacklistResult = await JFCache.get(blacklistCacheKey,
-                () => AnomalyHelper.getBlacklistCustomers(0, 50),
-                { ttl: 3 * 60 * 1000 }
-            );
-            var blacklist = blacklistResult.data;
-            var blacklistTotalCount = blacklistResult.totalCount;
+            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             
-            var top3 = [], bottom3 = [];
-            if (isAdmin) {
-                const stores = await SUPABASE.getAllStores();
-                const rankingCacheKey = 'monthly_store_ranking';
-                const rankingResult = await JFCache.get(rankingCacheKey,
-                    () => AnomalyHelper.getMonthlyStoreRanking(stores),
-                    { ttl: 5 * 60 * 1000 }
-                );
-                top3 = rankingResult.top3;
-                bottom3 = rankingResult.bottom3;
+            var stores = await SUPABASE.getAllStores();
+            var storeMap = {};
+            for (var i = 0; i < stores.length; i++) {
+                storeMap[stores[i].id] = stores[i].name;
             }
             
-            var overdueTableHtml = '';
-            if (overdueOrders.length === 0) {
-                overdueTableHtml = '' +
-                    '<div class="empty-state">' +
-                        '<div class="empty-state-icon">✅</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Semua pesanan dalam keadaan baik' : '所有订单状态良好') + '</div>' +
-                    '</div>';
-            } else {
-                var overdueRows = '';
-                for (let overdueIdx = 0; overdueIdx < overdueOrders.length; overdueIdx++) {
-                    var o = overdueOrders[overdueIdx];
-                    var customerName = o.customer_name || '-';
-                    overdueRows += '<tr>' +
+            var baseCols = 9;
+            var totalCols = isAdmin ? baseCols + 1 : baseCols;
+            
+            var renderOrdersIntoTable = function(orders, append) {
+                var tbody = document.getElementById('orderTableBody');
+                if (!tbody) return;
+                
+                var rows = '';
+                for (var i = 0; i < orders.length; i++) {
+                    var o = orders[i];
+                    var sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
+                    var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
+                    
+                    var nextDueDate = o.next_interest_due_date || '-';
+                    var formattedDueDate = nextDueDate !== '-' ? Utils.formatDate(nextDueDate) : '-';
+                    
+                    var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
+                    var currentMonthlyInterestForList = remainingPrincipalForList * (o.agreed_interest_rate || 0.08);
+                    
+                    var repaymentTypeText = o.repayment_type === 'fixed' 
+                        ? (lang === 'id' ? 'Tetap' : '固定')
+                        : (lang === 'id' ? 'Fleksibel' : '灵活');
+                    var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
+                    
+                    rows += '<tr>' +
                         '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
-                        '<td>' + Utils.escapeHtml(customerName) + '</td>' +
-                        '<td class="text-center expense">' + (o.overdue_days || 0) + '</td>' +
+                        '<td>' + Utils.escapeHtml(o.customer_name) + '</td>' +
+                        '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
-                        '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
+                        '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterestForList) + '</td>' +
+                        '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
+                        '<td class="date-cell text-center">' + formattedDueDate + '</td>' +
+                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
+                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
+                    '</tr>';
+                    
+                    var actionButtons = '';
+                    if (o.status === 'active' && !isAdmin) {
+                        actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>';
+                    }
+                    actionButtons += '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>';
+                    actionButtons += '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">🖨️ ' + t('print') + '</button>';
+                    if (PERMISSION.canDeleteOrder()) {
+                        actionButtons += '<button onclick="APP.deleteOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
+                    }
+                    
+                    rows += '<tr class="action-row">' +
+                        '<td class="action-label">' + t('action') + '</td>' +
+                        '<td colspan="' + (totalCols - 1) + '">' +
+                            '<div class="action-buttons">' + actionButtons + '</div>' +
+                        '</td>' +
                     '</tr>';
                 }
                 
-                var loadMoreHtml = '';
-                if (overdueTotalCount > overdueOrders.length) {
-                    loadMoreHtml = '' +
-                        '<tr id="overdueLoadMoreRow">' +
-                            '<td colspan="5" style="text-align:center;padding:10px;">' +
-                                '<button onclick="APP.loadMoreOverdueOrders()" class="btn-small primary" style="padding:8px 24px;">' +
-                                    '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
-                                    ' (' + (overdueTotalCount - overdueOrders.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
-                                '</button>' +
-                            '</td>' +
-                        '</tr>';
+                if (append) {
+                    var loadMoreRow = document.getElementById('loadMoreRow');
+                    if (loadMoreRow) loadMoreRow.remove();
+                    tbody.insertAdjacentHTML('beforeend', rows);
+                } else {
+                    tbody.innerHTML = rows;
                 }
                 
-                overdueTableHtml = '' +
-                    '<div class="table-container">' +
-                        '<table class="data-table anomaly-table">' +
-                            '<thead>' +
-                                '<tr>' +
-                                    '<th class="col-id">' + (lang === 'id' ? 'ID Pesanan' : '订单号') + '</th>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Nama Nasabah' : '客户姓名') + '</th>' +
-                                    '<th class="col-months text-center">' + (lang === 'id' ? 'Hari Terlambat' : '逾期天数') + '</th>' +
-                                    '<th class="col-amount amount">' + (lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额') + '</th>' +
-                                    '<th class="text-center" style="width:60px;">' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
-                                '</tr>' +
-                            '</thead>' +
-                            '<tbody>' + overdueRows + loadMoreHtml + '</tbody>' +
-                        '</table>' +
-                    '</div>';
-            }
+                updateLoadMoreArea();
+            };
             
-            var blacklistTableHtml = '';
-            if (blacklist.length === 0) {
-                blacklistTableHtml = '' +
-                    '<div class="empty-state">' +
-                        '<div class="empty-state-icon">👍</div>' +
-                        '<div class="empty-state-text">' + (lang === 'id' ? 'Tidak ada nasabah di blacklist' : '暂无黑名单客户') + '</div>' +
-                    '</div>';
-            } else {
-                var blacklistRows = '';
-                for (let blIdx = 0; blIdx < blacklist.length; blIdx++) {
-                    var b = blacklist[blIdx];
-                    blacklistRows += '<tr>' +
-                        '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '</td>' +
-                        '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
-                    '</tr>';
-                }
+            var updateLoadMoreArea = function() {
+                var tbody = document.getElementById('orderTableBody');
+                if (!tbody) return;
                 
-                var blacklistLoadMoreHtml = '';
-                if (blacklistTotalCount > blacklist.length) {
-                    blacklistLoadMoreHtml = '' +
-                        '<tr id="blacklistLoadMoreRow">' +
-                            '<td colspan="4" style="text-align:center;padding:10px;">' +
-                                '<button onclick="APP.loadMoreBlacklist()" class="btn-small primary" style="padding:8px 24px;">' +
-                                    '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
-                                    ' (' + (blacklistTotalCount - blacklist.length) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
-                                '</button>' +
-                            '</td>' +
-                        '</tr>';
-                }
+                var existingRow = document.getElementById('loadMoreRow');
+                if (existingRow) existingRow.remove();
                 
-                blacklistTableHtml = '' +
-                    '<div class="table-container">' +
-                        '<table class="data-table anomaly-table">' +
-                            '<thead>' +
-                                '<tr>' +
-                                    '<th class="col-id">' + (lang === 'id' ? 'ID Nasabah' : '客户ID') + '</th>' +
-                                    '<th class="col-name">' + (lang === 'id' ? 'Nama' : '姓名') + '</th>' +
-                                    '<th class="col-phone">' + (lang === 'id' ? 'Telepon' : '电话') + '</th>' +
-                                    '<th>' + (lang === 'id' ? 'Alasan' : '原因') + '</th>' +
-                                '</tr>' +
-                            '</thead>' +
-                            '<tbody>' + blacklistRows + blacklistLoadMoreHtml + '</tbody>' +
-                        '</table>' +
-                    '</div>';
-            }
-            
-            if (!isAdmin) {
-                document.getElementById("app").innerHTML = '' +
-                    '<div class="page-header">' +
-                        '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
-                        '<div class="header-actions">' +
-                            '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
-                            '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="anomaly-grid">' +
-                        '<div class="anomaly-card anomaly-card-danger">' +
-                            '<div class="anomaly-card-header">' +
-                                '<span class="anomaly-icon">⚠️</span>' +
-                                '<h3>' + (lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单') + '</h3>' +
-                                '<span class="anomaly-badge">' + overdueTotalCount + '</span>' +
-                            '</div>' +
-                            '<div class="anomaly-card-body">' + overdueTableHtml + '</div>' +
-                            (overdueOrders.length > 0 ? 
-                                '<div class="anomaly-card-footer">' +
-                                    '<span class="warning-text">💡 ' + (lang === 'id' ? 'Pesanan ini akan memasuki proses likuidasi' : '这些订单即将进入变卖程序') + '</span>' +
-                                '</div>' : '') +
-                        '</div>' +
-                        '<div class="anomaly-card anomaly-card-warning">' +
-                            '<div class="anomaly-card-header">' +
-                                '<span class="anomaly-icon">🚫</span>' +
-                                '<h3>' + (lang === 'id' ? 'Daftar Hitam Nasabah (Semua Toko)' : '黑名单客户（全部门店）') + '</h3>' +
-                                '<span class="anomaly-badge">' + blacklistTotalCount + '</span>' +
-                            '</div>' +
-                            '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
-                        '</div>' +
-                    '</div>';
-                
-                window._anomalyOverdueState = {
-                    page: 0, pageSize: 50, totalCount: overdueTotalCount,
-                    profile: profile, isAdmin: isAdmin, storeId: storeId
-                };
-                window._anomalyBlacklistState = {
-                    page: 0, pageSize: 50, totalCount: blacklistTotalCount
-                };
-                return;
-            }
-            
-            var top3Html = '';
-            if (top3.length === 0) {
-                top3Html = '' +
-                    '<div class="empty-state"><div class="empty-state-icon">📊</div>' +
-                    '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko bulan ini' : '本月暂无门店数据') + '</div></div>';
-            } else {
-                var top3Items = '';
-                for (let topIdx = 0; topIdx < top3.length; topIdx++) {
-                    var s = top3[topIdx];
-                    var medal = topIdx === 0 ? '🥇' : topIdx === 1 ? '🥈' : '🥉';
-                    top3Items += '' +
-                        '<div class="ranking-item ' + (topIdx === 0 ? 'first' : '') + '">' +
-                            '<div class="ranking-number">' + medal + '</div>' +
-                            '<div class="ranking-info"><span class="ranking-name">' + Utils.escapeHtml(s.name) + '</span><span class="ranking-code">' + Utils.escapeHtml(s.code) + '</span></div>' +
-                            '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
-                                (lang === 'id' ? 'Pesanan: ' : '订单: ') + s.orderCount + '<br>' +
-                                (lang === 'id' ? 'Pinjaman: ' : '放款: ') + Utils.formatCurrency(s.totalLoanOutflow) + '<br>' +
-                                (lang === 'id' ? 'Buruk: ' : '不良: ') + s.badOrders + '<br>' +
-                                (lang === 'id' ? 'Pemulihan: ' : '回收: ') + Utils.formatCurrency(s.totalRecovery) +
-                            '</div>' +
-                        '</div>';
+                if (currentFrom < totalCount) {
+                    var remaining = totalCount - currentFrom;
+                    var loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;">' +
+                        '<button onclick="APP.loadMoreOrders()" class="btn-small primary" style="padding:10px 32px;font-size:14px;">' +
+                        '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
+                        ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
+                        '</button></td></tr>';
+                    tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
+                } else if (totalCount > PAGE_SIZE) {
+                    var doneHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;color:var(--text-muted);">' +
+                        '✅ ' + (lang === 'id' ? 'Semua ' + totalCount + ' pesanan telah dimuat' : '已加载全部 ' + totalCount + ' 条订单') +
+                        '</td></tr>';
+                    tbody.insertAdjacentHTML('beforeend', doneHtml);
                 }
-                top3Html = '<div class="ranking-list">' + top3Items + '</div>';
-            }
-            
-            var bottom3Html = '';
-            if (bottom3.length === 0) {
-                bottom3Html = '' +
-                    '<div class="empty-state"><div class="empty-state-icon">📊</div>' +
-                    '<div class="empty-state-text">' + (lang === 'id' ? 'Belum ada data toko bulan ini' : '本月暂无门店数据') + '</div></div>';
-            } else {
-                var bottom3Items = '';
-                for (let bottomIdx = 0; bottomIdx < bottom3.length; bottomIdx++) {
-                    var store = bottom3[bottomIdx];
-                    var mark = bottomIdx === 0 ? '🔴' : bottomIdx === 1 ? '🟡' : '🟠';
-                    bottom3Items += '' +
-                        '<div class="ranking-item ' + (bottomIdx === 0 ? 'last' : '') + '">' +
-                            '<div class="ranking-number">' + mark + '</div>' +
-                            '<div class="ranking-info"><span class="ranking-name">' + Utils.escapeHtml(store.name) + '</span><span class="ranking-code">' + Utils.escapeHtml(store.code) + '</span></div>' +
-                            '<div class="ranking-count" style="font-size:var(--font-xxs);text-align:right;line-height:1.6;">' +
-                                (lang === 'id' ? 'Pesanan: ' : '订单: ') + store.orderCount + '<br>' +
-                                (lang === 'id' ? 'Pinjaman: ' : '放款: ') + Utils.formatCurrency(store.totalLoanOutflow) + '<br>' +
-                                (lang === 'id' ? 'Buruk: ' : '不良: ') + store.badOrders + '<br>' +
-                                (lang === 'id' ? 'Pemulihan: ' : '回收: ') + Utils.formatCurrency(store.totalRecovery) +
-                            '</div>' +
-                        '</div>';
-                }
-                bottom3Html = '<div class="ranking-list">' + bottom3Items + '</div>';
-            }
+            };
             
             document.getElementById("app").innerHTML = '' +
                 '<div class="page-header">' +
-                    '<h2>⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</h2>' +
+                    '<h2>📋 ' + t('order_list') + '</h2>' +
                     '<div class="header-actions">' +
-                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + (lang === 'id' ? 'Kembali' : '返回') + '</button>' +
-                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + (lang === 'id' ? 'Cetak' : '打印') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
                     '</div>' +
                 '</div>' +
-                '<div class="anomaly-grid">' +
-                    '<div class="anomaly-card anomaly-card-info">' +
-                        '<div class="anomaly-card-header"><span class="anomaly-icon">🏆</span><h3>' + (lang === 'id' ? 'Kinerja Terbaik Bulan Ini (3 Besar)' : '本月业绩前三排行') + '</h3><span class="anomaly-badge">' + top3.length + '</span></div>' +
-                        '<div class="anomaly-card-body">' + top3Html + '</div>' +
-                        '<div class="anomaly-card-footer"><span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini' : '排名基于当月数据') + '</span></div>' +
+                '<div class="toolbar no-print">' +
+                    '<select id="statusFilter" onchange="APP.filterOrders(this.value)">' +
+                        '<option value="all" ' + (APP.currentFilter === 'all' ? 'selected' : '') + '>' + (lang === 'id' ? 'Semua Pesanan' : '全部订单') + '</option>' +
+                        '<option value="active" ' + (APP.currentFilter === 'active' ? 'selected' : '') + '>' + t('active') + '</option>' +
+                        '<option value="completed" ' + (APP.currentFilter === 'completed' ? 'selected' : '') + '>' + t('completed') + '</option>' +
+                    '</select>' +
+                '</div>' +
+                
+                '<div class="info-bar info">' +
+                    '<span class="info-bar-icon">📌</span>' +
+                    '<div class="info-bar-content">' +
+                        '<strong>' + (lang === 'id' ? 'Total' : '共') + ' ' + totalCount + ' ' + (lang === 'id' ? 'pesanan' : '条订单') + '</strong> — ' + 
+                        (lang === 'id' ? 'Menampilkan ' + Math.min(PAGE_SIZE, totalCount) + ' pertama' : '显示前 ' + Math.min(PAGE_SIZE, totalCount) + ' 条') +
                     '</div>' +
-                    '<div class="anomaly-card anomaly-card-info">' +
-                        '<div class="anomaly-card-header"><span class="anomaly-icon">📉</span><h3>' + (lang === 'id' ? 'Kinerja Terendah Bulan Ini (3 Besar)' : '本月业绩后三排行') + '</h3><span class="anomaly-badge">' + bottom3.length + '</span></div>' +
-                        '<div class="anomaly-card-body">' + bottom3Html + '</div>' +
-                        '<div class="anomaly-card-footer"><span class="info-text">💡 ' + (lang === 'id' ? 'Peringkat berdasarkan data bulan ini' : '排名基于当月数据') + '</span></div>' +
-                    '</div>' +
-                    '<div class="anomaly-card anomaly-card-danger">' +
-                        '<div class="anomaly-card-header"><span class="anomaly-icon">⚠️</span><h3>' + (lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单') + '</h3><span class="anomaly-badge">' + overdueTotalCount + '</span></div>' +
-                        '<div class="anomaly-card-body">' + overdueTableHtml + '</div>' +
-                        (overdueOrders.length > 0 ? '<div class="anomaly-card-footer"><span class="warning-text">💡 ' + (lang === 'id' ? 'Pesanan ini akan memasuki proses likuidasi' : '这些订单即将进入变卖程序') + '</span></div>' : '') +
-                    '</div>' +
-                    '<div class="anomaly-card anomaly-card-warning">' +
-                        '<div class="anomaly-card-header"><span class="anomaly-icon">🚫</span><h3>' + (lang === 'id' ? 'Daftar Hitam Nasabah' : '黑名单客户') + '</h3><span class="anomaly-badge">' + blacklistTotalCount + '</span></div>' +
-                        '<div class="anomaly-card-body">' + blacklistTableHtml + '</div>' +
+                '</div>' +
+                
+                '<div class="card">' +
+                    '<div class="table-container">' +
+                        '<table class="data-table order-table">' +
+                            '<thead>' +
+                                '<tr>' +
+                                    '<th class="col-id">' + t('order_id') + '</th>' +
+                                    '<th class="col-name">' + t('customer_name') + '</th>' +
+                                    '<th>' + t('collateral_name') + '</th>' +
+                                    '<th class="col-amount amount">' + t('loan_amount') + '</th>' +
+                                    '<th class="col-amount amount">' + (lang === 'id' ? 'Bunga Bulanan' : '月利息') + '</th>' +
+                                    '<th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th>' +
+                                    '<th class="col-date text-center">' + t('payment_due_date') + '</th>' +
+                                    '<th class="col-status text-center">' + t('repayment_type') + '</th>' +
+                                    '<th class="col-status text-center">' + t('status') + '</th>' +
+                                    (isAdmin ? '<th class="col-store text-center">' + t('store') + '</th>' : '') +
+                                '</tr>' +
+                            '</thead>' +
+                            '<tbody id="orderTableBody"></tbody>' +
+                        '</table>' +
                     '</div>' +
                 '</div>';
             
-            window._anomalyOverdueState = {
-                page: 0, pageSize: 50, totalCount: overdueTotalCount,
-                profile: profile, isAdmin: isAdmin, storeId: storeId
-            };
-            window._anomalyBlacklistState = {
-                page: 0, pageSize: 50, totalCount: blacklistTotalCount
+            renderOrdersIntoTable(allOrders, false);
+            
+            window._orderTableState = {
+                currentFrom: currentFrom, totalCount: totalCount, allOrders: allOrders,
+                totalCols: totalCols, pageSize: PAGE_SIZE, filters: filters,
+                storeMap: storeMap, renderOrdersIntoTable: renderOrdersIntoTable
             };
             
-        } catch (error) {
-            console.error("showAnomaly error:", error);
-            Utils.ErrorHandler.capture(error, 'showAnomaly');
-            Utils.toast.error(lang === 'id' ? 'Gagal memuat data abnormal: ' + error.message : '加载异常数据失败：' + error.message);
-        }
-    },
-
-    loadMoreOverdueOrders: async function() {
-        var state = window._anomalyOverdueState;
-        if (!state) return;
-        var lang = Utils.lang;
-        var loadMoreBtn = document.querySelector('#overdueLoadMoreRow button');
-        if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...'); }
-        try {
-            var nextPage = state.page + 1;
-            var result = await AnomalyHelper.getOverdueOrders(state.profile, nextPage, state.pageSize);
-            var newRows = '';
-            for (let loadIdx = 0; loadIdx < result.data.length; loadIdx++) {
-                var o = result.data[loadIdx];
-                var customerName = o.customer_name || '-';
-                newRows += '<tr>' +
-                    '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
-                    '<td>' + Utils.escapeHtml(customerName) + '</td>' +
-                    '<td class="text-center expense">' + (o.overdue_days || 0) + '</td>' +
-                    '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
-                    '<td class="text-center"><button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">' + (lang === 'id' ? 'Lihat' : '查看') + '</button></td>' +
-                '</tr>';
-            }
-            var oldLoadMoreRow = document.getElementById('overdueLoadMoreRow');
-            if (oldLoadMoreRow) oldLoadMoreRow.remove();
-            var tbody = document.querySelector('.anomaly-card-danger table tbody');
-            if (tbody) {
-                tbody.insertAdjacentHTML('beforeend', newRows);
-                state.page = nextPage;
-                state.totalCount = result.totalCount;
-                var loadedCount = (nextPage + 1) * state.pageSize;
-                if (result.totalCount > loadedCount) {
-                    var loadMoreHtml = '<tr id="overdueLoadMoreRow"><td colspan="5" style="text-align:center;padding:10px;">' +
-                        '<button onclick="APP.loadMoreOverdueOrders()" class="btn-small primary" style="padding:8px 24px;">⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + ' (' + (result.totalCount - loadedCount) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' + '</button></td></tr>';
-                    tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
-                } else {
-                    var doneHtml = '<tr id="overdueLoadMoreRow"><td colspan="5" style="text-align:center;padding:10px;color:var(--text-muted);">✅ ' + (lang === 'id' ? 'Semua ' + result.totalCount + ' pesanan telah dimuat' : '已加载全部 ' + result.totalCount + ' 条订单') + '</td></tr>';
-                    tbody.insertAdjacentHTML('beforeend', doneHtml);
-                }
-            }
         } catch (err) {
-            console.error("loadMoreOverdueOrders error:", err);
-            if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
-            Utils.toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
-        }
-    },
-
-    loadMoreBlacklist: async function() {
-        var state = window._anomalyBlacklistState;
-        if (!state) return;
-        var lang = Utils.lang;
-        var loadMoreBtn = document.querySelector('#blacklistLoadMoreRow button');
-        if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...'); }
-        try {
-            var nextPage = state.page + 1;
-            var result = await AnomalyHelper.getBlacklistCustomers(nextPage, state.pageSize);
-            var newRows = '';
-            for (let loadIdx = 0; loadIdx < result.data.length; loadIdx++) {
-                var b = result.data[loadIdx];
-                newRows += '<tr>' +
-                    '<td>' + Utils.escapeHtml(b.customers?.customer_id || '-') + '</td>' +
-                    '<td>' + Utils.escapeHtml(b.customers?.name || '-') + '</td>' +
-                    '<td>' + Utils.escapeHtml(b.customers?.phone || '-') + '</td>' +
-                    '<td>' + Utils.escapeHtml(b.reason) + '</td>' +
-                '</tr>';
-            }
-            var oldLoadMoreRow = document.getElementById('blacklistLoadMoreRow');
-            if (oldLoadMoreRow) oldLoadMoreRow.remove();
-            var tbody = document.querySelector('.anomaly-card-warning table tbody');
-            if (tbody) {
-                tbody.insertAdjacentHTML('beforeend', newRows);
-                state.page = nextPage;
-                state.totalCount = result.totalCount;
-                var loadedCount = (nextPage + 1) * state.pageSize;
-                if (result.totalCount > loadedCount) {
-                    var loadMoreHtml = '<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;">' +
-                        '<button onclick="APP.loadMoreBlacklist()" class="btn-small primary" style="padding:8px 24px;">⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + ' (' + (result.totalCount - loadedCount) + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' + '</button></td></tr>';
-                    tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
-                } else {
-                    var doneHtml = '<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;color:var(--text-muted);">✅ ' + (lang === 'id' ? 'Semua ' + result.totalCount + ' data telah dimuat' : '已加载全部 ' + result.totalCount + ' 条数据') + '</td></tr>';
-                    tbody.insertAdjacentHTML('beforeend', doneHtml);
-                }
-            }
-        } catch (err) {
-            console.error("loadMoreBlacklist error:", err);
-            if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
-            Utils.toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
+            console.error("showOrderTable error:", err);
+            Utils.ErrorHandler.capture(err, 'showOrderTable');
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
         }
     },
     
-    clearAnomalyCache: function() {
-        JFCache.clear();
-        Utils.toast.info('缓存已清除', 2000);
+    loadMoreOrders: async function() {
+        var state = window._orderTableState;
+        if (!state) return;
+        var lang = Utils.lang;
+        var loadMoreBtn = document.querySelector('#loadMoreRow button');
+        if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...'); }
+        try {
+            var result = await SUPABASE.getOrders(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
+            var newOrders = result.data;
+            state.allOrders = state.allOrders.concat(newOrders);
+            state.currentFrom += result.data.length;
+            state.totalCount = result.totalCount;
+            state.renderOrdersIntoTable(newOrders, true);
+        } catch (err) {
+            console.error("loadMoreOrders error:", err);
+            if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
+        }
+    },
+    
+    payOrder: function(orderId) { if (!orderId) return; APP.navigateTo('payment', { orderId: orderId }); },
+    filterOrders: function(status) { APP.currentFilter = status; APP.showOrderTable(); },
+
+    viewOrder: async function(orderId) {
+        APP.currentPage = 'viewOrder';
+        APP.currentOrderId = orderId;
+        APP.saveCurrentPageState();
+        try {
+            var result = await SUPABASE.getPaymentHistory(orderId);
+            var order = result.order;
+            var payments = result.payments;
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); APP.goBack(); return; }
+            var lang = Utils.lang;
+            var t = function(key) { return Utils.t(key); };
+            var profile = await SUPABASE.getCurrentProfile();
+            var isAdmin = profile?.role === 'admin';
+            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+            
+            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+            var monthlyRate = order.agreed_interest_rate || 0.08;
+            var currentMonthlyInterest = remainingPrincipal * monthlyRate;
+            var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
+            
+            var repaymentInfoHtml = '';
+            if (order.repayment_type === 'fixed') {
+                var paidMonths = order.fixed_paid_months || 0;
+                var totalMonths = order.repayment_term;
+                var fixedPayment = order.monthly_fixed_payment || 0;
+                repaymentInfoHtml = '' +
+                    '<p><strong>' + t('repayment_type') + ':</strong> 📅 ' + t('fixed_repayment') + ' (' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</p>' +
+                    '<p><strong>' + t('monthly_payment') + ':</strong> ' + Utils.formatCurrency(fixedPayment) + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Progress' : '进度') + ':</strong> ' + paidMonths + '/' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</p>';
+            } else {
+                repaymentInfoHtml = '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? 'Maksimal perpanjangan 10 bulan' : '最长延期10个月') + ')</p>';
+            }
+
+            var payRows = '';
+            if (payments && payments.length > 0) {
+                for (var i = 0; i < payments.length; i++) {
+                    var p = payments[i];
+                    var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
+                    var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
+                    payRows += '<tr>' +
+                        '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                        '<td>' + typeText + '</td>' +
+                        '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
+                    '</tr>';
+                }
+            } else {
+                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td>';
+            }
+
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header">' +
+                    '<h2>📄 ' + t('order_details') + '</h2>' +
+                    '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-print">🖨️ ' + t('print') + '</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="card">' +
+                    '<div class="order-detail-grid">' +
+                        '<div class="info-column">' +
+                            '<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>' +
+                            '<p><strong>' + t('order_id') + ':</strong> ' + Utils.escapeHtml(order.order_id) + '</p>' +
+                            '<p><strong>' + t('status') + ':</strong> <span class="status-badge ' + order.status + '">' + (statusMap[order.status] || order.status) + '</span></p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Tanggal Dibuat' : '创建日期') + ':</strong> ' + Utils.formatDate(order.created_at) + '</p>' +
+                            repaymentInfoHtml +
+                            '<h3 style="margin-top:16px;">👤 ' + t('customer_info') + '</h3>' +
+                            '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(order.customer_name) + '</p>' +
+                            '<p><strong>' + t('ktp_number') + ':</strong> ' + Utils.escapeHtml(order.customer_ktp) + '</p>' +
+                            '<p><strong>' + t('phone') + ':</strong> ' + Utils.escapeHtml(order.customer_phone) + '</p>' +
+                            '<p><strong>' + t('address') + ':</strong> ' + Utils.escapeHtml(order.customer_address) + '</p>' +
+                        '</div>' +
+                        '<div class="info-column">' +
+                            '<h3>💎 ' + t('collateral_info') + '</h3>' +
+                            '<p><strong>' + t('collateral_name') + ':</strong> ' + Utils.escapeHtml(order.collateral_name) + '</p>' +
+                            '<p><strong>' + t('loan_amount') + ':</strong> ' + Utils.formatCurrency(order.loan_amount) + '</p>' +
+                            '<h3 style="margin-top:16px;">💰 ' + (lang === 'id' ? 'Rincian Biaya' : '费用明细') + '</h3>' +
+                            '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' ' + (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')) + '</p>' +
+                            '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) ' + ((order.service_fee_paid || 0) >= (order.service_fee_amount || 0) && (order.service_fee_amount || 0) > 0 ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : (order.service_fee_amount || 0) === 0 ? '—' : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')) + '</p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Bunga Bulanan (saat ini)' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? 'berdasarkan sisa pokok' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? 'bulan' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
+                            '<p><strong>' + t('payment_due_date') + ':</strong> ' + nextDueDate + '</p>' +
+                            '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="info-bar info">' +
+                        '<span class="info-bar-icon">💡</span>' +
+                        '<div class="info-bar-content">' +
+                            '<strong>' + (lang === 'id' ? 'Tips:' : '温馨提示：') + '</strong> ' + 
+                            (lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan.' : '请于每月到期日前支付利息。') +
+                        '</div>' +
+                    '</div>' +
+                    '<h3>📋 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
+                    '<div class="table-container"><table class="data-table payment-table"><thead><tr>' +
+                        '<th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th>' +
+                        '<th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th>' +
+                        '<th class="col-amount amount">' + t('amount') + '</th>' +
+                        '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
+                        '<th class="col-desc">' + t('description') + '</th>' +
+                    '</tr></thead><tbody>' + payRows + '</tbody></table></div>' +
+                    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
+                        '<button onclick="APP.goBack()">↩️ ' + t('back') + '</button>' +
+                        (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(order.order_id) + '\'})" class="success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>' : '') +
+                        (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeAttr(order.order_id) + '\')" class="success">🧾 ' + (lang === 'id' ? '结清凭证' : '结清凭证') + '</button>' : '') +
+                        '<button onclick="APP.sendWAReminder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="warning">📱 ' + (lang === 'id' ? 'WA提醒' : 'WA提醒') + '</button>' +
+                    '</div>' +
+                '</div>';
+        } catch (error) {
+            console.error("viewOrder error:", error);
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
+            APP.goBack();
+        }
+    },
+
+    deleteOrder: async function(orderId) {
+        var lang = Utils.lang;
+        var confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
+        if (!confirmed) return;
+        try {
+            const order = await SUPABASE.getOrder(orderId);
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
+            await Order.delete(orderId);
+            if (window.Audit) {
+                await window.Audit.log('order_delete', JSON.stringify({
+                    order_id: order.order_id, customer_name: order.customer_name,
+                    loan_amount: order.loan_amount, deleted_by: AUTH.user?.id,
+                    deleted_at: new Date().toISOString()
+                }));
+            }
+            Utils.toast.success(Utils.t('order_deleted'));
+            await APP.showOrderTable();
+        } catch (error) {
+            Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
+        }
+    },
+
+    printOrder: async function(orderId) {
+        try {
+            var result = await SUPABASE.getPaymentHistory(orderId);
+            var order = result.order;
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
+            var lang = Utils.lang;
+            var t = Utils.t.bind(Utils);
+            var safeOrderId = Utils.escapeHtml(order.order_id);
+            var safeCustomerName = Utils.escapeHtml(order.customer_name);
+            var safeCustomerKtp = Utils.escapeHtml(order.customer_ktp || '-');
+            var safeCustomerPhone = Utils.escapeHtml(order.customer_phone || '-');
+            var safeCustomerAddress = Utils.escapeHtml(order.customer_address || '-');
+            var safeCollateral = Utils.escapeHtml(order.collateral_name || '-');
+            var safeStoreName = Utils.escapeHtml(AUTH.getCurrentStoreName());
+            var safeLoanAmount = Utils.formatCurrency(order.loan_amount);
+            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+            var safeRemainingPrincipal = Utils.formatCurrency(remainingPrincipal);
+            var safeCreatedAt = Utils.formatDate(order.created_at);
+
+            var paymentRows = '';
+            var payments = result.payments || [];
+            for (var i = 0; i < payments.length; i++) {
+                var p = payments[i];
+                var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
+                paymentRows += '<tr><td>' + Utils.formatDate(p.date) + '</td><td>' + typeText + '</td><td class="text-right">' + Utils.formatCurrency(p.amount) + '</td><td>' + (p.payment_method === 'cash' ? 'Tunai' : 'Bank') + '</td></tr>';
+            }
+            if (paymentRows === '') { paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + '</td>'; }
+
+            var printWindow = window.open('', '_blank');
+            printWindow.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! - ' + safeOrderId + '</title>' +
+                '<style>*{margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;padding:15mm}' +
+                '.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}' +
+                'table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px}th{background:#f5f5f5}' +
+                '.text-right{text-align:right}.footer{text-align:center;margin-top:20px;font-size:10px;color:#666}' +
+                '@media print{@page{size:A4;margin:15mm}}</style></head><body>' +
+                '<div class="header"><h1>JF! by Gadai</h1><p>' + safeOrderId + ' | ' + safeCreatedAt + '</p></div>' +
+                '<div><h3>' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '</h3>' +
+                '<p>' + t('customer_name') + ': ' + safeCustomerName + '</p><p>KTP: ' + safeCustomerKtp + '</p>' +
+                '<p>' + t('phone') + ': ' + safeCustomerPhone + '</p><p>' + t('address') + ': ' + safeCustomerAddress + '</p></div>' +
+                '<div><h3>' + (lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款') + '</h3>' +
+                '<p>' + t('collateral_name') + ': ' + safeCollateral + '</p><p>' + t('loan_amount') + ': ' + safeLoanAmount + '</p>' +
+                '<p>' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ': ' + safeRemainingPrincipal + '</p></div>' +
+                '<div><h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
+                '<table><thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead><tbody>' + paymentRows + '</tbody></table></div>' +
+                '<div class="footer"><div>JF! by Gadai</div><div>' + safeStoreName + '</div></div>' +
+                '<script>window.onload=function(){window.print();setTimeout(function(){window.close();},1000)};<\/script></body></html>');
+            printWindow.document.close();
+        } catch (error) {
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak' : '打印失败');
+        }
+    },
+
+    showPaymentHistory: async function() {
+        APP.currentPage = 'paymentHistory';
+        APP.saveCurrentPageState();
+        var lang = Utils.lang;
+        var t = Utils.t.bind(Utils);
+        try {
+            var allPayments = await SUPABASE.getAllPayments();
+            var totalAdminFee = 0, totalServiceFee = 0, totalInterest = 0, totalPrincipal = 0;
+            for (var i = 0; i < allPayments.length; i++) {
+                var p = allPayments[i];
+                if (p.type === 'admin_fee') totalAdminFee += p.amount;
+                else if (p.type === 'service_fee') totalServiceFee += p.amount;
+                else if (p.type === 'interest') totalInterest += p.amount;
+                else if (p.type === 'principal') totalPrincipal += p.amount;
+            }
+            var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
+            var methodMap = { cash: t('cash'), bank: t('bank') };
+            var rows = '';
+            if (allPayments.length === 0) {
+                rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td>';
+            } else {
+                for (var i = 0; i < allPayments.length; i++) {
+                    var p = allPayments[i];
+                    var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
+                    rows += '<tr>' +
+                        '<td class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '</td>' +
+                        '<td>' + Utils.escapeHtml(p.orders?.customer_name || '-') + '</td>' +
+                        '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                        '<td>' + (typeMap[p.type] || p.type) + '</td>' +
+                        '<td class="text-center">' + (p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
+                    '</tr>';
+                }
+            }
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header"><h2>💰 ' + t('payment_history') + '</h2>' +
+                    '<div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button></div></div>' +
+                '<div class="stats-grid stats-grid-auto">' +
+                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalAdminFee) + '</div><div class="stat-label">' + t('admin_fee') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalServiceFee) + '</div><div class="stat-label">' + t('service_fee') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalInterest) + '</div><div class="stat-label">' + t('interest') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value">' + Utils.formatCurrency(totalPrincipal) + '</div><div class="stat-label">' + t('principal') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value">' + Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal) + '</div><div class="stat-label">' + (lang === 'id' ? 'Total Keseluruhan' : '全部总计') + '</div></div>' +
+                '</div>' +
+                '<div class="card"><div class="table-container"><table class="data-table payment-table"><thead><tr>' +
+                    '<th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th>' +
+                    '<th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th>' +
+                    '<th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th>' +
+                    '<th class="col-amount amount">' + t('amount') + '</th>' +
+                    '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
+                    '<th class="col-desc">' + t('description') + '</th>' +
+                '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        } catch (error) {
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
+        }
     }
 };
 
-for (var key in DashboardAnomaly) {
-    if (typeof DashboardAnomaly[key] === 'function') {
-        window.APP[key] = DashboardAnomaly[key];
+for (var key in DashboardOrders) {
+    if (typeof DashboardOrders[key] === 'function') {
+        window.APP[key] = DashboardOrders[key];
     }
 }
-
-window.APP.loadMoreOverdueOrders = DashboardAnomaly.loadMoreOverdueOrders.bind(DashboardAnomaly);
-window.APP.loadMoreBlacklist = DashboardAnomaly.loadMoreBlacklist.bind(DashboardAnomaly);
-window.APP.clearAnomalyCache = DashboardAnomaly.clearAnomalyCache.bind(DashboardAnomaly);
