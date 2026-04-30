@@ -67,8 +67,8 @@ const DashboardOrders = {
                         '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterestForList) + '</td>' +
                         '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                         '<td class="date-cell text-center">' + formattedDueDate + '</td>' +
-                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span><td>' +
-                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span><tr>' +
+                        '<td class="text-center"><span class="badge badge-repayment-' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
                     
@@ -288,7 +288,7 @@ const DashboardOrders = {
                         '<td>' + typeText + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
-                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-method-' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
                         '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
                     '</tr>';
                 }
@@ -309,7 +309,7 @@ const DashboardOrders = {
                         '<div class="info-column">' +
                             '<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>' +
                             '<p><strong>' + t('order_id') + ':</strong> ' + Utils.escapeHtml(order.order_id) + '</p>' +
-                            '<p><strong>' + t('status') + ':</strong> <span class="status-badge ' + order.status + '">' + (statusMap[order.status] || order.status) + '</span></p>' +
+                            '<p><strong>' + t('status') + ':</strong> <span class="badge badge-' + order.status + '">' + (statusMap[order.status] || order.status) + '</span></p>' +
                             '<p><strong>' + (lang === 'id' ? 'Tanggal Dibuat' : '创建日期') + ':</strong> ' + Utils.formatDate(order.created_at) + '</p>' +
                             repaymentInfoHtml +
                             '<h3 style="margin-top:16px;">👤 ' + t('customer_info') + '</h3>' +
@@ -511,7 +511,7 @@ const DashboardOrders = {
                     '<div class="section">' +
                         '<h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
                         '<table>' +
-                            '<thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '支付方式') + '</th></td></thead>' +
+                            '<thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '支付方式') + '</th></tr></thead>' +
                             '<tbody>' + paymentRows + '</tbody>' +
                         '</table>' +
                     '</div>' +
@@ -564,7 +564,7 @@ const DashboardOrders = {
                         '<td>' + (typeMap[p.type] || p.type) + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
-                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-method-' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
                         '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
                     '</tr>';
                 }
@@ -603,7 +603,7 @@ const DashboardOrders = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
-                        '<tr>' +
+                        '</table>' +
                     '</div>' +
                 '</div>';
             
