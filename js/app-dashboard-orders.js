@@ -1,6 +1,6 @@
-// app-dashboard-anomaly.js - v1.1 (过滤练习数据)
-
+// app-dashboard-orders.js - v1.1
 window.APP = window.APP || {};
+const DashboardOrders = {
 
 const AnomalyHelper = {
     async getOverdueOrders(profile, page, pageSize) {
