@@ -77,13 +77,8 @@
     flex-shrink: 0;
 }
 
-.anomaly-card-footer .warning-text {
-    color: #dc2626;
-}
-
-.anomaly-card-footer .info-text {
-    color: var(--text-muted);
-}
+.anomaly-card-footer .warning-text { color: var(--danger-dark); }
+.anomaly-card-footer .info-text   { color: var(--text-muted); }
 
 /* 异常表格 */
 .anomaly-table {
@@ -144,9 +139,7 @@
     font-weight: 700;
 }
 
-.store-item-count.lowest {
-    color: #dc2626;
-}
+.store-item-count.lowest { color: var(--danger-dark); }
 
 /* 排名 */
 .ranking-list {
@@ -194,12 +187,12 @@
 
 .ranking-item.first {
     background: #fef3c7;
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid var(--warning);
 }
 
 .ranking-item.last {
     background: #fee2e2;
-    border-left: 3px solid #ef4444;
+    border-left: 3px solid var(--danger);
 }
 
 
@@ -227,7 +220,7 @@
    ============================================================ */
 .fixed-repayment-card {
     background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border-left: 4px solid #10b981;
+    border-left: 4px solid var(--success);
 }
 
 
@@ -257,9 +250,7 @@
    P6. 资金流水页面 - 表格微调
    ============================================================ */
 .cashflow-table .date-cell,
-.capital-table .date-cell {
-    white-space: nowrap;
-}
+.capital-table .date-cell { white-space: nowrap; }
 
 .cashflow-table .flow-desc,
 .capital-table .flow-desc {
@@ -270,26 +261,18 @@
 }
 
 .cashflow-table .income,
-.capital-table .income {
-    color: var(--success);
-}
+.capital-table .income { color: var(--success); }
 
 .cashflow-table .expense,
-.capital-table .expense {
-    color: var(--danger);
-}
+.capital-table .expense { color: var(--danger); }
 
 
 /* ============================================================
    P7. 支出页面 - 表格微调
    ============================================================ */
-.expense-table .date-cell {
-    white-space: nowrap;
-}
+.expense-table .date-cell { white-space: nowrap; }
 
-.expense-table .expense-category {
-    font-weight: 500;
-}
+.expense-table .expense-category { font-weight: 500; }
 
 .expense-table .expense-desc {
     max-width: 160px;
@@ -298,9 +281,7 @@
     white-space: nowrap;
 }
 
-.expense-table .action-cell {
-    white-space: nowrap;
-}
+.expense-table .action-cell { white-space: nowrap; }
 
 
 /* ============================================================
@@ -336,20 +317,15 @@
 
 .backup-card-primary {
     background: linear-gradient(135deg, #e8f4e8 0%, #d4ecd4 100%);
-    border-left: 4px solid #10b981;
+    border-left: 4px solid var(--success);
 }
 
-.backup-card-primary h3 {
-    color: #065f46;
-}
-
-.backup-card-primary p {
-    color: #065f46;
-}
+.backup-card-primary h3 { color: #065f46; }
+.backup-card-primary p  { color: #065f46; }
 
 .btn-backup-primary {
-    background: #10b981;
-    color: white;
+    background: var(--success);
+    color: var(--text-white);
     border: none;
     padding: var(--spacing-3) var(--spacing-5);
     border-radius: var(--radius-md);
@@ -361,22 +337,22 @@
 }
 
 .btn-backup-primary:hover {
-    background: #059669;
+    background: var(--success-dark);
     transform: translateY(-1px);
 }
 
 .warning-text-small {
     font-size: var(--font-xs);
-    color: #dc2626;
-    background: #fee2e2;
+    color: var(--danger-dark);
+    background: var(--danger-light);
     padding: 6px 10px;
     border-radius: var(--radius-sm);
     margin-bottom: var(--spacing-3);
 }
 
 .btn-restore {
-    background: #f59e0b;
-    color: white;
+    background: var(--warning);
+    color: var(--text-white);
     border: none;
     padding: var(--spacing-2) var(--spacing-4);
     border-radius: var(--radius-sm);
@@ -387,7 +363,7 @@
 }
 
 .btn-restore:hover {
-    background: #d97706;
+    background: var(--warning-dark);
 }
 
 
@@ -445,24 +421,7 @@
 
 
 /* ============================================================
-   P11. 黑名单页面
-   ============================================================ */
-.blacklist-info-card {
-    background: #fef3c7;
-    border-left: 4px solid #f59e0b;
-}
-
-.blacklist-info-card .info-text {
-    color: #92400e;
-}
-
-.blacklist-info-card .info-text strong {
-    color: #b45309;
-}
-
-
-/* ============================================================
-   P12. 用户管理 - 角色下拉
+   P11. 用户管理 - 角色下拉
    ============================================================ */
 .user-table .role-select {
     padding: 4px 8px;
@@ -475,7 +434,7 @@
 
 
 /* ============================================================
-   P13. 黑名单按钮
+   P12. 黑名单按钮
    ============================================================ */
 .btn-blacklist {
     background: #f97316 !important;
@@ -489,15 +448,13 @@
 
 
 /* ============================================================
-   P14. 转账记录日期
+   P13. 转账记录日期
    ============================================================ */
-.transfer-table .date-cell {
-    white-space: nowrap;
-}
+.transfer-table .date-cell { white-space: nowrap; }
 
 
 /* ============================================================
-   P15. 门店备份恢复页面 - 统一卡片样式
+   P14. 门店备份恢复页面 - 统一卡片样式
    ============================================================ */
 .backup-grid-store {
     display: grid;
@@ -540,7 +497,7 @@
 
 .btn-backup-store-primary {
     background: var(--success-dark);
-    color: white;
+    color: var(--text-white);
     border: none;
     padding: var(--spacing-3) var(--spacing-5);
     border-radius: var(--radius-md);
@@ -557,7 +514,7 @@
 }
 
 .backup-card-store-secondary .btn-small {
-    background: white;
+    background: var(--bg-card);
     border: 1px solid #bae6fd;
     color: var(--primary-dark);
 }
@@ -569,216 +526,124 @@
 
 
 /* ============================================================
-   P16. 资金流水表格列宽修复
+   P15. 资金流水表格列宽
    ============================================================ */
 .cashflow-table {
     width: 100%;
     table-layout: fixed;
 }
 
-.cashflow-table .col-date {
-    width: 10%;
-}
-.cashflow-table .col-type {
-    width: 15%;
-}
-.cashflow-table .col-status {
-    width: 8%;
-}
-.cashflow-table .col-method {
-    width: 12%;
-}
-.cashflow-table .col-amount {
-    width: 15%;
-}
-.cashflow-table .col-desc {
-    width: 30%;
-}
-.cashflow-table .col-store {
-    width: 10%;
-}
+.cashflow-table .col-date   { width: 10%; }
+.cashflow-table .col-type   { width: 15%; }
+.cashflow-table .col-status { width: 8%;  }
+.cashflow-table .col-method { width: 12%; }
+.cashflow-table .col-amount { width: 15%; }
+.cashflow-table .col-desc   { width: 30%; }
+.cashflow-table .col-store  { width: 10%; }
 
 @media (max-width: 768px) {
-    .cashflow-table {
-        min-width: 650px;
-    }
-    .cashflow-table .col-date {
-        width: 12%;
-    }
-    .cashflow-table .col-type {
-        width: 18%;
-    }
-    .cashflow-table .col-amount {
-        width: 18%;
-    }
+    .cashflow-table { min-width: 650px; }
+    .cashflow-table .col-date   { width: 12%; }
+    .cashflow-table .col-type   { width: 18%; }
+    .cashflow-table .col-amount { width: 18%; }
 }
 
 
 /* ============================================================
-   P17. 缴费记录表格（订单详情内）列宽修复
+   P16. 缴费记录表格（订单详情内）列宽
    ============================================================ */
 .payment-table {
     width: 100%;
     table-layout: fixed;
 }
 
-.payment-table .col-date {
-    width: 12%;
-}
-.payment-table .col-type {
-    width: 18%;
-}
-.payment-table .col-months {
-    width: 8%;
-}
-.payment-table .col-amount {
-    width: 18%;
-}
-.payment-table .col-method {
-    width: 12%;
-}
-.payment-table .col-desc {
-    width: 32%;
-}
+.payment-table .col-date   { width: 12%; }
+.payment-table .col-type   { width: 18%; }
+.payment-table .col-months { width: 8%;  }
+.payment-table .col-amount { width: 18%; }
+.payment-table .col-method { width: 12%; }
+.payment-table .col-desc   { width: 32%; }
 
 @media (max-width: 768px) {
-    .payment-table {
-        min-width: 550px;
-    }
+    .payment-table { min-width: 550px; }
 }
 
 
 /* ============================================================
-   P18. 客户列表表格列宽修复
+   P17. 客户列表表格列宽
    ============================================================ */
 .customer-list-table {
     width: 100%;
     table-layout: fixed;
 }
 
-.customer-list-table .col-id {
-    width: 10%;
-}
-.customer-list-table .col-name {
-    width: 18%;
-}
-.customer-list-table .col-ktp {
-    width: 15%;
-}
-.customer-list-table .col-phone {
-    width: 12%;
-}
-.customer-list-table .col-occupation {
-    width: 12%;
-}
+.customer-list-table .col-id         { width: 10%; }
+.customer-list-table .col-name       { width: 18%; }
+.customer-list-table .col-ktp        { width: 15%; }
+.customer-list-table .col-phone      { width: 12%; }
+.customer-list-table .col-occupation { width: 12%; }
 
 @media (max-width: 768px) {
-    .customer-list-table {
-        min-width: 600px;
-    }
-    .customer-list-table .col-id {
-        width: 80px;
-    }
-    .customer-list-table .col-name {
-        width: 100px;
-    }
-    .customer-list-table .col-ktp {
-        width: 110px;
-    }
-    .customer-list-table .col-phone {
-        width: 90px;
-    }
-    .customer-list-table .col-occupation {
-        width: 80px;
-    }
+    .customer-list-table { min-width: 600px; }
+    .customer-list-table .col-id         { width: 80px;  }
+    .customer-list-table .col-name       { width: 100px; }
+    .customer-list-table .col-ktp        { width: 110px; }
+    .customer-list-table .col-phone      { width: 90px;  }
+    .customer-list-table .col-occupation { width: 80px;  }
 }
 
 
 /* ============================================================
-   P19. 订单列表表格列宽修复
+   P18. 订单列表表格列宽
    ============================================================ */
 .order-table {
     width: 100%;
     table-layout: fixed;
 }
 
-.order-table .col-id {
-    width: 9%;
-}
-.order-table .col-name {
-    width: 12%;
-}
-.order-table .col-amount {
-    width: 11%;
-}
-.order-table .col-months {
-    width: 8%;
-}
-.order-table .col-date {
-    width: 10%;
-}
-.order-table .col-status {
-    width: 8%;
-}
+.order-table .col-id     { width: 9%;  }
+.order-table .col-name   { width: 12%; }
+.order-table .col-amount { width: 11%; }
+.order-table .col-months { width: 8%;  }
+.order-table .col-date   { width: 10%; }
+.order-table .col-status { width: 8%;  }
 
 @media (max-width: 768px) {
-    .order-table {
-        min-width: 800px;
-    }
+    .order-table { min-width: 800px; }
 }
 
 
 /* ============================================================
-   P20. 黑名单表格列宽修复
+   P19. 黑名单表格列宽
    ============================================================ */
 .blacklist-table {
     width: 100%;
     table-layout: fixed;
 }
 
-.blacklist-table .col-id {
-    width: 12%;
-}
-.blacklist-table .col-name {
-    width: 18%;
-}
-.blacklist-table .col-phone {
-    width: 15%;
-}
+.blacklist-table .col-id    { width: 12%; }
+.blacklist-table .col-name  { width: 18%; }
+.blacklist-table .col-phone { width: 15%; }
 
 @media (max-width: 768px) {
-    .blacklist-table {
-        min-width: 500px;
-    }
+    .blacklist-table { min-width: 500px; }
 }
 
 
 /* ============================================================
-   P21. 异常表格列宽修复
+   P20. 异常表格列宽
    ============================================================ */
 .anomaly-table {
     width: 100%;
     table-layout: fixed;
 }
 
-.anomaly-table .col-id {
-    width: 12%;
-}
-.anomaly-table .col-name {
-    width: 18%;
-}
-.anomaly-table .col-phone {
-    width: 15%;
-}
-.anomaly-table .col-months {
-    width: 10%;
-}
-.anomaly-table .col-amount {
-    width: 15%;
-}
+.anomaly-table .col-id     { width: 12%; }
+.anomaly-table .col-name   { width: 18%; }
+.anomaly-table .col-phone  { width: 15%; }
+.anomaly-table .col-months { width: 10%; }
+.anomaly-table .col-amount { width: 15%; }
 
 @media (max-width: 768px) {
-    .anomaly-table {
-        min-width: 550px;
-    }
+    .anomaly-table { min-width: 550px; }
 }
