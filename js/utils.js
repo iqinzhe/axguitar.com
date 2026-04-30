@@ -740,19 +740,15 @@ return /^\d{16}$/.test(ktp);
 @returns {number} 管理费
 */
 Utils.calculateAdminFee = function(loanAmount) {
-if (!loanAmount || loanAmount <= 0) return 0;
+    if (!loanAmount || loanAmount <= 0) return 0;
+    if (loanAmount <= 500000) return 20000;
+    if (loanAmount <= 3000000) return 30000;
+    return Math.round(loanAmount * 0.01);
+};
 
-// 第一档：≤ Rp 500,000 → Rp 20,000
-if (loanAmount <= 500000) {
-return 20000;
-}
-
-// 第二档：Rp 500,000 < 金额 ≤ Rp 3,000,000 → Rp 30,000
 if (loanAmount <= 3000000) {
 return 30000;
 }
-
-// 第三档：> Rp 3,000,000 → 按 1% 收取，上不封顶
 return Math.round(loanAmount * 0.01);
 };
 
