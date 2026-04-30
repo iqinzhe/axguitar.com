@@ -89,21 +89,20 @@
 
 
 /* ============================================================
-   L3. 按钮系统（保留所有旧类名，内部结构统一）
+   L3. 按钮系统（统一基础样式 + 修饰符模式）
    ============================================================ */
 
-/* 原生按钮重置 */
+/* --- 原生按钮重置（唯一的基础规则源）--- */
 button {
     padding: var(--spacing-2) var(--spacing-3);
     border-radius: var(--radius-md);
-    border: 1px solid transparent;
+    border: 1px solid var(--border-medium);
     font-size: var(--font-sm);
     font-weight: 500;
     cursor: pointer;
     transition: var(--transition-fast);
     background: var(--bg-hover);
     color: var(--text-primary);
-    border-color: var(--border-medium);
 }
 button:hover {
     background: var(--border-light);
@@ -118,98 +117,99 @@ button:disabled {
     transform: none;
 }
 
-/* 返回按钮 */
+/* --- 返回按钮 --- */
 .btn-back {
     background: var(--text-secondary);
-    color: white;
-    border: none;
-    padding: var(--spacing-1) var(--spacing-4);
-    font-size: var(--font-md);
+    color: var(--text-white);
+    border-color: var(--text-secondary);
 }
 .btn-back:hover {
     background: var(--text-primary);
 }
 
-/* 打印按钮 */
+/* --- 打印按钮 --- */
 .btn-print {
     background: var(--bg-hover);
-    border: 1px solid var(--border-medium);
+    border-color: var(--border-medium);
     color: var(--text-secondary);
-    padding: var(--spacing-1) var(--spacing-4);
-    font-size: var(--font-md);
 }
 .btn-print:hover {
     background: var(--border-light);
     color: var(--text-primary);
 }
 
-/* 导出按钮 */
+/* --- 导出按钮 --- */
 .btn-export {
     background: var(--success-dark);
-    color: white;
-    border: none;
+    color: var(--text-white);
+    border-color: var(--success-dark);
 }
 .btn-export:hover {
     background: var(--success);
+    border-color: var(--success);
 }
 
-/* 平账按钮 */
+/* --- 平账按钮 --- */
 .btn-balance {
     background: var(--warning-dark);
-    color: white;
-    border: none;
+    color: var(--text-white);
+    border-color: var(--warning-dark);
 }
 .btn-balance:hover {
     background: var(--warning);
+    border-color: var(--warning);
 }
 
-/* 详情按钮 */
+/* --- 详情按钮 --- */
 .btn-detail {
     background: var(--primary-dark);
-    color: white;
-    border: none;
+    color: var(--text-white);
+    border-color: var(--primary-dark);
 }
 .btn-detail:hover {
     background: var(--primary);
+    border-color: var(--primary);
 }
 
-/* 语义化按钮 */
+/* --- 语义化按钮修饰符 --- */
 button.success,
 .btn-success {
     background: var(--success-dark);
-    color: white;
-    border: none;
+    color: var(--text-white);
+    border-color: var(--success-dark);
 }
 button.success:hover,
 .btn-success:hover {
     background: var(--success);
+    border-color: var(--success);
 }
 
 button.warning,
 .btn-warning {
     background: var(--warning-dark);
-    color: white;
-    border: none;
+    color: var(--text-white);
+    border-color: var(--warning-dark);
 }
 button.warning:hover,
 .btn-warning:hover {
     background: var(--warning);
+    border-color: var(--warning);
 }
 
 button.danger,
 .btn-danger {
     background: var(--danger-dark);
-    color: white;
-    border: none;
+    color: var(--text-white);
+    border-color: var(--danger-dark);
 }
 button.danger:hover,
 .btn-danger:hover {
     background: var(--danger);
+    border-color: var(--danger);
 }
 
-/* 提醒按钮高亮动画 */
+/* --- 提醒按钮高亮动画 --- */
 button.warning.highlight {
-    background: var(--warning-dark);
     animation: btn-pulse 1.5s infinite;
     font-weight: 600;
 }
@@ -219,19 +219,18 @@ button.warning.highlight {
     50% { opacity: 0.8; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3); }
 }
 
-/* 资金按钮 */
+/* --- 资金按钮 --- */
 .capital-btn {
     background: var(--primary-dark);
-    color: white;
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--font-sm);
-    border: none;
+    color: var(--text-white);
+    border-color: var(--primary-dark);
 }
 .capital-btn:hover {
     background: var(--primary);
+    border-color: var(--primary);
 }
 
-/* 全宽操作按钮 */
+/* --- 全宽操作按钮 --- */
 .btn-action {
     display: inline-flex !important;
     align-items: center;
@@ -250,20 +249,20 @@ button.warning.highlight {
 }
 .btn-action.success {
     background: var(--success-dark);
-    color: white;
+    color: var(--text-white);
 }
 .btn-action.success:hover {
     background: var(--success);
 }
 .btn-action.early-settle {
     background: #7c3aed;
-    color: white;
+    color: var(--text-white);
 }
 .btn-action.early-settle:hover {
     background: #6d28d9;
 }
 
-/* 操作按钮容器 */
+/* --- 操作按钮容器 --- */
 .action-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -304,11 +303,6 @@ button.warning.highlight {
     text-align: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-/* 语义化边框颜色（使用 data-type 属性，替代 nth-child）*/
-.cashflow-item[data-type="cash"] { border-left: 4px solid var(--warning); }
-.cashflow-item[data-type="bank"] { border-left: 4px solid var(--primary); }
-.cashflow-item[data-type="transfer"] { border-left: 4px solid var(--success); }
-
 .cashflow-item .label {
     font-size: var(--font-sm);
     color: var(--text-secondary);
@@ -338,11 +332,10 @@ button.warning.highlight {
 }
 .transfer-btn {
     width: 100%;
-    min-width: auto;
     padding: var(--spacing-2) var(--spacing-3);
     font-size: var(--font-sm);
     border-radius: var(--radius-md);
-    background: white;
+    background: var(--bg-card);
     border: 1px solid var(--border-medium);
     cursor: pointer;
     transition: var(--transition-fast);
@@ -542,7 +535,7 @@ button.warning.highlight {
     font-size: var(--font-md);
     font-weight: 600;
     background: var(--primary-dark);
-    color: white;
+    color: var(--text-white);
     border: none;
     border-radius: var(--radius-md);
     margin-top: 8px;
@@ -624,7 +617,7 @@ button.warning.highlight {
 }
 .error-btn {
     background: var(--primary-dark);
-    color: white;
+    color: var(--text-white);
     padding: var(--spacing-2) var(--spacing-4);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -1087,8 +1080,8 @@ button.warning.highlight {
     border-bottom: none;
 }
 .info-box.success-box {
-    border-left: 4px solid #10b981;
-    background: #f0fdf4;
+    border-left: 4px solid var(--success);
+    background: var(--success-light);
 }
 .info-box.warning-box {
     border-left: 4px solid var(--warning);
@@ -1096,7 +1089,7 @@ button.warning.highlight {
 }
 .info-box .amount-highlight {
     font-size: var(--font-lg);
-    color: #10b981;
+    color: var(--success);
     font-weight: 700;
 }
 
