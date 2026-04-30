@@ -1,4 +1,4 @@
-// app-payments.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
+// app-payments.js - v2.0 (徽章类名更新为统一 .badge 系统)
 
 window.APP = window.APP || {};
 
@@ -313,7 +313,7 @@ const PaymentsModule = {
                         '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
                         '<td class="text-center">' + (p.months || 1) + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
-                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-method-' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
                     '</tr>';
                 }
             }
@@ -334,7 +334,7 @@ const PaymentsModule = {
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(cumulativePaid) + '</td>' +
                         '<td class="amount ' + (remainingAfter <= 0 ? 'income' : 'expense') + '">' + Utils.formatCurrency(remainingAfter) + '</td>' +
-                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="text-center"><span class="badge badge-method-' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
                     '</tr>';
                 }
             }
@@ -382,7 +382,7 @@ const PaymentsModule = {
                     '<div class="card action-card fixed-repayment-card">' +
                         '<div class="card-header">' +
                             '<h3>📅 ' + t('fixed_repayment') + '</h3>' +
-                            '<span class="repayment-badge fixed-badge">' + t('fixed_repayment') + '</span>' +
+                            '<span class="badge badge-repayment-fixed">' + t('fixed_repayment') + '</span>' +
                         '</div>' +
                         '<div class="card-body">' +
                             '<div class="info-box success-box">' +
