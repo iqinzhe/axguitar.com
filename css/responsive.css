@@ -4,125 +4,47 @@
    ============================================================ */
 
 /* ============================================================
-   R1. 桌面端响应式（≥769px）- 修复表格列宽问题
+   R1. 桌面端响应式（≥769px）
    ============================================================ */
 @media (min-width: 769px) {
-    html {
-        font-size: 17px;
-    }
+    html { font-size: 17px; }
 
-    #app {
-        padding: var(--spacing-3) var(--spacing-4);
-    }
+    #app { padding: var(--spacing-3) var(--spacing-4); }
 
     .page-header h1,
-    .page-header h2 {
-        font-size: var(--font-xl);
-    }
+    .page-header h2 { font-size: var(--font-xl); }
 
-    .card h3 {
-        font-size: var(--font-md);
-    }
+    .card h3 { font-size: var(--font-md); }
 
-    .stat-card .stat-value {
-        font-size: var(--font-lg);
-    }
-
-    .stat-card .stat-label {
-        font-size: var(--font-xs);
-    }
+    .stat-card .stat-value { font-size: var(--font-lg); }
+    .stat-card .stat-label { font-size: var(--font-xs); }
 
     .data-table thead th,
-    .data-table tbody td {
-        font-size: var(--font-sm);
-    }
+    .data-table tbody td { font-size: var(--font-sm); }
 
     button,
-    .btn-small {
-        font-size: var(--font-sm);
-    }
+    .btn-small { font-size: var(--font-sm); }
 
-    .toolbar button {
-        font-size: var(--font-sm);
-    }
+    .toolbar button { font-size: var(--font-sm); }
 
-    .cashflow-item .value {
-        font-size: var(--font-xl);
-    }
+    .cashflow-item .value { font-size: var(--font-xl); }
+    .cashflow-item .label { font-size: var(--font-sm); }
 
-    .cashflow-item .label {
-        font-size: var(--font-sm);
-    }
-
-    .form-group label {
-        font-size: var(--font-sm);
-    }
+    .form-group label { font-size: var(--font-sm); }
 
     .form-group input,
     .form-group select,
-    .form-group textarea {
-        font-size: var(--font-md);
-    }
+    .form-group textarea { font-size: var(--font-md); }
 
-    .dashboard-footer-card p {
-        font-size: var(--font-sm);
-    }
+    .dashboard-footer-card p { font-size: var(--font-sm); }
 
-    /* 关键修复：覆盖手机端的表格强制设置 */
-    .table-container {
-        overflow-x: visible;
-    }
+    /* 桌面端表格正常显示，无需水平滚动 */
+    .table-container { overflow-x: visible; }
 
     .data-table {
         table-layout: auto !important;
         min-width: auto !important;
         width: 100%;
-    }
-
-    /* 黑名单表格/异常表格列宽修复 */
-    .anomaly-table,
-    .blacklist-table {
-        table-layout: fixed;
-    }
-
-    /* 客户ID列 */
-    .anomaly-table .col-id,
-    .blacklist-table .col-id,
-    .anomaly-table th:first-child,
-    .anomaly-table td:first-child,
-    .blacklist-table th:first-child,
-    .blacklist-table td:first-child {
-        width: 12%;
-    }
-
-    /* 姓名列 - 增加左侧间距 */
-    .anomaly-table .col-name,
-    .blacklist-table .col-name,
-    .anomaly-table th:nth-child(2),
-    .anomaly-table td:nth-child(2),
-    .blacklist-table th:nth-child(2),
-    .blacklist-table td:nth-child(2) {
-        width: 18%;
-        padding-left: 16px;
-    }
-
-    /* 电话列 - 禁止换行 */
-    .anomaly-table .col-phone,
-    .blacklist-table .col-phone,
-    .anomaly-table th:nth-child(3),
-    .anomaly-table td:nth-child(3),
-    .blacklist-table th:nth-child(3),
-    .blacklist-table td:nth-child(3) {
-        width: 15%;
-        white-space: nowrap;
-    }
-
-    /* 原因/操作列 - 自适应 */
-    .anomaly-table th:last-child,
-    .anomaly-table td:last-child,
-    .blacklist-table th:last-child,
-    .blacklist-table td:last-child {
-        width: auto;
     }
 }
 
@@ -131,24 +53,14 @@
    R2. 手机端响应式（≤768px）
    ============================================================ */
 @media (max-width: 768px) {
-    /* 根字体 */
-    html {
-        font-size: 15px;
-    }
+    html { font-size: 15px; }
 
-    #app {
-        padding: var(--spacing-2);
-    }
+    #app { padding: var(--spacing-2); }
 
-    /* 页面头部 */
     .page-header h1,
-    .page-header h2 {
-        font-size: var(--font-lg);
-    }
+    .page-header h2 { font-size: var(--font-lg); }
 
-    .card h3 {
-        font-size: var(--font-md);
-    }
+    .card h3 { font-size: var(--font-md); }
 
     /* 统计卡片：保持 2 列 */
     .stats-grid,
@@ -164,24 +76,14 @@
         padding: var(--spacing-2) var(--spacing-3);
     }
 
-    .stat-card .stat-value {
-        font-size: var(--font-md);
-    }
-
-    .stat-card .stat-label {
-        font-size: var(--font-xs);
-    }
+    .stat-card .stat-value { font-size: var(--font-md); }
+    .stat-card .stat-label { font-size: var(--font-xs); }
 
     /* 信息卡片：堆叠 */
-    .info-cards-row {
-        flex-direction: column;
-    }
+    .info-cards-row { flex-direction: column; }
+    .info-cards-row .info-item-card { min-width: auto; }
 
-    .info-cards-row .info-item-card {
-        min-width: auto;
-    }
-
-    /* 费用卡片：堆叠 + 内部元素纵向排列 */
+    /* 费用卡片：堆叠 */
     .fee-cards-row {
         grid-template-columns: 1fr;
         gap: var(--spacing-3);
@@ -193,15 +95,8 @@
         gap: var(--spacing-2);
     }
 
-    .fee-card .fee-card-body select {
-        width: 100%;
-        min-width: auto;
-    }
-
-    .fee-card .fee-card-body input {
-        width: 100%;
-        text-align: right;
-    }
+    .fee-card .fee-card-body select { width: 100%; min-width: auto; }
+    .fee-card .fee-card-body input  { width: 100%; text-align: right; }
 
     /* 按钮 */
     button,
@@ -222,7 +117,7 @@
         text-align: center;
     }
 
-    /* 表格：水平滚动，不换行 */
+    /* 表格：水平滚动 */
     .table-container {
         border: 1px solid var(--border-light);
         border-radius: var(--radius-md);
@@ -250,9 +145,6 @@
         white-space: nowrap;
     }
 
-    /* 长文本列允许有限换行 */
-    .data-table .col-address,
-    .data-table .col-desc,
     .data-table .desc-cell {
         white-space: normal;
         word-break: break-word;
@@ -260,15 +152,8 @@
         max-width: 160px;
     }
 
-    /* 异常表格 */
-    .anomaly-table {
-        min-width: 500px;
-    }
-
-    /* 操作行按钮：单行显示 */
-    .action-row td {
-        padding: 6px 5px !important;
-    }
+    /* 操作行按钮 */
+    .action-row td { padding: 6px 5px !important; }
 
     .action-row .action-label {
         font-size: var(--font-xs);
@@ -302,7 +187,6 @@
         text-overflow: ellipsis;
     }
 
-    /* 门店管理操作按钮 */
     .store-table .action-buttons .btn-small {
         padding: 6px 10px;
         font-size: 10px;
@@ -325,16 +209,21 @@
         padding: 8px 16px;
     }
 
-    /* 徽章缩小 */
+    /* 徽章缩小（使用新统一 .badge 类） */
+    .badge,
     .status-badge,
     .repayment-badge,
-    .payment-method-badge,
-    .locked-badge,
-    .reconciled-badge {
+    .payment-method-badge {
         font-size: 10px;
         padding: 1px 6px;
         white-space: nowrap;
         flex-shrink: 0;
+    }
+
+    .locked-badge,
+    .reconciled-badge {
+        font-size: 10px;
+        padding: 2px 8px;
     }
 
     /* 资金管理：单列 */
@@ -343,13 +232,8 @@
         gap: var(--spacing-2);
     }
 
-    .cashflow-item .value {
-        font-size: var(--font-lg);
-    }
-
-    .cashflow-item .label {
-        font-size: var(--font-xs);
-    }
+    .cashflow-item .value { font-size: var(--font-lg); }
+    .cashflow-item .label { font-size: var(--font-xs); }
 
     .transfer-btn {
         white-space: normal;
@@ -359,9 +243,7 @@
 
     /* 工具栏：2列 */
     .toolbar.admin-grid,
-    .toolbar.store-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    .toolbar.store-grid { grid-template-columns: repeat(2, 1fr); }
 
     /* 摘要网格：2列 */
     .summary-grid {
@@ -374,19 +256,11 @@
         gap: var(--spacing-1);
     }
 
-    .summary-item .label {
-        font-size: var(--font-xs);
-    }
-
-    .summary-item .value {
-        font-size: var(--font-xs);
-    }
+    .summary-item .label { font-size: var(--font-xs); }
+    .summary-item .value { font-size: var(--font-xs); }
 
     /* 缴费双列：单列 */
-    .payment-double-column {
-        flex-direction: column;
-        gap: var(--spacing-2);
-    }
+    .payment-double-column { flex-direction: column; gap: var(--spacing-2); }
 
     .payment-double-column .card {
         flex: none;
@@ -398,9 +272,7 @@
     }
 
     /* 底部卡片 */
-    .dashboard-footer-card p {
-        font-size: var(--font-xs);
-    }
+    .dashboard-footer-card p { font-size: var(--font-xs); }
 
     /* 表单：单列 */
     .form-grid,
@@ -410,56 +282,30 @@
         gap: var(--spacing-2);
     }
 
-    .form-grid-mobile-2 {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
+    .form-grid-mobile-2 { grid-template-columns: repeat(2, 1fr) !important; }
 
-    .order-first-row {
-        grid-template-columns: 1fr;
-    }
+    .order-first-row { grid-template-columns: 1fr; }
 
     .repayment-cards-row {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
     }
 
-    .info-display {
-        grid-template-columns: 1fr;
-    }
+    .info-display { grid-template-columns: 1fr; }
 
-    .info-display-item .info-label {
-        min-width: 70px;
-    }
+    .info-display-item .info-label { min-width: 70px; }
 
-    .payment-method-selector {
-        flex-direction: column;
-        gap: var(--spacing-1);
-    }
+    .payment-method-selector { flex-direction: column; gap: var(--spacing-1); }
+    .payment-method-row { flex-direction: column; align-items: flex-start; gap: var(--spacing-2); }
+    .address-option { flex-direction: column; gap: var(--spacing-1); }
 
-    .payment-method-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--spacing-2);
-    }
+    .interest-rate-group { max-width: none; }
 
-    .address-option {
-        flex-direction: column;
-        gap: var(--spacing-1);
-    }
-
-    .interest-rate-group {
-        max-width: none;
-    }
-
-    .form-group label {
-        font-size: var(--font-xs);
-    }
+    .form-group label { font-size: var(--font-xs); }
 
     .form-group input,
     .form-group select,
-    .form-group textarea {
-        font-size: var(--font-sm);
-    }
+    .form-group textarea { font-size: var(--font-sm); }
 
     /* 订单详情 */
     .order-detail-grid {
@@ -473,39 +319,24 @@
         gap: var(--spacing-4);
     }
 
-    .anomaly-card {
-        min-height: auto;
-    }
+    .anomaly-card { min-height: auto; }
 
     /* 备份页面 */
-    .backup-grid {
-        grid-template-columns: 1fr !important;
-        gap: var(--spacing-4);
-    }
+    .backup-grid,
+    .backup-grid-store { grid-template-columns: 1fr !important; gap: var(--spacing-4); }
 
     /* 门店现金流 */
-    .cashflow-card .cashflow-stats {
-        flex-direction: column;
-    }
+    .cashflow-card .cashflow-stats { flex-direction: column; }
+    .cashflow-card .cashflow-item-card { min-width: auto; }
 
-    .cashflow-card .cashflow-item-card {
-        min-width: auto;
-    }
-
-    /* 资金流水 */
+    /* 资金流水描述列 */
     .cashflow-table .flow-desc,
-    .capital-table .flow-desc {
-        max-width: 150px;
-    }
+    .capital-table .flow-desc { max-width: 150px; }
 
-    .expense-table .expense-desc {
-        max-width: 100px;
-    }
+    .expense-table .expense-desc { max-width: 100px; }
 
     /* 隐藏次要列 */
-    .mobile-hide {
-        display: none;
-    }
+    .mobile-hide { display: none; }
 
     /* 模态框筛选 */
     .modal-content > div:first-of-type {
@@ -555,12 +386,8 @@
         display: none !important;
     }
 
-    /* 显示仅打印元素 */
-    .print-only {
-        display: block !important;
-    }
+    .print-only { display: block !important; }
 
-    /* 链接 */
     a {
         color: #000 !important;
         text-decoration: none !important;
@@ -582,19 +409,13 @@
         font-size: 9pt !important;
         margin-bottom: 3px !important;
         border-bottom: none !important;
-        text-decoration: none !important;
         text-align: left !important;
     }
 
-    .card p {
-        text-align: left !important;
-    }
+    .card p { text-align: left !important; }
 
-    /* 页面头部 */
     .page-header h1,
-    .page-header h2 {
-        text-align: left !important;
-    }
+    .page-header h2 { text-align: left !important; }
 
     /* 表格 */
     .table-container {
@@ -621,37 +442,8 @@
         word-break: break-word !important;
     }
 
-    /* 打印时列宽恢复百分比 */
-    .col-id       { width: 8% !important; }
-    .col-name     { width: 14% !important; }
-    .col-ktp      { width: 12% !important; }
-    .col-phone    { width: 11% !important; }
-    .col-address  { width: 18% !important; }
-    .col-date     { width: 10% !important; }
-    .col-status   { width: 8% !important; }
-    .col-store    { width: 9% !important; }
-    .col-amount   { width: 12% !important; }
-    .col-type     { width: 12% !important; }
-    .col-months   { width: 7% !important; }
-    .col-method   { width: 9% !important; }
-    .col-desc     { width: auto !important; }
-    .col-action   { width: auto !important; }
-
-    /* 打印时资金流水/缴费表格 */
-    .cashflow-table .col-date,
-    .payment-table .col-date {
-        width: 10% !important;
-    }
-    .cashflow-table .col-type,
-    .payment-table .col-type {
-        width: 15% !important;
-    }
-    .cashflow-table .col-amount,
-    .payment-table .col-amount {
-        width: 15% !important;
-    }
-
     /* 徽章 */
+    .badge,
     .status-badge,
     .repayment-badge,
     .payment-method-badge {
@@ -698,9 +490,7 @@
         text-align: left !important;
     }
 
-    .stat-card:hover {
-        transform: none !important;
-    }
+    .stat-card:hover { transform: none !important; }
 
     /* 资金管理 */
     .cashflow-stats {
@@ -716,13 +506,8 @@
         padding: 6px !important;
     }
 
-    .cashflow-item .label {
-        text-align: left !important;
-    }
-
-    .cashflow-item .value {
-        text-align: left !important;
-    }
+    .cashflow-item .label { text-align: left !important; }
+    .cashflow-item .value { text-align: left !important; }
 
     /* 表单 */
     .form-grid,
@@ -732,17 +517,9 @@
         gap: 8px !important;
     }
 
-    .order-first-row {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
-
-    .fee-cards-row {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
-
-    .repayment-cards-row {
-        grid-template-columns: repeat(3, 1fr) !important;
-    }
+    .order-first-row { grid-template-columns: repeat(2, 1fr) !important; }
+    .fee-cards-row    { grid-template-columns: repeat(2, 1fr) !important; }
+    .repayment-cards-row { grid-template-columns: repeat(3, 1fr) !important; }
 
     .info-display {
         grid-template-columns: repeat(2, 1fr) !important;
@@ -813,19 +590,13 @@
         border: 1px solid #ccc !important;
     }
 
-    .anomaly-card:hover {
-        box-shadow: none !important;
-    }
+    .anomaly-card:hover { box-shadow: none !important; }
 
     /* 订单详情 */
-    .order-detail-grid {
-        grid-template-columns: 1fr 1fr !important;
-    }
+    .order-detail-grid { grid-template-columns: 1fr 1fr !important; }
 
     /* 备份页面 */
-    .backup-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
+    .backup-grid { grid-template-columns: repeat(2, 1fr) !important; }
 
     .backup-card {
         border: 1px solid #ccc !important;
@@ -844,9 +615,7 @@
 
     .btn-backup-primary,
     .btn-restore,
-    .btn-blacklist {
-        display: none !important;
-    }
+    .btn-blacklist { display: none !important; }
 
     /* 底部 */
     .dashboard-footer-card {
