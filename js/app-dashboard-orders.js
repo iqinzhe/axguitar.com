@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
+// app-dashboard-orders.js - v1.1 (过滤练习数据)
 
 window.APP = window.APP || {};
 
@@ -11,16 +11,14 @@ const DashboardOrders = {
         var profile = await SUPABASE.getCurrentProfile();
         var isAdmin = profile?.role === 'admin';
         
-        // 分页状态
         var PAGE_SIZE = 50;
         var currentFrom = 0;
         var totalCount = 0;
         var allOrders = [];
         
         try {
-            var filters = { status: APP.currentFilter, search: '' };
+            var filters = { status: APP.currentFilter, search: '', is_practice: false };
             
-            // 首次加载
             var result = await SUPABASE.getOrders(filters, currentFrom, currentFrom + PAGE_SIZE - 1);
             allOrders = result.data;
             totalCount = result.totalCount;
@@ -37,7 +35,6 @@ const DashboardOrders = {
             var baseCols = 9;
             var totalCols = isAdmin ? baseCols + 1 : baseCols;
             
-            // 渲染表格的辅助函数
             var renderOrdersIntoTable = function(orders, append) {
                 var tbody = document.getElementById('orderTableBody');
                 if (!tbody) return;
@@ -67,12 +64,11 @@ const DashboardOrders = {
                         '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterestForList) + '</td>' +
                         '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                         '<td class="date-cell text-center">' + formattedDueDate + '</td>' +
-                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span><td>' +
-                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span><tr>' +
+                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
                     
-                    // 操作行
                     var actionButtons = '';
                     if (o.status === 'active' && !isAdmin) {
                         actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>';
@@ -191,7 +187,6 @@ const DashboardOrders = {
         }
     },
     
-    // ==================== 加载更多订单 ====================
     loadMoreOrders: async function() {
         var state = window._orderTableState;
         if (!state) return;
@@ -226,11 +221,7 @@ const DashboardOrders = {
     },
     
     payOrder: function(orderId) {
-        console.log('payOrder 被调用，订单ID:', orderId);
-        if (!orderId) {
-            console.error('订单ID为空');
-            return;
-        }
+        if (!orderId) return;
         APP.navigateTo('payment', { orderId: orderId });
     },
 
@@ -376,29 +367,19 @@ const DashboardOrders = {
 
     deleteOrder: async function(orderId) {
         var lang = Utils.lang;
-        
         var confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
         if (!confirmed) return;
-        
         try {
             const order = await SUPABASE.getOrder(orderId);
-            if (!order) {
-                Utils.toast.error(Utils.t('order_not_found'));
-                return;
-            }
-            
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
             await Order.delete(orderId);
-            
             if (window.Audit) {
                 await window.Audit.log('order_delete', JSON.stringify({
-                    order_id: order.order_id,
-                    customer_name: order.customer_name,
-                    loan_amount: order.loan_amount,
-                    deleted_by: AUTH.user?.id,
+                    order_id: order.order_id, customer_name: order.customer_name,
+                    loan_amount: order.loan_amount, deleted_by: AUTH.user?.id,
                     deleted_at: new Date().toISOString()
                 }));
             }
-            
             Utils.toast.success(Utils.t('order_deleted'));
             await APP.showOrderTable();
         } catch (error) {
@@ -408,16 +389,12 @@ const DashboardOrders = {
         }
     },
 
-    // ==================== 打印订单 ====================
     printOrder: async function(orderId) {
         try {
             var result = await SUPABASE.getPaymentHistory(orderId);
             var order = result.order;
             var payments = result.payments;
-            if (!order) { 
-                Utils.toast.error(Utils.t('order_not_found'));
-                return; 
-            }
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
             var lang = Utils.lang;
             var t = Utils.t.bind(Utils); 
             var methodMap = { 
@@ -442,11 +419,9 @@ const DashboardOrders = {
                 else if (p.type === 'interest') typeText = t('interest');
                 else if (p.type === 'principal') typeText = t('principal');
                 else typeText = p.type || '-';
-                
                 var methodText = methodMap[p.payment_method] || (p.payment_method === 'cash' ? 'Tunai' : 'Bank');
                 var safeDate = Utils.formatDate(p.date);
                 var safeAmount = Utils.formatCurrency(p.amount);
-                
                 paymentRows += '<tr>' +
                     '<td class="col-date">' + safeDate + '</td>' +
                     '<td>' + typeText + '</td>' +
@@ -454,10 +429,7 @@ const DashboardOrders = {
                     '<td>' + methodText + '</td>' +
                 '</tr>';
             }
-            
-            if (paymentRows === '') {
-                paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + '</td>';
-            }
+            if (paymentRows === '') { paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + '</td>'; }
             
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
             var safeStoreName = Utils.escapeHtml(AUTH.getCurrentStoreName());
@@ -467,62 +439,42 @@ const DashboardOrders = {
             
             var printWindow = window.open('', '_blank');
             printWindow.document.write('' +
-                '<!DOCTYPE html>' +
-                '<html>' +
-                '<head>' +
-                    '<meta charset="UTF-8">' +
-                    '<title>JF! by Gadai - ' + safeOrderId + '</title>' +
-                    '<style>' +
-                        '*{margin:0;padding:0;box-sizing:border-box}' +
-                        'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:12px;padding:15mm}' +
-                        '.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}' +
-                        '.header h1{font-size:18px}' +
-                        '.section{border:1px solid #ccc;border-radius:6px;padding:12px;margin-bottom:12px}' +
-                        '.section h3{font-size:13px;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}' +
-                        '.info-row{display:flex;margin-bottom:4px}' +
-                        '.info-label{width:100px;font-weight:600}' +
-                        'table{width:100%;border-collapse:collapse;margin-top:8px}' +
-                        'th,td{border:1px solid #ccc;padding:6px;text-align:left}' +
-                        'th{background:#f5f5f5}' +
-                        '.text-right{text-align:right}' +
-                        '.footer{text-align:center;margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#666}' +
-                        '@media print{@page{size:A4;margin:15mm}}' +
-                    '</style>' +
-                '</head>' +
-                '<body>' +
-                    '<div class="header">' +
-                        '<h1>JF! by Gadai</h1>' +
-                        '<p>' + (lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证') + ' | <strong>' + safeOrderId + '</strong> | ' + safeCreatedAt + '</p>' +
-                    '</div>' +
-                    '<div class="section">' +
-                        '<h3>' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '</h3>' +
-                        '<div class="info-row"><div class="info-label">' + t('customer_name') + ':</div><div>' + safeCustomerName + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">KTP:</div><div>' + safeCustomerKtp + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('phone') + ':</div><div>' + safeCustomerPhone + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('address') + ':</div><div>' + safeCustomerAddress + '</div></div>' +
-                    '</div>' +
-                    '<div class="section">' +
-                        '<h3>' + (lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款') + '</h3>' +
-                        '<div class="info-row"><div class="info-label">' + t('collateral_name') + ':</div><div>' + safeCollateral + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('loan_amount') + ':</div><div>' + safeLoanAmount + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</div><div>' + safeRemainingPrincipal + '</div></div>' +
-                        '<div class="info-row"><div class="info-label">' + t('notes') + ':</div><div>' + safeNotes + '</div></div>' +
-                    '</div>' +
-                    '<div class="section">' +
-                        '<h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
-                        '<table>' +
-                            '<thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '支付方式') + '</th></td></thead>' +
-                            '<tbody>' + paymentRows + '</tbody>' +
-                        '</table>' +
-                    '</div>' +
-                    '<div class="footer">' +
-                        '<div>JF! by Gadai - ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + '</div>' +
-                        '<div>' + (lang === 'id' ? 'Toko' : '门店') + '：' + safeStoreName + '</div>' +
-                        '<div>' + (lang === 'id' ? 'Bukti ini dicetak secara elektronik, tidak perlu tanda tangan' : '本凭证为电子打印，无需签名') + '</div>' +
-                    '</div>' +
+                '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+                '<title>JF! by Gadai - ' + safeOrderId + '</title>' +
+                '<style>' +
+                    '*{margin:0;padding:0;box-sizing:border-box}' +
+                    'body{font-family:\'Segoe UI\',Arial,sans-serif;font-size:12px;padding:15mm}' +
+                    '.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}' +
+                    '.header h1{font-size:18px}' +
+                    '.section{border:1px solid #ccc;border-radius:6px;padding:12px;margin-bottom:12px}' +
+                    '.section h3{font-size:13px;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}' +
+                    '.info-row{display:flex;margin-bottom:4px}.info-label{width:100px;font-weight:600}' +
+                    'table{width:100%;border-collapse:collapse;margin-top:8px}' +
+                    'th,td{border:1px solid #ccc;padding:6px;text-align:left}th{background:#f5f5f5}' +
+                    '.text-right{text-align:right}' +
+                    '.footer{text-align:center;margin-top:20px;padding-top:8px;border-top:1px solid #ccc;font-size:10px;color:#666}' +
+                    '@media print{@page{size:A4;margin:15mm}}' +
+                '</style></head><body>' +
+                    '<div class="header"><h1>JF! by Gadai</h1>' +
+                    '<p>' + (lang === 'id' ? 'Bukti Transaksi Gadai' : '典当交易凭证') + ' | <strong>' + safeOrderId + '</strong> | ' + safeCreatedAt + '</p></div>' +
+                    '<div class="section"><h3>' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '</h3>' +
+                    '<div class="info-row"><div class="info-label">' + t('customer_name') + ':</div><div>' + safeCustomerName + '</div></div>' +
+                    '<div class="info-row"><div class="info-label">KTP:</div><div>' + safeCustomerKtp + '</div></div>' +
+                    '<div class="info-row"><div class="info-label">' + t('phone') + ':</div><div>' + safeCustomerPhone + '</div></div>' +
+                    '<div class="info-row"><div class="info-label">' + t('address') + ':</div><div>' + safeCustomerAddress + '</div></div></div>' +
+                    '<div class="section"><h3>' + (lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款') + '</h3>' +
+                    '<div class="info-row"><div class="info-label">' + t('collateral_name') + ':</div><div>' + safeCollateral + '</div></div>' +
+                    '<div class="info-row"><div class="info-label">' + t('loan_amount') + ':</div><div>' + safeLoanAmount + '</div></div>' +
+                    '<div class="info-row"><div class="info-label">' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</div><div>' + safeRemainingPrincipal + '</div></div>' +
+                    '<div class="info-row"><div class="info-label">' + t('notes') + ':</div><div>' + safeNotes + '</div></div></div>' +
+                    '<div class="section"><h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
+                    '<table><thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '支付方式') + '</th></tr></thead>' +
+                    '<tbody>' + paymentRows + '</tbody></table></div>' +
+                    '<div class="footer"><div>JF! by Gadai - ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + '</div>' +
+                    '<div>' + (lang === 'id' ? 'Toko' : '门店') + '：' + safeStoreName + '</div>' +
+                    '<div>' + (lang === 'id' ? 'Bukti ini dicetak secara elektronik, tidak perlu tanda tangan' : '本凭证为电子打印，无需签名') + '</div></div>' +
                     '<script>window.onload=function(){window.print();setTimeout(function(){window.close();},1000)};<\/script>' +
-                '</body>' +
-                '</html>'
+                '</body></html>'
             );
             printWindow.document.close();
         } catch (error) {
@@ -603,7 +555,7 @@ const DashboardOrders = {
                                 '</tr>' +
                             '</thead>' +
                             '<tbody>' + rows + '</tbody>' +
-                        '<tr>' +
+                        '</table>' +
                     '</div>' +
                 '</div>';
             
