@@ -1,7 +1,8 @@
-// app-dashboard-core.js - v1.1
+// app-dashboard-core.js - v1.2
 // 修复：
 //   问题6: 仪表盘净利润展示修复，使用 getCashFlowSummary() 新返回值
 //   问题1: 逐步迁移内联三元到 t() 体系
+//   新增: hasSentRemindersToday 方法供提醒按钮使用
 
 window.APP = window.APP || {};
 
@@ -471,6 +472,112 @@ const DashboardCore = {
             return false;
         }
         return true;
+    },
+
+    // ==================== 新增：检查今天是否已发送过提醒 ====================
+    hasSentRemindersToday: async function() {
+        try {
+            // 优先使用 SUPABASE 的方法
+            if (SUPABASE && typeof SUPABASE.hasSentRemindersToday === 'function') {
+                return await SUPABASE.hasSentRemindersToday();
+            }
+            // 降级方案：直接查询 reminder_logs 表
+            const today = Utils.getLocalToday();
+            const client = SUPABASE.getClient();
+            const { data, error } = await client
+                .from('reminder_logs')
+                .select('id', { count: 'exact' })
+                .eq('reminder_date', today);
+            if (error) return false;
+            return (data?.length || 0) > 0;
+        } catch (e) {
+            console.warn('[hasSentRemindersToday] 检查失败:', e);
+            return false;
+        }
+    },
+
+    // ==================== 发送每日提醒 ====================
+    sendDailyReminders: async function() {
+        var lang = Utils.lang;
+        
+        var reminderBtn = document.getElementById('reminderBtn');
+        if (reminderBtn && reminderBtn.disabled) {
+            Utils.toast.warning(lang === 'id' ? 'Pengingat sudah dikirim hari ini' : '今日提醒已发送过');
+            return;
+        }
+        
+        try {
+            const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
+            
+            if (needRemindOrders.length === 0) {
+                Utils.toast.info(lang === 'id' ? 'Tidak ada pesanan yang perlu diingatkan hari ini' : '今日没有需要提醒的订单');
+                return;
+            }
+            
+            var confirmed = await Utils.toast.confirm(
+                lang === 'id' 
+                    ? 'Kirim pengingat WhatsApp ke ' + needRemindOrders.length + ' nasabah yang akan jatuh tempo dalam 2 hari?'
+                    : '向 ' + needRemindOrders.length + ' 位将在2天内到期的客户发送 WhatsApp 提醒？'
+            );
+            
+            if (!confirmed) return;
+            
+            var successCount = 0;
+            var failCount = 0;
+            
+            for (var i = 0; i < needRemindOrders.length; i++) {
+                var order = needRemindOrders[i];
+                try {
+                    var storeWA = await SUPABASE.getStoreWANumber(order.store_id);
+                    if (!storeWA) {
+                        failCount++;
+                        continue;
+                    }
+                    
+                    var customerPhone = order.customer_phone;
+                    if (!customerPhone) {
+                        failCount++;
+                        continue;
+                    }
+                    
+                    var cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+                    if (!cleanPhone.startsWith('62') && !cleanPhone.startsWith('0')) {
+                        cleanPhone = '62' + cleanPhone;
+                    }
+                    if (cleanPhone.startsWith('0')) {
+                        cleanPhone = '62' + cleanPhone.substring(1);
+                    }
+                    
+                    var waMessage = window.APP.generateWAText(order, storeWA);
+                    var encodedMessage = encodeURIComponent(waMessage);
+                    var waUrl = 'https://wa.me/' + cleanPhone + '?text=' + encodedMessage;
+                    
+                    window.open(waUrl, '_blank');
+                    
+                    await SUPABASE.logReminder(order.id);
+                    successCount++;
+                    
+                    await new Promise(r => setTimeout(r, 500));
+                    
+                } catch (err) {
+                    console.error('发送提醒失败:', order.order_id, err);
+                    failCount++;
+                }
+            }
+            
+            Utils.toast.success(
+                lang === 'id'
+                    ? '✅ Pengingat terkirim: ' + successCount + ' berhasil, ' + failCount + ' gagal'
+                    : '✅ 提醒发送完成：成功 ' + successCount + ' 条，失败 ' + failCount + ' 条',
+                5000
+            );
+            
+            await this.refreshCurrentPage();
+            
+        } catch (error) {
+            console.error('sendDailyReminders error:', error);
+            Utils.toast.error(lang === 'id' ? 'Gagal mengirim pengingat' : '发送提醒失败');
+        }
     },
 
     init: async function() {
@@ -1013,7 +1120,6 @@ const DashboardCore = {
             const cashFlowCacheKey = 'cashflow_v2_' + (isAdmin ? 'admin' : storeId);
             const cashFlow = await DashboardCache.get(cashFlowCacheKey,
                 async () => {
-                    // 问题6修复：使用新版 getCashFlowSummary()，它返回正确的 netProfit
                     return await SUPABASE.getCashFlowSummary();
                 },
                 { ttl: 5 * 60 * 1000 }
@@ -1047,19 +1153,22 @@ const DashboardCore = {
             
             const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             const hasReminders = needRemindOrders.length > 0;
+            
+            // 修复：使用 hasSentRemindersToday 方法
             let hasSentToday = false;
             try {
-                hasSentToday = await (window.APP.hasSentRemindersToday ? window.APP.hasSentRemindersToday() : Promise.resolve(false));
+                hasSentToday = await this.hasSentRemindersToday();
             } catch(e) {
+                console.warn('hasSentRemindersToday 调用失败:', e);
                 hasSentToday = false;
             }
+            
             const btnDisabled = hasSentToday;
             const btnHighlight = hasReminders && !hasSentToday;
             
             const overdueOrdersCount = report.overdue_orders || 0;
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
             
-            // 问题6修复：使用正确的净利润值
             const netProfitBalance = cashFlow.netProfit?.balance || 0;
             const operatingIncome = cashFlow.netProfit?.operatingIncome || 0;
             const operatingExpense = cashFlow.netProfit?.operatingExpense || 0;
@@ -1077,7 +1186,6 @@ const DashboardCore = {
             
             var cardsHtml = '';
             for (var i = 0; i < cards.length; i++) {
-                // 问题6：净利润卡片添加子标题提示
                 var subtitleHtml = '';
                 if (cards[i].label === t('net_profit') && (operatingIncome > 0 || operatingExpense > 0)) {
                     subtitleHtml = '<div class="stat-subtitle" style="font-size:10px;color:var(--text-muted);margin-top:2px;">' +
@@ -1257,7 +1365,6 @@ const DashboardCore = {
     },
 
     _calculateCashFlowSummary: function(allFlows, isAdmin, storeId) {
-        // 问题6修复：排除本金进出，正确计算损益
         var cashInflow = 0, cashOutflow = 0;
         var bankInflow = 0, bankOutflow = 0;
         var operatingIncome = 0;
@@ -1272,7 +1379,6 @@ const DashboardCore = {
                 if (flow.source_target === 'cash') cashInflow += amount;
                 else if (flow.source_target === 'bank') bankInflow += amount;
                 
-                // 营业收入
                 if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') {
                     operatingIncome += amount;
                 }
@@ -1280,7 +1386,6 @@ const DashboardCore = {
                 if (flow.source_target === 'cash') cashOutflow += amount;
                 else if (flow.source_target === 'bank') bankOutflow += amount;
                 
-                // 运营支出
                 if (flow.flow_type === 'expense') {
                     operatingExpense += amount;
                 }
@@ -1376,6 +1481,8 @@ window.APP.currentPage = DashboardCore.currentPage;
 window.APP.currentOrderId = DashboardCore.currentOrderId;
 window.APP.currentCustomerId = DashboardCore.currentCustomerId;
 window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
+window.APP.sendDailyReminders = DashboardCore.sendDailyReminders.bind(DashboardCore);
+window.APP.hasSentRemindersToday = DashboardCore.hasSentRemindersToday.bind(DashboardCore);
 
 window.addEventListener('beforeunload', function() {
     if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
