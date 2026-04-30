@@ -1,4 +1,5 @@
-// app.js - 主入口文件 (v1.0)
+// app.js - 主入口文件 (v1.1)
+// 修复：问题1 - 迁移内联三元到 t() 体系，删除与 app-dashboard-core.js 重复的冗余代码
 
 window.APP = window.APP || {};
 
@@ -39,7 +40,14 @@ APP.toggleLanguage = function() {
     Utils.setLanguage(newLang);
     Utils.forceSyncLanguage();
     if (APP.isLoggedIn && APP.isLoggedIn()) {
-        APP.renderDashboard();
+        // 委托给 DashboardCore 的 refreshCurrentPage
+        if (typeof window.DashboardCore !== 'undefined' && DashboardCore.refreshCurrentPage) {
+            DashboardCore.refreshCurrentPage();
+        } else if (APP.currentPage === 'dashboard') {
+            APP.renderDashboard();
+        } else {
+            location.reload();
+        }
     } else {
         APP.showLogin();
     }
@@ -47,8 +55,9 @@ APP.toggleLanguage = function() {
 
 // 返回上一页
 APP.goBack = function() {
-    var validPages = ['dashboard', 'orderTable', 'customers', 'expenses', 'userManagement', 'storeManagement', 'anomaly', 'paymentHistory', 'backupRestore', 'blacklist'];
-    if (window.history.length > 1 && document.referrer) {
+    if (typeof window.DashboardCore !== 'undefined' && DashboardCore.goBack) {
+        DashboardCore.goBack();
+    } else if (window.history.length > 1 && document.referrer) {
         window.history.back();
     } else {
         APP.renderDashboard();
@@ -57,123 +66,37 @@ APP.goBack = function() {
 
 // 导航到指定页面
 APP.navigateTo = function(page, params) {
-    console.log('[APP] navigateTo:', page, params);
-    
+    if (typeof window.DashboardCore !== 'undefined' && DashboardCore.navigateTo) {
+        DashboardCore.navigateTo(page, params);
+        return;
+    }
+    // 降级方案（DashboardCore 未加载时）
+    console.log('[APP] navigateTo (fallback):', page, params);
     if (params) {
         if (params.orderId) APP.currentOrderId = params.orderId;
         if (params.customerId) APP.currentCustomerId = params.customerId;
     }
-    
     switch(page) {
-        case 'dashboard':
-            APP.renderDashboard();
-            break;
-        case 'orderTable':
-            if (typeof APP.showOrderTable === 'function') {
-                APP.showOrderTable();
-            } else {
-                console.error('showOrderTable 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'customers':
-            if (typeof APP.showCustomers === 'function') {
-                APP.showCustomers();
-            } else {
-                console.error('showCustomers 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'expenses':
-            if (typeof APP.showExpenses === 'function') {
-                APP.showExpenses();
-            } else {
-                console.error('showExpenses 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'userManagement':
-            if (typeof APP.showUserManagement === 'function') {
-                APP.showUserManagement();
-            } else {
-                console.error('showUserManagement 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'storeManagement':
-            if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') {
-                StoreManager.renderStoreManagement();
-            } else {
-                console.error('StoreManager.renderStoreManagement 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'anomaly':
-            if (typeof APP.showAnomaly === 'function') {
-                APP.showAnomaly();
-            } else {
-                console.error('showAnomaly 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'paymentHistory':
-            if (typeof APP.showPaymentHistory === 'function') {
-                APP.showPaymentHistory();
-            } else {
-                console.error('showPaymentHistory 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'backupRestore':
-            if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') {
-                BackupStorage.renderBackupUI();
-            } else {
-                console.error('BackupStorage.renderBackupUI 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'blacklist':
-            if (typeof APP.showBlacklist === 'function') {
-                APP.showBlacklist();
-            } else {
-                console.error('showBlacklist 未定义');
-                APP.renderDashboard();
-            }
-            break;
-        case 'payment':
-            if (params && params.orderId && typeof APP.showPayment === 'function') {
-                APP.showPayment(params.orderId);
-            } else {
-                console.error('showPayment 未定义或缺少orderId');
-                APP.renderDashboard();
-            }
-            break;
-        case 'viewOrder':
-            if (params && params.orderId && typeof APP.viewOrder === 'function') {
-                APP.viewOrder(params.orderId);
-            } else {
-                console.error('viewOrder 未定义或缺少orderId');
-                APP.renderDashboard();
-            }
-            break;
-        case 'createOrder':
-            if (params && params.customerId && typeof APP.createOrderForCustomer === 'function') {
-                APP.createOrderForCustomer(params.customerId);
-            } else {
-                console.error('createOrderForCustomer 未定义或缺少customerId');
-                APP.renderDashboard();
-            }
-            break;
-        default:
-            APP.renderDashboard();
+        case 'dashboard': APP.renderDashboard(); break;
+        case 'orderTable': if (typeof APP.showOrderTable === 'function') APP.showOrderTable(); else APP.renderDashboard(); break;
+        case 'customers': if (typeof APP.showCustomers === 'function') APP.showCustomers(); else APP.renderDashboard(); break;
+        case 'expenses': if (typeof APP.showExpenses === 'function') APP.showExpenses(); else APP.renderDashboard(); break;
+        case 'userManagement': if (typeof APP.showUserManagement === 'function') APP.showUserManagement(); else APP.renderDashboard(); break;
+        case 'storeManagement': if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') StoreManager.renderStoreManagement(); else APP.renderDashboard(); break;
+        case 'anomaly': if (typeof APP.showAnomaly === 'function') APP.showAnomaly(); else APP.renderDashboard(); break;
+        case 'paymentHistory': if (typeof APP.showCashFlowPage === 'function') APP.showCashFlowPage(); else if (typeof APP.showPaymentHistory === 'function') APP.showPaymentHistory(); else APP.renderDashboard(); break;
+        case 'backupRestore': if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') BackupStorage.renderBackupUI(); else APP.renderDashboard(); break;
+        case 'blacklist': if (typeof APP.showBlacklist === 'function') APP.showBlacklist(); else APP.renderDashboard(); break;
+        case 'payment': if (params && params.orderId && typeof APP.showPayment === 'function') APP.showPayment(params.orderId); else APP.renderDashboard(); break;
+        case 'viewOrder': if (params && params.orderId && typeof APP.viewOrder === 'function') APP.viewOrder(params.orderId); else APP.renderDashboard(); break;
+        case 'createOrder': if (params && params.customerId && typeof APP.createOrderForCustomer === 'function') APP.createOrderForCustomer(params.customerId); else APP.renderDashboard(); break;
+        default: APP.renderDashboard();
     }
 };
 
 // 打印当前页面
 APP.printCurrentPage = function() {
-    if (window.APP && typeof window.APP._doPrint === 'function') {
-        window.APP._doPrint();
-    } else if (window.DashboardPrint && typeof DashboardPrint.printCurrentPage === 'function') {
+    if (window.DashboardPrint && typeof DashboardPrint.printCurrentPage === 'function') {
         DashboardPrint.printCurrentPage();
     } else {
         window.print();
@@ -185,7 +108,7 @@ APP.exportData = function() {
     if (typeof BackupStorage !== 'undefined' && BackupStorage.backup) {
         BackupStorage.backup();
     } else {
-        Utils.toast.error('备份功能不可用');
+        Utils.toast.error(Utils.t('backup_restore') + ' ' + (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
     }
 };
 
@@ -199,7 +122,7 @@ APP.importData = function() {
             if (typeof BackupStorage !== 'undefined' && BackupStorage.restore) {
                 await BackupStorage.restore(e.target.files[0]);
             } else {
-                Utils.toast.error('恢复功能不可用');
+                Utils.toast.error(Utils.t('backup_restore') + ' ' + (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
             }
         }
     };
@@ -270,19 +193,22 @@ APP.showLogin = function() {
 
 // 登录方法
 APP.login = async function() {
+    var lang = Utils.lang;
+    var t = Utils.t.bind(Utils);
+    
     var username = document.getElementById('loginUsername').value.trim();
     var password = document.getElementById('loginPassword').value;
     var rememberMe = document.getElementById('rememberMe')?.checked || false;
     
     if (!username || !password) {
-        Utils.toast.warning(Utils.lang === 'id' ? 'Harap isi username dan password' : '请填写用户名和密码');
+        Utils.toast.warning(t('fill_all_fields'));
         return;
     }
     
     var loginBtn = document.querySelector('.login-btn');
     var originalText = loginBtn.innerHTML;
     loginBtn.disabled = true;
-    loginBtn.innerHTML = '⏳ ' + (Utils.lang === 'id' ? 'Memproses...' : '登录中...');
+    loginBtn.innerHTML = '⏳ ' + (lang === 'id' ? 'Memproses...' : '登录中...');
     
     try {
         var result = await AUTH.login(username, password);
@@ -296,8 +222,14 @@ APP.login = async function() {
                 localStorage.removeItem('jf_remembered_user');
             }
             
-            Utils.toast.success(Utils.lang === 'id' ? '✅ Login berhasil' : '✅ 登录成功');
-            APP.renderDashboard();
+            Utils.toast.success(lang === 'id' ? '✅ Login berhasil' : '✅ 登录成功');
+            
+            // 委托给 DashboardCore.init 处理页面路由
+            if (typeof window.DashboardCore !== 'undefined' && DashboardCore.router) {
+                await DashboardCore.router();
+            } else {
+                APP.renderDashboard();
+            }
         } else {
             loginBtn.disabled = false;
             loginBtn.innerHTML = originalText;
@@ -306,25 +238,30 @@ APP.login = async function() {
         console.error('Login error:', error);
         loginBtn.disabled = false;
         loginBtn.innerHTML = originalText;
-        Utils.toast.error(Utils.lang === 'id' ? 'Login gagal: ' + error.message : '登录失败：' + error.message);
+        Utils.toast.error(lang === 'id' ? 'Login gagal: ' + error.message : '登录失败：' + error.message);
     }
 };
 
 // 退出登录
 APP.logout = async function() {
-    var confirmed = await Utils.toast.confirm(
-        Utils.lang === 'id' ? 'Yakin ingin keluar?' : '确认退出登录？'
-    );
+    var lang = Utils.lang;
+    var confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
     if (confirmed) {
         await AUTH.logout();
         APP.clearPageState();
         APP.showLogin();
-        Utils.toast.success(Utils.lang === 'id' ? '✅ Berhasil keluar' : '✅ 已退出登录');
+        Utils.toast.success(lang === 'id' ? '✅ Berhasil keluar' : '✅ 已退出登录');
     }
 };
 
 // 渲染仪表盘
 APP.renderDashboard = async function() {
+    // 委托给 DashboardCore
+    if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
+        return await DashboardCore.renderDashboard();
+    }
+    
+    // 降级方案：简单仪表盘
     APP.currentPage = 'dashboard';
     APP.saveCurrentPageState();
     
@@ -343,12 +280,12 @@ APP.renderDashboard = async function() {
             '<div class="dashboard-container">' +
                 '<div class="dashboard-header">' +
                     '<div class="dashboard-title">' +
-                        '<h1>🏦 ' + (lang === 'id' ? 'Dashboard' : '仪表盘') + '</h1>' +
-                        '<p>' + (lang === 'id' ? 'Selamat datang' : '欢迎') + ', ' + Utils.escapeHtml(userName) + ' @ ' + Utils.escapeHtml(storeName) + '</p>' +
+                        '<h1>🏦 ' + t('dashboard_title') + '</h1>' +
+                        '<p>' + t('welcome') + ', ' + Utils.escapeHtml(userName) + ' @ ' + Utils.escapeHtml(storeName) + '</p>' +
                     '</div>' +
                     '<div class="dashboard-actions">' +
                         '<button onclick="APP.toggleLanguage()" class="lang-btn">🌐 ' + (lang === 'id' ? '中文' : 'Bahasa') + '</button>' +
-                        '<button onclick="APP.logout()" class="logout-btn">🚪 ' + (lang === 'id' ? 'Keluar' : '退出') + '</button>' +
+                        '<button onclick="APP.logout()" class="logout-btn">🚪 ' + t('save_exit') + '</button>' +
                     '</div>' +
                 '</div>' +
                 
@@ -356,26 +293,26 @@ APP.renderDashboard = async function() {
                     '<div class="stat-card"><div class="stat-value">' + report.total_orders + '</div><div class="stat-label">' + t('total_orders') + '</div></div>' +
                     '<div class="stat-card"><div class="stat-value">' + report.active_orders + '</div><div class="stat-label">' + t('active') + '</div></div>' +
                     '<div class="stat-card"><div class="stat-value">' + Utils.formatCurrency(report.total_loan_amount) + '</div><div class="stat-label">' + t('total_loan') + '</div></div>' +
-                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(cashFlow.netProfit?.balance || 0) + '</div><div class="stat-label">' + (lang === 'id' ? 'Laba Bersih' : '净利润') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(cashFlow.netProfit?.balance || 0) + '</div><div class="stat-label">' + t('net_profit') + '</div></div>' +
                 '</div>' +
                 
                 '<div class="dashboard-grid">' +
-                    '<div class="dashboard-card" onclick="APP.navigateTo(\'orderTable\')"><div class="card-icon">📋</div><div class="card-title">' + t('order_list') + '</div><div class="card-desc">' + (lang === 'id' ? 'Kelola semua pesanan' : '管理所有订单') + '</div></div>' +
-                    '<div class="dashboard-card" onclick="APP.navigateTo(\'customers\')"><div class="card-icon">👥</div><div class="card-title">' + t('customers') + '</div><div class="card-desc">' + (lang === 'id' ? 'Data nasabah' : '客户信息管理') + '</div></div>' +
-                    '<div class="dashboard-card" onclick="APP.navigateTo(\'expenses\')"><div class="card-icon">📝</div><div class="card-title">' + t('expenses') + '</div><div class="card-desc">' + (lang === 'id' ? 'Pengeluaran operasional' : '运营支出管理') + '</div></div>' +
-                    '<div class="dashboard-card" onclick="APP.navigateTo(\'paymentHistory\')"><div class="card-icon">💰</div><div class="card-title">' + t('payment_history') + '</div><div class="card-desc">' + (lang === 'id' ? 'Riwayat arus kas' : '资金流水记录') + '</div></div>' +
-                    '<div class="dashboard-card" onclick="APP.showCapitalModal()"><div class="card-icon">🏦</div><div class="card-title">' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</div><div class="card-desc">' + (lang === 'id' ? 'Lihat transaksi kas' : '查看现金交易记录') + '</div></div>' +
-                    '<div class="dashboard-card" onclick="APP.navigateTo(\'anomaly\')"><div class="card-icon">⚠️</div><div class="card-title">' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</div><div class="card-desc">' + (lang === 'id' ? 'Pesanan terlambat & blacklist' : '逾期订单和黑名单') + '</div></div>';
+                    '<div class="dashboard-card" onclick="APP.navigateTo(\'orderTable\')"><div class="card-icon">📋</div><div class="card-title">' + t('order_list') + '</div><div class="card-desc">' + t('manage_orders') + '</div></div>' +
+                    '<div class="dashboard-card" onclick="APP.navigateTo(\'customers\')"><div class="card-icon">👥</div><div class="card-title">' + t('customers') + '</div><div class="card-desc">' + t('manage_customers') + '</div></div>' +
+                    '<div class="dashboard-card" onclick="APP.navigateTo(\'expenses\')"><div class="card-icon">📝</div><div class="card-title">' + t('expenses') + '</div><div class="card-desc">' + t('manage_expenses') + '</div></div>' +
+                    '<div class="dashboard-card" onclick="APP.navigateTo(\'paymentHistory\')"><div class="card-icon">💰</div><div class="card-title">' + t('payment_history') + '</div><div class="card-desc">' + t('view_cashflow') + '</div></div>' +
+                    '<div class="dashboard-card" onclick="APP.showCapitalModal()"><div class="card-icon">🏦</div><div class="card-title">' + t('payment_history') + '</div><div class="card-desc">' + t('view_transactions') + '</div></div>' +
+                    '<div class="dashboard-card" onclick="APP.navigateTo(\'anomaly\')"><div class="card-icon">⚠️</div><div class="card-title">' + t('anomaly_title') + '</div><div class="card-desc">' + t('abnormal_status') + '</div></div>';
         
         if (isAdmin) {
             document.getElementById("app").innerHTML +=
-                '<div class="dashboard-card" onclick="APP.navigateTo(\'userManagement\')"><div class="card-icon">👥</div><div class="card-title">' + t('user_management') + '</div><div class="card-desc">' + (lang === 'id' ? 'Kelola pengguna' : '用户管理') + '</div></div>' +
-                '<div class="dashboard-card" onclick="StoreManager.renderStoreManagement()"><div class="card-icon">🏪</div><div class="card-title">' + t('store_management') + '</div><div class="card-desc">' + (lang === 'id' ? 'Kelola toko' : '门店管理') + '</div></div>' +
-                '<div class="dashboard-card" onclick="APP.navigateTo(\'backupRestore\')"><div class="card-icon">💾</div><div class="card-title">' + t('backup_restore') + '</div><div class="card-desc">' + (lang === 'id' ? 'Cadangkan & pulihkan' : '备份与恢复') + '</div></div>' +
-                '<div class="dashboard-card" onclick="APP.navigateTo(\'blacklist\')"><div class="card-icon">🚫</div><div class="card-title">' + (lang === 'id' ? 'Blacklist' : '黑名单') + '</div><div class="card-desc">' + (lang === 'id' ? 'Kelola blacklist' : '黑名单管理') + '</div></div>';
+                '<div class="dashboard-card" onclick="APP.navigateTo(\'userManagement\')"><div class="card-icon">👥</div><div class="card-title">' + t('user_management') + '</div><div class="card-desc">' + t('manage_users') + '</div></div>' +
+                '<div class="dashboard-card" onclick="StoreManager.renderStoreManagement()"><div class="card-icon">🏪</div><div class="card-title">' + t('store_management') + '</div><div class="card-desc">' + t('manage_stores') + '</div></div>' +
+                '<div class="dashboard-card" onclick="APP.navigateTo(\'backupRestore\')"><div class="card-icon">💾</div><div class="card-title">' + t('backup_restore') + '</div><div class="card-desc">' + t('backup_restore_data') + '</div></div>' +
+                '<div class="dashboard-card" onclick="APP.navigateTo(\'blacklist\')"><div class="card-icon">🚫</div><div class="card-title">' + t('blacklist_title') + '</div><div class="card-desc">' + t('manage_blacklist') + '</div></div>';
         } else {
             document.getElementById("app").innerHTML +=
-                '<div class="dashboard-card" onclick="APP.navigateTo(\'blacklist\')"><div class="card-icon">🚫</div><div class="card-title">' + (lang === 'id' ? 'Blacklist' : '黑名单') + '</div><div class="card-desc">' + (lang === 'id' ? 'Lihat blacklist' : '查看黑名单') + '</div></div>';
+                '<div class="dashboard-card" onclick="APP.navigateTo(\'blacklist\')"><div class="card-icon">🚫</div><div class="card-title">' + t('blacklist_title') + '</div><div class="card-desc">' + t('view_blacklist') + '</div></div>';
         }
         
         document.getElementById("app").innerHTML += '</div></div>';
@@ -389,11 +326,12 @@ APP.renderDashboard = async function() {
 // 发送 WA 提醒
 APP.sendWAReminder = async function(orderId) {
     var lang = Utils.lang;
+    var t = Utils.t.bind(Utils);
     try {
         var result = await SUPABASE.getPaymentHistory(orderId);
         var order = result.order;
         if (!order) {
-            Utils.toast.error(lang === 'id' ? 'Pesanan tidak ditemukan' : '订单不存在');
+            Utils.toast.error(t('order_not_found'));
             return;
         }
         
@@ -432,63 +370,7 @@ APP.sendWAReminder = async function(orderId) {
     }
 };
 
-// 生成 WA 文本
-APP.generateWAText = function(order, senderNumber) {
-    var lang = Utils.lang;
-    var monthlyRate = order.agreed_interest_rate || 0.08;
-    var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-    var currentMonthlyInterest = remainingPrincipal * monthlyRate;
-    var dueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
-    var repaymentType = order.repayment_type || 'flexible';
-    
-    if (lang === 'id') {
-        if (repaymentType === 'fixed') {
-            var monthlyFixedPayment = order.monthly_fixed_payment || 0;
-            var paidMonths = order.fixed_paid_months || 0;
-            var totalMonths = order.repayment_term || '?';
-            return '🔔 *Pengingat Pembayaran - JF!*\n\n' +
-                'Kepada Bpk/Ibu ' + order.customer_name + ',\n\n' +
-                '📋 ' + order.order_id + '\n' +
-                '💰 ' + Utils.formatCurrency(monthlyFixedPayment) + '\n' +
-                '📅 ' + dueDate + '\n\n' +
-                'Angsuran ke-' + (paidMonths + 1) + '/' + totalMonths + '\n\n' +
-                'Harap bayar tepat waktu. Terima kasih.\n\n' +
-                '- ' + (senderNumber || 'JF! by Gadai');
-        } else {
-            return '🔔 *Pengingat Pembayaran - JF!*\n\n' +
-                'Kepada Bpk/Ibu ' + order.customer_name + ',\n\n' +
-                '📋 ' + order.order_id + '\n' +
-                '💰 ' + Utils.formatCurrency(currentMonthlyInterest) + '\n' +
-                '📅 ' + dueDate + '\n\n' +
-                'Harap bayar tepat waktu. Terima kasih.\n\n' +
-                '- ' + (senderNumber || 'JF! by Gadai');
-        }
-    } else {
-        if (repaymentType === 'fixed') {
-            var monthlyFixedPaymentZh = order.monthly_fixed_payment || 0;
-            var paidMonthsZh = order.fixed_paid_months || 0;
-            var totalMonthsZh = order.repayment_term || '?';
-            return '🔔 *缴费提醒 - JF!*\n\n' +
-                '尊敬的 ' + order.customer_name + '，\n\n' +
-                '📋 ' + order.order_id + '\n' +
-                '💰 ' + Utils.formatCurrency(monthlyFixedPaymentZh) + '\n' +
-                '📅 ' + dueDate + '\n\n' +
-                '第' + (paidMonthsZh + 1) + '/' + totalMonthsZh + '期\n\n' +
-                '请按时缴费。感谢信任。\n\n' +
-                '- ' + (senderNumber || 'JF! by Gadai');
-        } else {
-            return '🔔 *缴费提醒 - JF!*\n\n' +
-                '尊敬的 ' + order.customer_name + '，\n\n' +
-                '📋 ' + order.order_id + '\n' +
-                '💰 ' + Utils.formatCurrency(currentMonthlyInterest) + '\n' +
-                '📅 ' + dueDate + '\n\n' +
-                '请按时缴费。感谢信任。\n\n' +
-                '- ' + (senderNumber || 'JF! by Gadai');
-        }
-    }
-};
-
 // 导出 APP 到全局
 window.APP = APP;
 
-console.log('[APP] app.js 加载完成，APP.init 已定义:', typeof APP.init);
+console.log('[APP] app.js 加载完成');
