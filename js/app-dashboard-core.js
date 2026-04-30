@@ -1,1328 +1,464 @@
-// app-dashboard-core.js - v1.1 (过滤练习数据)
+// app-dashboard-orders.js - v1.1 (过滤练习数据)
 
 window.APP = window.APP || {};
 
-// ========== 逾期更新定时器 ==========
-let _overdueUpdateInterval = null;
-
-// ==================== 模块降级通知 ====================
-const ModuleFallback = {
-    _degradedModules: {},
-    
-    async safeCall(moduleName, fn, args, fallbackFn) {
-        try {
-            if (typeof fn !== 'function') throw new Error('module_not_loaded');
-            return await fn.apply(null, args || []);
-        } catch (error) {
-            var lang = Utils.lang;
-            var moduleKey = moduleName + '_' + (error.message || 'unknown');
-            
-            if (!this._degradedModules[moduleKey]) {
-                this._degradedModules[moduleKey] = true;
-                
-                var msg = '';
-                if (error.message === 'module_not_loaded') {
-                    msg = lang === 'id'
-                        ? '⚠️ 模块 "' + moduleName + '" 加载失败，部分功能可能不可用。'
-                        : '⚠️ Module "' + moduleName + '" failed to load.';
-                } else {
-                    msg = lang === 'id'
-                        ? '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message
-                        : '⚠️ Module "' + moduleName + '" error: ' + error.message;
-                }
-                
-                if (window.Toast) {
-                    window.Toast.warning(msg, 5000);
-                } else {
-                    setTimeout(function() { alert(msg); }, 300);
-                }
-                ModuleFallback._showBanner(moduleName, error.message);
-            }
-            
-            setTimeout(function() {
-                delete ModuleFallback._degradedModules[moduleKey];
-            }, 10 * 60 * 1000);
-            
-            if (typeof fallbackFn === 'function') return await fallbackFn();
-            return null;
-        }
-    },
-    
-    _showBanner(moduleName, errorMsg) {
-        var existingBanner = document.getElementById('moduleFallbackBanner');
-        if (existingBanner) {
-            var content = existingBanner.querySelector('.info-bar-content');
-            if (content && content.textContent.indexOf(moduleName) === -1) {
-                content.textContent += ' | ' + moduleName;
-            }
-            return;
-        }
-        
-        var lang = Utils.lang;
-        var banner = document.createElement('div');
-        banner.id = 'moduleFallbackBanner';
-        banner.className = 'info-bar warning';
-        banner.style.cssText = 'position:sticky;top:0;z-index:9999;margin-bottom:12px;border-radius:6px;';
-        banner.innerHTML = '' +
-            '<span class="info-bar-icon">⚠️</span>' +
-            '<div class="info-bar-content">' +
-                '<strong>' + (lang === 'id' ? '功能降级通知' : 'Feature Degraded') + '</strong> — ' +
-                (lang === 'id' 
-                    ? '模块 "' + moduleName + '" 加载失败，请刷新页面。'
-                    : 'Module "' + moduleName + '" failed to load.') +
-            '</div>' +
-            '<button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 8px;" title="' + (lang === 'id' ? '关闭' : 'Close') + '">✖</button>';
-        
-        var app = document.getElementById('app');
-        if (app && app.firstChild) {
-            app.insertBefore(banner, app.firstChild);
-        }
-    },
-    
-    clearAll() {
-        this._degradedModules = {};
-        var banner = document.getElementById('moduleFallbackBanner');
-        if (banner) banner.remove();
-    }
-};
-
-window.ModuleFallback = ModuleFallback;
-
-const DashboardCache = JFCache;
-
-const DashboardStatsHelper = {
-    async getDashboardStats(profile) {
-        const isAdmin = profile?.role === 'admin';
-        const storeId = profile?.store_id;
-        
-        const client = SUPABASE.getClient();
-        
-        const totalCountPromise = (() => {
-            let q = client.from('orders').select('*', { count: 'exact', head: true });
-            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-            q = q.eq('is_practice', false);
-            return q;
-        })();
-        
-        const activeCountPromise = (() => {
-            let q = client.from('orders').select('*', { count: 'exact', head: true });
-            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-            q = q.eq('status', 'active');
-            q = q.eq('is_practice', false);
-            return q;
-        })();
-        
-        const completedCountPromise = (() => {
-            let q = client.from('orders').select('*', { count: 'exact', head: true });
-            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-            q = q.eq('status', 'completed');
-            q = q.eq('is_practice', false);
-            return q;
-        })();
-        
-        const overdueCountPromise = (() => {
-            let q = client.from('orders').select('*', { count: 'exact', head: true });
-            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-            q = q.eq('status', 'active').gte('overdue_days', 1);
-            q = q.eq('is_practice', false);
-            return q;
-        })();
-        
-        const activeOrdersPromise = (() => {
-            let q = client.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount');
-            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-            q = q.eq('status', 'active');
-            q = q.eq('is_practice', false);
-            return q;
-        })();
-        
-        const allOrdersLoanPromise = (() => {
-            let q = client.from('orders').select('loan_amount');
-            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-            q = q.eq('is_practice', false);
-            return q;
-        })();
-        
-        const [
-            totalCountResult,
-            activeCountResult,
-            completedCountResult,
-            overdueCountResult,
-            activeOrdersData,
-            loanSumData
-        ] = await Promise.all([
-            totalCountPromise,
-            activeCountPromise,
-            completedCountPromise,
-            overdueCountPromise,
-            activeOrdersPromise,
-            allOrdersLoanPromise
-        ]);
-        
-        let totalAdminFees = 0;
-        let totalServiceFees = 0;
-        let totalInterest = 0;
-        let totalPrincipal = 0;
-        let totalActiveLoanAmount = 0;
-        
-        const activeOrders = activeOrdersData?.data || [];
-        for (const order of activeOrders) {
-            if (order.admin_fee_paid) totalAdminFees += (order.admin_fee || 0);
-            totalServiceFees += (order.service_fee_paid || 0);
-            totalInterest += (order.interest_paid_total || 0);
-            totalPrincipal += (order.principal_paid || 0);
-            totalActiveLoanAmount += (order.loan_amount || 0);
-        }
-        
-        let totalLoanAmount = 0;
-        const allOrdersLoanData = loanSumData?.data || [];
-        for (const order of allOrdersLoanData) {
-            totalLoanAmount += (order.loan_amount || 0);
-        }
-        
-        return {
-            total_orders: totalCountResult?.count || 0,
-            active_orders: activeCountResult?.count || 0,
-            completed_orders: completedCountResult?.count || 0,
-            overdue_orders: overdueCountResult?.count || 0,
-            total_loan_amount: totalLoanAmount,
-            total_active_loan_amount: totalActiveLoanAmount,
-            total_admin_fees: totalAdminFees,
-            total_service_fees: totalServiceFees,
-            total_interest: totalInterest,
-            total_principal: totalPrincipal
-        };
-    },
-    
-    async getAnomalyStats(profile) {
-        const isAdmin = profile?.role === 'admin';
-        const storeId = profile?.store_id;
-        
-        const client = SUPABASE.getClient();
-        
-        let overdueQuery = client.from('orders').select('*', { count: 'exact', head: true });
-        if (!isAdmin && storeId) overdueQuery = overdueQuery.eq('store_id', storeId);
-        overdueQuery = overdueQuery.eq('status', 'active').gte('overdue_days', 30);
-        overdueQuery = overdueQuery.eq('is_practice', false);
-        
-        let blacklistQuery = client.from('blacklist').select('*', { count: 'exact', head: true });
-        
-        const [overdue30Result, blacklistResult] = await Promise.all([
-            overdueQuery,
-            blacklistQuery
-        ]);
-        
-        return {
-            overdue30Count: overdue30Result?.count || 0,
-            blacklistCount: blacklistResult?.count || 0
-        };
-    },
-    
-    async getMonthlyStoreRanking(profile, stores) {
-        const isAdmin = profile?.role === 'admin';
-        if (!isAdmin) return null;
-        
-        const today = new Date();
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-        const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-        const monthEnd = today.toISOString().split('T')[0];
-        
-        const client = SUPABASE.getClient();
-        
-        const { data: monthlyOrders, error } = await client
-            .from('orders')
-            .select('id, store_id, loan_amount, status, created_at, overdue_days')
-            .eq('is_practice', false)
-            .gte('created_at', monthStart)
-            .lte('created_at', monthEnd);
-        
-        if (error) throw error;
-        
-        const { data: monthlyFlows } = await client
-            .from('cash_flow_records')
-            .select('store_id, amount, order_id')
-            .eq('direction', 'inflow')
-            .eq('is_voided', false)
-            .gte('recorded_at', monthStart);
-        
-        const flowAmountByOrder = {};
-        if (monthlyFlows) {
-            for (const flow of monthlyFlows) {
-                if (flow.order_id) {
-                    flowAmountByOrder[flow.order_id] = (flowAmountByOrder[flow.order_id] || 0) + (flow.amount || 0);
-                }
-            }
-        }
-        
-        const storeInfoMap = {};
-        for (const store of stores) {
-            storeInfoMap[store.id] = {
-                id: store.id,
-                name: store.name,
-                code: store.code,
-                isActive: store.is_active !== false
-            };
-        }
-        
-        const storeStats = {};
-        for (const order of (monthlyOrders || [])) {
-            const s = storeInfoMap[order.store_id];
-            if (!s || !s.isActive || s.code === 'STORE_000') continue;
-            
-            if (!storeStats[order.store_id]) {
-                storeStats[order.store_id] = {
-                    id: order.store_id,
-                    name: s.name,
-                    code: s.code,
-                    orderCount: 0,
-                    totalLoanOutflow: 0,
-                    badOrders: 0,
-                    totalRecovery: 0
-                };
-            }
-            
-            storeStats[order.store_id].orderCount++;
-            storeStats[order.store_id].totalLoanOutflow += (order.loan_amount || 0);
-            
-            if ((order.overdue_days || 0) >= 15 && order.status === 'active') {
-                storeStats[order.store_id].badOrders++;
-            }
-            
-            storeStats[order.store_id].totalRecovery += (flowAmountByOrder[order.id] || 0);
-        }
-        
-        let eligibleStores = Object.values(storeStats);
-        if (eligibleStores.length === 0) return { top3: [], bottom3: [] };
-        
-        for (const s of eligibleStores) s.rankSum = 0;
-        
-        eligibleStores.sort((a, b) => b.orderCount - a.orderCount);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankOrderCount = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
-        }
-        
-        eligibleStores.sort((a, b) => a.totalLoanOutflow - b.totalLoanOutflow);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankLoanOutflow = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
-        }
-        
-        eligibleStores.sort((a, b) => a.badOrders - b.badOrders);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankBadOrders = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
-        }
-        
-        eligibleStores.sort((a, b) => b.totalRecovery - a.totalRecovery);
-        for (let i = 0; i < eligibleStores.length; i++) {
-            eligibleStores[i].rankRecovery = i + 1;
-            eligibleStores[i].rankSum += (i + 1);
-        }
-        
-        eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
-        
-        const totalCount = eligibleStores.length;
-        
-        if (totalCount === 1) return { top3: eligibleStores.slice(0, 1), bottom3: [] };
-        if (totalCount === 2) return { top3: eligibleStores.slice(0, 2), bottom3: [] };
-        if (totalCount === 3) return { top3: eligibleStores.slice(0, 3), bottom3: eligibleStores.slice(-1).reverse() };
-        
-        return {
-            top3: eligibleStores.slice(0, Math.min(3, eligibleStores.length)),
-            bottom3: eligibleStores.slice(-Math.min(3, eligibleStores.length)).reverse()
-        };
-    }
-};
-
-const DashboardCore = {
-    currentFilter: "all",
-    historyStack: [],
-    currentPage: "dashboard",
-    currentOrderId: null,
-    currentCustomerId: null,
-
-    saveCurrentPageState: function() {
-        try {
-            sessionStorage.setItem('jf_current_page', this.currentPage || '');
-            sessionStorage.setItem('jf_current_filter', this.currentFilter || "all");
-            if (this.currentOrderId) {
-                sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
-            } else {
-                sessionStorage.removeItem('jf_current_order_id');
-            }
-            if (this.currentCustomerId) {
-                sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
-            } else {
-                sessionStorage.removeItem('jf_current_customer_id');
-            }
-            localStorage.setItem('jf_last_page', this.currentPage);
-            localStorage.setItem('jf_last_filter', this.currentFilter);
-            if (this.currentOrderId) {
-                localStorage.setItem('jf_last_order_id', this.currentOrderId);
-            } else {
-                localStorage.removeItem('jf_last_order_id');
-            }
-            if (this.currentCustomerId) {
-                localStorage.setItem('jf_last_customer_id', this.currentCustomerId);
-            } else {
-                localStorage.removeItem('jf_last_customer_id');
-            }
-        } catch(e) {
-            console.warn('[State] 保存状态失败:', e);
-        }
-    },
-    
-    restorePageState: function() {
-        try {
-            let page = sessionStorage.getItem('jf_current_page');
-            let filter = sessionStorage.getItem('jf_current_filter') || "all";
-            let orderId = sessionStorage.getItem('jf_current_order_id');
-            let customerId = sessionStorage.getItem('jf_current_customer_id');
-            
-            if (!page) {
-                page = localStorage.getItem('jf_last_page');
-                filter = localStorage.getItem('jf_last_filter') || "all";
-                orderId = localStorage.getItem('jf_last_order_id');
-                customerId = localStorage.getItem('jf_last_customer_id');
-            }
-            
-            const validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
-                                'anomaly', 'userManagement', 'storeManagement', 'expenses', 
-                                'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
-                                'customerPaymentHistory', 'blacklist'];
-            
-            if (page && validPages.includes(page) && page !== 'login') {
-                return { page, filter, orderId, customerId };
-            }
-            return { page: null, filter: "all", orderId: null, customerId: null };
-        } catch(e) {
-            return { page: null, filter: "all", orderId: null, customerId: null };
-        }
-    },
-    
-    clearPageState: function() {
-        try {
-            sessionStorage.removeItem('jf_current_page');
-            sessionStorage.removeItem('jf_current_filter');
-            sessionStorage.removeItem('jf_current_order_id');
-            sessionStorage.removeItem('jf_current_customer_id');
-        } catch(e) {}
-        this.currentOrderId = null;
-        this.currentCustomerId = null;
-    },
-
-    _clearOverdueUpdateInterval: function() {
-        if (_overdueUpdateInterval) {
-            clearInterval(_overdueUpdateInterval);
-            _overdueUpdateInterval = null;
-        }
-    },
-
-    _startOverdueUpdateInterval: function() {
-        this._clearOverdueUpdateInterval();
-        if (!AUTH.isLoggedIn()) return;
-        _overdueUpdateInterval = setInterval(async () => {
-            try {
-                await SUPABASE.updateOverdueDays();
-                if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
-                    await this.refreshCurrentPage();
-                }
-            } catch (err) {
-                console.warn('[逾期更新] 失败:', err.message);
-            }
-        }, 30 * 60 * 1000);
-        setTimeout(async () => {
-            try {
-                await SUPABASE.updateOverdueDays();
-                if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
-                    await this.refreshCurrentPage();
-                }
-            } catch (err) {
-                console.warn('[逾期更新] 初始化失败:', err.message);
-            }
-        }, 5000);
-    },
-
-    _ensureModuleLoaded: function(moduleName, moduleFn) {
-        if (typeof moduleFn !== 'function') {
-            console.warn(`[ModuleCheck] ${moduleName} 未加载，将使用降级方案`);
-            return false;
-        }
-        return true;
-    },
-
-    init: async function() {
-        var lang = Utils.lang || 'zh';
-        
-        if (window.Toast && !window.Toast._initialized) {
-            window.Toast._initialized = true;
-        }
-        
-        Utils.ErrorHandler.init();
-        ModuleFallback.clearAll();
-        
-        document.getElementById("app").innerHTML = '' +
-            '<div class="loading-container">' +
-                '<div class="loader"></div>' +
-                '<p class="loading-text">' + 
-                    (lang === 'id' ? '🔄 Memuat sistem...' : '🔄 Loading system...') + 
-                '</p>' +
-            '</div>';
-        
-        try {
-            await AUTH.init();
-            
-            var initTimeout = setTimeout(function() {
-                var currentLang = Utils.lang || 'zh';
-                var timeoutDiv = document.getElementById('initTimeout');
-                if (!timeoutDiv) {
-                    var div = document.createElement('div');
-                    div.id = 'initTimeout';
-                    div.className = 'info-bar warning';
-                    div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;max-width:400px;text-align:center;';
-                    div.innerHTML = '' +
-                        '<div class="info-bar-content">' +
-                            '<strong>' + (currentLang === 'id' ? '⏳ Memuat terlalu lama' : '⏳ 加载超时') + '</strong>' +
-                            '<p>' + (currentLang === 'id' 
-                                ? 'Sistem membutuhkan waktu lebih lama dari biasanya. Silakan periksa koneksi internet Anda dan muat ulang halaman.'
-                                : '系统加载时间超过预期，请检查网络连接后刷新页面重试。') + '</p>' +
-                            '<button onclick="location.reload()" style="margin-top:8px;padding:6px 16px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer;">' +
-                                (currentLang === 'id' ? '🔄 Muat Ulang' : '🔄 刷新页面') +
-                            '</button>' +
-                        '</div>';
-                    document.getElementById("app").appendChild(div);
-                }
-            }, 15000);
-            
-            var savedState = null;
-            
-            if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
-                savedState = window._RESTORED_STATE;
-                delete window._RESTORED_STATE;
-            } else {
-                savedState = this.restorePageState();
-            }
-            
-            var savedPage = savedState.page;
-            var savedFilter = savedState.filter;
-            var savedOrderId = savedState.orderId;
-            var savedCustomerId = savedState.customerId;
-            
-            const isLoggedIn = AUTH.isLoggedIn();
-            
-            if (savedPage && savedPage !== 'login' && isLoggedIn) {
-                this.currentPage = savedPage;
-                this.currentFilter = savedFilter || "all";
-                this.currentOrderId = savedOrderId || null;
-                this.currentCustomerId = savedCustomerId || null;
-                await this.refreshCurrentPage();
-            } else if (isLoggedIn) {
-                await this.renderDashboard();
-            } else {
-                await this.router();
-            }
-            
-            clearTimeout(initTimeout);
-            var timeoutEl = document.getElementById('initTimeout');
-            if (timeoutEl) timeoutEl.remove();
-            
-            if (AUTH.isLoggedIn()) {
-                this._startOverdueUpdateInterval();
-            }
-            
-        } catch (error) {
-            console.error("Init error:", error);
-            var timeoutEl2 = document.getElementById('initTimeout');
-            if (timeoutEl2) timeoutEl2.remove();
-            
-            var errorMsg = (Utils.lang === 'id'
-                ? '⚠️ 系统加载失败: ' + error.message + '\n\n请刷新页面重试。'
-                : '⚠️ System load failed: ' + error.message + '\n\nPlease refresh the page.');
-            
-            Utils.toast.error(errorMsg, 5000);
-            
-            document.getElementById("app").innerHTML = '' +
-                '<div class="card" style="text-align:center;padding:40px;">' +
-                    '<p style="white-space:pre-line;">' + errorMsg + '</p>' +
-                    '<button onclick="location.reload()" style="margin-top:12px;">🔄 ' + 
-                        (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
-                '</div>';
-        }
-    },
-
-    router: async function() {
-        if (!AUTH.isLoggedIn()) await this.renderLogin();
-        else await this.renderDashboard();
-    },
-
-    refreshCurrentPage: async function() {
-        var self = this;
-        
-        var skeletonType = 'default';
-        if (this.currentPage === 'dashboard') skeletonType = 'dashboard';
-        else if (this.currentPage === 'orderTable' || this.currentPage === 'customers' || 
-                 this.currentPage === 'paymentHistory' || this.currentPage === 'expenses') skeletonType = 'table';
-        else if (this.currentPage === 'viewOrder' || this.currentPage === 'payment') skeletonType = 'detail';
-        
-        document.getElementById("app").innerHTML = Utils.renderSkeleton(skeletonType);
-        
-        await new Promise(function(resolve) { setTimeout(resolve, 100); });
-        
-        var handlers = {
-            dashboard: async () => {
-                try { await self.renderDashboard(); } catch (e) {
-                    console.error("renderDashboard failed:", e);
-                    Utils.toast.error('加载仪表盘失败，请刷新页面', 4000);
-                    document.getElementById("app").innerHTML = '' +
-                        '<div class="card" style="text-align:center;padding:40px;">' +
-                            '<p>' + (Utils.lang === 'id' ? '⚠️ 加载仪表盘失败，请刷新页面。' : '⚠️ Dashboard load failed.') + '</p>' +
-                            '<button onclick="location.reload()">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button>' +
-                        '</div>';
-                }
-            },
-            orderTable: () => ModuleFallback.safeCall('Daftar Pesanan', window.APP.showOrderTable, [], () => self.renderDashboard()),
-            createOrder: () => ModuleFallback.safeCall('Buat Pesanan', window.APP.showCreateOrder, [], null),
-            viewOrder: async () => { 
-                if (self.currentOrderId && self._ensureModuleLoaded('viewOrder', window.APP.viewOrder)) {
-                    return await ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [self.currentOrderId], () => self.renderDashboard());
-                }
-                return await self.renderDashboard();
-            },
-            payment: async () => { 
-                if (self.currentOrderId && self._ensureModuleLoaded('showPayment', window.APP.showPayment)) {
-                    return await ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [self.currentOrderId], () => self.renderDashboard());
-                }
-                return await self.renderDashboard();
-            },
-            anomaly: () => {
-                if (self._ensureModuleLoaded('showAnomaly', window.APP.showAnomaly)) {
-                    return ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            userManagement: () => {
-                if (self._ensureModuleLoaded('showUserManagement', window.APP.showUserManagement)) {
-                    return ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            storeManagement: () => {
-                if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') {
-                    return ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            expenses: () => {
-                if (self._ensureModuleLoaded('showExpenses', window.APP.showExpenses)) {
-                    return ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            customers: () => {
-                if (self._ensureModuleLoaded('showCustomers', window.APP.showCustomers)) {
-                    return ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            paymentHistory: async () => {
-                if (typeof window.APP.showCashFlowPage === 'function') {
-                    return await ModuleFallback.safeCall('Arus Kas', window.APP.showCashFlowPage, [], () => self.renderDashboard());
-                }
-                if (typeof window.APP.showPaymentHistory === 'function') {
-                    return await ModuleFallback.safeCall('Riwayat Pembayaran', window.APP.showPaymentHistory, [], () => self.renderDashboard());
-                }
-                return await self.renderDashboard();
-            },
-            backupRestore: () => {
-                if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') {
-                    return ModuleFallback.safeCall('Cadangan', BackupStorage.renderBackupUI, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            customerOrders: async () => { 
-                if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerOrders', window.APP.showCustomerOrders)) {
-                    return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], () => self.renderDashboard());
-                }
-                return await self.renderDashboard();
-            },
-            customerPaymentHistory: async () => { 
-                if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerPaymentHistory', window.APP.showCustomerPaymentHistory)) {
-                    return await ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [self.currentCustomerId], () => self.renderDashboard());
-                }
-                return await self.renderDashboard();
-            },
-            blacklist: () => {
-                if (self._ensureModuleLoaded('showBlacklist', window.APP.showBlacklist)) {
-                    return ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            }
-        };
-        
-        var handler = handlers[this.currentPage];
-        if (handler) await handler();
-        else await self.renderDashboard();
-    },
-
-    navigateTo: function(page, params) {
-        window.scrollTo(0, 0);
-        
-        params = params || {};
-        this.historyStack.push({
-            page: this.currentPage,
-            orderId: this.currentOrderId,
-            customerId: this.currentCustomerId,
-            filter: this.currentFilter
-        });
-        this.currentPage = page;
-        
-        if (params.orderId) this.currentOrderId = params.orderId;
-        if (params.customerId) this.currentCustomerId = params.customerId;
-        
-        this.saveCurrentPageState();
-        
-        var self = this;
-        var moduleMap = {
-            'orderTable':       { fn: window.APP.showOrderTable,       name: 'Daftar Pesanan' },
-            'createOrder':      { fn: window.APP.showCreateOrder,      name: 'Buat Pesanan' },
-            'dashboard':        { fn: self.renderDashboard,            name: 'Dashboard', isCore: true },
-            'anomaly':          { fn: window.APP.showAnomaly,          name: 'Situasi Abnormal' },
-            'userManagement':   { fn: window.APP.showUserManagement,   name: 'Manajemen Peran' },
-            'storeManagement':  { 
-                fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
-                name: 'Manajemen Toko' 
-            },
-            'expenses':         { fn: window.APP.showExpenses,         name: 'Pengeluaran' },
-            'customers':        { fn: window.APP.showCustomers,        name: 'Nasabah' },
-            'backupRestore': { 
-                fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
-                name: 'Cadangan' 
-            },
-            'blacklist':        { fn: window.APP.showBlacklist,        name: 'Daftar Hitam' }
-        };
-        
-        var mapped = moduleMap[page];
-        if (mapped) {
-            if (mapped.isCore) { mapped.fn.call(self); }
-            else if (mapped.fn && typeof mapped.fn === 'function') {
-                ModuleFallback.safeCall(mapped.name, mapped.fn, [], null).then(function(result) {
-                    if (result === null) self.renderDashboard();
-                });
-            } else { self.renderDashboard(); }
-            return;
-        }
-        
-        var specialHandlers = {
-            'paymentHistory': function() {
-                var fn = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
-                ModuleFallback.safeCall('Arus Kas', fn, [], null).then(function(r) {
-                    if (r === null) self.renderDashboard();
-                });
-            },
-            'customerOrders': function() {
-                if (params.customerId && typeof window.APP.showCustomerOrders === 'function') {
-                    ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [params.customerId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            },
-            'customerPaymentHistory': function() {
-                if (params.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                    ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [params.customerId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            },
-            'viewOrder': function() {
-                if (params.orderId && typeof window.APP.viewOrder === 'function') {
-                    ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [params.orderId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            },
-            'payment': function() {
-                if (params.orderId && typeof window.APP.showPayment === 'function') {
-                    ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [params.orderId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            }
-        };
-        
-        var special = specialHandlers[page];
-        if (special) { special(); return; }
-        self.renderDashboard();
-    },
-
-    goBack: function() {
-        var self = this;
-        if (this.historyStack.length > 0) {
-            var prev = this.historyStack.pop();
-            this.currentPage = prev.page;
-            this.currentOrderId = prev.orderId;
-            this.currentCustomerId = prev.customerId;
-            this.currentFilter = prev.filter || "all";
-            
-            this.saveCurrentPageState();
-            
-            var backMap = {
-                'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
-                'dashboard':     { fn: self.renderDashboard,          name: 'Dashboard', isCore: true },
-                'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
-                'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
-                'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
-                'storeManagement':{ 
-                    fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
-                    name: 'Manajemen Toko' 
-                },
-                'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
-                'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
-                'backupRestore': { 
-                    fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
-                    name: 'Cadangan' 
-                },
-                'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
-            };
-            
-            var back = backMap[prev.page];
-            if (back) {
-                if (back.isCore) { back.fn.call(self); }
-                else if (back.param && back.fn && typeof back.fn === 'function') {
-                    ModuleFallback.safeCall(back.name, back.fn, [back.param], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else if (back.fn && typeof back.fn === 'function') {
-                    ModuleFallback.safeCall(back.name, back.fn, [], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else { self.renderDashboard(); }
-                return;
-            }
-            
-            switch(prev.page) {
-                case 'paymentHistory':
-                    var fnPH = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
-                    ModuleFallback.safeCall('Arus Kas', fnPH, [], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                    break;
-                case 'payment':
-                    if (prev.orderId && typeof window.APP.showPayment === 'function') {
-                        ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [prev.orderId], null).then(function(r) {
-                            if (r === null) self.renderDashboard();
-                        });
-                    } else self.renderDashboard();
-                    break;
-                case 'customerOrders':
-                    if (prev.customerId && typeof window.APP.showCustomerOrders === 'function') {
-                        ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [prev.customerId], null).then(function(r) {
-                            if (r === null) self.renderDashboard();
-                        });
-                    } else self.renderDashboard();
-                    break;
-                case 'customerPaymentHistory':
-                    if (prev.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                        ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [prev.customerId], null).then(function(r) {
-                            if (r === null) self.renderDashboard();
-                        });
-                    } else self.renderDashboard();
-                    break;
-                default: self.renderDashboard();
-            }
-        } else {
-            this.renderDashboard();
-        }
-    },
-
-    // ==================== 登录页 ====================
-    renderLogin: async function() {
-        this.currentPage = 'login';
-        this.clearPageState();
-        
-        Utils.initLanguage();
+const DashboardOrders = {
+    showOrderTable: async function() {
+        APP.currentPage = 'orderTable';
+        APP.saveCurrentPageState();
         var lang = Utils.lang;
         var t = function(key) { return Utils.t(key); };
+        var profile = await SUPABASE.getCurrentProfile();
+        var isAdmin = profile?.role === 'admin';
         
-        document.getElementById("app").innerHTML = '' +
-            '<div class="login-container">' +
-                '<div class="login-box">' +
-                    '<div class="lang-toggle">' +
-                        '<button onclick="APP.toggleLanguageOnLogin()" class="lang-btn">🌐 ' + (lang === 'id' ? '中文' : 'Bahasa Indonesia') + '</button>' +
-                    '</div>' +
-                    '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;">' +
-                        '<img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;">' +
-                        '<h2 class="login-title" style="margin:0;">JF! by Gadai</h2>' +
-                    '</div>' +
-                    '<h3>' + t('login') + '</h3>' +
-                    
-                    '<div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;">' +
-                        '<span class="info-bar-icon">⚠️</span>' +
-                        '<div class="info-bar-content" id="loginErrorMessage"></div>' +
-                    '</div>' +
-                    
-                    '<div class="form-group">' +
-                        '<label>' + (lang === 'id' ? 'Email / Username' : '邮箱 / 用户名') + '</label>' +
-                        '<input id="username" placeholder="email@domain.com" autocomplete="username">' +
-                    '</div>' +
-                    '<div class="form-group" style="position:relative;">' +
-                        '<label>' + t('password') + '</label>' +
-                        '<input id="password" type="password" placeholder="' + t('password') + '" autocomplete="current-password">' +
-                        '<span onclick="Utils.togglePasswordVisibility(\'password\', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;user-select:none;z-index:2;">👁️</span>' +
-                    '</div>' +
-                    
-                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;font-size:var(--font-sm);">' +
-                        '<input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;">' +
-                        '<label for="rememberMe" style="cursor:pointer;font-weight:500;">' + 
-                            (lang === 'id' ? 'Ingat saya' : '记住我') + 
-                        '</label>' +
-                    '</div>' +
-                    
-                    '<button onclick="APP.login()" id="loginBtn">' + t('login') + '</button>' +
-                    '<p class="login-note">' +
-                        'ℹ️ ' + (lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号') +
-                    '</p>' +
-                '</div>' +
-            '</div>';
-    },
-
-    toggleLanguageOnLogin: function() {
-        var newLang = Utils.lang === 'id' ? 'zh' : 'id';
-        Utils.setLanguage(newLang);
-        this.renderLogin();
-    },
-
-    login: async function() {
-        var username = document.getElementById("username").value.trim();
-        var password = document.getElementById("password").value;
-        var rememberMe = document.getElementById("rememberMe").checked;
-        var errorDiv = document.getElementById("loginError");
-        var errorMsg = document.getElementById("loginErrorMessage");
-        var btnEl = document.getElementById("loginBtn");
-        
-        if (errorDiv) errorDiv.style.display = 'none';
-        
-        if (!username || !password) {
-            if (errorDiv) {
-                errorDiv.style.display = 'flex';
-                errorMsg.textContent = Utils.t('fill_all_fields');
-            }
-            return;
-        }
-        
-        if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
-        
-        AUTH.setRememberMe(rememberMe);
-        
-        var user = await AUTH.login(username, password);
-        if (!user) {
-            if (errorDiv) {
-                errorDiv.style.display = 'flex';
-                errorMsg.textContent = Utils.lang === 'id' 
-                    ? 'Login gagal. Periksa kembali email/username dan password Anda.'
-                    : '登录失败，请检查邮箱/用户名和密码。';
-            }
-            if (btnEl) { btnEl.disabled = false; btnEl.textContent = Utils.t('login'); }
-            return;
-        }
-        await this.router();
-    },
-
-    clearLoginError: function() {
-        var errorDiv = document.getElementById('loginError');
-        if (errorDiv) errorDiv.style.display = 'none';
-    },
-
-    logout: async function() {
-        this._clearOverdueUpdateInterval();
-        
-        var confirmMsg = Utils.t('save_exit_confirm');
-        var confirmed = await Utils.toast.confirm(confirmMsg);
-        if (!confirmed) return;
-        
-        this.clearPageState();
-        sessionStorage.clear();
-        await AUTH.logout();
-        await this.router();
-    },
-
-    toggleLanguage: function() {
-        var newLang = Utils.lang === 'id' ? 'zh' : 'id';
-        Utils.setLanguage(newLang);
-        if (this.currentPage === 'login' || !AUTH.isLoggedIn()) this.renderLogin();
-        else this.refreshCurrentPage();
-    },
-
-    // ==================== 仪表盘 ====================
-    renderDashboard: async function() {
-        this.currentPage = 'dashboard';
-        this.currentOrderId = null;
-        this.saveCurrentPageState();
+        var PAGE_SIZE = 50;
+        var currentFrom = 0;
+        var totalCount = 0;
+        var allOrders = [];
         
         try {
-            var lang = Utils.lang;
-            var t = function(key) { return Utils.t(key); };
+            var filters = { status: APP.currentFilter, search: '', is_practice: false };
             
-            const profile = await SUPABASE.getCurrentProfile();
-            const isAdmin = profile?.role === 'admin';
-            const storeId = profile?.store_id;
+            var result = await SUPABASE.getOrders(filters, currentFrom, currentFrom + PAGE_SIZE - 1);
+            allOrders = result.data;
+            totalCount = result.totalCount;
+            currentFrom += PAGE_SIZE;
             
-            const cacheKey = DashboardCache.getKey ? DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId) : 'dashboard_stats_' + (isAdmin ? 'admin' : storeId);
-            const report = await DashboardCache.get(cacheKey, 
-                () => DashboardStatsHelper.getDashboardStats(profile),
-                { ttl: 5 * 60 * 1000 }
-            );
+            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             
-            const cashFlowCacheKey = 'cashflow_' + (isAdmin ? 'admin' : storeId);
-            const cashFlow = await DashboardCache.get(cashFlowCacheKey,
-                async () => {
-                    const allCashFlows = await SUPABASE.getCashFlowRecords();
-                    return this._calculateCashFlowSummary(allCashFlows, isAdmin, storeId);
-                },
-                { ttl: 5 * 60 * 1000 }
-            );
-            
-            const expensesCacheKey = 'expenses_' + (isAdmin ? 'admin' : storeId);
-            const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
-                const client = SUPABASE.getClient();
-                let query = client.from('expenses').select('amount');
-                if (!isAdmin && storeId) query = query.eq('store_id', storeId);
-                const { data } = await query;
-                let sum = 0;
-                for (const ex of (data || [])) sum += (ex.amount || 0);
-                return sum;
-            }, { ttl: 5 * 60 * 1000 });
-            
-            const today = new Date();
-            const currentMonth = today.getMonth();
-            const currentYear = today.getFullYear();
-            const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-            
-            const monthOrdersCacheKey = 'month_orders_' + (isAdmin ? 'admin' : storeId) + '_' + currentYear + '_' + currentMonth;
-            let thisMonthOrderCount = await DashboardCache.get(monthOrdersCacheKey, async () => {
-                const client = SUPABASE.getClient();
-                let query = client.from('orders').select('created_at', { count: 'exact', head: true });
-                if (!isAdmin && storeId) query = query.eq('store_id', storeId);
-                query = query.eq('is_practice', false);
-                query = query.gte('created_at', monthStart);
-                const { count } = await query;
-                return count || 0;
-            }, { ttl: 10 * 60 * 1000 });
-            
-            const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
-            const hasReminders = needRemindOrders.length > 0;
-            let hasSentToday = false;
-            try {
-                hasSentToday = await (window.APP.hasSentRemindersToday ? window.APP.hasSentRemindersToday() : Promise.resolve(false));
-            } catch(e) {
-                hasSentToday = false;
+            var stores = await SUPABASE.getAllStores();
+            var storeMap = {};
+            for (var i = 0; i < stores.length; i++) {
+                storeMap[stores[i].id] = stores[i].name;
             }
-            const btnDisabled = hasSentToday;
-            const btnHighlight = hasReminders && !hasSentToday;
             
-            const overdueOrdersCount = report.overdue_orders || 0;
-            const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
+            var baseCols = 9;
+            var totalCols = isAdmin ? baseCols + 1 : baseCols;
             
-            const flowsForDeficit = await DashboardCache.get('flows_for_deficit_' + (isAdmin ? 'admin' : storeId), async () => {
-                const client = SUPABASE.getClient();
-                let q = client.from('cash_flow_records').select('direction, amount, flow_type').eq('is_voided', false);
-                if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-                const { data } = await q;
-                return data || [];
-            }, { ttl: 3 * 60 * 1000 });
-            
-            let totalInflowExcludingPrincipal = 0;
-            let totalOutflow = 0;
-            for (const f of flowsForDeficit) {
-                const amount = f.amount || 0;
-                if (f.direction === 'inflow' && f.flow_type !== 'principal') {
-                    totalInflowExcludingPrincipal += amount;
-                } else if (f.direction === 'outflow') {
-                    totalOutflow += amount;
+            var renderOrdersIntoTable = function(orders, append) {
+                var tbody = document.getElementById('orderTableBody');
+                if (!tbody) return;
+                
+                var rows = '';
+                for (var i = 0; i < orders.length; i++) {
+                    var o = orders[i];
+                    var sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
+                    var storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
+                    
+                    var nextDueDate = o.next_interest_due_date || '-';
+                    var formattedDueDate = nextDueDate !== '-' ? Utils.formatDate(nextDueDate) : '-';
+                    
+                    var remainingPrincipalForList = (o.loan_amount || 0) - (o.principal_paid || 0);
+                    var currentMonthlyInterestForList = remainingPrincipalForList * (o.agreed_interest_rate || 0.08);
+                    
+                    var repaymentTypeText = o.repayment_type === 'fixed' 
+                        ? (lang === 'id' ? 'Tetap' : '固定')
+                        : (lang === 'id' ? 'Fleksibel' : '灵活');
+                    var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
+                    
+                    rows += '<tr>' +
+                        '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
+                        '<td>' + Utils.escapeHtml(o.customer_name) + '</td>' +
+                        '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterestForList) + '</td>' +
+                        '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
+                        '<td class="date-cell text-center">' + formattedDueDate + '</td>' +
+                        '<td class="text-center"><span class="repayment-badge ' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                        '<td class="text-center"><span class="status-badge ' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
+                        (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
+                    '</tr>';
+                    
+                    var actionButtons = '';
+                    if (o.status === 'active' && !isAdmin) {
+                        actionButtons += '<button onclick="APP.payOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>';
+                    }
+                    actionButtons += '<button onclick="APP.viewOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">👁️ ' + t('view') + '</button>';
+                    actionButtons += '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small">🖨️ ' + t('print') + '</button>';
+                    if (PERMISSION.canDeleteOrder()) {
+                        actionButtons += '<button onclick="APP.deleteOrder(\'' + Utils.escapeAttr(o.order_id) + '\')" class="btn-small danger">🗑️ ' + t('delete') + '</button>';
+                    }
+                    
+                    rows += '<tr class="action-row">' +
+                        '<td class="action-label">' + t('action') + '</td>' +
+                        '<td colspan="' + (totalCols - 1) + '">' +
+                            '<div class="action-buttons">' + actionButtons + '</div>' +
+                        '</td>' +
+                    '</tr>';
                 }
-            }
-            const deficit = totalOutflow - totalInflowExcludingPrincipal;
+                
+                if (append) {
+                    var loadMoreRow = document.getElementById('loadMoreRow');
+                    if (loadMoreRow) loadMoreRow.remove();
+                    tbody.insertAdjacentHTML('beforeend', rows);
+                } else {
+                    tbody.innerHTML = rows;
+                }
+                
+                updateLoadMoreArea();
+            };
             
-            const cards = [
-                { label: (lang === 'id' ? 'Bulan ini' : '本月新增') + '/' + t('total_orders'), value: thisMonthOrderCount + '/' + report.total_orders, class: '' },
-                { label: lang === 'id' ? 'Berjalan / Jatuh Tempo' : '进行中 / 逾期单', value: activeDisplay, class: '' },
-                { label: (lang === 'id' ? 'Lunas' : '已结清'), value: report.completed_orders, class: '' },
-                { label: lang === 'id' ? 'Defisit (Keluar - Masuk)' : '赤字 (流出-流入)', value: Utils.formatCurrency(deficit), class: deficit >= 0 ? 'expense' : 'income' },
-                { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), class: 'income' },
-                { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees || 0), class: 'income' },
-                { label: lang === 'id' ? 'Bunga Diterima' : '已收利息', value: Utils.formatCurrency(report.total_interest), class: 'income' },
-                { label: lang === 'id' ? 'Total Pengeluaran' : '支出汇总', value: Utils.formatCurrency(totalExpenses), class: 'expense' }
-            ];
+            var updateLoadMoreArea = function() {
+                var tbody = document.getElementById('orderTableBody');
+                if (!tbody) return;
+                
+                var existingRow = document.getElementById('loadMoreRow');
+                if (existingRow) existingRow.remove();
+                
+                if (currentFrom < totalCount) {
+                    var remaining = totalCount - currentFrom;
+                    var loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;">' +
+                        '<button onclick="APP.loadMoreOrders()" class="btn-small primary" style="padding:10px 32px;font-size:14px;">' +
+                        '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + 
+                        ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')' +
+                        '</button></td></tr>';
+                    tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
+                } else if (totalCount > PAGE_SIZE) {
+                    var doneHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;color:var(--text-muted);">' +
+                        '✅ ' + (lang === 'id' ? 'Semua ' + totalCount + ' pesanan telah dimuat' : '已加载全部 ' + totalCount + ' 条订单') +
+                        '</td></tr>';
+                    tbody.insertAdjacentHTML('beforeend', doneHtml);
+                }
+            };
             
-            var cardsHtml = '';
-            for (var i = 0; i < cards.length; i++) {
-                cardsHtml += '<div class="stat-card">' +
-                    '<div class="stat-value ' + cards[i].class + '">' + cards[i].value + '</div>' +
-                    '<div class="stat-label">' + cards[i].label + '</div>' +
-                '</div>';
-            }
-            
-            var cashBalance = cashFlow.cash?.balance ?? 0;
-            var bankBalance = cashFlow.bank?.balance ?? 0;
-            var cashIncome = cashFlow.cash?.income ?? 0;
-            var cashExpense = cashFlow.cash?.expense ?? 0;
-            var bankIncome = cashFlow.bank?.income ?? 0;
-            var bankExpense = cashFlow.bank?.expense ?? 0;
-            
-            var cashFlowHtml = '';
-            if (isAdmin) {
-                cashFlowHtml = '' +
-                '<div class="cashflow-summary">' +
-                    '<h3>💰 ' + t('fund_management') + ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')</h3>' +
-                    '<div class="cashflow-stats">' +
-                        '<div class="cashflow-item">' +
-                            '<div class="label">🏦 ' + (lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)') + '</div>' +
-                            '<div class="value ' + (cashBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(cashBalance) + '</div>' +
-                            '<div class="cashflow-detail">' +
-                                t('inflow') + ': +' + Utils.formatCurrency(cashIncome) + '<br>' +
-                                t('outflow') + ': -' + Utils.formatCurrency(cashExpense) +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="cashflow-item">' +
-                            '<div class="label">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行 BNI') + '</div>' +
-                            '<div class="value ' + (bankBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(bankBalance) + '</div>' +
-                            '<div class="cashflow-detail">' +
-                                t('inflow') + ': +' + Utils.formatCurrency(bankIncome) + '<br>' +
-                                t('outflow') + ': -' + Utils.formatCurrency(bankExpense) +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="cashflow-item">' +
-                            '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
-                            '<div class="transfer-buttons">' +
-                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦' + (lang === 'id' ? 'Brankas→→🏧 Bank BNI' : '保险柜→→🏧 银行BNI') + '</button>' +
-                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧 ' + (lang === 'id' ? 'Bank BNI→→🏦Brankas' : '银行BNI→→🏦保险柜') + '</button>' +
-                                '<button onclick="APP.showTransferModal(\'store_to_hq\')" class="transfer-btn store-to-hq">🏢 ' + t('submit_to_hq') + '</button>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>';
-            } else {
-                cashFlowHtml = '' +
-                '<div class="cashflow-summary">' +
-                    '<h3>💰 ' + t('fund_management') + '</h3>' +
-                    '<div class="cashflow-stats">' +
-                        '<div class="cashflow-item">' +
-                            '<div class="label">🏦 ' + (lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)') + '</div>' +
-                            '<div class="value ' + (cashBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(cashBalance) + '</div>' +
-                            '<div class="cashflow-detail">' +
-                                t('inflow') + ': +' + Utils.formatCurrency(cashIncome) + '<br>' +
-                                t('outflow') + ': -' + Utils.formatCurrency(cashExpense) +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="cashflow-item">' +
-                            '<div class="label">🏧 ' + (lang === 'id' ? 'Bank BNI' : '银行 BNI') + '</div>' +
-                            '<div class="value ' + (bankBalance < 0 ? 'negative' : '') + '">' + Utils.formatCurrency(bankBalance) + '</div>' +
-                            '<div class="cashflow-detail">' +
-                                t('inflow') + ': +' + Utils.formatCurrency(bankIncome) + '<br>' +
-                                t('outflow') + ': -' + Utils.formatCurrency(bankExpense) +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="cashflow-item">' +
-                            '<div class="label">🔄 ' + t('internal_transfer') + '</div>' +
-                            '<div class="transfer-buttons">' +
-                                '<button onclick="APP.showTransferModal(\'cash_to_bank\')" class="transfer-btn cash-to-bank">🏦' + (lang === 'id' ? 'Brankas→→🏧 Bank BNI' : '保险柜→→🏧 银行BNI') + '</button>' +
-                                '<button onclick="APP.showTransferModal(\'bank_to_cash\')" class="transfer-btn bank-to-cash">🏧 ' + (lang === 'id' ? 'Bank BNI→→🏦Brankas' : '银行BNI→→🏦保险柜') + '</button>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>';
-            }
-            
-            var toolbarHtml = '';
-            if (isAdmin) {
-                toolbarHtml = '' +
-                '<div class="toolbar admin-grid no-print">' +
-                    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + (lang === 'id' ? 'Manajemen Pesanan' : '订单管理') + '</button>' +
-                    '<button onclick="APP.showCashFlowPage()">💰 ' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'backupRestore\')">📦 ' + t('backup_restore') + '</button>' +
-                    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'userManagement\')">👤 ' + t('user_management') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'storeManagement\')">🏪 ' + t('store_management') + '</button>' +
-                    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
-                '</div>';
-            } else {
-                toolbarHtml = '' +
-                '<div class="toolbar store-grid no-print">' +
-                    '<button onclick="APP.navigateTo(\'customers\')">👥 ' + t('customers') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'orderTable\')">📋 ' + (lang === 'id' ? 'Manajemen Pesanan' : '订单管理') + '</button>' +
-                    '<button onclick="APP.showCashFlowPage()">💰 ' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'expenses\')">📝 ' + t('expenses') + '</button>' +
-                    '<button id="reminderBtn" onclick="APP.sendDailyReminders()" class="warning ' + (btnHighlight ? 'highlight' : '') + '" ' + (btnDisabled ? 'disabled' : '') + '>🔔 ' + t('send_reminder') + ' ' + (hasReminders ? '(' + needRemindOrders.length + ')' : '') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'anomaly\')">⚠️ ' + (lang === 'id' ? 'Situasi Abnormal' : '异常状况') + '</button>' +
-                    '<button onclick="APP.navigateTo(\'backupRestore\')">📦 ' + t('backup_restore') + '</button>' +
-                    '<button onclick="APP.logout()">💾 ' + t('save_exit') + '</button>' +
-                '</div>';
-            }
-            
-            var userRoleText = AUTH.user?.role === 'admin' 
-                ? (lang === 'id' ? 'Administrator' : '管理员') 
-                : (lang === 'id' ? 'Manajer Toko' : '店长');
-            var storeName = AUTH.getCurrentStoreName();
-            
-            var bottomHtml = '';
-            if (isAdmin) {
-                bottomHtml = '' +
-                '<div class="card dashboard-footer-card">' +
-                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(AUTH.user?.name || '') + ' (' + userRoleText + ')</p>' +
-                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + (lang === 'id' ? 'Kantor Pusat' : '总部') + '</p>' +
-                    '<p>📌 ' + t('more_pawn_higher_fee') + '</p>' +
-                    '<p>🔒 ' + t('order_saved_locked') + '</p>' +
-                '</div>';
-            } else {
-                bottomHtml = '' +
-                '<div class="card dashboard-footer-card">' +
-                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(storeName) + ' (' + userRoleText + ')</p>' +
-                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + Utils.escapeHtml(storeName) + '</p>' +
-                    '<p>📌 ' + t('contract_pay_info') + '</p>' +
-                    '<p>🔒 ' + t('order_saved_locked') + ' ' + t('more_pawn_higher_fee') + '</p>' +
-                '</div>';
-            }
-            
-            var backButtonHtml = (this.historyStack.length > 0) ? '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' : '';
-
             document.getElementById("app").innerHTML = '' +
-                '<div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">' +
-                    '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
-                        backButtonHtml +
-                        '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
-                        '<h1 style="margin:0;">JF! by Gadai</h1>' +
-                    '</div>' +
+                '<div class="page-header">' +
+                    '<h2>📋 ' + t('order_list') + '</h2>' +
                     '<div class="header-actions">' +
-                        (this.currentPage !== 'dashboard' ? 
-                            '<button onclick="APP.navigateTo(\'dashboard\')" class="btn-back" style="background:var(--primary);color:white;">🏠 ' + (lang === 'id' ? 'Beranda' : '首页') + '</button>' : 
-                            '') +
-                        '<button onclick="APP.toggleLanguage()" class="lang-btn" style="margin-left:8px;">🌐 ' + (lang === 'id' ? '中文' : 'Bahasa Indonesia') + '</button>' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button>' +
                     '</div>' +
                 '</div>' +
-                '<div style="margin:0 0 12px 0;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ' + (lang === 'id' ? 'Pusat Manajemen' : '管理中心') + '</h3>' +
+                '<div class="toolbar no-print">' +
+                    '<select id="statusFilter" onchange="APP.filterOrders(this.value)">' +
+                        '<option value="all" ' + (APP.currentFilter === 'all' ? 'selected' : '') + '>' + (lang === 'id' ? 'Semua Pesanan' : '全部订单') + '</option>' +
+                        '<option value="active" ' + (APP.currentFilter === 'active' ? 'selected' : '') + '>' + t('active') + '</option>' +
+                        '<option value="completed" ' + (APP.currentFilter === 'completed' ? 'selected' : '') + '>' + t('completed') + '</option>' +
+                    '</select>' +
                 '</div>' +
-                toolbarHtml +
-                '<div style="margin:0 0 12px 0;">' +
-                    '<h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ' + (lang === 'id' ? 'Indikator Bisnis' : '业务指标') + (isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : '') + '</h3>' +
+                
+                '<div class="info-bar info">' +
+                    '<span class="info-bar-icon">📌</span>' +
+                    '<div class="info-bar-content">' +
+                        '<strong>' + (lang === 'id' ? 'Total' : '共') + ' ' + totalCount + ' ' + (lang === 'id' ? 'pesanan' : '条订单') + '</strong> — ' + 
+                        (lang === 'id' ? 'Menampilkan ' + Math.min(PAGE_SIZE, totalCount) + ' pertama' : '显示前 ' + Math.min(PAGE_SIZE, totalCount) + ' 条') +
+                    '</div>' +
                 '</div>' +
-                '<div class="stats-grid">' + cardsHtml + '</div>' +
-                cashFlowHtml +
-                bottomHtml;
+                
+                '<div class="card">' +
+                    '<div class="table-container">' +
+                        '<table class="data-table order-table">' +
+                            '<thead>' +
+                                '<tr>' +
+                                    '<th class="col-id">' + t('order_id') + '</th>' +
+                                    '<th class="col-name">' + t('customer_name') + '</th>' +
+                                    '<th>' + t('collateral_name') + '</th>' +
+                                    '<th class="col-amount amount">' + t('loan_amount') + '</th>' +
+                                    '<th class="col-amount amount">' + (lang === 'id' ? 'Bunga Bulanan' : '月利息') + '</th>' +
+                                    '<th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th>' +
+                                    '<th class="col-date text-center">' + t('payment_due_date') + '</th>' +
+                                    '<th class="col-status text-center">' + t('repayment_type') + '</th>' +
+                                    '<th class="col-status text-center">' + t('status') + '</th>' +
+                                    (isAdmin ? '<th class="col-store text-center">' + t('store') + '</th>' : '') +
+                                '</tr>' +
+                            '</thead>' +
+                            '<tbody id="orderTableBody"></tbody>' +
+                        '</table>' +
+                    '</div>' +
+                '</div>';
+            
+            renderOrdersIntoTable(allOrders, false);
+            
+            window._orderTableState = {
+                currentFrom: currentFrom, totalCount: totalCount, allOrders: allOrders,
+                totalCols: totalCols, pageSize: PAGE_SIZE, filters: filters,
+                storeMap: storeMap, renderOrdersIntoTable: renderOrdersIntoTable
+            };
             
         } catch (err) {
-            console.error("renderDashboard error:", err);
-            Utils.ErrorHandler.capture(err, 'renderDashboard');
-            Utils.toast.error('加载仪表盘失败: ' + err.message, 5000);
-            document.getElementById("app").innerHTML = '' +
-                '<div class="card" style="padding:40px;text-align:center;">' +
-                    '<p style="margin-bottom:16px;">⚠️ ' + (Utils.lang === 'id' ? '加载仪表盘失败: ' + err.message : 'Dashboard load failed: ' + err.message) + '</p>' +
-                    '<button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button>' +
-                    '<button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
-                '</div>';
+            console.error("showOrderTable error:", err);
+            Utils.ErrorHandler.capture(err, 'showOrderTable');
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat daftar pesanan' : '加载订单列表失败');
         }
-    },
-
-    _calculateCashFlowSummary: function(allFlows, isAdmin, storeId) {
-        var cashInflow = 0, cashOutflow = 0;
-        var bankInflow = 0, bankOutflow = 0;
-        var flowsToUse = allFlows || [];
-        for (var i = 0; i < flowsToUse.length; i++) {
-            var flow = flowsToUse[i];
-            var amount = flow.amount || 0;
-            if (flow.direction === 'inflow') {
-                if (flow.source_target === 'cash') cashInflow += amount;
-                else if (flow.source_target === 'bank') bankInflow += amount;
-            } else if (flow.direction === 'outflow') {
-                if (flow.source_target === 'cash') cashOutflow += amount;
-                else if (flow.source_target === 'bank') bankOutflow += amount;
-            }
-        }
-        return {
-            cash: { income: cashInflow, expense: cashOutflow, balance: cashInflow - cashOutflow },
-            bank: { income: bankInflow, expense: bankOutflow, balance: bankInflow - bankOutflow }
-        };
-    },
-
-    showCreateOrder: function() { 
-        Utils.toast.info(Utils.lang === 'id' ? '请先选择客户' : 'Please select a customer first', 3000);
-        this.navigateTo('customers'); 
     },
     
-    showBlacklist: async function() {
-        if (window.APP.showBlacklist && typeof window.APP.showBlacklist === 'function') {
-            await ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], null);
-        } else {
-            Utils.toast.warning(Utils.lang === 'id' ? '黑名单模块加载中，请稍后重试' : 'Blacklist module loading, please try again later');
-            this.renderDashboard();
-        }
-    },
-
-    addStore: async function() {
+    loadMoreOrders: async function() {
+        var state = window._orderTableState;
+        if (!state) return;
         var lang = Utils.lang;
-        var name = document.getElementById("newStoreName")?.value.trim();
-        var address = document.getElementById("newStoreAddress")?.value.trim();
-        var phone = document.getElementById("newStorePhone")?.value.trim();
-        if (!name) { Utils.toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写'); return; }
+        var loadMoreBtn = document.querySelector('#loadMoreRow button');
+        if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...'); }
         try {
-            if (typeof StoreManager !== 'undefined') {
-                await StoreManager.createStore(name, address, phone);
-                Utils.toast.success(lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
-                await StoreManager.renderStoreManagement();
-            }
-        } catch (error) {
-            Utils.toast.error(lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
+            var result = await SUPABASE.getOrders(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
+            var newOrders = result.data;
+            state.allOrders = state.allOrders.concat(newOrders);
+            state.currentFrom += result.data.length;
+            state.totalCount = result.totalCount;
+            state.renderOrdersIntoTable(newOrders, true);
+        } catch (err) {
+            console.error("loadMoreOrders error:", err);
+            if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
         }
     },
     
-    editStore: async function(storeId) { 
-        if (typeof StoreManager !== 'undefined') await StoreManager.editStore(storeId); 
+    payOrder: function(orderId) { if (!orderId) return; APP.navigateTo('payment', { orderId: orderId }); },
+    filterOrders: function(status) { APP.currentFilter = status; APP.showOrderTable(); },
+
+    viewOrder: async function(orderId) {
+        APP.currentPage = 'viewOrder';
+        APP.currentOrderId = orderId;
+        APP.saveCurrentPageState();
+        try {
+            var result = await SUPABASE.getPaymentHistory(orderId);
+            var order = result.order;
+            var payments = result.payments;
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); APP.goBack(); return; }
+            var lang = Utils.lang;
+            var t = function(key) { return Utils.t(key); };
+            var profile = await SUPABASE.getCurrentProfile();
+            var isAdmin = profile?.role === 'admin';
+            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+            
+            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+            var monthlyRate = order.agreed_interest_rate || 0.08;
+            var currentMonthlyInterest = remainingPrincipal * monthlyRate;
+            var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
+            
+            var repaymentInfoHtml = '';
+            if (order.repayment_type === 'fixed') {
+                var paidMonths = order.fixed_paid_months || 0;
+                var totalMonths = order.repayment_term;
+                var fixedPayment = order.monthly_fixed_payment || 0;
+                repaymentInfoHtml = '' +
+                    '<p><strong>' + t('repayment_type') + ':</strong> 📅 ' + t('fixed_repayment') + ' (' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</p>' +
+                    '<p><strong>' + t('monthly_payment') + ':</strong> ' + Utils.formatCurrency(fixedPayment) + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Progress' : '进度') + ':</strong> ' + paidMonths + '/' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</p>';
+            } else {
+                repaymentInfoHtml = '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? 'Maksimal perpanjangan 10 bulan' : '最长延期10个月') + ')</p>';
+            }
+
+            var payRows = '';
+            if (payments && payments.length > 0) {
+                for (var i = 0; i < payments.length; i++) {
+                    var p = payments[i];
+                    var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
+                    var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
+                    payRows += '<tr>' +
+                        '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                        '<td>' + typeText + '</td>' +
+                        '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
+                    '</tr>';
+                }
+            } else {
+                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td>';
+            }
+
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header">' +
+                    '<h2>📄 ' + t('order_details') + '</h2>' +
+                    '<div class="header-actions">' +
+                        '<button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button>' +
+                        '<button onclick="APP.printOrder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="btn-print">🖨️ ' + t('print') + '</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="card">' +
+                    '<div class="order-detail-grid">' +
+                        '<div class="info-column">' +
+                            '<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>' +
+                            '<p><strong>' + t('order_id') + ':</strong> ' + Utils.escapeHtml(order.order_id) + '</p>' +
+                            '<p><strong>' + t('status') + ':</strong> <span class="status-badge ' + order.status + '">' + (statusMap[order.status] || order.status) + '</span></p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Tanggal Dibuat' : '创建日期') + ':</strong> ' + Utils.formatDate(order.created_at) + '</p>' +
+                            repaymentInfoHtml +
+                            '<h3 style="margin-top:16px;">👤 ' + t('customer_info') + '</h3>' +
+                            '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(order.customer_name) + '</p>' +
+                            '<p><strong>' + t('ktp_number') + ':</strong> ' + Utils.escapeHtml(order.customer_ktp) + '</p>' +
+                            '<p><strong>' + t('phone') + ':</strong> ' + Utils.escapeHtml(order.customer_phone) + '</p>' +
+                            '<p><strong>' + t('address') + ':</strong> ' + Utils.escapeHtml(order.customer_address) + '</p>' +
+                        '</div>' +
+                        '<div class="info-column">' +
+                            '<h3>💎 ' + t('collateral_info') + '</h3>' +
+                            '<p><strong>' + t('collateral_name') + ':</strong> ' + Utils.escapeHtml(order.collateral_name) + '</p>' +
+                            '<p><strong>' + t('loan_amount') + ':</strong> ' + Utils.formatCurrency(order.loan_amount) + '</p>' +
+                            '<h3 style="margin-top:16px;">💰 ' + (lang === 'id' ? 'Rincian Biaya' : '费用明细') + '</h3>' +
+                            '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' ' + (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')) + '</p>' +
+                            '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) ' + ((order.service_fee_paid || 0) >= (order.service_fee_amount || 0) && (order.service_fee_amount || 0) > 0 ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : (order.service_fee_amount || 0) === 0 ? '—' : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')) + '</p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Bunga Bulanan (saat ini)' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? 'berdasarkan sisa pokok' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? 'bulan' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
+                            '<p><strong>' + t('payment_due_date') + ':</strong> ' + nextDueDate + '</p>' +
+                            '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="info-bar info">' +
+                        '<span class="info-bar-icon">💡</span>' +
+                        '<div class="info-bar-content">' +
+                            '<strong>' + (lang === 'id' ? 'Tips:' : '温馨提示：') + '</strong> ' + 
+                            (lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan.' : '请于每月到期日前支付利息。') +
+                        '</div>' +
+                    '</div>' +
+                    '<h3>📋 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
+                    '<div class="table-container"><table class="data-table payment-table"><thead><tr>' +
+                        '<th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th>' +
+                        '<th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th>' +
+                        '<th class="col-amount amount">' + t('amount') + '</th>' +
+                        '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
+                        '<th class="col-desc">' + t('description') + '</th>' +
+                    '</tr></thead><tbody>' + payRows + '</tbody></table></div>' +
+                    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
+                        '<button onclick="APP.goBack()">↩️ ' + t('back') + '</button>' +
+                        (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(order.order_id) + '\'})" class="success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>' : '') +
+                        (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeAttr(order.order_id) + '\')" class="success">🧾 ' + (lang === 'id' ? '结清凭证' : '结清凭证') + '</button>' : '') +
+                        '<button onclick="APP.sendWAReminder(\'' + Utils.escapeAttr(order.order_id) + '\')" class="warning">📱 ' + (lang === 'id' ? 'WA提醒' : 'WA提醒') + '</button>' +
+                    '</div>' +
+                '</div>';
+        } catch (error) {
+            console.error("viewOrder error:", error);
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
+            APP.goBack();
+        }
     },
-    
-    deleteStore: async function(storeId) {
+
+    deleteOrder: async function(orderId) {
         var lang = Utils.lang;
         var confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
         if (!confirmed) return;
         try {
-            if (typeof StoreManager !== 'undefined') {
-                await StoreManager.deleteStore(storeId);
-                Utils.toast.success(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
-                await StoreManager.renderStoreManagement();
+            const order = await SUPABASE.getOrder(orderId);
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
+            await Order.delete(orderId);
+            if (window.Audit) {
+                await window.Audit.log('order_delete', JSON.stringify({
+                    order_id: order.order_id, customer_name: order.customer_name,
+                    loan_amount: order.loan_amount, deleted_by: AUTH.user?.id,
+                    deleted_at: new Date().toISOString()
+                }));
             }
+            Utils.toast.success(Utils.t('order_deleted'));
+            await APP.showOrderTable();
         } catch (error) {
-            Utils.toast.error(lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+            Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
         }
     },
-    
-    invalidateDashboardCache: function() {
-        JFCache.clear();
-        Utils.toast.info(Utils.lang === 'id' ? '缓存已清除' : 'Cache cleared', 2000);
+
+    printOrder: async function(orderId) {
+        try {
+            var result = await SUPABASE.getPaymentHistory(orderId);
+            var order = result.order;
+            if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
+            var lang = Utils.lang;
+            var t = Utils.t.bind(Utils);
+            var safeOrderId = Utils.escapeHtml(order.order_id);
+            var safeCustomerName = Utils.escapeHtml(order.customer_name);
+            var safeCustomerKtp = Utils.escapeHtml(order.customer_ktp || '-');
+            var safeCustomerPhone = Utils.escapeHtml(order.customer_phone || '-');
+            var safeCustomerAddress = Utils.escapeHtml(order.customer_address || '-');
+            var safeCollateral = Utils.escapeHtml(order.collateral_name || '-');
+            var safeStoreName = Utils.escapeHtml(AUTH.getCurrentStoreName());
+            var safeLoanAmount = Utils.formatCurrency(order.loan_amount);
+            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+            var safeRemainingPrincipal = Utils.formatCurrency(remainingPrincipal);
+            var safeCreatedAt = Utils.formatDate(order.created_at);
+
+            var paymentRows = '';
+            var payments = result.payments || [];
+            for (var i = 0; i < payments.length; i++) {
+                var p = payments[i];
+                var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
+                paymentRows += '<tr><td>' + Utils.formatDate(p.date) + '</td><td>' + typeText + '</td><td class="text-right">' + Utils.formatCurrency(p.amount) + '</td><td>' + (p.payment_method === 'cash' ? 'Tunai' : 'Bank') + '</td></tr>';
+            }
+            if (paymentRows === '') { paymentRows = '<tr><td colspan="4" class="text-center">' + t('no_data') + '</td>'; }
+
+            var printWindow = window.open('', '_blank');
+            printWindow.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! - ' + safeOrderId + '</title>' +
+                '<style>*{margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;padding:15mm}' +
+                '.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}' +
+                'table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px}th{background:#f5f5f5}' +
+                '.text-right{text-align:right}.footer{text-align:center;margin-top:20px;font-size:10px;color:#666}' +
+                '@media print{@page{size:A4;margin:15mm}}</style></head><body>' +
+                '<div class="header"><h1>JF! by Gadai</h1><p>' + safeOrderId + ' | ' + safeCreatedAt + '</p></div>' +
+                '<div><h3>' + (lang === 'id' ? 'Informasi Nasabah' : '客户信息') + '</h3>' +
+                '<p>' + t('customer_name') + ': ' + safeCustomerName + '</p><p>KTP: ' + safeCustomerKtp + '</p>' +
+                '<p>' + t('phone') + ': ' + safeCustomerPhone + '</p><p>' + t('address') + ': ' + safeCustomerAddress + '</p></div>' +
+                '<div><h3>' + (lang === 'id' ? 'Jaminan & Pinjaman' : '质押物与贷款') + '</h3>' +
+                '<p>' + t('collateral_name') + ': ' + safeCollateral + '</p><p>' + t('loan_amount') + ': ' + safeLoanAmount + '</p>' +
+                '<p>' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ': ' + safeRemainingPrincipal + '</p></div>' +
+                '<div><h3>' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>' +
+                '<table><thead><tr><th>' + t('date') + '</th><th>' + t('type') + '</th><th class="text-right">' + t('amount') + '</th><th>' + (lang === 'id' ? 'Metode' : '方式') + '</th></tr></thead><tbody>' + paymentRows + '</tbody></table></div>' +
+                '<div class="footer"><div>JF! by Gadai</div><div>' + safeStoreName + '</div></div>' +
+                '<script>window.onload=function(){window.print();setTimeout(function(){window.close();},1000)};<\/script></body></html>');
+            printWindow.document.close();
+        } catch (error) {
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak' : '打印失败');
+        }
+    },
+
+    showPaymentHistory: async function() {
+        APP.currentPage = 'paymentHistory';
+        APP.saveCurrentPageState();
+        var lang = Utils.lang;
+        var t = Utils.t.bind(Utils);
+        try {
+            var allPayments = await SUPABASE.getAllPayments();
+            var totalAdminFee = 0, totalServiceFee = 0, totalInterest = 0, totalPrincipal = 0;
+            for (var i = 0; i < allPayments.length; i++) {
+                var p = allPayments[i];
+                if (p.type === 'admin_fee') totalAdminFee += p.amount;
+                else if (p.type === 'service_fee') totalServiceFee += p.amount;
+                else if (p.type === 'interest') totalInterest += p.amount;
+                else if (p.type === 'principal') totalPrincipal += p.amount;
+            }
+            var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
+            var methodMap = { cash: t('cash'), bank: t('bank') };
+            var rows = '';
+            if (allPayments.length === 0) {
+                rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td>';
+            } else {
+                for (var i = 0; i < allPayments.length; i++) {
+                    var p = allPayments[i];
+                    var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
+                    rows += '<tr>' +
+                        '<td class="order-id">' + Utils.escapeHtml(p.orders?.order_id || '-') + '</td>' +
+                        '<td>' + Utils.escapeHtml(p.orders?.customer_name || '-') + '</td>' +
+                        '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                        '<td>' + (typeMap[p.type] || p.type) + '</td>' +
+                        '<td class="text-center">' + (p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                        '<td class="text-center"><span class="payment-method-badge ' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                        '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
+                    '</tr>';
+                }
+            }
+            document.getElementById("app").innerHTML = '' +
+                '<div class="page-header"><h2>💰 ' + t('payment_history') + '</h2>' +
+                    '<div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ' + t('back') + '</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ' + t('print') + '</button></div></div>' +
+                '<div class="stats-grid stats-grid-auto">' +
+                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalAdminFee) + '</div><div class="stat-label">' + t('admin_fee') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalServiceFee) + '</div><div class="stat-label">' + t('service_fee') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value income">' + Utils.formatCurrency(totalInterest) + '</div><div class="stat-label">' + t('interest') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value">' + Utils.formatCurrency(totalPrincipal) + '</div><div class="stat-label">' + t('principal') + '</div></div>' +
+                    '<div class="stat-card"><div class="stat-value">' + Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal) + '</div><div class="stat-label">' + (lang === 'id' ? 'Total Keseluruhan' : '全部总计') + '</div></div>' +
+                '</div>' +
+                '<div class="card"><div class="table-container"><table class="data-table payment-table"><thead><tr>' +
+                    '<th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th>' +
+                    '<th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th>' +
+                    '<th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th>' +
+                    '<th class="col-amount amount">' + t('amount') + '</th>' +
+                    '<th class="col-method text-center">' + (lang === 'id' ? 'Metode' : '支付方式') + '</th>' +
+                    '<th class="col-desc">' + t('description') + '</th>' +
+                '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        } catch (error) {
+            Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
+        }
     }
 };
 
-for (var key in DashboardCore) {
-    if (typeof DashboardCore[key] === 'function' && 
-        key !== 'showExpenses' && key !== 'showOrderTable' && key !== 'showReport' && 
-        key !== 'showUserManagement' && key !== 'showCustomers' && key !== 'showPaymentHistory' && 
-        key !== 'viewOrder' && key !== 'showPayment' && key !== 'showCustomerOrders' && 
-        key !== 'showCustomerPaymentHistory') {
-        window.APP[key] = DashboardCore[key];
+for (var key in DashboardOrders) {
+    if (typeof DashboardOrders[key] === 'function') {
+        window.APP[key] = DashboardOrders[key];
     }
 }
-
-window.APP.currentFilter = DashboardCore.currentFilter;
-window.APP.historyStack = DashboardCore.historyStack;
-window.APP.currentPage = DashboardCore.currentPage;
-window.APP.currentOrderId = DashboardCore.currentOrderId;
-window.APP.currentCustomerId = DashboardCore.currentCustomerId;
-window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
-
-window.addEventListener('beforeunload', function() {
-    if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
-        window.APP.saveCurrentPageState();
-    }
-});
