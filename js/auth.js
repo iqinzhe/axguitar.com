@@ -309,11 +309,15 @@ this.user._isPractice = this.user?.stores?.is_practice || false;
     async loadCurrentUser() {
         try {
             this.user = (await SUPABASE.getCurrentProfile()) || null;
-        } catch (e) {
-            console.warn('loadCurrentUser error:', e.message);
-            this.user = null;
+            // ========== 新增 ==========
+        if (this.user) {
+            this.user._isPractice = this.user?.stores?.is_practice || false;
         }
-    },
+    } catch (e) {
+        console.warn('loadCurrentUser error:', e.message);
+        this.user = null;
+    }
+},
 
     async logout() {
         // 审计：退出登录
