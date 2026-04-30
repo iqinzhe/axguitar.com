@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v1.0 (修复：使用 SUPABASE.getClient() 替代直接使用 supabaseClient)
+// app-dashboard-core.js - v1.1 (过滤练习数据)
 
 window.APP = window.APP || {};
 
@@ -10,7 +10,6 @@ const ModuleFallback = {
     _degradedModules: {},
     
     async safeCall(moduleName, fn, args, fallbackFn) {
-        // fallbackFn 必须是函数（懒执行），防止调用时立即执行 renderDashboard 等副作用
         try {
             if (typeof fn !== 'function') throw new Error('module_not_loaded');
             return await fn.apply(null, args || []);
@@ -44,7 +43,6 @@ const ModuleFallback = {
                 delete ModuleFallback._degradedModules[moduleKey];
             }, 10 * 60 * 1000);
             
-            // 只有在 fallbackFn 是函数时才调用，否则直接返回 null
             if (typeof fallbackFn === 'function') return await fallbackFn();
             return null;
         }
@@ -90,11 +88,8 @@ const ModuleFallback = {
 
 window.ModuleFallback = ModuleFallback;
 
-// ==================== 使用统一缓存模块 ====================
-// DashboardCache 现在指向 JFCache，保持向后兼容
 const DashboardCache = JFCache;
 
-// ==================== 聚合查询辅助方法 ====================
 const DashboardStatsHelper = {
     async getDashboardStats(profile) {
         const isAdmin = profile?.role === 'admin';
@@ -105,6 +100,7 @@ const DashboardStatsHelper = {
         const totalCountPromise = (() => {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            q = q.eq('is_practice', false);
             return q;
         })();
         
@@ -112,6 +108,7 @@ const DashboardStatsHelper = {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'active');
+            q = q.eq('is_practice', false);
             return q;
         })();
         
@@ -119,6 +116,7 @@ const DashboardStatsHelper = {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'completed');
+            q = q.eq('is_practice', false);
             return q;
         })();
         
@@ -126,6 +124,7 @@ const DashboardStatsHelper = {
             let q = client.from('orders').select('*', { count: 'exact', head: true });
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'active').gte('overdue_days', 1);
+            q = q.eq('is_practice', false);
             return q;
         })();
         
@@ -133,12 +132,14 @@ const DashboardStatsHelper = {
             let q = client.from('orders').select('admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid, loan_amount');
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
             q = q.eq('status', 'active');
+            q = q.eq('is_practice', false);
             return q;
         })();
         
         const allOrdersLoanPromise = (() => {
             let q = client.from('orders').select('loan_amount');
             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+            q = q.eq('is_practice', false);
             return q;
         })();
         
@@ -202,6 +203,7 @@ const DashboardStatsHelper = {
         let overdueQuery = client.from('orders').select('*', { count: 'exact', head: true });
         if (!isAdmin && storeId) overdueQuery = overdueQuery.eq('store_id', storeId);
         overdueQuery = overdueQuery.eq('status', 'active').gte('overdue_days', 30);
+        overdueQuery = overdueQuery.eq('is_practice', false);
         
         let blacklistQuery = client.from('blacklist').select('*', { count: 'exact', head: true });
         
@@ -231,6 +233,7 @@ const DashboardStatsHelper = {
         const { data: monthlyOrders, error } = await client
             .from('orders')
             .select('id, store_id, loan_amount, status, created_at, overdue_days')
+            .eq('is_practice', false)
             .gte('created_at', monthStart)
             .lte('created_at', monthEnd);
         
@@ -320,20 +323,11 @@ const DashboardStatsHelper = {
         
         eligibleStores.sort((a, b) => a.rankSum - b.rankSum);
         
-        // ========== 修复：当门店数量不足时，top3 和 bottom3 不应重叠 ==========
         const totalCount = eligibleStores.length;
         
-        if (totalCount === 1) {
-            return { top3: eligibleStores.slice(0, 1), bottom3: [] };
-        }
-        
-        if (totalCount === 2) {
-            return { top3: eligibleStores.slice(0, 2), bottom3: [] };
-        }
-        
-        if (totalCount === 3) {
-            return { top3: eligibleStores.slice(0, 3), bottom3: eligibleStores.slice(-1).reverse() };
-        }
+        if (totalCount === 1) return { top3: eligibleStores.slice(0, 1), bottom3: [] };
+        if (totalCount === 2) return { top3: eligibleStores.slice(0, 2), bottom3: [] };
+        if (totalCount === 3) return { top3: eligibleStores.slice(0, 3), bottom3: eligibleStores.slice(-1).reverse() };
         
         return {
             top3: eligibleStores.slice(0, Math.min(3, eligibleStores.length)),
@@ -349,7 +343,6 @@ const DashboardCore = {
     currentOrderId: null,
     currentCustomerId: null,
 
-    // ========== 页面状态持久化（刷新后停留当前页面） ==========
     saveCurrentPageState: function() {
         try {
             sessionStorage.setItem('jf_current_page', this.currentPage || '');
@@ -364,7 +357,6 @@ const DashboardCore = {
             } else {
                 sessionStorage.removeItem('jf_current_customer_id');
             }
-            // 额外保存到 localStorage 作为备份
             localStorage.setItem('jf_last_page', this.currentPage);
             localStorage.setItem('jf_last_filter', this.currentFilter);
             if (this.currentOrderId) {
@@ -377,7 +369,6 @@ const DashboardCore = {
             } else {
                 localStorage.removeItem('jf_last_customer_id');
             }
-            console.log('[State] 已保存页面状态:', this.currentPage);
         } catch(e) {
             console.warn('[State] 保存状态失败:', e);
         }
@@ -390,7 +381,6 @@ const DashboardCore = {
             let orderId = sessionStorage.getItem('jf_current_order_id');
             let customerId = sessionStorage.getItem('jf_current_customer_id');
             
-            // 如果 sessionStorage 没有，从 localStorage 恢复
             if (!page) {
                 page = localStorage.getItem('jf_last_page');
                 filter = localStorage.getItem('jf_last_filter') || "all";
@@ -398,19 +388,16 @@ const DashboardCore = {
                 customerId = localStorage.getItem('jf_last_customer_id');
             }
             
-            // 验证页面是否有效
             const validPages = ['dashboard', 'orderTable', 'createOrder', 'viewOrder', 'payment', 
                                 'anomaly', 'userManagement', 'storeManagement', 'expenses', 
                                 'customers', 'paymentHistory', 'backupRestore', 'customerOrders', 
                                 'customerPaymentHistory', 'blacklist'];
             
             if (page && validPages.includes(page) && page !== 'login') {
-                console.log('[State] 从存储恢复页面:', page);
                 return { page, filter, orderId, customerId };
             }
             return { page: null, filter: "all", orderId: null, customerId: null };
         } catch(e) {
-            console.warn('[State] 恢复状态失败:', e);
             return { page: null, filter: "all", orderId: null, customerId: null };
         }
     },
@@ -426,25 +413,19 @@ const DashboardCore = {
         this.currentCustomerId = null;
     },
 
-    // ========== 清理逾期更新定时器 ==========
     _clearOverdueUpdateInterval: function() {
         if (_overdueUpdateInterval) {
             clearInterval(_overdueUpdateInterval);
             _overdueUpdateInterval = null;
-            console.log('[逾期更新] 定时器已清理');
         }
     },
 
-    // ========== 启动逾期更新定时器 ==========
     _startOverdueUpdateInterval: function() {
         this._clearOverdueUpdateInterval();
-        
         if (!AUTH.isLoggedIn()) return;
-        
         _overdueUpdateInterval = setInterval(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
-                console.log('[逾期更新] 自动更新完成', new Date().toLocaleTimeString());
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
@@ -452,11 +433,9 @@ const DashboardCore = {
                 console.warn('[逾期更新] 失败:', err.message);
             }
         }, 30 * 60 * 1000);
-        
         setTimeout(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
-                console.log('[逾期更新] 初始化更新完成');
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
@@ -466,7 +445,6 @@ const DashboardCore = {
         }, 5000);
     },
 
-    // ========== 防御性模块检查 ==========
     _ensureModuleLoaded: function(moduleName, moduleFn) {
         if (typeof moduleFn !== 'function') {
             console.warn(`[ModuleCheck] ${moduleName} 未加载，将使用降级方案`);
@@ -475,14 +453,11 @@ const DashboardCore = {
         return true;
     },
 
-    // ========== init 方法 ==========
     init: async function() {
         var lang = Utils.lang || 'zh';
         
-        // 初始化 Toast 系统
         if (window.Toast && !window.Toast._initialized) {
             window.Toast._initialized = true;
-            console.log('✅ Toast 通知系统已初始化');
         }
         
         Utils.ErrorHandler.init();
@@ -521,16 +496,13 @@ const DashboardCore = {
                 }
             }, 15000);
             
-            // ========== 关键修复：刷新后停留当前页面 ==========
             var savedState = null;
             
             if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
                 savedState = window._RESTORED_STATE;
-                console.log('[状态恢复] 使用 HTML 传递的状态:', savedState.page);
                 delete window._RESTORED_STATE;
             } else {
                 savedState = this.restorePageState();
-                console.log('[状态恢复] 从存储恢复:', savedState.page);
             }
             
             var savedPage = savedState.page;
@@ -545,13 +517,10 @@ const DashboardCore = {
                 this.currentFilter = savedFilter || "all";
                 this.currentOrderId = savedOrderId || null;
                 this.currentCustomerId = savedCustomerId || null;
-                console.log('[状态恢复] 最终恢复页面:', savedPage, '订单ID:', savedOrderId, '客户ID:', savedCustomerId);
                 await this.refreshCurrentPage();
             } else if (isLoggedIn) {
-                console.log('[状态恢复] 无保存状态，显示仪表盘');
                 await this.renderDashboard();
             } else {
-                console.log('[状态恢复] 未登录，显示登录页');
                 await this.router();
             }
             
@@ -601,12 +570,9 @@ const DashboardCore = {
         
         await new Promise(function(resolve) { setTimeout(resolve, 100); });
         
-        // 防御性模块检查
         var handlers = {
             dashboard: async () => {
-                try {
-                    await self.renderDashboard();
-                } catch (e) {
+                try { await self.renderDashboard(); } catch (e) {
                     console.error("renderDashboard failed:", e);
                     Utils.toast.error('加载仪表盘失败，请刷新页面', 4000);
                     document.getElementById("app").innerHTML = '' +
@@ -739,15 +705,12 @@ const DashboardCore = {
         
         var mapped = moduleMap[page];
         if (mapped) {
-            if (mapped.isCore) {
-                mapped.fn.call(self);
-            } else if (mapped.fn && typeof mapped.fn === 'function') {
+            if (mapped.isCore) { mapped.fn.call(self); }
+            else if (mapped.fn && typeof mapped.fn === 'function') {
                 ModuleFallback.safeCall(mapped.name, mapped.fn, [], null).then(function(result) {
                     if (result === null) self.renderDashboard();
                 });
-            } else {
-                self.renderDashboard();
-            }
+            } else { self.renderDashboard(); }
             return;
         }
         
@@ -790,7 +753,6 @@ const DashboardCore = {
         
         var special = specialHandlers[page];
         if (special) { special(); return; }
-        
         self.renderDashboard();
     },
 
@@ -826,9 +788,8 @@ const DashboardCore = {
             
             var back = backMap[prev.page];
             if (back) {
-                if (back.isCore) {
-                    back.fn.call(self);
-                } else if (back.param && back.fn && typeof back.fn === 'function') {
+                if (back.isCore) { back.fn.call(self); }
+                else if (back.param && back.fn && typeof back.fn === 'function') {
                     ModuleFallback.safeCall(back.name, back.fn, [back.param], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
@@ -836,9 +797,7 @@ const DashboardCore = {
                     ModuleFallback.safeCall(back.name, back.fn, [], null).then(function(r) {
                         if (r === null) self.renderDashboard();
                     });
-                } else {
-                    self.renderDashboard();
-                }
+                } else { self.renderDashboard(); }
                 return;
             }
             
@@ -870,8 +829,7 @@ const DashboardCore = {
                         });
                     } else self.renderDashboard();
                     break;
-                default:
-                    self.renderDashboard();
+                default: self.renderDashboard();
             }
         } else {
             this.renderDashboard();
@@ -1010,7 +968,6 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            // 使用统一缓存模块
             const cacheKey = DashboardCache.getKey ? DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId) : 'dashboard_stats_' + (isAdmin ? 'admin' : storeId);
             const report = await DashboardCache.get(cacheKey, 
                 () => DashboardStatsHelper.getDashboardStats(profile),
@@ -1047,6 +1004,7 @@ const DashboardCore = {
                 const client = SUPABASE.getClient();
                 let query = client.from('orders').select('created_at', { count: 'exact', head: true });
                 if (!isAdmin && storeId) query = query.eq('store_id', storeId);
+                query = query.eq('is_practice', false);
                 query = query.gte('created_at', monthStart);
                 const { count } = await query;
                 return count || 0;
@@ -1272,9 +1230,7 @@ const DashboardCore = {
     _calculateCashFlowSummary: function(allFlows, isAdmin, storeId) {
         var cashInflow = 0, cashOutflow = 0;
         var bankInflow = 0, bankOutflow = 0;
-        
         var flowsToUse = allFlows || [];
-        
         for (var i = 0; i < flowsToUse.length; i++) {
             var flow = flowsToUse[i];
             var amount = flow.amount || 0;
@@ -1286,7 +1242,6 @@ const DashboardCore = {
                 else if (flow.source_target === 'bank') bankOutflow += amount;
             }
         }
-        
         return {
             cash: { income: cashInflow, expense: cashOutflow, balance: cashInflow - cashOutflow },
             bank: { income: bankInflow, expense: bankOutflow, balance: bankInflow - bankOutflow }
@@ -1312,12 +1267,7 @@ const DashboardCore = {
         var name = document.getElementById("newStoreName")?.value.trim();
         var address = document.getElementById("newStoreAddress")?.value.trim();
         var phone = document.getElementById("newStorePhone")?.value.trim();
-        
-        if (!name) {
-            Utils.toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
-            return;
-        }
-        
+        if (!name) { Utils.toast.warning(lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写'); return; }
         try {
             if (typeof StoreManager !== 'undefined') {
                 await StoreManager.createStore(name, address, phone);
@@ -1354,7 +1304,6 @@ const DashboardCore = {
     }
 };
 
-// 挂载方法到 window.APP
 for (var key in DashboardCore) {
     if (typeof DashboardCore[key] === 'function' && 
         key !== 'showExpenses' && key !== 'showOrderTable' && key !== 'showReport' && 
@@ -1372,7 +1321,6 @@ window.APP.currentOrderId = DashboardCore.currentOrderId;
 window.APP.currentCustomerId = DashboardCore.currentCustomerId;
 window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
 
-// 页面关闭前保存状态
 window.addEventListener('beforeunload', function() {
     if (window.APP && typeof window.APP.saveCurrentPageState === 'function') {
         window.APP.saveCurrentPageState();
