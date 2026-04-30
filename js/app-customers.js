@@ -1,7 +1,9 @@
-// app-customers.js - v2.1
-// 修复：问题1 - 将内联三元全面迁移至 t() 体系
-//   - 139处 lang === 'id' ? '...' : '...' 替换为 t('key') 调用
-//   - Utils._translations 作为唯一真相来源
+// app-customers.js - v2.2 (最终版)
+// 适配新计费规则：
+//   管理费：≤50万→Rp20,000 / 50万~300万→Rp30,000 / >300万→1%
+//   服务费：默认2%，下拉0-5%
+//   利率：默认8%，下拉6-10%
+//   双语统一：t() 体系
 
 window.APP = window.APP || {};
 
@@ -152,7 +154,7 @@ const CustomersModule = {
                 console.warn('黑名单检查失败:', blErr.message);
             }
             
-            const { activeCount, completedCount, abnormalCount, orders } = await SUPABASE.getCustomerOrdersStats(customerId);
+            const { activeCount, completedCount, abnormalCount } = await SUPABASE.getCustomerOrdersStats(customerId);
             
             var canEdit = isAdmin;
             var canBlacklist = !isBlacklisted;
@@ -276,8 +278,7 @@ const CustomersModule = {
             Utils.toast.success(lang === 'id' ? '✅ Nasabah "' + customerName + '" telah ditambahkan ke blacklist.' : '✅ 客户 "' + customerName + '" 已加入黑名单。');
             await APP.showCustomers();
         } catch (error) {
-            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
-            Utils.toast.error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + errMsg : '拉黑失败：' + errMsg);
+            Utils.toast.error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + error.message : '拉黑失败：' + error.message);
         }
     },
     
@@ -298,14 +299,12 @@ const CustomersModule = {
             
             await APP.showCustomers();
         } catch (error) {
-            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
-            Utils.toast.error(lang === 'id' ? 'Gagal membuka blacklist: ' + errMsg : '解除拉黑失败：' + errMsg);
+            Utils.toast.error(lang === 'id' ? 'Gagal membuka blacklist: ' + error.message : '解除拉黑失败：' + error.message);
         }
     },
     
     showCustomerOrdersByStatus: async function(customerId, statusType) {
         var lang = Utils.lang;
-        var t = Utils.t.bind(Utils);
         
         try {
             const customer = await SUPABASE.getCustomer(customerId);
@@ -390,12 +389,8 @@ const CustomersModule = {
                                 ? '❌ Nomor telepon ' + phone + ' sudah terdaftar di blacklist (Nasabah: ' + blacklistedCustomer.name + ')\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.'
                                 : '❌ 手机号 ' + phone + ' 已被拉黑（客户：' + blacklistedCustomer.name + '）\n\n无法添加相同信息的客户。';
                         }
-                        
                         Utils.toast.error(reason, 5000);
-                        if (addBtn) {
-                            addBtn.disabled = false;
-                            addBtn.textContent = '💾 ' + t('save_customer');
-                        }
+                        if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); }
                         return;
                     }
                 } catch (blErr) {
@@ -410,7 +405,6 @@ const CustomersModule = {
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
                     const prefix = await SUPABASE._getStorePrefix(storeId);
-                    
                     const client = SUPABASE.getClient();
                     const { data: customers, error: queryError } = await client
                         .from('customers')
@@ -419,16 +413,12 @@ const CustomersModule = {
                         .order('customer_id', { ascending: false })
                         .limit(1);
                     
-                    if (queryError) {
-                        console.warn("查询最大客户ID失败:", queryError);
-                    }
+                    if (queryError) console.warn("查询最大客户ID失败:", queryError);
                     
                     let maxNumber = 0;
                     if (customers && customers.length > 0) {
                         const match = customers[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
-                        if (match) {
-                            maxNumber = parseInt(match[1], 10);
-                        }
+                        if (match) maxNumber = parseInt(match[1], 10);
                     }
                     
                     const nextNumber = maxNumber + 1;
@@ -470,32 +460,21 @@ const CustomersModule = {
                     break;
                     
                 } catch (err) {
-                    if (err.code === '23505' && attempt < maxRetries - 1) {
-                        continue;
-                    }
+                    if (err.code === '23505' && attempt < maxRetries - 1) continue;
                     throw err;
                 }
             }
             
-            if (!newCustomer) {
-                throw lastError || new Error(lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '无法生成唯一的客户ID');
-            }
+            if (!newCustomer) throw lastError || new Error(lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '无法生成唯一的客户ID');
             
-            if (addBtn) {
-                addBtn.disabled = false;
-                addBtn.textContent = '💾 ' + t('save_customer');
-            }
+            if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); }
             Utils.toast.success(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
             await APP.showCustomers();
             
         } catch (error) {
-            if (addBtn) { 
-                addBtn.disabled = false; 
-                addBtn.textContent = '💾 ' + t('save_customer'); 
-            }
+            if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); }
             console.error("addCustomer error:", error);
-            var errMsg = error.message || error.details || error.code || (lang === 'id' ? 'Gagal menyimpan' : '保存失败');
-            Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + errMsg : '保存失败：' + errMsg);
+            Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
         }
     },
 
@@ -504,10 +483,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         var t = Utils.t.bind(Utils);
         
-        if (!isAdmin) {
-            Utils.toast.warning(t('store_operation'));
-            return;
-        }
+        if (!isAdmin) { Utils.toast.warning(t('store_operation')); return; }
         
         try {
             const client = SUPABASE.getClient();
@@ -516,42 +492,29 @@ const CustomersModule = {
             var livingSame = c.living_same_as_ktp !== false;
             var occupation = c.occupation || '';
 
-            // 使用 t() 获取标签文本
-            var labelName = t('customer_name');
-            var labelPhone = t('phone');
-            var labelKtp = t('ktp_number');
-            var labelOccupation = t('occupation');
-            var labelKtpAddress = t('ktp_address');
-            var labelLivingAddress = t('living_address');
-            var labelSameAsKtp = t('same_as_ktp');
-            var labelDifferent = t('different_from_ktp');
-            var labelSave = t('save');
-            var labelCancel = t('cancel');
-            var titleEditCustomer = t('edit_customer');
-
             var modal = document.createElement('div');
             modal.id = 'editCustomerModal';
             modal.className = 'modal-overlay';
             modal.innerHTML = '' +
                 '<div class="modal-content" style="max-width:600px;">' +
-                    '<h3>✏️ ' + titleEditCustomer + '</h3>' +
+                    '<h3>✏️ ' + t('edit_customer') + '</h3>' +
                     '<div class="form-grid order-first-row">' +
-                        '<div class="form-group"><label>' + labelName + ' *</label><input id="ec_name" value="' + Utils.escapeHtml(c.name) + '"></div>' +
-                        '<div class="form-group"><label>' + labelPhone + ' *</label><input id="ec_phone" value="' + Utils.escapeHtml(c.phone || '') + '"></div>' +
-                        '<div class="form-group"><label>' + labelKtp + '</label><input id="ec_ktp" value="' + Utils.escapeHtml(c.ktp_number || '') + '"></div>' +
-                        '<div class="form-group"><label>' + labelOccupation + '</label><input id="ec_occupation" value="' + Utils.escapeHtml(occupation) + '"></div>' +
-                        '<div class="form-group full-width"><label>' + labelKtpAddress + '</label><textarea id="ec_ktpAddr" rows="2">' + Utils.escapeHtml(c.ktp_address || c.address || '') + '</textarea></div>' +
+                        '<div class="form-group"><label>' + t('customer_name') + ' *</label><input id="ec_name" value="' + Utils.escapeHtml(c.name) + '"></div>' +
+                        '<div class="form-group"><label>' + t('phone') + ' *</label><input id="ec_phone" value="' + Utils.escapeHtml(c.phone || '') + '"></div>' +
+                        '<div class="form-group"><label>' + t('ktp_number') + '</label><input id="ec_ktp" value="' + Utils.escapeHtml(c.ktp_number || '') + '"></div>' +
+                        '<div class="form-group"><label>' + t('occupation') + '</label><input id="ec_occupation" value="' + Utils.escapeHtml(occupation) + '"></div>' +
+                        '<div class="form-group full-width"><label>' + t('ktp_address') + '</label><textarea id="ec_ktpAddr" rows="2">' + Utils.escapeHtml(c.ktp_address || c.address || '') + '</textarea></div>' +
                         '<div class="form-group full-width">' +
-                            '<label>' + labelLivingAddress + '</label>' +
+                            '<label>' + t('living_address') + '</label>' +
                             '<div class="address-option">' +
-                                '<label><input type="radio" name="ec_livingOpt" value="same" ' + (livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + labelSameAsKtp + '</label>' +
-                                '<label><input type="radio" name="ec_livingOpt" value="different" ' + (!livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + labelDifferent + '</label>' +
+                                '<label><input type="radio" name="ec_livingOpt" value="same" ' + (livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + t('same_as_ktp') + '</label>' +
+                                '<label><input type="radio" name="ec_livingOpt" value="different" ' + (!livingSame ? 'checked' : '') + ' onchange="APP._toggleEditLiving(this.value)"> ' + t('different_from_ktp') + '</label>' +
                             '</div>' +
                             '<textarea id="ec_livingAddr" rows="2" style="margin-top:8px;' + (livingSame ? 'display:none;' : '') + '">' + Utils.escapeHtml(c.living_address || '') + '</textarea>' +
                         '</div>' +
                         '<div class="form-actions">' +
-                            '<button onclick="APP._saveEditCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success">💾 ' + labelSave + '</button>' +
-                            '<button onclick="document.getElementById(\'editCustomerModal\').remove()">✖ ' + labelCancel + '</button>' +
+                            '<button onclick="APP._saveEditCustomer(\'' + Utils.escapeAttr(customerId) + '\')" class="success">💾 ' + t('save') + '</button>' +
+                            '<button onclick="document.getElementById(\'editCustomerModal\').remove()">✖ ' + t('cancel') + '</button>' +
                         '</div>' +
                     '</div>' +
                 '</div>';
@@ -572,10 +535,7 @@ const CustomersModule = {
         var lang = Utils.lang;
         var t = Utils.t.bind(Utils);
         
-        if (!isAdmin) {
-            Utils.toast.warning(t('store_operation'));
-            return;
-        }
+        if (!isAdmin) { Utils.toast.warning(t('store_operation')); return; }
         
         var name = document.getElementById('ec_name').value.trim();
         var phone = document.getElementById('ec_phone').value.trim();
@@ -594,15 +554,10 @@ const CustomersModule = {
         try {
             const client = SUPABASE.getClient();
             const { error } = await client.from('customers').update({
-                name: name,
-                phone: phone,
-                ktp_number: ktp || null,
-                occupation: occupation || null,
-                ktp_address: ktpAddr || null,
-                address: ktpAddr || null,
-                living_same_as_ktp: livingSame,
-                living_address: livingAddr || null,
-                updated_at: Utils.getLocalDateTime()
+                name: name, phone: phone, ktp_number: ktp || null,
+                occupation: occupation || null, ktp_address: ktpAddr || null,
+                address: ktpAddr || null, living_same_as_ktp: livingSame,
+                living_address: livingAddr || null, updated_at: Utils.getLocalDateTime()
             }).eq('id', customerId);
             
             if (error) throw error;
@@ -610,9 +565,7 @@ const CustomersModule = {
             document.getElementById('editCustomerModal')?.remove();
             Utils.toast.success(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
             
-            if (window.APP.clearAnomalyCache) {
-                window.APP.clearAnomalyCache();
-            }
+            if (window.APP.clearAnomalyCache) window.APP.clearAnomalyCache();
             
             await APP.showCustomers();
         } catch (e) {
@@ -645,9 +598,7 @@ const CustomersModule = {
             
             Utils.toast.success(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
             
-            if (window.APP.clearAnomalyCache) {
-                window.APP.clearAnomalyCache();
-            }
+            if (window.APP.clearAnomalyCache) window.APP.clearAnomalyCache();
             
             await APP.showCustomers();
         } catch (e) {
@@ -656,7 +607,9 @@ const CustomersModule = {
         }
     },
 
-    // ==================== 创建订单页面 ====================
+    // ======================================================================
+    // 创建订单页面（新计费规则）
+    // ======================================================================
     createOrderForCustomer: async function(customerId) {
         var lang = Utils.lang || 'id';
         var t = function(key) { return Utils.t(key); };
@@ -729,6 +682,7 @@ const CustomersModule = {
                 '</div>' +
                 
                 '<div class="card">' +
+                    // ===== 客户信息 =====
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">👤</span> ' + t('customer_info') +
@@ -765,6 +719,7 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
+                    // ===== 质押物信息 =====
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">💎</span> ' + t('collateral_info') +
@@ -792,18 +747,25 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
+                    // ===== 费用明细（新计费规则） =====
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">💰</span> ' + t('fee_details') +
                         '</div>' +
+                        
+                        // 管理费卡片
                         '<div class="fee-cards-row">' +
                             '<div class="fee-card">' +
                                 '<div class="fee-card-label">📋 ' + t('admin_fee') + '</div>' +
                                 '<div class="fee-card-body">' +
-                                    '<input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">' +
+                                    '<input type="text" id="adminFeeInput" value="0" class="amount-input" readonly style="background:#f8fafc;">' +
                                 '</div>' +
-                                '<div class="fee-card-hint">💡 ' + t('admin_fee_auto') + '</div>' +
+                                '<div class="fee-card-hint">' +
+                                    '💡 ≤Rp500rb→Rp20rb | Rp500rb~3jt→Rp30rb | >3jt→1%' +
+                                '</div>' +
                             '</div>' +
+                            
+                            // 服务费卡片
                             '<div class="fee-card">' +
                                 '<div class="fee-card-label">✨ ' + t('service_fee') + '</div>' +
                                 '<div class="fee-card-body">' +
@@ -812,10 +774,11 @@ const CustomersModule = {
                                     '</select>' +
                                     '<input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()">' +
                                 '</div>' +
-                                '<div class="fee-card-hint">💡 ' + t('service_fee_auto') + '</div>' +
+                                '<div class="fee-card-hint">💡 ' + (lang === 'id' ? 'Default 2% dari jumlah gadai' : '默认当金金额的2%') + '</div>' +
                             '</div>' +
                         '</div>' +
                         
+                        // 入账方式
                         '<div class="payment-method-row">' +
                             '<span class="payment-method-label">📥 ' + t('fee_payment_method') + '</span>' +
                             '<div class="payment-method-selector compact" style="padding:0;">' +
@@ -825,6 +788,7 @@ const CustomersModule = {
                             '<div class="payment-method-hint">💡 ' + t('fee_payment_hint') + '</div>' +
                         '</div>' +
                         
+                        // 利率选择
                         '<div class="form-group interest-rate-group">' +
                             '<label>📈 ' + t('interest_rate_select') + '</label>' +
                             '<select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">' +
@@ -833,6 +797,7 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
+                    // ===== 还款方式 =====
                     '<div class="form-section">' +
                         '<div class="form-section-title">' +
                             '<span class="section-icon">📅</span> ' + t('repayment_method') +
@@ -886,6 +851,7 @@ const CustomersModule = {
                         '</div>' +
                     '</div>' +
                     
+                    // ===== 备注和按钮 =====
                     '<div class="form-section">' +
                         '<div class="form-group full-width">' +
                             '<label>' + t('notes') + '</label>' +
@@ -898,11 +864,9 @@ const CustomersModule = {
                     '</div>' +
                 '</div>';
             
+            // 绑定金额格式化
             var amountInput = document.getElementById("amount");
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
-            
-            var adminFeeInput = document.getElementById("adminFeeInput");
-            if (adminFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(adminFeeInput);
             
             var serviceFeeInput = document.getElementById("serviceFeeInput");
             if (serviceFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(serviceFeeInput);
@@ -910,6 +874,7 @@ const CustomersModule = {
             var monthlyPaymentInput = document.getElementById("monthlyPaymentInput");
             if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
             
+            // 初始计算
             APP.recalculateAllFees();
             
         } catch (error) {
@@ -918,6 +883,9 @@ const CustomersModule = {
         }
     },
 
+    // ======================================================================
+    // 保存订单（新计费规则）
+    // ======================================================================
     saveOrderForCustomer: async function(customerId) {
         var lang = Utils.lang;
         var t = Utils.t.bind(Utils);
@@ -934,10 +902,11 @@ const CustomersModule = {
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
         var notes = document.getElementById("notes").value;
         
-        var adminFeeStr = document.getElementById("adminFeeInput").value;
-        var adminFee = Utils.parseNumberFromCommas(adminFeeStr) || Utils.calculateAdminFee(amount);
+        // 管理费 — 阶梯定价
+        var adminFee = Utils.calculateAdminFee(amount);
         
-        var serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 0;
+        // 服务费
+        var serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 2;
         var serviceFeeStr = document.getElementById("serviceFeeInput").value;
         var serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
         if (serviceFee === 0 && serviceFeePercent > 0) {
@@ -945,8 +914,11 @@ const CustomersModule = {
         }
         
         var feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
+        
+        // 利率
         var agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 8;
         
+        // 还款方式
         var repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked');
         var repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
         var repaymentTerm = null;
@@ -1017,6 +989,7 @@ const CustomersModule = {
             
             var newOrder = await Order.create(orderData);
             
+            // 记录管理费
             if (adminFee > 0) {
                 try {
                     await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee);
@@ -1025,6 +998,7 @@ const CustomersModule = {
                 }
             }
             
+            // 记录服务费
             if (serviceFee > 0) {
                 try {
                     await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod);
@@ -1033,6 +1007,7 @@ const CustomersModule = {
                 }
             }
             
+            // 记录当金发放
             if (amount > 0) {
                 try {
                     var disbursementDesc = lang === 'id' 
@@ -1060,26 +1035,11 @@ const CustomersModule = {
             document.getElementById("amount").value = '';
             document.getElementById("notes").value = '';
             
-            var amountInput = document.getElementById("amount");
-            if (amountInput) amountInput.value = '';
+            var svcSelect = document.getElementById("serviceFeePercentSelect");
+            if (svcSelect) { svcSelect.value = '2'; delete svcSelect.dataset.manual; }
             
-            var adminFeeInput = document.getElementById("adminFeeInput");
-            if (adminFeeInput) {
-                adminFeeInput.value = '0';
-                delete adminFeeInput.dataset.manual;
-            }
-            
-            var serviceFeePercentSelect = document.getElementById("serviceFeePercentSelect");
-            if (serviceFeePercentSelect) {
-                serviceFeePercentSelect.value = '2';
-                delete serviceFeePercentSelect.dataset.manual;
-            }
-            
-            var serviceFeeInput = document.getElementById("serviceFeeInput");
-            if (serviceFeeInput) {
-                serviceFeeInput.value = '0';
-                delete serviceFeeInput.dataset.manual;
-            }
+            var svcInput = document.getElementById("serviceFeeInput");
+            if (svcInput) { svcInput.value = '0'; delete svcInput.dataset.manual; }
             
             var cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]');
             if (cashRadio) cashRadio.checked = true;
@@ -1091,54 +1051,48 @@ const CustomersModule = {
             if (interestSelect) interestSelect.value = '8';
             
             var flexibleRadio = document.getElementById("flexibleRadio");
-            if (flexibleRadio) {
-                flexibleRadio.checked = true;
-                APP.toggleRepaymentForm('flexible');
-            }
+            if (flexibleRadio) { flexibleRadio.checked = true; APP.toggleRepaymentForm('flexible'); }
             
             APP.recalculateAllFees();
             
             var monthlyInput = document.getElementById("monthlyPaymentInput");
-            if (monthlyInput) {
-                monthlyInput.value = '0';
-                delete monthlyInput.dataset.manual;
-            }
+            if (monthlyInput) { monthlyInput.value = '0'; delete monthlyInput.dataset.manual; }
             
             document.getElementById("collateral").focus();
             
         } catch (error) {
             if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
             console.error("saveOrderForCustomer error:", error);
-            var errMsg = error.message || error.details || error.code || JSON.stringify(error);
-            Utils.toast.error(t('save_failed') + ': ' + errMsg);
+            Utils.toast.error(t('save_failed') + ': ' + error.message);
         } finally {
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = '💾 ' + t('save');
-            }
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
         }
     },
 
+    // ======================================================================
+    // 费用自动计算（新计费规则）
+    // ======================================================================
     recalculateAllFees: function() {
         var amountStr = document.getElementById('amount')?.value || '0';
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
         
+        // 管理费 — 阶梯定价（只读，自动计算）
         var adminFee = Utils.calculateAdminFee(amount);
         var adminFeeInput = document.getElementById('adminFeeInput');
-        if (adminFeeInput && !adminFeeInput.dataset.manual) {
+        if (adminFeeInput) {
             adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
         }
         
-        var serviceFeeData = Utils.calculateServiceFeeNew(amount);
+        // 服务费
         var serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
         var serviceFeeInput = document.getElementById('serviceFeeInput');
-        if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
-            serviceFeeSelect.value = serviceFeeData.percent;
-        }
+        var percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
         if (serviceFeeInput && !serviceFeeInput.dataset.manual) {
-            serviceFeeInput.value = Utils.formatNumberWithCommas(serviceFeeData.amount);
+            var fee = Math.round(amount * percent / 100);
+            serviceFeeInput.value = Utils.formatNumberWithCommas(fee);
         }
         
+        // 固定还款 — 月供
         var repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
         if (repaymentType === 'fixed') {
             var rateSelect = document.getElementById('agreedInterestRateSelect');
@@ -1157,18 +1111,13 @@ const CustomersModule = {
         }
     },
 
-    onAdminFeeManualChange: function() {
-        var input = document.getElementById('adminFeeInput');
-        if (input) input.dataset.manual = 'true';
-    },
-
     recalculateServiceFee: function() {
         var select = document.getElementById('serviceFeePercentSelect');
         if (select) select.dataset.manual = 'true';
         
         var amountStr = document.getElementById('amount')?.value || '0';
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
-        var percent = select ? parseFloat(select.value) : 0;
+        var percent = select ? parseFloat(select.value) : 2;
         var fee = Math.round(amount * percent / 100);
         
         var input = document.getElementById('serviceFeeInput');
@@ -1197,16 +1146,13 @@ const CustomersModule = {
         if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none';
         if (flexibleCard) flexibleCard.style.display = value === 'flexible' ? 'block' : 'none';
         
-        if (flexibleCardDiv) {
-            flexibleCardDiv.classList.toggle('selected', value === 'flexible');
-        }
-        if (fixedCardDiv) {
-            fixedCardDiv.classList.toggle('selected', value === 'fixed');
-        }
+        if (flexibleCardDiv) flexibleCardDiv.classList.toggle('selected', value === 'flexible');
+        if (fixedCardDiv) fixedCardDiv.classList.toggle('selected', value === 'fixed');
         
         if (value === 'fixed') APP.recalculateAllFees();
     },
 
+    // ==================== 客户订单列表 ====================
     showCustomerOrders: async function(customerId) {
         APP.currentPage = 'customerOrders';
         APP.currentCustomerId = customerId;
@@ -1233,9 +1179,7 @@ const CustomersModule = {
                     var o = orders[i];
                     var sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
                     var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
-                    var repaymentTypeText = o.repayment_type === 'fixed' 
-                        ? t('fixed_repayment')
-                        : t('flexible_repayment');
+                    var repaymentTypeText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment');
                     
                     rows += '<tr>' +
                         '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
@@ -1280,7 +1224,7 @@ const CustomersModule = {
                     '<h3>📋 ' + t('order_list') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead><tr><th class="col-id">ID</th><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + t('loan_amount') + '</th><th class="col-amount amount">' + t('principal_paid') + '</th><th class="col-months text-center">' + t('interest') + ' ' + t('paid') + '</th><th class="col-status text-center">' + t('repayment_type') + '</th><th class="col-status text-center">' + t('status') + '</th></tr></thead>' +
+                            '<thead><tr><th class="col-id">ID</th><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + t('loan_amount') + '</th><th class="col-amount amount">' + t('principal_paid') + '</th><th class="col-months text-center">' + t('interest') + '</th><th class="col-status text-center">' + t('repayment_type') + '</th><th class="col-status text-center">' + t('status') + '</th></tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
                     '</div>' +
@@ -1303,11 +1247,7 @@ const CustomersModule = {
             const client = SUPABASE.getClient();
             const { data: orders } = await client.from('orders').select('id, order_id').eq('customer_id', customerId);
             var orderIds = [];
-            if (orders) {
-                for (var i = 0; i < orders.length; i++) {
-                    orderIds.push(orders[i].id);
-                }
-            }
+            if (orders) { for (var i = 0; i < orders.length; i++) { orderIds.push(orders[i].id); } }
             var allPayments = [];
             if (orderIds.length > 0) {
                 const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false });
@@ -1349,17 +1289,7 @@ const CustomersModule = {
                     '<h3>💰 ' + t('payment_history') + '</h3>' +
                     '<div class="table-container">' +
                         '<table class="data-table">' +
-                            '<thead>' +
-                                '<tr>' +
-                                    '<th class="col-date">' + t('date') + '</th>' +
-                                    '<th class="col-id">' + t('order_id') + '</th>' +
-                                    '<th class="col-type">' + t('type') + '</th>' +
-                                    '<th class="col-months text-center">' + t('month') + '</th>' +
-                                    '<th class="col-amount amount">' + t('amount') + '</th>' +
-                                    '<th class="col-method text-center">' + t('payment_method') + '</th>' +
-                                    '<th class="col-desc">' + t('description') + '</th>' +
-                                '</tr>' +
-                            '</thead>' +
+                            '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-id">' + t('order_id') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + t('month') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + t('payment_method') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
                             '<tbody>' + rows + '</tbody>' +
                         '</table>' +
                     '</div>' +
@@ -1371,7 +1301,7 @@ const CustomersModule = {
     }
 };
 
-// 统一挂载到 window.APP
+// 挂载到 window.APP
 for (var key in CustomersModule) {
     if (CustomersModule.hasOwnProperty(key) && typeof CustomersModule[key] === 'function') {
         window.APP[key] = CustomersModule[key];
