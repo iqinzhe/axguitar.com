@@ -574,10 +574,10 @@
 
                 document.getElementById("app").innerHTML = `
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                            <img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">
-                            <h1 style="margin:0;">JF! by Gadai</h1>
-                        </div>
+                        '<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">' +
+    '<img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">' +
+    '<h1 style="margin:0;">JF! by Gadai</h1>' +
+'</div>' +
                         <div class="header-actions">
                             <button onclick="APP.toggleLanguage()" class="lang-btn" style="margin-left:8px;">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
                         </div>
