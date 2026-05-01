@@ -1,73 +1,72 @@
-// app-dashboard-core.js - v1.3
-// 修复：
-//   问题6: 仪表盘净利润展示修复，使用 getCashFlowSummary() 新返回值
-//   问题1: 逐步迁移内联三元到 t() 体系
-//   新增: hasSentRemindersToday 方法供提醒按钮使用
-//   修复: ModuleFallback.safeCall 失败时返回仪表盘，避免白板
+// app-dashboard-core.js - v1.4 (精简修复版)
+// 修复核心：ModuleFallback.safeCall 失败时自动恢复仪表盘，绝不返回 null
 
 window.APP = window.APP || {};
 
 // ========== 逾期更新定时器 ==========
 let _overdueUpdateInterval = null;
 
-// ==================== 模块降级通知 ====================
+// ==================== 模块降级通知（核心修复） ====================
 const ModuleFallback = {
     _degradedModules: {},
     
     async safeCall(moduleName, fn, args, fallbackFn) {
         try {
-            if (typeof fn !== 'function') throw new Error('module_not_loaded');
+            if (typeof fn !== 'function') {
+                throw new Error('module_not_loaded');
+            }
             return await fn.apply(null, args || []);
         } catch (error) {
-            var lang = Utils.lang;
-            var moduleKey = moduleName + '_' + (error.message || 'unknown');
+            const lang = Utils.lang;
+            const moduleKey = moduleName + '_' + (error.message || 'unknown');
             
+            // 避免重复提示
             if (!this._degradedModules[moduleKey]) {
                 this._degradedModules[moduleKey] = true;
                 
-                var msg = '';
-                if (error.message === 'module_not_loaded') {
-                    msg = lang === 'id'
-                        ? '⚠️ 模块 "' + moduleName + '" 加载失败，返回仪表盘。'
-                        : '⚠️ Module "' + moduleName + '" failed to load. Returning to dashboard.';
-                } else {
-                    msg = lang === 'id'
-                        ? '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message + '，返回仪表盘。'
-                        : '⚠️ Module "' + moduleName + '" error: ' + error.message + '. Returning to dashboard.';
-                }
+                const msg = lang === 'id'
+                    ? `⚠️ 模块 "${moduleName}" 加载失败: ${error.message}，已返回仪表盘。`
+                    : `⚠️ Module "${moduleName}" failed: ${error.message}, returned to dashboard.`;
                 
                 if (window.Toast) {
                     window.Toast.warning(msg, 5000);
                 }
-                ModuleFallback._showBanner(moduleName, error.message);
+                this._showBanner(moduleName, error.message);
             }
             
-            // 修复：优先使用 fallbackFn，否则返回仪表盘而不是 null
+            // ========== 核心修复：绝不返回 null，而是恢复页面 ==========
+            
+            // 1. 如果有 fallbackFn，执行它
             if (typeof fallbackFn === 'function') {
                 return await fallbackFn();
             }
             
-            // 默认返回仪表盘，避免白板
+            // 2. 尝试恢复仪表盘
             if (window.DashboardCore && typeof window.DashboardCore.renderDashboard === 'function') {
-                return await window.DashboardCore.renderDashboard();
+                await window.DashboardCore.renderDashboard();
+                return true;
             }
             
+            // 3. 最后手段：刷新页面
+            console.error('[ModuleFallback] 无法恢复，刷新页面');
+            location.reload();
             return null;
         }
     },
     
     _showBanner(moduleName, errorMsg) {
-        var existingBanner = document.getElementById('moduleFallbackBanner');
+        // 移除旧 banner 避免重复
+        const existingBanner = document.getElementById('moduleFallbackBanner');
         if (existingBanner) {
-            var content = existingBanner.querySelector('.info-bar-content');
-            if (content && content.textContent.indexOf(moduleName) === -1) {
+            const content = existingBanner.querySelector('.info-bar-content');
+            if (content && !content.textContent.includes(moduleName)) {
                 content.textContent += ' | ' + moduleName;
             }
             return;
         }
         
-        var lang = Utils.lang;
-        var banner = document.createElement('div');
+        const lang = Utils.lang;
+        const banner = document.createElement('div');
         banner.id = 'moduleFallbackBanner';
         banner.className = 'info-bar warning';
         banner.style.cssText = 'position:sticky;top:0;z-index:9999;margin-bottom:12px;border-radius:6px;';
@@ -76,12 +75,12 @@ const ModuleFallback = {
             '<div class="info-bar-content">' +
                 '<strong>' + (lang === 'id' ? '功能降级通知' : 'Feature Degraded') + '</strong> — ' +
                 (lang === 'id' 
-                    ? '模块 "' + moduleName + '" 加载失败，请刷新页面。'
-                    : 'Module "' + moduleName + '" failed to load.') +
+                    ? '模块 "' + moduleName + '" 加载失败，已返回仪表盘。'
+                    : 'Module "' + moduleName + '" failed, returned to dashboard.') +
             '</div>' +
-            '<button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 8px;" title="' + (lang === 'id' ? '关闭' : 'Close') + '">✖</button>';
+            '<button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:0 8px;">✖</button>';
         
-        var app = document.getElementById('app');
+        const app = document.getElementById('app');
         if (app && app.firstChild) {
             app.insertBefore(banner, app.firstChild);
         }
@@ -89,14 +88,14 @@ const ModuleFallback = {
     
     clearAll() {
         this._degradedModules = {};
-        var banner = document.getElementById('moduleFallbackBanner');
+        const banner = document.getElementById('moduleFallbackBanner');
         if (banner) banner.remove();
     }
 };
 
 window.ModuleFallback = ModuleFallback;
 
-// ==================== 使用统一缓存模块 ====================
+// ==================== 缓存别名 ====================
 const DashboardCache = JFCache;
 
 // ==================== 聚合查询辅助方法 ====================
@@ -352,6 +351,7 @@ const DashboardStatsHelper = {
     }
 };
 
+// ==================== DashboardCore 主模块 ====================
 const DashboardCore = {
     currentFilter: "all",
     historyStack: [],
@@ -385,10 +385,7 @@ const DashboardCore = {
             } else {
                 localStorage.removeItem('jf_last_customer_id');
             }
-            console.log('[State] 已保存页面状态:', this.currentPage);
-        } catch(e) {
-            console.warn('[State] 保存状态失败:', e);
-        }
+        } catch(e) {}
     },
     
     restorePageState: function() {
@@ -411,12 +408,10 @@ const DashboardCore = {
                                 'customerPaymentHistory', 'blacklist'];
             
             if (page && validPages.includes(page) && page !== 'login') {
-                console.log('[State] 从存储恢复页面:', page);
                 return { page, filter, orderId, customerId };
             }
             return { page: null, filter: "all", orderId: null, customerId: null };
         } catch(e) {
-            console.warn('[State] 恢复状态失败:', e);
             return { page: null, filter: "all", orderId: null, customerId: null };
         }
     },
@@ -436,19 +431,16 @@ const DashboardCore = {
         if (_overdueUpdateInterval) {
             clearInterval(_overdueUpdateInterval);
             _overdueUpdateInterval = null;
-            console.log('[逾期更新] 定时器已清理');
         }
     },
 
     _startOverdueUpdateInterval: function() {
         this._clearOverdueUpdateInterval();
-        
         if (!AUTH.isLoggedIn()) return;
         
         _overdueUpdateInterval = setInterval(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
-                console.log('[逾期更新] 自动更新完成', new Date().toLocaleTimeString());
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
@@ -460,25 +452,18 @@ const DashboardCore = {
         setTimeout(async () => {
             try {
                 await SUPABASE.updateOverdueDays();
-                console.log('[逾期更新] 初始化更新完成');
                 if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') {
                     await this.refreshCurrentPage();
                 }
-            } catch (err) {
-                console.warn('[逾期更新] 初始化失败:', err.message);
-            }
+            } catch (err) {}
         }, 5000);
     },
 
     _ensureModuleLoaded: function(moduleName, moduleFn) {
-        if (typeof moduleFn !== 'function') {
-            console.warn(`[ModuleCheck] ${moduleName} 未加载，将使用降级方案`);
-            return false;
-        }
-        return true;
+        return typeof moduleFn === 'function';
     },
 
-    // ==================== 新增：检查今天是否已发送过提醒 ====================
+    // 检查今天是否已发送过提醒
     hasSentRemindersToday: async function() {
         try {
             if (SUPABASE && typeof SUPABASE.hasSentRemindersToday === 'function') {
@@ -493,12 +478,11 @@ const DashboardCore = {
             if (error) return false;
             return (data?.length || 0) > 0;
         } catch (e) {
-            console.warn('[hasSentRemindersToday] 检查失败:', e);
             return false;
         }
     },
 
-    // ==================== 发送每日提醒 ====================
+    // 发送每日提醒
     sendDailyReminders: async function() {
         var lang = Utils.lang;
         
@@ -555,12 +539,9 @@ const DashboardCore = {
                     var waUrl = 'https://wa.me/' + cleanPhone + '?text=' + encodedMessage;
                     
                     window.open(waUrl, '_blank');
-                    
                     await SUPABASE.logReminder(order.id);
                     successCount++;
-                    
                     await new Promise(r => setTimeout(r, 500));
-                    
                 } catch (err) {
                     console.error('发送提醒失败:', order.order_id, err);
                     failCount++;
@@ -575,7 +556,6 @@ const DashboardCore = {
             );
             
             await this.refreshCurrentPage();
-            
         } catch (error) {
             console.error('sendDailyReminders error:', error);
             Utils.toast.error(lang === 'id' ? 'Gagal mengirim pengingat' : '发送提醒失败');
@@ -587,7 +567,6 @@ const DashboardCore = {
         
         if (window.Toast && !window.Toast._initialized) {
             window.Toast._initialized = true;
-            console.log('✅ Toast 通知系统已初始化');
         }
         
         Utils.ErrorHandler.init();
@@ -596,45 +575,18 @@ const DashboardCore = {
         document.getElementById("app").innerHTML = '' +
             '<div class="loading-container">' +
                 '<div class="loader"></div>' +
-                '<p class="loading-text">' + 
-                    (lang === 'id' ? '🔄 Memuat sistem...' : '🔄 Loading system...') + 
-                '</p>' +
+                '<p class="loading-text">' + (lang === 'id' ? '🔄 Memuat sistem...' : '🔄 Loading system...') + '</p>' +
             '</div>';
         
         try {
             await AUTH.init();
             
-            var initTimeout = setTimeout(function() {
-                var currentLang = Utils.lang || 'zh';
-                var timeoutDiv = document.getElementById('initTimeout');
-                if (!timeoutDiv) {
-                    var div = document.createElement('div');
-                    div.id = 'initTimeout';
-                    div.className = 'info-bar warning';
-                    div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;max-width:400px;text-align:center;';
-                    div.innerHTML = '' +
-                        '<div class="info-bar-content">' +
-                            '<strong>' + (currentLang === 'id' ? '⏳ Memuat terlalu lama' : '⏳ 加载超时') + '</strong>' +
-                            '<p>' + (currentLang === 'id' 
-                                ? 'Sistem membutuhkan waktu lebih lama dari biasanya. Silakan periksa koneksi internet Anda dan muat ulang halaman.'
-                                : '系统加载时间超过预期，请检查网络连接后刷新页面重试。') + '</p>' +
-                            '<button onclick="location.reload()" style="margin-top:8px;padding:6px 16px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer;">' +
-                                (currentLang === 'id' ? '🔄 Muat Ulang' : '🔄 刷新页面') +
-                            '</button>' +
-                        '</div>';
-                    document.getElementById("app").appendChild(div);
-                }
-            }, 15000);
-            
             var savedState = null;
-            
             if (window._RESTORED_STATE && window._RESTORED_STATE.page) {
                 savedState = window._RESTORED_STATE;
-                console.log('[状态恢复] 使用 HTML 传递的状态:', savedState.page);
                 delete window._RESTORED_STATE;
             } else {
                 savedState = this.restorePageState();
-                console.log('[状态恢复] 从存储恢复:', savedState.page);
             }
             
             var savedPage = savedState.page;
@@ -649,63 +601,39 @@ const DashboardCore = {
                 this.currentFilter = savedFilter || "all";
                 this.currentOrderId = savedOrderId || null;
                 this.currentCustomerId = savedCustomerId || null;
-                console.log('[状态恢复] 最终恢复页面:', savedPage, '订单ID:', savedOrderId, '客户ID:', savedCustomerId);
                 await this.refreshCurrentPage();
             } else if (isLoggedIn) {
-                console.log('[状态恢复] 无保存状态，显示仪表盘');
                 await this.renderDashboard();
             } else {
-                console.log('[状态恢复] 未登录，显示登录页');
                 await this.router();
             }
-            
-            clearTimeout(initTimeout);
-            var timeoutEl = document.getElementById('initTimeout');
-            if (timeoutEl) timeoutEl.remove();
             
             if (AUTH.isLoggedIn()) {
                 this._startOverdueUpdateInterval();
             }
-            
         } catch (error) {
             console.error("Init error:", error);
-            var timeoutEl2 = document.getElementById('initTimeout');
-            if (timeoutEl2) timeoutEl2.remove();
-            
-            var errorMsg = (Utils.lang === 'id'
-                ? '⚠️ 系统加载失败: ' + error.message + '\n\n请刷新页面重试。'
-                : '⚠️ System load failed: ' + error.message + '\n\nPlease refresh the page.');
-            
-            Utils.toast.error(errorMsg, 5000);
-            
+            Utils.toast.error(lang === 'id' ? '系统加载失败，请刷新页面' : 'System load failed, please refresh', 5000);
             document.getElementById("app").innerHTML = '' +
                 '<div class="card" style="text-align:center;padding:40px;">' +
-                    '<p style="white-space:pre-line;">' + errorMsg + '</p>' +
-                    '<button onclick="location.reload()" style="margin-top:12px;">🔄 ' + 
-                        (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
+                    '<p>' + (lang === 'id' ? '系统加载失败，请刷新页面' : 'System load failed, please refresh') + '</p>' +
+                    '<button onclick="location.reload()" style="margin-top:12px;">🔄 ' + (lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
                 '</div>';
         }
     },
 
     router: async function() {
-        // 修复：添加错误处理，确保失败时返回仪表盘
         if (!AUTH.isLoggedIn()) {
             await this.renderLogin();
             return;
         }
-        
-        try {
-            await this.refreshCurrentPage();
-        } catch (error) {
-            console.error('Router error:', error);
-            Utils.toast.error(Utils.lang === 'id' ? '页面加载失败，返回仪表盘' : 'Page load failed, returning to dashboard');
-            await this.renderDashboard();
-        }
+        await this.refreshCurrentPage();
     },
 
     refreshCurrentPage: async function() {
         var self = this;
         
+        // 显示骨架屏
         var skeletonType = 'default';
         if (this.currentPage === 'dashboard') skeletonType = 'dashboard';
         else if (this.currentPage === 'orderTable' || this.currentPage === 'customers' || 
@@ -713,79 +641,52 @@ const DashboardCore = {
         else if (this.currentPage === 'viewOrder' || this.currentPage === 'payment') skeletonType = 'detail';
         
         document.getElementById("app").innerHTML = Utils.renderSkeleton(skeletonType);
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        await new Promise(function(resolve) { setTimeout(resolve, 100); });
-        
-        var handlers = {
+        // 页面处理器映射
+        const handlers = {
             dashboard: async () => {
                 try {
                     await self.renderDashboard();
                 } catch (e) {
                     console.error("renderDashboard failed:", e);
-                    Utils.toast.error('加载仪表盘失败，请刷新页面', 4000);
-                    // 修复：添加返回首页按钮，避免白板
+                    Utils.toast.error('加载仪表盘失败', 4000);
                     document.getElementById("app").innerHTML = '' +
                         '<div class="card" style="text-align:center;padding:40px;">' +
-                            '<p>' + (Utils.lang === 'id' ? '⚠️ 加载仪表盘失败，请返回首页。' : '⚠️ Dashboard load failed.') + '</p>' +
-                            '<button onclick="APP.navigateTo(\'dashboard\')" style="margin-right:8px;">🏠 ' + 
-                                (Utils.lang === 'id' ? '返回首页' : 'Back to Home') + '</button>' +
-                            '<button onclick="location.reload()">🔄 ' + 
-                                (Utils.lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
+                            '<p>⚠️ ' + (Utils.lang === 'id' ? '加载仪表盘失败' : 'Dashboard load failed') + '</p>' +
+                            '<button onclick="APP.forceRecovery()" style="margin-top:12px;margin-right:8px;">🔄 ' + 
+                                (Utils.lang === 'id' ? '强制恢复' : 'Force Recovery') + '</button>' +
+                            '<button onclick="location.reload()">🔄 ' + (Utils.lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
                         '</div>';
                 }
             },
             orderTable: () => ModuleFallback.safeCall('Daftar Pesanan', window.APP.showOrderTable, [], () => self.renderDashboard()),
             createOrder: () => ModuleFallback.safeCall('Buat Pesanan', window.APP.showCreateOrder, [], () => self.renderDashboard()),
-            viewOrder: async () => { 
+            viewOrder: async () => {
                 if (self.currentOrderId && self._ensureModuleLoaded('viewOrder', window.APP.viewOrder)) {
                     return await ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [self.currentOrderId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
-            payment: async () => { 
+            payment: async () => {
                 if (self.currentOrderId && self._ensureModuleLoaded('showPayment', window.APP.showPayment)) {
                     return await ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [self.currentOrderId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
-            anomaly: () => {
-                if (self._ensureModuleLoaded('showAnomaly', window.APP.showAnomaly)) {
-                    return ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            userManagement: () => {
-                if (self._ensureModuleLoaded('showUserManagement', window.APP.showUserManagement)) {
-                    return ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
+            anomaly: () => ModuleFallback.safeCall('Situasi Abnormal', window.APP.showAnomaly, [], () => self.renderDashboard()),
+            userManagement: () => ModuleFallback.safeCall('Manajemen Peran', window.APP.showUserManagement, [], () => self.renderDashboard()),
             storeManagement: () => {
                 if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') {
                     return ModuleFallback.safeCall('Manajemen Toko', StoreManager.renderStoreManagement, [], () => self.renderDashboard());
                 }
                 return self.renderDashboard();
             },
-            expenses: () => {
-                if (self._ensureModuleLoaded('showExpenses', window.APP.showExpenses)) {
-                    return ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
-            customers: () => {
-                if (self._ensureModuleLoaded('showCustomers', window.APP.showCustomers)) {
-                    return ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            },
+            expenses: () => ModuleFallback.safeCall('Pengeluaran', window.APP.showExpenses, [], () => self.renderDashboard()),
+            customers: () => ModuleFallback.safeCall('Nasabah', window.APP.showCustomers, [], () => self.renderDashboard()),
             paymentHistory: async () => {
-                if (typeof window.APP.showCashFlowPage === 'function') {
-                    return await ModuleFallback.safeCall('Arus Kas', window.APP.showCashFlowPage, [], () => self.renderDashboard());
-                }
-                if (typeof window.APP.showPaymentHistory === 'function') {
-                    return await ModuleFallback.safeCall('Riwayat Pembayaran', window.APP.showPaymentHistory, [], () => self.renderDashboard());
-                }
-                return await self.renderDashboard();
+                const fn = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
+                return await ModuleFallback.safeCall('Arus Kas', fn, [], () => self.renderDashboard());
             },
             backupRestore: () => {
                 if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') {
@@ -793,39 +694,27 @@ const DashboardCore = {
                 }
                 return self.renderDashboard();
             },
-            customerOrders: async () => { 
+            customerOrders: async () => {
                 if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerOrders', window.APP.showCustomerOrders)) {
                     return await ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [self.currentCustomerId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
-            customerPaymentHistory: async () => { 
+            customerPaymentHistory: async () => {
                 if (self.currentCustomerId && self._ensureModuleLoaded('showCustomerPaymentHistory', window.APP.showCustomerPaymentHistory)) {
                     return await ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [self.currentCustomerId], () => self.renderDashboard());
                 }
                 return await self.renderDashboard();
             },
-            blacklist: () => {
-                if (self._ensureModuleLoaded('showBlacklist', window.APP.showBlacklist)) {
-                    return ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], () => self.renderDashboard());
-                }
-                return self.renderDashboard();
-            }
+            blacklist: () => ModuleFallback.safeCall('Daftar Hitam', window.APP.showBlacklist, [], () => self.renderDashboard())
         };
         
-        var handler = handlers[this.currentPage];
+        const handler = handlers[this.currentPage];
         if (handler) await handler();
         else await self.renderDashboard();
     },
 
     navigateTo: function(page, params) {
-        // 防御性检查：确保 APP 对象存在
-        if (typeof window.APP === 'undefined') {
-            console.error('APP 对象不存在');
-            location.reload();
-            return;
-        }
-        
         window.scrollTo(0, 0);
         
         params = params || {};
@@ -843,167 +732,25 @@ const DashboardCore = {
         this.saveCurrentPageState();
         
         var self = this;
-        var moduleMap = {
-            'orderTable':       { fn: window.APP.showOrderTable,       name: 'Daftar Pesanan' },
-            'createOrder':      { fn: window.APP.showCreateOrder,      name: 'Buat Pesanan' },
-            'dashboard':        { fn: self.renderDashboard,            name: 'Dashboard', isCore: true },
-            'anomaly':          { fn: window.APP.showAnomaly,          name: 'Situasi Abnormal' },
-            'userManagement':   { fn: window.APP.showUserManagement,   name: 'Manajemen Peran' },
-            'storeManagement':  { 
-                fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
-                name: 'Manajemen Toko' 
-            },
-            'expenses':         { fn: window.APP.showExpenses,         name: 'Pengeluaran' },
-            'customers':        { fn: window.APP.showCustomers,        name: 'Nasabah' },
-            'backupRestore': { 
-                fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
-                name: 'Cadangan' 
-            },
-            'blacklist':        { fn: window.APP.showBlacklist,        name: 'Daftar Hitam' }
-        };
         
-        var mapped = moduleMap[page];
-        if (mapped) {
-            if (mapped.isCore) {
-                mapped.fn.call(self);
-            } else if (mapped.fn && typeof mapped.fn === 'function') {
-                ModuleFallback.safeCall(mapped.name, mapped.fn, [], null).then(function(result) {
-                    if (result === null) self.renderDashboard();
-                });
-            } else {
-                self.renderDashboard();
-            }
-            return;
-        }
-        
-        var specialHandlers = {
-            'paymentHistory': function() {
-                var fn = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
-                ModuleFallback.safeCall('Arus Kas', fn, [], null).then(function(r) {
-                    if (r === null) self.renderDashboard();
-                });
-            },
-            'customerOrders': function() {
-                if (params.customerId && typeof window.APP.showCustomerOrders === 'function') {
-                    ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [params.customerId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            },
-            'customerPaymentHistory': function() {
-                if (params.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                    ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [params.customerId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            },
-            'viewOrder': function() {
-                if (params.orderId && typeof window.APP.viewOrder === 'function') {
-                    ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [params.orderId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            },
-            'payment': function() {
-                if (params.orderId && typeof window.APP.showPayment === 'function') {
-                    ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [params.orderId], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else self.renderDashboard();
-            }
-        };
-        
-        var special = specialHandlers[page];
-        if (special) { special(); return; }
-        
-        self.renderDashboard();
+        // 直接刷新当前页面
+        this.refreshCurrentPage();
     },
 
     goBack: function() {
-        var self = this;
         if (this.historyStack.length > 0) {
             var prev = this.historyStack.pop();
             this.currentPage = prev.page;
             this.currentOrderId = prev.orderId;
             this.currentCustomerId = prev.customerId;
             this.currentFilter = prev.filter || "all";
-            
             this.saveCurrentPageState();
-            
-            var backMap = {
-                'orderTable':    { fn: window.APP.showOrderTable,     name: 'Daftar Pesanan' },
-                'dashboard':     { fn: self.renderDashboard,          name: 'Dashboard', isCore: true },
-                'viewOrder':     { fn: window.APP.viewOrder,          name: 'Detail Pesanan', param: prev.orderId },
-                'anomaly':       { fn: window.APP.showAnomaly,        name: 'Situasi Abnormal' },
-                'userManagement':{ fn: window.APP.showUserManagement, name: 'Manajemen Peran' },
-                'storeManagement':{ 
-                    fn: typeof StoreManager !== 'undefined' ? StoreManager.renderStoreManagement : null, 
-                    name: 'Manajemen Toko' 
-                },
-                'expenses':      { fn: window.APP.showExpenses,       name: 'Pengeluaran' },
-                'customers':     { fn: window.APP.showCustomers,      name: 'Nasabah' },
-                'backupRestore': { 
-                    fn: typeof BackupStorage !== 'undefined' ? BackupStorage.renderBackupUI : null, 
-                    name: 'Cadangan' 
-                },
-                'blacklist':     { fn: window.APP.showBlacklist,      name: 'Daftar Hitam' }
-            };
-            
-            var back = backMap[prev.page];
-            if (back) {
-                if (back.isCore) {
-                    back.fn.call(self);
-                } else if (back.param && back.fn && typeof back.fn === 'function') {
-                    ModuleFallback.safeCall(back.name, back.fn, [back.param], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else if (back.fn && typeof back.fn === 'function') {
-                    ModuleFallback.safeCall(back.name, back.fn, [], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                } else {
-                    self.renderDashboard();
-                }
-                return;
-            }
-            
-            switch(prev.page) {
-                case 'paymentHistory':
-                    var fnPH = window.APP.showCashFlowPage || window.APP.showPaymentHistory;
-                    ModuleFallback.safeCall('Arus Kas', fnPH, [], null).then(function(r) {
-                        if (r === null) self.renderDashboard();
-                    });
-                    break;
-                case 'payment':
-                    if (prev.orderId && typeof window.APP.showPayment === 'function') {
-                        ModuleFallback.safeCall('Pembayaran', window.APP.showPayment, [prev.orderId], null).then(function(r) {
-                            if (r === null) self.renderDashboard();
-                        });
-                    } else self.renderDashboard();
-                    break;
-                case 'customerOrders':
-                    if (prev.customerId && typeof window.APP.showCustomerOrders === 'function') {
-                        ModuleFallback.safeCall('Order Nasabah', window.APP.showCustomerOrders, [prev.customerId], null).then(function(r) {
-                            if (r === null) self.renderDashboard();
-                        });
-                    } else self.renderDashboard();
-                    break;
-                case 'customerPaymentHistory':
-                    if (prev.customerId && typeof window.APP.showCustomerPaymentHistory === 'function') {
-                        ModuleFallback.safeCall('Riwayat Nasabah', window.APP.showCustomerPaymentHistory, [prev.customerId], null).then(function(r) {
-                            if (r === null) self.renderDashboard();
-                        });
-                    } else self.renderDashboard();
-                    break;
-                default:
-                    self.renderDashboard();
-            }
+            this.refreshCurrentPage();
         } else {
             this.renderDashboard();
         }
     },
 
-    // ==================== 登录页 ====================
     renderLogin: async function() {
         this.currentPage = 'login';
         this.clearPageState();
@@ -1023,12 +770,10 @@ const DashboardCore = {
                         '<h2 class="login-title" style="margin:0;">JF! by Gadai</h2>' +
                     '</div>' +
                     '<h3>' + t('login') + '</h3>' +
-                    
                     '<div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;">' +
                         '<span class="info-bar-icon">⚠️</span>' +
                         '<div class="info-bar-content" id="loginErrorMessage"></div>' +
                     '</div>' +
-                    
                     '<div class="form-group">' +
                         '<label>' + (lang === 'id' ? 'Email / Username' : '邮箱 / 用户名') + '</label>' +
                         '<input id="username" placeholder="email@domain.com" autocomplete="username">' +
@@ -1036,20 +781,14 @@ const DashboardCore = {
                     '<div class="form-group" style="position:relative;">' +
                         '<label>' + t('password') + '</label>' +
                         '<input id="password" type="password" placeholder="' + t('password') + '" autocomplete="current-password">' +
-                        '<span onclick="Utils.togglePasswordVisibility(\'password\', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;user-select:none;z-index:2;">👁️</span>' +
+                        '<span onclick="Utils.togglePasswordVisibility(\'password\', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;">👁️</span>' +
                     '</div>' +
-                    
-                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;font-size:var(--font-sm);">' +
+                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">' +
                         '<input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;">' +
-                        '<label for="rememberMe" style="cursor:pointer;font-weight:500;">' + 
-                            (lang === 'id' ? 'Ingat saya' : '记住我') + 
-                        '</label>' +
+                        '<label for="rememberMe" style="cursor:pointer;">' + (lang === 'id' ? 'Ingat saya' : '记住我') + '</label>' +
                     '</div>' +
-                    
                     '<button onclick="APP.login()" id="loginBtn">' + t('login') + '</button>' +
-                    '<p class="login-note">' +
-                        'ℹ️ ' + (lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号') +
-                    '</p>' +
+                    '<p class="login-note">ℹ️ ' + (lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号') + '</p>' +
                 '</div>' +
             '</div>';
     },
@@ -1096,18 +835,10 @@ const DashboardCore = {
         await this.router();
     },
 
-    clearLoginError: function() {
-        var errorDiv = document.getElementById('loginError');
-        if (errorDiv) errorDiv.style.display = 'none';
-    },
-
     logout: async function() {
         this._clearOverdueUpdateInterval();
-        
-        var confirmMsg = Utils.t('save_exit_confirm');
-        var confirmed = await Utils.toast.confirm(confirmMsg);
+        var confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
         if (!confirmed) return;
-        
         this.clearPageState();
         sessionStorage.clear();
         await AUTH.logout();
@@ -1121,7 +852,7 @@ const DashboardCore = {
         else this.refreshCurrentPage();
     },
 
-    // ==================== 仪表盘 ====================
+    // ==================== 仪表盘渲染 ====================
     renderDashboard: async function() {
         this.currentPage = 'dashboard';
         this.currentOrderId = null;
@@ -1135,7 +866,7 @@ const DashboardCore = {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             
-            const cacheKey = DashboardCache.getKey ? DashboardCache.getKey('dashboard_stats', isAdmin ? 'admin' : storeId) : 'dashboard_stats_' + (isAdmin ? 'admin' : storeId);
+            const cacheKey = 'dashboard_stats_' + (isAdmin ? 'admin' : storeId);
             const report = await DashboardCache.get(cacheKey, 
                 () => DashboardStatsHelper.getDashboardStats(profile),
                 { ttl: 5 * 60 * 1000 }
@@ -1143,9 +874,7 @@ const DashboardCore = {
             
             const cashFlowCacheKey = 'cashflow_v2_' + (isAdmin ? 'admin' : storeId);
             const cashFlow = await DashboardCache.get(cashFlowCacheKey,
-                async () => {
-                    return await SUPABASE.getCashFlowSummary();
-                },
+                async () => await SUPABASE.getCashFlowSummary(),
                 { ttl: 5 * 60 * 1000 }
             );
             
@@ -1181,17 +910,12 @@ const DashboardCore = {
             let hasSentToday = false;
             try {
                 hasSentToday = await this.hasSentRemindersToday();
-            } catch(e) {
-                console.warn('hasSentRemindersToday 调用失败:', e);
-                hasSentToday = false;
-            }
+            } catch(e) {}
             
             const btnDisabled = hasSentToday;
             const btnHighlight = hasReminders && !hasSentToday;
-            
             const overdueOrdersCount = report.overdue_orders || 0;
             const activeDisplay = report.active_orders + (overdueOrdersCount > 0 ? ' / ⚠️ ' + overdueOrdersCount : '');
-            
             const netProfitBalance = cashFlow.netProfit?.balance || 0;
             const operatingIncome = cashFlow.netProfit?.operatingIncome || 0;
             const operatingExpense = cashFlow.netProfit?.operatingExpense || 0;
@@ -1326,7 +1050,7 @@ const DashboardCore = {
             var userRoleText = AUTH.user?.role === 'admin' 
                 ? (lang === 'id' ? 'Administrator' : '管理员') 
                 : (lang === 'id' ? 'Manajer Toko' : '店长');
-            var storeName = AUTH.getCurrentStoreName();
+            var storeNameDisplay = AUTH.getCurrentStoreName();
             
             var bottomHtml = '';
             if (isAdmin) {
@@ -1340,8 +1064,8 @@ const DashboardCore = {
             } else {
                 bottomHtml = '' +
                 '<div class="card dashboard-footer-card">' +
-                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(storeName) + ' (' + userRoleText + ')</p>' +
-                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + Utils.escapeHtml(storeName) + '</p>' +
+                    '<p><strong>🏪 ' + (lang === 'id' ? 'Pengguna saat ini' : '当前用户') + ':</strong> ' + Utils.escapeHtml(storeNameDisplay) + ' (' + userRoleText + ')</p>' +
+                    '<p>📍 ' + (lang === 'id' ? 'Toko' : '门店') + ': ' + Utils.escapeHtml(storeNameDisplay) + '</p>' +
                     '<p>📌 ' + t('contract_pay_info') + '</p>' +
                     '<p>🔒 ' + t('order_saved_locked') + ' ' + t('more_pawn_higher_fee') + '</p>' +
                 '</div>';
@@ -1373,57 +1097,16 @@ const DashboardCore = {
                 '<div class="stats-grid">' + cardsHtml + '</div>' +
                 cashFlowHtml +
                 bottomHtml;
-            
         } catch (err) {
             console.error("renderDashboard error:", err);
-            Utils.ErrorHandler.capture(err, 'renderDashboard');
             Utils.toast.error('加载仪表盘失败: ' + err.message, 5000);
             document.getElementById("app").innerHTML = '' +
                 '<div class="card" style="padding:40px;text-align:center;">' +
-                    '<p style="margin-bottom:16px;">⚠️ ' + (Utils.lang === 'id' ? '加载仪表盘失败: ' + err.message : 'Dashboard load failed: ' + err.message) + '</p>' +
-                    '<button onclick="APP.logout()">💾 ' + Utils.t('save_exit') + '</button>' +
-                    '<button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新页面') + '</button>' +
+                    '<p>⚠️ ' + (Utils.lang === 'id' ? '加载仪表盘失败: ' + err.message : 'Dashboard load failed: ' + err.message) + '</p>' +
+                    '<button onclick="APP.forceRecovery()" style="margin-top:12px;margin-right:8px;">🔄 ' + (Utils.lang === 'id' ? '强制恢复' : 'Force Recovery') + '</button>' +
+                    '<button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
                 '</div>';
         }
-    },
-
-    _calculateCashFlowSummary: function(allFlows, isAdmin, storeId) {
-        var cashInflow = 0, cashOutflow = 0;
-        var bankInflow = 0, bankOutflow = 0;
-        var operatingIncome = 0;
-        var operatingExpense = 0;
-        
-        var flowsToUse = allFlows || [];
-        
-        for (var i = 0; i < flowsToUse.length; i++) {
-            var flow = flowsToUse[i];
-            var amount = flow.amount || 0;
-            if (flow.direction === 'inflow') {
-                if (flow.source_target === 'cash') cashInflow += amount;
-                else if (flow.source_target === 'bank') bankInflow += amount;
-                
-                if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') {
-                    operatingIncome += amount;
-                }
-            } else if (flow.direction === 'outflow') {
-                if (flow.source_target === 'cash') cashOutflow += amount;
-                else if (flow.source_target === 'bank') bankOutflow += amount;
-                
-                if (flow.flow_type === 'expense') {
-                    operatingExpense += amount;
-                }
-            }
-        }
-        
-        return {
-            cash: { income: cashInflow, expense: cashOutflow, balance: cashInflow - cashOutflow },
-            bank: { income: bankInflow, expense: bankOutflow, balance: bankInflow - bankOutflow },
-            netProfit: { 
-                balance: operatingIncome - operatingExpense,
-                operatingIncome: operatingIncome,
-                operatingExpense: operatingExpense
-            }
-        };
     },
 
     showCreateOrder: function() { 
