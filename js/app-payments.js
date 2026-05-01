@@ -1,9 +1,7 @@
-// app-payments.js - v2.2
-// 修复：问题5 - 利息收款双路径安全加固
-//   - 统一使用 app-payments.js 的安全路径（防重锁+幂等检查+补偿事务）
-//   - 标记 supabase.js 的 recordInterestPayment() 为内部使用（需经过本层安全检查）
-//   - payFixedInstallment() 本金负数保护
-//   - 修复：earlySettleFixedOrder 中的 confirm 改为异步 Utils.toast.confirm
+// app-payments.js - v2.3 (利息部分缴费)
+// 修改：利息缴费仅1个月，支持部分缴费（差额加入本金）和超额缴费（抵扣本金）
+// 使用 Utils.calculateInterestPartialPayment 处理部分缴费逻辑
+// 修复：earlySettleFixedOrder 中的 confirm 改为异步 Utils.toast.confirm
 
 window.APP = window.APP || {};
 
@@ -330,10 +328,7 @@ const PaymentsModule = {
 
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
             
-            var interestOptions = [1, 2, 3].map(function(i) {
-                return '<option value="' + i + '">' + i + ' ' + t('month') + ' = ' + Utils.formatCurrency(currentMonthlyInterest * i) + '</option>';
-            }).join('');
-
+            // 利息缴费：仅支持1个月，金额可手动输入（支持部分缴费/超额缴费）
             var nextInterestNumber = interestPayments.length + 1;
 
             var fixedRepaymentHtml = '';
@@ -428,8 +423,13 @@ const PaymentsModule = {
                                     '</div>' +
                                 '</div>' +
                                 '<div class="action-input-group">' +
-                                    '<label class="action-label">' + t('take_months') + ':</label>' +
-                                    '<select id="interestMonths" class="action-select">' + interestOptions + '</select>' +
+                                    '<label class="action-label">' + (lang === 'id' ? 'Jumlah Dibayar' : '缴纳金额') + ':</label>' +
+                                    '<input type="text" id="interestAmount" class="action-input amount-input" placeholder="' + Utils.formatCurrency(currentMonthlyInterest) + '" value="' + Utils.formatNumberWithCommas(Math.round(currentMonthlyInterest)) + '">' +
+                                    '<div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">' +
+                                        (lang === 'id' 
+                                            ? '💡 Bunga 1 bln: ' + Utils.formatCurrency(currentMonthlyInterest) + ' | Bisa kurang/lebih'
+                                            : '💡 1个月利息: ' + Utils.formatCurrency(currentMonthlyInterest) + ' | 可少缴/多缴') +
+                                    '</div>' +
                                 '</div>' +
                                 '<div class="payment-method-group">' +
                                     '<div class="payment-method-title">' + t('recording_method') + ':</div>' +
@@ -482,7 +482,7 @@ const PaymentsModule = {
                                     '<table class="data-table history-table" style="min-width:300px;">' +
                                         '<thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + t('payment_amount') + '</th><th class="col-amount amount">' + t('total') + ' ' + t('principal_paid') + '</th><th class="col-amount amount">' + t('remaining_principal') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead>' +
                                         '<tbody>' + principalRows + '</tbody>' +
-                                    '</tr>' +
+                                    '</table>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -532,6 +532,9 @@ const PaymentsModule = {
             var principalInput = document.getElementById("principalAmount");
             if (principalInput && Utils.bindAmountFormat) Utils.bindAmountFormat(principalInput);
             
+            var interestInput = document.getElementById("interestAmount");
+            if (interestInput && Utils.bindAmountFormat) Utils.bindAmountFormat(interestInput);
+            
         } catch (error) {
             console.error("showPayment error:", error);
             Utils.ErrorHandler.capture(error, 'showPayment');
@@ -540,12 +543,18 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 利息收款（防重锁 + 幂等检查 + 补偿事务） ==========
+    // ========== 利息收款（支持部分缴费/超额缴费） ==========
     payInterestWithMethod: async function(orderId) {
-        var months = parseInt(document.getElementById("interestMonths").value);
+        var amountStr = document.getElementById("interestAmount")?.value || '0';
+        var actualPaid = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
         var method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
         var methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
         var lang = Utils.lang;
+        
+        if (isNaN(actualPaid) || actualPaid <= 0) {
+            Utils.toast.warning(Utils.t('invalid_amount'));
+            return;
+        }
         
         if (!window.APP._acquirePaymentLock(orderId + '_interest')) {
             Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...');
@@ -559,14 +568,10 @@ const PaymentsModule = {
         try {
             var order = await SUPABASE.getOrder(orderId);
             
-            var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
-            var loanAmount = order.loan_amount || 0;
-            var principalPaid = order.principal_paid || 0;
-            var remainingPrincipal = loanAmount - principalPaid;
-            var monthlyInterest = remainingPrincipal * monthlyRate;
-            var totalInterest = monthlyInterest * months;
+            // 使用新的部分缴费计算函数
+            var calcResult = Utils.calculateInterestPartialPayment(order, actualPaid);
             
-            var isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', totalInterest, method);
+            var isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', calcResult.interestPaid, method);
             if (isDuplicate) {
                 Utils.toast.warning(lang === 'id' 
                     ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' 
@@ -575,39 +580,74 @@ const PaymentsModule = {
                 return;
             }
             
+            var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
+            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+            var theoreticalInterest = remainingPrincipal * monthlyRate;
             var nextInterestNumber = (order.interest_paid_months || 0) + 1;
-            var endNumber = nextInterestNumber + months - 1;
             
             var previewMsg = lang === 'id'
                 ? '📋 Konfirmasi Pembayaran Bunga\n' +
                   'Pesanan: ' + order.order_id + '\n' +
                   'Nasabah: ' + order.customer_name + '\n' +
-                  'Periode: ke-' + nextInterestNumber + (months > 1 ? ' sampai ke-' + endNumber : '') + '\n' +
+                  'Periode: ke-' + nextInterestNumber + '\n' +
                   'Sisa Pokok: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
                   'Suku Bunga: ' + (monthlyRate*100).toFixed(0) + '%\n' +
-                  'Bulan: ' + months + ' bulan\n' +
-                  'Jumlah Dibayar: ' + Utils.formatCurrency(totalInterest) + '\n' +
+                  'Bunga 1 bln (teoritis): ' + Utils.formatCurrency(theoreticalInterest) + '\n' +
+                  'Jumlah Dibayar: ' + Utils.formatCurrency(actualPaid) + '\n' +
                   'Metode: ' + methodName + '\n' +
-                  'Lanjutkan?'
+                  '\n' + calcResult.description + '\n' +
+                  '\nLanjutkan?'
                 : '📋 利息收款确认\n' +
                   '订单号: ' + order.order_id + '\n' +
                   '客户: ' + order.customer_name + '\n' +
-                  '期数: 第' + nextInterestNumber + '期' + (months > 1 ? ' 至 第' + endNumber + '期' : '') + '\n' +
+                  '期数: 第' + nextInterestNumber + '期\n' +
                   '剩余本金: ' + Utils.formatCurrency(remainingPrincipal) + '\n' +
                   '月利率: ' + (monthlyRate*100).toFixed(0) + '%\n' +
-                  '收取月数: ' + months + ' 个月\n' +
-                  '本次收款: ' + Utils.formatCurrency(totalInterest) + '\n' +
+                  '1个月利息(理论): ' + Utils.formatCurrency(theoreticalInterest) + '\n' +
+                  '实际缴纳: ' + Utils.formatCurrency(actualPaid) + '\n' +
                   '入账方式: ' + methodName + '\n' +
-                  '确认收款？';
+                  '\n' + calcResult.description + '\n' +
+                  '\n确认收款？';
 
             var confirmed = await Utils.toast.confirm(previewMsg);
             if (!confirmed) return;
             
             try {
-                await SUPABASE.recordInterestPayment(orderId, months, method);
+                // 记录利息
+                if (calcResult.interestPaid > 0) {
+                    await SUPABASE.recordInterestPayment(orderId, 1, method, calcResult.interestPaid);
+                }
+                
+                // 处理本金变动（超额抵扣 或 差额加入本金）
+                if (calcResult.principalDeducted > 0) {
+                    // 超额抵扣本金
+                    await SUPABASE.recordPrincipalPayment(orderId, calcResult.principalDeducted, method);
+                } else if (calcResult.principalDeducted < 0) {
+                    // 差额加入本金（利息资本化）
+                    var client = SUPABASE.getClient();
+                    var newPrincipalRemaining = (order.loan_amount || 0) - (order.principal_paid || 0) + Math.abs(calcResult.principalDeducted);
+                    var newLoanAmount = (order.loan_amount || 0) + Math.abs(calcResult.principalDeducted);
+                    await client
+                        .from('orders')
+                        .update({
+                            loan_amount: newLoanAmount,
+                            principal_remaining: newPrincipalRemaining,
+                            updated_at: Utils.getLocalDateTime()
+                        })
+                        .eq('order_id', orderId);
+                }
                 
                 if (window.Audit) {
-                    await window.Audit.logPayment(order.order_id, 'interest', totalInterest, method);
+                    await window.Audit.logPayment(order.order_id, 'interest', actualPaid, method);
+                    if (calcResult.principalDeducted !== 0) {
+                        await window.Audit.log('interest_adjustment', JSON.stringify({
+                            order_id: order.order_id,
+                            actual_paid: actualPaid,
+                            interest_recorded: calcResult.interestPaid,
+                            principal_adjustment: calcResult.principalDeducted,
+                            description: calcResult.description
+                        }));
+                    }
                 }
                 
                 Utils.toast.success(lang === 'id' ? '✅ Pembayaran bunga berhasil!' : '✅ 利息收款成功！');
@@ -780,7 +820,7 @@ const PaymentsModule = {
         }
     },
 
-    // ========== 提前结清（修复：将 confirm 改为异步 Utils.toast.confirm） ==========
+    // ========== 提前结清 ==========
     earlySettleFixedOrder: async function(orderId) {
         var method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
         var lang = Utils.lang;
