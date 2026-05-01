@@ -1,4 +1,4 @@
-// app-capital.js - 资金管理模块 v2.1 (JF 命名空间统一版)
+// app-capital.js - 资金管理模块 v2.1 最终版 (JF 命名空间统一版)
 // 包含：资本注入、利润再投入、资金占用报告、资金健康度评估
 
 'use strict';
@@ -16,32 +16,86 @@
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
+            // 非管理员直接拒绝
+            if (!isAdmin) {
+                Utils.toast.warning(lang === 'id' 
+                    ? 'Hanya administrator yang dapat mencatat injeksi modal' 
+                    : '仅管理员可记录资本注入');
+                return;
+            }
+            
             let storeOptions = '';
-            if (isAdmin) {
-                storeOptions = '<select id="injectionStoreId" class="full-width" style="width:100%;padding:10px;border-radius:8px;">';
-                for (const store of stores) {
-                    if (store.code !== 'STORE_000' && (store.is_active !== false)) {
-                        storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${store.code})</option>`;
-                    }
+            storeOptions = '<select id="injectionStoreId" class="full-width" style="width:100%;padding:10px;border-radius:8px;">';
+            for (const store of stores) {
+                if (store.code !== 'STORE_000' && (store.is_active !== false)) {
+                    storeOptions += `<option value="${store.id}">${Utils.escapeHtml(store.name)} (${store.code})</option>`;
                 }
-                storeOptions += '</select>';
+            }
+            storeOptions += '</select>';
+            
+            // 获取当前各门店的资本情况
+            let storeBalancesHtml = '';
+            try {
+                const client = SUPABASE.getClient();
+                const { data: injections } = await client
+                    .from('capital_injections')
+                    .select('store_id, amount')
+                    .eq('is_voided', false);
+                
+                const storeCapitalMap = {};
+                for (const inj of (injections || [])) {
+                    storeCapitalMap[inj.store_id] = (storeCapitalMap[inj.store_id] || 0) + (inj.amount || 0);
+                }
+
+                const { data: activeOrders } = await client
+                    .from('orders')
+                    .select('store_id, loan_amount')
+                    .eq('status', 'active');
+                
+                const storeDeployedMap = {};
+                for (const o of (activeOrders || [])) {
+                    storeDeployedMap[o.store_id] = (storeDeployedMap[o.store_id] || 0) + (o.loan_amount || 0);
+                }
+
+                storeBalancesHtml = `
+                    <div class="info-bar info" style="margin:8px 0;font-size:11px;">
+                        <span class="info-bar-icon">📊</span>
+                        <div class="info-bar-content">
+                            <strong>${lang === 'id' ? 'Status Modal per Toko:' : '各门店资本状况:'}</strong>
+                            <div style="margin-top:4px;max-height:120px;overflow-y:auto;">
+                                ${stores.filter(s => s.code !== 'STORE_000' && s.is_active !== false).map(s => {
+                                    const capital = storeCapitalMap[s.id] || 0;
+                                    const deployed = storeDeployedMap[s.id] || 0;
+                                    const available = capital - deployed;
+                                    return `<div style="margin:2px 0;">🏪 ${Utils.escapeHtml(s.name)}: 
+                                        💉 ${Utils.formatCurrency(capital)} | 
+                                        📋 ${Utils.formatCurrency(deployed)} | 
+                                        ✅ ${Utils.formatCurrency(available)}</div>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>`;
+            } catch (e) {
+                console.warn('获取门店资本状况失败:', e);
             }
             
             const modalHtml = `
                 <div id="capitalInjectionModal" class="modal-overlay">
-                    <div class="modal-content" style="max-width: 450px;">
+                    <div class="modal-content" style="max-width: 480px;">
                         <h3>💰 ${lang === 'id' ? 'Injeksi Modal Baru' : '新增资本注入'}</h3>
                         
-                        ${isAdmin ? `
                         <div class="form-group">
-                            <label>🏪 ${lang === 'id' ? 'Pilih Toko' : '选择门店'}</label>
+                            <label>🏪 ${lang === 'id' ? 'Pilih Toko' : '选择门店'} *</label>
                             ${storeOptions}
+                            <div class="form-hint">${lang === 'id' ? 'Pilih toko yang akan menerima injeksi modal' : '选择要注入资金的门店'}</div>
                         </div>
-                        ` : ''}
+                        
+                        ${storeBalancesHtml}
                         
                         <div class="form-group">
-                            <label>💰 ${lang === 'id' ? 'Jumlah Injeksi' : '注入金额'}</label>
+                            <label>💰 ${lang === 'id' ? 'Jumlah Injeksi' : '注入金额'} *</label>
                             <input type="text" id="injectionAmount" placeholder="0" class="amount-input" style="width:100%;padding:10px;border-radius:8px;">
+                            <div class="form-hint">${lang === 'id' ? 'Masukkan jumlah dalam Rupiah' : '请输入印尼盾金额'}</div>
                         </div>
                         
                         <div class="form-group">
@@ -50,19 +104,20 @@
                                 <label><input type="radio" name="injectionSource" value="cash" checked> 🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</label>
                                 <label><input type="radio" name="injectionSource" value="bank"> 🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</label>
                             </div>
+                            <div class="form-hint">${lang === 'id' ? 'Dana akan dicatat masuk ke sumber ini' : '资金将记入此来源'}</div>
                         </div>
                         
                         <div class="form-group">
                             <label>📝 ${lang === 'id' ? 'Deskripsi' : '描述'}</label>
-                            <textarea id="injectionDesc" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注说明'}" style="width:100%;border-radius:8px;"></textarea>
+                            <textarea id="injectionDesc" rows="2" placeholder="${lang === 'id' ? 'Contoh: Modal awal toko, Tambahan modal operasional' : '例如: 门店启动资金、运营追加资本'}" style="width:100%;border-radius:8px;"></textarea>
                         </div>
                         
                         <div class="info-bar info" style="margin: 12px 0;">
                             <span class="info-bar-icon">💡</span>
                             <div class="info-bar-content">
                                 ${lang === 'id' 
-                                    ? 'Injeksi modal akan meningkatkan total modal yang tersedia untuk operasional.' 
-                                    : '资本注入将增加可用于运营的总资本。'}
+                                    ? 'Injeksi modal akan meningkatkan total modal toko. Dana akan tercatat sebagai arus kas masuk dan dapat digunakan untuk operasional gadai.' 
+                                    : '资本注入将增加门店总资本。资金将记录为现金流入，可用于典当业务运营。'}
                             </div>
                         </div>
                         
@@ -95,39 +150,36 @@
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
-            let storeId = null;
-            if (isAdmin) {
-                const storeSelect = document.getElementById('injectionStoreId');
-                if (!storeSelect) {
-                    Utils.toast.warning(lang === 'id' ? 'Pilih toko terlebih dahulu' : '请先选择门店');
-                    return;
-                }
-                storeId = storeSelect.value;
-                if (!storeId) {
-                    Utils.toast.warning(lang === 'id' ? 'Pilih toko terlebih dahulu' : '请先选择门店');
-                    return;
-                }
-            } else {
-                storeId = profile?.store_id;
-                if (!storeId) {
-                    Utils.toast.error(lang === 'id' ? 'Tidak ada toko yang terhubung' : '未关联门店');
-                    return;
-                }
+            // 权限二次确认
+            if (!isAdmin) {
+                Utils.toast.error(lang === 'id' ? 'Hanya admin yang dapat mencatat injeksi modal' : '仅管理员可记录资本注入');
+                return;
             }
+            
+            const storeSelect = document.getElementById('injectionStoreId');
+            if (!storeSelect || !storeSelect.value) {
+                Utils.toast.warning(lang === 'id' ? 'Pilih toko terlebih dahulu' : '请先选择门店');
+                return;
+            }
+            const storeId = storeSelect.value;
             
             const amountStr = document.getElementById('injectionAmount')?.value || '0';
             const amount = Utils.parseNumberFromCommas(amountStr);
             const source = document.querySelector('input[name="injectionSource"]:checked')?.value || 'cash';
-            const description = document.getElementById('injectionDesc')?.value.trim() || '';
+            const description = document.getElementById('injectionDesc')?.value.trim() || 
+                (lang === 'id' ? 'Injeksi modal' : '资本注入');
             
             if (amount <= 0) {
                 Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
                 return;
             }
             
+            // 获取门店名称用于确认
+            const storeName = document.getElementById('injectionStoreId')?.selectedOptions?.[0]?.text || '';
+            
             const confirmMsg = lang === 'id'
-                ? `⚠️ Konfirmasi Injeksi Modal\n\nJumlah: ${Utils.formatCurrency(amount)}\nSumber: ${source === 'cash' ? 'Tunai' : 'Bank'}\n\nLanjutkan?`
-                : `⚠️ 确认资本注入\n\n金额: ${Utils.formatCurrency(amount)}\n来源: ${source === 'cash' ? '现金' : '银行'}\n\n确认继续？`;
+                ? `⚠️ Konfirmasi Injeksi Modal\n\nToko: ${storeName}\nJumlah: ${Utils.formatCurrency(amount)}\nSumber: ${source === 'cash' ? 'Tunai (Brankas)' : 'Bank BNI'}\nDeskripsi: ${description}\n\nLanjutkan?`
+                : `⚠️ 确认资本注入\n\n门店: ${storeName}\n金额: ${Utils.formatCurrency(amount)}\n来源: ${source === 'cash' ? '现金 (保险柜)' : '银行 BNI'}\n描述: ${description}\n\n确认继续？`;
             
             const confirmed = await Utils.toast.confirm(confirmMsg);
             if (!confirmed) return;
@@ -139,12 +191,11 @@
             }
             
             try {
-                // ===== 修改：调用新增的 recordCapitalInjection 方法 =====
                 await SUPABASE.recordCapitalInjection(storeId, amount, source, description);
                 
                 Utils.toast.success(lang === 'id' 
-                    ? `✅ Injeksi modal ${Utils.formatCurrency(amount)} berhasil dicatat`
-                    : `✅ 资本注入 ${Utils.formatCurrency(amount)} 已记录`);
+                    ? `✅ Injeksi modal ${Utils.formatCurrency(amount)} berhasil dicatat ke ${storeName}`
+                    : `✅ 资本注入 ${Utils.formatCurrency(amount)} 已记录到 ${storeName}`);
                 
                 APP.closeCapitalInjectionModal();
                 
@@ -411,5 +462,5 @@
         };
     }
 
-    console.log('✅ JF.CapitalModule v2.1 初始化完成（资金池指标版）');
+    console.log('✅ JF.CapitalModule v2.1 最终版初始化完成');
 })();
