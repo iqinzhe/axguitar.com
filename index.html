@@ -73,34 +73,30 @@
     <script defer src="js/app.js"></script>
 
     <!-- 6. 启动应用 -->
-    <script defer>
-        document.addEventListener('DOMContentLoaded', function() {
-            // 确保 JF 命名空间和 APP 对象存在
-            if (typeof window.JF === 'undefined') {
-                window.JF = {};
+<script defer>
+    (async function boot() {
+        for (let i = 0; i < 30; i++) {
+            if (typeof JF !== 'undefined' && 
+                typeof JF.DashboardCore !== 'undefined' && 
+                typeof JF.DashboardCore.init === 'function') {
+                console.log('[Boot] DashboardCore 已就绪，启动应用');
+                await JF.DashboardCore.init();
+                return;
             }
-            if (typeof window.APP === 'undefined') {
-                window.APP = window.JF.APP || {};
-            }
-
-            // 启动应用（DashboardCore 负责路由和初始化）
-            if (typeof window.DashboardCore !== 'undefined' && typeof window.DashboardCore.init === 'function') {
-                console.log('[Init] 启动 DashboardCore.init()');
-                window.DashboardCore.init();
-            } else if (typeof window.APP.init === 'function') {
-                // 降级：调用 APP.init
-                console.log('[Init] 降级启动 APP.init()');
-                window.APP.init();
-            } else {
-                console.error('[Init] 未找到 DashboardCore.init 或 APP.init，请检查模块加载顺序');
-                document.getElementById('app').innerHTML =
-                    '<div class="card" style="text-align:center;padding:40px;">' +
-                    '<p>⚠️ Sistem gagal dimuat. Silakan muat ulang halaman.</p>' +
-                    '<button onclick="location.reload()" style="margin-top:12px;">🔄 Muat Ulang</button>' +
-                    '</div>';
-            }
-        });
-    </script>
+            await new Promise(r => setTimeout(r, 100));
+        }
+        console.error('[Boot] DashboardCore.init 未在 3 秒内出现');
+        if (typeof APP !== 'undefined' && typeof APP.init === 'function') {
+            APP.init();
+        } else {
+            document.getElementById('app').innerHTML = 
+                '<div class="card" style="text-align:center;padding:40px;">' +
+                '<p>⚠️ Sistem gagal dimuat. Silakan muat ulang halaman.</p>' +
+                '<button onclick="location.reload()" style="margin-top:12px;">🔄 Muat Ulang</button>' +
+                '</div>';
+        }
+    })();
+</script>
 
 </body>
 </html>
