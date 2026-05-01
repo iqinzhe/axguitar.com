@@ -1,8 +1,7 @@
-// app.js - 主入口文件 (v1.6 统一登录入口版)
+// app.js - 主入口文件 (v1.5 最终修复版)
 // 修复：仪表盘卡片功能错误 - 银行卡图标应跳转到 paymentHistory
 // 添加：手动强制恢复函数 APP.forceRecovery()
 // 优化：错误界面添加恢复按钮
-// 统一：登录入口委托给 DashboardCore.renderLogin
 
 window.APP = window.APP || {};
 
@@ -43,10 +42,8 @@ APP.forceRecovery = function() {
                     location.reload();
                 }
             } else {
-                // 未登录，显示登录页 - 统一使用 DashboardCore
-                if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderLogin) {
-                    DashboardCore.renderLogin();
-                } else if (typeof APP.showLogin === 'function') {
+                // 未登录，显示登录页
+                if (typeof APP.showLogin === 'function') {
                     APP.showLogin();
                 } else {
                     location.reload();
@@ -102,14 +99,7 @@ APP.toggleLanguage = function() {
             location.reload();
         }
     } else {
-        // 未登录时显示登录页，委托给 DashboardCore
-        if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderLogin) {
-            DashboardCore.renderLogin();
-        } else if (typeof APP.showLogin === 'function') {
-            APP.showLogin();
-        } else {
-            location.reload();
-        }
+        APP.showLogin();
     }
 };
 
@@ -203,16 +193,8 @@ APP.isLoggedIn = function() {
     return AUTH && typeof AUTH.isLoggedIn === 'function' && AUTH.isLoggedIn();
 };
 
-// ========== 统一登录入口（委托给 DashboardCore） ==========
+// 显示登录页面
 APP.showLogin = function() {
-    // 优先使用 DashboardCore 的登录界面（保持单一入口）
-    if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderLogin) {
-        DashboardCore.renderLogin();
-        return;
-    }
-    
-    // 降级方案：当 DashboardCore 不可用时使用原始登录界面（极少情况）
-    console.warn('[APP] DashboardCore 不可用，使用降级登录界面');
     var lang = Utils.lang;
     var t = function(key) { return Utils.t(key); };
     
@@ -456,7 +438,7 @@ APP.sendWAReminder = async function(orderId) {
 window.APP = APP;
 
 // 在控制台输出可用的恢复命令
-console.log('[APP] app.js 加载完成 (v1.6)');
+console.log('[APP] app.js 加载完成 (v1.5)');
 console.log('[APP] 如果出现白板，请在控制台执行 APP.forceRecovery() 恢复页面');
 
 // 可选：注册全局快捷键 Alt+R 恢复页面（方便调试）
@@ -467,47 +449,3 @@ document.addEventListener('keydown', function(e) {
         APP.forceRecovery();
     }
 });
-
-// ==================== 资金管理模块方法挂载（确保全局可用） ====================
-// 确保资金管理模块的方法被正确暴露到 window.APP
-
-(function() {
-    'use strict';
-    
-    // 检查并挂载资金管理相关方法
-    var capitalMethods = [
-        'showCapitalInjectionModal',
-        'closeCapitalInjectionModal',
-        'saveCapitalInjection',
-        'showProfitReinvestPage',
-        'loadProfitReinvestData',
-        'executeProfitReinvestment',
-        'showPartialReinvestModal',
-        'closePartialReinvestModal',
-        'confirmPartialReinvest',
-        'showCapitalUtilizationDetail',
-        'closeCapitalDetailModal',
-        'printCapitalDetail',
-        '_loadReinvestHistory'
-    ];
-    
-    for (var i = 0; i < capitalMethods.length; i++) {
-        var methodName = capitalMethods[i];
-        if (typeof window.APP[methodName] === 'undefined' && typeof CapitalModule !== 'undefined') {
-            if (typeof CapitalModule[methodName] === 'function') {
-                window.APP[methodName] = CapitalModule[methodName].bind(CapitalModule);
-                console.log('[APP] 已挂载资金管理方法:', methodName);
-            }
-        }
-    }
-    
-    // 确保 _loadCapitalCardData 方法存在（来自 DashboardCore）
-    if (typeof window.APP._loadCapitalCardData === 'undefined' && typeof DashboardCore !== 'undefined') {
-        if (typeof DashboardCore._loadCapitalCardData === 'function') {
-            window.APP._loadCapitalCardData = DashboardCore._loadCapitalCardData.bind(DashboardCore);
-            console.log('[APP] 已挂载 DashboardCore._loadCapitalCardData');
-        }
-    }
-    
-    console.log('[APP] 资金管理模块方法挂载完成');
-})();
