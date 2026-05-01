@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.2 最终版 (JF 命名空间) - 复用CSS类版
+// app-dashboard-core.js - v2.3 最终版 (JF 命名空间) - 三卡片资金布局
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
@@ -460,17 +460,25 @@
                     let allLoan = 0;
                     for (const o of allLoanData.data || []) allLoan += (o.loan_amount || 0);
 
-                    // 资金池：查询总投入资本
-                    let injectionQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
-                    if (!isAdmin && storeId) injectionQuery = injectionQuery.eq('store_id', storeId);
-                    const { data: injections } = await injectionQuery;
-                    const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+                    // 查询总投入资本
+                    let totalInjectedCapital = 0;
+                    try {
+                        let injectionQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
+                        if (!isAdmin && storeId) injectionQuery = injectionQuery.eq('store_id', storeId);
+                        const { data: injections, error: injError } = await injectionQuery;
+                        if (!injError) {
+                            totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+                        }
+                    } catch (e) { /* 表可能不存在 */ }
 
-                    // 资金池：查询在押资金
-                    let deployedQuery = client.from('orders').select('loan_amount').eq('status', 'active');
-                    if (!isAdmin && storeId) deployedQuery = deployedQuery.eq('store_id', storeId);
-                    const { data: deployedOrders } = await deployedQuery;
-                    const deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
+                    // 查询在押资金
+                    let deployedCapital = 0;
+                    try {
+                        let deployedQuery = client.from('orders').select('loan_amount').eq('status', 'active');
+                        if (!isAdmin && storeId) deployedQuery = deployedQuery.eq('store_id', storeId);
+                        const { data: deployedOrders } = await deployedQuery;
+                        deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
+                    } catch (e) { /* ignore */ }
 
                     return {
                         total_orders: totalRes.count || 0, active_orders: activeRes.count || 0,
@@ -521,7 +529,7 @@
                 const bankIncome = cashFlow.bank?.income ?? 0;
                 const bankExpense = cashFlow.bank?.expense ?? 0;
 
-                // ===== 资金池卡片（使用现有 CSS 类） =====
+                // ===== 三卡片资金布局 =====
                 const totalInjected = report.total_injected_capital || 0;
                 const deployed = report.deployed_capital || 0;
                 const available = report.available_capital || 0;
@@ -530,36 +538,43 @@
                 const injectButtonHtml = isAdmin ? `
                 <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info(lang === 'id' ? 'Modul belum dimuat' : '模块未加载')"
                     class="btn-capital-inject">
-                    💉 ${lang === 'id' ? 'Catat Injeksi Modal' : '记录资本注入'}
+                    💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}
                 </button>` : '';
 
-                const capitalPoolHtml = `
-                <div class="card" style="margin-bottom:16px;">
-                    <h3>💰 ${lang === 'id' ? 'Struktur Modal' : '资金结构'}</h3>
-                    
-                    <div class="stats-grid stats-grid-3" style="margin-bottom:12px;">
-                        <div class="stat-card">
-                            <div class="stat-value">${Utils.formatCurrency(totalInjected)}</div>
-                            <div class="stat-label">💉 ${lang === 'id' ? '总投入资本' : '总投入资本'}</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value warning">${Utils.formatCurrency(deployed)}</div>
-                            <div class="stat-label">📋 ${lang === 'id' ? '在押资金' : '在押资金'}</div>
-                            <div class="progress-bar" style="margin-top:8px;">
-                                <div class="progress-fill" style="width:${utilizationPercent}%;background:#f59e0b;"></div>
-                            </div>
-                            <small>${utilizationPercent}% ${lang === 'id' ? 'dari total modal' : '占总资本'}</small>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value income">${Utils.formatCurrency(available)}</div>
-                            <div class="stat-label">✅ ${lang === 'id' ? '可动用资金' : '可动用资金'}</div>
-                        </div>
+                const topRowHtml = `
+                <div class="stats-grid stats-grid-2" style="margin-bottom:16px;">
+                    <!-- 卡片1：总投入资本 -->
+                    <div class="card" style="margin-bottom:0;">
+                        <h3>💉 ${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</h3>
+                        <div class="stat-value" style="font-size:var(--font-2xl);margin-bottom:8px;">${Utils.formatCurrency(totalInjected)}</div>
+                        <div class="stat-label" style="margin-bottom:12px;">${lang === 'id' ? 'Modal dasar operasional gadai' : '典当运营基础资本'}</div>
+                        ${injectButtonHtml}
                     </div>
                     
-                    ${injectButtonHtml}
+                    <!-- 卡片2：在押资金 -->
+                    <div class="card" style="margin-bottom:0;">
+                        <h3>📋 ${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</h3>
+                        <div class="stat-value warning" style="font-size:var(--font-2xl);margin-bottom:8px;">${Utils.formatCurrency(deployed)}</div>
+                        <div class="progress-bar" style="margin-bottom:4px;">
+                            <div class="progress-fill" style="width:${utilizationPercent}%;background:#f59e0b;"></div>
+                        </div>
+                        <div class="stat-label" style="margin-bottom:12px;">${utilizationPercent}% ${lang === 'id' ? 'dari total modal' : '占总资本'}</div>
+                        <button onclick="APP.navigateTo('orderTable'); setTimeout(function(){ if(APP.filterOrders) APP.filterOrders('active'); }, 300);"
+                            class="btn-small primary" style="width:100%;">
+                            👁️ ${lang === 'id' ? 'Lihat Pesanan Aktif' : '查看活跃订单'}
+                        </button>
+                    </div>
+                </div>`;
+
+                const bottomCardHtml = `
+                <div class="card" style="margin-bottom:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h3 style="margin:0;padding:0;border:none;">✅ ${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</h3>
+                        <span style="font-size:var(--font-xl);font-weight:700;color:#16a34a;">${Utils.formatCurrency(available)}</span>
+                    </div>
                     
-                    <div class="cashflow-summary" style="margin-top:12px;">
-                        <div class="cashflow-stats">
+                    <div class="cashflow-summary" style="margin-bottom:12px;">
+                        <div class="cashflow-stats" style="grid-template-columns:repeat(2,1fr);">
                             <div class="cashflow-item">
                                 <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
                                 <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
@@ -573,12 +588,17 @@
                         </div>
                     </div>
                     
-                    <div class="transfer-buttons" style="margin-top:8px;flex-direction:row;gap:8px;">
-                        <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank" style="flex:1;">${t('cash_to_bank')}</button>
-                        <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash" style="flex:1;">${t('bank_to_cash')}</button>
+                    <div style="font-size:var(--font-xs);font-weight:600;color:var(--text-secondary);margin-bottom:8px;">
+                        🔄 ${lang === 'id' ? 'Transfer Internal' : '内部互转'}
+                    </div>
+                    <div class="transfer-buttons" style="flex-direction:row;gap:8px;">
+                        <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank" style="flex:1;">🏦→🏧 ${t('cash_to_bank')}</button>
+                        <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash" style="flex:1;">🏧→🏦 ${t('bank_to_cash')}</button>
                         ${isAdmin ? `<button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq" style="flex:1;">🏢 ${t('submit_to_hq')}</button>` : ''}
                     </div>
                 </div>`;
+
+                const capitalPoolHtml = topRowHtml + bottomCardHtml;
 
                 const userRoleText = AUTH.user?.role === 'admin'
                     ? (lang === 'id' ? 'Administrator' : '管理员')
@@ -635,6 +655,7 @@
                     ${toolbarHtml}
                     <div style="margin:0 0 12px 0;"><h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ${t('financial_indicators')}${isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : ''}</h3></div>
                     <div class="stats-grid">${cardsHtml}</div>
+                    <div style="margin:0 0 8px 0;"><h3 style="margin:0;font-size:var(--font-md);font-weight:600;">💰 ${lang === 'id' ? 'Struktur Modal' : '资金结构'}</h3></div>
                     ${capitalPoolHtml}
                     ${bottomHtml}`;
 
@@ -649,7 +670,6 @@
             }
         },
 
-        // 辅助方法
         showCreateOrder() {
             Utils.toast.info(Utils.lang === 'id' ? 'Pilih nasabah terlebih dahulu' : '请先选择客户', 3000);
             this.navigateTo('customers');
@@ -664,7 +684,6 @@
     // 挂载到命名空间
     JF.DashboardCore = DashboardCore;
 
-    // 向下兼容
     if (!window.APP) window.APP = {};
     const appMethods = ['init', 'router', 'refreshCurrentPage', 'navigateTo', 'goBack', 'renderLogin', 'login', 'logout', 'toggleLanguage', 'renderDashboard', 'forceRecovery', 'showCreateOrder', 'invalidateDashboardCache', 'saveCurrentPageState', 'restorePageState', 'clearPageState', 'currentFilter', 'historyStack', 'currentPage', 'currentOrderId', 'currentCustomerId'];
     for (const method of appMethods) {
@@ -698,5 +717,5 @@
         }
     });
 
-    console.log('✅ JF.DashboardCore v2.2 最终版初始化完成（复用CSS类版）');
+    console.log('✅ JF.DashboardCore v2.3 最终版初始化完成（三卡片资金布局）');
 })();
