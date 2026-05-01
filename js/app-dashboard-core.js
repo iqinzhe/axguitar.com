@@ -283,7 +283,6 @@
         async renderLogin() {
             this.currentPage = 'login';
             this.clearPageState();
-            Utils.initLanguage();
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
             document.getElementById("app").innerHTML = `
