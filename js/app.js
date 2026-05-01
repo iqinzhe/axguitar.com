@@ -1,4 +1,4 @@
-// app.js - v2.0 最终完整版（修复版）
+// app.js - v2.0 最终完整版（修复版 - 语言判断和状态管理委托）
 // JF 命名空间下的主入口，提供全局 APP 方法与协调功能
 
 'use strict';
@@ -15,14 +15,16 @@
         currentCustomerId: null,
         historyStack: [],
 
-        // ==================== 强制恢复 ====================
+        // ==================== 强制恢复（修复语言判断） ====================
         forceRecovery() {
             console.log('[Recovery] 手动强制恢复');
             const appDiv = document.getElementById('app');
             if (!appDiv) return;
+            // 修复：印尼语显示印尼语，中文显示中文
+            const loadingText = Utils.lang === 'id' ? 'Sedang memulihkan...' : '正在恢复...';
             appDiv.innerHTML = `<div class="card" style="text-align:center;padding:40px;margin:20px;">
                 <div class="loader" style="margin:20px auto;"></div>
-                <p>${Utils.lang === 'id' ? '正在恢复...' : 'Recovering...'}</p>
+                <p>${loadingText}</p>
             </div>`;
             setTimeout(() => {
                 try {
@@ -42,27 +44,57 @@
             }, 100);
         },
 
-        // ==================== 页面状态持久化 ====================
+        // ==================== 页面状态持久化（委托给 DashboardCore） ====================
         saveCurrentPageState() {
+            // 统一委托给 DashboardCore 处理，避免状态不同步
+            if (JF.DashboardCore && typeof JF.DashboardCore.saveCurrentPageState === 'function') {
+                JF.DashboardCore.saveCurrentPageState();
+            } else {
+                // 降级：直接保存到 sessionStorage
+                try {
+                    sessionStorage.setItem('jf_current_page', this.currentPage);
+                    sessionStorage.setItem('jf_current_filter', this.currentFilter || 'all');
+                    if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
+                    if (this.currentCustomerId) sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
+                    localStorage.setItem('jf_last_page', this.currentPage);
+                    localStorage.setItem('jf_last_filter', this.currentFilter || 'all');
+                    if (this.currentOrderId) localStorage.setItem('jf_last_order_id', this.currentOrderId);
+                    if (this.currentCustomerId) localStorage.setItem('jf_last_customer_id', this.currentCustomerId);
+                } catch (e) { /* ignore */ }
+            }
+        },
+
+        restorePageState() {
+            // 统一委托给 DashboardCore 处理
+            if (JF.DashboardCore && typeof JF.DashboardCore.restorePageState === 'function') {
+                return JF.DashboardCore.restorePageState();
+            }
+            // 降级
             try {
-                sessionStorage.setItem('jf_current_page', this.currentPage);
-                sessionStorage.setItem('jf_current_filter', this.currentFilter || 'all');
-                if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
-                if (this.currentCustomerId) sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
-                localStorage.setItem('jf_last_page', this.currentPage);
-                localStorage.setItem('jf_last_filter', this.currentFilter || 'all');
-                if (this.currentOrderId) localStorage.setItem('jf_last_order_id', this.currentOrderId);
-                if (this.currentCustomerId) localStorage.setItem('jf_last_customer_id', this.currentCustomerId);
-            } catch (e) { /* ignore */ }
+                let page = sessionStorage.getItem('jf_current_page') || localStorage.getItem('jf_last_page');
+                let filter = sessionStorage.getItem('jf_current_filter') || localStorage.getItem('jf_last_filter') || "all";
+                let orderId = sessionStorage.getItem('jf_current_order_id') || localStorage.getItem('jf_last_order_id');
+                let customerId = sessionStorage.getItem('jf_current_customer_id') || localStorage.getItem('jf_last_customer_id');
+                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','backupRestore','customerOrders','customerPaymentHistory','blacklist'];
+                if (page && validPages.includes(page) && page !== 'login') {
+                    return { page, filter, orderId, customerId };
+                }
+                return { page: null, filter: "all", orderId: null, customerId: null };
+            } catch (e) { return { page: null, filter: "all", orderId: null, customerId: null }; }
         },
 
         clearPageState() {
-            try {
-                sessionStorage.removeItem('jf_current_page');
-                sessionStorage.removeItem('jf_current_filter');
-                sessionStorage.removeItem('jf_current_order_id');
-                sessionStorage.removeItem('jf_current_customer_id');
-            } catch (e) { /* ignore */ }
+            // 委托给 DashboardCore
+            if (JF.DashboardCore && typeof JF.DashboardCore.clearPageState === 'function') {
+                JF.DashboardCore.clearPageState();
+            } else {
+                try {
+                    sessionStorage.removeItem('jf_current_page');
+                    sessionStorage.removeItem('jf_current_filter');
+                    sessionStorage.removeItem('jf_current_order_id');
+                    sessionStorage.removeItem('jf_current_customer_id');
+                } catch (e) { /* ignore */ }
+            }
             this.currentOrderId = null;
             this.currentCustomerId = null;
         },
@@ -112,11 +144,9 @@
 
         // ==================== 登录 ====================
         showLogin() {
-            // 委托给 DashboardCore 渲染，保证样式一致
             if (JF.DashboardCore?.renderLogin) {
                 JF.DashboardCore.renderLogin();
             } else {
-                // 极简降级
                 document.getElementById('app').innerHTML = `<div class="login-container"><div class="login-box"><h2>JF! by Gadai</h2><p>Loading...</p></div></div>`;
             }
         },
@@ -187,7 +217,6 @@
             if (JF.DashboardCore?.renderDashboard) {
                 return await JF.DashboardCore.renderDashboard();
             }
-            // 极少情况下的简单占位
             document.getElementById('app').innerHTML = `<div class="card"><p>Dashboard unavailable</p></div>`;
         },
 
@@ -264,9 +293,9 @@
         }
     };
 
-    // 挂载到命名空间及全局（保留其他模块已挂载到 window.APP 的方法）
+    // 挂载到命名空间及全局
     window.APP = Object.assign(window.APP || {}, APP);
-    JF.APP = window.APP;   // 保持 JF.APP 与 window.APP 指向同一对象
+    JF.APP = window.APP;
 
     console.log('[APP] app.js v2.0 最终版加载完成');
     console.log('[APP] 如果出现白板，请在控制台执行 APP.forceRecovery() 恢复页面');
