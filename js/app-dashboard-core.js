@@ -1,4 +1,5 @@
-// app-dashboard-core.js - v2.0
+// app-dashboard-core.js - v2.0 (JF 命名空间) - 资金池指标版
+// 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
 
