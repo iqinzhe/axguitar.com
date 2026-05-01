@@ -68,10 +68,13 @@
     <script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
     <script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
 
-    <!-- 5. 状态初始化模块（页面恢复状态预加载） -->
+    <!-- 5. 资金管理模块（新增强化功能） -->
+    <script defer src="js/app-capital.js"></script>            <!-- 资本注入、利润再投入、资金占用 -->
+
+    <!-- 6. 状态初始化模块（页面恢复状态预加载） -->
     <script defer src="js/app-state-init.js"></script>
 
-    <!-- 6. 主入口（defer，在所有模块之后） -->
+    <!-- 7. 主入口（defer，在所有模块之后） -->
     <script defer>
         // 启动应用（等待所有模块加载完成后）
         document.addEventListener('DOMContentLoaded', function() {
