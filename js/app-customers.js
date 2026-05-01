@@ -1,11 +1,8 @@
-// app-customers.js - v2.3 (最终修复版)
-// 修复：this.navigateTo 错误
-// 修复：添加错误边界保护
-// 适配新计费规则：
-//   管理费：≤50万→Rp20,000 / 50万~300万→Rp30,000 / >300万→1%
-//   服务费：默认2%，下拉0-5%
-//   利率：默认8%，下拉6-10%
-//   双语统一：t() 体系
+// app-customers.js - v2.4 (计费规则更新)
+// 管理费阶梯：≤50万→Rp20,000 / 50万~300万→Rp30,000 / >300万→1%
+// 服务费阶梯：≤300万→0% / 301万~500万→1% / >500万→默认2%，下拉2%-6%
+// 利率：默认8%，下拉10%-6%
+// 双语统一：t() 体系
 
 window.APP = window.APP || {};
 
@@ -780,7 +777,7 @@ const CustomersModule = {
                                     '</select>' +
                                     '<input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()">' +
                                 '</div>' +
-                                '<div class="fee-card-hint">💡 ' + (lang === 'id' ? 'Default 2% dari jumlah gadai' : '默认当金金额的2%') + '</div>' +
+                                '<div class="fee-card-hint" id="serviceFeeHint">💡 ' + (lang === 'id' ? '≤3jt: 0% | 3jt~5jt: 1% | >5jt: dapat dipilih' : '≤300万: 0% | 301万~500万: 1% | >500万: 可选') + '</div>' +
                             '</div>' +
                         '</div>' +
                         
@@ -915,12 +912,14 @@ const CustomersModule = {
         // 管理费 — 阶梯定价
         var adminFee = Utils.calculateAdminFee(amount);
         
-        // 服务费
+        // 服务费（阶梯定价）
         var serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 2;
         var serviceFeeStr = document.getElementById("serviceFeeInput").value;
         var serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
-        if (serviceFee === 0 && serviceFeePercent > 0) {
-            serviceFee = Math.round(amount * serviceFeePercent / 100);
+        if (serviceFee === 0 && amount > 0) {
+            var serviceFeeResult = Utils.calculateServiceFee(amount, serviceFeePercent);
+            serviceFee = serviceFeeResult.amount;
+            serviceFeePercent = serviceFeeResult.percent; // 使用实际计算的百分比
         }
         
         var feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
@@ -1046,7 +1045,13 @@ const CustomersModule = {
             document.getElementById("notes").value = '';
             
             var svcSelect = document.getElementById("serviceFeePercentSelect");
-            if (svcSelect) { svcSelect.value = '2'; delete svcSelect.dataset.manual; }
+            if (svcSelect) { 
+                svcSelect.value = '2'; 
+                delete svcSelect.dataset.manual;
+                // 重置服务费下拉显示状态
+                var svcSelectGroup = svcSelect.closest('.form-group') || svcSelect.parentElement;
+                if (svcSelectGroup) svcSelectGroup.style.display = '';
+            }
             
             var svcInput = document.getElementById("serviceFeeInput");
             if (svcInput) { svcInput.value = '0'; delete svcInput.dataset.manual; }
@@ -1093,13 +1098,21 @@ const CustomersModule = {
             adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
         }
         
-        // 服务费
+        // 服务费（阶梯定价）
         var serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
         var serviceFeeInput = document.getElementById('serviceFeeInput');
         var percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
         if (serviceFeeInput && !serviceFeeInput.dataset.manual) {
-            var fee = Math.round(amount * percent / 100);
-            serviceFeeInput.value = Utils.formatNumberWithCommas(fee);
+            var serviceFeeResult = Utils.calculateServiceFee(amount, percent);
+            serviceFeeInput.value = Utils.formatNumberWithCommas(serviceFeeResult.amount);
+        }
+        
+        // 控制服务费下拉是否显示（仅>500万时显示）
+        if (serviceFeeSelect) {
+            var serviceFeeSelectGroup = serviceFeeSelect.closest('.form-group') || serviceFeeSelect.parentElement;
+            if (serviceFeeSelectGroup) {
+                serviceFeeSelectGroup.style.display = (amount > 5000000) ? '' : 'none';
+            }
         }
         
         // 固定还款 — 月供
@@ -1128,12 +1141,36 @@ const CustomersModule = {
         var amountStr = document.getElementById('amount')?.value || '0';
         var amount = Utils.parseNumberFromCommas(amountStr) || 0;
         var percent = select ? parseFloat(select.value) : 2;
-        var fee = Math.round(amount * percent / 100);
+        
+        // 使用新的阶梯服务费计算
+        var serviceFeeResult = Utils.calculateServiceFee(amount, percent);
+        var actualFee = serviceFeeResult.amount;
         
         var input = document.getElementById('serviceFeeInput');
         if (input) {
-            input.value = Utils.formatNumberWithCommas(fee);
+            input.value = Utils.formatNumberWithCommas(actualFee);
             input.dataset.manual = 'true';
+        }
+        
+        // 更新服务费提示文字
+        var hint = document.getElementById('serviceFeeHint');
+        if (hint) {
+            var lang = Utils.lang;
+            if (amount <= 3000000) {
+                hint.innerHTML = '💡 ' + (lang === 'id' ? '≤3jt: Gratis (0%)' : '≤300万: 免费 (0%)');
+            } else if (amount <= 5000000) {
+                hint.innerHTML = '💡 ' + (lang === 'id' ? '3jt~5jt: 1% (otomatis)' : '301万~500万: 1% (自动)');
+            } else {
+                hint.innerHTML = '💡 ' + (lang === 'id' ? '>5jt: Pilih 2%-6%' : '>500万: 可选 2%-6%');
+            }
+        }
+        
+        // 控制服务费下拉是否显示（仅>500万时显示）
+        if (select) {
+            var serviceFeeSelectGroup = select.closest('.form-group') || select.parentElement;
+            if (serviceFeeSelectGroup) {
+                serviceFeeSelectGroup.style.display = (amount > 5000000) ? '' : 'none';
+            }
         }
     },
 
@@ -1201,7 +1238,6 @@ const CustomersModule = {
                         '<td class="text-center"><span class="badge badge-' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
                     '</tr>';
                     
-                    // 修复：使用 APP.navigateTo 而不是 this.navigateTo
                     var actionButtons = '';
                     if (o.status === 'active' && !AUTH.isAdmin()) {
                         actionButtons += '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small success">💰 ' + t('pay_fee') + '</button>';
@@ -1243,7 +1279,6 @@ const CustomersModule = {
         } catch (error) {
             console.error("showCustomerOrders error:", error);
             Utils.toast.error(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
-            // 错误时返回仪表盘
             if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
                 DashboardCore.renderDashboard();
             }
@@ -1312,7 +1347,6 @@ const CustomersModule = {
         } catch (error) {
             console.error("showCustomerPaymentHistory error:", error);
             Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
-            // 错误时返回仪表盘
             if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
                 DashboardCore.renderDashboard();
             }
