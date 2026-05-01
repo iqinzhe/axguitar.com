@@ -274,7 +274,6 @@
                     }
                 }
 
-                // 确保所有门店都有记录（即使余额为0）
                 for (const s of StoreManager.stores) {
                     if (!balances[s.id]) balances[s.id] = { cashBalance: 0, bankBalance: 0 };
                 }
@@ -322,7 +321,8 @@
                         loadingMsg.innerHTML = '<div style="background:white;padding:20px 40px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:12px;"><div class="loader" style="width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;"></div><p style="margin:0;">' + (lang === 'id' ? 'Membersihkan data latihan...' : '正在清理练习数据...') + '</p></div>';
                         document.body.appendChild(loadingMsg);
 
-                        await StoreManager._cleanPracticeData(storeId);
+                        // 使用增强版清理方法（带详细错误收集）
+                        await StoreManager._cleanPracticeDataEnhanced(storeId);
 
                         if (loadingMsg.parentElement) loadingMsg.remove();
                         Utils.toast.success(lang === 'id' ? '✅ Data latihan berhasil dibersihkan' : '✅ 练习数据已清理');
@@ -330,7 +330,11 @@
                         const errLoading = document.getElementById('cleanPracticeLoading');
                         if (errLoading) errLoading.remove();
                         console.error('清理练习数据失败:', cleanError);
-                        Utils.toast.error(lang === 'id' ? '⚠️ Gagal membersihkan data: ' + cleanError.message : '⚠️ 清理数据失败：' + cleanError.message);
+                        // 增强错误提示，告知用户数据可能不完整
+                        const errorMsg = lang === 'id'
+                            ? `⚠️ Gagal membersihkan data: ${cleanError.message}\n\nData mungkin tidak lengkap. Silakan hubungi administrator atau coba lagi.`
+                            : `⚠️ 清理数据失败：${cleanError.message}\n\n数据可能不完整。请联系管理员或重试。`;
+                        Utils.toast.error(errorMsg, 8000);
                         return;
                     }
                 } else {
@@ -360,7 +364,7 @@
         },
 
         /**
-         * 清理练习门店的所有业务数据
+         * 清理练习门店的所有业务数据（原版，保留用于内部调用）
          * @param {string} storeId - 门店ID
          */
         async _cleanPracticeData(storeId) {
@@ -438,6 +442,157 @@
                 throw new Error(lang === 'id'
                     ? 'Gagal membersihkan data latihan: ' + error.message
                     : '清理练习数据失败：' + error.message);
+            }
+        },
+
+        /**
+         * 增强版清理练习门店数据（带详细错误收集，防止部分失败时静默继续）
+         * @param {string} storeId - 门店ID
+         */
+        async _cleanPracticeDataEnhanced(storeId) {
+            const lang = Utils.lang;
+            const client = SUPABASE.getClient();
+            const errors = [];
+
+            console.log('[StoreManager] 开始增强版清理门店 ' + storeId + ' 的练习数据...');
+
+            try {
+                // 1. 查找该门店所有订单ID
+                const { data: orders, error: orderError } = await client
+                    .from('orders').select('id').eq('store_id', storeId);
+                if (orderError) {
+                    errors.push('查询订单失败: ' + orderError.message);
+                    throw new Error('查询订单失败: ' + orderError.message);
+                }
+
+                const orderIds = (orders || []).map(o => o.id);
+                console.log('[StoreManager] 找到 ' + orderIds.length + ' 个订单需要清理');
+
+                // 定义清理步骤（顺序执行，某一步失败时记录但不中断，最终汇总报告）
+                const cleanSteps = [];
+
+                // 资金流水清理
+                cleanSteps.push({
+                    name: 'cash_flow_records',
+                    exec: async () => {
+                        const { error } = await client.from('cash_flow_records').delete().eq('store_id', storeId);
+                        if (error) throw error;
+                    }
+                });
+
+                if (orderIds.length > 0) {
+                    cleanSteps.push({
+                        name: 'payment_history',
+                        exec: async () => {
+                            const { error } = await client.from('payment_history').delete().in('order_id', orderIds);
+                            if (error) throw error;
+                        }
+                    });
+                    cleanSteps.push({
+                        name: 'reminder_logs',
+                        exec: async () => {
+                            const { error } = await client.from('reminder_logs').delete().in('order_id', orderIds);
+                            if (error) throw error;
+                        }
+                    });
+                    cleanSteps.push({
+                        name: 'internal_transfers',
+                        exec: async () => {
+                            const { error } = await client.from('internal_transfers').delete().eq('store_id', storeId);
+                            if (error) throw error;
+                        }
+                    });
+                }
+
+                cleanSteps.push({
+                    name: 'orders',
+                    exec: async () => {
+                        const { error } = await client.from('orders').delete().eq('store_id', storeId);
+                        if (error) throw error;
+                    }
+                });
+                cleanSteps.push({
+                    name: 'expenses',
+                    exec: async () => {
+                        const { error } = await client.from('expenses').delete().eq('store_id', storeId);
+                        if (error) throw error;
+                    }
+                });
+                cleanSteps.push({
+                    name: 'customers',
+                    exec: async () => {
+                        const { error } = await client.from('customers').delete().eq('store_id', storeId);
+                        if (error) throw error;
+                    }
+                });
+                cleanSteps.push({
+                    name: 'blacklist',
+                    exec: async () => {
+                        const { error } = await client.from('blacklist').delete().eq('store_id', storeId);
+                        if (error) throw error;
+                    }
+                });
+
+                // 顺序执行清理步骤
+                for (const step of cleanSteps) {
+                    try {
+                        await step.exec();
+                        console.log(`[StoreManager] ✅ ${step.name} 已清理`);
+                    } catch (err) {
+                        errors.push(`${step.name} 清理失败: ${err.message}`);
+                        console.warn(`[StoreManager] ⚠️ ${step.name} 清理失败:`, err.message);
+                        // 继续执行后续步骤，不中断
+                    }
+                }
+
+                // 清除缓存
+                SUPABASE.clearCache();
+                if (window.JFCache) window.JFCache.clear();
+
+                if (errors.length > 0) {
+                    const errorSummary = errors.join('; ');
+                    console.warn('[StoreManager] 清理完成但有部分失败:', errorSummary);
+                    // 抛出包含详细错误信息的异常，供上层显示
+                    throw new Error(lang === 'id'
+                        ? `Pembersihan selesai dengan ${errors.length} kesalahan: ${errorSummary}`
+                        : `清理完成但有 ${errors.length} 个错误: ${errorSummary}`);
+                }
+
+                console.log('[StoreManager] ✅ 门店 ' + storeId + ' 练习数据完整清理完成');
+            } catch (error) {
+                console.error('[StoreManager] 增强版清理练习数据异常:', error);
+                throw error; // 向上抛出，由上层处理
+            }
+        },
+
+        /**
+         * 调用 Edge Function 进行事务性清理（推荐方式，需后端部署）
+         * @param {string} storeId - 门店ID
+         */
+        async _cleanPracticeDataWithTransaction(storeId) {
+            const lang = Utils.lang;
+            const client = SUPABASE.getClient();
+
+            console.log('[StoreManager] 尝试通过 Edge Function 事务性清理门店 ' + storeId);
+
+            try {
+                const { data, error } = await client.functions.invoke('clean-practice-store', {
+                    body: { storeId: storeId }
+                });
+
+                if (error) {
+                    console.warn('[StoreManager] Edge Function 调用失败:', error);
+                    throw new Error(lang === 'id'
+                        ? 'Fungsi pembersihan transaksional tidak tersedia, gunakan metode biasa'
+                        : '事务清理功能不可用，使用普通方式');
+                }
+
+                console.log('[StoreManager] Edge Function 清理完成:', data);
+                return data;
+            } catch (error) {
+                console.warn('[StoreManager] Edge Function 未部署或调用失败，降级到普通清理:', error.message);
+                // 降级到增强版清理
+                await StoreManager._cleanPracticeDataEnhanced(storeId);
             }
         },
 
@@ -757,36 +912,36 @@
     JF.StoreManager = StoreManager;
     window.StoreManager = StoreManager; // 向下兼容
 
-    // 兼容旧版 APP 调用
-    if (window.APP) {
-        window.APP.addStore = async function () {
-            const name = document.getElementById('newStoreName')?.value.trim();
-            const address = document.getElementById('newStoreAddress')?.value.trim();
-            const phone = document.getElementById('newStorePhone')?.value.trim();
-            if (!name) {
-                Utils.toast.warning(Utils.lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
-                return;
-            }
-            try {
-                await StoreManager.createStore(name, address, phone);
-                Utils.toast.success(Utils.lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
-                await StoreManager.renderStoreManagement();
-            } catch (error) {
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
-            }
-        };
-        window.APP.deleteStore = async function (storeId) {
-            const confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
-            if (!confirmed) return;
-            try {
-                await StoreManager.deleteStore(storeId);
-                Utils.toast.success(Utils.lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
-                await StoreManager.renderStoreManagement();
-            } catch (error) {
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
-            }
-        };
-    }
+    // 修复注册时机：直接挂载到 window.APP（无论 APP 是否存在）
+    // 这样即使 store.js 在 app.js 之前加载，方法也能被正确注册
+    window.APP = window.APP || {};
+    window.APP.addStore = async function () {
+        const name = document.getElementById('newStoreName')?.value.trim();
+        const address = document.getElementById('newStoreAddress')?.value.trim();
+        const phone = document.getElementById('newStorePhone')?.value.trim();
+        if (!name) {
+            Utils.toast.warning(Utils.lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写');
+            return;
+        }
+        try {
+            await StoreManager.createStore(name, address, phone);
+            Utils.toast.success(Utils.lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
+            await StoreManager.renderStoreManagement();
+        } catch (error) {
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal menambah toko: ' + error.message : '添加门店失败：' + error.message);
+        }
+    };
+    window.APP.deleteStore = async function (storeId) {
+        const confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
+        if (!confirmed) return;
+        try {
+            await StoreManager.deleteStore(storeId);
+            Utils.toast.success(Utils.lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
+            await StoreManager.renderStoreManagement();
+        } catch (error) {
+            Utils.toast.error(Utils.lang === 'id' ? 'Gagal menghapus: ' + error.message : '删除失败：' + error.message);
+        }
+    };
 
     console.log('✅ JF.StoreManager v2.0 初始化完成');
 })();
