@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.0 (JF 命名空间)
+// app-dashboard-core.js - v2.0 (JF 命名空间) - 修复版
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
@@ -187,10 +187,11 @@
             await this.refreshCurrentPage();
         },
 
-        // ---------- 导航（修复缩进，统一4空格） ----------
+        // ---------- 导航 ----------
         navigateTo: function(page, params) {
             window.scrollTo(0, 0);
             params = params || {};
+            // 保存当前页面到历史栈（用于返回）
             this.historyStack.push({
                 page: this.currentPage,
                 orderId: this.currentOrderId,
@@ -231,6 +232,36 @@
                     this.renderDashboard();
                 });
             } else {
+                this.renderDashboard();
+            }
+        },
+
+        // ---------- 返回上一页（修复版） ----------
+        goBack: function() {
+            console.log('[DashboardCore] goBack 被调用，历史栈深度:', this.historyStack.length);
+            
+            if (this.historyStack.length > 0) {
+                const prev = this.historyStack.pop();
+                console.log('[DashboardCore] 返回到:', prev.page);
+                
+                this.currentPage = prev.page;
+                this.currentOrderId = prev.orderId || null;
+                this.currentCustomerId = prev.customerId || null;
+                this.currentFilter = prev.filter || "all";
+                this.saveCurrentPageState();
+                
+                // 刷新页面
+                this.refreshCurrentPage().catch(err => {
+                    console.error('[DashboardCore] goBack 刷新失败:', err);
+                    this.renderDashboard();
+                });
+            } else if (document.referrer && window.history.length > 1) {
+                // 没有历史记录时尝试浏览器后退
+                console.log('[DashboardCore] 使用浏览器后退');
+                window.history.back();
+            } else {
+                // 默认返回仪表盘
+                console.log('[DashboardCore] 默认返回仪表盘');
                 this.renderDashboard();
             }
         },
