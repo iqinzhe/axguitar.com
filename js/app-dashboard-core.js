@@ -211,7 +211,7 @@ const DashboardStatsHelper = {
         };
     },
     
-    async getAnomalyStats(profile) {
+       async getAnomalyStats(profile) {
         const isAdmin = profile?.role === 'admin';
         const storeId = profile?.store_id;
         
@@ -219,6 +219,12 @@ const DashboardStatsHelper = {
         
         let overdueQuery = client.from('orders').select('*', { count: 'exact', head: true });
         if (!isAdmin && storeId) overdueQuery = overdueQuery.eq('store_id', storeId);
+        else if (isAdmin) {
+            const practiceIds = await SUPABASE._getPracticeStoreIds();
+            if (practiceIds.length > 0) {
+                overdueQuery = overdueQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
+        }
         overdueQuery = overdueQuery.eq('status', 'active').gte('overdue_days', 30);
         
         let blacklistQuery = client.from('blacklist').select('*', { count: 'exact', head: true });
