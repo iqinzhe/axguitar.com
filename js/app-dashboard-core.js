@@ -138,7 +138,6 @@
                     }
                 } catch (err) { console.warn('[逾期更新] 失败:', err.message); }
             }, 30 * 60 * 1000);
-            // 立即执行一次
             setTimeout(async () => {
                 try {
                     await SUPABASE.updateOverdueDays();
@@ -188,53 +187,53 @@
             await this.refreshCurrentPage();
         },
 
-        // ---------- 导航 ----------
-       navigateTo: function(page, params) {
-    window.scrollTo(0, 0);
-    params = params || {};
-    this.historyStack.push({
-        page: this.currentPage,
-        orderId: this.currentOrderId,
-        customerId: this.currentCustomerId,
-        filter: this.currentFilter
-    });
-    this.currentPage = page;
-    if (params.orderId) this.currentOrderId = params.orderId;
-    if (params.customerId) this.currentCustomerId = params.customerId;
-    this.saveCurrentPageState();
+        // ---------- 导航（修复缩进，统一4空格） ----------
+        navigateTo: function(page, params) {
+            window.scrollTo(0, 0);
+            params = params || {};
+            this.historyStack.push({
+                page: this.currentPage,
+                orderId: this.currentOrderId,
+                customerId: this.currentCustomerId,
+                filter: this.currentFilter
+            });
+            this.currentPage = page;
+            if (params.orderId) this.currentOrderId = params.orderId;
+            if (params.customerId) this.currentCustomerId = params.customerId;
+            this.saveCurrentPageState();
 
-    // 直接调用 JF 命名空间下的对应页面方法
-    const pageMap = {
-        'dashboard': () => this.renderDashboard(),
-        'orderTable': () => JF.OrdersPage.showOrderTable(),
-        'customers': () => JF.CustomersPage.showCustomers(),
-        'expenses': () => JF.ExpensesPage.showExpenses(),
-        'paymentHistory': () => JF.FundsPage.showCashFlowPage(),
-        'anomaly': () => JF.AnomalyPage.showAnomaly(),
-        'userManagement': () => JF.UsersPage.showUserManagement(),
-        'storeManagement': () => JF.StoreManager.renderStoreManagement(),
-        'backupRestore': () => JF.BackupStorage.renderBackupUI(),
-        'blacklist': () => JF.BlacklistPage.showBlacklist(),
-        'viewOrder': () => {
-            if (this.currentOrderId) return JF.OrdersPage.viewOrder(this.currentOrderId);
-            return this.renderDashboard();
+            // 直接调用 JF 命名空间下的对应页面方法
+            const pageMap = {
+                'dashboard': () => this.renderDashboard(),
+                'orderTable': () => JF.OrdersPage.showOrderTable(),
+                'customers': () => JF.CustomersPage.showCustomers(),
+                'expenses': () => JF.ExpensesPage.showExpenses(),
+                'paymentHistory': () => JF.FundsPage.showCashFlowPage(),
+                'anomaly': () => JF.AnomalyPage.showAnomaly(),
+                'userManagement': () => JF.UsersPage.showUserManagement(),
+                'storeManagement': () => JF.StoreManager.renderStoreManagement(),
+                'backupRestore': () => JF.BackupStorage.renderBackupUI(),
+                'blacklist': () => JF.BlacklistPage.showBlacklist(),
+                'viewOrder': () => {
+                    if (this.currentOrderId) return JF.OrdersPage.viewOrder(this.currentOrderId);
+                    return this.renderDashboard();
+                },
+                'payment': () => {
+                    if (this.currentOrderId) return JF.PaymentPage.showPayment(this.currentOrderId);
+                    return this.renderDashboard();
+                }
+            };
+
+            const handler = pageMap[page];
+            if (handler) {
+                handler().catch(err => {
+                    console.error(`[navigateTo] 页面 ${page} 加载失败:`, err);
+                    this.renderDashboard();
+                });
+            } else {
+                this.renderDashboard();
+            }
         },
-        'payment': () => {
-            if (this.currentOrderId) return JF.PaymentPage.showPayment(this.currentOrderId);
-            return this.renderDashboard();
-        }
-    };
-
-    const handler = pageMap[page];
-    if (handler) {
-        handler().catch(err => {
-            console.error(`[navigateTo] 页面 ${page} 加载失败:`, err);
-            this.renderDashboard();
-        });
-    } else {
-        this.renderDashboard();
-    }
-},
 
         // ---------- 页面刷新 ----------
         async refreshCurrentPage() {
@@ -379,7 +378,8 @@
             console.log('[Recovery] 手动强制恢复');
             const appDiv = document.getElementById('app');
             if (!appDiv) return;
-            appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;margin:20px;"><div class="loader" style="margin:20px auto;"></div><p>' + (Utils.lang === 'id' ? 'Memulihkan...' : '恢复中...') + '</p></div>';
+            const loadingText = Utils.lang === 'id' ? 'Sedang memulihkan...' : '恢复中...';
+            appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;margin:20px;"><div class="loader" style="margin:20px auto;"></div><p>' + loadingText + '</p></div>';
             setTimeout(async () => {
                 try {
                     if (AUTH.isLoggedIn()) {
@@ -574,7 +574,7 @@
 
                 document.getElementById("app").innerHTML = `
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                             <img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">
                             <h1 style="margin:0;">JF! by Gadai</h1>
                         </div>
@@ -622,7 +622,6 @@
         if (typeof DashboardCore[method] === 'function') {
             window.APP[method] = DashboardCore[method].bind(DashboardCore);
         } else {
-            // 非函数属性（getter?）直接代理
             Object.defineProperty(window.APP, method, {
                 get() { return DashboardCore[method]; },
                 set(v) { DashboardCore[method] = v; },
@@ -631,7 +630,8 @@
             });
         }
     }
-    // 兼容 sendDailyReminders 等未定义的方法（保留原 app.js 中的逻辑，但可由外部挂载）
+
+    // 兼容 sendDailyReminders
     window.APP.sendDailyReminders = DashboardCore.sendDailyReminders || (async function() {
         Utils.toast.info(Utils.lang === 'id' ? 'Fungsi pengingat belum tersedia' : '提醒功能尚未就绪');
     });
