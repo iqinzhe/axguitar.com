@@ -1785,4 +1785,849 @@ const SupabaseAPI = {
     formatDate(dateStr) { return Utils.formatDate(dateStr); }
 };
 
+// ==================== 以下方法请添加到 supabase.js 的 SupabaseAPI 对象中 ====================
+// 位置：在 window.SUPABASE = SupabaseAPI; 之前插入
+
+    // ==================== 资金占用管理（新增） ====================
+    
+    /**
+     * 获取门店资本总额（累计注资）
+     */
+    async getTotalCapital(storeId) {
+        let query = supabaseClient
+            .from('capital_injections')
+            .select('amount');
+        
+        if (storeId) {
+            query = query.eq('store_id', storeId);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.warn('获取资本总额失败:', error);
+            return 0;
+        }
+        
+        let total = 0;
+        for (const inj of (data || [])) {
+            total += inj.amount;
+        }
+        return total;
+    },
+    
+    /**
+     * 记录资本注入
+     * @param {string} storeId - 门店ID
+     * @param {number} amount - 注入金额
+     * @param {string} source - 资金来源 'cash' 或 'bank'
+     * @param {string} description - 描述
+     */
+    async recordCapitalInjection(storeId, amount, source, description) {
+        const profile = await this.getCurrentProfile();
+        const lang = Utils.lang;
+        
+        if (profile?.role !== 'admin') {
+            throw new Error(lang === 'id' 
+                ? 'Hanya admin yang dapat mencatat injeksi modal'
+                : '只有管理员可以记录资本注入');
+        }
+        
+        if (amount <= 0) {
+            throw new Error(lang === 'id' 
+                ? 'Jumlah injeksi harus lebih dari 0'
+                : '注入金额必须大于0');
+        }
+        
+        const injectionData = {
+            store_id: storeId,
+            amount: amount,
+            injection_date: Utils.getLocalToday(),
+            source: source,
+            injection_type: 'external',
+            description: description || null,
+            recorded_by: profile?.id
+        };
+        
+        const { data, error } = await supabaseClient
+            .from('capital_injections')
+            .insert(injectionData)
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        // 记录资金流水（注入资金作为现金/银行流入）
+        await this.recordCashFlow({
+            store_id: storeId,
+            flow_type: 'capital_injection',
+            direction: 'inflow',
+            amount: amount,
+            source_target: source,
+            description: description || (lang === 'id' ? 'Injeksi modal' : '资本注入'),
+            reference_id: data.id
+        });
+        
+        // 记录审计日志
+        if (window.Audit) {
+            await window.Audit.log('capital_injection', JSON.stringify({
+                store_id: storeId,
+                amount: amount,
+                source: source,
+                description: description
+            }));
+        }
+        
+        return data;
+    },
+    
+    /**
+     * 获取订单资金占用状态
+     */
+    async getOrderCapitalStatus(orderId) {
+        const order = await this.getOrder(orderId);
+        if (!order) return null;
+        
+        return {
+            order_id: order.order_id,
+            loan_amount: order.loan_amount,
+            fund_status: order.fund_status || 'pending',
+            capital_occupied_at: order.capital_occupied_at,
+            capital_released_at: order.capital_released_at
+        };
+    },
+    
+    /**
+     * 更新订单资金占用状态（放款时调用）
+     * @param {string} orderId - 订单号
+     * @param {string} status - 状态: pending, deployed, returned, extended, forfeited
+     */
+    async updateOrderFundStatus(orderId, status) {
+        const validStatuses = ['pending', 'deployed', 'returned', 'extended', 'forfeited'];
+        if (!validStatuses.includes(status)) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Status dana tidak valid'
+                : '资金状态无效');
+        }
+        
+        const order = await this.getOrder(orderId);
+        if (!order) {
+            throw new Error(Utils.lang === 'id' 
+                ? 'Pesanan tidak ditemukan'
+                : '订单不存在');
+        }
+        
+        const oldStatus = order.fund_status || 'pending';
+        
+        // 获取当前占用金额统计
+        let deployedBefore = 0;
+        let capitalBefore = 0;
+        
+        if (order.store_id) {
+            const deployedResult = await this.getDeployedCapital(order.store_id);
+            deployedBefore = deployedResult.totalDeployed;
+            capitalBefore = await this.getTotalCapital(order.store_id);
+        }
+        
+        const updates = {
+            fund_status: status,
+            updated_at: Utils.getLocalDateTime()
+        };
+        
+        if (status === 'deployed' && !order.capital_occupied_at) {
+            updates.capital_occupied_at = Utils.getLocalDateTime();
+        }
+        
+        if (status === 'returned' && !order.capital_released_at) {
+            updates.capital_released_at = Utils.getLocalDateTime();
+        }
+        
+        const { error } = await supabaseClient
+            .from('orders')
+            .update(updates)
+            .eq('order_id', orderId);
+        
+        if (error) throw error;
+        
+        // 记录资金占用变动日志
+        let deployedAfter = deployedBefore;
+        let capitalAfter = capitalBefore;
+        
+        if (status === 'deployed' && oldStatus !== 'deployed') {
+            deployedAfter = deployedBefore + (order.loan_amount || 0);
+        } else if (status === 'returned' && oldStatus === 'deployed') {
+            deployedAfter = deployedBefore - (order.loan_amount || 0);
+        }
+        
+        await this._recordCapitalUtilizationLog({
+            store_id: order.store_id,
+            order_id: order.id,
+            event_type: this._getEventTypeFromStatusChange(oldStatus, status),
+            amount: order.loan_amount || 0,
+            capital_before: capitalBefore,
+            capital_after: capitalAfter,
+            deployed_before: deployedBefore,
+            deployed_after: deployedAfter
+        });
+        
+        return true;
+    },
+    
+    _getEventTypeFromStatusChange(oldStatus, newStatus) {
+        if (newStatus === 'deployed' && oldStatus !== 'deployed') return 'deploy';
+        if (newStatus === 'returned') return 'release';
+        if (newStatus === 'forfeited') return 'forfeit';
+        if (newStatus === 'extended') return 'extend';
+        return 'update';
+    },
+    
+    async _recordCapitalUtilizationLog(data) {
+        const profile = await this.getCurrentProfile();
+        
+        const logData = {
+            store_id: data.store_id,
+            order_id: data.order_id,
+            event_type: data.event_type,
+            amount: data.amount,
+            capital_before: data.capital_before,
+            capital_after: data.capital_after,
+            deployed_before: data.deployed_before,
+            deployed_after: data.deployed_after,
+            recorded_by: profile?.id
+        };
+        
+        const { error } = await supabaseClient
+            .from('capital_utilization_log')
+            .insert(logData);
+        
+        if (error) {
+            console.warn('记录资金占用日志失败:', error);
+        }
+    },
+    
+    /**
+     * 获取当前在押资金总额
+     * @param {string} storeId - 门店ID（可选）
+     */
+    async getDeployedCapital(storeId) {
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        
+        let query = supabaseClient
+            .from('orders')
+            .select('loan_amount, order_id, customer_name, store_id')
+            .eq('fund_status', 'deployed')
+            .eq('status', 'active');
+        
+        if (profile?.role !== 'admin' && targetStoreId) {
+            query = query.eq('store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && targetStoreId) {
+            query = query.eq('store_id', targetStoreId);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.warn('获取在押资金失败:', error);
+            return { totalDeployed: 0, count: 0, orders: [] };
+        }
+        
+        let total = 0;
+        for (const order of (data || [])) {
+            total += (order.loan_amount || 0);
+        }
+        
+        return {
+            totalDeployed: total,
+            count: data?.length || 0,
+            orders: data || []
+        };
+    },
+    
+    // ==================== 利润再投入管理 ====================
+    
+    /**
+     * 获取指定期间的营业利润（管理费+服务费+利息）
+     */
+    async getOperatingProfit(storeId, startDate, endDate) {
+        const client = supabaseClient;
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        
+        let query = client
+            .from('payment_history')
+            .select(`
+                amount,
+                type,
+                date,
+                orders!inner(store_id, order_id)
+            `)
+            .in('type', ['admin_fee', 'service_fee', 'interest']);
+        
+        if (startDate) {
+            query = query.gte('date', startDate);
+        }
+        if (endDate) {
+            query = query.lte('date', endDate);
+        }
+        
+        if (profile?.role !== 'admin' && targetStoreId) {
+            query = query.eq('orders.store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && targetStoreId) {
+            query = query.eq('orders.store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && !targetStoreId) {
+            // 总部排除练习门店
+            const practiceIds = await this._getPracticeStoreIds();
+            if (practiceIds.length > 0) {
+                query = query.not('orders.store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.warn('获取营业利润失败:', error);
+            return { total: 0, admin_fee: 0, service_fee: 0, interest: 0, details: [] };
+        }
+        
+        let total = 0;
+        let adminFeeTotal = 0;
+        let serviceFeeTotal = 0;
+        let interestTotal = 0;
+        
+        for (const payment of (data || [])) {
+            const amount = payment.amount || 0;
+            total += amount;
+            
+            if (payment.type === 'admin_fee') adminFeeTotal += amount;
+            else if (payment.type === 'service_fee') serviceFeeTotal += amount;
+            else if (payment.type === 'interest') interestTotal += amount;
+        }
+        
+        return {
+            total: total,
+            admin_fee: adminFeeTotal,
+            service_fee: serviceFeeTotal,
+            interest: interestTotal,
+            details: data || [],
+            period: { start: startDate, end: endDate }
+        };
+    },
+    
+    /**
+     * 获取累计利润（从开业至今的总利润）
+     */
+    async getCumulativeProfit(storeId) {
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        
+        let query = supabaseClient
+            .from('payment_history')
+            .select('amount, type, orders!inner(store_id)')
+            .in('type', ['admin_fee', 'service_fee', 'interest']);
+        
+        if (profile?.role !== 'admin' && targetStoreId) {
+            query = query.eq('orders.store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && targetStoreId) {
+            query = query.eq('orders.store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && !targetStoreId) {
+            const practiceIds = await this._getPracticeStoreIds();
+            if (practiceIds.length > 0) {
+                query = query.not('orders.store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.warn('获取累计利润失败:', error);
+            return 0;
+        }
+        
+        let total = 0;
+        for (const payment of (data || [])) {
+            total += (payment.amount || 0);
+        }
+        
+        return total;
+    },
+    
+    /**
+     * 获取已转化为资本的总利润
+     */
+    async getReinvestedProfit(storeId) {
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        
+        let query = supabaseClient
+            .from('capital_injections')
+            .select('amount')
+            .eq('injection_type', 'reinvestment');
+        
+        if (profile?.role !== 'admin' && targetStoreId) {
+            query = query.eq('store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && targetStoreId) {
+            query = query.eq('store_id', targetStoreId);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+            console.warn('获取已再投入利润失败:', error);
+            return 0;
+        }
+        
+        let total = 0;
+        for (const inj of (data || [])) {
+            total += (inj.amount || 0);
+        }
+        
+        return total;
+    },
+    
+    /**
+     * 获取待转化的利润（累计利润 - 已转化利润）
+     */
+    async getPendingReinvestProfit(storeId) {
+        const cumulative = await this.getCumulativeProfit(storeId);
+        const reinvested = await this.getReinvestedProfit(storeId);
+        return Math.max(0, cumulative - reinvested);
+    },
+    
+    /**
+     * 执行利润再投入（将营业利润转化为资本）
+     * @param {Object} options
+     * @param {string} options.storeId - 门店ID
+     * @param {number} options.amount - 再投入金额（可选，不填则转化全部待转化利润）
+     * @param {string} options.periodStart - 期间开始日期
+     * @param {string} options.periodEnd - 期间结束日期
+     * @param {string} options.description - 描述
+     * @param {boolean} options.isAuto - 是否自动转化
+     */
+    async reinvestProfit(options) {
+        const profile = await this.getCurrentProfile();
+        const lang = Utils.lang;
+        
+        const storeId = options.storeId || profile?.store_id;
+        if (!storeId) {
+            throw new Error(lang === 'id' ? 'Toko tidak ditemukan' : '门店不存在');
+        }
+        
+        // 获取待转化利润
+        const pendingProfit = await this.getPendingReinvestProfit(storeId);
+        
+        if (pendingProfit <= 0) {
+            throw new Error(lang === 'id' 
+                ? 'Tidak ada keuntungan yang dapat di-reinvest'
+                : '没有可再投入的利润');
+        }
+        
+        let reinvestAmount = options.amount || pendingProfit;
+        if (reinvestAmount > pendingProfit) {
+            reinvestAmount = pendingProfit;
+        }
+        
+        if (reinvestAmount <= 0) {
+            throw new Error(lang === 'id' 
+                ? 'Jumlah reinvest tidak valid'
+                : '再投入金额无效');
+        }
+        
+        // 获取期间的利润明细
+        let profitDetail = null;
+        if (options.periodStart && options.periodEnd) {
+            profitDetail = await this.getOperatingProfit(storeId, options.periodStart, options.periodEnd);
+        } else {
+            // 如果没有指定期间，获取所有历史利润
+            profitDetail = {
+                admin_fee: 0,
+                service_fee: 0,
+                interest: 0
+            };
+            // 按比例分配再投入金额
+            const cumulativeProfit = await this.getCumulativeProfit(storeId);
+            if (cumulativeProfit > 0) {
+                const ratio = reinvestAmount / cumulativeProfit;
+                const profitBreakdown = await this._getProfitBreakdown(storeId);
+                profitDetail.admin_fee = Math.round(profitBreakdown.admin_fee * ratio);
+                profitDetail.service_fee = Math.round(profitBreakdown.service_fee * ratio);
+                profitDetail.interest = Math.round(profitBreakdown.interest * ratio);
+            }
+        }
+        
+        // 开始事务
+        const client = supabaseClient;
+        
+        // 1. 创建资本积累记录
+        const accumulationData = {
+            store_id: storeId,
+            accumulation_date: Utils.getLocalToday(),
+            amount: reinvestAmount,
+            from_admin_fee: profitDetail?.admin_fee || 0,
+            from_service_fee: profitDetail?.service_fee || 0,
+            from_interest: profitDetail?.interest || 0,
+            period_start: options.periodStart || null,
+            period_end: options.periodEnd || null,
+            recorded_by: profile?.id,
+            is_auto: options.isAuto !== false,
+            description: options.description || (lang === 'id' 
+                ? `Reinvestasi keuntungan periode ${options.periodStart || 'sejak awal'} - ${options.periodEnd || 'sekarang'}`
+                : `利润再投入 ${options.periodStart || '从开业'} 至 ${options.periodEnd || '至今'}`)
+        };
+        
+        const { data: accumulation, error: accError } = await client
+            .from('capital_accumulation')
+            .insert(accumulationData)
+            .select()
+            .single();
+        
+        if (accError) throw accError;
+        
+        // 2. 将利润注入资本（作为资本注入记录）
+        const injectionData = {
+            store_id: storeId,
+            amount: reinvestAmount,
+            injection_date: Utils.getLocalToday(),
+            source: 'reinvest',
+            injection_type: 'reinvestment',
+            accumulation_id: accumulation.id,
+            description: options.description || (lang === 'id' 
+                ? `Reinvestasi keuntungan sebesar ${Utils.formatCurrency(reinvestAmount)}`
+                : `利润再投入 ${Utils.formatCurrency(reinvestAmount)}`),
+            recorded_by: profile?.id
+        };
+        
+        const { data: injection, error: injError } = await client
+            .from('capital_injections')
+            .insert(injectionData)
+            .select()
+            .single();
+        
+        if (injError) throw injError;
+        
+        // 3. 记录资金流水（资本注入）
+        await this.recordCashFlow({
+            store_id: storeId,
+            flow_type: 'capital_reinvestment',
+            direction: 'inflow',
+            amount: reinvestAmount,
+            source_target: 'reinvest',
+            description: lang === 'id' 
+                ? `Reinvestasi keuntungan ${Utils.formatCurrency(reinvestAmount)}`
+                : `利润再投入 ${Utils.formatCurrency(reinvestAmount)}`,
+            reference_id: accumulation.id
+        });
+        
+        // 4. 审计日志
+        if (window.Audit) {
+            await window.Audit.log('profit_reinvestment', JSON.stringify({
+                store_id: storeId,
+                amount: reinvestAmount,
+                pending_before: pendingProfit,
+                pending_after: pendingProfit - reinvestAmount,
+                period_start: options.periodStart,
+                period_end: options.periodEnd,
+                profit_detail: profitDetail
+            }));
+        }
+        
+        // 5. 清除缓存
+        this.clearCache();
+        
+        return {
+            success: true,
+            reinvested_amount: reinvestAmount,
+            pending_remaining: pendingProfit - reinvestAmount,
+            accumulation: accumulation,
+            injection: injection
+        };
+    },
+    
+    /**
+     * 获取利润构成明细（用于按比例分配）
+     */
+    async _getProfitBreakdown(storeId) {
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        
+        let adminFeeTotal = 0;
+        let serviceFeeTotal = 0;
+        let interestTotal = 0;
+        
+        let query = supabaseClient
+            .from('payment_history')
+            .select('amount, type, orders!inner(store_id)')
+            .in('type', ['admin_fee', 'service_fee', 'interest']);
+        
+        if (profile?.role !== 'admin' && targetStoreId) {
+            query = query.eq('orders.store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && targetStoreId) {
+            query = query.eq('orders.store_id', targetStoreId);
+        }
+        
+        const { data, error } = await query;
+        
+        if (!error && data) {
+            for (const payment of data) {
+                const amount = payment.amount || 0;
+                if (payment.type === 'admin_fee') adminFeeTotal += amount;
+                else if (payment.type === 'service_fee') serviceFeeTotal += amount;
+                else if (payment.type === 'interest') interestTotal += amount;
+            }
+        }
+        
+        return { admin_fee: adminFeeTotal, service_fee: serviceFeeTotal, interest: interestTotal };
+    },
+    
+    /**
+     * 获取完整的资本分析报告（包含利润再投入部分）
+     */
+    async getFullCapitalAnalysis(storeId) {
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        const lang = Utils.lang;
+        
+        // 1. 资本注入明细
+        let externalInjections = 0;
+        let reinvestments = 0;
+        
+        let injectionQuery = supabaseClient
+            .from('capital_injections')
+            .select('*');
+        
+        if (profile?.role !== 'admin' && targetStoreId) {
+            injectionQuery = injectionQuery.eq('store_id', targetStoreId);
+        } else if (profile?.role === 'admin' && targetStoreId) {
+            injectionQuery = injectionQuery.eq('store_id', targetStoreId);
+        }
+        
+        const { data: injections } = await injectionQuery;
+        
+        for (const inj of (injections || [])) {
+            if (inj.injection_type === 'reinvestment') {
+                reinvestments += inj.amount;
+            } else {
+                externalInjections += inj.amount;
+            }
+        }
+        
+        const totalCapital = externalInjections + reinvestments;
+        
+        // 2. 累计利润（总收入）
+        const cumulativeProfit = await this.getCumulativeProfit(storeId);
+        
+        // 3. 待转化利润
+        const pendingReinvest = await this.getPendingReinvestProfit(storeId);
+        
+        // 4. 在押资金
+        const deployedResult = await this.getDeployedCapital(storeId);
+        
+        // 5. 可动用资金
+        const availableCapital = totalCapital - deployedResult.totalDeployed;
+        
+        // 6. 利润转化率（已转化利润 / 累计利润）
+        const profitReinvestRate = cumulativeProfit > 0 
+            ? (reinvestments / cumulativeProfit) * 100 
+            : 0;
+        
+        // 7. 资本杠杆率（在押资金 / 外部注入）
+        const leverageRatio = externalInjections > 0 
+            ? deployedResult.totalDeployed / externalInjections 
+            : 0;
+        
+        // 8. 资金占用率
+        const utilizationRate = totalCapital > 0 
+            ? (deployedResult.totalDeployed / totalCapital) * 100 
+            : 0;
+        
+        // 9. 获取现金/银行余额
+        let cashBalance = 0;
+        let bankBalance = 0;
+        
+        if (targetStoreId) {
+            const shopAccount = await this.getShopAccount(targetStoreId);
+            cashBalance = shopAccount.cash_balance;
+            bankBalance = shopAccount.bank_balance;
+        } else {
+            const cashFlow = await this.getCashFlowSummary();
+            cashBalance = cashFlow.cash?.balance || 0;
+            bankBalance = cashFlow.bank?.balance || 0;
+        }
+        
+        return {
+            capital_breakdown: {
+                external_injections: externalInjections,
+                profit_reinvestments: reinvestments,
+                total_capital: totalCapital
+            },
+            cumulative_profit: cumulativeProfit,
+            reinvested_profit: reinvestments,
+            pending_reinvest_profit: pendingReinvest,
+            profit_reinvest_rate: profitReinvestRate,
+            deployed_capital: deployedResult.totalDeployed,
+            deployed_orders_count: deployedResult.count,
+            available_capital: availableCapital,
+            utilization_rate: utilizationRate,
+            leverage_ratio: leverageRatio,
+            cash_balance: cashBalance,
+            bank_balance: bankBalance,
+            health_assessment: this._assessCapitalHealth({
+                utilizationRate: utilizationRate,
+                profitReinvestRate: profitReinvestRate,
+                leverageRatio: leverageRatio,
+                pendingProfit: pendingReinvest
+            }, lang),
+            injection_history: injections || [],
+            deployed_orders: deployedResult.orders
+        };
+    },
+    
+    _assessCapitalHealth(metrics, lang) {
+        const issues = [];
+        const strengths = [];
+        
+        // 资金占用率评估
+        if (metrics.utilizationRate > 90) {
+            issues.push(lang === 'id' ? 'Tingkat okupansi terlalu tinggi (>90%)' : '资金占用率过高 (>90%)');
+        } else if (metrics.utilizationRate > 75) {
+            issues.push(lang === 'id' ? 'Tingkat okupansi tinggi (>75%)' : '资金占用率偏高 (>75%)');
+        } else if (metrics.utilizationRate < 30) {
+            issues.push(lang === 'id' ? 'Tingkat okupansi rendah (<30%), modal menganggur' : '资金占用率偏低 (<30%)，资本闲置');
+        } else {
+            strengths.push(lang === 'id' ? 'Tingkat okupansi optimal' : '资金占用率适中');
+        }
+        
+        // 利润转化率评估
+        if (metrics.profitReinvestRate > 70) {
+            strengths.push(lang === 'id' 
+                ? `Tingkat reinvestasi keuntungan tinggi (${metrics.profitReinvestRate.toFixed(1)}%)`
+                : `利润转化率高 (${metrics.profitReinvestRate.toFixed(1)}%)`);
+        } else if (metrics.profitReinvestRate < 30 && metrics.cumulativeProfit > 0) {
+            issues.push(lang === 'id' 
+                ? `Tingkat reinvestasi keuntungan rendah (${metrics.profitReinvestRate.toFixed(1)}%)`
+                : `利润转化率偏低 (${metrics.profitReinvestRate.toFixed(1)}%)`);
+        }
+        
+        // 杠杆率评估
+        if (metrics.leverageRatio > 3) {
+            strengths.push(lang === 'id' 
+                ? `Leverage modal tinggi (${metrics.leverageRatio.toFixed(1)}x)`
+                : `资本杠杆效率高 (${metrics.leverageRatio.toFixed(1)}倍)`);
+        }
+        
+        // 待转化利润提示
+        if (metrics.pendingProfit > 0) {
+            strengths.push(lang === 'id' 
+                ? `${Utils.formatCurrency(metrics.pendingProfit)} keuntungan siap direinvest`
+                : `${Utils.formatCurrency(metrics.pendingProfit)} 利润待再投入`);
+        }
+        
+        let overall = 'good';
+        if (issues.length >= 2) overall = 'warning';
+        if (metrics.utilizationRate > 90) overall = 'critical';
+        
+        return {
+            overall: overall,
+            issues: issues,
+            strengths: strengths,
+            summary: lang === 'id'
+                ? `💰 ${issues.length > 0 ? issues[0] : 'Kesehatan modal baik'}`
+                : `💰 ${issues.length > 0 ? issues[0] : '资本健康状况良好'}`
+        };
+    },
+    
+    /**
+     * 获取资金占用报告（简化版，用于仪表盘）
+     */
+    async getCapitalUtilizationReport(storeId) {
+        const profile = await this.getCurrentProfile();
+        const targetStoreId = storeId || profile?.store_id;
+        const lang = Utils.lang;
+        
+        const isAdmin = profile?.role === 'admin';
+        
+        // 获取总资本
+        let totalCapital = 0;
+        if (isAdmin && (!targetStoreId || targetStoreId === 'all')) {
+            const allStores = await this.getAllStores();
+            for (const store of allStores) {
+                if (store.code !== 'STORE_000') {
+                    totalCapital += await this.getTotalCapital(store.id);
+                }
+            }
+        } else if (targetStoreId) {
+            totalCapital = await this.getTotalCapital(targetStoreId);
+        }
+        
+        // 获取在押资金
+        const deployedResult = await this.getDeployedCapital(targetStoreId);
+        
+        // 可动用资金
+        const availableCapital = totalCapital - deployedResult.totalDeployed;
+        
+        // 资金占用率
+        const utilizationRate = totalCapital > 0 
+            ? (deployedResult.totalDeployed / totalCapital) * 100 
+            : 0;
+        
+        // 获取现金/银行余额
+        let cashBalance = 0;
+        let bankBalance = 0;
+        
+        if (targetStoreId && targetStoreId !== 'all') {
+            const shopAccount = await this.getShopAccount(targetStoreId);
+            cashBalance = shopAccount.cash_balance;
+            bankBalance = shopAccount.bank_balance;
+        } else {
+            const cashFlow = await this.getCashFlowSummary();
+            cashBalance = cashFlow.cash?.balance || 0;
+            bankBalance = cashFlow.bank?.balance || 0;
+        }
+        
+        // 账实差异
+        const balanceVariance = (cashBalance + bankBalance) - availableCapital;
+        
+        // 健康状态
+        let healthStatus = 'good';
+        let healthMessage = '';
+        
+        if (utilizationRate > 90) {
+            healthStatus = 'critical';
+            healthMessage = lang === 'id'
+                ? '⚠️ 资金占用率超过90%，建议尽快补充资本或加速资金回笼'
+                : '⚠️ 资金占用率超过90%，建议尽快补充资本或加速资金回笼';
+        } else if (utilizationRate > 75) {
+            healthStatus = 'warning';
+            healthMessage = lang === 'id'
+                ? '⚠️ 资金占用率超过75%，需关注资金流动性'
+                : '⚠️ 资金占用率超过75%，需关注资金流动性';
+        } else if (utilizationRate > 50) {
+            healthStatus = 'normal';
+            healthMessage = lang === 'id'
+                ? '✅ 资金占用率正常，流动性良好'
+                : '✅ 资金占用率正常，流动性良好';
+        } else {
+            healthStatus = 'excellent';
+            healthMessage = lang === 'id'
+                ? '✅ 资金充裕，可考虑扩大业务'
+                : '✅ 资金充裕，可考虑扩大业务';
+        }
+        
+        return {
+            total_capital: totalCapital,
+            deployed_capital: deployedResult.totalDeployed,
+            available_capital: availableCapital,
+            utilization_rate: utilizationRate,
+            deployed_orders_count: deployedResult.count,
+            cash_balance: cashBalance,
+            bank_balance: bankBalance,
+            balance_variance: balanceVariance,
+            health_status: healthStatus,
+            health_message: healthMessage,
+            deployed_orders: deployedResult.orders
+        };
+    },
+
+// ==================== 以上为新增的资金占用管理方法 ====================
+
 window.SUPABASE = SupabaseAPI;
