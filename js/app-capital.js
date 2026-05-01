@@ -1,4 +1,4 @@
-// app-capital.js - 资金管理模块 v2.0 (JF 命名空间统一版)
+// app-capital.js - 资金管理模块 v2.1 (JF 命名空间统一版)
 // 包含：资本注入、利润再投入、资金占用报告、资金健康度评估
 
 'use strict';
@@ -67,7 +67,7 @@
                         </div>
                         
                         <div class="modal-actions" style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
-                            <button onclick="APP.saveCapitalInjection()" class="success" style="padding:8px 20px;">💾 ${lang === 'id' ? 'Simpan' : '保存'}</button>
+                            <button onclick="APP.saveCapitalInjection()" id="saveInjectionBtn" class="success" style="padding:8px 20px;">💾 ${lang === 'id' ? 'Simpan' : '保存'}</button>
                             <button onclick="APP.closeCapitalInjectionModal()" class="btn-back" style="padding:8px 20px;">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
                         </div>
                     </div>
@@ -132,13 +132,14 @@
             const confirmed = await Utils.toast.confirm(confirmMsg);
             if (!confirmed) return;
             
-            const saveBtn = document.querySelector('#capitalInjectionModal .success');
+            const saveBtn = document.getElementById('saveInjectionBtn');
             if (saveBtn) {
                 saveBtn.disabled = true;
                 saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
             }
             
             try {
+                // ===== 修改：调用新增的 recordCapitalInjection 方法 =====
                 await SUPABASE.recordCapitalInjection(storeId, amount, source, description);
                 
                 Utils.toast.success(lang === 'id' 
@@ -147,8 +148,12 @@
                 
                 APP.closeCapitalInjectionModal();
                 
+                // 清除缓存，刷新仪表盘
+                if (JF.Cache) JF.Cache.clear();
                 if (typeof window.DashboardCore !== 'undefined' && DashboardCore.refreshCurrentPage) {
                     await DashboardCore.refreshCurrentPage();
+                } else if (typeof APP.renderDashboard === 'function') {
+                    await APP.renderDashboard();
                 } else {
                     location.reload();
                 }
@@ -317,7 +322,7 @@
                         <div class="table-container">
                             <table class="data-table">
                                 <thead>
-                                    </tr>
+                                    <tr>
                                         <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
                                         <th class="col-store">${lang === 'id' ? 'Toko' : '门店'}</th>
                                         <th class="col-amount amount">💰 ${lang === 'id' ? 'Jumlah' : '金额'}</th>
@@ -376,4 +381,35 @@
                     <tr>
                         <td class="date-cell">${Utils.formatDate(acc.accumulation_date)}</td>
                         <td>${Utils.escapeHtml(acc.stores?.name || '-')}</td>
-                        <td class="amount
+                        <td class="amount">${Utils.formatCurrency(acc.total_amount || 0)}</td>
+                        <td class="amount">${Utils.formatCurrency(acc.admin_fee_amount || 0)}</td>
+                        <td class="amount">${Utils.formatCurrency(acc.service_fee_amount || 0)}</td>
+                        <td class="amount">${Utils.formatCurrency(acc.interest_amount || 0)}</td>
+                        <td class="desc-cell">${Utils.escapeHtml(acc.description || '-')}</td>
+                    </tr>
+                `;
+            }
+            tbody.innerHTML = rows;
+        }
+    };
+
+    // 挂载到命名空间
+    JF.CapitalModule = CapitalModule;
+
+    // 向下兼容：将方法挂载到 APP
+    if (window.APP) {
+        window.APP.showCapitalInjectionModal = CapitalModule.showCapitalInjectionModal.bind(CapitalModule);
+        window.APP.closeCapitalInjectionModal = CapitalModule.closeCapitalInjectionModal.bind(CapitalModule);
+        window.APP.saveCapitalInjection = CapitalModule.saveCapitalInjection.bind(CapitalModule);
+        window.APP.showProfitReinvestPage = CapitalModule.showProfitReinvestPage.bind(CapitalModule);
+    } else {
+        window.APP = {
+            showCapitalInjectionModal: CapitalModule.showCapitalInjectionModal.bind(CapitalModule),
+            closeCapitalInjectionModal: CapitalModule.closeCapitalInjectionModal.bind(CapitalModule),
+            saveCapitalInjection: CapitalModule.saveCapitalInjection.bind(CapitalModule),
+            showProfitReinvestPage: CapitalModule.showProfitReinvestPage.bind(CapitalModule),
+        };
+    }
+
+    console.log('✅ JF.CapitalModule v2.1 初始化完成（资金池指标版）');
+})();
