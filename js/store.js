@@ -1,4 +1,7 @@
-// store.js - v2.1 (修复：移除不存在的 updated_at 列引用)
+// store.js - v2.2 (练习模式数据隔离)
+// 新增：_cleanPracticeData 方法清理练习数据
+// 修复：_getAllStoreCashFlowBalances 排除练习门店
+// 优化：togglePracticeMode 关闭练习模式时提供清理选项
 
 const StoreManager = {
     stores: [],
@@ -268,10 +271,18 @@ const StoreManager = {
     _getAllStoreCashFlowBalances: async function() {
         try {
             const client = SUPABASE.getClient();
-            const { data: allFlows, error } = await client
+            const practiceIds = await SUPABASE._getPracticeStoreIds();
+            let query = client
                 .from('cash_flow_records')
                 .select('store_id, direction, amount, source_target')
                 .eq('is_voided', false);
+            
+            // 排除练习门店
+            if (practiceIds.length > 0) {
+                query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
+            
+            const { data: allFlows, error } = await query;
             
             if (error) {
                 console.warn('批量获取门店现金流失败:', error);
@@ -330,17 +341,55 @@ const StoreManager = {
         
         var confirmMsg;
         if (newValue) {
+            // 开启练习模式
             confirmMsg = lang === 'id'
-                ? '🎓 Jadikan toko ini sebagai Toko Latihan?\n\nData dari toko latihan TIDAK akan dihitung dalam statistik pusat.\nCocok untuk akun simulasi / pelatihan staff.'
-                : '🎓 将此门店设为练习门店？\n\n练习门店的数据不会计入总部统计报表。\n适合用于模拟操作/员工培训账号。';
+                ? '🎓 Jadikan toko ini sebagai Toko Latihan?\n\n📌 Data dari toko latihan TIDAK akan dihitung dalam statistik pusat.\n📌 Cocok untuk akun simulasi / pelatihan staff.\n\n❗ Semua data pesanan dan nasabah toko ini akan otomatis tersembunyi dari laporan pusat.'
+                : '🎓 将此门店设为练习门店？\n\n📌 练习门店的数据不会计入总部统计报表。\n📌 适合用于模拟操作/员工培训账号。\n\n❗ 该门店所有订单和客户数据将自动从总部报表中隐藏。';
         } else {
+            // 关闭练习模式，转为正式门店
             confirmMsg = lang === 'id'
-                ? '⚠️ Kembalikan toko ini ke mode normal?\n\nData toko akan dihitung kembali dalam statistik pusat.'
-                : '⚠️ 将此门店恢复为正常门店？\n\n该门店数据将重新计入总部统计报表。';
+                ? '⚠️ Kembalikan toko ini ke mode normal?\n\n📌 Data toko akan dihitung kembali dalam statistik pusat.\n\n📌 Anda akan ditanya apakah perlu membersihkan data latihan.'
+                : '⚠️ 将此门店恢复为正常门店？\n\n📌 该门店数据将重新计入总部统计报表。\n\n📌 系统将询问是否需要清理练习数据。';
         }
         
         var confirmed = await Utils.toast.confirm(confirmMsg);
         if (!confirmed) return;
+        
+        // 关闭练习模式时，询问是否清理历史数据
+        if (!newValue) {
+            var cleanChoice = await Utils.toast.confirm(
+                lang === 'id'
+                    ? '🗑️ Bersihkan data latihan sebelum beralih ke mode normal?\n\n✅ "Ya" = Hapus semua pesanan, nasabah, dan data keuangan toko ini\n❌ "Tidak" = Pertahankan data, toko langsung beroperasi normal\n\nDisarankan pilih "Ya" jika data hanya untuk latihan.'
+                    : '🗑️ 切换到正常模式前，是否清理练习数据？\n\n✅ "确认" = 删除该门店所有订单、客户和财务数据\n❌ "取消" = 保留数据，门店直接正常运营\n\n如果数据仅是练习用途，建议选择"确认"。',
+                lang === 'id' ? 'Bersihkan Data Latihan' : '清理练习数据'
+            );
+            
+            if (cleanChoice) {
+                try {
+                    var loadingMsg = document.createElement('div');
+                    loadingMsg.id = 'cleanPracticeLoading';
+                    loadingMsg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                    loadingMsg.innerHTML = '<div style="background:white;padding:20px 40px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:12px;">' +
+                        '<div class="loader" style="width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;"></div>' +
+                        '<p style="margin:0;">' + (lang === 'id' ? 'Membersihkan data latihan...' : '正在清理练习数据...') + '</p>' +
+                    '</div>';
+                    document.body.appendChild(loadingMsg);
+                    
+                    await StoreManager._cleanPracticeData(storeId);
+                    
+                    if (loadingMsg.parentElement) loadingMsg.remove();
+                    Utils.toast.success(lang === 'id' ? '✅ Data latihan berhasil dibersihkan' : '✅ 练习数据已清理');
+                } catch (cleanError) {
+                    var errLoading = document.getElementById('cleanPracticeLoading');
+                    if (errLoading) errLoading.remove();
+                    console.error('清理练习数据失败:', cleanError);
+                    Utils.toast.error(lang === 'id' ? '⚠️ Gagal membersihkan data: ' + cleanError.message : '⚠️ 清理数据失败：' + cleanError.message);
+                    return;
+                }
+            } else {
+                Utils.toast.info(lang === 'id' ? 'ℹ️ Data latihan dipertahankan, toko akan beroperasi normal' : 'ℹ️ 练习数据已保留，门店将正常运营');
+            }
+        }
         
         try {
             const client = SUPABASE.getClient();
@@ -365,6 +414,141 @@ const StoreManager = {
             await StoreManager.renderStoreManagement();
         } catch (error) {
             Utils.toast.error(lang === 'id' ? 'Gagal mengubah mode: ' + error.message : '切换模式失败：' + error.message);
+        }
+    },
+
+    /**
+     * 清理练习门店的所有业务数据
+     * 保留门店本身和用户账号，只删除业务数据
+     * @param {string} storeId - 门店ID
+     */
+    _cleanPracticeData: async function(storeId) {
+        var lang = Utils.lang;
+        var client = SUPABASE.getClient();
+        
+        console.log('[StoreManager] 开始清理门店 ' + storeId + ' 的练习数据...');
+        
+        try {
+            // 1. 查找该门店的所有订单ID
+            var { data: orders, error: orderError } = await client
+                .from('orders')
+                .select('id')
+                .eq('store_id', storeId);
+            
+            if (orderError) throw orderError;
+            
+            var orderIds = (orders || []).map(function(o) { return o.id; });
+            console.log('[StoreManager] 找到 ' + orderIds.length + ' 个订单需要清理');
+            
+            if (orderIds.length > 0) {
+                // 2. 删除资金流水记录（按store_id直接删除更彻底）
+                var { error: cashFlowError } = await client
+                    .from('cash_flow_records')
+                    .delete()
+                    .eq('store_id', storeId);
+                
+                if (cashFlowError) {
+                    console.warn('[StoreManager] 清理资金流水失败:', cashFlowError.message);
+                } else {
+                    console.log('[StoreManager] ✅ 资金流水已清理');
+                }
+                
+                // 3. 删除缴费记录
+                var { error: paymentError } = await client
+                    .from('payment_history')
+                    .delete()
+                    .in('order_id', orderIds);
+                
+                if (paymentError) {
+                    console.warn('[StoreManager] 清理缴费记录失败:', paymentError.message);
+                } else {
+                    console.log('[StoreManager] ✅ 缴费记录已清理');
+                }
+                
+                // 4. 删除提醒日志
+                var { error: reminderError } = await client
+                    .from('reminder_logs')
+                    .delete()
+                    .in('order_id', orderIds);
+                
+                if (reminderError) {
+                    console.warn('[StoreManager] 清理提醒日志失败:', reminderError.message);
+                } else {
+                    console.log('[StoreManager] ✅ 提醒日志已清理');
+                }
+                
+                // 5. 删除内部转账记录
+                var { error: transferError } = await client
+                    .from('internal_transfers')
+                    .delete()
+                    .eq('store_id', storeId);
+                
+                if (transferError) {
+                    console.warn('[StoreManager] 清理内部转账失败:', transferError.message);
+                } else {
+                    console.log('[StoreManager] ✅ 内部转账已清理');
+                }
+                
+                // 6. 删除订单
+                var { error: orderDeleteError } = await client
+                    .from('orders')
+                    .delete()
+                    .eq('store_id', storeId);
+                
+                if (orderDeleteError) {
+                    console.warn('[StoreManager] 清理订单失败:', orderDeleteError.message);
+                } else {
+                    console.log('[StoreManager] ✅ 订单已清理');
+                }
+            }
+            
+            // 7. 删除支出记录（按store_id删除）
+            var { error: expenseError } = await client
+                .from('expenses')
+                .delete()
+                .eq('store_id', storeId);
+            
+            if (expenseError) {
+                console.warn('[StoreManager] 清理支出记录失败:', expenseError.message);
+            } else {
+                console.log('[StoreManager] ✅ 支出记录已清理');
+            }
+            
+            // 8. 删除该门店的客户
+            var { error: customerError } = await client
+                .from('customers')
+                .delete()
+                .eq('store_id', storeId);
+            
+            if (customerError) {
+                console.warn('[StoreManager] 清理客户失败:', customerError.message);
+            } else {
+                console.log('[StoreManager] ✅ 客户已清理');
+            }
+            
+            // 9. 删除该门店的黑名单
+            var { error: blacklistError } = await client
+                .from('blacklist')
+                .delete()
+                .eq('store_id', storeId);
+            
+            if (blacklistError) {
+                console.warn('[StoreManager] 清理黑名单失败:', blacklistError.message);
+            } else {
+                console.log('[StoreManager] ✅ 黑名单已清理');
+            }
+            
+            // 10. 清除所有缓存，确保统计立即生效
+            SUPABASE.clearCache();
+            if (window.JFCache) window.JFCache.clear();
+            
+            console.log('[StoreManager] ✅ 门店 ' + storeId + ' 练习数据清理完成');
+            
+        } catch (error) {
+            console.error('[StoreManager] 清理练习数据异常:', error);
+            throw new Error(lang === 'id' 
+                ? 'Gagal membersihkan data latihan: ' + error.message 
+                : '清理练习数据失败：' + error.message);
         }
     },
 
@@ -500,7 +684,10 @@ const StoreManager = {
                     storeStatusBadge += ' <span class="badge" style="background:#a78bfa;color:#fff;">' + (lang === 'id' ? 'LATIHAN' : '练习') + '</span>';
                 }
                 
-                storeStatsRows += '<tr>' +
+                // 练习门店行添加特殊样式
+                var practiceRowStyle = isPracticeStore ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
+                
+                storeStatsRows += '<tr' + practiceRowStyle + '>' +
                     '<td class="store-name-cell"><strong>' + Utils.escapeHtml(store.name) + storeStatusBadge + '</strong><br><small>' + Utils.escapeHtml(store.code) + '</small></td>' +
                     '<td class="text-center">' + ordsCount + '</td>' +
                     '<td class="text-center">' + activeCount + '</td>' +
@@ -550,7 +737,9 @@ const StoreManager = {
                         statusBadgeHtml += ' <span class="badge" style="background:#a78bfa;color:#fff;">🎓 ' + (lang === 'id' ? 'Latihan' : '练习') + '</span>';
                     }
                     
-                    storeRows += '<tr>' +
+                    var practiceRowStyle2 = isStorePractice ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
+                    
+                    storeRows += '<tr' + practiceRowStyle2 + '>' +
                         '<td class="store-code">' + Utils.escapeHtml(store.code) + '</td>' +
                         '<td class="store-name">' + Utils.escapeHtml(store.name) + '</td>' +
                         '<td class="store-address desc-cell">' + Utils.escapeHtml(store.address || '-') + '</td>' +
@@ -568,6 +757,9 @@ const StoreManager = {
                         ? (lang === 'id' ? '✅ Mode Latihan (Aktif)' : '✅ 练习模式 (已开启)')
                         : (lang === 'id' ? '🎓 Jadikan Toko Latihan' : '🎓 设为练习门店');
                     var practiceBtnStyle = isPractice ? 'style="background:#a78bfa;color:#fff;"' : 'style="background:#ede9fe;color:#6d28d9;"';
+                    var practiceBtnTitle = isPractice
+                        ? (lang === 'id' ? 'Kembalikan ke mode normal' : '恢复为正常门店')
+                        : (lang === 'id' ? 'Jadikan toko latihan (data tidak dihitung)' : '设为练习门店（数据不计入统计）');
                     
                     var actionButtons = '' +
                         '<button onclick="StoreManager.editStore(\'' + store.id + '\')" class="btn-small">✏️ ' + t('edit') + '</button>';
@@ -578,10 +770,10 @@ const StoreManager = {
                         actionButtons += '<button onclick="StoreManager.resumeStore(\'' + store.id + '\')" class="btn-small success">▶️ ' + (lang === 'id' ? 'Buka Kembali' : '恢复营业') + '</button>';
                     }
                     
-                    actionButtons += '<button onclick="StoreManager.togglePracticeMode(\'' + store.id + '\', ' + isPractice + ')" class="btn-small" ' + practiceBtnStyle + '>' + practiceLabel + '</button>';
+                    actionButtons += '<button onclick="StoreManager.togglePracticeMode(\'' + store.id + '\', ' + isPractice + ')" class="btn-small" ' + practiceBtnStyle + ' title="' + practiceBtnTitle + '">' + practiceLabel + '</button>';
                     actionButtons += '<button class="btn-small danger" onclick="APP.deleteStore(\'' + store.id + '\')">🗑️ ' + t('delete') + '</button>';
                     
-                    storeRows += '<tr class="action-row">' +
+                    storeRows += '<tr class="action-row" ' + practiceRowStyle2 + '>' +
                         '<td class="action-label">' + t('action') + '</td>' +
                         '<td colspan="5">' +
                             '<div class="action-buttons">' + actionButtons + '</div>' +
@@ -615,6 +807,9 @@ const StoreManager = {
                             '<div class="value">' + Utils.formatCurrency(grandTotal.cashBalance + grandTotal.bankBalance) + '</div>' +
                         '</div>' +
                     '</div>' +
+                    '<p style="font-size:11px;color:var(--text-muted);margin-top:8px;">' +
+                        (lang === 'id' ? '💡 Tidak termasuk Toko Latihan' : '💡 不含练习门店') +
+                    '</p>' +
                 '</div>' +
                 
                 '<div class="card">' +
@@ -640,6 +835,9 @@ const StoreManager = {
                             '<tbody>' + storeStatsRows + summaryRow + '</tbody>' +
                         '</table>' +
                     '</div>' +
+                    '<p style="font-size:11px;color:var(--text-muted);margin-top:8px;">' +
+                        (lang === 'id' ? '💡 Baris ungu = Toko Latihan (tidak dihitung dalam total)' : '💡 紫色行 = 练习门店（不计入合计）') +
+                    '</p>' +
                 '</div>' +
                 
                 '<div class="card">' +
