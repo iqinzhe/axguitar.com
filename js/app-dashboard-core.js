@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.2 (JF 命名空间) - 资金池层级版
+// app-dashboard-core.js - v2.0 (JF 命名空间) - 资金池层级版
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
