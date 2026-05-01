@@ -1,6 +1,6 @@
 /* ============================================================
    responsive.css - 第6层：响应式与打印中心
-   职责：桌面端/手机端响应式适配、打印样式
+   优化：统一 CSS 变量，清晰注释，保留所有断点和打印样式
    ============================================================ */
 
 /* ============================================================
@@ -47,7 +47,6 @@
         width: 100%;
     }
 }
-
 
 /* ============================================================
    R2. 手机端响应式（≤768px）
@@ -209,11 +208,8 @@
         padding: 8px 16px;
     }
 
-    /* 徽章缩小（使用新统一 .badge 类） */
-    .badge,
-    .status-badge,
-    .repayment-badge,
-    .payment-method-badge {
+    /* 徽章缩小 */
+    .badge {
         font-size: 10px;
         padding: 1px 6px;
         white-space: nowrap;
@@ -345,7 +341,6 @@
     }
 }
 
-
 /* ============================================================
    R3. 打印样式（全系统统一）
    ============================================================ */
@@ -443,10 +438,7 @@
     }
 
     /* 徽章 */
-    .badge,
-    .status-badge,
-    .repayment-badge,
-    .payment-method-badge {
+    .badge {
         border: 1px solid #999 !important;
         background: none !important;
     }
@@ -561,7 +553,6 @@
         page-break-inside: avoid !important;
     }
 
-    .fee-card-item,
     .fee-card {
         border: 1px solid #ccc !important;
         background: #fff !important;
