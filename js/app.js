@@ -1,4 +1,4 @@
-// app.js - v2.0 最终完整版
+// app.js - v2.0 最终完整版（修复版）
 // JF 命名空间下的主入口，提供全局 APP 方法与协调功能
 
 'use strict';
@@ -264,9 +264,9 @@
         }
     };
 
-    // 挂载到命名空间及全局
-    JF.APP = APP;
-    window.APP = APP;
+    // 挂载到命名空间及全局（保留其他模块已挂载到 window.APP 的方法）
+    window.APP = Object.assign(window.APP || {}, APP);
+    JF.APP = window.APP;   // 保持 JF.APP 与 window.APP 指向同一对象
 
     console.log('[APP] app.js v2.0 最终版加载完成');
     console.log('[APP] 如果出现白板，请在控制台执行 APP.forceRecovery() 恢复页面');
