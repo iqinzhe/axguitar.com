@@ -189,29 +189,52 @@
         },
 
         // ---------- 导航 ----------
-        navigateTo(page, params = {}) {
-            window.scrollTo(0, 0);
-            this.historyStack.push({ page: this.currentPage, orderId: this.currentOrderId, customerId: this.currentCustomerId, filter: this.currentFilter });
-            this.currentPage = page;
-            if (params.orderId) this.currentOrderId = params.orderId;
-            if (params.customerId) this.currentCustomerId = params.customerId;
-            this.saveCurrentPageState();
-            this.refreshCurrentPage();
-        },
+       navigateTo: function(page, params) {
+    window.scrollTo(0, 0);
+    params = params || {};
+    this.historyStack.push({
+        page: this.currentPage,
+        orderId: this.currentOrderId,
+        customerId: this.currentCustomerId,
+        filter: this.currentFilter
+    });
+    this.currentPage = page;
+    if (params.orderId) this.currentOrderId = params.orderId;
+    if (params.customerId) this.currentCustomerId = params.customerId;
+    this.saveCurrentPageState();
 
-        goBack() {
-            if (this.historyStack.length > 0) {
-                const prev = this.historyStack.pop();
-                this.currentPage = prev.page;
-                this.currentOrderId = prev.orderId;
-                this.currentCustomerId = prev.customerId;
-                this.currentFilter = prev.filter || "all";
-                this.saveCurrentPageState();
-                this.refreshCurrentPage();
-            } else {
-                this.renderDashboard();
-            }
+    // 直接调用 JF 命名空间下的对应页面方法
+    const pageMap = {
+        'dashboard': () => this.renderDashboard(),
+        'orderTable': () => JF.OrdersPage.showOrderTable(),
+        'customers': () => JF.CustomersPage.showCustomers(),
+        'expenses': () => JF.ExpensesPage.showExpenses(),
+        'paymentHistory': () => JF.FundsPage.showCashFlowPage(),
+        'anomaly': () => JF.AnomalyPage.showAnomaly(),
+        'userManagement': () => JF.UsersPage.showUserManagement(),
+        'storeManagement': () => JF.StoreManager.renderStoreManagement(),
+        'backupRestore': () => JF.BackupStorage.renderBackupUI(),
+        'blacklist': () => JF.BlacklistPage.showBlacklist(),
+        'viewOrder': () => {
+            if (this.currentOrderId) return JF.OrdersPage.viewOrder(this.currentOrderId);
+            return this.renderDashboard();
         },
+        'payment': () => {
+            if (this.currentOrderId) return JF.PaymentPage.showPayment(this.currentOrderId);
+            return this.renderDashboard();
+        }
+    };
+
+    const handler = pageMap[page];
+    if (handler) {
+        handler().catch(err => {
+            console.error(`[navigateTo] 页面 ${page} 加载失败:`, err);
+            this.renderDashboard();
+        });
+    } else {
+        this.renderDashboard();
+    }
+},
 
         // ---------- 页面刷新 ----------
         async refreshCurrentPage() {
