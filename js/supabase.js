@@ -1,5 +1,4 @@
-// supabase.js - v2.3 最终版 (JF 统一命名空间，资金池完整版)
-// 数据层核心，挂载到 JF.Supabase，向下兼容 window.SUPABASE
+// supabase.js - v2.0 (JF 统一命名空间，资金池完整版)
 
 'use strict';
 
