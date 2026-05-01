@@ -655,6 +655,25 @@
 
 .stat-item.abnormal .stat-number { color: #d97706; }
 
+/*C12. 资本注入按钮 */
+.btn-capital-inject {
+    width: 100%;
+    padding: 10px;
+    background: #fff;
+    color: #2563eb;
+    border: 2px dashed #93c5fd;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--font-sm);
+    font-weight: 500;
+    margin-top: 4px;
+    transition: var(--transition-fast);
+}
+.btn-capital-inject:hover {
+    background: #eff6ff;
+    border-color: #2563eb;
+}
+
 /* ============================================================
    列宽系统 (基础建议宽度，可通过媒体查询覆盖)
    ============================================================ */
