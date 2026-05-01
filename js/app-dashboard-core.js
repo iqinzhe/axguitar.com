@@ -1,8 +1,9 @@
-// app-dashboard-core.js - v1.2
+// app-dashboard-core.js - v1.3
 // 修复：
 //   问题6: 仪表盘净利润展示修复，使用 getCashFlowSummary() 新返回值
 //   问题1: 逐步迁移内联三元到 t() 体系
 //   新增: hasSentRemindersToday 方法供提醒按钮使用
+//   修复: ModuleFallback.safeCall 失败时返回仪表盘，避免白板
 
 window.APP = window.APP || {};
 
@@ -27,27 +28,30 @@ const ModuleFallback = {
                 var msg = '';
                 if (error.message === 'module_not_loaded') {
                     msg = lang === 'id'
-                        ? '⚠️ 模块 "' + moduleName + '" 加载失败，部分功能可能不可用。'
-                        : '⚠️ Module "' + moduleName + '" failed to load.';
+                        ? '⚠️ 模块 "' + moduleName + '" 加载失败，返回仪表盘。'
+                        : '⚠️ Module "' + moduleName + '" failed to load. Returning to dashboard.';
                 } else {
                     msg = lang === 'id'
-                        ? '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message
-                        : '⚠️ Module "' + moduleName + '" error: ' + error.message;
+                        ? '⚠️ 模块 "' + moduleName + '" 发生错误: ' + error.message + '，返回仪表盘。'
+                        : '⚠️ Module "' + moduleName + '" error: ' + error.message + '. Returning to dashboard.';
                 }
                 
                 if (window.Toast) {
                     window.Toast.warning(msg, 5000);
-                } else {
-                    setTimeout(function() { alert(msg); }, 300);
                 }
                 ModuleFallback._showBanner(moduleName, error.message);
             }
             
-            setTimeout(function() {
-                delete ModuleFallback._degradedModules[moduleKey];
-            }, 10 * 60 * 1000);
+            // 修复：优先使用 fallbackFn，否则返回仪表盘而不是 null
+            if (typeof fallbackFn === 'function') {
+                return await fallbackFn();
+            }
             
-            if (typeof fallbackFn === 'function') return await fallbackFn();
+            // 默认返回仪表盘，避免白板
+            if (window.DashboardCore && typeof window.DashboardCore.renderDashboard === 'function') {
+                return await window.DashboardCore.renderDashboard();
+            }
+            
             return null;
         }
     },
@@ -477,11 +481,9 @@ const DashboardCore = {
     // ==================== 新增：检查今天是否已发送过提醒 ====================
     hasSentRemindersToday: async function() {
         try {
-            // 优先使用 SUPABASE 的方法
             if (SUPABASE && typeof SUPABASE.hasSentRemindersToday === 'function') {
                 return await SUPABASE.hasSentRemindersToday();
             }
-            // 降级方案：直接查询 reminder_logs 表
             const today = Utils.getLocalToday();
             const client = SUPABASE.getClient();
             const { data, error } = await client
@@ -686,8 +688,19 @@ const DashboardCore = {
     },
 
     router: async function() {
-        if (!AUTH.isLoggedIn()) await this.renderLogin();
-        else await this.renderDashboard();
+        // 修复：添加错误处理，确保失败时返回仪表盘
+        if (!AUTH.isLoggedIn()) {
+            await this.renderLogin();
+            return;
+        }
+        
+        try {
+            await this.refreshCurrentPage();
+        } catch (error) {
+            console.error('Router error:', error);
+            Utils.toast.error(Utils.lang === 'id' ? '页面加载失败，返回仪表盘' : 'Page load failed, returning to dashboard');
+            await this.renderDashboard();
+        }
     },
 
     refreshCurrentPage: async function() {
@@ -710,15 +723,19 @@ const DashboardCore = {
                 } catch (e) {
                     console.error("renderDashboard failed:", e);
                     Utils.toast.error('加载仪表盘失败，请刷新页面', 4000);
+                    // 修复：添加返回首页按钮，避免白板
                     document.getElementById("app").innerHTML = '' +
                         '<div class="card" style="text-align:center;padding:40px;">' +
-                            '<p>' + (Utils.lang === 'id' ? '⚠️ 加载仪表盘失败，请刷新页面。' : '⚠️ Dashboard load failed.') + '</p>' +
-                            '<button onclick="location.reload()">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button>' +
+                            '<p>' + (Utils.lang === 'id' ? '⚠️ 加载仪表盘失败，请返回首页。' : '⚠️ Dashboard load failed.') + '</p>' +
+                            '<button onclick="APP.navigateTo(\'dashboard\')" style="margin-right:8px;">🏠 ' + 
+                                (Utils.lang === 'id' ? '返回首页' : 'Back to Home') + '</button>' +
+                            '<button onclick="location.reload()">🔄 ' + 
+                                (Utils.lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
                         '</div>';
                 }
             },
             orderTable: () => ModuleFallback.safeCall('Daftar Pesanan', window.APP.showOrderTable, [], () => self.renderDashboard()),
-            createOrder: () => ModuleFallback.safeCall('Buat Pesanan', window.APP.showCreateOrder, [], null),
+            createOrder: () => ModuleFallback.safeCall('Buat Pesanan', window.APP.showCreateOrder, [], () => self.renderDashboard()),
             viewOrder: async () => { 
                 if (self.currentOrderId && self._ensureModuleLoaded('viewOrder', window.APP.viewOrder)) {
                     return await ModuleFallback.safeCall('Detail Pesanan', window.APP.viewOrder, [self.currentOrderId], () => self.renderDashboard());
@@ -802,6 +819,13 @@ const DashboardCore = {
     },
 
     navigateTo: function(page, params) {
+        // 防御性检查：确保 APP 对象存在
+        if (typeof window.APP === 'undefined') {
+            console.error('APP 对象不存在');
+            location.reload();
+            return;
+        }
+        
         window.scrollTo(0, 0);
         
         params = params || {};
@@ -1154,7 +1178,6 @@ const DashboardCore = {
             const needRemindOrders = await SUPABASE.getOrdersNeedReminder();
             const hasReminders = needRemindOrders.length > 0;
             
-            // 修复：使用 hasSentRemindersToday 方法
             let hasSentToday = false;
             try {
                 hasSentToday = await this.hasSentRemindersToday();
