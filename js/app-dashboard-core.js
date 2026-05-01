@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.3 最终版 (JF 命名空间) - 三卡片资金布局
+// app-dashboard-core.js - v2.4 最终版 (JF 命名空间) - 完整工具栏+三卡片资金布局
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
@@ -539,7 +539,11 @@
                 <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info(lang === 'id' ? 'Modul belum dimuat' : '模块未加载')"
                     class="btn-capital-inject">
                     💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}
-                </button>` : '';
+                </button>` : `
+                <div class="info-bar info" style="margin-top:8px;">
+                    <span class="info-bar-icon">ℹ️</span>
+                    <div class="info-bar-content">${lang === 'id' ? 'Hanya administrator yang dapat mencatat injeksi modal' : '仅管理员可记录资本注入'}</div>
+                </div>`;
 
                 const topRowHtml = `
                 <div class="stats-grid stats-grid-2" style="margin-bottom:16px;">
@@ -605,12 +609,16 @@
                     : (lang === 'id' ? 'Manajer Toko' : '店长');
                 const storeNameDisplay = AUTH.getCurrentStoreName();
 
+                // ===== 工具栏（恢复资本注入按钮） =====
+                const capitalizeBtnHtml = `<button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info(lang === 'id' ? 'Modul belum dimuat' : '模块未加载')">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>`;
+
                 const toolbarHtml = isAdmin ? `
                     <div class="toolbar admin-grid no-print">
                         <button onclick="APP.navigateTo('customers')">👥 ${t('customers')}</button>
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
+                        ${capitalizeBtnHtml}
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
@@ -622,6 +630,7 @@
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
+                        ${capitalizeBtnHtml}
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
@@ -717,5 +726,5 @@
         }
     });
 
-    console.log('✅ JF.DashboardCore v2.3 最终版初始化完成（三卡片资金布局）');
+    console.log('✅ JF.DashboardCore v2.4 最终版初始化完成（完整工具栏+三卡片资金布局）');
 })();
