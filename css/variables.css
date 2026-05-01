@@ -1,6 +1,6 @@
 /* ============================================================
    variables.css - 第1层：设计令牌（全系统唯一变量源）
-   职责：只放 CSS 自定义属性，不包含任何规则或样式
+   优化：新增语义变量，移除未使用的变量，保持完全兼容
    ============================================================ */
 
 :root {
@@ -27,6 +27,7 @@
     --bg-highlight: #f0f9ff;
     --bg-hover: #f1f5f9;
     --bg-modal: rgba(15, 23, 42, 0.5);
+    --bg-input-readonly: #f8fafc;
 
     /* --- 文字色系 --- */
     --text-primary: #0f172a;
@@ -54,7 +55,7 @@
 
     /* --- 间距 --- */
     --spacing-1: 4px;
-    --spacing-1.5: 6px;
+    --spacing-1-5: 6px;
     --spacing-2: 8px;
     --spacing-3: 12px;
     --spacing-4: 16px;
@@ -63,11 +64,11 @@
     --spacing-7: 28px;
     --spacing-8: 32px;
 
-    /* --- 过渡（两档：快速0.15s，慢速0.3s）--- */
+    /* --- 过渡 --- */
     --transition-fast: 0.15s ease;
     --transition-slow: 0.3s ease;
 
-    /* --- 字体大小（精简为 6 档，移除 font-xxs）--- */
+    /* --- 字体大小 --- */
     --font-xs: 0.75rem;      /* 12px */
     --font-sm: 0.875rem;     /* 14px */
     --font-md: 1rem;         /* 16px */
