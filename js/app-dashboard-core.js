@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.1 (JF 命名空间) - 资金池指标版
+// app-dashboard-core.js - v2.2 (JF 命名空间) - 资金池层级版
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
@@ -460,13 +460,13 @@
                     let allLoan = 0;
                     for (const o of allLoanData.data || []) allLoan += (o.loan_amount || 0);
 
-                    // ===== 新增：查询总投入资本 =====
+                    // ===== 资金池：查询总投入资本 =====
                     let injectionQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
                     if (!isAdmin && storeId) injectionQuery = injectionQuery.eq('store_id', storeId);
                     const { data: injections } = await injectionQuery;
                     const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
 
-                    // ===== 新增：查询在押资金（active状态的贷款总额） =====
+                    // ===== 资金池：查询在押资金（active状态的贷款总额） =====
                     let deployedQuery = client.from('orders').select('loan_amount').eq('status', 'active');
                     if (!isAdmin && storeId) deployedQuery = deployedQuery.eq('store_id', storeId);
                     const { data: deployedOrders } = await deployedQuery;
@@ -477,7 +477,6 @@
                         completed_orders: completedRes.count || 0, overdue_orders: overdueRes.count || 0,
                         total_loan_amount: allLoan, total_admin_fees: adminFees,
                         total_service_fees: serviceFees, total_interest: interest, total_principal: principal,
-                        // 新增资金池指标
                         total_injected_capital: totalInjectedCapital,
                         deployed_capital: deployedCapital,
                         available_capital: totalInjectedCapital - deployedCapital
@@ -522,76 +521,70 @@
                 const bankIncome = cashFlow.bank?.income ?? 0;
                 const bankExpense = cashFlow.bank?.expense ?? 0;
 
-                // ===== 资金池指标行（通用） =====
+                // ===== 资金池层级结构 =====
+                const totalInjected = report.total_injected_capital || 0;
+                const deployed = report.deployed_capital || 0;
+                const available = report.available_capital || 0;
+                const cashBankTotal = cashBalance + bankBalance;
+
                 const capitalPoolHtml = `
-                    <div class="capital-pool-stats" style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
-                        <div class="capital-pool-item" style="flex:1;min-width:140px;background:#f8fafc;border-radius:8px;padding:12px;border:1px solid #e2e8f0;">
-                            <div style="font-size:11px;color:#64748b;margin-bottom:4px;">💉 ${lang === 'id' ? '总投入资本' : '总投入资本'}</div>
-                            <div style="font-size:16px;font-weight:700;">${Utils.formatCurrency(report.total_injected_capital || 0)}</div>
+                    <div class="capital-pool-section" style="margin-top:16px;border:2px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                        <!-- 总投入资本（分母） -->
+                        <div style="background:#1e293b;color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-size:12px;opacity:0.8;margin-bottom:2px;">💉 ${lang === 'id' ? '总投入资本 (Modal)' : '总投入资本 (分母)'}</div>
+                                <div style="font-size:22px;font-weight:700;">${Utils.formatCurrency(totalInjected)}</div>
+                            </div>
+                            ${isAdmin ? `
+                            <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info(lang === 'id' ? 'Modul modal belum dimuat' : '资本注入模块未加载')" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;white-space:nowrap;">
+                                ➕ ${lang === 'id' ? 'Tambah Modal' : '注入资金'}
+                            </button>
+                            ` : ''}
                         </div>
-                        <div class="capital-pool-item" style="flex:1;min-width:140px;background:#fffbeb;border-radius:8px;padding:12px;border:1px solid #fde68a;">
-                            <div style="font-size:11px;color:#92400e;margin-bottom:4px;">📋 ${lang === 'id' ? '在押资金' : '在押资金'}</div>
-                            <div style="font-size:16px;font-weight:700;color:#d97706;">${Utils.formatCurrency(report.deployed_capital || 0)}</div>
-                        </div>
-                        <div class="capital-pool-item" style="flex:1;min-width:140px;background:#f0fdf4;border-radius:8px;padding:12px;border:1px solid #bbf7d0;">
-                            <div style="font-size:11px;color:#166534;margin-bottom:4px;">✅ ${lang === 'id' ? '可动用资金' : '可动用资金'}</div>
-                            <div style="font-size:16px;font-weight:700;color:#16a34a;">${Utils.formatCurrency(report.available_capital || 0)}</div>
+                        <!-- 分配明细 -->
+                        <div style="display:flex;flex-wrap:wrap;gap:0;">
+                            <!-- 在押资金 -->
+                            <div style="flex:1;min-width:200px;background:#fffbeb;padding:14px 20px;border-right:1px solid #fde68a;">
+                                <div style="font-size:11px;color:#92400e;margin-bottom:4px;">📋 ${lang === 'id' ? 'Dalam Gadai (Dalam Gadai)' : '在押资金 (已放贷)'}</div>
+                                <div style="font-size:18px;font-weight:700;color:#d97706;">${Utils.formatCurrency(deployed)}</div>
+                                <div style="font-size:10px;color:#a16207;margin-top:2px;">${totalInjected > 0 ? (deployed / totalInjected * 100).toFixed(1) : 0}% ${lang === 'id' ? 'dari total modal' : '占总资本'}</div>
+                            </div>
+                            <!-- 可动用资金 -->
+                            <div style="flex:2;min-width:300px;background:#f0fdf4;padding:14px 20px;">
+                                <div style="font-size:11px;color:#166534;margin-bottom:4px;">✅ ${lang === 'id' ? 'Dapat Digunakan' : '可动用资金'}</div>
+                                <div style="font-size:18px;font-weight:700;color:#16a34a;">${Utils.formatCurrency(available)}</div>
+                                <!-- 子项：保险柜+银行 -->
+                                <div style="display:flex;gap:12px;margin-top:10px;">
+                                    <div style="flex:1;background:#fff;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;">
+                                        <div style="font-size:10px;color:#64748b;">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
+                                        <div style="font-size:14px;font-weight:600;color:#1e293b;">${Utils.formatCurrency(cashBalance)}</div>
+                                        <div style="font-size:9px;color:#94a3b8;">${t('inflow')}: +${Utils.formatCurrency(cashIncome)} | ${t('outflow')}: -${Utils.formatCurrency(cashExpense)}</div>
+                                    </div>
+                                    <div style="flex:1;background:#fff;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;">
+                                        <div style="font-size:10px;color:#64748b;">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
+                                        <div style="font-size:14px;font-weight:600;color:#1e293b;">${Utils.formatCurrency(bankBalance)}</div>
+                                        <div style="font-size:9px;color:#94a3b8;">${t('inflow')}: +${Utils.formatCurrency(bankIncome)} | ${t('outflow')}: -${Utils.formatCurrency(bankExpense)}</div>
+                                    </div>
+                                </div>
+                                <div style="font-size:9px;color:#64748b;margin-top:6px;">
+                                    ${lang === 'id' ? 'Total Kas + Bank' : '保险柜 + 银行合计'}: ${Utils.formatCurrency(cashBankTotal)}
+                                    ${cashBankTotal !== available ? ` <span style="color:#f59e0b;">(${lang === 'id' ? 'selisih' : '差额'}: ${Utils.formatCurrency(available - cashBankTotal)})</span>` : ' ✅'}
+                                </div>
+                            </div>
                         </div>
                     </div>`;
 
-                let cashFlowHtml = '';
-                if (isAdmin) {
-                    cashFlowHtml = `
-                        <div class="cashflow-summary">
-                            <h3>💰 ${t('fund_management')} (${lang === 'id' ? 'Semua Toko' : '全部门店'})</h3>
-                            <div class="cashflow-stats">
-                                <div class="cashflow-item">
-                                    <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                                    <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
-                                    <div class="cashflow-detail">${t('inflow')}: +${Utils.formatCurrency(cashIncome)}<br>${t('outflow')}: -${Utils.formatCurrency(cashExpense)}</div>
-                                </div>
-                                <div class="cashflow-item">
-                                    <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                                    <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
-                                    <div class="cashflow-detail">${t('inflow')}: +${Utils.formatCurrency(bankIncome)}<br>${t('outflow')}: -${Utils.formatCurrency(bankExpense)}</div>
-                                </div>
-                                <div class="cashflow-item">
-                                    <div class="label">🔄 ${t('internal_transfer')}</div>
-                                    <div class="transfer-buttons">
-                                        <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">${t('cash_to_bank')}</button>
-                                        <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">${t('bank_to_cash')}</button>
-                                        <button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq">🏢 ${t('submit_to_hq')}</button>
-                                    </div>
-                                </div>
-                            </div>
-                            ${capitalPoolHtml}
-                        </div>`;
-                } else {
-                    cashFlowHtml = `
-                        <div class="cashflow-summary">
-                            <h3>💰 ${t('fund_management')}</h3>
-                            <div class="cashflow-stats">
-                                <div class="cashflow-item">
-                                    <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                                    <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
-                                    <div class="cashflow-detail">${t('inflow')}: +${Utils.formatCurrency(cashIncome)}<br>${t('outflow')}: -${Utils.formatCurrency(cashExpense)}</div>
-                                </div>
-                                <div class="cashflow-item">
-                                    <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                                    <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
-                                    <div class="cashflow-detail">${t('inflow')}: +${Utils.formatCurrency(bankIncome)}<br>${t('outflow')}: -${Utils.formatCurrency(bankExpense)}</div>
-                                </div>
-                                <div class="cashflow-item">
-                                    <div class="label">🔄 ${t('internal_transfer')}</div>
-                                    <div class="transfer-buttons">
-                                        <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank">${t('cash_to_bank')}</button>
-                                        <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash">${t('bank_to_cash')}</button>
-                                    </div>
-                                </div>
-                            </div>
-                            ${capitalPoolHtml}
-                        </div>`;
-                }
+                // 转账按钮
+                const transferButtonsHtml = isAdmin ? `
+                    <div class="transfer-buttons" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                        <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank" style="padding:6px 14px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:12px;">${t('cash_to_bank')}</button>
+                        <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash" style="padding:6px 14px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:12px;">${t('bank_to_cash')}</button>
+                        <button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq" style="padding:6px 14px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;cursor:pointer;font-size:12px;">🏢 ${t('submit_to_hq')}</button>
+                    </div>` : `
+                    <div class="transfer-buttons" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                        <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank" style="padding:6px 14px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:12px;">${t('cash_to_bank')}</button>
+                        <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash" style="padding:6px 14px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:12px;">${t('bank_to_cash')}</button>
+                    </div>`;
 
                 const userRoleText = AUTH.user?.role === 'admin'
                     ? (lang === 'id' ? 'Administrator' : '管理员')
@@ -604,7 +597,6 @@
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                        <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info('Modul modal belum dimuat')" class="btn-capital-inject">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
@@ -616,7 +608,6 @@
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                        <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info('Modul modal belum dimuat')" class="btn-capital-inject">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
@@ -650,7 +641,15 @@
                     ${toolbarHtml}
                     <div style="margin:0 0 12px 0;"><h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ${t('financial_indicators')}${isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : ''}</h3></div>
                     <div class="stats-grid">${cardsHtml}</div>
-                    ${cashFlowHtml}
+                    <div class="card" style="padding:0;overflow:hidden;">
+                        <h3 style="margin:0;padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:15px;">💰 ${lang === 'id' ? 'Struktur Modal & Arus Kas' : '资金结构与现金流'}${isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : ''}</h3>
+                        <div style="padding:0;">
+                            ${capitalPoolHtml}
+                            <div style="padding:0 20px 16px;">
+                                ${transferButtonsHtml}
+                            </div>
+                        </div>
+                    </div>
                     ${bottomHtml}`;
 
             } catch (err) {
@@ -679,7 +678,7 @@
     // 挂载到命名空间
     JF.DashboardCore = DashboardCore;
 
-    // 向下兼容：将 DashboardCore 的能力挂载到 APP
+    // 向下兼容
     if (!window.APP) window.APP = {};
     const appMethods = ['init', 'router', 'refreshCurrentPage', 'navigateTo', 'goBack', 'renderLogin', 'login', 'logout', 'toggleLanguage', 'renderDashboard', 'forceRecovery', 'showCreateOrder', 'invalidateDashboardCache', 'saveCurrentPageState', 'restorePageState', 'clearPageState', 'currentFilter', 'historyStack', 'currentPage', 'currentOrderId', 'currentCustomerId'];
     for (const method of appMethods) {
@@ -695,12 +694,10 @@
         }
     }
 
-    // 兼容 sendDailyReminders
     window.APP.sendDailyReminders = DashboardCore.sendDailyReminders || (async function() {
         Utils.toast.info(Utils.lang === 'id' ? 'Fungsi pengingat belum tersedia' : '提醒功能尚未就绪');
     });
 
-    // 注册快捷键恢复
     document.addEventListener('keydown', function(e) {
         if (e.altKey && e.key === 'r') {
             e.preventDefault();
@@ -709,12 +706,11 @@
         }
     });
 
-    // 页面卸载前保存状态
     window.addEventListener('beforeunload', () => {
         if (DashboardCore && typeof DashboardCore.saveCurrentPageState === 'function') {
             DashboardCore.saveCurrentPageState();
         }
     });
 
-    console.log('✅ JF.DashboardCore v2.1 初始化完成（资金池指标版）');
+    console.log('✅ JF.DashboardCore v2.2 初始化完成（资金池层级版）');
 })();
