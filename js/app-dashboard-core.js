@@ -572,8 +572,6 @@
                         <p>🔒 ${t('order_saved_locked')} ${t('more_pawn_higher_fee')}</p>
                     </div>`;
 
-                const backBtn = this.historyStack.length > 0 ? `<button onclick="APP.goBack()" class="btn-back no-print">↩️ ${t('back')}</button>` : '';
-
                 document.getElementById("app").innerHTML = `
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
