@@ -1,6 +1,7 @@
-// app.js - 主入口文件 (v1.4)
+// app.js - 主入口文件 (v1.5 最终修复版)
 // 修复：仪表盘卡片功能错误 - 银行卡图标应跳转到 paymentHistory
-// 添加：手动恢复按钮
+// 添加：手动强制恢复函数 APP.forceRecovery()
+// 优化：错误界面添加恢复按钮
 
 window.APP = window.APP || {};
 
@@ -9,6 +10,55 @@ APP.currentPage = 'dashboard';
 APP.currentFilter = 'all';
 APP.currentOrderId = null;
 APP.currentCustomerId = null;
+
+// ==================== 手动强制恢复函数 ====================
+// 当页面出现白板时，用户可通过控制台调用 APP.forceRecovery() 恢复
+// 也可在错误界面点击"强制恢复"按钮调用
+APP.forceRecovery = function() {
+    console.log('[Recovery] 手动强制恢复执行');
+    var appDiv = document.getElementById('app');
+    
+    if (!appDiv) {
+        console.error('[Recovery] app 元素不存在');
+        return;
+    }
+    
+    // 显示加载状态
+    appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;margin:20px;">' +
+        '<div class="loader" style="margin:20px auto;"></div>' +
+        '<p>' + (Utils.lang === 'id' ? '正在恢复...' : 'Recovering...') + '</p>' +
+        '</div>';
+    
+    // 延迟执行恢复，让界面有时间渲染加载状态
+    setTimeout(function() {
+        try {
+            if (AUTH && typeof AUTH.isLoggedIn === 'function' && AUTH.isLoggedIn()) {
+                // 已登录，恢复仪表盘
+                if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
+                    DashboardCore.renderDashboard();
+                } else if (typeof APP.renderDashboard === 'function') {
+                    APP.renderDashboard();
+                } else {
+                    location.reload();
+                }
+            } else {
+                // 未登录，显示登录页
+                if (typeof APP.showLogin === 'function') {
+                    APP.showLogin();
+                } else {
+                    location.reload();
+                }
+            }
+        } catch (error) {
+            console.error('[Recovery] 恢复失败:', error);
+            appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;">' +
+                '<p>⚠️ ' + (Utils.lang === 'id' ? '自动恢复失败，请刷新页面' : 'Auto recovery failed, please refresh') + '</p>' +
+                '<button onclick="location.reload()" style="margin-top:12px;">🔄 ' + 
+                    (Utils.lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
+                '</div>';
+        }
+    }, 100);
+};
 
 // 页面状态恢复
 APP.saveCurrentPageState = function() {
@@ -33,30 +83,6 @@ APP.clearPageState = function() {
         sessionStorage.removeItem('jf_current_order_id');
         sessionStorage.removeItem('jf_current_customer_id');
     } catch(e) {}
-};
-
-// ==================== 手动恢复函数（用户可点击） ====================
-APP.forceRecovery = function() {
-    console.log('[Recovery] 手动强制恢复');
-    var appDiv = document.getElementById('app');
-    if (appDiv) {
-        appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><div class="loader"></div><p>' + 
-            (Utils.lang === 'id' ? '正在恢复...' : 'Recovering...') + '</p></div>';
-    }
-    
-    setTimeout(function() {
-        if (AUTH.isLoggedIn && AUTH.isLoggedIn()) {
-            if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
-                DashboardCore.renderDashboard();
-            } else if (typeof APP.renderDashboard === 'function') {
-                APP.renderDashboard();
-            } else {
-                location.reload();
-            }
-        } else {
-            APP.showLogin();
-        }
-    }, 100);
 };
 
 // 切换语言
@@ -348,12 +374,15 @@ APP.renderDashboard = async function() {
     } catch (error) {
         console.error("renderDashboard error:", error);
         Utils.toast.error(lang === 'id' ? 'Gagal memuat dashboard' : '加载仪表盘失败');
-        // 显示带恢复按钮的错误界面
+        // 错误界面添加恢复按钮
         document.getElementById("app").innerHTML = '' +
             '<div class="card" style="text-align:center;padding:40px;">' +
                 '<p>⚠️ ' + (lang === 'id' ? '加载仪表盘失败' : 'Dashboard load failed') + '</p>' +
-                '<button onclick="APP.forceRecovery()" style="margin-top:12px;margin-right:8px;">🔄 ' + (lang === 'id' ? '强制恢复' : 'Force Recovery') + '</button>' +
-                '<button onclick="location.reload()" style="margin-top:12px;">🔄 ' + (lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
+                '<p style="font-size:12px;color:#64748b;margin:8px 0;">' + Utils.escapeHtml(error.message) + '</p>' +
+                '<button onclick="APP.forceRecovery()" style="margin-top:12px;margin-right:8px;padding:8px 20px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;">🔄 ' + 
+                    (lang === 'id' ? '强制恢复' : 'Force Recovery') + '</button>' +
+                '<button onclick="location.reload()" style="margin-top:12px;padding:8px 20px;">🔄 ' + 
+                    (lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
             '</div>';
     }
 };
@@ -408,4 +437,15 @@ APP.sendWAReminder = async function(orderId) {
 // 导出 APP 到全局
 window.APP = APP;
 
-console.log('[APP] app.js 加载完成 (v1.4 with forceRecovery)');
+// 在控制台输出可用的恢复命令
+console.log('[APP] app.js 加载完成 (v1.5)');
+console.log('[APP] 如果出现白板，请在控制台执行 APP.forceRecovery() 恢复页面');
+
+// 可选：注册全局快捷键 Alt+R 恢复页面（方便调试）
+document.addEventListener('keydown', function(e) {
+    if (e.altKey && e.key === 'r') {
+        e.preventDefault();
+        console.log('[快捷键] Alt+R 触发强制恢复');
+        APP.forceRecovery();
+    }
+});
