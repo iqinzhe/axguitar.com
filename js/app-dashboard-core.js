@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.0 (JF 命名空间) - 修复版
+// app-dashboard-core.js - v2.1 (JF 命名空间) - 资金池指标版
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
@@ -191,7 +191,6 @@
         navigateTo: function(page, params) {
             window.scrollTo(0, 0);
             params = params || {};
-            // 保存当前页面到历史栈（用于返回）
             this.historyStack.push({
                 page: this.currentPage,
                 orderId: this.currentOrderId,
@@ -203,7 +202,6 @@
             if (params.customerId) this.currentCustomerId = params.customerId;
             this.saveCurrentPageState();
 
-            // 直接调用 JF 命名空间下的对应页面方法
             const pageMap = {
                 'dashboard': () => this.renderDashboard(),
                 'orderTable': () => JF.OrdersPage.showOrderTable(),
@@ -236,7 +234,7 @@
             }
         },
 
-        // ---------- 返回上一页（修复版） ----------
+        // ---------- 返回上一页 ----------
         goBack: function() {
             console.log('[DashboardCore] goBack 被调用，历史栈深度:', this.historyStack.length);
             
@@ -250,17 +248,14 @@
                 this.currentFilter = prev.filter || "all";
                 this.saveCurrentPageState();
                 
-                // 刷新页面
                 this.refreshCurrentPage().catch(err => {
                     console.error('[DashboardCore] goBack 刷新失败:', err);
                     this.renderDashboard();
                 });
             } else if (document.referrer && window.history.length > 1) {
-                // 没有历史记录时尝试浏览器后退
                 console.log('[DashboardCore] 使用浏览器后退');
                 window.history.back();
             } else {
-                // 默认返回仪表盘
                 console.log('[DashboardCore] 默认返回仪表盘');
                 this.renderDashboard();
             }
@@ -464,11 +459,28 @@
                     }
                     let allLoan = 0;
                     for (const o of allLoanData.data || []) allLoan += (o.loan_amount || 0);
+
+                    // ===== 新增：查询总投入资本 =====
+                    let injectionQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
+                    if (!isAdmin && storeId) injectionQuery = injectionQuery.eq('store_id', storeId);
+                    const { data: injections } = await injectionQuery;
+                    const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+
+                    // ===== 新增：查询在押资金（active状态的贷款总额） =====
+                    let deployedQuery = client.from('orders').select('loan_amount').eq('status', 'active');
+                    if (!isAdmin && storeId) deployedQuery = deployedQuery.eq('store_id', storeId);
+                    const { data: deployedOrders } = await deployedQuery;
+                    const deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
+
                     return {
                         total_orders: totalRes.count || 0, active_orders: activeRes.count || 0,
                         completed_orders: completedRes.count || 0, overdue_orders: overdueRes.count || 0,
                         total_loan_amount: allLoan, total_admin_fees: adminFees,
-                        total_service_fees: serviceFees, total_interest: interest, total_principal: principal
+                        total_service_fees: serviceFees, total_interest: interest, total_principal: principal,
+                        // 新增资金池指标
+                        total_injected_capital: totalInjectedCapital,
+                        deployed_capital: deployedCapital,
+                        available_capital: totalInjectedCapital - deployedCapital
                     };
                 }, { ttl: 5 * 60 * 1000 });
 
@@ -510,6 +522,23 @@
                 const bankIncome = cashFlow.bank?.income ?? 0;
                 const bankExpense = cashFlow.bank?.expense ?? 0;
 
+                // ===== 资金池指标行（通用） =====
+                const capitalPoolHtml = `
+                    <div class="capital-pool-stats" style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
+                        <div class="capital-pool-item" style="flex:1;min-width:140px;background:#f8fafc;border-radius:8px;padding:12px;border:1px solid #e2e8f0;">
+                            <div style="font-size:11px;color:#64748b;margin-bottom:4px;">💉 ${lang === 'id' ? '总投入资本' : '总投入资本'}</div>
+                            <div style="font-size:16px;font-weight:700;">${Utils.formatCurrency(report.total_injected_capital || 0)}</div>
+                        </div>
+                        <div class="capital-pool-item" style="flex:1;min-width:140px;background:#fffbeb;border-radius:8px;padding:12px;border:1px solid #fde68a;">
+                            <div style="font-size:11px;color:#92400e;margin-bottom:4px;">📋 ${lang === 'id' ? '在押资金' : '在押资金'}</div>
+                            <div style="font-size:16px;font-weight:700;color:#d97706;">${Utils.formatCurrency(report.deployed_capital || 0)}</div>
+                        </div>
+                        <div class="capital-pool-item" style="flex:1;min-width:140px;background:#f0fdf4;border-radius:8px;padding:12px;border:1px solid #bbf7d0;">
+                            <div style="font-size:11px;color:#166534;margin-bottom:4px;">✅ ${lang === 'id' ? '可动用资金' : '可动用资金'}</div>
+                            <div style="font-size:16px;font-weight:700;color:#16a34a;">${Utils.formatCurrency(report.available_capital || 0)}</div>
+                        </div>
+                    </div>`;
+
                 let cashFlowHtml = '';
                 if (isAdmin) {
                     cashFlowHtml = `
@@ -535,6 +564,7 @@
                                     </div>
                                 </div>
                             </div>
+                            ${capitalPoolHtml}
                         </div>`;
                 } else {
                     cashFlowHtml = `
@@ -559,6 +589,7 @@
                                     </div>
                                 </div>
                             </div>
+                            ${capitalPoolHtml}
                         </div>`;
                 }
 
@@ -573,6 +604,7 @@
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
+                        <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info('Modul modal belum dimuat')" class="btn-capital-inject">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
@@ -584,6 +616,7 @@
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
+                        <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info('Modul modal belum dimuat')" class="btn-capital-inject">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
@@ -683,5 +716,5 @@
         }
     });
 
-    console.log('✅ JF.DashboardCore v2.0 初始化完成');
+    console.log('✅ JF.DashboardCore v2.1 初始化完成（资金池指标版）');
 })();
