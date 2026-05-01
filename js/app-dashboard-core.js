@@ -1,5 +1,4 @@
-// app-dashboard-core.js - v2.4 最终版 (JF 命名空间) - 完整工具栏+三卡片资金布局
-// 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
+// app-dashboard-core.js - v2.0
 
 'use strict';
 
