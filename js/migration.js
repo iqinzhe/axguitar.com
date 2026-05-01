@@ -1,5 +1,5 @@
-// migration.js - v2.0 数据迁移模块 (JF 命名空间)
-// 挂载到 JF.Migration，保留 window.Migration 别名
+// migration.js - v2.0 (JF 命名空间)
+// 数据迁移模块，挂载到 JF.Migration
 
 'use strict';
 
@@ -51,7 +51,7 @@
             let existingIds = new Set();
             try {
                 existingIds = new Set((await SUPABASE.getOrders()).map(o => o.order_id));
-            } catch {}
+            } catch { /* ignore */ }
 
             const BATCH_SIZE = 10;
             for (let i = 0; i < orders.length; i += BATCH_SIZE) {
@@ -84,23 +84,23 @@
             const client = SUPABASE.getClient();
             const orderData = {
                 order_id: oldOrder.order_id,
-                customer_name:    oldOrder.customer?.name    || 'Unknown',
-                customer_ktp:     oldOrder.customer?.ktp     || '',
-                customer_phone:   oldOrder.customer?.phone   || '',
+                customer_name: oldOrder.customer?.name || 'Unknown',
+                customer_ktp: oldOrder.customer?.ktp || '',
+                customer_phone: oldOrder.customer?.phone || '',
                 customer_address: oldOrder.customer?.address || '',
-                collateral_name:  oldOrder.collateral_name   || '',
-                loan_amount:      oldOrder.loan_amount        || 0,
-                admin_fee:        oldOrder.admin_fee          || 30000,
-                admin_fee_paid:      oldOrder.admin_fee_paid      || false,
+                collateral_name: oldOrder.collateral_name || '',
+                loan_amount: oldOrder.loan_amount || 0,
+                admin_fee: oldOrder.admin_fee || 30000,
+                admin_fee_paid: oldOrder.admin_fee_paid || false,
                 admin_fee_paid_date: oldOrder.admin_fee_paid_date || null,
-                monthly_interest:    oldOrder.monthly_interest    || ((oldOrder.loan_amount || 0) * 0.10),
+                monthly_interest: oldOrder.monthly_interest || ((oldOrder.loan_amount || 0) * 0.10),
                 interest_paid_months: oldOrder.interest_paid_months || 0,
-                interest_paid_total:  oldOrder.interest_paid_total  || 0,
+                interest_paid_total: oldOrder.interest_paid_total || 0,
                 next_interest_due_date: oldOrder.next_interest_due_date || null,
-                principal_paid:      oldOrder.principal_paid      || 0,
+                principal_paid: oldOrder.principal_paid || 0,
                 principal_remaining: oldOrder.principal_remaining || oldOrder.loan_amount || 0,
-                status:     oldOrder.status     || 'active',
-                store_id:   storeId,
+                status: oldOrder.status || 'active',
+                store_id: storeId,
                 created_by: adminUserId,
                 created_at: oldOrder.created_at || new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -116,11 +116,11 @@
 
             if (oldOrder.payment_history?.length) {
                 const paymentRows = oldOrder.payment_history.map(payment => ({
-                    order_id:    newOrder.id,
-                    date:        payment.date || new Date().toISOString().split('T')[0],
-                    type:        payment.type,
-                    months:      payment.months || null,
-                    amount:      payment.amount,
+                    order_id: newOrder.id,
+                    date: payment.date || new Date().toISOString().split('T')[0],
+                    type: payment.type,
+                    months: payment.months || null,
+                    amount: payment.amount,
                     description: payment.description || '',
                     recorded_by: adminUserId
                 }));
