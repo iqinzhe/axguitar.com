@@ -68,31 +68,22 @@
     <script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
     <script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
 
-    <!-- 5. 资金管理模块（新增强化功能） -->
-    <script defer src="js/app-capital.js"></script>            <!-- 资本注入、利润再投入、资金占用 -->
-
-    <!-- 6. 主入口文件（核心导航和恢复功能） -->
-    <script defer src="js/app.js"></script>                    <!-- 主入口：APP.forceRecovery, navigateTo, renderDashboard 等 -->
-
-    <!-- 7. 状态初始化模块（页面恢复状态预加载） -->
+    <!-- 5. 状态初始化模块（页面恢复状态预加载） -->
     <script defer src="js/app-state-init.js"></script>
 
-    <!-- 8. 启动应用（等待所有模块加载完成后） -->
+    <!-- 6. 主入口（defer，在所有模块之后） -->
     <script defer>
+        // 启动应用（等待所有模块加载完成后）
         document.addEventListener('DOMContentLoaded', function() {
+            // 确保 APP 对象存在
             if (typeof window.APP === 'undefined') {
                 window.APP = {};
             }
+            // 启动应用
             if (typeof window.APP.init === 'function') {
                 window.APP.init();
-            } else if (typeof window.DashboardCore !== 'undefined' && typeof window.DashboardCore.init === 'function') {
-                window.DashboardCore.init();
             } else {
-                console.error('[Init] APP.init 或 DashboardCore.init 未定义');
-                // 尝试强制恢复
-                if (typeof window.APP.forceRecovery === 'function') {
-                    window.APP.forceRecovery();
-                }
+                console.error('[Init] APP.init 未定义，请检查模块加载顺序');
             }
         });
     </script>
