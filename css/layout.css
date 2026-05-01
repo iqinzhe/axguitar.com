@@ -1,6 +1,6 @@
 /* ============================================================
    layout.css - 第4层：页面级布局模式
-   职责：卡片、按钮、工具栏、模态框、表单等页面级组件
+   优化：统一 CSS 变量，卡片/按钮系统规范化，完全向后兼容
    ============================================================ */
 
 /* ============================================================
@@ -17,9 +17,11 @@
     transition: var(--transition-fast);
     margin-bottom: var(--spacing-4);
 }
+
 .card:hover {
     box-shadow: var(--shadow-lg);
 }
+
 .card h3 {
     font-size: var(--font-md);
     margin-bottom: var(--spacing-2);
@@ -37,6 +39,7 @@
     padding: var(--spacing-3) var(--spacing-4);
     margin-bottom: var(--spacing-4);
 }
+
 .card-secondary h3 {
     font-size: var(--font-md);
     margin-bottom: var(--spacing-2);
@@ -53,13 +56,13 @@
     padding: var(--spacing-3) var(--spacing-4);
     margin-bottom: var(--spacing-3);
 }
+
 .card-inset h3 {
     font-size: var(--font-sm);
     margin-bottom: var(--spacing-2);
     color: var(--text-secondary);
     font-weight: 600;
 }
-
 
 /* ============================================================
    L2. 页面头部
@@ -72,6 +75,7 @@
     flex-wrap: wrap;
     gap: var(--spacing-2);
 }
+
 .page-header h1,
 .page-header h2 {
     margin: 0;
@@ -79,6 +83,7 @@
     font-weight: 600;
     color: var(--text-primary);
 }
+
 .header-actions {
     display: flex;
     gap: var(--spacing-6);
@@ -87,12 +92,11 @@
     flex-direction: row-reverse;
 }
 
-
 /* ============================================================
    L3. 按钮系统（统一基础样式 + 修饰符模式）
    ============================================================ */
 
-/* --- 原生按钮重置（唯一的基础规则源）--- */
+/* 原生按钮重置 */
 button {
     padding: var(--spacing-2) var(--spacing-3);
     border-radius: var(--radius-md);
@@ -104,80 +108,85 @@ button {
     background: var(--bg-hover);
     color: var(--text-primary);
 }
+
 button:hover {
     background: var(--border-light);
     transform: translateY(-1px);
 }
+
 button:active {
     transform: translateY(0);
 }
+
 button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
 }
 
-/* --- 返回按钮 --- */
+/* 语义化按钮修饰符 */
 .btn-back {
     background: var(--text-secondary);
     color: var(--text-white);
     border-color: var(--text-secondary);
 }
+
 .btn-back:hover {
     background: var(--text-primary);
 }
 
-/* --- 打印按钮 --- */
 .btn-print {
     background: var(--bg-hover);
     border-color: var(--border-medium);
     color: var(--text-secondary);
 }
+
 .btn-print:hover {
     background: var(--border-light);
     color: var(--text-primary);
 }
 
-/* --- 导出按钮 --- */
 .btn-export {
     background: var(--success-dark);
     color: var(--text-white);
     border-color: var(--success-dark);
 }
+
 .btn-export:hover {
     background: var(--success);
     border-color: var(--success);
 }
 
-/* --- 平账按钮 --- */
 .btn-balance {
     background: var(--warning-dark);
     color: var(--text-white);
     border-color: var(--warning-dark);
 }
+
 .btn-balance:hover {
     background: var(--warning);
     border-color: var(--warning);
 }
 
-/* --- 详情按钮 --- */
 .btn-detail {
     background: var(--primary-dark);
     color: var(--text-white);
     border-color: var(--primary-dark);
 }
+
 .btn-detail:hover {
     background: var(--primary);
     border-color: var(--primary);
 }
 
-/* --- 语义化按钮修饰符 --- */
+/* 语义化按钮全局修饰符 */
 button.success,
 .btn-success {
     background: var(--success-dark);
     color: var(--text-white);
     border-color: var(--success-dark);
 }
+
 button.success:hover,
 .btn-success:hover {
     background: var(--success);
@@ -190,6 +199,7 @@ button.warning,
     color: var(--text-white);
     border-color: var(--warning-dark);
 }
+
 button.warning:hover,
 .btn-warning:hover {
     background: var(--warning);
@@ -202,13 +212,14 @@ button.danger,
     color: var(--text-white);
     border-color: var(--danger-dark);
 }
+
 button.danger:hover,
 .btn-danger:hover {
     background: var(--danger);
     border-color: var(--danger);
 }
 
-/* --- 提醒按钮高亮动画 --- */
+/* 提醒按钮高亮动画 */
 button.warning.highlight {
     animation: btn-pulse 1.5s infinite;
     font-weight: 600;
@@ -219,18 +230,19 @@ button.warning.highlight {
     50% { opacity: 0.8; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3); }
 }
 
-/* --- 资金按钮 --- */
+/* 资金按钮 */
 .capital-btn {
     background: var(--primary-dark);
     color: var(--text-white);
     border-color: var(--primary-dark);
 }
+
 .capital-btn:hover {
     background: var(--primary);
     border-color: var(--primary);
 }
 
-/* --- 全宽操作按钮 --- */
+/* 全宽操作按钮 */
 .btn-action {
     display: inline-flex !important;
     align-items: center;
@@ -247,22 +259,26 @@ button.warning.highlight {
     min-width: 120px;
     margin-top: var(--spacing-2);
 }
+
 .btn-action.success {
     background: var(--success-dark);
     color: var(--text-white);
 }
+
 .btn-action.success:hover {
     background: var(--success);
 }
+
 .btn-action.early-settle {
     background: #7c3aed;
     color: var(--text-white);
 }
+
 .btn-action.early-settle:hover {
     background: #6d28d9;
 }
 
-/* --- 操作按钮容器 --- */
+/* 操作按钮容器 */
 .action-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -270,7 +286,6 @@ button.warning.highlight {
     align-items: center;
     margin-top: var(--spacing-2);
 }
-
 
 /* ============================================================
    L4. 资金管理区块
@@ -283,6 +298,7 @@ button.warning.highlight {
     border: 2px solid #bae6fd;
     box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08);
 }
+
 .cashflow-summary h3 {
     color: var(--text-primary);
     border-bottom: 1px solid var(--border-light);
@@ -290,11 +306,13 @@ button.warning.highlight {
     padding-bottom: var(--spacing-1);
     font-size: var(--font-md);
 }
+
 .cashflow-stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-3);
 }
+
 .cashflow-item {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
@@ -303,20 +321,24 @@ button.warning.highlight {
     text-align: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
+
 .cashflow-item .label {
     font-size: var(--font-sm);
     color: var(--text-secondary);
     margin-bottom: var(--spacing-1);
 }
+
 .cashflow-item .value {
     font-size: var(--font-xl);
     font-weight: 700;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
 }
+
 .cashflow-item .value.negative {
     color: var(--danger-dark);
 }
+
 .cashflow-item .cashflow-detail {
     font-size: var(--font-xs);
     color: var(--text-muted);
@@ -330,6 +352,7 @@ button.warning.highlight {
     gap: var(--spacing-1);
     margin-top: var(--spacing-2);
 }
+
 .transfer-btn {
     width: 100%;
     padding: var(--spacing-2) var(--spacing-3);
@@ -342,26 +365,29 @@ button.warning.highlight {
     text-align: center;
     white-space: nowrap;
 }
+
 .transfer-btn:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-sm);
 }
+
 .transfer-btn.cash-to-bank {
     background: #e0f2fe;
     color: #0369a1;
     border-color: #7dd3fc;
 }
+
 .transfer-btn.bank-to-cash {
     background: #fef3c7;
     color: #b45309;
     border-color: #fde68a;
 }
+
 .transfer-btn.store-to-hq {
     background: #dbeafe;
     color: #1e40af;
     border-color: #93c5fd;
 }
-
 
 /* ============================================================
    L5. 工具栏
@@ -375,12 +401,15 @@ button.warning.highlight {
     border-radius: var(--radius-md);
     border: 1px solid var(--border-medium);
 }
+
 .toolbar.admin-grid {
     grid-template-columns: repeat(5, 1fr);
 }
+
 .toolbar.store-grid {
     grid-template-columns: repeat(4, 1fr);
 }
+
 .toolbar button {
     width: 100%;
     text-align: center;
@@ -388,6 +417,7 @@ button.warning.highlight {
     padding: var(--spacing-3) var(--spacing-3);
     font-size: var(--font-sm);
 }
+
 .toolbar input,
 .toolbar select {
     padding: var(--spacing-1) var(--spacing-2);
@@ -396,7 +426,6 @@ button.warning.highlight {
     font-size: var(--font-sm);
 }
 
-
 /* ============================================================
    L6. 底部信息卡片
    ============================================================ */
@@ -404,18 +433,19 @@ button.warning.highlight {
     background: var(--bg-hover);
     border: 1px solid var(--border-medium);
 }
+
 .dashboard-footer-card h3 {
     font-size: var(--font-md);
     margin-bottom: var(--spacing-1);
     border-bottom: none;
 }
+
 .dashboard-footer-card p {
     font-size: var(--font-sm);
     color: var(--text-secondary);
     margin-bottom: var(--spacing-1);
     line-height: 1.5;
 }
-
 
 /* ============================================================
    L7. 模态框
@@ -433,6 +463,7 @@ button.warning.highlight {
     justify-content: center;
     padding: var(--spacing-4);
 }
+
 .modal-content {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
@@ -444,18 +475,19 @@ button.warning.highlight {
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-medium);
 }
+
 .modal-content h3 {
     font-size: var(--font-lg);
     margin-bottom: var(--spacing-3);
     color: var(--text-primary);
 }
+
 .modal-actions {
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-3);
     margin-top: var(--spacing-4);
 }
-
 
 /* ============================================================
    L8. 登录页面
@@ -468,6 +500,7 @@ button.warning.highlight {
     background: linear-gradient(135deg, var(--primary-soft) 0%, var(--bg-page) 100%);
     padding: var(--spacing-4);
 }
+
 .login-box {
     width: 100%;
     max-width: 400px;
@@ -477,6 +510,7 @@ button.warning.highlight {
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-medium);
 }
+
 .login-box .login-title {
     font-size: 1.5rem;
     margin-bottom: 28px;
@@ -488,10 +522,12 @@ button.warning.highlight {
     color: var(--text-primary);
     white-space: nowrap;
 }
+
 .login-box .lang-toggle {
     text-align: right;
     margin-bottom: 20px;
 }
+
 .login-box .lang-btn {
     background: transparent;
     color: var(--primary-dark);
@@ -500,13 +536,16 @@ button.warning.highlight {
     font-size: var(--font-sm);
     border-radius: var(--radius-md);
 }
+
 .login-box .lang-btn:hover {
     background: var(--primary-soft);
     transform: none;
 }
+
 .login-box .form-group {
     margin-bottom: 20px;
 }
+
 .login-box .form-group label {
     font-size: var(--font-sm);
     font-weight: 500;
@@ -514,6 +553,7 @@ button.warning.highlight {
     margin-bottom: 8px;
     display: block;
 }
+
 .login-box input {
     width: 100%;
     padding: 12px 14px;
@@ -524,11 +564,13 @@ button.warning.highlight {
     color: var(--text-primary);
     background: var(--bg-card);
 }
+
 .login-box input:focus {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
+
 .login-box button {
     width: 100%;
     padding: 12px;
@@ -540,17 +582,18 @@ button.warning.highlight {
     border-radius: var(--radius-md);
     margin-top: 8px;
 }
+
 .login-box button:hover {
     background: var(--primary);
     transform: translateY(-1px);
 }
+
 .login-box .login-note {
     margin-top: 24px;
     font-size: var(--font-xs);
     color: var(--text-muted);
     text-align: center;
 }
-
 
 /* ============================================================
    L9. 加载动画
@@ -563,6 +606,7 @@ button.warning.highlight {
     min-height: 100vh;
     background: var(--bg-page);
 }
+
 .loader {
     width: 40px;
     height: 40px;
@@ -571,15 +615,16 @@ button.warning.highlight {
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
 .loading-text {
     color: var(--text-secondary);
     margin-top: var(--spacing-4);
     font-size: var(--font-sm);
 }
-
 
 /* ============================================================
    L10. 报错信息
@@ -592,6 +637,7 @@ button.warning.highlight {
     background: var(--bg-page);
     padding: var(--spacing-5);
 }
+
 .error-card {
     max-width: 400px;
     background: var(--bg-card);
@@ -601,20 +647,24 @@ button.warning.highlight {
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-medium);
 }
+
 .error-icon {
     font-size: var(--font-2xl);
     margin-bottom: var(--spacing-3);
 }
+
 .error-title {
     color: var(--danger-dark);
     margin-bottom: var(--spacing-2);
     font-size: var(--font-lg);
 }
+
 .error-message {
     color: var(--text-secondary);
     margin-bottom: var(--spacing-4);
     font-size: var(--font-sm);
 }
+
 .error-btn {
     background: var(--primary-dark);
     color: var(--text-white);
@@ -625,7 +675,6 @@ button.warning.highlight {
     border: none;
 }
 
-
 /* ============================================================
    表单系统
    ============================================================ */
@@ -634,21 +683,26 @@ button.warning.highlight {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-3);
 }
+
 .form-grid.form-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .form-grid.form-grid-4 { grid-template-columns: repeat(4, 1fr); }
+
 .form-group {
     display: flex;
     flex-direction: column;
 }
+
 .form-group.full-width {
     grid-column: 1 / -1;
 }
+
 .form-group label {
     font-size: var(--font-sm);
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: var(--spacing-1);
 }
+
 .form-group input,
 .form-group select,
 .form-group textarea {
@@ -662,6 +716,7 @@ button.warning.highlight {
     width: 100%;
     font-family: inherit;
 }
+
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
@@ -669,24 +724,29 @@ button.warning.highlight {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
+
 .form-group textarea {
     resize: vertical;
     min-height: 60px;
 }
+
 .form-group input[readonly] {
     background: var(--bg-hover);
     cursor: not-allowed;
 }
+
 .form-group .amount-input {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
+
 .form-hint {
     font-size: var(--font-xs);
     color: var(--text-muted);
     margin-top: var(--spacing-1);
     line-height: 1.4;
 }
+
 .form-actions {
     grid-column: 1 / -1;
     display: flex;
@@ -696,16 +756,19 @@ button.warning.highlight {
     border-top: 1px solid var(--border-light);
     margin-top: var(--spacing-2);
 }
+
 .form-section {
     margin-bottom: var(--spacing-4);
     padding-bottom: var(--spacing-3);
     border-bottom: 1px solid var(--border-light);
 }
+
 .form-section:last-child {
     border-bottom: none;
     margin-bottom: 0;
     padding-bottom: 0;
 }
+
 .form-section-title {
     font-size: var(--font-md);
     font-weight: 700;
@@ -715,11 +778,11 @@ button.warning.highlight {
     align-items: center;
     gap: var(--spacing-2);
 }
+
 .form-section-title .section-icon {
     font-size: 1.2em;
     line-height: 1;
 }
-
 
 /* ============================================================
    客户信息摘要展示
@@ -733,11 +796,13 @@ button.warning.highlight {
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
 }
+
 .info-display-item {
     display: flex;
     align-items: baseline;
     gap: var(--spacing-2);
 }
+
 .info-display-item .info-label {
     font-size: var(--font-xs);
     font-weight: 600;
@@ -746,12 +811,12 @@ button.warning.highlight {
     min-width: 80px;
     flex-shrink: 0;
 }
+
 .info-display-item .info-value {
     font-size: var(--font-sm);
     color: var(--text-primary);
     word-break: break-word;
 }
-
 
 /* ============================================================
    居住地址选项
@@ -762,6 +827,7 @@ button.warning.highlight {
     flex-wrap: wrap;
     padding: var(--spacing-1) 0;
 }
+
 .address-option label {
     display: flex;
     align-items: center;
@@ -771,13 +837,13 @@ button.warning.highlight {
     font-size: var(--font-sm);
     white-space: nowrap;
 }
+
 .address-option input[type="radio"] {
     width: 16px;
     height: 16px;
     accent-color: var(--primary);
     margin: 0;
 }
-
 
 /* ============================================================
    新建订单 - 第一行（四列）
@@ -788,7 +854,6 @@ button.warning.highlight {
     gap: var(--spacing-3);
     margin-bottom: var(--spacing-3);
 }
-
 
 /* ============================================================
    新建订单 - 入账方式行
@@ -803,12 +868,14 @@ button.warning.highlight {
     margin: var(--spacing-3) 0;
     flex-wrap: wrap;
 }
+
 .payment-method-row .payment-method-label {
     font-weight: 600;
     font-size: var(--font-sm);
     color: var(--text-secondary);
     white-space: nowrap;
 }
+
 .payment-method-row .payment-method-hint {
     font-size: var(--font-xs);
     color: var(--text-muted);
@@ -816,14 +883,12 @@ button.warning.highlight {
     margin-top: var(--spacing-1);
 }
 
-
 /* ============================================================
    新建订单 - 利率组
    ============================================================ */
 .interest-rate-group {
     max-width: 300px;
 }
-
 
 /* ============================================================
    三卡片选择（还款方式）
@@ -834,6 +899,7 @@ button.warning.highlight {
     gap: var(--spacing-3);
     margin: var(--spacing-3) 0;
 }
+
 .repayment-card {
     background: var(--bg-card);
     border: 2px solid var(--border-medium);
@@ -842,20 +908,24 @@ button.warning.highlight {
     cursor: pointer;
     transition: var(--transition-fast);
 }
+
 .repayment-card:hover {
     border-color: var(--primary-light);
     box-shadow: var(--shadow-md);
 }
+
 .repayment-card.selected {
     border-color: var(--primary);
     background: var(--primary-soft);
 }
+
 .repayment-card-header {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
     margin-bottom: var(--spacing-2);
 }
+
 .repayment-card-header input[type="radio"] {
     width: 18px;
     height: 18px;
@@ -864,24 +934,29 @@ button.warning.highlight {
     margin: 0;
     flex-shrink: 0;
 }
+
 .repayment-card-title {
     font-weight: 700;
     font-size: var(--font-sm);
     color: var(--text-primary);
 }
+
 .repayment-card-desc {
     font-size: var(--font-xs);
     color: var(--text-secondary);
     margin-bottom: var(--spacing-1);
     line-height: 1.4;
 }
+
 .repayment-card-note {
     font-size: var(--font-xs);
     color: var(--text-muted);
 }
+
 .repayment-card.extension-card .extension-select {
     margin: var(--spacing-2) 0;
 }
+
 .repayment-card.extension-card .extension-select select {
     width: 100%;
     padding: 10px 12px;
@@ -891,6 +966,7 @@ button.warning.highlight {
     background: var(--bg-card);
     cursor: pointer;
 }
+
 .extension-note {
     font-size: var(--font-xs);
     color: var(--warning-dark);
@@ -898,7 +974,6 @@ button.warning.highlight {
     padding-top: var(--spacing-2);
     border-top: 1px solid var(--border-light);
 }
-
 
 /* ============================================================
    固定还款额外表单
@@ -910,18 +985,20 @@ button.warning.highlight {
     margin: var(--spacing-3) 0;
     border: 1px solid #bbf7d0;
 }
+
 .fixed-repayment-form .form-group {
     margin-bottom: var(--spacing-3);
 }
+
 .fixed-repayment-form .form-group:last-child {
     margin-bottom: 0;
 }
+
 .fixed-repayment-form label {
     font-weight: 600;
     font-size: var(--font-sm);
     color: #166534;
 }
-
 
 /* ============================================================
    客户摘要卡片（订单详情中的客户信息）
@@ -929,16 +1006,17 @@ button.warning.highlight {
 .customer-summary {
     margin-bottom: var(--spacing-3);
 }
+
 .customer-summary p {
     margin-bottom: var(--spacing-1);
     font-size: var(--font-sm);
     line-height: 1.5;
 }
+
 .customer-summary strong {
     color: var(--text-secondary);
     font-weight: 600;
 }
-
 
 /* ============================================================
    缴费页面 - 订单摘要网格
@@ -949,6 +1027,7 @@ button.warning.highlight {
     gap: var(--spacing-2);
     margin-bottom: 0;
 }
+
 .summary-item {
     display: flex;
     justify-content: flex-start;
@@ -959,6 +1038,7 @@ button.warning.highlight {
     gap: var(--spacing-2);
     border: 1px solid var(--border-light);
 }
+
 .summary-item .label {
     font-weight: 600;
     color: var(--text-secondary);
@@ -966,6 +1046,7 @@ button.warning.highlight {
     white-space: nowrap;
     flex-shrink: 0;
 }
+
 .summary-item .value {
     font-weight: 500;
     color: var(--text-primary);
@@ -974,17 +1055,19 @@ button.warning.highlight {
     flex: 1;
     font-size: var(--font-sm);
 }
+
 .summary-item .value.order-id {
     font-family: monospace;
     font-weight: 600;
 }
+
 .summary-item .value.warning {
     color: var(--warning-dark);
 }
+
 .summary-item .value.success-text {
     color: var(--success-dark);
 }
-
 
 /* ============================================================
    缴费页面 - 双列操作卡片
@@ -995,12 +1078,12 @@ button.warning.highlight {
     gap: var(--spacing-3);
     margin-bottom: var(--spacing-3);
 }
+
 .payment-double-column .card {
     flex: 1;
     min-width: 280px;
     margin-bottom: 0;
 }
-
 
 /* ============================================================
    缴费页面 - 操作卡片特有样式
@@ -1011,26 +1094,29 @@ button.warning.highlight {
     align-items: center;
     margin-bottom: var(--spacing-3);
 }
+
 .action-card .card-header h3 {
     margin: 0;
     border-bottom: none;
     padding-bottom: 0;
 }
+
 .action-card .card-body {
     margin-bottom: var(--spacing-3);
 }
+
 .action-card .card-history {
     margin-top: var(--spacing-3);
     padding-top: var(--spacing-3);
     border-top: 1px solid var(--border-light);
 }
+
 .card-history .history-title {
     font-size: var(--font-xs);
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: var(--spacing-2);
 }
-
 
 /* ============================================================
    缴费页面 - 操作输入组
@@ -1041,12 +1127,14 @@ button.warning.highlight {
     gap: var(--spacing-2);
     margin: var(--spacing-3) 0;
 }
+
 .action-input-group .action-label {
     font-size: var(--font-sm);
     font-weight: 600;
     color: var(--text-secondary);
     white-space: nowrap;
 }
+
 .action-input-group .action-select,
 .action-input-group .action-input {
     flex: 1;
@@ -1056,7 +1144,6 @@ button.warning.highlight {
     font-size: var(--font-sm);
 }
 
-
 /* ============================================================
    缴费页面 - 信息盒子
    ============================================================ */
@@ -1065,6 +1152,7 @@ button.warning.highlight {
     border-radius: var(--radius-md);
     margin-bottom: var(--spacing-3);
 }
+
 .info-box .info-row {
     display: flex;
     justify-content: space-between;
@@ -1074,25 +1162,28 @@ button.warning.highlight {
     border-bottom: 1px solid var(--border-light);
     font-size: var(--font-sm);
 }
+
 .info-box .info-row:last-child {
     margin-bottom: 0;
     padding-bottom: 0;
     border-bottom: none;
 }
+
 .info-box.success-box {
     border-left: 4px solid var(--success);
     background: var(--success-light);
 }
+
 .info-box.warning-box {
     border-left: 4px solid var(--warning);
     background: var(--warning-light);
 }
+
 .info-box .amount-highlight {
     font-size: var(--font-lg);
     color: var(--success);
     font-weight: 700;
 }
-
 
 /* ============================================================
    缴费页面 - 支付方式组
@@ -1100,16 +1191,19 @@ button.warning.highlight {
 .payment-method-group {
     margin: var(--spacing-3) 0;
 }
+
 .payment-method-group .payment-method-title {
     font-size: var(--font-xs);
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: var(--spacing-1);
 }
+
 .payment-method-options {
     display: flex;
     gap: var(--spacing-4);
 }
+
 .payment-method-options label {
     display: flex;
     align-items: center;
@@ -1118,10 +1212,10 @@ button.warning.highlight {
     font-weight: 500;
     font-size: var(--font-sm);
 }
+
 .payment-method-options input[type="radio"] {
     accent-color: var(--primary);
 }
-
 
 /* ============================================================
    缴费页面 - 提示卡片
@@ -1136,7 +1230,6 @@ button.warning.highlight {
     line-height: 1.4;
 }
 
-
 /* ============================================================
    信息备注行
    ============================================================ */
@@ -1147,7 +1240,6 @@ button.warning.highlight {
     line-height: 1.5;
 }
 
-
 /* ============================================================
    客户信息展示
    ============================================================ */
@@ -1156,6 +1248,7 @@ button.warning.highlight {
     font-size: var(--font-sm);
     line-height: 1.5;
 }
+
 .customer-info-display strong {
     color: var(--text-secondary);
     font-weight: 600;
