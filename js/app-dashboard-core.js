@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.0 (JF 命名空间) - 资金池指标版
+// app-dashboard-core.js - v2.5 最终版 (JF 命名空间) - 简化调用+三卡片资金布局
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
 
 'use strict';
@@ -460,7 +460,6 @@
                     let allLoan = 0;
                     for (const o of allLoanData.data || []) allLoan += (o.loan_amount || 0);
 
-                    // 查询总投入资本
                     let totalInjectedCapital = 0;
                     try {
                         let injectionQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
@@ -471,7 +470,6 @@
                         }
                     } catch (e) { /* 表可能不存在 */ }
 
-                    // 查询在押资金
                     let deployedCapital = 0;
                     try {
                         let deployedQuery = client.from('orders').select('loan_amount').eq('status', 'active');
@@ -529,15 +527,13 @@
                 const bankIncome = cashFlow.bank?.income ?? 0;
                 const bankExpense = cashFlow.bank?.expense ?? 0;
 
-                // ===== 三卡片资金布局 =====
                 const totalInjected = report.total_injected_capital || 0;
                 const deployed = report.deployed_capital || 0;
                 const available = report.available_capital || 0;
                 const utilizationPercent = totalInjected > 0 ? (deployed / totalInjected * 100).toFixed(1) : 0;
 
                 const injectButtonHtml = isAdmin ? `
-                <button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info(lang === 'id' ? 'Modul belum dimuat' : '模块未加载')"
-                    class="btn-capital-inject">
+                <button onclick="JF.CapitalModule.showCapitalInjectionModal()" class="btn-capital-inject">
                     💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}
                 </button>` : `
                 <div class="info-bar info" style="margin-top:8px;">
@@ -547,15 +543,12 @@
 
                 const topRowHtml = `
                 <div class="stats-grid stats-grid-2" style="margin-bottom:16px;">
-                    <!-- 卡片1：总投入资本 -->
                     <div class="card" style="margin-bottom:0;">
                         <h3>💉 ${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</h3>
                         <div class="stat-value" style="font-size:var(--font-2xl);margin-bottom:8px;">${Utils.formatCurrency(totalInjected)}</div>
                         <div class="stat-label" style="margin-bottom:12px;">${lang === 'id' ? 'Modal dasar operasional gadai' : '典当运营基础资本'}</div>
                         ${injectButtonHtml}
                     </div>
-                    
-                    <!-- 卡片2：在押资金 -->
                     <div class="card" style="margin-bottom:0;">
                         <h3>📋 ${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</h3>
                         <div class="stat-value warning" style="font-size:var(--font-2xl);margin-bottom:8px;">${Utils.formatCurrency(deployed)}</div>
@@ -576,7 +569,6 @@
                         <h3 style="margin:0;padding:0;border:none;">✅ ${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</h3>
                         <span style="font-size:var(--font-xl);font-weight:700;color:#16a34a;">${Utils.formatCurrency(available)}</span>
                     </div>
-                    
                     <div class="cashflow-summary" style="margin-bottom:12px;">
                         <div class="cashflow-stats" style="grid-template-columns:repeat(2,1fr);">
                             <div class="cashflow-item">
@@ -591,7 +583,6 @@
                             </div>
                         </div>
                     </div>
-                    
                     <div style="font-size:var(--font-xs);font-weight:600;color:var(--text-secondary);margin-bottom:8px;">
                         🔄 ${lang === 'id' ? 'Transfer Internal' : '内部互转'}
                     </div>
@@ -609,8 +600,7 @@
                     : (lang === 'id' ? 'Manajer Toko' : '店长');
                 const storeNameDisplay = AUTH.getCurrentStoreName();
 
-                // ===== 工具栏（恢复资本注入按钮） =====
-                const capitalizeBtnHtml = `<button onclick="JF.CapitalModule ? JF.CapitalModule.showCapitalInjectionModal() : Utils.toast.info(lang === 'id' ? 'Modul belum dimuat' : '模块未加载')">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>`;
+                const injectBtn = `<button onclick="JF.CapitalModule.showCapitalInjectionModal()">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>`;
 
                 const toolbarHtml = isAdmin ? `
                     <div class="toolbar admin-grid no-print">
@@ -618,7 +608,7 @@
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                        ${capitalizeBtnHtml}
+                        ${injectBtn}
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
@@ -630,7 +620,7 @@
                         <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
                         <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
                         <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                        ${capitalizeBtnHtml}
+                        ${injectBtn}
                         <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
                         <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
                         <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
@@ -690,7 +680,6 @@
         }
     };
 
-    // 挂载到命名空间
     JF.DashboardCore = DashboardCore;
 
     if (!window.APP) window.APP = {};
@@ -726,5 +715,5 @@
         }
     });
 
-    console.log('✅ JF.DashboardCore v2.4 最终版初始化完成（完整工具栏+三卡片资金布局）');
+    console.log('✅ JF.DashboardCore v2.5 初始化完成');
 })();
