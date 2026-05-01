@@ -575,7 +575,6 @@
                 document.getElementById("app").innerHTML = `
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                            ${backBtn}
                             <img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">
                             <h1 style="margin:0;">JF! by Gadai</h1>
                         </div>
