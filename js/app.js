@@ -1,5 +1,6 @@
-// app.js - 主入口文件 (v1.2)
+// app.js - 主入口文件 (v1.4)
 // 修复：仪表盘卡片功能错误 - 银行卡图标应跳转到 paymentHistory
+// 添加：手动恢复按钮
 
 window.APP = window.APP || {};
 
@@ -34,6 +35,30 @@ APP.clearPageState = function() {
     } catch(e) {}
 };
 
+// ==================== 手动恢复函数（用户可点击） ====================
+APP.forceRecovery = function() {
+    console.log('[Recovery] 手动强制恢复');
+    var appDiv = document.getElementById('app');
+    if (appDiv) {
+        appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><div class="loader"></div><p>' + 
+            (Utils.lang === 'id' ? '正在恢复...' : 'Recovering...') + '</p></div>';
+    }
+    
+    setTimeout(function() {
+        if (AUTH.isLoggedIn && AUTH.isLoggedIn()) {
+            if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
+                DashboardCore.renderDashboard();
+            } else if (typeof APP.renderDashboard === 'function') {
+                APP.renderDashboard();
+            } else {
+                location.reload();
+            }
+        } else {
+            APP.showLogin();
+        }
+    }, 100);
+};
+
 // 切换语言
 APP.toggleLanguage = function() {
     var newLang = Utils.lang === 'id' ? 'zh' : 'id';
@@ -65,30 +90,40 @@ APP.goBack = function() {
 
 // 导航到指定页面
 APP.navigateTo = function(page, params) {
+    console.log('[APP] navigateTo:', page, params);
+    
     if (typeof window.DashboardCore !== 'undefined' && DashboardCore.navigateTo) {
         DashboardCore.navigateTo(page, params);
         return;
     }
+    
     console.log('[APP] navigateTo (fallback):', page, params);
     if (params) {
         if (params.orderId) APP.currentOrderId = params.orderId;
         if (params.customerId) APP.currentCustomerId = params.customerId;
     }
-    switch(page) {
-        case 'dashboard': APP.renderDashboard(); break;
-        case 'orderTable': if (typeof APP.showOrderTable === 'function') APP.showOrderTable(); else APP.renderDashboard(); break;
-        case 'customers': if (typeof APP.showCustomers === 'function') APP.showCustomers(); else APP.renderDashboard(); break;
-        case 'expenses': if (typeof APP.showExpenses === 'function') APP.showExpenses(); else APP.renderDashboard(); break;
-        case 'userManagement': if (typeof APP.showUserManagement === 'function') APP.showUserManagement(); else APP.renderDashboard(); break;
-        case 'storeManagement': if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') StoreManager.renderStoreManagement(); else APP.renderDashboard(); break;
-        case 'anomaly': if (typeof APP.showAnomaly === 'function') APP.showAnomaly(); else APP.renderDashboard(); break;
-        case 'paymentHistory': if (typeof APP.showCashFlowPage === 'function') APP.showCashFlowPage(); else if (typeof APP.showPaymentHistory === 'function') APP.showPaymentHistory(); else APP.renderDashboard(); break;
-        case 'backupRestore': if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') BackupStorage.renderBackupUI(); else APP.renderDashboard(); break;
-        case 'blacklist': if (typeof APP.showBlacklist === 'function') APP.showBlacklist(); else APP.renderDashboard(); break;
-        case 'payment': if (params && params.orderId && typeof APP.showPayment === 'function') APP.showPayment(params.orderId); else APP.renderDashboard(); break;
-        case 'viewOrder': if (params && params.orderId && typeof APP.viewOrder === 'function') APP.viewOrder(params.orderId); else APP.renderDashboard(); break;
-        case 'createOrder': if (params && params.customerId && typeof APP.createOrderForCustomer === 'function') APP.createOrderForCustomer(params.customerId); else APP.renderDashboard(); break;
-        default: APP.renderDashboard();
+    
+    try {
+        switch(page) {
+            case 'dashboard': APP.renderDashboard(); break;
+            case 'orderTable': if (typeof APP.showOrderTable === 'function') APP.showOrderTable(); else APP.renderDashboard(); break;
+            case 'customers': if (typeof APP.showCustomers === 'function') APP.showCustomers(); else APP.renderDashboard(); break;
+            case 'expenses': if (typeof APP.showExpenses === 'function') APP.showExpenses(); else APP.renderDashboard(); break;
+            case 'userManagement': if (typeof APP.showUserManagement === 'function') APP.showUserManagement(); else APP.renderDashboard(); break;
+            case 'storeManagement': if (typeof StoreManager !== 'undefined' && typeof StoreManager.renderStoreManagement === 'function') StoreManager.renderStoreManagement(); else APP.renderDashboard(); break;
+            case 'anomaly': if (typeof APP.showAnomaly === 'function') APP.showAnomaly(); else APP.renderDashboard(); break;
+            case 'paymentHistory': if (typeof APP.showCashFlowPage === 'function') APP.showCashFlowPage(); else if (typeof APP.showPaymentHistory === 'function') APP.showPaymentHistory(); else APP.renderDashboard(); break;
+            case 'backupRestore': if (typeof BackupStorage !== 'undefined' && typeof BackupStorage.renderBackupUI === 'function') BackupStorage.renderBackupUI(); else APP.renderDashboard(); break;
+            case 'blacklist': if (typeof APP.showBlacklist === 'function') APP.showBlacklist(); else APP.renderDashboard(); break;
+            case 'payment': if (params && params.orderId && typeof APP.showPayment === 'function') APP.showPayment(params.orderId); else APP.renderDashboard(); break;
+            case 'viewOrder': if (params && params.orderId && typeof APP.viewOrder === 'function') APP.viewOrder(params.orderId); else APP.renderDashboard(); break;
+            case 'createOrder': if (params && params.customerId && typeof APP.createOrderForCustomer === 'function') APP.createOrderForCustomer(params.customerId); else APP.renderDashboard(); break;
+            default: APP.renderDashboard();
+        }
+    } catch (error) {
+        console.error('[navigateTo] 页面切换错误:', error);
+        Utils.toast.error(Utils.lang === 'id' ? '页面加载失败，返回首页' : 'Page load failed, returning to home');
+        APP.renderDashboard();
     }
 };
 
@@ -293,9 +328,7 @@ APP.renderDashboard = async function() {
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'orderTable\')"><div class="card-icon">📋</div><div class="card-title">' + t('order_list') + '</div><div class="card-desc">' + t('manage_orders') + '</div></div>' +
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'customers\')"><div class="card-icon">👥</div><div class="card-title">' + t('customers') + '</div><div class="card-desc">' + t('manage_customers') + '</div></div>' +
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'expenses\')"><div class="card-icon">📝</div><div class="card-title">' + t('expenses') + '</div><div class="card-desc">' + t('manage_expenses') + '</div></div>' +
-                    // 修复：银行卡卡片应跳转到 paymentHistory 页面
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'paymentHistory\')"><div class="card-icon">💰</div><div class="card-title">' + t('payment_history') + '</div><div class="card-desc">' + t('view_cashflow') + '</div></div>' +
-                    // 删除重复的银行卡卡片，添加资金流水查看
                     '<div class="dashboard-card" onclick="APP.showCashFlowPage()"><div class="card-icon">🏦</div><div class="card-title">' + (lang === 'id' ? 'Arus Kas' : '资金流水') + '</div><div class="card-desc">' + t('view_transactions') + '</div></div>' +
                     '<div class="dashboard-card" onclick="APP.navigateTo(\'anomaly\')"><div class="card-icon">⚠️</div><div class="card-title">' + t('anomaly_title') + '</div><div class="card-desc">' + t('abnormal_status') + '</div></div>';
         
@@ -315,6 +348,13 @@ APP.renderDashboard = async function() {
     } catch (error) {
         console.error("renderDashboard error:", error);
         Utils.toast.error(lang === 'id' ? 'Gagal memuat dashboard' : '加载仪表盘失败');
+        // 显示带恢复按钮的错误界面
+        document.getElementById("app").innerHTML = '' +
+            '<div class="card" style="text-align:center;padding:40px;">' +
+                '<p>⚠️ ' + (lang === 'id' ? '加载仪表盘失败' : 'Dashboard load failed') + '</p>' +
+                '<button onclick="APP.forceRecovery()" style="margin-top:12px;margin-right:8px;">🔄 ' + (lang === 'id' ? '强制恢复' : 'Force Recovery') + '</button>' +
+                '<button onclick="location.reload()" style="margin-top:12px;">🔄 ' + (lang === 'id' ? '刷新页面' : 'Refresh') + '</button>' +
+            '</div>';
     }
 };
 
@@ -368,4 +408,4 @@ APP.sendWAReminder = async function(orderId) {
 // 导出 APP 到全局
 window.APP = APP;
 
-console.log('[APP] app.js 加载完成');
+console.log('[APP] app.js 加载完成 (v1.4 with forceRecovery)');
