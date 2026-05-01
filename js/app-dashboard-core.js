@@ -884,11 +884,17 @@ const DashboardCore = {
                 { ttl: 5 * 60 * 1000 }
             );
             
-            const expensesCacheKey = 'expenses_' + (isAdmin ? 'admin' : storeId);
+                       const expensesCacheKey = 'expenses_' + (isAdmin ? 'admin' : storeId);
             const totalExpenses = await DashboardCache.get(expensesCacheKey, async () => {
                 const client = SUPABASE.getClient();
-                let query = client.from('expenses').select('amount');
+                let query = client.from('expenses').select('amount, store_id');
                 if (!isAdmin && storeId) query = query.eq('store_id', storeId);
+                else if (isAdmin) {
+                    const practiceIds = await SUPABASE._getPracticeStoreIds();
+                    if (practiceIds.length > 0) {
+                        query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                    }
+                }
                 const { data } = await query;
                 let sum = 0;
                 for (const ex of (data || [])) sum += (ex.amount || 0);
