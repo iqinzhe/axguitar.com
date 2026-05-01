@@ -1,7 +1,8 @@
-// app.js - 主入口文件 (v1.5 最终修复版)
+// app.js - 主入口文件 (v1.6 统一登录入口版)
 // 修复：仪表盘卡片功能错误 - 银行卡图标应跳转到 paymentHistory
 // 添加：手动强制恢复函数 APP.forceRecovery()
 // 优化：错误界面添加恢复按钮
+// 统一：登录入口委托给 DashboardCore.renderLogin
 
 window.APP = window.APP || {};
 
@@ -42,8 +43,10 @@ APP.forceRecovery = function() {
                     location.reload();
                 }
             } else {
-                // 未登录，显示登录页
-                if (typeof APP.showLogin === 'function') {
+                // 未登录，显示登录页 - 统一使用 DashboardCore
+                if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderLogin) {
+                    DashboardCore.renderLogin();
+                } else if (typeof APP.showLogin === 'function') {
                     APP.showLogin();
                 } else {
                     location.reload();
@@ -99,7 +102,14 @@ APP.toggleLanguage = function() {
             location.reload();
         }
     } else {
-        APP.showLogin();
+        // 未登录时显示登录页，委托给 DashboardCore
+        if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderLogin) {
+            DashboardCore.renderLogin();
+        } else if (typeof APP.showLogin === 'function') {
+            APP.showLogin();
+        } else {
+            location.reload();
+        }
     }
 };
 
@@ -193,8 +203,16 @@ APP.isLoggedIn = function() {
     return AUTH && typeof AUTH.isLoggedIn === 'function' && AUTH.isLoggedIn();
 };
 
-// 显示登录页面
+// ========== 统一登录入口（委托给 DashboardCore） ==========
 APP.showLogin = function() {
+    // 优先使用 DashboardCore 的登录界面（保持单一入口）
+    if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderLogin) {
+        DashboardCore.renderLogin();
+        return;
+    }
+    
+    // 降级方案：当 DashboardCore 不可用时使用原始登录界面（极少情况）
+    console.warn('[APP] DashboardCore 不可用，使用降级登录界面');
     var lang = Utils.lang;
     var t = function(key) { return Utils.t(key); };
     
@@ -438,7 +456,7 @@ APP.sendWAReminder = async function(orderId) {
 window.APP = APP;
 
 // 在控制台输出可用的恢复命令
-console.log('[APP] app.js 加载完成 (v1.5)');
+console.log('[APP] app.js 加载完成 (v1.6)');
 console.log('[APP] 如果出现白板，请在控制台执行 APP.forceRecovery() 恢复页面');
 
 // 可选：注册全局快捷键 Alt+R 恢复页面（方便调试）
