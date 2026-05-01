@@ -1518,15 +1518,21 @@ const SupabaseAPI = {
     // ======================================================================
     // 问题6修复：getCashFlowSummary() 净利润公式排除本金进出
     // ======================================================================
-    async getCashFlowSummary() {
+       async getCashFlowSummary() {
         const profile = await this.getCurrentProfile();
 
         let query = supabaseClient.from('cash_flow_records')
-            .select('direction, amount, source_target, flow_type')
+            .select('direction, amount, source_target, flow_type, store_id')
             .eq('is_voided', false);
 
         if (profile?.role !== 'admin' && profile?.store_id) {
             query = query.eq('store_id', profile.store_id);
+        } else if (profile?.role === 'admin') {
+            // 总部排除练习门店
+            const practiceIds = await this._getPracticeStoreIds();
+            if (practiceIds.length > 0) {
+                query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
         }
 
         const { data: flows, error } = await query;
