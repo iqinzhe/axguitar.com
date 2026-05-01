@@ -1,4 +1,4 @@
-// supabase.js - v2.2 优化版 (JF 统一命名空间，完整方法)
+// supabase.js - v2.3 优化版 (JF 统一命名空间，资金池指标版)
 // 数据层核心，挂载到 JF.Supabase，向下兼容 window.SUPABASE
 
 'use strict';
@@ -684,6 +684,83 @@
             return flowRecord;
         },
 
+        // ===== 新增：记录资本注入 =====
+        async recordCapitalInjection(storeId, amount, source, description) {
+            const profile = await this.getCurrentProfile();
+            const targetStoreId = storeId || profile?.store_id;
+            if (!targetStoreId) throw new Error(Utils.lang === 'id' ? 'ID toko tidak ditemukan' : '门店ID缺失');
+            if (!amount || amount <= 0) throw new Error(Utils.t('invalid_amount'));
+
+            const { data, error } = await supabaseClient.from('capital_injections').insert({
+                store_id: targetStoreId,
+                amount: amount,
+                source: source || 'cash',
+                description: description || (Utils.lang === 'id' ? 'Injeksi modal' : '资本注入'),
+                injection_date: Utils.getLocalToday(),
+                recorded_by: profile?.id,
+                is_voided: false,
+                created_at: Utils.getLocalDateTime()
+            }).select().single();
+
+            if (error) throw error;
+
+            // 同时记录资金流水（入账）
+            await this.recordCashFlow({
+                store_id: targetStoreId,
+                flow_type: 'capital_injection',
+                direction: 'inflow',
+                amount: amount,
+                source_target: source || 'cash',
+                description: description || (Utils.lang === 'id' ? 'Injeksi modal' : '资本注入'),
+                reference_id: data.id
+            });
+
+            console.log(`✅ 资本注入记录成功: ${Utils.formatCurrency(amount)} -> ${targetStoreId}`);
+            return data;
+        },
+
+        // ===== 新增：获取资本注入总额（辅助方法） =====
+        async getTotalInjectedCapital(storeId) {
+            const profile = await this.getCurrentProfile();
+            const targetStoreId = storeId || profile?.store_id;
+
+            let query = supabaseClient.from('capital_injections')
+                .select('amount')
+                .eq('is_voided', false);
+
+            if (profile?.role !== 'admin' && targetStoreId) {
+                query = query.eq('store_id', targetStoreId);
+            }
+
+            const { data, error } = await query;
+            if (error) {
+                console.warn('查询资本注入失败:', error);
+                return 0;
+            }
+            return (data || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+        },
+
+        // ===== 新增：获取在押资金（active状态的贷款总额） =====
+        async getDeployedCapital(storeId) {
+            const profile = await this.getCurrentProfile();
+            const targetStoreId = storeId || profile?.store_id;
+
+            let query = supabaseClient.from('orders')
+                .select('loan_amount')
+                .eq('status', 'active');
+
+            if (profile?.role !== 'admin' && targetStoreId) {
+                query = query.eq('store_id', targetStoreId);
+            }
+
+            const { data, error } = await query;
+            if (error) {
+                console.warn('查询在押资金失败:', error);
+                return 0;
+            }
+            return (data || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
+        },
+
         // ---------- 订单核心操作 ----------
         async getOrders(filters, from, to) {
             if (filters === undefined) filters = {};
@@ -792,6 +869,7 @@
                         overdue_days: 0,
                         liquidation_status: 'normal',
                         max_extension_months: orderData.max_extension_months || 10,
+                        fund_status: 'deployed',  // ===== 新增：放款时标记为在押 =====
                         created_at: Utils.getLocalDateTime(),
                         updated_at: Utils.getLocalDateTime()
                     };
@@ -806,7 +884,7 @@
                         throw error;
                     }
                     newOrder = data;
-                    console.log('✅ 订单创建成功: ' + orderId + ' (还款方式: ' + repaymentType + ')');
+                    console.log('✅ 订单创建成功: ' + orderId + ' (还款方式: ' + repaymentType + ', 资金状态: deployed)');
                     break;
                 } catch (err) {
                     if (err.code === '23505' && retryCount < 4) {
@@ -924,6 +1002,7 @@
                     interest_paid_total: newInterestPaidTotal,
                     next_interest_due_date: nextDueDate,
                     monthly_interest: monthlyInterest,
+                    fund_status: 'extended',  // ===== 新增：续当时标记 =====
                     updated_at: Utils.getLocalDateTime()
                 }).eq('order_id', orderId);
                 if (updateError) throw updateError;
@@ -979,6 +1058,7 @@
             if (isFullRepayment) {
                 updates.status = 'completed';
                 updates.monthly_interest = 0;
+                updates.fund_status = 'returned';  // ===== 新增：全额结清时标记为回笼 =====
                 updates.completed_at = Utils.getLocalDateTime();
             } else {
                 updates.monthly_interest = newPrincipalRemaining * monthlyRate;
@@ -1039,7 +1119,11 @@
                 next_interest_due_date: nextDueDate,
                 updated_at: Utils.getLocalDateTime()
             };
-            if (isCompleted) { updates.status = 'completed'; updates.completed_at = Utils.getLocalDateTime(); }
+            if (isCompleted) {
+                updates.status = 'completed';
+                updates.fund_status = 'returned';  // ===== 新增：固定还款结清时标记为回笼 =====
+                updates.completed_at = Utils.getLocalDateTime();
+            }
             const { error: updateError } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
             if (updateError) throw updateError;
             if (interestAmount > 0) {
@@ -1101,8 +1185,11 @@
                 reference_id: order.order_id
             });
             const { error } = await supabaseClient.from('orders').update({
-                status: 'completed', principal_paid: order.loan_amount,
-                principal_remaining: 0, completed_at: Utils.getLocalDateTime(),
+                status: 'completed',
+                principal_paid: order.loan_amount,
+                principal_remaining: 0,
+                fund_status: 'returned',  // ===== 新增：提前结清标记为回笼 =====
+                completed_at: Utils.getLocalDateTime(),
                 updated_at: Utils.getLocalDateTime()
             }).eq('order_id', orderId);
             if (error) throw error;
@@ -1122,12 +1209,20 @@
                 let overdueDays = 0;
                 if (todayLocal > due) overdueDays = Math.floor((todayLocal - due) / 86400000);
                 let liquidationStatus = order.liquidation_status || 'normal';
-                if (overdueDays >= 30) liquidationStatus = 'liquidated';
-                else if (overdueDays >= 15) liquidationStatus = 'warning';
-                else liquidationStatus = 'normal';
+                let fundStatusUpdate = {};
+                if (overdueDays >= 30) {
+                    liquidationStatus = 'liquidated';
+                    fundStatusUpdate.fund_status = 'forfeited';  // ===== 新增：流当时标记 =====
+                } else if (overdueDays >= 15) {
+                    liquidationStatus = 'warning';
+                } else {
+                    liquidationStatus = 'normal';
+                }
                 if (overdueDays !== order.overdue_days || liquidationStatus !== order.liquidation_status) {
                     await supabaseClient.from('orders').update({
-                        overdue_days: overdueDays, liquidation_status: liquidationStatus,
+                        overdue_days: overdueDays,
+                        liquidation_status: liquidationStatus,
+                        ...fundStatusUpdate,
                         updated_at: Utils.getLocalDateTime()
                     }).eq('id', order.id);
                 }
@@ -1268,6 +1363,7 @@
             return data;
         },
 
+        // ===== 修改：getCashFlowSummary() 增加资金池三个指标 =====
         async getCashFlowSummary() {
             const profile = await this.getCurrentProfile();
             let query = supabaseClient.from('cash_flow_records').select('direction, amount, source_target, flow_type, store_id').eq('is_voided', false);
@@ -1279,6 +1375,7 @@
             }
             const { data: flows, error } = await query;
             if (error) throw error;
+
             let cashIn = 0, cashOut = 0, bankIn = 0, bankOut = 0, operatingIncome = 0, operatingExpense = 0;
             for (const flow of (flows || [])) {
                 const amt = flow.amount || 0;
@@ -1292,11 +1389,39 @@
                 if (flow.flow_type === 'expense') operatingExpense += amt;
                 else if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') operatingIncome += amt;
             }
+
+            // ===== 新增：查询总投入资本 =====
+            let injectionQuery = supabaseClient.from('capital_injections')
+                .select('amount')
+                .eq('is_voided', false);
+            if (profile?.role !== 'admin' && profile?.store_id) {
+                injectionQuery = injectionQuery.eq('store_id', profile.store_id);
+            }
+            const { data: injections } = await injectionQuery;
+            const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+
+            // ===== 新增：查询在押资金 =====
+            let deployedQuery = supabaseClient.from('orders')
+                .select('loan_amount')
+                .eq('status', 'active');
+            if (profile?.role !== 'admin' && profile?.store_id) {
+                deployedQuery = deployedQuery.eq('store_id', profile.store_id);
+            }
+            const { data: deployedOrders } = await deployedQuery;
+            const deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
+
+            // ===== 新增：计算可动用资金 =====
+            const availableCapital = totalInjectedCapital - deployedCapital;
+
             return {
                 cash: { income: cashIn, expense: cashOut, netIncome: cashIn - cashOut, balance: cashIn - cashOut },
                 bank: { income: bankIn, expense: bankOut, netIncome: bankIn - bankOut, balance: bankIn - bankOut },
                 total: { income: cashIn + bankIn, expense: cashOut + bankOut, netIncome: (cashIn + bankIn) - (cashOut + bankOut), balance: (cashIn - cashOut) + (bankIn - bankOut) },
-                netProfit: { balance: operatingIncome - operatingExpense, operatingIncome, operatingExpense }
+                netProfit: { balance: operatingIncome - operatingExpense, operatingIncome, operatingExpense },
+                // ===== 新增：资金池三个指标 =====
+                total_injected_capital: totalInjectedCapital,
+                deployed_capital: deployedCapital,
+                available_capital: availableCapital
             };
         },
 
@@ -1495,5 +1620,5 @@
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI; // 向下兼容
 
-    console.log('✅ JF.Supabase v2.2 初始化完成');
+    console.log('✅ JF.Supabase v2.3 初始化完成（资金池指标版）');
 })();
