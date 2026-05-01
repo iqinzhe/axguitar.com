@@ -100,20 +100,21 @@ const AnomalyHelper = {
             }
         }
         
-        const storeInfoMap = {};
+                const storeInfoMap = {};
         for (const store of stores) {
             storeInfoMap[store.id] = {
                 id: store.id,
                 name: store.name,
                 code: store.code,
-                isActive: store.is_active !== false
+                isActive: store.is_active !== false,
+                isPractice: store.is_practice === true
             };
         }
         
         const storeStats = {};
         for (const order of (monthlyOrders || [])) {
             const s = storeInfoMap[order.store_id];
-            if (!s || !s.isActive || s.code === 'STORE_000') continue;
+            if (!s || !s.isActive || s.code === 'STORE_000' || s.isPractice) continue;
             
             if (!storeStats[order.store_id]) {
                 storeStats[order.store_id] = {
