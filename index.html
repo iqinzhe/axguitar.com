@@ -33,10 +33,13 @@
 </div>
 
 <!-- ========== 脚本加载顺序（重要！请勿调整） ========== -->
+
     <!-- 0. 先引入配置文件（放真实密钥） -->
     <script src="config.js"></script>
+
     <!-- 1. 基础库（同步） -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <!-- 2. 核心模块（defer，按依赖顺序排列） -->
     <script defer src="js/utils.js"></script>           <!-- 工具类，无依赖 -->
     <script defer src="js/toast.js"></script>          <!-- Toast 通知，依赖 utils -->
@@ -48,8 +51,10 @@
     <script defer src="js/store.js"></script>          <!-- 门店管理，依赖 supabase -->
     <script defer src="js/storage.js"></script>        <!-- 备份恢复，依赖 supabase, audit -->
     <script defer src="js/migration.js"></script>      <!-- 数据迁移，依赖 supabase -->
+
     <!-- 3. 统一缓存模块（必须在所有使用它的模块之前） -->
     <script defer src="js/cache.js"></script>          <!-- 统一缓存模块 -->
+
     <!-- 4. 页面组件模块（defer，依赖核心模块和缓存模块） -->
     <script defer src="js/app-dashboard-core.js"></script>     <!-- 核心仪表盘 -->
     <script defer src="js/app-dashboard-anomaly.js"></script>  <!-- 异常检测 -->
@@ -62,23 +67,32 @@
     <script defer src="js/app-customers.js"></script>          <!-- 客户管理 -->
     <script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
     <script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
+
     <!-- 5. 资金管理模块（新增强化功能） -->
     <script defer src="js/app-capital.js"></script>            <!-- 资本注入、利润再投入、资金占用 -->
-    <!-- 6. 状态初始化模块（页面恢复状态预加载） -->
+
+    <!-- 6. 主入口文件（核心导航和恢复功能） -->
+    <script defer src="js/app.js"></script>                    <!-- 主入口：APP.forceRecovery, navigateTo, renderDashboard 等 -->
+
+    <!-- 7. 状态初始化模块（页面恢复状态预加载） -->
     <script defer src="js/app-state-init.js"></script>
-    <!-- 7. 主入口（defer，在所有模块之后） -->
+
+    <!-- 8. 启动应用（等待所有模块加载完成后） -->
     <script defer>
-        // 启动应用（等待所有模块加载完成后）
         document.addEventListener('DOMContentLoaded', function() {
-            // 确保 APP 对象存在
             if (typeof window.APP === 'undefined') {
                 window.APP = {};
             }
-            // 启动应用
             if (typeof window.APP.init === 'function') {
                 window.APP.init();
+            } else if (typeof window.DashboardCore !== 'undefined' && typeof window.DashboardCore.init === 'function') {
+                window.DashboardCore.init();
             } else {
-                console.error('[Init] APP.init 未定义，请检查模块加载顺序');
+                console.error('[Init] APP.init 或 DashboardCore.init 未定义');
+                // 尝试强制恢复
+                if (typeof window.APP.forceRecovery === 'function') {
+                    window.APP.forceRecovery();
+                }
             }
         });
     </script>
