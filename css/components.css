@@ -1,6 +1,6 @@
 /* ============================================================
    components.css - 第3层：全系统可复用 UI 组件库
-   职责：所有可复用的组件 + 表格系统 + 徽章 + 空状态
+   优化：统一 BEM 命名，使用 CSS 变量，合并冗余，移除旧别名
    ============================================================ */
 
 /* ============================================================
@@ -48,7 +48,6 @@
     padding: var(--spacing-1);
 }
 
-
 /* ============================================================
    C2. 提示信息条
    ============================================================ */
@@ -82,32 +81,35 @@
     border-left: 4px solid #0284c7;
     color: #0c4a6e;
 }
+
 .info-bar.info strong { color: #0369a1; }
 
 .info-bar.warning {
     background: #fef3c7;
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid var(--warning);
     color: #92400e;
 }
+
 .info-bar.warning strong { color: #b45309; }
 
 .info-bar.danger {
     background: #fee2e2;
-    border-left: 4px solid #ef4444;
+    border-left: 4px solid var(--danger);
     color: #991b1b;
 }
-.info-bar.danger strong { color: #dc2626; }
+
+.info-bar.danger strong { color: var(--danger-dark); }
 
 .info-bar.success {
-    background: #ecfdf5;
-    border-left: 4px solid #10b981;
+    background: var(--success-light);
+    border-left: 4px solid var(--success);
     color: #065f46;
 }
-.info-bar.success strong { color: #059669; }
 
+.info-bar.success strong { color: var(--success-dark); }
 
 /* ============================================================
-   C3. 统计卡片（小号）- 层级：次级卡片
+   C3. 统计卡片（小号）
    ============================================================ */
 .stat-card {
     background: var(--bg-card);
@@ -154,13 +156,13 @@
     gap: var(--spacing-3);
     margin-bottom: var(--spacing-4);
 }
+
 .stats-grid.stats-grid-2 { grid-template-columns: repeat(2, 1fr); }
 .stats-grid.stats-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .stats-grid.stats-grid-auto { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 
-
 /* ============================================================
-   C4. 信息项卡片（大号）- 层级：次级卡片
+   C4. 信息项卡片（大号）
    ============================================================ */
 .info-item-card {
     background: var(--bg-hover);
@@ -209,14 +211,14 @@
     gap: var(--spacing-4);
     flex-wrap: wrap;
 }
+
 .info-cards-row .info-item-card {
     flex: 1;
     min-width: 160px;
 }
 
-
 /* ============================================================
-   C5. 费用卡片 - 层级：内嵌面板
+   C5. 费用卡片
    ============================================================ */
 .fee-card {
     background: var(--bg-hover);
@@ -254,6 +256,7 @@
     border: 1px solid var(--border-medium);
     border-radius: var(--radius-md);
     font-variant-numeric: tabular-nums;
+    background: var(--bg-input-readonly);
 }
 
 .fee-card .fee-card-body select {
@@ -290,7 +293,6 @@
     margin: var(--spacing-4) 0;
 }
 
-
 /* ============================================================
    C6. 操作行（表格内的操作按钮行）
    ============================================================ */
@@ -298,10 +300,12 @@
     background: var(--bg-hover);
     border-bottom: 2px solid var(--border-medium);
 }
+
 .action-row td {
     padding: 6px 8px !important;
     vertical-align: middle;
 }
+
 .action-row .action-label {
     font-size: var(--font-xs);
     font-weight: 600;
@@ -310,6 +314,7 @@
     width: 50px;
     padding-right: var(--spacing-2);
 }
+
 .action-row .action-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -317,8 +322,8 @@
     align-items: center;
 }
 
-/* 标准小按钮（保留原类名，内部统一）*/
-.action-buttons .btn-small {
+/* 基础小按钮 */
+.btn-small {
     white-space: nowrap;
     flex-shrink: 0;
     padding: 4px 12px;
@@ -332,49 +337,47 @@
     font-weight: 500;
     line-height: 1.4;
 }
-.action-buttons .btn-small:hover {
+
+.btn-small:hover {
     background: var(--bg-hover);
     transform: translateY(-1px);
 }
-.action-buttons .btn-small.success {
+
+.btn-small.success {
     background: var(--success-dark);
     color: white;
     border-color: var(--success-dark);
 }
-.action-buttons .btn-small.success:hover {
-    background: var(--success);
-}
-.action-buttons .btn-small.danger {
+
+.btn-small.success:hover { background: var(--success); }
+
+.btn-small.danger {
     background: var(--danger-dark);
     color: white;
     border-color: var(--danger-dark);
 }
-.action-buttons .btn-small.danger:hover {
-    background: var(--danger);
-}
-.action-buttons .btn-small.warning {
+
+.btn-small.danger:hover { background: var(--danger); }
+
+.btn-small.warning {
     background: var(--warning-dark);
     color: white;
     border-color: var(--warning-dark);
 }
-.action-buttons .btn-small.warning:hover {
-    background: var(--warning);
-}
-.action-buttons .btn-small.primary {
+
+.btn-small.warning:hover { background: var(--warning); }
+
+.btn-small.primary {
     background: var(--primary-dark);
     color: white;
     border-color: var(--primary-dark);
 }
-.action-buttons .btn-small.primary:hover {
-    background: var(--primary);
-}
 
+.btn-small.primary:hover { background: var(--primary); }
 
 /* ============================================================
-   C7. 统一徽章系统（所有徽章合并为一个基础类 + 修饰符）
+   C7. 统一徽章系统（BEM 风格）
    ============================================================ */
-
-/* --- 基础徽章：所有徽章共用 --- */
 .badge {
     display: inline-block;
     padding: 2px 10px;
@@ -385,65 +388,45 @@
     line-height: 1.6;
 }
 
-/* --- 向后兼容别名（指向同一基础类）--- */
-.status-badge,
-.repayment-badge,
-.payment-method-badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-xs);
-    font-weight: 600;
-    white-space: nowrap;
-    line-height: 1.6;
-}
-
-/* --- 状态徽章颜色 --- */
-.badge-active,
-.status-badge.active {
+/* 状态徽章 */
+.badge--active {
     background: #dcfce7;
     color: #16a34a;
 }
 
-.badge-completed,
-.status-badge.completed {
+.badge--completed {
     background: #dbeafe;
     color: #2563eb;
 }
 
-.badge-liquidated,
-.status-badge.liquidated {
+.badge--liquidated {
     background: #fee2e2;
     color: #dc2626;
 }
 
-/* --- 还款方式徽章颜色 --- */
-.badge-repayment-fixed,
-.repayment-badge.fixed {
+/* 还款方式徽章 */
+.badge--repayment-fixed {
     background: #d1fae5;
     color: #065f46;
 }
 
-.badge-repayment-flexible,
-.repayment-badge.flexible {
+.badge--repayment-flexible {
     background: #fed7aa;
     color: #9a3412;
 }
 
-/* --- 支付方式徽章颜色 --- */
-.badge-method-cash,
-.payment-method-badge.cash {
+/* 支付方式徽章 */
+.badge--method-cash {
     background: #fef3c7;
     color: #92400e;
 }
 
-.badge-method-bank,
-.payment-method-badge.bank {
+.badge--method-bank {
     background: #e0f2fe;
     color: #0369a1;
 }
 
-/* --- 锁定徽章 --- */
+/* 锁定、已平账徽章 */
 .locked-badge {
     display: inline-block;
     padding: 4px 12px;
@@ -455,18 +438,16 @@
     white-space: nowrap;
 }
 
-/* --- 已平账徽章 --- */
 .reconciled-badge {
     display: inline-block;
     padding: 4px 12px;
-    background: #ecfdf5;
+    background: var(--success-light);
     color: #065f46;
     border-radius: 20px;
     font-size: var(--font-xs);
     font-weight: 600;
     white-space: nowrap;
 }
-
 
 /* ============================================================
    C8. 空状态
@@ -480,16 +461,17 @@
     text-align: center;
     color: var(--text-muted);
 }
+
 .empty-state .empty-state-icon {
     font-size: 48px;
     margin-bottom: var(--spacing-3);
     opacity: 0.4;
 }
+
 .empty-state .empty-state-text {
     font-size: var(--font-sm);
     font-weight: 500;
 }
-
 
 /* ============================================================
    C9. 进度条
@@ -501,13 +483,13 @@
     border-radius: 4px;
     overflow: hidden;
 }
+
 .progress-bar .progress-fill {
     height: 100%;
     background: var(--success-dark);
     border-radius: 4px;
     transition: width var(--transition-slow);
 }
-
 
 /* ============================================================
    C10. 逾期警告条
@@ -519,15 +501,16 @@
     font-weight: 600;
     margin-top: var(--spacing-2);
 }
+
 .overdue-warning.mild {
     background: var(--warning-light);
     color: var(--warning-dark);
 }
+
 .overdue-warning.severe {
     background: var(--danger-light);
     color: var(--danger-dark);
 }
-
 
 /* ============================================================
    表格系统
@@ -580,6 +563,7 @@
 .data-table.striped tbody tr:nth-child(even) {
     background: var(--bg-page);
 }
+
 .data-table.striped tbody tr:hover {
     background: var(--bg-hover);
 }
@@ -587,25 +571,28 @@
 .data-table .text-left   { text-align: left; }
 .data-table .text-center { text-align: center; }
 .data-table .text-right  { text-align: right; }
+
 .data-table .amount {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
+
 .data-table .date-cell {
     white-space: nowrap;
 }
+
 .data-table .desc-cell {
     max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
 .data-table .order-id {
     font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
     font-weight: 600;
     color: var(--primary-dark);
 }
-
 
 /* ============================================================
    C11. 订单统计（客户详情弹窗）
@@ -616,6 +603,7 @@
     justify-content: center;
     padding: var(--spacing-3);
 }
+
 .stat-item {
     flex: 1;
     text-align: center;
@@ -626,41 +614,49 @@
     transition: var(--transition-fast);
     min-width: 80px;
 }
+
 .stat-item:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-sm);
 }
+
 .stat-item .stat-number {
     font-size: var(--font-2xl);
     font-weight: 700;
     display: block;
     line-height: 1.2;
 }
+
 .stat-item .stat-label {
     font-size: var(--font-xs);
     color: var(--text-secondary);
     display: block;
     margin-top: var(--spacing-1);
 }
+
 .stat-item.active {
     background: #e0f2fe;
     border-left: 3px solid #0284c7;
 }
+
 .stat-item.active .stat-number { color: #0369a1; }
+
 .stat-item.completed {
-    background: #ecfdf5;
-    border-left: 3px solid #10b981;
+    background: var(--success-light);
+    border-left: 3px solid var(--success);
 }
-.stat-item.completed .stat-number { color: #059669; }
+
+.stat-item.completed .stat-number { color: var(--success-dark); }
+
 .stat-item.abnormal {
     background: #fef3c7;
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid var(--warning);
 }
+
 .stat-item.abnormal .stat-number { color: #d97706; }
 
-
 /* ============================================================
-   列宽系统
+   列宽系统 (基础建议宽度，可通过媒体查询覆盖)
    ============================================================ */
 .col-id       { width: 8%;  }
 .col-name     { width: 14%; }
@@ -679,25 +675,4 @@
 .col-id-narrow    { width: 6%; }
 .col-status-wide  { width: 10%; }
 
-.data-table {
-    table-layout: fixed;
-}
-
-@media (max-width: 768px) {
-    .data-table {
-        min-width: 700px;
-    }
-    .col-id       { width: 75px; }
-    .col-name     { width: 100px; }
-    .col-ktp      { width: 110px; }
-    .col-phone    { width: 90px; }
-    .col-address  { width: 130px; }
-    .col-date     { width: 80px; }
-    .col-status   { width: 70px; }
-    .col-store    { width: 80px; }
-    .col-amount   { width: 100px; }
-    .col-type     { width: 90px; }
-    .col-months   { width: 60px; }
-    .col-method   { width: 80px; }
-    .col-action   { width: 100px; }
-}
+/* 移动端基础适配将在 responsive.css 中覆盖 */
