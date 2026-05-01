@@ -1,4 +1,6 @@
-// app-customers.js - v2.2 (最终版)
+// app-customers.js - v2.3 (最终修复版)
+// 修复：this.navigateTo 错误
+// 修复：添加错误边界保护
 // 适配新计费规则：
 //   管理费：≤50万→Rp20,000 / 50万~300万→Rp30,000 / >300万→1%
 //   服务费：默认2%，下拉0-5%
@@ -128,6 +130,10 @@ const CustomersModule = {
         } catch (error) {
             console.error("showCustomers error:", error);
             Utils.toast.error(lang === 'id' ? '加载客户数据失败：' + error.message : 'Gagal memuat data nasabah: ' + error.message);
+            // 错误时返回仪表盘
+            if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
+                DashboardCore.renderDashboard();
+            }
         }
     },
 
@@ -880,6 +886,10 @@ const CustomersModule = {
         } catch (error) {
             console.error("createOrderForCustomer 错误:", error);
             Utils.toast.error(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message);
+            // 错误时返回仪表盘
+            if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
+                DashboardCore.renderDashboard();
+            }
         }
     },
 
@@ -1191,6 +1201,7 @@ const CustomersModule = {
                         '<td class="text-center"><span class="badge badge-' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
                     '</tr>';
                     
+                    // 修复：使用 APP.navigateTo 而不是 this.navigateTo
                     var actionButtons = '';
                     if (o.status === 'active' && !AUTH.isAdmin()) {
                         actionButtons += '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeAttr(o.order_id) + '\'})" class="btn-small success">💰 ' + t('pay_fee') + '</button>';
@@ -1232,6 +1243,10 @@ const CustomersModule = {
         } catch (error) {
             console.error("showCustomerOrders error:", error);
             Utils.toast.error(lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败');
+            // 错误时返回仪表盘
+            if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
+                DashboardCore.renderDashboard();
+            }
         }
     },
 
@@ -1297,6 +1312,10 @@ const CustomersModule = {
         } catch (error) {
             console.error("showCustomerPaymentHistory error:", error);
             Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
+            // 错误时返回仪表盘
+            if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) {
+                DashboardCore.renderDashboard();
+            }
         }
     }
 };
