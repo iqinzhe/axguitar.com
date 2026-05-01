@@ -509,34 +509,6 @@
     .cashflow-item .label { text-align: left !important; }
     .cashflow-item .value { text-align: left !important; }
 
-    /* 仪表盘网格卡片 */
-    .dashboard-grid {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-    }
-    
-    .dashboard-card {
-        flex: 1 1 180px !important;
-        border: 1px solid #ccc !important;
-        background: #fff !important;
-        box-shadow: none !important;
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-    }
-    
-    .dashboard-card .card-icon {
-        font-size: 24px !important;
-    }
-    
-    .dashboard-card .card-title {
-        font-size: 9pt !important;
-    }
-    
-    .dashboard-card .card-desc {
-        font-size: 7pt !important;
-    }
-
     /* 表单 */
     .form-grid,
     .form-grid.form-grid-3,
