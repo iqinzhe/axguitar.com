@@ -1,11 +1,8 @@
-// utils.js - v1.4 (最终版)
-// 修复：删除残留的 getMonthlyInterest/getMonthlyPayment 未定义方法引用
-// 管理费：阶梯定价
-//   ≤ 500,000 → Rp 20,000
-//   500,001 ~ 3,000,000 → Rp 30,000
-//   > 3,000,000 → 1%，上不封顶
-// 服务费：默认2%，下拉 0-5%
-// 利率：默认8%，下拉 6-10%
+// utils.js - v1.5 (计费规则更新)
+// 管理费阶梯：≤50万→Rp20,000 / 50万~300万→Rp30,000 / >300万→1%
+// 服务费阶梯：≤300万→0% / 301万~500万→1% / >500万→默认2%，下拉2%-6%
+// 利息缴费：仅收1个月，支持部分缴费（差额加入本金）和超额缴费（抵扣本金）
+// 利率：默认8%，下拉10%-6%
 
 window.Utils = window.Utils || {};
 
@@ -218,7 +215,7 @@ window.Utils = window.Utils || {};
      * 管理费 — 阶梯定价
      *
      * 当金金额 ≤ Rp 500,000              → Rp 20,000
-     * Rp 500,000 < 当金 ≤ Rp 3,000,000   → Rp 30,000
+     * Rp 500,001 ~ Rp 3,000,000         → Rp 30,000
      * 当金 > Rp 3,000,000                → 当金 × 1%，上不封顶
      *
      * @param {number} loanAmount - 当金金额
@@ -227,35 +224,54 @@ window.Utils = window.Utils || {};
     Utils.calculateAdminFee = function(loanAmount) {
         if (!loanAmount || loanAmount <= 0) return 0;
 
+        // 第一档：≤500,000 → Rp 20,000
         if (loanAmount <= 500000) {
             return 20000;
         }
 
+        // 第二档：500,001 ~ 3,000,000 → Rp 30,000
         if (loanAmount <= 3000000) {
             return 30000;
         }
 
-        // > 3,000,000 → 1%，上不封顶
+        // 第三档：> 3,000,000 → 1%，上不封顶
         return Math.round(loanAmount * 0.01);
     };
 
     /**
-     * 服务费 — 默认当金金额的 2%
+     * 服务费 — 阶梯定价
+     *
+     * 当金 ≤ Rp 3,000,000               → 免收（0%）
+     * Rp 3,000,001 ~ Rp 5,000,000       → 1%
+     * 当金 > Rp 5,000,000                → 默认2%，下拉选项：[2%, 3%, 4%, 5%, 6%]
      *
      * @param {number} loanAmount - 当金金额
-     * @param {number} percent - 服务费率（0-5）
+     * @param {number} percent - 服务费率（>500万时使用，默认2%）
      * @returns {{ percent: number, amount: number }}
      */
     Utils.calculateServiceFee = function(loanAmount, percent) {
-        if (percent === undefined) percent = 2;
-        if (!loanAmount || loanAmount <= 0) return { percent: percent, amount: 0 };
-        var amount = Math.round(loanAmount * percent / 100);
-        return { percent: percent, amount: amount };
+        if (!loanAmount || loanAmount <= 0) return { percent: 0, amount: 0 };
+
+        // 第一档：≤300万 → 免收
+        if (loanAmount <= 3000000) {
+            return { percent: 0, amount: 0 };
+        }
+
+        // 第二档：301万~500万 → 1%
+        if (loanAmount <= 5000000) {
+            var amount = Math.round(loanAmount * 0.01);
+            return { percent: 1, amount: amount };
+        }
+
+        // 第三档：>500万 → 使用指定 percent，默认2%
+        var finalPercent = (percent !== undefined && percent >= 2 && percent <= 6) ? percent : 2;
+        var feeAmount = Math.round(loanAmount * finalPercent / 100);
+        return { percent: finalPercent, amount: feeAmount };
     };
 
     // 兼容旧接口
-    Utils.calculateServiceFeeNew = function(loanAmount) {
-        return Utils.calculateServiceFee(loanAmount, 2);
+    Utils.calculateServiceFeeNew = function(loanAmount, percent) {
+        return Utils.calculateServiceFee(loanAmount, percent);
     };
 
     /**
@@ -294,11 +310,14 @@ window.Utils = window.Utils || {};
     };
 
     /**
-     * 服务费率选项：0%, 1%, 2%, 3%, 4%, 5%（默认 2%）
+     * 服务费率选项（仅当金>500万时显示）
+     * 选项：2%, 3%, 4%, 5%, 6%（默认2%）
+     * @param {number} defaultPercent - 默认百分比
+     * @returns {string} HTML选项字符串
      */
     Utils.getServiceFeePercentOptions = function(defaultPercent) {
         if (defaultPercent === undefined) defaultPercent = 2;
-        var options = [0, 1, 2, 3, 4, 5];
+        var options = [2, 3, 4, 5, 6];
         var html = '';
         for (var i = 0; i < options.length; i++) {
             var selected = options[i] === defaultPercent ? ' selected' : '';
@@ -319,6 +338,67 @@ window.Utils = window.Utils || {};
             html += '<option value="' + i + '"' + selected + '>' + i + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</option>';
         }
         return html;
+    };
+
+    /**
+     * 利息部分缴费计算
+     *
+     * 当客户实际缴费金额与理论利息不一致时：
+     *   - 实缴 >= 理论利息：按1个月利息收取，超额部分抵扣本金
+     *   - 实缴 < 理论利息：实缴金额记为利息，差额加入本金（利息资本化）
+     *
+     * @param {Object} order - 当前订单对象
+     * @param {number} actualPaid - 客户实际缴纳的金额
+     * @returns {Object}
+     *   - interestPaid {number} 实际记录为利息的金额
+     *   - principalDeducted {number} 正数=超额抵扣本金，负数=差额加入本金
+     *   - isPartial {boolean} 是否为部分缴费（实缴 < 理论利息）
+     *   - isExcess {boolean} 是否为超额缴费（实缴 > 理论利息）
+     *   - description {string} 描述文字
+     */
+    Utils.calculateInterestPartialPayment = function(order, actualPaid) {
+        var lang = Utils.lang;
+        var loanAmount = order.loan_amount || 0;
+        var principalPaid = order.principal_paid || 0;
+        var remainingPrincipal = loanAmount - principalPaid;
+        var monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
+        var theoreticalInterest = remainingPrincipal * monthlyRate;
+
+        var result = {
+            interestPaid: 0,
+            principalDeducted: 0,
+            isPartial: false,
+            isExcess: false,
+            description: ''
+        };
+
+        if (actualPaid >= theoreticalInterest) {
+            // 足额或超额
+            result.interestPaid = theoreticalInterest;
+            result.isExcess = (actualPaid > theoreticalInterest);
+            if (result.isExcess) {
+                var excess = actualPaid - theoreticalInterest;
+                result.principalDeducted = excess;
+                result.description = lang === 'id'
+                    ? 'Bunga 1 bulan: ' + Utils.formatCurrency(theoreticalInterest) + ' + Kelebihan ' + Utils.formatCurrency(excess) + ' dipotong pokok'
+                    : '1个月利息: ' + Utils.formatCurrency(theoreticalInterest) + ' + 超额 ' + Utils.formatCurrency(excess) + ' 抵扣本金';
+            } else {
+                result.description = lang === 'id'
+                    ? 'Bunga 1 bulan: ' + Utils.formatCurrency(theoreticalInterest)
+                    : '1个月利息: ' + Utils.formatCurrency(theoreticalInterest);
+            }
+        } else {
+            // 部分缴费：差额加入本金
+            result.interestPaid = actualPaid;
+            var shortfall = theoreticalInterest - actualPaid;
+            result.principalDeducted = -(shortfall); // 负数表示本金增加
+            result.isPartial = true;
+            result.description = lang === 'id'
+                ? 'Bunga dibayar: ' + Utils.formatCurrency(actualPaid) + ' (Kekurangan ' + Utils.formatCurrency(shortfall) + ' ditambahkan ke pokok)'
+                : '实缴利息: ' + Utils.formatCurrency(actualPaid) + ' (差额 ' + Utils.formatCurrency(shortfall) + ' 加入本金)';
+        }
+
+        return result;
     };
 
     // ==================== CSV / JSON 导出 ====================
