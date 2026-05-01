@@ -449,3 +449,47 @@ document.addEventListener('keydown', function(e) {
         APP.forceRecovery();
     }
 });
+
+// ==================== 资金管理模块方法挂载（确保全局可用） ====================
+// 确保资金管理模块的方法被正确暴露到 window.APP
+
+(function() {
+    'use strict';
+    
+    // 检查并挂载资金管理相关方法
+    var capitalMethods = [
+        'showCapitalInjectionModal',
+        'closeCapitalInjectionModal',
+        'saveCapitalInjection',
+        'showProfitReinvestPage',
+        'loadProfitReinvestData',
+        'executeProfitReinvestment',
+        'showPartialReinvestModal',
+        'closePartialReinvestModal',
+        'confirmPartialReinvest',
+        'showCapitalUtilizationDetail',
+        'closeCapitalDetailModal',
+        'printCapitalDetail',
+        '_loadReinvestHistory'
+    ];
+    
+    for (var i = 0; i < capitalMethods.length; i++) {
+        var methodName = capitalMethods[i];
+        if (typeof window.APP[methodName] === 'undefined' && typeof CapitalModule !== 'undefined') {
+            if (typeof CapitalModule[methodName] === 'function') {
+                window.APP[methodName] = CapitalModule[methodName].bind(CapitalModule);
+                console.log('[APP] 已挂载资金管理方法:', methodName);
+            }
+        }
+    }
+    
+    // 确保 _loadCapitalCardData 方法存在（来自 DashboardCore）
+    if (typeof window.APP._loadCapitalCardData === 'undefined' && typeof DashboardCore !== 'undefined') {
+        if (typeof DashboardCore._loadCapitalCardData === 'function') {
+            window.APP._loadCapitalCardData = DashboardCore._loadCapitalCardData.bind(DashboardCore);
+            console.log('[APP] 已挂载 DashboardCore._loadCapitalCardData');
+        }
+    }
+    
+    console.log('[APP] 资金管理模块方法挂载完成');
+})();
