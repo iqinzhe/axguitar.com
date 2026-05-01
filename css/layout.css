@@ -1160,3 +1160,44 @@ button.warning.highlight {
     color: var(--text-secondary);
     font-weight: 600;
 }
+
+/* ============================================================
+   Dashboard 网格卡片布局
+   ============================================================ */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-4);
+    margin-top: var(--spacing-4);
+}
+
+.dashboard-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-light);
+    padding: var(--spacing-4);
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.dashboard-card .card-icon {
+    font-size: 36px;
+    margin-bottom: var(--spacing-2);
+}
+
+.dashboard-card .card-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-1);
+}
+
+.dashboard-card .card-desc {
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+}
