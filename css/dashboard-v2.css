@@ -24,7 +24,8 @@
         "sidebar main";
     min-height: 100vh;
     max-height: 100vh;            /* 限制最大高度，让内部滚动生效 */
-    background: #f5f6fa;          /* 柔和蓝灰底色 */
+    background: #f5f6fa;          /* 偏中性灰 */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     font-family: var(--font-sans);
 }
 
