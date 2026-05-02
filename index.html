@@ -12,15 +12,13 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest?v=1">
 
-<!-- CSS 样式（v2.0 统一版本） -->
+<!-- ========== CSS 加载顺序（5层精简架构） ========== -->
+<!-- 原则：变量 → 重置 → 组件 → 布局 → 响应式 -->
 <link rel="stylesheet" href="css/variables.css">
 <link rel="stylesheet" href="css/reset.css">
 <link rel="stylesheet" href="css/components.css">
-<link rel="stylesheet" href="css/layout.css">
-<link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/dashboard.css">
 <link rel="stylesheet" href="css/responsive.css">
-<link rel="stylesheet" href="css/dashboard-v2.css">
-<link rel="stylesheet" href="css/dashboard-layout-helper.css">
 
 <!-- 预加载关键资源 -->
 <link rel="preconnect" href="https://hiupsvsbcdsgoyiieqiv.supabase.co">
