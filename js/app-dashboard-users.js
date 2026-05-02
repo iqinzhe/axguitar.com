@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v2.0 (JF 命名空间)
+// app-dashboard-users.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
 // 用户管理页面模块，挂载到 JF.UsersPage
 
 'use strict';
@@ -8,9 +8,9 @@
     window.JF = JF;
 
     const UsersPage = {
-        async showUserManagement() {
-            APP.currentPage = 'userManagement';
-            APP.saveCurrentPageState();
+
+        // ==================== 构建用户管理 HTML（纯内容） ====================
+        async buildUserManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
 
@@ -69,7 +69,7 @@
                 const storeOptions = `<option value="">${lang === 'id' ? 'Pilih toko' : '选择门店'}</option>` +
                     stores.map(s => `<option value="${s.id}">${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})</option>`).join('');
 
-                document.getElementById("app").innerHTML = `
+                const content = `
                     <div class="page-header">
                         <h2>👥 ${lang === 'id' ? 'Manajemen Peran' : '角色管理'}</h2>
                         <div class="header-actions">
@@ -134,12 +134,28 @@
                             </div>
                         </div>
                     </div>`;
+                return content;
             } catch (error) {
-                console.error("showUserManagement error:", error);
+                console.error("buildUserManagementHTML error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data pengguna' : '加载用户数据失败');
+                return `<div class="card"><p>❌ ${Utils.t('loading_failed', { module: '用户管理' })}</p></div>`;
             }
         },
 
+        // 供外壳调用的渲染函数
+        async renderUserManagementHTML() {
+            return await this.buildUserManagementHTML();
+        },
+
+        // 原有的 showUserManagement（兼容直接调用）
+        async showUserManagement() {
+            APP.currentPage = 'userManagement';
+            APP.saveCurrentPageState();
+            const contentHTML = await this.buildUserManagementHTML();
+            document.getElementById("app").innerHTML = contentHTML;
+        },
+
+        // ==================== 用户操作（完整保留） ====================
         async addUser() {
             const lang = Utils.lang;
             const username = document.getElementById("newUsername").value.trim();
@@ -309,8 +325,10 @@
         }
     };
 
-    // 挂载
+    // 挂载到命名空间
     JF.UsersPage = UsersPage;
+
+    // 向下兼容 APP 方法
     if (window.APP) {
         window.APP.showUserManagement = UsersPage.showUserManagement.bind(UsersPage);
         window.APP.addUser = UsersPage.addUser.bind(UsersPage);
@@ -331,5 +349,5 @@
         };
     }
 
-    console.log('✅ JF.UsersPage v2.0 初始化完成');
+    console.log('✅ JF.UsersPage v2.1 初始化完成（支持外壳渲染，完整版）');
 })();
