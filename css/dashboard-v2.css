@@ -41,7 +41,7 @@
    ============================================================ */
 .dash-sidebar {
     grid-area: sidebar;
-    background: linear-gradient(180deg, #071e3d 0%, #0c2d52 60%, #0e3a68 100%);
+    background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
