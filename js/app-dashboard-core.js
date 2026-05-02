@@ -654,9 +654,6 @@
 
     JF.DashboardCore = DashboardCore;
 
-    // 重要：不要覆盖 window.APP！依赖原有的 app.js 来挂载全局 APP 对象
-    // 原有的 app.js 会通过 JF.DashboardCore 自动绑定方法到 window.APP
-
     // 快捷键 Alt+R 恢复（挂载在全局，因为 window.APP 可能还未完全初始化）
     document.addEventListener('keydown', (e) => {
         if (e.altKey && e.key === 'r') {
