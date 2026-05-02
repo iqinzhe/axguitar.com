@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.0 (JF 命名空间)
+// app-dashboard-expenses.js - v2.1 (JF 命名空间) - 支持外壳渲染
 // 支出管理页面模块，挂载到 JF.ExpensesPage
 
 'use strict';
@@ -8,18 +8,15 @@
     window.JF = JF;
 
     const ExpensesPage = {
-        // ==================== 显示支出列表 ====================
-        async showExpenses() {
-            APP.currentPage = 'expenses';
-            APP.saveCurrentPageState();
+        // ==================== 构建支出列表 HTML（纯内容） ====================
+        async buildExpensesHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = PERMISSION.isAdmin();
+            const storeId = profile?.store_id;
 
             try {
-                const profile = await SUPABASE.getCurrentProfile();
-                const isAdmin = PERMISSION.isAdmin();
-                const storeId = profile?.store_id;
-
                 // 获取门店列表用于显示门店名
                 const storesData = await SUPABASE.getAllStores();
                 const storeMap = {};
@@ -83,7 +80,7 @@
                     : ['电费', '水费', '网络费', '员工工资', '场地租金', '办公用品', '维修', '交通费', '其他'];
                 const categoryOptions = expenseCategories.map(c => `<option value="${c}">${c}</option>`).join('');
 
-                document.getElementById("app").innerHTML = `
+                const content = `
                     <div class="page-header">
                         <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
                         <div class="header-actions">
@@ -151,17 +148,31 @@
                         </div>
                         <p class="info-note">💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}</p>
                     </div>`;
-
-                // 绑定金额输入格式化
-                const amountInput = document.getElementById("expenseAmount");
-                if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+                return content;
             } catch (error) {
-                console.error("showExpenses error:", error);
+                console.error("buildExpensesHTML error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat pengeluaran: ' + error.message : '加载支出失败：' + error.message);
+                return `<div class="card"><p>❌ ${t('loading_failed', { module: '支出' })}</p></div>`;
             }
         },
 
-        // ==================== 添加支出 ====================
+        // 供外壳调用的渲染函数
+        async renderExpensesHTML() {
+            return await this.buildExpensesHTML();
+        },
+
+        // 原有的 showExpenses 兼容直接调用
+        async showExpenses() {
+            APP.currentPage = 'expenses';
+            APP.saveCurrentPageState();
+            const contentHTML = await this.buildExpensesHTML();
+            document.getElementById("app").innerHTML = contentHTML;
+            // 绑定金额输入格式化
+            const amountInput = document.getElementById("expenseAmount");
+            if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+        },
+
+        // 添加支出（保持原有逻辑）
         async addExpense() {
             const lang = Utils.lang;
             const expenseDate = document.getElementById("expenseDate").value || new Date().toISOString().split('T')[0];
@@ -192,7 +203,7 @@
             }
         },
 
-        // ==================== 编辑支出 ====================
+        // 编辑支出（管理员）
         async editExpense(expenseId) {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -221,7 +232,7 @@
             }
         },
 
-        // ==================== 删除支出 ====================
+        // 删除支出（管理员）
         async deleteExpense(expenseId) {
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
@@ -242,7 +253,7 @@
             }
         },
 
-        // ==================== 平账 ====================
+        // 平账（管理员）
         async balanceExpenses() {
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
@@ -310,7 +321,7 @@
     // 挂载到命名空间
     JF.ExpensesPage = ExpensesPage;
 
-    // 向下兼容：将方法挂载到 APP
+    // 向下兼容 APP 方法
     if (window.APP) {
         window.APP.showExpenses = ExpensesPage.showExpenses.bind(ExpensesPage);
         window.APP.addExpense = ExpensesPage.addExpense.bind(ExpensesPage);
@@ -327,5 +338,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.0 初始化完成');
+    console.log('✅ JF.ExpensesPage v2.1 初始化完成（支持外壳渲染）');
 })();
