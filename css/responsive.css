@@ -1,6 +1,8 @@
 /* ============================================================
-   responsive.css - 第6层：响应式与打印中心
+   responsive.css - 第6层：响应式与打印中心（v2.1 精简版）
    优化：统一 CSS 变量，清晰注释，保留所有断点和打印样式
+   精简：移除旧仪表盘专属死代码（.cashflow-item、
+         .transfer-btn、.dashboard-footer-card）
    ============================================================ */
 
 /* ============================================================
@@ -27,16 +29,11 @@
 
     .toolbar button { font-size: var(--font-sm); }
 
-    .cashflow-item .value { font-size: var(--font-xl); }
-    .cashflow-item .label { font-size: var(--font-sm); }
-
     .form-group label { font-size: var(--font-sm); }
 
     .form-group input,
     .form-group select,
     .form-group textarea { font-size: var(--font-md); }
-
-    .dashboard-footer-card p { font-size: var(--font-sm); }
 
     /* 桌面端表格正常显示，无需水平滚动 */
     .table-container { overflow-x: visible; }
@@ -222,21 +219,6 @@
         padding: 2px 8px;
     }
 
-    /* 资金管理：单列 */
-    .cashflow-stats {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-2);
-    }
-
-    .cashflow-item .value { font-size: var(--font-lg); }
-    .cashflow-item .label { font-size: var(--font-xs); }
-
-    .transfer-btn {
-        white-space: normal;
-        font-size: var(--font-sm);
-        padding: var(--spacing-2) var(--spacing-3);
-    }
-
     /* 工具栏：2列 */
     .toolbar.admin-grid,
     .toolbar.store-grid { grid-template-columns: repeat(2, 1fr); }
@@ -266,9 +248,6 @@
         margin-bottom: 0;
         overflow-x: hidden;
     }
-
-    /* 底部卡片 */
-    .dashboard-footer-card p { font-size: var(--font-xs); }
 
     /* 表单：单列 */
     .form-grid,
@@ -390,8 +369,7 @@
 
     /* 卡片 */
     .card,
-    .cashflow-summary,
-    .dashboard-footer-card {
+    .cashflow-summary {
         box-shadow: none !important;
         border: 1px solid #ccc !important;
         margin-bottom: 6px !important;
@@ -483,23 +461,6 @@
     }
 
     .stat-card:hover { transform: none !important; }
-
-    /* 资金管理 */
-    .cashflow-stats {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-    }
-
-    .cashflow-item {
-        flex: 1 !important;
-        min-width: 130px !important;
-        text-align: left !important;
-        padding: 6px !important;
-    }
-
-    .cashflow-item .label { text-align: left !important; }
-    .cashflow-item .value { text-align: left !important; }
 
     /* 表单 */
     .form-grid,
@@ -607,12 +568,4 @@
     .btn-backup-primary,
     .btn-restore,
     .btn-blacklist { display: none !important; }
-
-    /* 底部 */
-    .dashboard-footer-card {
-        margin-top: 4px !important;
-        padding-top: 4px !important;
-        font-size: 7pt !important;
-        border-top: none !important;
-    }
 }
