@@ -1,4 +1,4 @@
-// supabase.js - v2.0 (JF 统一命名空间，资金池完整版)
+// supabase.js - v2.1 (JF 统一命名空间，收益处置完整版)
 
 'use strict';
 
@@ -674,6 +674,114 @@
 
             console.log(`✅ 资本注入记录成功: ${Utils.formatCurrency(amount)} -> ${targetStoreId}`);
             return data;
+        },
+
+        // ===== 利润分配相关（新增） =====
+        async getDistributableProfit(storeId) {
+            const profile = await this.getCurrentProfile();
+            const targetStoreId = storeId || profile?.store_id;
+            if (!targetStoreId) throw new Error('Store ID missing');
+
+            const cashFlowSummary = await this.getCashFlowSummary();
+            const totalIncome = cashFlowSummary.netProfit.operatingIncome;
+            const totalExpense = cashFlowSummary.netProfit.operatingExpense;
+
+            const { data: distributions, error } = await supabaseClient
+                .from('profit_distributions')
+                .select('amount')
+                .eq('store_id', targetStoreId)
+                .eq('type', 'reinvest');
+            
+            const reinvested = (distributions || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+            const distributable = totalIncome - totalExpense - reinvested;
+            return Math.max(0, distributable);
+        },
+
+        async getExternalCapitalBalance(storeId) {
+            const targetStoreId = storeId || (await this.getCurrentProfile())?.store_id;
+            if (!targetStoreId) return 0;
+
+            const { data: injections } = await supabaseClient
+                .from('capital_injections')
+                .select('amount')
+                .eq('store_id', targetStoreId)
+                .eq('is_voided', false)
+                .eq('source', 'external');
+
+            const totalInjected = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+
+            const { data: returns } = await supabaseClient
+                .from('profit_distributions')
+                .select('amount')
+                .eq('store_id', targetStoreId)
+                .eq('type', 'return_capital');
+
+            const totalReturned = (returns || []).reduce((sum, r) => sum + (r.amount || 0), 0);
+            return Math.max(0, totalInjected - totalReturned);
+        },
+
+        async distributeProfit(storeId, amount, type, description) {
+            const profile = await this.getCurrentProfile();
+            if (profile?.role !== 'admin') throw new Error('Admin only');
+            const targetStoreId = storeId || profile.store_id;
+            if (!targetStoreId) throw new Error('Store ID missing');
+            if (!amount || amount <= 0) throw new Error('Invalid amount');
+
+            if (type === 'reinvest') {
+                const available = await this.getDistributableProfit(targetStoreId);
+                if (amount > available) throw new Error('Insufficient distributable profit');
+            } else if (type === 'return_capital') {
+                const available = await this.getExternalCapitalBalance(targetStoreId);
+                if (amount > available) throw new Error('Insufficient external capital to return');
+            }
+
+            const { data: distribution, error: distError } = await supabaseClient
+                .from('profit_distributions')
+                .insert({
+                    store_id: targetStoreId,
+                    amount: amount,
+                    type: type,
+                    description: description || (type === 'reinvest' ? 'Profit Reinvestment' : 'Return of Capital'),
+                    recorded_by: profile.id,
+                    created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+            if (distError) throw distError;
+
+            if (type === 'reinvest') {
+                await this.recordCashFlow({
+                    store_id: targetStoreId,
+                    flow_type: 'profit_reinvest',
+                    direction: 'inflow',
+                    amount: amount,
+                    source_target: 'cash',
+                    description: '利润再投入',
+                    reference_id: distribution.id
+                });
+
+                await supabaseClient.from('capital_injections').insert({
+                    store_id: targetStoreId,
+                    amount: amount,
+                    source: 'profit',
+                    injection_date: new Date().toISOString().split('T')[0],
+                    description: '利润再投入',
+                    recorded_by: profile.id,
+                    is_voided: false
+                });
+            } else if (type === 'return_capital') {
+                await this.recordCashFlow({
+                    store_id: targetStoreId,
+                    flow_type: 'return_of_capital',
+                    direction: 'outflow',
+                    amount: amount,
+                    source_target: 'cash',
+                    description: '偿还投资本金',
+                    reference_id: distribution.id
+                });
+            }
+
+            return distribution;
         },
 
         // ---------- 订单核心 ----------
@@ -1463,5 +1571,5 @@
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
 
-    console.log('✅ JF.Supabase v2.3 最终版初始化完成（资金池完整版）');
+    console.log('✅ JF.Supabase v2.3 最终版初始化完成（含收益处置）');
 })();
