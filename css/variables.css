@@ -1,50 +1,50 @@
 /* ============================================================
    variables.css - 第1层：设计令牌（全系统唯一变量源）
-   优化：新增语义变量，移除未使用的变量，保持完全兼容
+   优化v2：专业深青色调色板，高对比度，精致层次感
    ============================================================ */
 
 :root {
-    /* --- 主色调 --- */
-    --primary: #2563eb;
-    --primary-light: #60a5fa;
-    --primary-soft: #dbeafe;
-    --primary-dark: #1d4ed8;
+    /* --- 主色调（深青蓝 — 专业沉稳）--- */
+    --primary: #0e7490;          /* 深青蓝 */
+    --primary-light: #22d3ee;    /* 亮青 */
+    --primary-soft: #cffafe;     /* 极淡青 */
+    --primary-dark: #0c4a6e;     /* 深海蓝 */
 
-    /* --- 功能色 --- */
-    --success: #10b981;
-    --success-dark: #059669;
-    --success-light: #ecfdf5;
-    --warning: #f59e0b;
-    --warning-dark: #d97706;
+    /* --- 功能色（调低饱和度，更专业）--- */
+    --success: #16a34a;
+    --success-dark: #15803d;
+    --success-light: #f0fdf4;
+    --warning: #d97706;
+    --warning-dark: #b45309;
     --warning-light: #fffbeb;
-    --danger: #ef4444;
-    --danger-dark: #dc2626;
-    --danger-light: #fef2f2;
+    --danger: #dc2626;
+    --danger-dark: #b91c1c;
+    --danger-light: #fff1f2;
 
-    /* --- 背景色系 --- */
-    --bg-page: #f8fafc;
+    /* --- 背景色系（暖灰调 — 减少视觉疲劳）--- */
+    --bg-page: #f4f6f9;          /* 柔和蓝灰底 */
     --bg-card: #ffffff;
     --bg-highlight: #f0f9ff;
-    --bg-hover: #f1f5f9;
-    --bg-modal: rgba(15, 23, 42, 0.5);
+    --bg-hover: #eef2f7;         /* 悬停态更柔和 */
+    --bg-modal: rgba(7, 22, 48, 0.55);
     --bg-input-readonly: #f8fafc;
 
-    /* --- 文字色系 --- */
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
+    /* --- 文字色系（增强对比度）--- */
+    --text-primary: #0c1929;     /* 近黑，深蓝调 */
+    --text-secondary: #3d5068;   /* 中蓝灰 */
+    --text-muted: #6b7e95;       /* 浅蓝灰 */
     --text-white: #ffffff;
 
-    /* --- 边框色 --- */
-    --border-light: #e2e8f0;
-    --border-medium: #cbd5e1;
+    /* --- 边框色（更有层次）--- */
+    --border-light: #dde3ec;
+    --border-medium: #c4cedb;
 
-    /* --- 阴影（三层卡片层级）--- */
+    /* --- 阴影（带冷色调）--- */
     --shadow-none: none;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.08);
-    --shadow-lg: 0 4px 8px -1px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 8px 16px -2px rgb(0 0 0 / 0.12);
+    --shadow-sm: 0 1px 3px 0 rgb(14 116 144 / 0.06);
+    --shadow-md: 0 2px 6px 0 rgb(14 116 144 / 0.09);
+    --shadow-lg: 0 4px 12px -1px rgb(14 116 144 / 0.12);
+    --shadow-xl: 0 8px 20px -2px rgb(14 116 144 / 0.15);
 
     /* --- 圆角 --- */
     --radius-sm: 6px;
@@ -53,16 +53,16 @@
     --radius-xl: 16px;
     --radius-2xl: 20px;
 
-    /* --- 间距 --- */
-    --spacing-1: 4px;
-    --spacing-1-5: 6px;
-    --spacing-2: 8px;
-    --spacing-3: 12px;
-    --spacing-4: 16px;
-    --spacing-5: 20px;
-    --spacing-6: 24px;
-    --spacing-7: 28px;
-    --spacing-8: 32px;
+    /* --- 间距（缩减外边距基础单位）--- */
+    --spacing-1: 3px;
+    --spacing-1-5: 5px;
+    --spacing-2: 6px;
+    --spacing-3: 10px;
+    --spacing-4: 14px;
+    --spacing-5: 18px;
+    --spacing-6: 22px;
+    --spacing-7: 26px;
+    --spacing-8: 30px;
 
     /* --- 过渡 --- */
     --transition-fast: 0.15s ease;

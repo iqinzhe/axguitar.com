@@ -13,9 +13,9 @@
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-medium);
     box-shadow: var(--shadow-md);
-    padding: var(--spacing-3) var(--spacing-4);
+    padding: var(--spacing-2) var(--spacing-3);
     transition: var(--transition-fast);
-    margin-bottom: var(--spacing-4);
+    margin-bottom: var(--spacing-3);
 }
 
 .card:hover {
@@ -36,8 +36,8 @@
     background: var(--bg-card);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-medium);
-    padding: var(--spacing-3) var(--spacing-4);
-    margin-bottom: var(--spacing-4);
+    padding: var(--spacing-2) var(--spacing-3);
+    margin-bottom: var(--spacing-3);
 }
 
 .card-secondary h3 {
