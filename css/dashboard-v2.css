@@ -229,5 +229,107 @@
     .quick-btn {
         min-height: 44px;
     }
+}
 
+/* ============================================================
+   兼容旧JS结构（关键修复）
+   不改JS，只适配CSS
+   ============================================================ */
+
+/* 外层容器 */
+.dashboard-container {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: var(--topbar-height) 1fr;
+    grid-template-areas:
+        "sidebar topbar"
+        "sidebar main";
+    min-height: 100vh;
+}
+
+/* Sidebar 兼容 */
+.sidebar {
+    grid-area: sidebar;
+    background: linear-gradient(180deg, #f4f7fb, #eaf2fb);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e2e8f0;
+}
+
+/* Topbar（如果你有） */
+.topbar {
+    grid-area: topbar;
+}
+
+/* 主内容 */
+.main-content {
+    grid-area: main;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* KPI */
+.kpi,
+.kpi-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+/* KPI卡片 */
+.kpi-item,
+.kpi-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+/* ============================================================
+   移动端兼容
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    .dashboard-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: var(--topbar-height) auto;
+        grid-template-areas:
+            "topbar"
+            "main";
+    }
+
+    /* Sidebar 抽屉化（直接复用逻辑） */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 240px;
+        height: 100%;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        box-shadow: 4px 0 20px rgba(0,0,0,0.08);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    /* KPI 横滑 */
+    .kpi,
+    .kpi-container {
+        display: flex;
+        overflow-x: auto;
+        gap: 10px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .kpi-item,
+    .kpi-card {
+        min-width: 140px;
+        flex-shrink: 0;
+    }
 }
