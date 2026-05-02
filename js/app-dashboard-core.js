@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.8.1 完整银行级仪表盘 + 统一外壳 + 移动端修复（无递归）
+// app-dashboard-core.js - v2.9 最终稳定版（修复 navigateTo 缺失 + 全局 APP 兼容）
 'use strict';
 
 (function () {
@@ -329,6 +329,40 @@
             this.refreshCurrentPage();
         },
 
+        // ========== 路由和导航（关键方法） ==========
+        navigateTo(page, params) {
+            window.scrollTo(0, 0);
+            this.historyStack.push({
+                page: this.currentPage,
+                orderId: this.currentOrderId,
+                customerId: this.currentCustomerId,
+                filter: this.currentFilter
+            });
+            this.currentPage = page;
+            if (params) {
+                if (params.orderId) this.currentOrderId = params.orderId;
+                if (params.customerId) this.currentCustomerId = params.customerId;
+            }
+            this.saveCurrentPageState();
+            this.refreshCurrentPage().catch(err => {
+                console.error('导航失败', err);
+                this.renderDashboard();
+            });
+        },
+        goBack() {
+            if (this.historyStack.length > 0) {
+                const prev = this.historyStack.pop();
+                this.currentPage = prev.page;
+                this.currentOrderId = prev.orderId || null;
+                this.currentCustomerId = prev.customerId || null;
+                this.currentFilter = prev.filter || "all";
+                this.saveCurrentPageState();
+                this.refreshCurrentPage();
+            } else {
+                this.navigateTo('dashboard');
+            }
+        },
+
         // ========== 原完整仪表盘渲染（银行级金融风格） ==========
         async originalRenderDashboard() {
             this.currentPage = 'dashboard';
@@ -467,7 +501,7 @@
                     quickActions = [
                         { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
                         { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
-                        { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "JF.DashboardCore.navigateTo('orderTable');setTimeout(function(){if(APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
+                        { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "JF.DashboardCore.navigateTo('orderTable');setTimeout(function(){if(window.APP && APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
                         { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' },
                         { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
                         { icon: '📦', label: t('backup_restore'), action: "JF.DashboardCore.navigateTo('backupRestore')", cls: '' },
@@ -557,7 +591,7 @@
             }
         },
 
-        // ========== 对外公开方法（供 app.js 桥接） ==========
+        // ========== 对外公开方法 ==========
         async renderDashboard() {
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
@@ -652,9 +686,34 @@
         },
     };
 
+    // ========== 挂载到 JF 命名空间 ==========
     JF.DashboardCore = DashboardCore;
 
-    // 快捷键 Alt+R 恢复（挂载在全局，因为 window.APP 可能还未完全初始化）
+    // ========== 兼容全局 APP 对象（保留原 app.js 的功能但补充必要方法） ==========
+    if (!window.APP) {
+        window.APP = DashboardCore;
+    } else {
+        // 将 DashboardCore 的方法添加到现有 APP 对象（避免覆盖原有方法，但补充缺失的方法）
+        for (const key of Object.keys(DashboardCore)) {
+            if (typeof DashboardCore[key] === 'function' && !window.APP[key]) {
+                window.APP[key] = DashboardCore[key].bind(DashboardCore);
+            }
+        }
+        // 确保核心方法指向 DashboardCore 实例
+        window.APP.navigateTo = DashboardCore.navigateTo.bind(DashboardCore);
+        window.APP.goBack = DashboardCore.goBack.bind(DashboardCore);
+        window.APP.refreshCurrentPage = DashboardCore.refreshCurrentPage.bind(DashboardCore);
+        window.APP.renderDashboard = DashboardCore.renderDashboard.bind(DashboardCore);
+        window.APP.logout = DashboardCore.logout.bind(DashboardCore);
+        window.APP.forceRecovery = DashboardCore.forceRecovery.bind(DashboardCore);
+        window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
+        window.APP.toggleLanguage = DashboardCore.toggleLanguage.bind(DashboardCore);
+        window.APP.login = DashboardCore.login.bind(DashboardCore);
+        window.APP.renderLogin = DashboardCore.renderLogin.bind(DashboardCore);
+        window.APP.init = DashboardCore.init.bind(DashboardCore);
+    }
+
+    // 快捷键 Alt+R 恢复
     document.addEventListener('keydown', (e) => {
         if (e.altKey && e.key === 'r') {
             e.preventDefault();
@@ -666,5 +725,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.8.1 完整版（无递归，无 APP 覆盖）已加载');
+    console.log('✅ JF.DashboardCore v2.9 最终版（导航方法已修复）已加载');
 })();
