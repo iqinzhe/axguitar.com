@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.0 (JF 命名空间)
+// app-dashboard-anomaly.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
 // 异常检测页面模块，挂载到 JF.AnomalyPage
 
 'use strict';
@@ -8,7 +8,8 @@
     window.JF = JF;
 
     const AnomalyPage = {
-        // ==================== 异常检测辅助方法 ====================
+
+        // ==================== 辅助数据获取方法 ====================
         async _getOverdueOrders(profile, page = 0, pageSize = 50) {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
@@ -120,10 +121,8 @@
             };
         },
 
-        // ==================== 显示异常页面 ====================
-        async showAnomaly() {
-            APP.currentPage = 'anomaly';
-            APP.saveCurrentPageState();
+        // ==================== 构建异常页面 HTML（纯内容） ====================
+        async buildAnomalyHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
 
@@ -219,10 +218,10 @@
                     return `<div class="ranking-list">${items}</div>`;
                 };
 
-                // 根据角色渲染不同布局
+                // 根据角色构建不同布局
+                let contentGrid = '';
                 if (!isAdmin) {
-                    document.getElementById("app").innerHTML = `
-                        <div class="page-header"><h2>⚠️ ${t('anomaly_title')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${t('print')}</button></div></div>
+                    contentGrid = `
                         <div class="anomaly-grid">
                             <div class="anomaly-card anomaly-card-danger">
                                 <div class="anomaly-card-header"><span class="anomaly-icon">⚠️</span><h3>${lang === 'id' ? 'Pesanan Terlambat 30+ Hari' : '逾期30天以上订单'}</h3><span class="anomaly-badge">${overdueTotalCount}</span></div>
@@ -235,8 +234,7 @@
                             </div>
                         </div>`;
                 } else {
-                    document.getElementById("app").innerHTML = `
-                        <div class="page-header"><h2>⚠️ ${t('anomaly_title')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${t('print')}</button></div></div>
+                    contentGrid = `
                         <div class="anomaly-grid">
                             <div class="anomaly-card anomaly-card-info">
                                 <div class="anomaly-card-header"><span class="anomaly-icon">🏆</span><h3>${lang === 'id' ? 'Kinerja Terbaik Bulan Ini (3 Besar)' : '本月业绩前三排行'}</h3><span class="anomaly-badge">${top3.length}</span></div>
@@ -260,15 +258,34 @@
                         </div>`;
                 }
 
+                const content = `
+                    <div class="page-header"><h2>⚠️ ${t('anomaly_title')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${t('print')}</button></div></div>
+                    ${contentGrid}`;
+
                 // 保存状态，供加载更多功能使用
                 window._anomalyOverdueState = { page: 0, pageSize: 50, totalCount: overdueTotalCount, profile, isAdmin, storeId };
                 window._anomalyBlacklistState = { page: 0, pageSize: 50, totalCount: blacklistTotalCount };
 
+                return content;
+
             } catch (error) {
-                console.error("showAnomaly error:", error);
+                console.error("buildAnomalyHTML error:", error);
                 Utils.toast.error(Utils.t('loading_failed', { module: '异常页面' }));
-                APP.renderDashboard();
+                return `<div class="card"><p>❌ ${Utils.t('loading_failed', { module: '异常页面' })}</p></div>`;
             }
+        },
+
+        // 供外壳调用的渲染函数
+        async renderAnomalyHTML() {
+            return await this.buildAnomalyHTML();
+        },
+
+        // 原有的 showAnomaly（兼容直接调用）
+        async showAnomaly() {
+            APP.currentPage = 'anomaly';
+            APP.saveCurrentPageState();
+            const contentHTML = await this.buildAnomalyHTML();
+            document.getElementById("app").innerHTML = contentHTML;
         },
 
         // ==================== 加载更多逾期订单 ====================
@@ -353,7 +370,7 @@
     // 挂载到命名空间
     JF.AnomalyPage = AnomalyPage;
 
-    // 向下兼容：将方法挂载到 APP
+    // 向下兼容 APP 方法
     if (window.APP) {
         window.APP.showAnomaly = AnomalyPage.showAnomaly.bind(AnomalyPage);
         window.APP.loadMoreOverdueOrders = AnomalyPage.loadMoreOverdueOrders.bind(AnomalyPage);
@@ -368,5 +385,5 @@
         };
     }
 
-    console.log('✅ JF.AnomalyPage v2.0 初始化完成');
+    console.log('✅ JF.AnomalyPage v2.1 初始化完成（支持外壳渲染，完整版）');
 })();
