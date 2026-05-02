@@ -1,5 +1,5 @@
-// store.js - v2.0 统一门店管理模块 (JF 命名空间)
-// 挂载到 JF.StoreManager，保留 window.StoreManager 别名
+// store.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
+// 统一门店管理模块，挂载到 JF.StoreManager，保留 window.StoreManager 别名
 
 'use strict';
 
@@ -321,7 +321,6 @@
                         loadingMsg.innerHTML = '<div style="background:white;padding:20px 40px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:12px;"><div class="loader" style="width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;"></div><p style="margin:0;">' + (lang === 'id' ? 'Membersihkan data latihan...' : '正在清理练习数据...') + '</p></div>';
                         document.body.appendChild(loadingMsg);
 
-                        // 使用增强版清理方法（带详细错误收集）
                         await StoreManager._cleanPracticeDataEnhanced(storeId);
 
                         if (loadingMsg.parentElement) loadingMsg.remove();
@@ -330,7 +329,6 @@
                         const errLoading = document.getElementById('cleanPracticeLoading');
                         if (errLoading) errLoading.remove();
                         console.error('清理练习数据失败:', cleanError);
-                        // 增强错误提示，告知用户数据可能不完整
                         const errorMsg = lang === 'id'
                             ? `⚠️ Gagal membersihkan data: ${cleanError.message}\n\nData mungkin tidak lengkap. Silakan hubungi administrator atau coba lagi.`
                             : `⚠️ 清理数据失败：${cleanError.message}\n\n数据可能不完整。请联系管理员或重试。`;
@@ -363,92 +361,7 @@
             }
         },
 
-        /**
-         * 清理练习门店的所有业务数据（原版，保留用于内部调用）
-         * @param {string} storeId - 门店ID
-         */
-        async _cleanPracticeData(storeId) {
-            const lang = Utils.lang;
-            const client = SUPABASE.getClient();
-
-            console.log('[StoreManager] 开始清理门店 ' + storeId + ' 的练习数据...');
-
-            try {
-                // 1. 查找该门店所有订单ID
-                const { data: orders, error: orderError } = await client
-                    .from('orders').select('id').eq('store_id', storeId);
-                if (orderError) throw orderError;
-
-                const orderIds = (orders || []).map(o => o.id);
-                console.log('[StoreManager] 找到 ' + orderIds.length + ' 个订单需要清理');
-
-                if (orderIds.length > 0) {
-                    // 2. 删除资金流水
-                    const { error: cashFlowError } = await client
-                        .from('cash_flow_records').delete().eq('store_id', storeId);
-                    if (cashFlowError) console.warn('[StoreManager] 清理资金流水失败:', cashFlowError.message);
-                    else console.log('[StoreManager] ✅ 资金流水已清理');
-
-                    // 3. 删除缴费记录
-                    const { error: paymentError } = await client
-                        .from('payment_history').delete().in('order_id', orderIds);
-                    if (paymentError) console.warn('[StoreManager] 清理缴费记录失败:', paymentError.message);
-                    else console.log('[StoreManager] ✅ 缴费记录已清理');
-
-                    // 4. 删除提醒日志
-                    const { error: reminderError } = await client
-                        .from('reminder_logs').delete().in('order_id', orderIds);
-                    if (reminderError) console.warn('[StoreManager] 清理提醒日志失败:', reminderError.message);
-                    else console.log('[StoreManager] ✅ 提醒日志已清理');
-
-                    // 5. 删除内部转账
-                    const { error: transferError } = await client
-                        .from('internal_transfers').delete().eq('store_id', storeId);
-                    if (transferError) console.warn('[StoreManager] 清理内部转账失败:', transferError.message);
-                    else console.log('[StoreManager] ✅ 内部转账已清理');
-
-                    // 6. 删除订单
-                    const { error: orderDeleteError } = await client
-                        .from('orders').delete().eq('store_id', storeId);
-                    if (orderDeleteError) console.warn('[StoreManager] 清理订单失败:', orderDeleteError.message);
-                    else console.log('[StoreManager] ✅ 订单已清理');
-                }
-
-                // 7. 删除支出记录
-                const { error: expenseError } = await client
-                    .from('expenses').delete().eq('store_id', storeId);
-                if (expenseError) console.warn('[StoreManager] 清理支出记录失败:', expenseError.message);
-                else console.log('[StoreManager] ✅ 支出记录已清理');
-
-                // 8. 删除客户
-                const { error: customerError } = await client
-                    .from('customers').delete().eq('store_id', storeId);
-                if (customerError) console.warn('[StoreManager] 清理客户失败:', customerError.message);
-                else console.log('[StoreManager] ✅ 客户已清理');
-
-                // 9. 删除黑名单
-                const { error: blacklistError } = await client
-                    .from('blacklist').delete().eq('store_id', storeId);
-                if (blacklistError) console.warn('[StoreManager] 清理黑名单失败:', blacklistError.message);
-                else console.log('[StoreManager] ✅ 黑名单已清理');
-
-                // 清除缓存
-                SUPABASE.clearCache();
-                if (window.JFCache) window.JFCache.clear();
-
-                console.log('[StoreManager] ✅ 门店 ' + storeId + ' 练习数据清理完成');
-            } catch (error) {
-                console.error('[StoreManager] 清理练习数据异常:', error);
-                throw new Error(lang === 'id'
-                    ? 'Gagal membersihkan data latihan: ' + error.message
-                    : '清理练习数据失败：' + error.message);
-            }
-        },
-
-        /**
-         * 增强版清理练习门店数据（带详细错误收集，防止部分失败时静默继续）
-         * @param {string} storeId - 门店ID
-         */
+        // 增强版清理练习门店数据（原有方法完整保留）
         async _cleanPracticeDataEnhanced(storeId) {
             const lang = Utils.lang;
             const client = SUPABASE.getClient();
@@ -457,7 +370,6 @@
             console.log('[StoreManager] 开始增强版清理门店 ' + storeId + ' 的练习数据...');
 
             try {
-                // 1. 查找该门店所有订单ID
                 const { data: orders, error: orderError } = await client
                     .from('orders').select('id').eq('store_id', storeId);
                 if (orderError) {
@@ -468,10 +380,8 @@
                 const orderIds = (orders || []).map(o => o.id);
                 console.log('[StoreManager] 找到 ' + orderIds.length + ' 个订单需要清理');
 
-                // 定义清理步骤（顺序执行，某一步失败时记录但不中断，最终汇总报告）
                 const cleanSteps = [];
 
-                // 资金流水清理
                 cleanSteps.push({
                     name: 'cash_flow_records',
                     exec: async () => {
@@ -533,7 +443,6 @@
                     }
                 });
 
-                // 顺序执行清理步骤
                 for (const step of cleanSteps) {
                     try {
                         await step.exec();
@@ -541,18 +450,15 @@
                     } catch (err) {
                         errors.push(`${step.name} 清理失败: ${err.message}`);
                         console.warn(`[StoreManager] ⚠️ ${step.name} 清理失败:`, err.message);
-                        // 继续执行后续步骤，不中断
                     }
                 }
 
-                // 清除缓存
                 SUPABASE.clearCache();
                 if (window.JFCache) window.JFCache.clear();
 
                 if (errors.length > 0) {
                     const errorSummary = errors.join('; ');
                     console.warn('[StoreManager] 清理完成但有部分失败:', errorSummary);
-                    // 抛出包含详细错误信息的异常，供上层显示
                     throw new Error(lang === 'id'
                         ? `Pembersihan selesai dengan ${errors.length} kesalahan: ${errorSummary}`
                         : `清理完成但有 ${errors.length} 个错误: ${errorSummary}`);
@@ -561,59 +467,14 @@
                 console.log('[StoreManager] ✅ 门店 ' + storeId + ' 练习数据完整清理完成');
             } catch (error) {
                 console.error('[StoreManager] 增强版清理练习数据异常:', error);
-                throw error; // 向上抛出，由上层处理
+                throw error;
             }
         },
 
-        /**
-         * 调用 Edge Function 进行事务性清理（推荐方式，需后端部署）
-         * @param {string} storeId - 门店ID
-         */
-        async _cleanPracticeDataWithTransaction(storeId) {
-            const lang = Utils.lang;
-            const client = SUPABASE.getClient();
-
-            console.log('[StoreManager] 尝试通过 Edge Function 事务性清理门店 ' + storeId);
-
-            try {
-                const { data, error } = await client.functions.invoke('clean-practice-store', {
-                    body: { storeId: storeId }
-                });
-
-                if (error) {
-                    console.warn('[StoreManager] Edge Function 调用失败:', error);
-                    throw new Error(lang === 'id'
-                        ? 'Fungsi pembersihan transaksional tidak tersedia, gunakan metode biasa'
-                        : '事务清理功能不可用，使用普通方式');
-                }
-
-                console.log('[StoreManager] Edge Function 清理完成:', data);
-                return data;
-            } catch (error) {
-                console.warn('[StoreManager] Edge Function 未部署或调用失败，降级到普通清理:', error.message);
-                // 降级到增强版清理
-                await StoreManager._cleanPracticeDataEnhanced(storeId);
-            }
-        },
-
-        // ==================== 渲染门店管理页面 ====================
-        async renderStoreManagement() {
-            console.log('[StoreManager] 开始加载门店管理页面');
+        // ==================== 构建门店管理 HTML（纯内容） ====================
+        async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
-
-            document.getElementById("app").innerHTML =
-                `<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                    <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
-                    <div class="header-actions">
-                        <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                        <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                    </div>
-                </div>
-                <div class="card" style="text-align:center;padding:40px;">
-                    <div class="loader"></div>
-                    <p>${lang === 'id' ? 'Memuat data toko...' : '加载门店数据中...'}</p>
-                </div>`;
 
             try {
                 await StoreManager.loadStores(true);
@@ -792,9 +653,8 @@
                     }
                 }
 
-                // 渲染页面
-                document.getElementById("app").innerHTML =
-                    `<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+                const content = `
+                    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                         <div class="header-actions">
                             <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
@@ -883,15 +743,15 @@
                         </div>
                     </div>`;
 
-                console.log('[StoreManager] 门店管理页面渲染完成');
+                console.log('[StoreManager] 门店管理页面内容构建完成');
+                return content;
 
             } catch (error) {
-                console.error('[StoreManager] 渲染失败:', error);
-                document.getElementById("app").innerHTML =
-                    `<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+                console.error('[StoreManager] 构建页面失败:', error);
+                return `<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                            <button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button>
                             <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </div>
                     </div>
@@ -905,15 +765,25 @@
                         <button onclick="APP.goBack()" class="btn-small" style="margin-top:16px;margin-left:8px;">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
                     </div>`;
             }
+        },
+
+        // 供外壳调用的渲染函数
+        async renderStoreManagementHTML() {
+            return await this.buildStoreManagementHTML();
+        },
+
+        // 原有的 renderStoreManagement（兼容直接调用）
+        async renderStoreManagement() {
+            const contentHTML = await this.buildStoreManagementHTML();
+            document.getElementById("app").innerHTML = contentHTML;
         }
     };
 
     // 挂载到命名空间
     JF.StoreManager = StoreManager;
-    window.StoreManager = StoreManager; // 向下兼容
+    window.StoreManager = StoreManager;
 
-    // 修复注册时机：直接挂载到 window.APP（无论 APP 是否存在）
-    // 这样即使 store.js 在 app.js 之前加载，方法也能被正确注册
+    // 向下兼容 APP 方法
     window.APP = window.APP || {};
     window.APP.addStore = async function () {
         const name = document.getElementById('newStoreName')?.value.trim();
@@ -943,5 +813,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.0 初始化完成');
+    console.log('✅ JF.StoreManager v2.1 初始化完成（支持外壳渲染，完整版）');
 })();
