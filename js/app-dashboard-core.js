@@ -1,11 +1,11 @@
-// app-dashboard-core.js - v3.0 最终修复版（导航统一使用 APP.navigateTo）
+// app-dashboard-core.js - v3.0 完整稳定版（仪表盘直接渲染，无无限加载）
 'use strict';
 
 (function () {
     const JF = window.JF || {};
     window.JF = JF;
 
-    // ========== 模块降级 ==========
+    // ========== 模块降级（完整实现） ==========
     const ModuleFallback = {
         _degradedModules: {},
         async safeCall(moduleName, fn, args, fallbackFn) {
@@ -117,12 +117,14 @@
         async _ensureShell() {
             let shell = document.querySelector('.dashboard-v2');
             if (shell) return shell;
-            await this._fullRenderDashboard();
+            await this.originalRenderDashboard();
             return document.querySelector('.dashboard-v2');
         },
+
         async _fullRenderDashboard() {
             await this.originalRenderDashboard();
         },
+
         async _updateMainContent(htmlContent) {
             const mainEl = document.querySelector('.dash-main');
             if (!mainEl) return;
@@ -135,156 +137,116 @@
             });
             mainEl.scrollTop = 0;
         },
+
         async refreshCurrentPage() {
             await this._ensureShell();
             await this._updateSidebarActive();
+
             const page = this.currentPage;
+            // 仪表盘直接完整重新渲染（避免主内容提取失败导致白屏）
+            if (page === 'dashboard') {
+                await this.originalRenderDashboard();
+                return;
+            }
+
             let contentHtml = '<div class="card"><p>' + (Utils.lang === 'id' ? 'Memuat...' : '加载中...') + '</p></div>';
             try {
-                if (page === 'dashboard') {
-                    contentHtml = await this._getDashboardMainHTML();
-                } else if (page === 'orderTable') {
+                if (page === 'orderTable') {
                     if (JF.OrdersPage && typeof JF.OrdersPage.buildOrderTableHTML === 'function') {
                         contentHtml = await JF.OrdersPage.buildOrderTableHTML({ status: this.currentFilter }, 0, 50);
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 订单模块未加载</p></div>';
                     }
                 } else if (page === 'customers') {
                     if (JF.CustomersPage && typeof JF.CustomersPage.buildCustomersHTML === 'function') {
                         contentHtml = await JF.CustomersPage.buildCustomersHTML();
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 客户模块未加载</p></div>';
                     }
                 } else if (page === 'expenses') {
                     if (JF.ExpensesPage && typeof JF.ExpensesPage.buildExpensesHTML === 'function') {
                         contentHtml = await JF.ExpensesPage.buildExpensesHTML();
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 支出模块未加载</p></div>';
                     }
                 } else if (page === 'paymentHistory') {
                     if (JF.FundsPage && typeof JF.FundsPage.buildCashFlowPageHTML === 'function') {
                         contentHtml = await JF.FundsPage.buildCashFlowPageHTML();
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 资金流水模块未加载</p></div>';
                     }
                 } else if (page === 'anomaly') {
                     if (JF.AnomalyPage && typeof JF.AnomalyPage.buildAnomalyHTML === 'function') {
                         contentHtml = await JF.AnomalyPage.buildAnomalyHTML();
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 异常模块未加载</p></div>';
                     }
                 } else if (page === 'userManagement') {
                     if (JF.UsersPage && typeof JF.UsersPage.buildUserManagementHTML === 'function') {
                         contentHtml = await JF.UsersPage.buildUserManagementHTML();
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 用户管理模块未加载</p></div>';
                     }
                 } else if (page === 'storeManagement') {
                     if (JF.StoreManager && typeof JF.StoreManager.buildStoreManagementHTML === 'function') {
                         contentHtml = await JF.StoreManager.buildStoreManagementHTML();
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 门店管理模块未加载</p></div>';
                     }
                 } else if (page === 'backupRestore') {
                     if (JF.BackupStorage && typeof JF.BackupStorage.renderBackupUI === 'function') {
-                        const tempDiv = document.createElement('div');
                         const originalApp = document.getElementById('app');
-                        const mockApp = document.createElement('div');
-                        mockApp.id = 'mock-backup';
-                        document.body.appendChild(mockApp);
+                        const mockDiv = document.createElement('div');
+                        mockDiv.id = 'mock-backup';
+                        document.body.appendChild(mockDiv);
                         const originalHtml = originalApp.innerHTML;
                         originalApp.innerHTML = '';
                         const originalRender = JF.BackupStorage.renderBackupUI;
                         JF.BackupStorage.renderBackupUI = async () => {
                             await originalRender.call(JF.BackupStorage);
-                            const content = mockApp.innerHTML;
-                            mockApp.remove();
+                            const content = mockDiv.innerHTML;
+                            mockDiv.remove();
                             originalApp.innerHTML = originalHtml;
                             return content;
                         };
                         contentHtml = await JF.BackupStorage.renderBackupUI();
                         JF.BackupStorage.renderBackupUI = originalRender;
                         originalApp.innerHTML = originalHtml;
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 备份恢复模块未加载</p></div>';
                     }
                 } else if (page === 'blacklist') {
                     if (JF.BlacklistPage && typeof JF.BlacklistPage.buildBlacklistHTML === 'function') {
                         contentHtml = await JF.BlacklistPage.buildBlacklistHTML();
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 黑名单模块未加载</p></div>';
                     }
                 } else if (page === 'viewOrder' && this.currentOrderId) {
                     if (JF.OrdersPage && typeof JF.OrdersPage.renderViewOrderHTML === 'function') {
                         contentHtml = await JF.OrdersPage.renderViewOrderHTML(this.currentOrderId);
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 订单详情模块未加载</p></div>';
                     }
                 } else if (page === 'payment' && this.currentOrderId) {
                     if (JF.PaymentPage && typeof JF.PaymentPage.showPayment === 'function') {
-                        const tempDiv = document.createElement('div');
                         const originalApp = document.getElementById('app');
-                        const mockApp = document.createElement('div');
-                        mockApp.id = 'mock-payment';
-                        document.body.appendChild(mockApp);
+                        const mockDiv = document.createElement('div');
+                        mockDiv.id = 'mock-payment';
+                        document.body.appendChild(mockDiv);
                         const originalHtml = originalApp.innerHTML;
                         originalApp.innerHTML = '';
                         const originalShow = JF.PaymentPage.showPayment;
                         JF.PaymentPage.showPayment = async (oid) => {
                             await originalShow.call(JF.PaymentPage, oid);
-                            const content = mockApp.innerHTML;
-                            mockApp.remove();
+                            const content = mockDiv.innerHTML;
+                            mockDiv.remove();
                             originalApp.innerHTML = originalHtml;
                             return content;
                         };
                         contentHtml = await JF.PaymentPage.showPayment(this.currentOrderId);
                         JF.PaymentPage.showPayment = originalShow;
                         originalApp.innerHTML = originalHtml;
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 缴费模块未加载</p></div>';
                     }
                 } else if (page === 'customerOrders' && this.currentCustomerId) {
                     if (JF.CustomersPage && typeof JF.CustomersPage.buildCustomerOrdersHTML === 'function') {
                         contentHtml = await JF.CustomersPage.buildCustomerOrdersHTML(this.currentCustomerId);
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 客户订单模块未加载</p></div>';
                     }
                 } else if (page === 'customerPaymentHistory' && this.currentCustomerId) {
                     if (JF.CustomersPage && typeof JF.CustomersPage.buildCustomerPaymentHistoryHTML === 'function') {
                         contentHtml = await JF.CustomersPage.buildCustomerPaymentHistoryHTML(this.currentCustomerId);
-                    } else {
-                        contentHtml = '<div class="card"><p>⚠️ 客户缴费历史模块未加载</p></div>';
                     }
                 } else {
                     contentHtml = '<div class="card"><p>⚠️ ' + (Utils.lang === 'id' ? 'Halaman tidak ditemukan' : '页面不存在') + '</p></div>';
                 }
                 await this._updateMainContent(contentHtml);
+                // 重新绑定金额输入
                 document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
             } catch (err) {
                 console.error('[refreshCurrentPage] error:', err);
                 await this._updateMainContent('<div class="card"><p>❌ ' + (Utils.lang === 'id' ? 'Gagal memuat halaman' : '页面加载失败') + '</p><button onclick="location.reload()" class="btn-small">🔄 Refresh</button></div>');
             }
         },
-        async _getDashboardMainHTML() {
-            const originalRender = this.renderDashboard;
-            let mainHtml = '';
-            const originalApp = document.getElementById('app');
-            const mockApp = document.createElement('div');
-            mockApp.id = 'mock-dashboard-main';
-            document.body.appendChild(mockApp);
-            const originalHtml = originalApp.innerHTML;
-            originalApp.innerHTML = '';
-            this.renderDashboard = async () => {
-                await this.originalRenderDashboard();
-                const dashMain = document.querySelector('.dash-main');
-                if (dashMain) mainHtml = dashMain.innerHTML;
-            };
-            await this.renderDashboard();
-            this.renderDashboard = originalRender;
-            originalApp.innerHTML = originalHtml;
-            mockApp.remove();
-            return mainHtml || '<div class="card"><p>仪表盘加载失败</p></div>';
-        },
+
         async _updateSidebarActive() {
             const navItems = document.querySelectorAll('.nav-item');
             if (!navItems.length) return;
@@ -298,6 +260,7 @@
             const badgeSpan = document.querySelector('.nav-item[onclick*="orderTable"] .nav-badge');
             if (badgeSpan) badgeSpan.textContent = activeOrders || '';
         },
+
         async _getActiveOrdersCount() {
             try {
                 const profile = await SUPABASE.getCurrentProfile();
@@ -308,6 +271,7 @@
                 return count || 0;
             } catch (e) { return 0; }
         },
+
         _toggleSidebar() {
             const sidebar = document.getElementById('dashSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -323,6 +287,7 @@
                 document.body.classList.add('menu-open');
             }
         },
+
         _setLang(lang) {
             Utils.setLanguage(lang);
             Utils.forceSyncLanguage();
@@ -331,7 +296,6 @@
 
         // ========== 路由和导航 ==========
         navigateTo(page, params) {
-            console.log('[DashboardCore] navigateTo:', page, params);
             window.scrollTo(0, 0);
             this.historyStack.push({
                 page: this.currentPage,
@@ -350,6 +314,7 @@
                 this.renderDashboard();
             });
         },
+
         goBack() {
             if (this.historyStack.length > 0) {
                 const prev = this.historyStack.pop();
@@ -364,7 +329,7 @@
             }
         },
 
-        // ========== 原完整仪表盘渲染（银行级金融风格，所有 onClick 改为 APP.navigateTo） ==========
+        // ========== 原完整仪表盘渲染（银行级金融风格） ==========
         async originalRenderDashboard() {
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
@@ -491,21 +456,21 @@
                 let quickActions = [];
                 if (isAdmin) {
                     quickActions = [
-                        { icon: '👥', label: t('customers'), action: "APP.navigateTo('customers')", cls: '' },
-                        { icon: '📋', label: t('order_list'), action: "APP.navigateTo('orderTable')", cls: '' },
+                        { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
+                        { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
                         { icon: '💉', label: lang === 'id' ? 'Injeksi Modal' : '资本注入', action: "JF.CapitalModule.showCapitalInjectionModal()", cls: '' },
-                        { icon: '⚠️', label: t('anomaly_title'), action: "APP.navigateTo('anomaly')", cls: '' },
-                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "APP.navigateTo('expenses')", cls: '' },
-                        { icon: '📦', label: t('backup_restore'), action: "APP.navigateTo('backupRestore')", cls: '' },
+                        { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' },
+                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
+                        { icon: '📦', label: t('backup_restore'), action: "JF.DashboardCore.navigateTo('backupRestore')", cls: '' },
                     ];
                 } else {
                     quickActions = [
-                        { icon: '👥', label: t('customers'), action: "APP.navigateTo('customers')", cls: '' },
-                        { icon: '📋', label: t('order_list'), action: "APP.navigateTo('orderTable')", cls: '' },
-                        { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "APP.navigateTo('orderTable');setTimeout(function(){if(APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
-                        { icon: '⚠️', label: t('anomaly_title'), action: "APP.navigateTo('anomaly')", cls: '' },
-                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "APP.navigateTo('expenses')", cls: '' },
-                        { icon: '📦', label: t('backup_restore'), action: "APP.navigateTo('backupRestore')", cls: '' },
+                        { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
+                        { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
+                        { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "JF.DashboardCore.navigateTo('orderTable');setTimeout(function(){if(window.APP && APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
+                        { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' },
+                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
+                        { icon: '📦', label: t('backup_restore'), action: "JF.DashboardCore.navigateTo('backupRestore')", cls: '' },
                     ];
                 }
                 const quickActionsHtml = quickActions.map(q => `<div class="quick-btn${q.cls ? ' ' + q.cls : ''}" onclick="${q.action}"><span class="qb-icon">${q.icon}</span><span class="qb-label">${q.label}</span></div>`).join('');
@@ -519,34 +484,34 @@
 
                 const finalHtml = `
                 <div class="dashboard-v2">
-                    <div class="sidebar-overlay" id="sidebarOverlay" onclick="APP._toggleSidebar()"></div>
+                    <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
                     <div class="dash-sidebar" id="dashSidebar">
                         <div class="sidebar-logo"><div class="logo-mark"><div class="logo-icon">JF</div><div><div class="logo-text">JF! by Gadai</div><div class="logo-sub">${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div></div></div>
                         <div class="sidebar-user"><div class="user-av">${userInitial}</div><div><div class="user-name">${Utils.escapeHtml(profile?.name || 'User')}</div><div class="user-role">${userRoleText}</div></div><div class="user-badge">${storeDisplay}</div></div>
                         <div class="sidebar-nav">
                             <div class="nav-section-label">${lang === 'id' ? 'Menu Utama' : '主菜单'}</div>
-                            <div class="nav-item active" onclick="APP.navigateTo('dashboard')"><span class="nav-icon">◼</span> ${lang === 'id' ? 'Dasbor' : '仪表盘'}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('customers')"><span class="nav-icon">👥</span> ${t('customers')}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('orderTable')"><span class="nav-icon">📋</span> ${t('order_list')}${activeBadgeCount > 0 ? `<span class="nav-badge">${activeBadgeCount}</span>` : ''}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('paymentHistory')"><span class="nav-icon">💰</span> ${lang === 'id' ? 'Arus Kas' : '资金流水'}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('expenses')"><span class="nav-icon">📝</span> ${t('expenses')}</div>
+                            <div class="nav-item active" onclick="JF.DashboardCore.navigateTo('dashboard')"><span class="nav-icon">◼</span> ${lang === 'id' ? 'Dasbor' : '仪表盘'}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('customers')"><span class="nav-icon">👥</span> ${t('customers')}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('orderTable')"><span class="nav-icon">📋</span> ${t('order_list')}${activeBadgeCount > 0 ? `<span class="nav-badge">${activeBadgeCount}</span>` : ''}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('paymentHistory')"><span class="nav-icon">💰</span> ${lang === 'id' ? 'Arus Kas' : '资金流水'}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('expenses')"><span class="nav-icon">📝</span> ${t('expenses')}</div>
                             ${isAdmin ? `<div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
                             <div class="nav-item" onclick="JF.CapitalModule.showCapitalInjectionModal()"><span class="nav-icon">💉</span> ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('userManagement')"><span class="nav-icon">👤</span> ${t('user_management')}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('storeManagement')"><span class="nav-icon">🏪</span> ${t('store_management')}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>` : `
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('userManagement')"><span class="nav-icon">👤</span> ${t('user_management')}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeManagement')"><span class="nav-icon">🏪</span> ${t('store_management')}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>` : `
                             <div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
-                            <div class="nav-item" onclick="APP.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>`}
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>`}
                             <div style="flex:1;"></div>
-                            <div class="nav-item danger" onclick="APP.logout()"><span class="nav-icon">🚪</span> ${t('save_exit')}</div>
+                            <div class="nav-item danger" onclick="JF.DashboardCore.logout()"><span class="nav-icon">🚪</span> ${t('save_exit')}</div>
                         </div>
-                        <div class="sidebar-footer"><div class="lang-toggle"><div class="lang-btn-side${Utils.lang === 'zh' ? ' active-lang' : ''}" onclick="APP._setLang('zh')">中文</div><div class="lang-btn-side${Utils.lang === 'id' ? ' active-lang' : ''}" onclick="APP._setLang('id')">Bahasa</div></div></div>
+                        <div class="sidebar-footer"><div class="lang-toggle"><div class="lang-btn-side${Utils.lang === 'zh' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('zh')">中文</div><div class="lang-btn-side${Utils.lang === 'id' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('id')">Bahasa</div></div></div>
                     </div>
                     <div class="dash-topbar">
-                        <div class="topbar-left"><div class="hamburger-btn" id="hamburgerBtn" onclick="APP._toggleSidebar()">☰</div><div><div class="topbar-title">${lang === 'id' ? 'Dasbor' : '仪表盘总览'}</div><div class="topbar-sub">${topbarSubtitle}</div></div></div>
-                        <div class="topbar-right"><div class="alert-btn-dash" onclick="APP.navigateTo('anomaly')">⚠️${overdueOrders > 0 ? '<div class="alert-dot"></div>' : ''}</div><div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div><div class="refresh-btn-dash" onclick="APP.invalidateDashboardCache()">🔄</div></div>
+                        <div class="topbar-left"><div class="hamburger-btn" id="hamburgerBtn" onclick="JF.DashboardCore._toggleSidebar()">☰</div><div><div class="topbar-title">${lang === 'id' ? 'Dasbor' : '仪表盘总览'}</div><div class="topbar-sub">${topbarSubtitle}</div></div></div>
+                        <div class="topbar-right"><div class="alert-btn-dash" onclick="JF.DashboardCore.navigateTo('anomaly')">⚠️${overdueOrders > 0 ? '<div class="alert-dot"></div>' : ''}</div><div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div><div class="refresh-btn-dash" onclick="JF.DashboardCore.invalidateDashboardCache()">🔄</div></div>
                     </div>
                     <div class="dash-main">
                         <div class="kpi-row">
@@ -557,7 +522,7 @@
                         </div>
                         <div class="mid-row">
                             <div class="fund-flow-card">
-                                <div class="card-header"><div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div><div class="card-action" onclick="APP.navigateTo('paymentHistory')">${lang === 'id' ? 'Lihat Detail →' : '查看明细 →'}</div></div>
+                                <div class="card-header"><div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div><div class="card-action" onclick="JF.DashboardCore.navigateTo('paymentHistory')">${lang === 'id' ? 'Lihat Detail →' : '查看明细 →'}</div></div>
                                 <div class="fund-total-row">
                                     <div class="fund-block injected"><div class="fund-block-label">${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</div><div class="fund-block-val">${Utils.formatCurrency(injected)}</div><div class="fund-block-sub">${lang === 'id' ? 'Dasar Operasional Gadai' : '典当运营基础'}</div></div>
                                     <div class="fund-block deployed"><div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div><div class="fund-block-val">${Utils.formatCurrency(deployed)}</div><div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div>
@@ -567,11 +532,11 @@
                                 <div class="cash-bank-row"><div class="cash-bank-item"><div class="cb-label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</div><div class="cb-val">${Utils.formatCurrency(cashBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(cashIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(cashExpense)}</span></div></div><div class="cash-bank-item"><div class="cb-label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div><div class="cb-val">${Utils.formatCurrency(bankBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(bankIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(bankExpense)}</span></div></div></div>
                                 <div class="transfer-row-v2"><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('cash_to_bank')">🏦→🏧 ${lang === 'id' ? 'Kas ke Bank' : '现金转银行'}</div><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Bank ke Kas' : '银行转现金'}</div>${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}</div>
                             </div>
-                            <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div><div class="card-action" onclick="APP.navigateTo('paymentHistory')">${lang === 'id' ? 'Lihat Tagihan →' : '查看账单 →'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfit)}</div></div></div>
+                            <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div><div class="card-action" onclick="JF.DashboardCore.navigateTo('paymentHistory')">${lang === 'id' ? 'Lihat Tagihan →' : '查看账单 →'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfit)}</div></div></div>
                         </div>
                         <div class="bottom-row">
                             <div class="quick-card"><div class="card-header"><div class="card-title">⚡ ${lang === 'id' ? 'Aksi Cepat' : '快捷操作'}</div></div><div class="quick-grid">${quickActionsHtml}</div></div>
-                            <div class="order-status-card"><div class="card-header"><div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div><div class="card-action" onclick="APP.navigateTo('orderTable')">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div></div><div class="donut-area"><svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="none" stroke="#f1f5f9" stroke-width="14"/>${donutPaths}<text x="50" y="48" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a2e" font-family="var(--font-mono)">${totalOrders}</text><text x="50" y="60" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="var(--font-sans)">${lang === 'id' ? 'Total Pesanan' : '总订单'}</text></svg><div class="donut-legend">${donutData.map(d => `<div class="legend-item"><div class="legend-dot" style="background:${d.color}"></div><div><div class="legend-name">${d.label}</div><div class="legend-pct">${d.pct}%</div></div><div class="legend-count">${d.count}</div></div>`).join('')}</div></div></div>
+                            <div class="order-status-card"><div class="card-header"><div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div><div class="card-action" onclick="JF.DashboardCore.navigateTo('orderTable')">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div></div><div class="donut-area"><svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="none" stroke="#f1f5f9" stroke-width="14"/>${donutPaths}<text x="50" y="48" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a2e" font-family="var(--font-mono)">${totalOrders}</text><text x="50" y="60" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="var(--font-sans)">${lang === 'id' ? 'Total Pesanan' : '总订单'}</text></svg><div class="donut-legend">${donutData.map(d => `<div class="legend-item"><div class="legend-dot" style="background:${d.color}"></div><div><div class="legend-name">${d.label}</div><div class="legend-pct">${d.pct}%</div></div><div class="legend-count">${d.count}</div></div>`).join('')}</div></div></div>
                         </div>
                     </div>
                 </div>`;
@@ -602,75 +567,135 @@
                 await this.refreshCurrentPage();
             }
         },
-        async renderLogin() { /* 同前，略 */ },
-        async login() { /* 同前 */ },
-        async logout() { /* 同前 */ },
-        toggleLanguage() { /* 同前 */ },
-        forceRecovery() { /* 同前 */ },
-        invalidateDashboardCache() { /* 同前 */ },
-        async init() { /* 同前 */ }
+
+        async renderLogin() {
+            this.currentPage = 'login';
+            this.clearPageState();
+            const lang = Utils.lang;
+            document.getElementById("app").innerHTML = `
+                <div class="login-container"><div class="login-box"><div class="lang-toggle"><button onclick="APP.toggleLanguage()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button></div><div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;"><img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;"><h2 class="login-title" style="margin:0;">JF! by Gadai</h2></div><h3>${Utils.t('login')}</h3><div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;"><span class="info-bar-icon">⚠️</span><div class="info-bar-content" id="loginErrorMessage"></div></div><div class="form-group"><label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label><input id="username" placeholder="email@domain.com" autocomplete="username"></div><div class="form-group" style="position:relative;"><label>${Utils.t('password')}</label><input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password"><span onclick="Utils.togglePasswordVisibility('password', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;">👁️</span></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;"><input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;"><label for="rememberMe" style="cursor:pointer;">${lang === 'id' ? 'Ingat saya' : '记住我'}</label></div><button onclick="APP.login()" id="loginBtn">${Utils.t('login')}</button><p class="login-note">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p></div></div>`;
+        },
+
+        async login() {
+            const username = document.getElementById("username")?.value.trim();
+            const password = document.getElementById("password")?.value;
+            const rememberMe = document.getElementById("rememberMe")?.checked;
+            const errorDiv = document.getElementById("loginError");
+            const errorMsg = document.getElementById("loginErrorMessage");
+            const btn = document.getElementById("loginBtn");
+            if (errorDiv) errorDiv.style.display = 'none';
+            if (!username || !password) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.t('fill_all_fields'); } return; }
+            if (btn) { btn.disabled = true; btn.textContent = '...'; }
+            AUTH.setRememberMe(rememberMe);
+            const user = await AUTH.login(username, password);
+            if (!user) {
+                if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.lang === 'id' ? 'Login gagal. Periksa kembali email/username dan password Anda.' : '登录失败，请检查邮箱/用户名和密码。'; }
+                if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); }
+                return;
+            }
+            await this.renderDashboard();
+        },
+
+        async logout() {
+            this._clearOverdueInterval();
+            const confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
+            if (!confirmed) return;
+            this.clearPageState();
+            sessionStorage.clear();
+            await AUTH.logout();
+            await this.renderLogin();
+        },
+
+        toggleLanguage() {
+            const newLang = Utils.lang === 'id' ? 'zh' : 'id';
+            Utils.setLanguage(newLang);
+            if (this.currentPage === 'login' || !AUTH.isLoggedIn()) this.renderLogin();
+            else this.refreshCurrentPage();
+        },
+
+        forceRecovery() {
+            console.log('[Recovery] 手动强制恢复');
+            const appDiv = document.getElementById('app');
+            if (!appDiv) return;
+            const loadingText = Utils.lang === 'id' ? 'Sedang memulihkan...' : '恢复中...';
+            appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;margin:20px;"><div class="loader" style="margin:20px auto;"></div><p>' + loadingText + '</p></div>';
+            setTimeout(async () => {
+                try {
+                    if (AUTH.isLoggedIn()) await this.refreshCurrentPage();
+                    else await this.renderLogin();
+                } catch (err) { appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Pemulihan gagal, muat ulang halaman.' : '恢复失败，请刷新页面。') + '</p><button onclick="location.reload()" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>'; }
+            }, 100);
+        },
+
+        invalidateDashboardCache() {
+            JF.Cache.clear();
+            this.refreshCurrentPage();
+            Utils.toast.info(Utils.lang === 'id' ? 'Cache dihapus, data diperbarui' : '缓存已清除，数据已刷新', 2000);
+        },
+
+        async init() {
+            ModuleFallback.clearAll();
+            document.getElementById("app").innerHTML = Utils.renderSkeleton('default');
+            try {
+                await AUTH.init();
+                const saved = this.restorePageState();
+                if (saved.page && AUTH.isLoggedIn()) {
+                    this.currentPage = saved.page;
+                    this.currentOrderId = saved.orderId || null;
+                    this.currentCustomerId = saved.customerId || null;
+                    this.currentFilter = saved.filter || "all";
+                    await this.refreshCurrentPage();
+                } else if (AUTH.isLoggedIn()) {
+                    await this.renderDashboard();
+                } else {
+                    await this.renderLogin();
+                }
+                if (AUTH.isLoggedIn()) this._startOverdueInterval();
+            } catch (error) {
+                console.error("Init error:", error);
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat sistem' : '系统加载失败', 5000);
+                document.getElementById("app").innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>' + (Utils.lang === 'id' ? 'Gagal memuat sistem, silakan muat ulang.' : '系统加载失败，请刷新页面。') + '</p><button onclick="location.reload()" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
+            }
+        },
     };
 
-    // 补充缺失的 renderLogin/login/logout 等方法的简写（为了完整性，可以保留原实现）
-    DashboardCore.renderLogin = async function() {
-        const lang = Utils.lang;
-        document.getElementById("app").innerHTML = `
-            <div class="login-container"><div class="login-box"><div class="lang-toggle"><button onclick="APP.toggleLanguage()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button></div><div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;"><img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;"><h2 class="login-title" style="margin:0;">JF! by Gadai</h2></div><h3>${Utils.t('login')}</h3><div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;"><span class="info-bar-icon">⚠️</span><div class="info-bar-content" id="loginErrorMessage"></div></div><div class="form-group"><label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label><input id="username" placeholder="email@domain.com" autocomplete="username"></div><div class="form-group" style="position:relative;"><label>${Utils.t('password')}</label><input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password"><span onclick="Utils.togglePasswordVisibility('password', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;">👁️</span></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;"><input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;"><label for="rememberMe" style="cursor:pointer;">${lang === 'id' ? 'Ingat saya' : '记住我'}</label></div><button onclick="APP.login()" id="loginBtn">${Utils.t('login')}</button><p class="login-note">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p></div></div>`;
-    };
-    DashboardCore.login = async function() {
-        const username = document.getElementById("username")?.value.trim();
-        const password = document.getElementById("password")?.value;
-        const rememberMe = document.getElementById("rememberMe")?.checked;
-        const errorDiv = document.getElementById("loginError");
-        const errorMsg = document.getElementById("loginErrorMessage");
-        const btn = document.getElementById("loginBtn");
-        if (errorDiv) errorDiv.style.display = 'none';
-        if (!username || !password) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.t('fill_all_fields'); } return; }
-        if (btn) { btn.disabled = true; btn.textContent = '...'; }
-        AUTH.setRememberMe(rememberMe);
-        const user = await AUTH.login(username, password);
-        if (!user) {
-            if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.lang === 'id' ? 'Login gagal. Periksa kembali email/username dan password Anda.' : '登录失败，请检查邮箱/用户名和密码。'; }
-            if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); }
-            return;
-        }
-        await DashboardCore.renderDashboard();
-    };
-    DashboardCore.logout = async function() {
-        DashboardCore._clearOverdueInterval();
-        const confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
-        if (!confirmed) return;
-        DashboardCore.clearPageState();
-        sessionStorage.clear();
-        await AUTH.logout();
-        await DashboardCore.renderLogin();
-    };
-    DashboardCore.toggleLanguage = function() {
-        const newLang = Utils.lang === 'id' ? 'zh' : 'id';
-        Utils.setLanguage(newLang);
-        if (DashboardCore.currentPage === 'login' || !AUTH.isLoggedIn()) DashboardCore.renderLogin();
-        else DashboardCore.refreshCurrentPage();
-    };
-    DashboardCore.forceRecovery = function() { /* 略 */ };
-    DashboardCore.invalidateDashboardCache = function() { JF.Cache.clear(); DashboardCore.refreshCurrentPage(); };
-    DashboardCore._toggleSidebar = DashboardCore._toggleSidebar.bind(DashboardCore);
-    DashboardCore._setLang = DashboardCore._setLang.bind(DashboardCore);
-    DashboardCore.init = async function() { /* 同前 */ };
-
-    // 挂载到 JF 和全局
+    // ========== 挂载到命名空间 ==========
     JF.DashboardCore = DashboardCore;
 
-    // 确保 window.APP 存在并指向正确的导航方法
-    if (!window.APP) window.APP = {};
-    for (const key of Object.keys(DashboardCore)) {
-        if (typeof DashboardCore[key] === 'function' && !window.APP[key]) {
-            window.APP[key] = DashboardCore[key].bind(DashboardCore);
+    // ========== 兼容全局 APP 对象（不覆盖原有方法） ==========
+    if (!window.APP) {
+        window.APP = DashboardCore;
+    } else {
+        for (const key of Object.keys(DashboardCore)) {
+            if (typeof DashboardCore[key] === 'function' && !window.APP[key]) {
+                window.APP[key] = DashboardCore[key].bind(DashboardCore);
+            }
         }
+        // 确保核心导航方法指向 DashboardCore 实例
+        window.APP.navigateTo = DashboardCore.navigateTo.bind(DashboardCore);
+        window.APP.goBack = DashboardCore.goBack.bind(DashboardCore);
+        window.APP.refreshCurrentPage = DashboardCore.refreshCurrentPage.bind(DashboardCore);
+        window.APP.renderDashboard = DashboardCore.renderDashboard.bind(DashboardCore);
+        window.APP.logout = DashboardCore.logout.bind(DashboardCore);
+        window.APP.forceRecovery = DashboardCore.forceRecovery.bind(DashboardCore);
+        window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore);
+        window.APP.toggleLanguage = DashboardCore.toggleLanguage.bind(DashboardCore);
+        window.APP.login = DashboardCore.login.bind(DashboardCore);
+        window.APP.renderLogin = DashboardCore.renderLogin.bind(DashboardCore);
+        window.APP.init = DashboardCore.init.bind(DashboardCore);
     }
-    window.APP.navigateTo = DashboardCore.navigateTo.bind(DashboardCore);
-    window.APP.goBack = DashboardCore.goBack.bind(DashboardCore);
-    window.APP._toggleSidebar = DashboardCore._toggleSidebar.bind(DashboardCore);
-    window.APP._setLang = DashboardCore._setLang.bind(DashboardCore);
 
-    console.log('✅ JF.DashboardCore v3.0 最终版（导航统一使用 APP.navigateTo）已加载');
+    // 快捷键 Alt+R 恢复
+    document.addEventListener('keydown', (e) => {
+        if (e.altKey && e.key === 'r') {
+            e.preventDefault();
+            if (JF.DashboardCore) JF.DashboardCore.forceRecovery();
+            else if (window.APP && window.APP.forceRecovery) window.APP.forceRecovery();
+        }
+    });
+    window.addEventListener('beforeunload', () => {
+        if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
+    });
+
+    console.log('✅ JF.DashboardCore v3.0 完整版已加载（仪表盘直接渲染，解决无限加载）');
 })();
