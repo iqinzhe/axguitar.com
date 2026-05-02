@@ -419,7 +419,7 @@
             }, 100);
         },
 
-        // ---------- 渲染仪表盘 ----------
+        // ---------- 渲染仪表盘（v2.0 银行级金融风格） ----------
         async renderDashboard() {
             this.currentPage = 'dashboard';
             this.currentOrderId = null;
@@ -432,94 +432,153 @@
                 const isAdmin = PERMISSION.isAdmin();
                 const storeId = profile?.store_id;
 
-                const cacheKey = `dashboard_stats_${isAdmin ? 'admin' : storeId}`;
+                // ========== 数据获取 ==========
+                const cacheKey = `dashboard_v2_${isAdmin ? 'admin' : storeId}`;
                 const report = await JF.Cache.get(cacheKey, async () => {
                     const client = SUPABASE.getClient();
                     const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
+
                     const applyFilter = (q) => {
-                        if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                        else if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                        if (isAdmin && practiceIds.length > 0) {
+                            q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                        } else if (!isAdmin && storeId) {
+                            q = q.eq('store_id', storeId);
+                        }
                         return q;
                     };
-                    const [totalRes, activeRes, completedRes, overdueRes] = await Promise.all([
+
+                    // 并行获取统计数据
+                    const [
+                        totalRes, activeRes, completedRes, overdueRes,
+                        activeOrdersData, allOrdersData
+                    ] = await Promise.all([
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active'),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'completed'),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active').gte('overdue_days', 1),
+                        applyFilter(client.from('orders').select('loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid')).eq('status', 'active'),
+                        applyFilter(client.from('orders').select('loan_amount')),
                     ]);
-                    const activeData = await applyFilter(client.from('orders').select('loan_amount, admin_fee, admin_fee_paid, service_fee_paid, interest_paid_total, principal_paid')).eq('status', 'active');
-                    const allLoanData = await applyFilter(client.from('orders').select('loan_amount'));
-                    let totalLoan = 0, adminFees = 0, serviceFees = 0, interest = 0, principal = 0;
-                    for (const o of activeData.data || []) {
-                        totalLoan += (o.loan_amount || 0);
-                        if (o.admin_fee_paid) adminFees += (o.admin_fee || 0);
-                        serviceFees += (o.service_fee_paid || 0);
-                        interest += (o.interest_paid_total || 0);
-                        principal += (o.principal_paid || 0);
-                    }
-                    let allLoan = 0;
-                    for (const o of allLoanData.data || []) allLoan += (o.loan_amount || 0);
 
+                    // 计算费用汇总
+                    let totalLoanActive = 0, adminFeesCollected = 0;
+                    let serviceFeesCollected = 0, interestCollected = 0, principalCollected = 0;
+
+                    for (const o of (activeOrdersData.data || [])) {
+                        totalLoanActive += (o.loan_amount || 0);
+                        if (o.admin_fee_paid) adminFeesCollected += (o.admin_fee || 0);
+                        serviceFeesCollected += (o.service_fee_paid || 0);
+                        interestCollected += (o.interest_paid_total || 0);
+                        principalCollected += (o.principal_paid || 0);
+                    }
+
+                    let totalLoanAll = 0;
+                    for (const o of (allOrdersData.data || [])) {
+                        totalLoanAll += (o.loan_amount || 0);
+                    }
+
+                    // 资本注入
                     let totalInjectedCapital = 0;
                     try {
-                        let injectionQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
+                        let injectionQuery = client.from('capital_injections')
+                            .select('amount').eq('is_voided', false);
                         if (!isAdmin && storeId) injectionQuery = injectionQuery.eq('store_id', storeId);
-                        const { data: injections, error: injError } = await injectionQuery;
-                        if (!injError) {
-                            totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
-                        }
-                    } catch (e) { /* 表可能不存在 */ }
+                        const { data: injections } = await injectionQuery;
+                        totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+                    } catch (e) { /* ignore */ }
 
+                    // 在押资金
                     let deployedCapital = 0;
                     try {
-                        let deployedQuery = client.from('orders').select('loan_amount').eq('status', 'active');
+                        let deployedQuery = client.from('orders')
+                            .select('loan_amount').eq('status', 'active');
                         if (!isAdmin && storeId) deployedQuery = deployedQuery.eq('store_id', storeId);
                         const { data: deployedOrders } = await deployedQuery;
                         deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
                     } catch (e) { /* ignore */ }
 
+                    // 本月新增订单数
+                    const today = new Date();
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+                        .toISOString().split('T')[0];
+                    let newThisMonth = 0;
+                    try {
+                        let newOrderQuery = client.from('orders')
+                            .select('*', { count: 'exact', head: true })
+                            .gte('created_at', monthStart);
+                        if (!isAdmin && storeId) newOrderQuery = newOrderQuery.eq('store_id', storeId);
+                        const { count: newCount } = await newOrderQuery;
+                        newThisMonth = newCount || 0;
+                    } catch (e) { /* ignore */ }
+
                     return {
-                        total_orders: totalRes.count || 0, active_orders: activeRes.count || 0,
-                        completed_orders: completedRes.count || 0, overdue_orders: overdueRes.count || 0,
-                        total_loan_amount: allLoan, total_admin_fees: adminFees,
-                        total_service_fees: serviceFees, total_interest: interest, total_principal: principal,
+                        total_orders: totalRes.count || 0,
+                        active_orders: activeRes.count || 0,
+                        completed_orders: completedRes.count || 0,
+                        overdue_orders: overdueRes.count || 0,
+                        new_this_month: newThisMonth,
+                        total_loan_amount: totalLoanAll,
+                        admin_fees_collected: adminFeesCollected,
+                        service_fees_collected: serviceFeesCollected,
+                        interest_collected: interestCollected,
+                        principal_collected: principalCollected,
                         total_injected_capital: totalInjectedCapital,
                         deployed_capital: deployedCapital,
-                        available_capital: totalInjectedCapital - deployedCapital
+                        available_capital: totalInjectedCapital - deployedCapital,
                     };
-                }, { ttl: 5 * 60 * 1000 });
+                }, { ttl: 3 * 60 * 1000 });
 
-                const cashFlowCacheKey = `cashflow_v2_${isAdmin ? 'admin' : storeId}`;
-                const cashFlow = await JF.Cache.get(cashFlowCacheKey, () => SUPABASE.getCashFlowSummary(), { ttl: 5 * 60 * 1000 });
+                // 现金流
+                const cashFlow = await JF.Cache.get(
+                    `cashflow_v2_${isAdmin ? 'admin' : storeId}`,
+                    () => SUPABASE.getCashFlowSummary(),
+                    { ttl: 3 * 60 * 1000 }
+                );
 
-                const expensesCacheKey = `expenses_${isAdmin ? 'admin' : storeId}`;
-                const totalExpenses = await JF.Cache.get(expensesCacheKey, async () => {
-                    const client = SUPABASE.getClient();
-                    let q = client.from('expenses').select('amount, store_id');
-                    if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-                    else if (isAdmin) {
-                        const practiceIds = await SUPABASE._getPracticeStoreIds();
-                        if (practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                    }
-                    const { data } = await q;
-                    return (data || []).reduce((sum, e) => sum + (e.amount || 0), 0);
-                }, { ttl: 5 * 60 * 1000 });
+                // 支出总额
+                const totalExpenses = await JF.Cache.get(
+                    `expenses_v2_${isAdmin ? 'admin' : storeId}`,
+                    async () => {
+                        const client = SUPABASE.getClient();
+                        let q = client.from('expenses').select('amount, store_id');
+                        if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                        else if (isAdmin) {
+                            const practiceIds = await SUPABASE._getPracticeStoreIds();
+                            if (practiceIds.length > 0) {
+                                q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                            }
+                        }
+                        const { data } = await q;
+                        return (data || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+                    },
+                    { ttl: 3 * 60 * 1000 }
+                );
 
-                const activeDisplay = report.active_orders + (report.overdue_orders > 0 ? ' / ⚠️ ' + report.overdue_orders : '');
-                const netProfitBalance = cashFlow.netProfit?.balance || 0;
+                // ========== 计算指标 ==========
+                const totalOrders = report.total_orders;
+                const activeOrders = report.active_orders;
+                const completedOrders = report.completed_orders;
+                const overdueOrders = report.overdue_orders;
+                const newThisMonth = report.new_this_month;
+                const completionRate = totalOrders > 0
+                    ? ((completedOrders / totalOrders) * 100).toFixed(1)
+                    : '0';
 
-                const cards = [
-                    { label: t('this_month') + '/' + t('total_orders'), value: '...' + '/' + report.total_orders, class: '' },
-                    { label: t('active') + ' / ' + t('overdue_days'), value: activeDisplay, class: '' },
-                    { label: t('completed'), value: report.completed_orders, class: '' },
-                    { label: t('net_profit'), value: Utils.formatCurrency(netProfitBalance), class: netProfitBalance >= 0 ? 'income' : 'expense' },
-                    { label: t('admin_fee'), value: Utils.formatCurrency(report.total_admin_fees), class: 'income' },
-                    { label: t('service_fee'), value: Utils.formatCurrency(report.total_service_fees), class: 'income' },
-                    { label: t('interest'), value: Utils.formatCurrency(report.total_interest), class: 'income' },
-                    { label: t('total_expenses'), value: Utils.formatCurrency(totalExpenses), class: 'expense' },
-                ];
-                const cardsHtml = cards.map(c => `<div class="stat-card"><div class="stat-value ${c.class}">${c.value}</div><div class="stat-label">${c.label}</div></div>`).join('');
+                // 净利润
+                const totalIncome = report.admin_fees_collected
+                    + report.service_fees_collected
+                    + report.interest_collected;
+                const netProfit = totalIncome - totalExpenses;
 
+                // 资金三格
+                const injected = report.total_injected_capital;
+                const deployed = report.deployed_capital;
+                const available = report.available_capital;
+                const utilizationRate = injected > 0
+                    ? ((deployed / injected) * 100).toFixed(1)
+                    : '0';
+
+                // 现金/银行余额
                 const cashBalance = cashFlow.cash?.balance ?? 0;
                 const bankBalance = cashFlow.bank?.balance ?? 0;
                 const cashIncome = cashFlow.cash?.income ?? 0;
@@ -527,139 +586,357 @@
                 const bankIncome = cashFlow.bank?.income ?? 0;
                 const bankExpense = cashFlow.bank?.expense ?? 0;
 
-                const totalInjected = report.total_injected_capital || 0;
-                const deployed = report.deployed_capital || 0;
-                const available = report.available_capital || 0;
-                const utilizationPercent = totalInjected > 0 ? (deployed / totalInjected * 100).toFixed(1) : 0;
+                // 环形图数据
+                const activeNormal = activeOrders - overdueOrders;
+                const donutData = [
+                    { label: lang === 'id' ? 'Selesai' : '已完成', count: completedOrders,
+                      color: '#10b981', pct: totalOrders > 0 ? ((completedOrders/totalOrders)*100).toFixed(1) : '0' },
+                    { label: lang === 'id' ? 'Aktif Normal' : '活跃·正常', count: Math.max(activeNormal, 0),
+                      color: '#6366f1', pct: totalOrders > 0 ? ((activeNormal/totalOrders)*100).toFixed(1) : '0' },
+                    { label: lang === 'id' ? 'Aktif Terlambat' : '活跃·逾期', count: overdueOrders,
+                      color: '#ef4444', pct: totalOrders > 0 ? ((overdueOrders/totalOrders)*100).toFixed(1) : '0' },
+                ];
 
-                const injectButtonHtml = isAdmin ? `
-                <button onclick="JF.CapitalModule.showCapitalInjectionModal()" class="btn-capital-inject">
-                    💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}
-                </button>` : `
-                <div class="info-bar info" style="margin-top:8px;">
-                    <span class="info-bar-icon">ℹ️</span>
-                    <div class="info-bar-content">${lang === 'id' ? 'Hanya administrator yang dapat mencatat injeksi modal' : '仅管理员可记录资本注入'}</div>
-                </div>`;
+                // 环形图 SVG 计算
+                const totalDonut = donutData.reduce((s, d) => s + d.count, 0) || 1;
+                const circumference = 2 * Math.PI * 36; // r=36
+                let dashOffset = 0;
+                let donutPaths = '';
+                for (const seg of donutData) {
+                    const segLen = (seg.count / totalDonut) * circumference;
+                    donutPaths += `<circle cx="50" cy="50" r="36" fill="none" stroke="${seg.color}" stroke-width="14"
+                        stroke-dasharray="${segLen} ${circumference - segLen}"
+                        stroke-dashoffset="${-dashOffset}"
+                        stroke-linecap="round" transform="rotate(-90 50 50)"/>`;
+                    dashOffset += segLen;
+                }
 
-                const topRowHtml = `
-                <div class="stats-grid stats-grid-2" style="margin-bottom:16px;">
-                    <div class="card" style="margin-bottom:0;">
-                        <h3>💉 ${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</h3>
-                        <div class="stat-value" style="font-size:var(--font-2xl);margin-bottom:8px;">${Utils.formatCurrency(totalInjected)}</div>
-                        <div class="stat-label" style="margin-bottom:12px;">${lang === 'id' ? 'Modal dasar operasional gadai' : '典当运营基础资本'}</div>
-                        ${injectButtonHtml}
-                    </div>
-                    <div class="card" style="margin-bottom:0;">
-                        <h3>📋 ${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</h3>
-                        <div class="stat-value warning" style="font-size:var(--font-2xl);margin-bottom:8px;">${Utils.formatCurrency(deployed)}</div>
-                        <div class="progress-bar" style="margin-bottom:4px;">
-                            <div class="progress-fill" style="width:${utilizationPercent}%;background:#f59e0b;"></div>
-                        </div>
-                        <div class="stat-label" style="margin-bottom:12px;">${utilizationPercent}% ${lang === 'id' ? 'dari total modal' : '占总资本'}</div>
-                        <button onclick="APP.navigateTo('orderTable'); setTimeout(function(){ if(APP.filterOrders) APP.filterOrders('active'); }, 300);"
-                            class="btn-small primary" style="width:100%;">
-                            👁️ ${lang === 'id' ? 'Lihat Pesanan Aktif' : '查看活跃订单'}
-                        </button>
-                    </div>
-                </div>`;
-
-                const bottomCardHtml = `
-                <div class="card" style="margin-bottom:16px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                        <h3 style="margin:0;padding:0;border:none;">✅ ${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</h3>
-                        <span style="font-size:var(--font-xl);font-weight:700;color:#16a34a;">${Utils.formatCurrency(available)}</span>
-                    </div>
-                    <div class="cashflow-summary" style="margin-bottom:12px;">
-                        <div class="cashflow-stats" style="grid-template-columns:repeat(2,1fr);">
-                            <div class="cashflow-item">
-                                <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                                <div class="value ${cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(cashBalance)}</div>
-                                <div class="cashflow-detail">${t('inflow')}: +${Utils.formatCurrency(cashIncome)} | ${t('outflow')}: -${Utils.formatCurrency(cashExpense)}</div>
-                            </div>
-                            <div class="cashflow-item">
-                                <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                                <div class="value ${bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(bankBalance)}</div>
-                                <div class="cashflow-detail">${t('inflow')}: +${Utils.formatCurrency(bankIncome)} | ${t('outflow')}: -${Utils.formatCurrency(bankExpense)}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="font-size:var(--font-xs);font-weight:600;color:var(--text-secondary);margin-bottom:8px;">
-                        🔄 ${lang === 'id' ? 'Transfer Internal' : '内部互转'}
-                    </div>
-                    <div class="transfer-buttons" style="flex-direction:row;gap:8px;">
-                        <button onclick="APP.showTransferModal('cash_to_bank')" class="transfer-btn cash-to-bank" style="flex:1;">🏦→🏧 ${t('cash_to_bank')}</button>
-                        <button onclick="APP.showTransferModal('bank_to_cash')" class="transfer-btn bank-to-cash" style="flex:1;">🏧→🏦 ${t('bank_to_cash')}</button>
-                        ${isAdmin ? `<button onclick="APP.showTransferModal('store_to_hq')" class="transfer-btn store-to-hq" style="flex:1;">🏢 ${t('submit_to_hq')}</button>` : ''}
-                    </div>
-                </div>`;
-
-                const capitalPoolHtml = topRowHtml + bottomCardHtml;
-
-                const userRoleText = AUTH.user?.role === 'admin'
+                // ========== 构建 HTML ==========
+                const userInitial = (profile?.name || 'A').charAt(0).toUpperCase();
+                const userRoleText = isAdmin
                     ? (lang === 'id' ? 'Administrator' : '管理员')
                     : (lang === 'id' ? 'Manajer Toko' : '店长');
-                const storeNameDisplay = AUTH.getCurrentStoreName();
+                const storeDisplay = isAdmin
+                    ? (lang === 'id' ? 'Kantor Pusat' : '总部')
+                    : Utils.escapeHtml(profile?.stores?.name || (lang === 'id' ? 'Toko' : '门店'));
+                const topbarSubtitle = isAdmin
+                    ? (lang === 'id' ? 'Semua Toko · Data Real-time' : '全部门店 · 实时数据')
+                    : (lang === 'id' ? 'Data Toko · Real-time' : '门店数据 · 实时更新');
 
-                const injectBtn = `<button onclick="JF.CapitalModule.showCapitalInjectionModal()">💉 ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</button>`;
+                // 活跃订单徽章数
+                const activeBadgeCount = activeOrders;
 
-                const toolbarHtml = isAdmin ? `
-                    <div class="toolbar admin-grid no-print">
-                        <button onclick="APP.navigateTo('customers')">👥 ${t('customers')}</button>
-                        <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                        <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
-                        <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                        ${injectBtn}
-                        <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
-                        <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
-                        <button onclick="APP.navigateTo('userManagement')">👤 ${t('user_management')}</button>
-                        <button onclick="APP.navigateTo('storeManagement')">🏪 ${t('store_management')}</button>
-                        <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
-                    </div>` : `
-                    <div class="toolbar store-grid no-print">
-                        <button onclick="APP.navigateTo('customers')">👥 ${t('customers')}</button>
-                        <button onclick="APP.navigateTo('orderTable')">📋 ${t('order_list')}</button>
-                        <button onclick="APP.showCashFlowPage()">💰 ${t('payment_history')}</button>
-                        <button onclick="APP.navigateTo('expenses')">📝 ${t('expenses')}</button>
-                        ${injectBtn}
-                        <button onclick="APP.navigateTo('anomaly')">⚠️ ${t('anomaly_title')}</button>
-                        <button onclick="APP.navigateTo('backupRestore')">📦 ${t('backup_restore')}</button>
-                        <button onclick="APP.logout()">💾 ${t('save_exit')}</button>
-                    </div>`;
+                // 快捷操作按钮（角色适配）
+                const quickActions = isAdmin ? [
+                    { icon: '👥', label: t('customers'), action: "APP.navigateTo('customers')", cls: '' },
+                    { icon: '📋', label: t('order_list'), action: "APP.navigateTo('orderTable')", cls: '' },
+                    { icon: '💉', label: lang === 'id' ? 'Injeksi Modal' : '资本注入', action: "JF.CapitalModule.showCapitalInjectionModal()", cls: '' },
+                    { icon: '⚠️', label: t('anomaly_title'), action: "APP.navigateTo('anomaly')", cls: '' },
+                    { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "APP.navigateTo('expenses')", cls: '' },
+                    { icon: '📦', label: t('backup_restore'), action: "APP.navigateTo('backupRestore')", cls: '' },
+                ] : [
+                    { icon: '👥', label: t('customers'), action: "APP.navigateTo('customers')", cls: '' },
+                    { icon: '📋', label: t('order_list'), action: "APP.navigateTo('orderTable')", cls: '' },
+                    { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "APP.navigateTo('orderTable');setTimeout(function(){if(APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
+                    { icon: '⚠️', label: t('anomaly_title'), action: "APP.navigateTo('anomaly')", cls: '' },
+                    { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "APP.navigateTo('expenses')", cls: '' },
+                    { icon: '📦', label: t('backup_restore'), action: "APP.navigateTo('backupRestore')", cls: '' },
+                ];
 
-                const bottomHtml = isAdmin
-                    ? `<div class="card dashboard-footer-card">
-                        <p><strong>🏪 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}:</strong> ${Utils.escapeHtml(AUTH.user?.name || '')} (${userRoleText})</p>
-                        <p>📍 ${lang === 'id' ? 'Toko' : '门店'}: ${t('headquarters')}</p>
-                        <p>📌 ${t('more_pawn_higher_fee')}</p>
-                        <p>🔒 ${t('order_saved_locked')}</p>
+                const quickActionsHtml = quickActions.map(q =>
+                    `<div class="quick-btn${q.cls ? ' ' + q.cls : ''}" onclick="${q.action}">
+                        <span class="qb-icon">${q.icon}</span>
+                        <span class="qb-label">${q.label}</span>
                     </div>`
-                    : `<div class="card dashboard-footer-card">
-                        <p><strong>🏪 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}:</strong> ${Utils.escapeHtml(storeNameDisplay)} (${userRoleText})</p>
-                        <p>📍 ${lang === 'id' ? 'Toko' : '门店'}: ${Utils.escapeHtml(storeNameDisplay)}</p>
-                        <p>📌 ${t('contract_pay_info')}</p>
-                        <p>🔒 ${t('order_saved_locked')} ${t('more_pawn_higher_fee')}</p>
-                    </div>`;
+                ).join('');
 
-                document.getElementById("app").innerHTML = `
-                    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                            <img src="icons/pagehead-logo.png" alt="JF!" style="height:32px;">
-                            <h1 style="margin:0;">JF! by Gadai</h1>
+                // 收入构成项
+                const incomeItems = [
+                    { dot: '#6366f1', label: t('admin_fee'), sub: lang === 'id' ? 'Terkumpul' : '已收取', amt: report.admin_fees_collected, cls: '' },
+                    { dot: '#8b5cf6', label: t('service_fee'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: report.service_fees_collected, cls: '' },
+                    { dot: '#06b6d4', label: t('interest'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: report.interest_collected, cls: '' },
+                    { dot: '#ef4444', label: lang === 'id' ? 'Pengeluaran' : '支出合计', sub: lang === 'id' ? 'Biaya Operasional' : '运营成本', amt: totalExpenses, cls: 'expense' },
+                ];
+
+                const incomeItemsHtml = incomeItems.map(item =>
+                    `<div class="income-item">
+                        <div class="income-dot" style="background:${item.dot}"></div>
+                        <div>
+                            <div class="income-name">${item.label}</div>
+                            <div class="income-sub">${item.sub}</div>
                         </div>
-                        <div class="header-actions">
-                            <button onclick="APP.toggleLanguage()" class="lang-btn" style="margin-left:8px;">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                        <div class="income-amt"${item.cls === 'expense' ? ' style="color:#dc2626"' : ''}>${item.cls === 'expense' ? '−' : ''}${Utils.formatCurrency(item.amt)}</div>
+                    </div>`
+                ).join('');
+
+                // ========== 完整 HTML ==========
+                document.getElementById("app").innerHTML = `
+                <div class="dashboard-v2">
+
+                    <!-- 侧边栏遮罩 -->
+                    <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
+
+                    <!-- 侧边栏 -->
+                    <div class="dash-sidebar" id="dashSidebar">
+                        <div class="sidebar-logo">
+                            <div class="logo-mark">
+                                <div class="logo-icon">JF</div>
+                                <div>
+                                    <div class="logo-text">JF! by Gadai</div>
+                                    <div class="logo-sub">${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sidebar-user">
+                            <div class="user-av">${userInitial}</div>
+                            <div>
+                                <div class="user-name">${Utils.escapeHtml(profile?.name || 'User')}</div>
+                                <div class="user-role">${userRoleText}</div>
+                            </div>
+                            <div class="user-badge">${storeDisplay}</div>
+                        </div>
+
+                        <div class="sidebar-nav">
+                            <div class="nav-section-label">${lang === 'id' ? 'Menu Utama' : '主菜单'}</div>
+
+                            <div class="nav-item active" onclick="JF.DashboardCore.navigateTo('dashboard')">
+                                <span class="nav-icon">◼</span> ${lang === 'id' ? 'Dasbor' : '仪表盘'}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('customers')">
+                                <span class="nav-icon">👥</span> ${t('customers')}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('orderTable')">
+                                <span class="nav-icon">📋</span> ${t('order_list')}
+                                ${activeBadgeCount > 0 ? `<span class="nav-badge">${activeBadgeCount}</span>` : ''}
+                            </div>
+                            <div class="nav-item" onclick="APP.showCashFlowPage()">
+                                <span class="nav-icon">💰</span> ${lang === 'id' ? 'Arus Kas' : '资金流水'}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('expenses')">
+                                <span class="nav-icon">📝</span> ${t('expenses')}
+                            </div>
+
+                            ${isAdmin ? `
+                            <div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
+
+                            <div class="nav-item" onclick="JF.CapitalModule.showCapitalInjectionModal()">
+                                <span class="nav-icon">💉</span> ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')">
+                                <span class="nav-icon">⚠️</span> ${t('anomaly_title')}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('userManagement')">
+                                <span class="nav-icon">👤</span> ${t('user_management')}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeManagement')">
+                                <span class="nav-icon">🏪</span> ${t('store_management')}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')">
+                                <span class="nav-icon">📦</span> ${t('backup_restore')}
+                            </div>
+                            ` : `
+                            <div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
+
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')">
+                                <span class="nav-icon">⚠️</span> ${t('anomaly_title')}
+                            </div>
+                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')">
+                                <span class="nav-icon">📦</span> ${t('backup_restore')}
+                            </div>
+                            `}
+
+                            <div style="flex:1;"></div>
+
+                            <div class="nav-item danger" onclick="JF.DashboardCore.logout()">
+                                <span class="nav-icon">🚪</span> ${t('save_exit')}
+                            </div>
+                        </div>
+
+                        <div class="sidebar-footer">
+                            <div class="lang-toggle">
+                                <div class="lang-btn-side${Utils.lang === 'zh' ? ' active-lang' : ''}"
+                                     onclick="JF.DashboardCore._setLang('zh')">中文</div>
+                                <div class="lang-btn-side${Utils.lang === 'id' ? ' active-lang' : ''}"
+                                     onclick="JF.DashboardCore._setLang('id')">Bahasa</div>
+                            </div>
                         </div>
                     </div>
-                    <div style="margin:0 0 12px 0;"><h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📋 ${t('operation')}</h3></div>
-                    ${toolbarHtml}
-                    <div style="margin:0 0 12px 0;"><h3 style="margin:0;font-size:var(--font-md);font-weight:600;">📊 ${t('financial_indicators')}${isAdmin ? ' (' + (lang === 'id' ? 'Semua Toko' : '全部门店') + ')' : ''}</h3></div>
-                    <div class="stats-grid">${cardsHtml}</div>
-                    <div style="margin:0 0 8px 0;"><h3 style="margin:0;font-size:var(--font-md);font-weight:600;">💰 ${lang === 'id' ? 'Struktur Modal' : '资金结构'}</h3></div>
-                    ${capitalPoolHtml}
-                    ${bottomHtml}`;
+
+                    <!-- 顶部栏 -->
+                    <div class="dash-topbar">
+                        <div class="topbar-left">
+                            <div class="hamburger-btn" id="hamburgerBtn" onclick="JF.DashboardCore._toggleSidebar()">☰</div>
+                            <div>
+                                <div class="topbar-title">${lang === 'id' ? 'Dasbor' : '仪表盘总览'}</div>
+                                <div class="topbar-sub">${topbarSubtitle}</div>
+                            </div>
+                        </div>
+                        <div class="topbar-right">
+                            <div class="alert-btn-dash" onclick="JF.DashboardCore.navigateTo('anomaly')" title="${t('anomaly_title')}">
+                                ⚠️${overdueOrders > 0 ? '<div class="alert-dot"></div>' : ''}
+                            </div>
+                            <div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div>
+                            <div class="refresh-btn-dash" onclick="JF.DashboardCore.invalidateDashboardCache()" title="${lang === 'id' ? 'Segarkan' : '刷新数据'}">🔄</div>
+                        </div>
+                    </div>
+
+                    <!-- 主内容区 -->
+                    <div class="dash-main">
+
+                        <!-- KPI 行 -->
+                        <div class="kpi-row">
+                            <div class="kpi-card blue">
+                                <div class="kpi-icon">📋</div>
+                                <div class="kpi-val">${totalOrders}</div>
+                                <div class="kpi-label">${lang === 'id' ? 'Total Pesanan' : '累计订单总数'}</div>
+                                <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月新增 +'}${newThisMonth}</div>
+                            </div>
+                            <div class="kpi-card amber">
+                                <div class="kpi-icon">🔄</div>
+                                <div class="kpi-val amber">${activeOrders}</div>
+                                <div class="kpi-label">${lang === 'id' ? 'Pesanan Aktif' : '活跃在押订单'}</div>
+                                ${overdueOrders > 0
+                                    ? `<div class="kpi-trend down">${lang === 'id' ? 'Terlambat' : '逾期'} ${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'} ⚠️</div>`
+                                    : `<div class="kpi-trend">${lang === 'id' ? 'Semua normal' : '全部正常'} ✅</div>`}
+                            </div>
+                            <div class="kpi-card green">
+                                <div class="kpi-icon">✅</div>
+                                <div class="kpi-val green">${completedOrders}</div>
+                                <div class="kpi-label">${lang === 'id' ? 'Sudah Ditebus' : '已完成赎回'}</div>
+                                <div class="kpi-trend">${lang === 'id' ? 'Tingkat Selesai' : '完成率'} ${completionRate}%</div>
+                            </div>
+                            <div class="kpi-card green">
+                                <div class="kpi-icon">📈</div>
+                                <div class="kpi-val green" style="font-size:1.2rem;">${Utils.formatCurrency(netProfit)}</div>
+                                <div class="kpi-label">${t('net_profit')}</div>
+                                <div class="kpi-trend">${lang === 'id' ? 'Pendapatan − Pengeluaran' : '收入 − 支出'}</div>
+                            </div>
+                        </div>
+
+                        <!-- 中间行：资金结构 + 收入构成 -->
+                        <div class="mid-row">
+                            <div class="fund-flow-card">
+                                <div class="card-header">
+                                    <div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div>
+                                    <div class="card-action" onclick="APP.showCashFlowPage()">${lang === 'id' ? 'Lihat Detail →' : '查看明细 →'}</div>
+                                </div>
+
+                                <div class="fund-total-row">
+                                    <div class="fund-block injected">
+                                        <div class="fund-block-label">${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</div>
+                                        <div class="fund-block-val">${Utils.formatCurrency(injected)}</div>
+                                        <div class="fund-block-sub">${lang === 'id' ? 'Dasar Operasional Gadai' : '典当运营基础'}</div>
+                                    </div>
+                                    <div class="fund-block deployed">
+                                        <div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div>
+                                        <div class="fund-block-val">${Utils.formatCurrency(deployed)}</div>
+                                        <div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div>
+                                    </div>
+                                    <div class="fund-block free">
+                                        <div class="fund-block-label">${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</div>
+                                        <div class="fund-block-val">${Utils.formatCurrency(available)}</div>
+                                        <div class="fund-block-sub">${lang === 'id' ? 'Kas + Bank' : '现金 + 银行'}</div>
+                                    </div>
+                                </div>
+
+                                <div class="util-bar-wrap">
+                                    <div class="util-bar-label">
+                                        <span>${lang === 'id' ? 'Tingkat Utilisasi' : '资金利用率'}</span>
+                                        <span class="util-bar-pct">${utilizationRate}%</span>
+                                    </div>
+                                    <div class="util-bar-track">
+                                        <div class="util-bar-fill" style="width:${Math.min(utilizationRate, 100)}%;"></div>
+                                    </div>
+                                </div>
+
+                                <div class="cash-bank-row">
+                                    <div class="cash-bank-item">
+                                        <div class="cb-label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</div>
+                                        <div class="cb-val">${Utils.formatCurrency(cashBalance)}</div>
+                                        <div class="cb-flow">
+                                            <span class="in">↑ +${Utils.formatCurrency(cashIncome)}</span> &nbsp;
+                                            <span class="out">↓ −${Utils.formatCurrency(cashExpense)}</span>
+                                        </div>
+                                    </div>
+                                    <div class="cash-bank-item">
+                                        <div class="cb-label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
+                                        <div class="cb-val">${Utils.formatCurrency(bankBalance)}</div>
+                                        <div class="cb-flow">
+                                            <span class="in">↑ +${Utils.formatCurrency(bankIncome)}</span> &nbsp;
+                                            <span class="out">↓ −${Utils.formatCurrency(bankExpense)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="transfer-row-v2">
+                                    <div class="tx-btn-v2" onclick="APP.showTransferModal('cash_to_bank')">🏦→🏧 ${lang === 'id' ? 'Kas ke Bank' : '现金转银行'}</div>
+                                    <div class="tx-btn-v2" onclick="APP.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Bank ke Kas' : '银行转现金'}</div>
+                                    ${isAdmin ? `<div class="tx-btn-v2" onclick="APP.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}
+                                </div>
+                            </div>
+
+                            <div class="income-card">
+                                <div class="card-header">
+                                    <div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div>
+                                    <div class="card-action" onclick="APP.showCashFlowPage()">${lang === 'id' ? 'Lihat Tagihan →' : '查看账单 →'}</div>
+                                </div>
+                                <div class="income-items">
+                                    ${incomeItemsHtml}
+                                </div>
+                                <div class="net-profit-box">
+                                    <div>
+                                        <div class="np-label">${t('net_profit')}</div>
+                                        <div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div>
+                                    </div>
+                                    <div class="np-val">${Utils.formatCurrency(netProfit)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 底部行：快捷操作 + 订单环形图 -->
+                        <div class="bottom-row">
+                            <div class="quick-card">
+                                <div class="card-header">
+                                    <div class="card-title">⚡ ${lang === 'id' ? 'Aksi Cepat' : '快捷操作'}</div>
+                                </div>
+                                <div class="quick-grid">
+                                    ${quickActionsHtml}
+                                </div>
+                            </div>
+
+                            <div class="order-status-card">
+                                <div class="card-header">
+                                    <div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div>
+                                    <div class="card-action" onclick="JF.DashboardCore.navigateTo('orderTable')">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div>
+                                </div>
+                                <div class="donut-area">
+                                    <svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="36" fill="none" stroke="#f1f5f9" stroke-width="14"/>
+                                        ${donutPaths}
+                                        <text x="50" y="48" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a2e" font-family="var(--font-mono)">${totalOrders}</text>
+                                        <text x="50" y="60" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="var(--font-sans)">${lang === 'id' ? 'Total Pesanan' : '总订单'}</text>
+                                    </svg>
+                                    <div class="donut-legend">
+                                        ${donutData.map(d => `
+                                        <div class="legend-item">
+                                            <div class="legend-dot" style="background:${d.color}"></div>
+                                            <div>
+                                                <div class="legend-name">${d.label}</div>
+                                                <div class="legend-pct">${d.pct}%</div>
+                                            </div>
+                                            <div class="legend-count">${d.count}</div>
+                                        </div>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div><!-- /dash-main -->
+                </div><!-- /dashboard-v2 -->`;
 
             } catch (err) {
-                console.error("renderDashboard error:", err);
+                console.error("renderDashboard v2 error:", err);
                 document.getElementById("app").innerHTML = `
                     <div class="card" style="padding:40px;text-align:center;">
                         <p>⚠️ ${Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '仪表盘加载失败: ' + err.message}</p>
