@@ -1,12 +1,8 @@
 /* ============================================================
    dashboard-v2.css — 新版仪表盘样式（银行级金融风格）
-   设计理念：侧边栏 + 顶部栏 + KPI行 + 资金结构(左) + 收入构成(右)
-             + 快捷操作(左) + 订单环形图(右)
+   优化：移动端顶部导航，桌面端侧边栏 + 主内容区，所有页面通用外壳布局
    ============================================================ */
 
-/* ============================================================
-   D1. 应用基础变量（仪表盘专属）
-   ============================================================ */
 :root {
     --font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
@@ -15,14 +11,11 @@
 }
 
 /* ============================================================
-   D2. 仪表盘整体布局
-   关键：用负 margin 抵消 #app 的 padding，使仪表盘贴边
+   基础外壳布局：所有使用侧边栏的页面都用 .dashboard-v2 包裹
    ============================================================ */
 .dashboard-v2 {
-    /* 抵消 reset.css 中 #app 的 padding：桌面端 16px，手机端 8px */
-    margin: -16px;
+    margin: -16px;                 /* 抵消 #app 的 padding */
     width: calc(100% + 32px);
-
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
     grid-template-rows: var(--topbar-height) 1fr;
@@ -31,7 +24,6 @@
     font-family: var(--font-sans);
 }
 
-/* 仪表盘内部统一盒模型，但不覆盖其他页面的全局样式 */
 .dashboard-v2,
 .dashboard-v2 *,
 .dashboard-v2 *::before,
@@ -40,7 +32,7 @@
 }
 
 /* ============================================================
-   D3. 侧边栏
+   侧边栏
    ============================================================ */
 .dash-sidebar {
     grid-row: 1 / 3;
@@ -245,7 +237,7 @@
 }
 
 /* ============================================================
-   D4. 顶部栏
+   顶部栏
    ============================================================ */
 .dash-topbar {
     grid-row: 1;
@@ -258,7 +250,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    /* 确保顶栏始终在正确位置 */
     position: relative;
     z-index: 50;
 }
@@ -269,9 +260,8 @@
     gap: 12px;
 }
 
-/* 汉堡菜单按钮（移动端可见） */
 .hamburger-btn {
-    display: none;
+    display: none;                /* 桌面端隐藏汉堡按钮 */
     width: 34px;
     height: 34px;
     background: #f8fafc;
@@ -354,7 +344,7 @@
 }
 
 /* ============================================================
-   D5. 主内容区
+   主内容区
    ============================================================ */
 .dash-main {
     grid-row: 2;
@@ -368,7 +358,7 @@
 }
 
 /* ============================================================
-   D6. KPI 行：4核心指标
+   KPI 行、资金结构、订单环形图等（仪表盘专用组件，保留）
    ============================================================ */
 .kpi-row {
     display: grid;
@@ -408,10 +398,7 @@
 .kpi-card.amber::before  { background: #f59e0b; }
 .kpi-card.green::before  { background: #10b981; }
 
-.kpi-icon {
-    font-size: 20px;
-    margin-bottom: 6px;
-}
+.kpi-icon { font-size: 20px; margin-bottom: 6px; }
 
 .kpi-val {
     font-size: 1.7rem;
@@ -425,27 +412,10 @@
 .kpi-val.green  { color: #059669; }
 .kpi-val.amber  { color: #d97706; }
 
-.kpi-label {
-    font-size: 0.7rem;
-    color: #94a3b8;
-    font-weight: 500;
-    margin-top: 4px;
-}
+.kpi-label { font-size: 0.7rem; color: #94a3b8; font-weight: 500; margin-top: 4px; }
+.kpi-trend { font-size: 0.68rem; color: #10b981; font-weight: 600; margin-top: 2px; }
+.kpi-trend.down { color: #ef4444; }
 
-.kpi-trend {
-    font-size: 0.68rem;
-    color: #10b981;
-    font-weight: 600;
-    margin-top: 2px;
-}
-
-.kpi-trend.down {
-    color: #ef4444;
-}
-
-/* ============================================================
-   D7. 中间行：资金结构(左) + 收入构成(右)
-   ============================================================ */
 .mid-row {
     display: grid;
     grid-template-columns: 1fr 340px;
@@ -453,264 +423,65 @@
     align-items: start;
 }
 
-/* --- 资金结构卡片 --- */
-.fund-flow-card {
+.fund-flow-card,
+.income-card,
+.quick-card,
+.order-status-card {
     background: #fff;
     border-radius: 14px;
     border: 1px solid #e5e7eb;
     padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
 }
 
-.card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
+.card-header { display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 0.88rem; font-weight: 700; color: #1a1a2e; margin: 0; }
+.card-action { font-size: 0.7rem; color: #6366f1; font-weight: 600; cursor: pointer; text-decoration: none; }
+.card-action:hover { color: #4f46e5; text-decoration: underline; }
 
-.card-title {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: #1a1a2e;
-    margin: 0;
-}
-
-.card-action {
-    font-size: 0.7rem;
-    color: #6366f1;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-}
-
-.card-action:hover {
-    color: #4f46e5;
-    text-decoration: underline;
-}
-
-/* 资金三格 */
-.fund-total-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-}
-
-.fund-block {
-    border-radius: 10px;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.fund-block.injected {
-    background: #ede9fe;
-    border: 1px solid #c4b5fd;
-}
-
-.fund-block.deployed {
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-}
-
-.fund-block.free {
-    background: #d1fae5;
-    border: 1px solid #6ee7b7;
-}
-
-.fund-block-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
-
+.fund-total-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.fund-block { border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.fund-block.injected { background: #ede9fe; border: 1px solid #c4b5fd; }
+.fund-block.deployed  { background: #fffbeb; border: 1px solid #fde68a; }
+.fund-block.free      { background: #d1fae5; border: 1px solid #6ee7b7; }
+.fund-block-label { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
 .fund-block.injected .fund-block-label { color: #7c3aed; }
 .fund-block.deployed  .fund-block-label { color: #92400e; }
 .fund-block.free      .fund-block-label { color: #065f46; }
-
-.fund-block-val {
-    font-size: 1.05rem;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    letter-spacing: -0.02em;
-}
-
+.fund-block-val { font-size: 1.05rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.02em; }
 .fund-block.injected .fund-block-val { color: #5b21b6; }
 .fund-block.deployed  .fund-block-val { color: #92400e; }
 .fund-block.free      .fund-block-val { color: #064e3b; }
+.fund-block-sub { font-size: 0.62rem; color: #64748b; }
 
-.fund-block-sub {
-    font-size: 0.62rem;
-    color: #64748b;
-}
+.util-bar-wrap { display: flex; flex-direction: column; gap: 6px; }
+.util-bar-label { display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; }
+.util-bar-pct { font-weight: 700; color: #f59e0b; }
+.util-bar-track { height: 8px; background: #f1f5f9; border-radius: 8px; overflow: hidden; }
+.util-bar-fill { height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24); border-radius: 8px; transition: width 0.6s ease; }
 
-/* 利用率进度条 */
-.util-bar-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
+.cash-bank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cash-bank-item { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.cb-label { font-size: 0.68rem; color: #64748b; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.cb-val { font-size: 1.1rem; font-weight: 700; font-family: var(--font-mono); color: #1a1a2e; margin: 2px 0; }
+.cb-flow { font-size: 0.62rem; color: #94a3b8; line-height: 1.6; }
+.cb-flow span.in  { color: #059669; font-weight: 600; }
+.cb-flow span.out { color: #dc2626; font-weight: 600; }
 
-.util-bar-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.72rem;
-    color: #64748b;
-}
-
-.util-bar-pct {
-    font-weight: 700;
-    color: #f59e0b;
-}
-
-.util-bar-track {
-    height: 8px;
-    background: #f1f5f9;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.util-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #f59e0b, #fbbf24);
-    border-radius: 8px;
-    transition: width 0.6s ease;
-}
-
-/* 现金/银行双列 */
-.cash-bank-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.cash-bank-item {
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 12px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.cb-label {
-    font-size: 0.68rem;
-    color: #64748b;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.cb-val {
-    font-size: 1.1rem;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #1a1a2e;
-    margin: 2px 0;
-}
-
-.cb-flow {
-    font-size: 0.62rem;
-    color: #94a3b8;
-    line-height: 1.6;
-}
-
-.cb-flow span.in {
-    color: #059669;
-    font-weight: 600;
-}
-
-.cb-flow span.out {
-    color: #dc2626;
-    font-weight: 600;
-}
-
-/* 转账按钮行 */
-.transfer-row-v2 {
-    display: flex;
-    gap: 8px;
-}
-
+.transfer-row-v2 { display: flex; gap: 8px; }
 .tx-btn-v2 {
-    flex: 1;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 9px 6px;
-    text-align: center;
-    font-size: 0.7rem;
-    color: #374151;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: var(--font-sans);
+    flex: 1; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 9px 6px; text-align: center; font-size: 0.7rem; color: #374151;
+    font-weight: 500; cursor: pointer; transition: all 0.15s ease; font-family: var(--font-sans);
 }
+.tx-btn-v2:hover { background: #ede9fe; border-color: #c4b5fd; color: #6366f1; }
 
-.tx-btn-v2:hover {
-    background: #ede9fe;
-    border-color: #c4b5fd;
-    color: #6366f1;
-}
+.income-items { display: flex; flex-direction: column; gap: 8px; }
+.income-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 10px; }
+.income-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.income-name { font-size: 0.78rem; color: #374151; font-weight: 500; flex: 1; }
+.income-amt { font-size: 0.82rem; font-weight: 700; font-family: var(--font-mono); color: #059669; }
+.income-sub { font-size: 0.62rem; color: #94a3b8; margin-top: 1px; }
 
-/* --- 收入构成卡片 --- */
-.income-card {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #e5e7eb;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.income-items {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.income-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    background: #f8fafc;
-    border-radius: 10px;
-}
-
-.income-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.income-name {
-    font-size: 0.78rem;
-    color: #374151;
-    font-weight: 500;
-    flex: 1;
-}
-
-.income-amt {
-    font-size: 0.82rem;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #059669;
-}
-
-.income-sub {
-    font-size: 0.62rem;
-    color: #94a3b8;
-    margin-top: 1px;
-}
-
-/* 净利润高亮盒 — 修复：文字颜色与绿色背景对比度 */
 .net-profit-box {
     background: linear-gradient(135deg, #d1fae5, #ecfdf5);
     border: 1px solid #6ee7b7;
@@ -720,181 +491,110 @@
     justify-content: space-between;
     align-items: center;
 }
+.np-label { font-size: 0.72rem; font-weight: 600; color: #065f46; }
+.np-sub   { font-size: 0.62rem; color: #047857; opacity: 0.85; margin-top: 2px; }
+.np-val   { font-size: 1.25rem; font-weight: 700; font-family: var(--font-mono); color: #047857; }
 
-.np-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #065f46;
-}
-
-.np-sub {
-    font-size: 0.62rem;
-    color: #047857;
-    opacity: 0.85;
-    margin-top: 2px;
-}
-
-.np-val {
-    font-size: 1.25rem;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #047857;
-}
-
-/* ============================================================
-   D8. 底部行：快捷操作(左) + 订单环形图(右)
-   ============================================================ */
-.bottom-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-}
-
-/* 快捷操作面板 */
-.quick-card {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #e5e7eb;
-    padding: 20px;
-}
-
-.quick-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 14px;
-}
-
+.bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 .quick-btn {
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 14px 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    text-decoration: none;
+    background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 14px 10px; display: flex; flex-direction: column; align-items: center;
+    gap: 6px; cursor: pointer; transition: all 0.18s ease; text-decoration: none;
 }
+.quick-btn:hover { border-color: #c4b5fd; background: #ede9fe; transform: translateY(-2px); }
+.quick-btn:hover .qb-label { color: #6366f1; }
+.quick-btn.red-hover:hover { border-color: #fecaca; background: #fef2f2; }
+.quick-btn.red-hover:hover .qb-label { color: #dc2626; }
+.qb-icon { font-size: 20px; }
+.qb-label { font-size: 0.72rem; font-weight: 600; color: #374151; text-align: center; line-height: 1.3; }
 
-.quick-btn:hover {
-    border-color: #c4b5fd;
-    background: #ede9fe;
-    transform: translateY(-2px);
-}
+.donut-area { display: flex; align-items: center; gap: 24px; margin-top: 14px; }
+.donut-svg { flex-shrink: 0; }
+.donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-name { font-size: 0.75rem; color: #374151; flex: 1; }
+.legend-count { font-size: 0.78rem; font-weight: 700; font-family: var(--font-mono); color: #1a1a2e; }
+.legend-pct { font-size: 0.65rem; color: #94a3b8; margin-top: 1px; }
 
-.quick-btn:hover .qb-label {
-    color: #6366f1;
-}
-
-.quick-btn.red-hover:hover {
-    border-color: #fecaca;
-    background: #fef2f2;
-}
-
-.quick-btn.red-hover:hover .qb-label {
-    color: #dc2626;
-}
-
-.qb-icon {
-    font-size: 20px;
-}
-
-.qb-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #374151;
-    text-align: center;
-    line-height: 1.3;
-}
-
-/* 订单状态卡片 */
-.order-status-card {
-    background: #fff;
-    border-radius: 14px;
-    border: 1px solid #e5e7eb;
-    padding: 20px;
-}
-
-.donut-area {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    margin-top: 14px;
-}
-
-.donut-svg {
-    flex-shrink: 0;
-}
-
-.donut-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.legend-name {
-    font-size: 0.75rem;
-    color: #374151;
-    flex: 1;
-}
-
-.legend-count {
-    font-size: 0.78rem;
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #1a1a2e;
-}
-
-.legend-pct {
-    font-size: 0.65rem;
-    color: #94a3b8;
-    margin-top: 1px;
-}
+.sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 99; }
+.sidebar-overlay.active { display: block; }
 
 /* ============================================================
-   D9. 侧边栏遮罩层（移动端）
+   响应式
    ============================================================ */
-.sidebar-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 99;
-}
-
-.sidebar-overlay.active {
-    display: block;
-}
-
-/* ============================================================
-   D10. 响应式
-   ============================================================ */
-
-/* 平板端：侧边栏开始折叠，KPI 2列，资金三列变单列 */
-@media (max-width: 1199px) {
+@media (max-width: 768px) {
     .dashboard-v2 {
+        margin: -8px;
+        width: calc(100% + 16px);
         grid-template-columns: 1fr;
         grid-template-rows: var(--topbar-height) 1fr;
+    }
+
+    /* 侧边栏变为顶部横向导航 */
+    .dash-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: auto;
+        max-height: 60px;
+        flex-direction: row;
+        align-items: center;
+        padding: 0 12px;
+        background: #1c2340;
+        z-index: 100;
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .dash-sidebar.open {
+        transform: translateY(0);
+        max-height: 100vh;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px;
+        overflow-y: auto;
+    }
+
+    /* 隐藏侧边栏中的 logo、用户信息，只保留导航 */
+    .dash-sidebar .sidebar-logo,
+    .dash-sidebar .sidebar-user,
+    .dash-sidebar .nav-section-label,
+    .dash-sidebar .sidebar-footer {
+        display: none;
+    }
+
+    .dash-sidebar.open .sidebar-logo,
+    .dash-sidebar.open .sidebar-user,
+    .dash-sidebar.open .nav-section-label,
+    .dash-sidebar.open .sidebar-footer {
+        display: flex;           /* 展开时重新显示，便于全菜单操作 */
+    }
+
+    .sidebar-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 4px 0;
+    }
+
+    .dash-sidebar.open .sidebar-nav {
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .nav-item {
+        padding: 6px 10px;
+        font-size: 0.72rem;
+        white-space: nowrap;
+        border-radius: 6px;
+    }
+
+    /* 汉堡按钮显示 */
+    .hamburger-btn {
+        display: flex;
     }
 
     /* 顶栏固定在顶部 */
@@ -906,68 +606,16 @@
         z-index: 90;
     }
 
-    /* 主内容区在顶栏下方 */
+    /* 主内容区移到侧边栏下方 */
     .dash-main {
         grid-row: 2;
         grid-column: 1;
-    }
-
-    /* 侧边栏改为固定定位，默认隐藏在左侧 */
-    .dash-sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: var(--sidebar-width);
-        transform: translateX(-100%);
-        transition: transform 0.25s ease;
-        z-index: 100;
-        grid-row: auto;
-        grid-column: auto;
-    }
-
-    .dash-sidebar.open {
-        transform: translateX(0);
-    }
-
-    .sidebar-overlay.active {
-        display: block;
-    }
-
-    .hamburger-btn {
-        display: flex;
-    }
-
-    .kpi-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .mid-row {
-        grid-template-columns: 1fr;
-    }
-
-    .fund-total-row {
-        grid-template-columns: 1fr;
-    }
-
-    .bottom-row {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* 手机端 */
-@media (max-width: 768px) {
-    /* 手机端 #app 的 padding 是 8px，所以负 margin 也相应调整 */
-    .dashboard-v2 {
-        margin: -8px;
-        width: calc(100% + 16px);
-    }
-
-    .dash-main {
         padding: 14px 12px;
         gap: 12px;
+        margin-top: 0;           /* 侧边栏固定时不需要额外 margin */
     }
 
+    /* KPI 变为两列 */
     .kpi-row {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
@@ -977,12 +625,21 @@
         font-size: 1.35rem;
     }
 
-    .fund-total-row {
+    .mid-row {
         grid-template-columns: 1fr;
     }
 
+    .fund-total-row,
     .cash-bank-row {
         grid-template-columns: 1fr;
+    }
+
+    .bottom-row {
+        grid-template-columns: 1fr;
+    }
+
+    .quick-grid {
+        grid-template-columns: 1fr 1fr;
     }
 
     .donut-area {
@@ -990,12 +647,11 @@
         align-items: flex-start;
     }
 
-    .quick-grid {
-        grid-template-columns: 1fr 1fr;
+    .transfer-row-v2 {
+        flex-direction: column;
     }
 }
 
-/* 小屏手机 */
 @media (max-width: 480px) {
     .dash-topbar {
         padding: 0 12px;
@@ -1012,15 +668,9 @@
     .kpi-val {
         font-size: 1.2rem;
     }
-
-    .transfer-row-v2 {
-        flex-direction: column;
-    }
 }
 
-/* ============================================================
-   D11. 动画
-   ============================================================ */
+/* 淡入动画 */
 @keyframes dashFadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
