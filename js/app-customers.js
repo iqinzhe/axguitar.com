@@ -1,4 +1,4 @@
-// app-customers.js - v2.0 (JF 命名空间)
+// app-customers.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
 // 客户管理模块，挂载到 JF.CustomersPage
 
 'use strict';
@@ -8,9 +8,9 @@
     window.JF = JF;
 
     const CustomersPage = {
-        showCustomers: async function () {
-            APP.currentPage = 'customers';
-            APP.saveCurrentPageState();
+
+        // ==================== 构建客户列表 HTML（纯内容） ====================
+        async buildCustomersHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
             const isAdmin = PERMISSION.isAdmin();
@@ -69,8 +69,8 @@
                         </div>`;
                 }
 
-                document.getElementById("app").innerHTML =
-                    `<div class="page-header">
+                const content = `
+                    <div class="page-header">
                         <h2>👥 ${t('customers')}</h2>
                         <div class="header-actions">
                             <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
@@ -95,18 +95,34 @@
                         </div>
                     </div>
                     ${addCustomerCardHtml}`;
+                return content;
             } catch (error) {
-                console.error("showCustomers error:", error);
-                Utils.toast.error(lang === 'id' ? '加载客户数据失败：' + error.message : 'Gagal memuat data nasabah: ' + error.message);
-                if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) DashboardCore.renderDashboard();
+                console.error("buildCustomersHTML error:", error);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat data nasabah' : '加载客户数据失败');
+                return `<div class="card"><p>❌ ${t('loading_failed', { module: '客户' })}</p></div>`;
             }
         },
 
+        // 供外壳调用的渲染函数
+        async renderCustomersHTML() {
+            return await this.buildCustomersHTML();
+        },
+
+        // 原有的 showCustomers 兼容直接调用
+        async showCustomers() {
+            APP.currentPage = 'customers';
+            APP.saveCurrentPageState();
+            const contentHTML = await this.buildCustomersHTML();
+            document.getElementById("app").innerHTML = contentHTML;
+        },
+
+        // 切换居住地址
         toggleLivingAddress(value) {
             const el = document.getElementById('customerLivingAddress');
             if (el) el.style.display = value === 'different' ? 'block' : 'none';
         },
 
+        // 添加客户（原有逻辑完整保留）
         addCustomer: async function () {
             const isAdmin = PERMISSION.isAdmin();
             const lang = Utils.lang;
@@ -210,7 +226,7 @@
             }
         },
 
-        // 详情卡片（弹窗）
+        // 客户详情卡片（弹窗）
         showCustomerDetailCard: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -228,10 +244,6 @@
                 } catch (blErr) { console.warn('黑名单检查失败:', blErr.message); }
 
                 const { activeCount, completedCount, abnormalCount } = await SUPABASE.getCustomerOrdersStats(customerId);
-
-                const canEdit = isAdmin;
-                const canBlacklist = !isBlacklisted;
-                const canUnblacklist = isAdmin && isBlacklisted;
 
                 const registeredDate = Utils.formatDate(customer.registered_date);
                 const ktpAddress = Utils.escapeHtml(customer.ktp_address || customer.address || '-');
@@ -254,6 +266,10 @@
 
                 const blacklistBadge = isBlacklisted
                     ? `<div class="info-bar warning" style="margin:0 0 12px 0; padding:6px 12px;"><small>⚠️ ${Utils.escapeHtml(blacklistReason)}</small></div>` : '';
+
+                const canEdit = isAdmin;
+                const canBlacklist = !isBlacklisted;
+                const canUnblacklist = isAdmin && isBlacklisted;
 
                 const modalHtml =
                     `<div id="customerDetailCard" class="modal-overlay customer-detail-card">
@@ -288,7 +304,7 @@
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
             } catch (error) {
                 console.error("showCustomerDetailCard error:", error);
-                Utils.toast.error(lang === 'id' ? '加载客户详情失败：' + error.message : 'Gagal memuat detail nasabah: ' + error.message);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat detail nasabah' : '加载客户详情失败');
             }
         },
 
@@ -357,7 +373,7 @@
             }
         },
 
-        // 保留编辑客户逻辑（管理员）
+        // 编辑客户（管理员）
         editCustomer: async function (customerId) {
             const isAdmin = PERMISSION.isAdmin();
             const lang = Utils.lang;
@@ -470,7 +486,7 @@
             }
         },
 
-        // ==================== 创建订单（含新计费规则） ====================
+        // 创建订单（含新计费规则）
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -580,7 +596,7 @@
             }
         },
 
-        // ==================== 保存订单 ====================
+        // 保存订单
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -873,16 +889,137 @@
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败');
                 if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) DashboardCore.renderDashboard();
             }
+        },
+
+        // --- 外壳渲染方法 ---
+        async buildCustomerOrdersHTML(customerId) {
+            const lang = Utils.lang;
+            const t = Utils.t.bind(Utils);
+            try {
+                const customer = await SUPABASE.getCustomer(customerId);
+                const client = SUPABASE.getClient();
+                const { data: orders, error } = await client.from('orders').select('*').eq('customer_id', customerId).order('created_at', { ascending: false });
+                if (error) throw error;
+
+                const statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+                let rows = '';
+                if (!orders || orders.length === 0) {
+                    rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
+                } else {
+                    for (const o of orders) {
+                        const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
+                        const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
+                        const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment');
+                        rows += `<tr>
+                            <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
+                            <td class="date-cell">${Utils.formatDate(o.created_at)}</td>
+                            <td class="amount">${Utils.formatCurrency(o.loan_amount)}</td>
+                            <td class="amount">${Utils.formatCurrency(o.principal_paid)}</td>
+                            <td class="text-center">${o.interest_paid_months} ${t('month')}</td>
+                            <td class="text-center"><span class="badge badge-repayment-${repaymentClass}">${repaymentText}</span></td>
+                            <td class="text-center"><span class="badge badge-${sc}">${statusMap[o.status] || o.status}</span></td>
+                        </tr>`;
+                        let actionButtons = '';
+                        if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small success">💰 ${t('pay_fee')}</button>`;
+                        actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn-small">👁️ ${t('view')}</button>`;
+                        rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`;
+                    }
+                }
+
+                const content = `
+                    <div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button></div></div>
+                    <div class="card customer-summary">
+                        <p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p>
+                        <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
+                        <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p>
+                        <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
+                        <p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p>
+                    </div>
+                    <div class="card">
+                        <h3>📋 ${t('order_list')}</h3>
+                        <div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></tr></thead><tbody>${rows}</tbody></table></div>
+                    </div>`;
+                return content;
+            } catch (error) {
+                console.error("buildCustomerOrdersHTML error:", error);
+                return `<div class="card"><p>❌ ${t('loading_failed', { module: '客户订单' })}</p></div>`;
+            }
+        },
+
+        async renderCustomerOrdersHTML(customerId) {
+            return await this.buildCustomerOrdersHTML(customerId);
+        },
+
+        async buildCustomerPaymentHistoryHTML(customerId) {
+            const lang = Utils.lang;
+            const t = Utils.t.bind(Utils);
+            const methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+            try {
+                const customer = await SUPABASE.getCustomer(customerId);
+                const client = SUPABASE.getClient();
+                const { data: orders } = await client.from('orders').select('id, order_id').eq('customer_id', customerId);
+                const orderIds = (orders || []).map(o => o.id);
+                let allPayments = [];
+                if (orderIds.length > 0) {
+                    const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false });
+                    allPayments = data || [];
+                }
+                const typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
+                let rows = '';
+                if (allPayments.length === 0) {
+                    rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td>`;
+                } else {
+                    for (const p of allPayments) {
+                        const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
+                        rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td class="col-type">${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge-method-${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
+                    }
+                }
+
+                const content = `
+                    <div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button></div></div>
+                    <div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div>
+                    <div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                return content;
+            } catch (error) {
+                console.error("buildCustomerPaymentHistoryHTML error:", error);
+                return `<div class="card"><p>❌ ${t('loading_failed', { module: '缴费记录' })}</p></div>`;
+            }
+        },
+
+        async renderCustomerPaymentHistoryHTML(customerId) {
+            return await this.buildCustomerPaymentHistoryHTML(customerId);
         }
     };
 
-    // 挂载
+    // 挂载到命名空间
     JF.CustomersPage = CustomersPage;
-    for (const key of Object.keys(CustomersPage)) {
-        if (typeof CustomersPage[key] === 'function') {
-            window.APP[key] = CustomersPage[key].bind(CustomersPage);
-        }
+
+    // 向下兼容 APP 方法
+    if (window.APP) {
+        window.APP.showCustomers = CustomersPage.showCustomers.bind(CustomersPage);
+        window.APP.addCustomer = CustomersPage.addCustomer.bind(CustomersPage);
+        window.APP.toggleLivingAddress = CustomersPage.toggleLivingAddress.bind(CustomersPage);
+        window.APP.showCustomerDetailCard = CustomersPage.showCustomerDetailCard.bind(CustomersPage);
+        window.APP.editCustomerFromCard = CustomersPage.editCustomerFromCard.bind(CustomersPage);
+        window.APP.blacklistFromCard = CustomersPage.blacklistFromCard.bind(CustomersPage);
+        window.APP.unblacklistFromCard = CustomersPage.unblacklistFromCard.bind(CustomersPage);
+        window.APP.showCustomerOrdersByStatus = CustomersPage.showCustomerOrdersByStatus.bind(CustomersPage);
+        window.APP.editCustomer = CustomersPage.editCustomer.bind(CustomersPage);
+        window.APP._toggleEditLiving = CustomersPage._toggleEditLiving.bind(CustomersPage);
+        window.APP._saveEditCustomer = CustomersPage._saveEditCustomer.bind(CustomersPage);
+        window.APP.deleteCustomer = CustomersPage.deleteCustomer.bind(CustomersPage);
+        window.APP.createOrderForCustomer = CustomersPage.createOrderForCustomer.bind(CustomersPage);
+        window.APP.saveOrderForCustomer = CustomersPage.saveOrderForCustomer.bind(CustomersPage);
+        window.APP.recalculateAllFees = CustomersPage.recalculateAllFees.bind(CustomersPage);
+        window.APP.recalculateServiceFee = CustomersPage.recalculateServiceFee.bind(CustomersPage);
+        window.APP.onServiceFeeManualChange = CustomersPage.onServiceFeeManualChange.bind(CustomersPage);
+        window.APP.onMonthlyPaymentManualChange = CustomersPage.onMonthlyPaymentManualChange.bind(CustomersPage);
+        window.APP.toggleRepaymentForm = CustomersPage.toggleRepaymentForm.bind(CustomersPage);
+        window.APP.showCustomerOrders = CustomersPage.showCustomerOrders.bind(CustomersPage);
+        window.APP.showCustomerPaymentHistory = CustomersPage.showCustomerPaymentHistory.bind(CustomersPage);
+    } else {
+        window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.0 初始化完成');
+    console.log('✅ JF.CustomersPage v2.1 初始化完成（支持外壳渲染，完整版）');
 })();
