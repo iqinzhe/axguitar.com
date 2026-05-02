@@ -220,16 +220,17 @@
 
 .lang-toggle {
     display: flex;
+    flex-direction: column;   /* 上下排列 */
+    align-items: center;      /* 关键：让子元素按内容居中 */
     background: rgba(14, 116, 144, 0.1);
     border-radius: 7px;
     padding: 4px;
-    gap: 2px;
+    gap: 4px;
 }
 
 .lang-btn-side {
-    flex: 1;
-    text-align: center;
-    padding: 4px;
+    display: block;
+    padding: 6px 12px;
     font-size: 0.8rem;
     color: #4a6b8a;
     border-radius: 5px;
@@ -237,7 +238,7 @@
     font-weight: 500;
     background: transparent;
     border: none;
-    transition: all 0.15s ease;
+    white-space: nowrap; /* 保证按最长文本计算 */
 }
 
 .lang-btn-side.active-lang {
