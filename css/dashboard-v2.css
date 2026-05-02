@@ -1,5 +1,7 @@
 /* ============================================================
    dashboard-v2.css — 新版仪表盘样式（银行级金融风格）
+   优化：移动端顶部导航，桌面端侧边栏固定 + 主内容区独立滚动
+   修复：强制使用 grid-template-areas，侧边栏 sticky 固定
    ============================================================ */
 
 :root {
@@ -22,6 +24,7 @@
         "sidebar topbar"
         "sidebar main";
     min-height: 100vh;
+    max-height: 100vh;            /* 限制最大高度，让内部滚动生效 */
     background: #f0f2f5;
     font-family: var(--font-sans);
 }
@@ -34,15 +37,18 @@
 }
 
 /* ============================================================
-   侧边栏
+   侧边栏（桌面端固定，移动端可切换）
    ============================================================ */
 .dash-sidebar {
     grid-area: sidebar;
     background: #1c2340;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    overflow-y: auto;             /* 内容过多时可滚动 */
     z-index: 100;
+    position: sticky;             /* 桌面端固定 */
+    top: 0;
+    height: 100vh;                /* 占满整个视口高度 */
 }
 
 /* --- Logo 区 --- */
@@ -238,7 +244,7 @@
 }
 
 /* ============================================================
-   顶部栏
+   顶部栏（固定在右侧内容区顶部）
    ============================================================ */
 .dash-topbar {
     grid-area: topbar;
@@ -250,7 +256,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    position: relative;
+    position: sticky;             /* 固定在主内容区顶部 */
+    top: 0;
     z-index: 50;
 }
 
@@ -344,7 +351,7 @@
 }
 
 /* ============================================================
-   主内容区
+   主内容区（独立滚动）
    ============================================================ */
 .dash-main {
     grid-area: main;
@@ -352,7 +359,7 @@
     display: flex;
     flex-direction: column;
     gap: 18px;
-    overflow-y: auto;
+    overflow-y: auto;             /* 核心：主内容区独立滚动 */
     overflow-x: hidden;
 }
 
@@ -527,12 +534,12 @@
     .dashboard-v2 {
         margin: -8px;
         width: calc(100% + 16px);
-        /* 移动端强制单列布局，覆盖 grid-template-areas */
         grid-template-columns: 1fr !important;
         grid-template-rows: var(--topbar-height) 1fr !important;
         grid-template-areas:
             "topbar"
             "main" !important;
+        max-height: none;           /* 移动端解除高度限制 */
     }
 
     /* 侧边栏变为顶部横向导航 */
@@ -573,7 +580,7 @@
     .dash-sidebar.open .sidebar-user,
     .dash-sidebar.open .nav-section-label,
     .dash-sidebar.open .sidebar-footer {
-        display: flex;           /* 展开时重新显示，便于全菜单操作 */
+        display: flex;
     }
 
     .sidebar-nav {
@@ -615,7 +622,8 @@
         grid-column: 1;
         padding: 14px 12px;
         gap: 12px;
-        margin-top: 0;           /* 侧边栏固定时不需要额外 margin */
+        margin-top: 0;
+        overflow-y: auto;
     }
 
     /* KPI 变为两列 */
