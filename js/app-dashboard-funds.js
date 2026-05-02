@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v2.0 (JF 命名空间)
+// app-dashboard-funds.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
 // 资金管理与转账模块，挂载到 JF.FundsPage
 
 'use strict';
@@ -30,7 +30,134 @@
             };
         },
 
-        // ==================== 显示资金流水弹窗 ====================
+        // ==================== 构建资金流水页面 HTML（纯内容） ====================
+        async buildCashFlowPageHTML() {
+            const lang = Utils.lang;
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = PERMISSION.isAdmin();
+
+            try {
+                let transactions = [];
+                const client = SUPABASE.getClient();
+                if (isAdmin) {
+                    const { data: allFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('is_voided', false).order('recorded_at', { ascending: false });
+                    transactions = allFlows || [];
+                } else {
+                    const { data: storeFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('store_id', profile?.store_id).eq('is_voided', false)
+                        .order('recorded_at', { ascending: false });
+                    transactions = storeFlows || [];
+                }
+
+                const typeMap = FundsPage._getFlowTypeMap(lang);
+                const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
+                const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
+
+                let rows = '';
+                if (transactions.length === 0) {
+                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                } else {
+                    for (const t of transactions) {
+                        rows += `<tr>
+                            <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
+                            <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                            <td class="text-center">${directionMap[t.direction] || t.direction}</td>
+                            <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
+                            <td class="amount">${Utils.formatCurrency(t.amount)}</td>
+                            <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
+                            ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                        </tr>`;
+                    }
+                }
+
+                const content = `
+                    <div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${Utils.t('print')}</button></div></div>
+                    <div class="card">
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;" class="no-print">
+                            <input type="date" id="cashFlowFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
+                            <input type="date" id="cashFlowFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
+                            <button onclick="APP.filterCashFlowPage()" class="btn-small">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
+                            <button onclick="APP.resetCashFlowPageFilters()" class="btn-small">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table cashflow-table">
+                                <thead><tr>
+                                    <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th class="col-type">${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                    <th class="col-status text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
+                                    <th class="col-method text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
+                                    <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                    ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                </tr></thead>
+                                <tbody id="cashFlowPageBody">${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>`;
+
+                window._cashFlowPageData = transactions;
+                return content;
+            } catch (error) {
+                console.error("buildCashFlowPageHTML error:", error);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
+                return `<div class="card"><p>❌ ${Utils.t('loading_failed', { module: '资金流水' })}</p></div>`;
+            }
+        },
+
+        // 供外壳调用
+        async renderCashFlowPageHTML() {
+            return await this.buildCashFlowPageHTML();
+        },
+
+        // 原有的 showCashFlowPage
+        async showCashFlowPage() {
+            APP.currentPage = 'paymentHistory';
+            APP.saveCurrentPageState();
+            const contentHTML = await this.buildCashFlowPageHTML();
+            document.getElementById("app").innerHTML = contentHTML;
+        },
+
+        filterCashFlowPage() {
+            const transactions = window._cashFlowPageData || [];
+            const startDate = document.getElementById('cashFlowFilterStart')?.value;
+            const endDate = document.getElementById('cashFlowFilterEnd')?.value;
+            const filtered = transactions.filter(t => {
+                if (startDate && t.recorded_at < startDate) return false;
+                if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+                return true;
+            });
+            FundsPage._renderCashFlowPageTable(filtered);
+        },
+
+        resetCashFlowPageFilters() {
+            document.getElementById('cashFlowFilterStart').value = '';
+            document.getElementById('cashFlowFilterEnd').value = '';
+            FundsPage.filterCashFlowPage();
+        },
+
+        _renderCashFlowPageTable(transactions) {
+            const tbody = document.getElementById('cashFlowPageBody');
+            if (!tbody) return;
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            const typeMap = FundsPage._getFlowTypeMap(lang);
+            const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
+            const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
+            let rows = '';
+            if (transactions.length === 0) {
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+            } else {
+                for (const t of transactions) {
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                }
+            }
+            tbody.innerHTML = rows;
+        },
+
+        // ==================== 原有弹窗、转账、导出等方法（完整保留） ====================
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -129,117 +256,6 @@
             if (modal) modal.remove();
         },
 
-        // ==================== 资金流水页面（独立页） ====================
-        async showCashFlowPage() {
-            const lang = Utils.lang;
-            const profile = await SUPABASE.getCurrentProfile();
-            const isAdmin = PERMISSION.isAdmin();
-            try {
-                let transactions = [];
-                const client = SUPABASE.getClient();
-                if (isAdmin) {
-                    const { data: allFlows } = await client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('is_voided', false).order('recorded_at', { ascending: false });
-                    transactions = allFlows || [];
-                } else {
-                    const { data: storeFlows } = await client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('store_id', profile?.store_id).eq('is_voided', false)
-                        .order('recorded_at', { ascending: false });
-                    transactions = storeFlows || [];
-                }
-
-                const typeMap = FundsPage._getFlowTypeMap(lang);
-                const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
-                const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
-
-                let rows = '';
-                if (transactions.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
-                } else {
-                    for (const t of transactions) {
-                        rows += `<tr>
-                            <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
-                            <td>${typeMap[t.flow_type] || t.flow_type}</td>
-                            <td class="text-center">${directionMap[t.direction] || t.direction}</td>
-                            <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
-                            <td class="amount">${Utils.formatCurrency(t.amount)}</td>
-                            <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
-                            ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                        </tr>`;
-                    }
-                }
-
-                document.getElementById("app").innerHTML = `
-                    <div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${Utils.t('print')}</button></div></div>
-                    <div class="card">
-                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;" class="no-print">
-                            <input type="date" id="cashFlowFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
-                            <input type="date" id="cashFlowFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
-                            <button onclick="APP.filterCashFlowPage()" class="btn-small">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
-                            <button onclick="APP.resetCashFlowPageFilters()" class="btn-small">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
-                        </div>
-                        <div class="table-container">
-                            <table class="data-table cashflow-table">
-                                <thead><tr>
-                                    <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th class="col-type">${lang === 'id' ? 'Tipe' : '类型'}</th>
-                                    <th class="col-status text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
-                                    <th class="col-method text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
-                                    <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                    ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                </tr></thead>
-                                <tbody id="cashFlowPageBody">${rows}</tbody>
-                            </table>
-                        </div>
-                    </div>`;
-
-                window._cashFlowPageData = transactions;
-            } catch (error) {
-                console.error("showCashFlowPage error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
-            }
-        },
-
-        filterCashFlowPage() {
-            const transactions = window._cashFlowPageData || [];
-            const startDate = document.getElementById('cashFlowFilterStart')?.value;
-            const endDate = document.getElementById('cashFlowFilterEnd')?.value;
-            const filtered = transactions.filter(t => {
-                if (startDate && t.recorded_at < startDate) return false;
-                if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
-                return true;
-            });
-            FundsPage._renderCashFlowPageTable(filtered);
-        },
-
-        resetCashFlowPageFilters() {
-            document.getElementById('cashFlowFilterStart').value = '';
-            document.getElementById('cashFlowFilterEnd').value = '';
-            FundsPage.filterCashFlowPage();
-        },
-
-        _renderCashFlowPageTable(transactions) {
-            const tbody = document.getElementById('cashFlowPageBody');
-            if (!tbody) return;
-            const lang = Utils.lang;
-            const isAdmin = PERMISSION.isAdmin();
-            const typeMap = FundsPage._getFlowTypeMap(lang);
-            const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
-            const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
-            let rows = '';
-            if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
-            } else {
-                for (const t of transactions) {
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
-                }
-            }
-            tbody.innerHTML = rows;
-        },
-
         filterCapitalTransactions() {
             const transactions = window._capitalTransactionsData || [];
             const searchDesc = document.getElementById('capitalFilterDesc')?.value.toLowerCase() || '';
@@ -310,7 +326,6 @@
             Utils.toast.success(lang === 'id' ? '✅ Ekspor berhasil!' : '✅ 导出成功！');
         },
 
-        // ==================== 转账弹窗 ====================
         async showTransferModal(transferType) {
             const lang = Utils.lang;
             let title, fromLabel, toLabel, maxAmount;
@@ -446,13 +461,13 @@
     // 挂载到命名空间
     JF.FundsPage = FundsPage;
 
-    // 向下兼容
+    // 向下兼容 APP 方法
     if (window.APP) {
-        window.APP.showCapitalModal = FundsPage.showCapitalModal.bind(FundsPage);
-        window.APP.closeCapitalModal = FundsPage.closeCapitalModal.bind(FundsPage);
         window.APP.showCashFlowPage = FundsPage.showCashFlowPage.bind(FundsPage);
         window.APP.filterCashFlowPage = FundsPage.filterCashFlowPage.bind(FundsPage);
         window.APP.resetCashFlowPageFilters = FundsPage.resetCashFlowPageFilters.bind(FundsPage);
+        window.APP.showCapitalModal = FundsPage.showCapitalModal.bind(FundsPage);
+        window.APP.closeCapitalModal = FundsPage.closeCapitalModal.bind(FundsPage);
         window.APP.filterCapitalTransactions = FundsPage.filterCapitalTransactions.bind(FundsPage);
         window.APP.resetCapitalFilters = FundsPage.resetCapitalFilters.bind(FundsPage);
         window.APP.printCapitalTransactions = FundsPage.printCapitalTransactions.bind(FundsPage);
@@ -466,5 +481,5 @@
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
     }
 
-    console.log('✅ JF.FundsPage v2.0 初始化完成');
+    console.log('✅ JF.FundsPage v2.1 初始化完成（支持外壳渲染，完整版）');
 })();
