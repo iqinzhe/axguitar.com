@@ -1,5 +1,6 @@
 // app-dashboard-core.js - v2.5 最终版 (JF 命名空间) - 银行级金融仪表盘
 // 主仪表盘与路由核心模块，挂载到 JF.DashboardCore
+// 修改：侧边栏精简，功能入口移到仪表盘快捷操作区
 
 'use strict';
 
@@ -419,7 +420,7 @@
             }, 100);
         },
 
-        // ---------- 渲染仪表盘（v2.0 银行级金融风格） ----------
+        // ---------- 渲染仪表盘（v2.0 银行级金融风格，侧边栏精简版） ----------
         async renderDashboard() {
             this.currentPage = 'dashboard';
             this.currentOrderId = null;
@@ -632,7 +633,7 @@
                 // 活跃订单徽章数
                 var activeBadgeCount = activeOrders;
 
-                // 快捷操作按钮（角色适配）
+                // 快捷操作按钮（角色适配，已移入仪表盘）
                 var quickActions;
                 if (isAdmin) {
                     quickActions = [
@@ -640,8 +641,11 @@
                         { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
                         { icon: '💉', label: lang === 'id' ? 'Injeksi Modal' : '资本注入', action: "JF.CapitalModule.showCapitalInjectionModal()", cls: '' },
                         { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' },
+                        { icon: '👤', label: t('user_management'), action: "JF.DashboardCore.navigateTo('userManagement')", cls: '' },
+                        { icon: '🏪', label: t('store_management'), action: "JF.DashboardCore.navigateTo('storeManagement')", cls: '' },
                         { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
                         { icon: '📦', label: t('backup_restore'), action: "JF.DashboardCore.navigateTo('backupRestore')", cls: '' },
+                        { icon: '🚪', label: t('save_exit'), action: "JF.DashboardCore.logout()", cls: 'red-hover' }
                     ];
                 } else {
                     quickActions = [
@@ -651,6 +655,7 @@
                         { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' },
                         { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
                         { icon: '📦', label: t('backup_restore'), action: "JF.DashboardCore.navigateTo('backupRestore')", cls: '' },
+                        { icon: '🚪', label: t('save_exit'), action: "JF.DashboardCore.logout()", cls: 'red-hover' }
                     ];
                 }
 
@@ -682,7 +687,7 @@
                         + '</div>';
                 }).join('');
 
-                // ========== 完整 HTML ==========
+                // ========== 完整 HTML（侧边栏移除管理项和退出按钮） ==========
                 document.getElementById("app").innerHTML = ''
                 + '<div class="dashboard-v2">'
 
@@ -728,46 +733,8 @@
                             + '</div>'
                             + '<div class="nav-item" onclick="JF.DashboardCore.navigateTo(\'expenses\')">'
                                 + '<span class="nav-icon">📝</span> ' + t('expenses')
-                            + '</div>';
-
-                // 管理菜单（角色判断）
-                if (isAdmin) {
-                    document.getElementById("app").innerHTML += ''
-                            + '<div class="nav-section-label" style="margin-top:8px;">' + (lang === 'id' ? 'Manajemen' : '管理') + '</div>'
-
-                            + '<div class="nav-item" onclick="JF.CapitalModule.showCapitalInjectionModal()">'
-                                + '<span class="nav-icon">💉</span> ' + (lang === 'id' ? 'Injeksi Modal' : '资本注入')
                             + '</div>'
-                            + '<div class="nav-item" onclick="JF.DashboardCore.navigateTo(\'anomaly\')">'
-                                + '<span class="nav-icon">⚠️</span> ' + t('anomaly_title')
-                            + '</div>'
-                            + '<div class="nav-item" onclick="JF.DashboardCore.navigateTo(\'userManagement\')">'
-                                + '<span class="nav-icon">👤</span> ' + t('user_management')
-                            + '</div>'
-                            + '<div class="nav-item" onclick="JF.DashboardCore.navigateTo(\'storeManagement\')">'
-                                + '<span class="nav-icon">🏪</span> ' + t('store_management')
-                            + '</div>'
-                            + '<div class="nav-item" onclick="JF.DashboardCore.navigateTo(\'backupRestore\')">'
-                                + '<span class="nav-icon">📦</span> ' + t('backup_restore')
-                            + '</div>';
-                } else {
-                    document.getElementById("app").innerHTML += ''
-                            + '<div class="nav-section-label" style="margin-top:8px;">' + (lang === 'id' ? 'Manajemen' : '管理') + '</div>'
-
-                            + '<div class="nav-item" onclick="JF.DashboardCore.navigateTo(\'anomaly\')">'
-                                + '<span class="nav-icon">⚠️</span> ' + t('anomaly_title')
-                            + '</div>'
-                            + '<div class="nav-item" onclick="JF.DashboardCore.navigateTo(\'backupRestore\')">'
-                                + '<span class="nav-icon">📦</span> ' + t('backup_restore')
-                            + '</div>';
-                }
-
-                document.getElementById("app").innerHTML += ''
                             + '<div style="flex:1;"></div>'
-
-                            + '<div class="nav-item danger" onclick="JF.DashboardCore.logout()">'
-                                + '<span class="nav-icon">🚪</span> ' + t('save_exit')
-                            + '</div>'
                         + '</div>'
 
                         + '<div class="sidebar-footer">'
@@ -1035,5 +1002,5 @@
         }
     });
 
-    console.log('✅ JF.DashboardCore v2.5 初始化完成（银行级金融仪表盘）');
+    console.log('✅ JF.DashboardCore v2.5 初始化完成（侧边栏精简版）');
 })();
