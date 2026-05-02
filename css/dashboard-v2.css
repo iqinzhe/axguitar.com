@@ -1,17 +1,16 @@
 /* ============================================================
-   dashboard-v2.css — 新版仪表盘样式（银行级金融风格）
+   dashboard-v2.css — 新版仪表盘样式（银行级金融风格）v2.1
    设计理念：侧边栏 + 顶部栏 + KPI行 + 资金结构(左) + 收入构成(右)
              + 快捷操作(左) + 订单环形图(右)
-   依赖：variables.css, reset.css
+   依赖：variables.css（必须在 dashboard-v2.css 之前加载）
+   修复：抵消 #app 的 padding，解决手机端顶部空白问题
+         .np-sub / .np-val 文字颜色对比度修复
+         SVG 字体回退
+         响应式断点提前至 1199px
    ============================================================ */
 
 /* ============================================================
-   导入字体（如果环境支持）
-   ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
-
-/* ============================================================
-   D1. 应用基础变量覆盖（仪表盘专属）
+   D1. 应用基础变量（仪表盘专属）
    ============================================================ */
 :root {
     --font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -21,9 +20,14 @@
 }
 
 /* ============================================================
-   D2. 仪表盘整体布局（覆盖原有 #app 样式）
+   D2. 仪表盘整体布局
+   关键：用负 margin 抵消 #app 的 padding，使仪表盘贴边
    ============================================================ */
 .dashboard-v2 {
+    /* 抵消 reset.css 中 #app 的 padding：桌面端 16px，手机端 8px */
+    margin: -16px;
+    width: calc(100% + 32px);
+
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
     grid-template-rows: var(--topbar-height) 1fr;
@@ -32,10 +36,12 @@
     font-family: var(--font-sans);
 }
 
-.dashboard-v2 * {
+/* 仪表盘内部统一盒模型，但不覆盖其他页面的全局样式 */
+.dashboard-v2,
+.dashboard-v2 *,
+.dashboard-v2 *::before,
+.dashboard-v2 *::after {
     box-sizing: border-box;
-    margin: 0;
-    padding: 0;
 }
 
 /* ============================================================
@@ -84,6 +90,7 @@
     color: #fff;
     letter-spacing: -0.01em;
     line-height: 1.2;
+    margin: 0;
 }
 
 .logo-sub {
@@ -119,11 +126,13 @@
     font-size: 0.8rem;
     font-weight: 600;
     color: #e2e8f0;
+    margin: 0;
 }
 
 .user-role {
     font-size: 0.65rem;
     color: #64748b;
+    margin: 0;
 }
 
 .user-badge {
@@ -154,6 +163,7 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     padding: 8px 10px 4px;
+    margin: 0;
 }
 
 .nav-item {
@@ -169,6 +179,7 @@
     font-weight: 500;
     text-decoration: none;
     border: 1px solid transparent;
+    margin: 0;
 }
 
 .nav-item:hover {
@@ -280,11 +291,13 @@
     font-weight: 700;
     color: #1a1a2e;
     letter-spacing: -0.01em;
+    margin: 0;
 }
 
 .topbar-sub {
     font-size: 0.72rem;
     color: #94a3b8;
+    margin: 0;
 }
 
 .topbar-right {
@@ -463,6 +476,7 @@
     font-size: 0.88rem;
     font-weight: 700;
     color: #1a1a2e;
+    margin: 0;
 }
 
 .card-action {
@@ -698,7 +712,7 @@
     margin-top: 1px;
 }
 
-/* 净利润高亮盒 */
+/* 净利润高亮盒 — 修复：文字颜色与绿色背景对比度 */
 .net-profit-box {
     background: linear-gradient(135deg, #d1fae5, #ecfdf5);
     border: 1px solid #6ee7b7;
@@ -717,7 +731,8 @@
 
 .np-sub {
     font-size: 0.62rem;
-    color: #6ee7b7;
+    color: #047857;
+    opacity: 0.85;
     margin-top: 2px;
 }
 
@@ -725,7 +740,7 @@
     font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
-    color: #059669;
+    color: #047857;
 }
 
 /* ============================================================
@@ -876,17 +891,9 @@
 /* ============================================================
    D10. 响应式
    ============================================================ */
-@media (max-width: 1200px) {
-    .mid-row {
-        grid-template-columns: 1fr;
-    }
 
-    .kpi-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 1024px) {
+/* 平板端：侧边栏开始折叠，KPI 2列，资金三列变单列 */
+@media (max-width: 1199px) {
     .dashboard-v2 {
         grid-template-columns: 1fr;
         grid-template-rows: var(--topbar-height) 1fr;
@@ -923,12 +930,31 @@
         display: flex;
     }
 
+    .kpi-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .mid-row {
+        grid-template-columns: 1fr;
+    }
+
+    .fund-total-row {
+        grid-template-columns: 1fr;
+    }
+
     .bottom-row {
         grid-template-columns: 1fr;
     }
 }
 
+/* 手机端 */
 @media (max-width: 768px) {
+    /* 手机端 #app 的 padding 是 8px，所以负 margin 也相应调整 */
+    .dashboard-v2 {
+        margin: -8px;
+        width: calc(100% + 16px);
+    }
+
     .dash-main {
         padding: 14px 12px;
         gap: 12px;
@@ -958,6 +984,29 @@
 
     .quick-grid {
         grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* 小屏手机 */
+@media (max-width: 480px) {
+    .dash-topbar {
+        padding: 0 12px;
+    }
+
+    .kpi-row {
+        gap: 8px;
+    }
+
+    .kpi-card {
+        padding: 12px 14px;
+    }
+
+    .kpi-val {
+        font-size: 1.2rem;
+    }
+
+    .transfer-row-v2 {
+        flex-direction: column;
     }
 }
 
