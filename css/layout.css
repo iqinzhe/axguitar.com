@@ -1,6 +1,9 @@
 /* ============================================================
-   layout.css - 第4层：页面级布局模式
+   layout.css - 第4层：页面级布局模式（v2.1 精简版）
    优化：统一 CSS 变量，卡片/按钮系统规范化，完全向后兼容
+   精简：移除旧仪表盘专属死代码（.dashboard-footer-card、
+         .info-item-card、.transfer-buttons、.transfer-btn、
+         .cashflow-item）
    ============================================================ */
 
 /* ============================================================
@@ -313,82 +316,6 @@ button.warning.highlight {
     gap: var(--spacing-3);
 }
 
-.cashflow-item {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-2) var(--spacing-3);
-    border: 1px solid var(--border-light);
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-}
-
-.cashflow-item .label {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-1);
-}
-
-.cashflow-item .value {
-    font-size: var(--font-xl);
-    font-weight: 700;
-    color: var(--text-primary);
-    font-variant-numeric: tabular-nums;
-}
-
-.cashflow-item .value.negative {
-    color: var(--danger-dark);
-}
-
-.cashflow-item .cashflow-detail {
-    font-size: var(--font-xs);
-    color: var(--text-muted);
-    margin-top: var(--spacing-1);
-    line-height: 1.4;
-}
-
-.transfer-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-1);
-    margin-top: var(--spacing-2);
-}
-
-.transfer-btn {
-    width: 100%;
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--font-sm);
-    border-radius: var(--radius-md);
-    background: var(--bg-card);
-    border: 1px solid var(--border-medium);
-    cursor: pointer;
-    transition: var(--transition-fast);
-    text-align: center;
-    white-space: nowrap;
-}
-
-.transfer-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
-}
-
-.transfer-btn.cash-to-bank {
-    background: #e0f2fe;
-    color: #0369a1;
-    border-color: #7dd3fc;
-}
-
-.transfer-btn.bank-to-cash {
-    background: #fef3c7;
-    color: #b45309;
-    border-color: #fde68a;
-}
-
-.transfer-btn.store-to-hq {
-    background: #dbeafe;
-    color: #1e40af;
-    border-color: #93c5fd;
-}
-
 /* ============================================================
    L5. 工具栏
    ============================================================ */
@@ -427,28 +354,7 @@ button.warning.highlight {
 }
 
 /* ============================================================
-   L6. 底部信息卡片
-   ============================================================ */
-.dashboard-footer-card {
-    background: var(--bg-hover);
-    border: 1px solid var(--border-medium);
-}
-
-.dashboard-footer-card h3 {
-    font-size: var(--font-md);
-    margin-bottom: var(--spacing-1);
-    border-bottom: none;
-}
-
-.dashboard-footer-card p {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-1);
-    line-height: 1.5;
-}
-
-/* ============================================================
-   L7. 模态框
+   L6. 模态框
    ============================================================ */
 .modal-overlay {
     position: fixed;
@@ -490,7 +396,7 @@ button.warning.highlight {
 }
 
 /* ============================================================
-   L8. 登录页面
+   L7. 登录页面
    ============================================================ */
 .login-container {
     min-height: 100vh;
@@ -596,7 +502,7 @@ button.warning.highlight {
 }
 
 /* ============================================================
-   L9. 加载动画
+   L8. 加载动画
    ============================================================ */
 .loading-container {
     display: flex;
@@ -627,7 +533,7 @@ button.warning.highlight {
 }
 
 /* ============================================================
-   L10. 报错信息
+   L9. 报错信息
    ============================================================ */
 .error-container {
     display: flex;
