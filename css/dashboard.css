@@ -150,14 +150,14 @@
     color: #4a6b8a;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    padding: 4px 8px 3px;
+    padding: 4px 4px 3px;
     margin: 0;
 }
 .nav-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 3px 10px;
     border-radius: 7px;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -200,7 +200,7 @@
 
 /* 侧边栏底部 */
 .sidebar-footer {
-    padding: 10px 14px;
+    padding: 5px 18px;
     border-top: 1px solid rgba(14, 116, 144, 0.2);
 }
 .lang-toggle {
@@ -236,14 +236,14 @@
     grid-area: topbar;
     background: #ffffff;
     border-bottom: 1px solid #dde3ec;
-    padding: 0 20px;
+    padding: 10px 20px;
     height: var(--topbar-height);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
     position: sticky;
-    top: 0;
+    top: 10;
     z-index: 50;
 }
 .topbar-left {
