@@ -143,7 +143,6 @@
             await this._updateSidebarActive();
 
             const page = this.currentPage;
-            // 仪表盘直接完整重新渲染（避免主内容提取失败导致白屏）
             if (page === 'dashboard') {
                 await this.originalRenderDashboard();
                 return;
@@ -239,7 +238,6 @@
                     contentHtml = '<div class="card"><p>⚠️ ' + (Utils.lang === 'id' ? 'Halaman tidak ditemukan' : '页面不存在') + '</p></div>';
                 }
                 await this._updateMainContent(contentHtml);
-                // 重新绑定金额输入
                 document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
             } catch (err) {
                 console.error('[refreshCurrentPage] error:', err);
@@ -272,7 +270,7 @@
             } catch (e) { return 0; }
         },
 
-        // ---------- 侧边栏控制（增强版） ----------
+        // ---------- 侧边栏控制 ----------
         _toggleSidebar(e) {
             const sidebar = document.getElementById('dashSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -287,21 +285,17 @@
                 if (overlay) overlay.classList.add('active');
                 document.body.classList.add('menu-open');
             }
-            // 阻止事件冒泡，避免立即触发主内容关闭
             if (e && e.stopPropagation) e.stopPropagation();
         },
 
-        // 点击主内容区域关闭侧边栏（移动端）
         _initSidebarCloseOnMain() {
             const mainEl = document.querySelector('.dash-main');
             if (!mainEl) return;
-            // 移除旧监听避免重复绑定
             mainEl.removeEventListener('click', this._handleMainClick);
             this._handleMainClick = (e) => {
                 const sidebar = document.getElementById('dashSidebar');
                 const overlay = document.getElementById('sidebarOverlay');
                 if (sidebar && sidebar.classList.contains('open')) {
-                    // 确保点击的不是侧边栏内部元素
                     if (!sidebar.contains(e.target)) {
                         this._toggleSidebar();
                     }
@@ -545,7 +539,7 @@
                         </div>
                         <div class="mid-row">
                             <div class="fund-flow-card">
-                            <div class="card-header"><div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div></div>
+                                <div class="card-header"><div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div></div>
                                 <div class="fund-total-row">
                                     <div class="fund-block injected"><div class="fund-block-label">${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</div><div class="fund-block-val">${Utils.formatCurrency(injected)}</div><div class="fund-block-sub">${lang === 'id' ? 'Dasar Operasional Gadai' : '典当运营基础'}</div></div>
                                     <div class="fund-block deployed"><div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div><div class="fund-block-val">${Utils.formatCurrency(deployed)}</div><div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div>
@@ -555,16 +549,15 @@
                                 <div class="cash-bank-row"><div class="cash-bank-item"><div class="cb-label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</div><div class="cb-val">${Utils.formatCurrency(cashBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(cashIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(cashExpense)}</span></div></div><div class="cash-bank-item"><div class="cb-label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div><div class="cb-val">${Utils.formatCurrency(bankBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(bankIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(bankExpense)}</span></div></div></div>
                                 <div class="transfer-row-v2"><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('cash_to_bank')">🏦→🏧 ${lang === 'id' ? 'Kas ke Bank' : '现金转银行'}</div><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Bank ke Kas' : '银行转现金'}</div>${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}</div>
                             </div>
-                            <div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div>
+                            <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfit)}</div></div></div>
                         </div>
                         <div class="bottom-row">
                             <div class="quick-card"><div class="card-header"><div class="card-title">⚡ ${lang === 'id' ? 'Aksi Cepat' : '快捷操作'}</div></div><div class="quick-grid">${quickActionsHtml}</div></div>
-                            <div class="card-header"><div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div></div>
+                            <div class="order-status-card"><div class="card-header"><div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div></div><div class="donut-area"><svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="none" stroke="#f1f5f9" stroke-width="14"/>${donutPaths}<text x="50" y="48" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a2e" font-family="var(--font-mono)">${totalOrders}</text><text x="50" y="60" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="var(--font-sans)">${lang === 'id' ? 'Total Pesanan' : '总订单'}</text></svg><div class="donut-legend">${donutData.map(d => `<div class="legend-item"><div class="legend-dot" style="background:${d.color}"></div><div><div class="legend-name">${d.label}</div><div class="legend-pct">${d.pct}%</div></div><div class="legend-count">${d.count}</div></div>`).join('')}</div></div></div>
                         </div>
                     </div>
                 </div>`;
                 document.getElementById("app").innerHTML = finalHtml;
-                // 初始化侧边栏点击关闭监听
                 this._initSidebarCloseOnMain();
                 if (!document.getElementById('dashboardV2AnimStyle')) {
                     const style = document.createElement('style');
@@ -676,7 +669,6 @@
                     await this.renderLogin();
                 }
                 if (AUTH.isLoggedIn()) this._startOverdueInterval();
-                // 在每次渲染后绑定侧边栏关闭事件（如果还没有绑定）
                 this._initSidebarCloseOnMain();
             } catch (error) {
                 console.error("Init error:", error);
@@ -689,7 +681,7 @@
     // ========== 挂载到命名空间 ==========
     JF.DashboardCore = DashboardCore;
 
-    // ========== 兼容全局 APP 对象（不覆盖原有方法） ==========
+    // ========== 兼容全局 APP 对象 ==========
     if (!window.APP) {
         window.APP = DashboardCore;
     } else {
@@ -698,7 +690,6 @@
                 window.APP[key] = DashboardCore[key].bind(DashboardCore);
             }
         }
-        // 确保核心导航方法指向 DashboardCore 实例
         window.APP.navigateTo = DashboardCore.navigateTo.bind(DashboardCore);
         window.APP.goBack = DashboardCore.goBack.bind(DashboardCore);
         window.APP.refreshCurrentPage = DashboardCore.refreshCurrentPage.bind(DashboardCore);
@@ -712,7 +703,6 @@
         window.APP.init = DashboardCore.init.bind(DashboardCore);
     }
 
-    // 快捷键 Alt+R 恢复
     document.addEventListener('keydown', (e) => {
         if (e.altKey && e.key === 'r') {
             e.preventDefault();
