@@ -1,6 +1,5 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局（重构版）
-   与 components.css 协同，统一使用 BEM 修饰符
+   dashboard.css - 仪表盘专属布局（重构版 + 移动端优化）
    =============================*/
 
 /* ==============================
@@ -206,27 +205,28 @@
 .lang-toggle {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     background: rgba(14, 116, 144, 0.1);
     border-radius: 7px;
     padding: 4px;
-    gap: 4px;
+    gap: 4px;               /* 按钮之间的间隔 */
 }
 .lang-btn-side {
     display: block;
-    padding: 6px 12px;
+    padding: 8px 12px;
+    text-align: center;
+    border-radius: 5px;
+    background: transparent;
+    border: 1px solid transparent;   /* 给每个按钮独立边框 */
+    transition: background 0.2s;
+    cursor: pointer;
     font-size: 0.8rem;
     color: #475569;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: 500;
-    background: transparent;
-    border: none;
-    white-space: nowrap;
 }
 .lang-btn-side.active-lang {
     background: rgba(14, 116, 144, 0.35);
     color: #0e7490;
+    border-color: rgba(14, 116, 144, 0.5);
 }
 
 /* ==============================
@@ -251,7 +251,6 @@
     align-items: center;
     gap: 12px;
 }
-/* 汉堡按钮使用通用 .btn 样式，删除原有独立样式 */
 .topbar-title {
     font-size: 0.95rem;
     font-weight: 700;
@@ -269,7 +268,6 @@
     align-items: center;
     gap: 12px;
 }
-/* 提醒按钮使用 .btn.btn--warning，删除 .alert-btn-dash 独立样式 */
 .topbar-store-badge {
     font-size: 0.72rem;
     color: #64748b;
@@ -280,7 +278,6 @@
     font-weight: 500;
     white-space: nowrap;
 }
-/* 刷新按钮使用 .btn.btn--outline */
 
 /* ==============================
    五、主内容区
@@ -329,7 +326,6 @@
     height: 3px;
     border-radius: 12px 12px 0 0;
 }
-/* 重构为双破折号修饰符 */
 .kpi-card--blue::before   { background: linear-gradient(90deg, #0e7490, #06b6d4); }
 .kpi-card--amber::before  { background: linear-gradient(90deg, #d97706, #f59e0b); }
 .kpi-card--green::before  { background: linear-gradient(90deg, #15803d, #16a34a); }
@@ -402,7 +398,6 @@
     flex-direction: column;
     gap: 4px;
 }
-/* 改为双破折号修饰符 */
 .fund-block--injected { background: #e0f2fe; border: 1px solid #7dd3fc; }
 .fund-block--deployed  { background: #fef9c3; border: 1px solid #fde047; }
 .fund-block--free      { background: #dcfce7; border: 1px solid #86efac; }
@@ -751,6 +746,7 @@
 
 /* ============================================================
    十一、移动端布局（≤768px）
+   包含侧边栏收窄、语言按钮分离、KPI单列、订单水平等优化
    ============================================================ */
 @media (max-width: 768px) {
     .dashboard-v2 {
@@ -790,16 +786,20 @@
         min-width: 0;
     }
     
-    /* 汉堡按钮显示（使用 .btn 通用样式） */
+    /* 隐藏顶部三角警示按钮 */
+    .dash-topbar .btn--warning {
+        display: none;
+    }
     
-    /* ---- 侧边栏（移动端）---- */
+    /* ---- 侧边栏（移动端）宽度调整 ---- */
     .dash-sidebar {
         position: fixed;
         top: 0;
         left: 0;
         bottom: 0;
-        width: 75vw;
-        max-width: 75vw;
+        width: 80vw;
+        max-width: 280px;
+        min-width: 240px;
         height: 100%;
         background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
         z-index: 1001;
@@ -842,6 +842,11 @@
         width: 100%;
     }
 
+    /* KPI 卡片强制单列 */
+    .kpi-row {
+        grid-template-columns: 1fr !important;
+    }
+
     .mid-row,
     .fund-total-row,
     .cash-bank-row,
@@ -856,13 +861,15 @@
         padding-top: 18px;
     }
 
+    /* 订单分布改为水平排列 */
     .donut-area {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
     }
     .donut-legend {
-        width: 100%;
+        width: auto;
+        flex: 1;
     }
 
     .transfer-row-v2 {
