@@ -746,7 +746,7 @@
 
 /* ============================================================
    十一、移动端布局（≤768px）
-   包含侧边栏收窄、语言按钮分离、KPI单列、订单水平等优化
+   包含侧边栏收窄、语言按钮分离、KPI双列、快捷操作提前等优化
    ============================================================ */
 @media (max-width: 768px) {
     .dashboard-v2 {
@@ -833,6 +833,7 @@
         overflow-x: visible;
         display: flex;
         flex-direction: column;
+        gap: 10px;
         min-height: calc(100vh - 56px);
     }
     
@@ -842,15 +843,34 @@
         width: 100%;
     }
 
-    /* KPI 卡片强制单列 */
+    /* ---- 重新排列内容顺序（order） ---- */
+    /* 默认 .dash-main 是 flex 列，子元素按 order 排序 */
     .kpi-row {
-        grid-template-columns: 1fr !important;
+        order: 2;
+    }
+    .mid-row {
+        order: 3;
+    }
+    /* 将 .bottom-row 变为透明容器，让其子元素参与主 flex 排序 */
+    .bottom-row {
+        display: contents;
+    }
+    .quick-card {
+        order: 1;          /* 第一个可见内容块 */
+    }
+    .order-status-card {
+        order: 4;          /* 放在最后 */
     }
 
+    /* KPI 卡片双列展示 */
+    .kpi-row {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    /* 中间行、现金银行等仍保持单列 */
     .mid-row,
     .fund-total-row,
-    .cash-bank-row,
-    .bottom-row {
+    .cash-bank-row {
         grid-template-columns: 1fr;
         gap: 12px;
     }
@@ -876,6 +896,7 @@
         flex-wrap: wrap;
     }
 
+    /* 快捷操作双列保持不变 */
     .quick-grid {
         grid-template-columns: 1fr 1fr;
     }
@@ -893,6 +914,7 @@
     }
     .kpi-row {
         gap: 8px;
+        grid-template-columns: 1fr 1fr !important; /* 确保持双列 */
     }
     .kpi-card {
         padding: 8px 10px;
@@ -921,6 +943,7 @@
 .order-status-card {
     animation: dashFadeIn 0.4s ease forwards;
 }
+/* 动画延迟只应用于 KPI 卡片（现在只有4个，双列下第一行2个，第二行2个） */
 .kpi-card:nth-child(2) { animation-delay: 0.05s; }
 .kpi-card:nth-child(3) { animation-delay: 0.10s; }
 .kpi-card:nth-child(4) { animation-delay: 0.15s; }
