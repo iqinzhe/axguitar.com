@@ -545,7 +545,7 @@
   margin-bottom: var(--spacing-2);
 }
 .info-item-card .info-item-value {
-  font-size: var(--font-2xl);
+  font-size: var(--font-xl);
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
@@ -973,7 +973,7 @@
   margin-bottom: var(--spacing-2);
 }
 .cashflow-item-card .value {
-  font-size: var(--font-2xl);
+  font-size: var(--font-xl);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
