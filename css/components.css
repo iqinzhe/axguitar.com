@@ -1594,13 +1594,10 @@ button.warning.highlight {
     text-align: right;
     margin-bottom: 20px;
 }
-.login-box .lang-btn {
-    background: transparent;
-    color: var(--primary-dark);
-    border: 1px solid var(--border-medium);
-    padding: 6px 14px;
-    font-size: var(--font-sm);
-    border-radius: var(--radius-md);
+.login-box .lang-btn,
+.login-box .login-btn {
+    width: 100%;
+    margin-top: var(--spacing-2);
 }
 
 .loading-container {
