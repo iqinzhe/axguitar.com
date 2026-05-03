@@ -1,11 +1,11 @@
-// app-dashboard-core.js - v2.0 完整稳定版
+// app-dashboard-core.js - v2.0 完整稳定版（类名重构）
 'use strict';
 
 (function () {
     const JF = window.JF || {};
     window.JF = JF;
 
-    // ========== 模块降级（完整实现） ==========
+    // ========== 模块降级（不变） ==========
     const ModuleFallback = {
         _degradedModules: {},
         async safeCall(moduleName, fn, args, fallbackFn) {
@@ -241,7 +241,7 @@
                 document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
             } catch (err) {
                 console.error('[refreshCurrentPage] error:', err);
-                await this._updateMainContent('<div class="card"><p>❌ ' + (Utils.lang === 'id' ? 'Gagal memuat halaman' : '页面加载失败') + '</p><button onclick="location.reload()" class="btn-small">🔄 Refresh</button></div>');
+                await this._updateMainContent('<div class="card"><p>❌ ' + (Utils.lang === 'id' ? 'Gagal memuat halaman' : '页面加载失败') + '</p><button onclick="location.reload()" class="btn btn--sm btn--primary">🔄 Refresh</button></div>');
             }
         },
 
@@ -270,7 +270,7 @@
             } catch (e) { return 0; }
         },
 
-        // ---------- 侧边栏控制 ----------
+        // ---------- 侧边栏控制（不变） ----------
         _toggleSidebar(e) {
             const sidebar = document.getElementById('dashSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -310,7 +310,7 @@
             this.refreshCurrentPage();
         },
 
-        // ========== 路由和导航 ==========
+        // ========== 路由和导航（不变） ==========
         navigateTo(page, params) {
             window.scrollTo(0, 0);
             this.historyStack.push({
@@ -345,7 +345,7 @@
             }
         },
 
-        // ========== 原完整仪表盘渲染（银行级金融风格） ==========
+        // ========== 原完整仪表盘渲染（银行级金融风格）— 类名重构在此 ==========
         async originalRenderDashboard() {
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
@@ -498,6 +498,7 @@
                 ];
                 const incomeItemsHtml = incomeItems.map(item => `<div class="income-item"><div class="income-dot" style="background:${item.dot}"></div><div><div class="income-name">${item.label}</div><div class="income-sub">${item.sub}</div></div><div class="income-amt${item.cls === 'expense' ? ' expense' : ''}">${item.cls === 'expense' ? '−' : ''}${Utils.formatCurrency(item.amt)}</div></div>`).join('');
 
+                // ===== 重构后的 HTML，按钮/卡片类名统一 =====
                 const finalHtml = `
                 <div class="dashboard-v2">
                     <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
@@ -527,23 +528,23 @@
                         <div class="sidebar-footer"><div class="lang-toggle"><div class="lang-btn-side${Utils.lang === 'zh' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('zh')">中文</div><div class="lang-btn-side${Utils.lang === 'id' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('id')">Bahasa</div></div></div>
                     </div>
                     <div class="dash-topbar">
-                        <div class="topbar-left"><div class="hamburger-btn" id="hamburgerBtn" onclick="JF.DashboardCore._toggleSidebar()">☰</div><div><div class="topbar-title">${lang === 'id' ? 'Dasbor' : '仪表盘总览'}</div><div class="topbar-sub">${topbarSubtitle}</div></div></div>
-                        <div class="topbar-right"><div class="alert-btn-dash" onclick="JF.DashboardCore.navigateTo('anomaly')">⚠️${overdueOrders > 0 ? '<div class="alert-dot"></div>' : ''}</div><div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div><div class="refresh-btn-dash" onclick="JF.DashboardCore.invalidateDashboardCache()">🔄</div></div>
+                        <div class="topbar-left"><div class="btn btn--outline" id="hamburgerBtn" onclick="JF.DashboardCore._toggleSidebar()">☰</div><div><div class="topbar-title">${lang === 'id' ? 'Dasbor' : '仪表盘总览'}</div><div class="topbar-sub">${topbarSubtitle}</div></div></div>
+                        <div class="topbar-right"><div class="btn btn--warning" onclick="JF.DashboardCore.navigateTo('anomaly')">⚠️${overdueOrders > 0 ? '<div class="alert-dot"></div>' : ''}</div><div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div><div class="btn btn--outline" onclick="JF.DashboardCore.invalidateDashboardCache()">🔄</div></div>
                     </div>
                     <div class="dash-main">
                         <div class="kpi-row">
-                            <div class="kpi-card blue"><div class="kpi-icon">📋</div><div class="kpi-val">${totalOrders}</div><div class="kpi-label">${lang === 'id' ? 'Total Pesanan' : '累计订单总数'}</div><div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月新增 +'}${newThisMonth}</div></div>
-                            <div class="kpi-card amber"><div class="kpi-icon">🔄</div><div class="kpi-val amber">${activeOrders}</div><div class="kpi-label">${lang === 'id' ? 'Pesanan Aktif' : '活跃在押订单'}</div>${overdueOrders > 0 ? `<div class="kpi-trend down">${lang === 'id' ? 'Terlambat' : '逾期'} ${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'} ⚠️</div>` : `<div class="kpi-trend">${lang === 'id' ? 'Semua normal' : '全部正常'} ✅</div>`}</div>
-                            <div class="kpi-card green"><div class="kpi-icon">✅</div><div class="kpi-val green">${completedOrders}</div><div class="kpi-label">${lang === 'id' ? 'Sudah Ditebus' : '已完成赎回'}</div><div class="kpi-trend">${lang === 'id' ? 'Tingkat Selesai' : '完成率'} ${completionRate}%</div></div>
-                            <div class="kpi-card green"><div class="kpi-icon">📈</div><div class="kpi-val green" style="font-size:1.2rem;">${Utils.formatCurrency(netProfit)}</div><div class="kpi-label">${t('net_profit')}</div><div class="kpi-trend">${lang === 'id' ? 'Pendapatan − Pengeluaran' : '收入 − 支出'}</div></div>
+                            <div class="kpi-card kpi-card--blue"><div class="kpi-icon">📋</div><div class="kpi-val">${totalOrders}</div><div class="kpi-label">${lang === 'id' ? 'Total Pesanan' : '累计订单总数'}</div><div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月新增 +'}${newThisMonth}</div></div>
+                            <div class="kpi-card kpi-card--amber"><div class="kpi-icon">🔄</div><div class="kpi-val amber">${activeOrders}</div><div class="kpi-label">${lang === 'id' ? 'Pesanan Aktif' : '活跃在押订单'}</div>${overdueOrders > 0 ? `<div class="kpi-trend down">${lang === 'id' ? 'Terlambat' : '逾期'} ${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'} ⚠️</div>` : `<div class="kpi-trend">${lang === 'id' ? 'Semua normal' : '全部正常'} ✅</div>`}</div>
+                            <div class="kpi-card kpi-card--green"><div class="kpi-icon">✅</div><div class="kpi-val green">${completedOrders}</div><div class="kpi-label">${lang === 'id' ? 'Sudah Ditebus' : '已完成赎回'}</div><div class="kpi-trend">${lang === 'id' ? 'Tingkat Selesai' : '完成率'} ${completionRate}%</div></div>
+                            <div class="kpi-card kpi-card--green"><div class="kpi-icon">📈</div><div class="kpi-val green" style="font-size:1.2rem;">${Utils.formatCurrency(netProfit)}</div><div class="kpi-label">${t('net_profit')}</div><div class="kpi-trend">${lang === 'id' ? 'Pendapatan − Pengeluaran' : '收入 − 支出'}</div></div>
                         </div>
                         <div class="mid-row">
                             <div class="fund-flow-card">
                                 <div class="card-header"><div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div></div>
                                 <div class="fund-total-row">
-                                    <div class="fund-block injected"><div class="fund-block-label">${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</div><div class="fund-block-val">${Utils.formatCurrency(injected)}</div><div class="fund-block-sub">${lang === 'id' ? 'Dasar Operasional Gadai' : '典当运营基础'}</div></div>
-                                    <div class="fund-block deployed"><div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div><div class="fund-block-val">${Utils.formatCurrency(deployed)}</div><div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div>
-                                    <div class="fund-block free"><div class="fund-block-label">${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</div><div class="fund-block-val">${Utils.formatCurrency(available)}</div><div class="fund-block-sub">${lang === 'id' ? 'Kas + Bank' : '现金 + 银行'}</div></div>
+                                    <div class="fund-block fund-block--injected"><div class="fund-block-label">${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</div><div class="fund-block-val">${Utils.formatCurrency(injected)}</div><div class="fund-block-sub">${lang === 'id' ? 'Dasar Operasional Gadai' : '典当运营基础'}</div></div>
+                                    <div class="fund-block fund-block--deployed"><div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div><div class="fund-block-val">${Utils.formatCurrency(deployed)}</div><div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div>
+                                    <div class="fund-block fund-block--free"><div class="fund-block-label">${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</div><div class="fund-block-val">${Utils.formatCurrency(available)}</div><div class="fund-block-sub">${lang === 'id' ? 'Kas + Bank' : '现金 + 银行'}</div></div>
                                 </div>
                                 <div class="util-bar-wrap"><div class="util-bar-label"><span>${lang === 'id' ? 'Tingkat Utilisasi' : '资金利用率'}</span><span class="util-bar-pct">${utilizationRate}%</span></div><div class="util-bar-track"><div class="util-bar-fill" style="width:${Math.min(utilizationRate, 100)}%;"></div></div></div>
                                 <div class="cash-bank-row"><div class="cash-bank-item"><div class="cb-label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</div><div class="cb-val">${Utils.formatCurrency(cashBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(cashIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(cashExpense)}</span></div></div><div class="cash-bank-item"><div class="cb-label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div><div class="cb-val">${Utils.formatCurrency(bankBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(bankIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(bankExpense)}</span></div></div></div>
@@ -571,11 +572,11 @@
                 }
             } catch (err) {
                 console.error("originalRenderDashboard error:", err);
-                document.getElementById("app").innerHTML = '<div class="card" style="padding:40px;text-align:center;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '仪表盘加载失败: ' + err.message) + '</p><button onclick="APP.forceRecovery()" style="margin-top:12px;margin-right:8px;">🔄 ' + (Utils.lang === 'id' ? 'Pulihkan Paksa' : '强制恢复') + '</button><button onclick="location.reload()" style="margin-left:8px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
+                document.getElementById("app").innerHTML = '<div class="card" style="padding:40px;text-align:center;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '仪表盘加载失败: ' + err.message) + '</p><button onclick="APP.forceRecovery()" class="btn btn--warning" style="margin-right:8px;">🔄 ' + (Utils.lang === 'id' ? 'Pulihkan Paksa' : '强制恢复') + '</button><button onclick="location.reload()" class="btn btn--outline">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
             }
         },
 
-        // ========== 对外公开方法 ==========
+        // ========== 对外公开方法（部分小调整） ==========
         async renderDashboard() {
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
@@ -591,7 +592,7 @@
             this.clearPageState();
             const lang = Utils.lang;
             document.getElementById("app").innerHTML = `
-                <div class="login-container"><div class="login-box"><div class="lang-toggle"><button onclick="APP.toggleLanguage()" class="lang-btn">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button></div><div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;"><img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;"><h2 class="login-title" style="margin:0;">JF! by Gadai</h2></div><h3>${Utils.t('login')}</h3><div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;"><span class="info-bar-icon">⚠️</span><div class="info-bar-content" id="loginErrorMessage"></div></div><div class="form-group"><label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label><input id="username" placeholder="email@domain.com" autocomplete="username"></div><div class="form-group" style="position:relative;"><label>${Utils.t('password')}</label><input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password"><span onclick="Utils.togglePasswordVisibility('password', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;">👁️</span></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;"><input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;"><label for="rememberMe" style="cursor:pointer;">${lang === 'id' ? 'Ingat saya' : '记住我'}</label></div><button onclick="APP.login()" id="loginBtn" class="login-btn">${Utils.t('login')}</button><p class="login-note">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p></div></div>`;
+                <div class="login-container"><div class="login-box"><div class="lang-toggle"><button onclick="APP.toggleLanguage()" class="btn btn--outline">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button></div><div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;"><img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;"><h2 class="login-title" style="margin:0;">JF! by Gadai</h2></div><h3>${Utils.t('login')}</h3><div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;"><span class="info-bar-icon">⚠️</span><div class="info-bar-content" id="loginErrorMessage"></div></div><div class="form-group"><label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label><input id="username" placeholder="email@domain.com" autocomplete="username"></div><div class="form-group" style="position:relative;"><label>${Utils.t('password')}</label><input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password"><span onclick="Utils.togglePasswordVisibility('password', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;">👁️</span></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;"><input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;"><label for="rememberMe" style="cursor:pointer;">${lang === 'id' ? 'Ingat saya' : '记住我'}</label></div><button onclick="APP.login()" id="loginBtn" class="btn btn--primary btn--block">${Utils.t('login')}</button><p class="login-note">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p></div></div>`;
         },
 
         async login() {
@@ -641,7 +642,7 @@
                 try {
                     if (AUTH.isLoggedIn()) await this.refreshCurrentPage();
                     else await this.renderLogin();
-                } catch (err) { appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Pemulihan gagal, muat ulang halaman.' : '恢复失败，请刷新页面。') + '</p><button onclick="location.reload()" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>'; }
+                } catch (err) { appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Pemulihan gagal, muat ulang halaman.' : '恢复失败，请刷新页面。') + '</p><button onclick="location.reload()" class="btn btn--primary" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>'; }
             }, 100);
         },
 
@@ -673,7 +674,7 @@
             } catch (error) {
                 console.error("Init error:", error);
                 Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat sistem' : '系统加载失败', 5000);
-                document.getElementById("app").innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>' + (Utils.lang === 'id' ? 'Gagal memuat sistem, silakan muat ulang.' : '系统加载失败，请刷新页面。') + '</p><button onclick="location.reload()" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
+                document.getElementById("app").innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>' + (Utils.lang === 'id' ? 'Gagal memuat sistem, silakan muat ulang.' : '系统加载失败，请刷新页面。') + '</p><button onclick="location.reload()" class="btn btn--primary" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
             }
         },
     };
@@ -681,7 +682,6 @@
     // ========== 挂载到命名空间 ==========
     JF.DashboardCore = DashboardCore;
 
-    // ========== 兼容全局 APP 对象 ==========
     if (!window.APP) {
         window.APP = DashboardCore;
     } else {
@@ -714,5 +714,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v3.0 完整版已加载（仪表盘直接渲染，侧边栏关闭优化）');
+    console.log('✅ JF.DashboardCore v3.0 重构版已加载（类名统一）');
 })();
