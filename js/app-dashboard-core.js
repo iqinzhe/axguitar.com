@@ -545,7 +545,6 @@
                         </div>
                         <div class="mid-row">
                             <div class="fund-flow-card">
-                                <div class="card-header"><div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div><div class="card-action" onclick="JF.DashboardCore.navigateTo('paymentHistory')">${lang === 'id' ? 'Lihat Detail →' : '查看明细 →'}</div></div>
                                 <div class="fund-total-row">
                                     <div class="fund-block injected"><div class="fund-block-label">${lang === 'id' ? 'Total Modal Disetor' : '总投入资本'}</div><div class="fund-block-val">${Utils.formatCurrency(injected)}</div><div class="fund-block-sub">${lang === 'id' ? 'Dasar Operasional Gadai' : '典当运营基础'}</div></div>
                                     <div class="fund-block deployed"><div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div><div class="fund-block-val">${Utils.formatCurrency(deployed)}</div><div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div>
