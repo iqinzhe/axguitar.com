@@ -86,7 +86,7 @@
     /* KPI 卡片行 */
     .kpi-row {
         display: grid;
-        grid-template-columns: 1fr 1fr; /* 保持两列，信息精简，可读性尚可 */
+        grid-template-columns: 1fr; /* 保持两列，信息精简，可读性尚可 */
         gap: 12px;
     }
     .kpi-card {
@@ -148,25 +148,8 @@
 
     /* 快捷操作网格保持两列 */
     .quick-grid {
-        grid-template-columns: 1fr 1fr; 
+        grid-template-columns: 4fr; 
         gap: 10px;
     }
 }
 
-/* 极小屏（宽度≤480px）的细微调整 */
-@media (max-width: 480px) {
-    .dash-sidebar {
-        max-width: 85vw; 
-    }
-    
-    .dash-main {
-        padding: 12px 8px !important;
-    }
-    
-    .kpi-card {
-        padding: 12px 10px;
-    }
-    .kpi-val {
-        font-size: 1.2rem;
-    }
-}
