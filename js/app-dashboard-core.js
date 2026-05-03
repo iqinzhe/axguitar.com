@@ -521,7 +521,6 @@
                             <div class="nav-item" onclick="JF.CapitalModule.showCapitalInjectionModal()"><span class="nav-icon">💉</span> ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</div>
                             <div class="nav-item" onclick="JF.ProfitPage.showDistributionPage()"><span class="nav-icon">💸</span> ${lang === 'id' ? 'Distribusi Laba' : '收益处置'}</div>
                             <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
-                            <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
                             <div class="nav-item" onclick="JF.DashboardCore.navigateTo('userManagement')"><span class="nav-icon">👤</span> ${t('user_management')}</div>
                             <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeManagement')"><span class="nav-icon">🏪</span> ${t('store_management')}</div>
                             <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>` : `
