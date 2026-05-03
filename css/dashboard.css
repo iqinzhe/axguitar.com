@@ -798,8 +798,8 @@
         left: 0;
         bottom: 0;
         width: 45vw;
-        min-width: 200px;
-        max-width: 260px;
+        min-width: 180px;
+        max-width: 220px;
         height: 100%;
         background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
         z-index: 1001;
