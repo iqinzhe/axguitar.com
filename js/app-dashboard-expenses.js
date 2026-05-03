@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.1 (JF 命名空间) - 支持外壳渲染
+// app-dashboard-expenses.js - v2.1 (JF 命名空间) - 类名重构
 // 支出管理页面模块，挂载到 JF.ExpensesPage
 
 'use strict';
@@ -50,13 +50,13 @@
                         let actionHtml = '';
                         if (isAdmin) {
                             if (!e.is_reconciled) {
-                                actionHtml += `<button onclick="APP.editExpense('${e.id}')" class="btn-small">✏️ ${t('edit')}</button> `;
-                                actionHtml += `<button class="btn-small danger" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button> `;
+                                actionHtml += `<button onclick="APP.editExpense('${e.id}')" class="btn btn--sm">✏️ ${t('edit')}</button> `;
+                                actionHtml += `<button class="btn btn--danger btn--sm" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button> `;
                             } else {
                                 actionHtml += `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span> `;
                             }
                             if (!e.is_reconciled) {
-                                actionHtml += `<button onclick="APP.balanceExpenses()" class="btn-small warning">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
+                                actionHtml += `<button onclick="APP.balanceExpenses()" class="btn btn--warning btn--sm">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
                             }
                         } else {
                             actionHtml += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
@@ -84,12 +84,12 @@
                     <div class="page-header">
                         <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </div>
                     </div>
                     <div class="card">
-                        <div class="stat-card" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">
+                        <div class="card card--stat" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">
                             <div class="stat-value expense">${Utils.formatCurrency(totalAmount)}</div>
                             <div class="stat-label">${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}</div>
                         </div>
@@ -115,7 +115,7 @@
                     </div>
                     <div class="card">
                         <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增运营支出'}</h3>
-                        <div class="form-grid form-grid-4">
+                        <div class="form-grid form-grid--4">
                             <div class="form-group">
                                 <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
                                 <input type="date" id="expenseDate" value="${todayDate}">
@@ -143,7 +143,7 @@
                                 <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}"></textarea>
                             </div>
                             <div class="form-actions">
-                                <button onclick="APP.addExpense()" class="success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
+                                <button onclick="APP.addExpense()" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
                             </div>
                         </div>
                         <p class="info-note">💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}</p>
@@ -338,5 +338,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.1 初始化完成（支持外壳渲染）');
+    console.log('✅ JF.ExpensesPage v2.1 重构完成（类名统一）');
 })();
