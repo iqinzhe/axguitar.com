@@ -1,7 +1,6 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局（已清理移动端死代码）
-   包含：仪表盘网格、侧边栏、顶栏、KPI卡片、资金卡片等
-   移动端仪表盘与侧边栏样式已移至 mobile-optimize.css
+   dashboard.css - 仪表盘专属布局（v2.3 整合版）
+   包含：桌面端样式 + 手机端仪表盘卡片与侧边栏优化
    =============================*/
 
 /* ==============================
@@ -342,7 +341,7 @@
 }
 
 /* ============================================================
-   六、KPI 卡片行（桌面端）
+   六、KPI 卡片行
    ============================================================ */
 .kpi-row {
     display: grid;
@@ -407,7 +406,7 @@
 .kpi-trend.down { color: #dc2626; }
 
 /* ==============================
-   七、中间行（资金结构 + 收入构成）- 桌面端
+   七、中间行（资金结构 + 收入构成）
    ============================*/
 .mid-row {
     display: grid;
@@ -638,7 +637,7 @@
 }
 
 /* ==============================
-   八、底部行（快捷操作 + 订单分布）- 桌面端
+   八、底部行（快捷操作 + 订单分布）
    ============================*/
 .bottom-row {
     display: grid;
@@ -793,10 +792,10 @@
     }
 }
 
-/* ==============================
-   十一、移动端布局 - 只保留必要的结构状态
-   （仪表盘卡片和侧边栏视觉优化已移至 mobile-optimize.css）
-   ============================*/
+/* ============================================================
+   十一、移动端布局（≤768px）
+   包含：仪表盘卡片单列 + 侧边栏视觉优化 + 交互
+   ============================================================ */
 @media (max-width: 768px) {
     /* 基础容器调整 */
     .dashboard-v2 {
@@ -849,15 +848,17 @@
         cursor: pointer;
     }
     
-    /* 侧边栏交互状态 */
+    /* ---- 侧边栏（移动端）---- */
     .dash-sidebar {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        bottom: 0 !important;
-        width: 72% !important;
-        max-width: 280px;
-        height: 100% !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        /* 宽度缩小，更紧凑 */
+        width: 75vw;
+        max-width: 75vw;
+        height: 100%;
+        background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%); /* 与桌面端统一 */
         z-index: 1001;
         transform: translateX(-100%);
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -865,7 +866,7 @@
         box-shadow: 2px 0 12px rgba(0,0,0,0.15);
     }
     .dash-sidebar.open {
-        transform: translateX(0) !important;
+        transform: translateX(0);
     }
     
     /* 遮罩层 */
@@ -881,31 +882,68 @@
         display: none;
     }
     .sidebar-overlay.active {
-        display: block !important;
+        display: block;
     }
     
-    /* 主内容区滚动 */
+    /* 主内容区 */
     .dash-main {
-        padding: 14px 12px !important;
-        margin-top: 0 !important;
-        overflow-x: visible !important;
-        display: flex !important;
-        flex-direction: column !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+        padding: 14px 12px;
+        margin-top: 0;
+        overflow-x: visible;
+        display: flex;
+        flex-direction: column;
         min-height: calc(100vh - 56px);
     }
     
-    /* 打开侧边栏时锁定 body */
+    /* 锁住 body 防止背景滚动 */
     body.menu-open {
         overflow: hidden;
         position: fixed;
         width: 100%;
     }
+
+    /* ------------------------------
+       仪表盘卡片移动端单列布局
+       ------------------------------ */
+    /* 强制所有资金、收入、底部区域为单列 */
+    .mid-row,
+    .fund-total-row,
+    .cash-bank-row,
+    .bottom-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    /* 收入构成卡片与资金结构之间的视觉区分 */
+    .income-card {
+        margin-top: 10px;
+        border-top: 2px solid var(--border-light);
+        padding-top: 18px;
+    }
+
+    /* 环形图区域改为垂直排列，防止溢出 */
+    .donut-area {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    .donut-legend {
+        width: 100%;
+    }
+
+    /* 转账按钮区域保持弹性，不换行太多 */
+    .transfer-row-v2 {
+        flex-wrap: wrap;
+    }
+
+    /* 快捷操作网格在手机上仍保持两列（如不需要可注释掉） */
+    .quick-grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 /* ==============================
-   十二、小屏手机（≤480px）- 保留基础调整
+   十二、小屏手机额外适配（≤480px）
    ============================*/
 @media (max-width: 480px) {
     .dash-topbar {
@@ -913,6 +951,15 @@
     }
     .dash-main {
         padding: 10px 8px;
+    }
+    .kpi-row {
+        gap: 8px;
+    }
+    .kpi-card {
+        padding: 8px 10px;
+    }
+    .kpi-val {
+        font-size: 1.1rem;
     }
 }
 
