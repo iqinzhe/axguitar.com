@@ -1,6 +1,6 @@
 /* ============================================================
-   responsive.css - 统一响应式与打印样式（已清理死代码）
-   只保留通用组件响应式，仪表盘和侧边栏由 mobile-optimize.css 管理
+   responsive.css - 统一响应式与打印样式（重构版）
+   已适配新版按钮/徽章类名，删除旧选择器
    ============================================================ */
 
 /* ============================================================
@@ -16,16 +16,16 @@
 
     .card h3 { font-size: var(--font-md); }
 
-    .stat-card .stat-value { font-size: var(--font-lg); }
-    .stat-card .stat-label { font-size: var(--font-xs); }
+    .card--stat .stat-value { font-size: var(--font-lg); }
+    .card--stat .stat-label { font-size: var(--font-xs); }
 
     .data-table thead th,
     .data-table tbody td { font-size: var(--font-sm); }
 
-    button,
-    .btn-small { font-size: var(--font-sm); }
+    .btn { font-size: var(--font-sm); }
+    .btn--sm { font-size: var(--font-sm); }   /* 小按钮桌面仍保持 sm 尺寸，也可不额外定义 */
 
-    .toolbar button { font-size: var(--font-sm); }
+    .toolbar .btn { font-size: var(--font-sm); }
 
     .form-group label { font-size: var(--font-sm); }
 
@@ -44,7 +44,6 @@
 
 /* ============================================================
    二、手机端响应式（≤768px）
-   （已删除与仪表盘卡片布局和侧边栏相关的重复样式）
    ============================================================ */
 @media (max-width: 768px) {
     html { font-size: 16px; }
@@ -58,20 +57,20 @@
 
     /* 统计卡片：保持 2 列 */
     .stats-grid,
-    .stats-grid.stats-grid-2,
-    .stats-grid.stats-grid-3,
-    .stats-grid.stats-grid-auto {
+    .stats-grid.stats-grid--2,
+    .stats-grid.stats-grid--3,
+    .stats-grid.stats-grid--auto {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: var(--spacing-2);
     }
 
-    .stat-card {
+    .card--stat {
         min-height: 64px;
         padding: var(--spacing-2) var(--spacing-3);
     }
 
-    .stat-card .stat-value { font-size: var(--font-md); }
-    .stat-card .stat-label { font-size: var(--font-xs); }
+    .card--stat .stat-value { font-size: var(--font-md); }
+    .card--stat .stat-label { font-size: var(--font-xs); }
 
     /* 信息卡片：堆叠 */
     .info-cards-row { flex-direction: column; }
@@ -92,22 +91,30 @@
     .fee-card .fee-card-body select { width: 100%; min-width: auto; }
     .fee-card .fee-card-body input  { width: 100%; text-align: right; }
 
-    /* 按钮 */
-    button,
-    .btn-small {
+    /* 按钮 - 统一缩小，全宽 */
+    .btn {
         font-size: var(--font-xs);
         padding: 8px 14px;
     }
+    .btn--sm {
+        padding: 6px 12px;
+        font-size: 11px;
+    }
 
-    .toolbar button {
+    .toolbar .btn {
         font-size: var(--font-xs);
         overflow: hidden;
         text-overflow: ellipsis;
         padding: var(--spacing-3) var(--spacing-1);
     }
 
-    .btn-action {
-        width: 100% !important;
+    /* 提交类按钮在移动端全宽 */
+    .btn--primary,
+    .btn--success,
+    .btn--warning,
+    .btn--danger,
+    .btn--outline {
+        width: 100%;
         text-align: center;
     }
 
@@ -164,7 +171,7 @@
         padding: 2px 0;
     }
 
-    .action-row .action-buttons .btn-small {
+    .action-row .action-buttons .btn--sm {
         flex-shrink: 0;
         white-space: nowrap;
         padding: 8px 14px;
@@ -179,26 +186,9 @@
         text-overflow: ellipsis;
     }
 
-    .store-table .action-buttons .btn-small {
+    .store-table .action-buttons .btn--sm {
         padding: 6px 10px;
         font-size: 10px;
-    }
-
-    /* 缴费页面按钮 */
-    .action-buttons {
-        flex-direction: row;
-        flex-wrap: nowrap;
-        gap: 12px;
-        overflow-x: auto;
-    }
-
-    .action-buttons .btn-action {
-        flex-shrink: 0;
-        width: auto !important;
-        min-width: 100px;
-        max-width: 140px;
-        font-size: var(--font-xs);
-        padding: 8px 16px;
     }
 
     /* 徽章缩小 */
@@ -247,8 +237,8 @@
 
     /* 表单：单列 */
     .form-grid,
-    .form-grid.form-grid-3,
-    .form-grid.form-grid-4 {
+    .form-grid.form-grid--3,
+    .form-grid.form-grid--4 {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
     }
@@ -297,8 +287,8 @@
     .backup-grid-store { grid-template-columns: 1fr !important; gap: var(--spacing-4); }
 
     /* 门店现金流 */
-    .cashflow-card .cashflow-stats { flex-direction: column; }
-    .cashflow-card .cashflow-item-card { min-width: auto; }
+    .cashflow-stats { flex-direction: column; }
+    .cashflow-item-card { min-width: auto; }
 
     /* 资金流水描述列 */
     .cashflow-table .flow-desc,
@@ -326,15 +316,17 @@
     .summary-grid {
         grid-template-columns: 1fr;
     }
-    .action-buttons .btn-action {
-        min-width: 80px;
+    .btn {
+        width: 100%;
+    }
+    .btn--sm {
         font-size: 10px;
-        padding: 8px 12px;
+        padding: 6px 10px;
     }
 }
 
 /* ============================================================
-   四、打印样式（全系统统一）
+   四、打印样式（全系统统一，仅用 no-print 控制）
    ============================================================ */
 @media print {
     @page {
@@ -354,25 +346,14 @@
         margin: 0 !important;
     }
 
-    /* 隐藏所有交互元素 */
+    /* 隐藏所有含 no-print 类的元素，以及一些已知不需要打印的交互项 */
     .no-print,
-    .page-header .header-actions,
     .toolbar,
-    .btn-print,
-    .btn-back,
-    .btn-export,
-    .btn-balance,
-    .btn-detail,
-    .lang-toggle,
-    .transfer-buttons,
     .action-buttons,
     .action-row,
     .modal-overlay,
     .form-actions,
-    button:not(.print-visible),
-    .hamburger-btn,
-    .refresh-btn-dash,
-    .alert-btn-dash {
+    .lang-toggle {
         display: none !important;
     }
 
@@ -464,7 +445,7 @@
         gap: 6px !important;
     }
 
-    .stat-card {
+    .card--stat {
         flex: 1 1 auto !important;
         min-width: 90px !important;
         border: 1px solid #ccc !important;
@@ -473,18 +454,18 @@
         box-shadow: none !important;
     }
 
-    .stat-card .stat-value {
+    .card--stat .stat-value {
         font-size: 9pt !important;
         font-weight: 600 !important;
         text-align: left !important;
     }
 
-    .stat-card .stat-label {
+    .card--stat .stat-label {
         font-size: 6.5pt !important;
         text-align: left !important;
     }
 
-    .stat-card:hover { transform: none !important; }
+    .card--stat:hover { transform: none !important; }
 
     /* KPI 卡片打印 */
     .kpi-row {
@@ -502,8 +483,8 @@
 
     /* 表单打印 */
     .form-grid,
-    .form-grid.form-grid-3,
-    .form-grid.form-grid-4 {
+    .form-grid.form-grid--3,
+    .form-grid.form-grid--4 {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 8px !important;
     }
@@ -591,6 +572,7 @@
         border-left: 4px solid #999 !important;
     }
 
+    /* 隐藏打印时不需要的按钮（现在按钮已经有 no-print 类，此处保留以防万一） */
     .btn-backup-primary,
     .btn-restore,
     .btn-blacklist,
