@@ -9,7 +9,7 @@
     /* --- 侧边栏 --- */
     .dash-sidebar {
         /* 减小最大宽度，让侧边栏更紧凑 */
-        max-width: 75vw; 
+        max-width: 50vw; 
         /* 保持与桌面端一致的清爽浅色背景 */
         background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
         color: var(--text-primary); /* 确保文字颜色跟随系统变量 */
