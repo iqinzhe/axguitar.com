@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.0 完整稳定版（类名重构 + 移动端侧边栏修复）
+// app-dashboard-core.js - v3.1 修复版（遮罩层清理 + 侧边栏状态修复）
 'use strict';
 
 (function () {
@@ -62,6 +62,36 @@
         currentPage: "dashboard",
         currentOrderId: null,
         currentCustomerId: null,
+
+        // ========== 【修复】清理残留遮罩层 ==========
+        _cleanupOverlays() {
+            // 清理侧边栏遮罩层
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                overlay.style.display = '';
+            }
+            
+            // 清理侧边栏打开状态
+            const sidebar = document.getElementById('dashSidebar');
+            if (sidebar && sidebar.classList.contains('open')) {
+                sidebar.classList.remove('open');
+                document.body.classList.remove('menu-open');
+            }
+            
+            // 清理所有可能残留的模态框
+            const modals = document.querySelectorAll('.modal-overlay');
+            modals.forEach(modal => {
+                // 移除残留的模态框
+                modal.remove();
+            });
+            
+            // 确保 body 可以正常滚动
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            
+            console.log('[DashboardCore] 遮罩层清理完成');
+        },
 
         // ---------- 页面状态持久化 ----------
         saveCurrentPageState() {
@@ -136,7 +166,11 @@
             mainEl.scrollTop = 0;
         },
 
+        // ========== 【修复】刷新当前页面时先清理遮罩层 ==========
         async refreshCurrentPage() {
+            // 清理残留的遮罩层
+            this._cleanupOverlays();
+            
             await this._ensureShell();
             await this._updateSidebarActive();
 
@@ -148,7 +182,7 @@
 
             let contentHtml = '<div class="card"><p>' + (Utils.lang === 'id' ? 'Memuat...' : '加载中...') + '</p></div>';
             try {
-                // 各页面路由逻辑（与重构版完全一致，此处省略具体 if-else，保证完整）
+                // 各页面路由逻辑
                 if (page === 'orderTable') {
                     if (JF.OrdersPage && typeof JF.OrdersPage.buildOrderTableHTML === 'function') {
                         contentHtml = await JF.OrdersPage.buildOrderTableHTML({ status: this.currentFilter }, 0, 50);
@@ -261,7 +295,6 @@
             const sidebar = document.getElementById('dashSidebar');
             const overlay = document.getElementById('sidebarOverlay');
             if (!sidebar) return;
-            // 不再设置任何宽度内联样式
             const isOpen = sidebar.classList.contains('open');
             if (isOpen) {
                 sidebar.classList.remove('open');
@@ -297,8 +330,11 @@
             this.refreshCurrentPage();
         },
 
-        // ========== 路由和导航（不变） ==========
+        // ========== 路由和导航 ==========
         navigateTo(page, params) {
+            // 【修复】导航前清理遮罩层
+            this._cleanupOverlays();
+            
             window.scrollTo(0, 0);
             this.historyStack.push({
                 page: this.currentPage,
@@ -319,6 +355,9 @@
         },
 
         goBack() {
+            // 【修复】返回前清理遮罩层
+            this._cleanupOverlays();
+            
             if (this.historyStack.length > 0) {
                 const prev = this.historyStack.pop();
                 this.currentPage = prev.page;
@@ -336,6 +375,9 @@
         async originalRenderDashboard() {
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
+            
+            // 【修复】渲染前清理残留的遮罩层
+            this._cleanupOverlays();
 
             try {
                 const lang = Utils.lang;
@@ -485,7 +527,6 @@
                 ];
                 const incomeItemsHtml = incomeItems.map(item => `<div class="income-item"><div class="income-dot" style="background:${item.dot}"></div><div><div class="income-name">${item.label}</div><div class="income-sub">${item.sub}</div></div><div class="income-amt${item.cls === 'expense' ? ' expense' : ''}">${item.cls === 'expense' ? '−' : ''}${Utils.formatCurrency(item.amt)}</div></div>`).join('');
 
-                // 最终 HTML 无内联宽度
                 const finalHtml = `
                 <div class="dashboard-v2">
                     <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
@@ -567,6 +608,9 @@
         async renderDashboard() {
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
+            // 【修复】渲染前清理遮罩层
+            this._cleanupOverlays();
+            
             if (!document.querySelector('.dashboard-v2')) {
                 await this.originalRenderDashboard();
             } else {
@@ -577,6 +621,9 @@
         async renderLogin() {
             this.currentPage = 'login';
             this.clearPageState();
+            // 【修复】登录页面也清理遮罩层
+            this._cleanupOverlays();
+            
             const lang = Utils.lang;
             document.getElementById("app").innerHTML = `
                 <div class="login-container"><div class="login-box"><div class="lang-toggle"><button onclick="APP.toggleLanguage()" class="btn btn--outline">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button></div><div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;"><img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;"><h2 class="login-title" style="margin:0;">JF! by Gadai</h2></div><h3>${Utils.t('login')}</h3><div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;"><span class="info-bar-icon">⚠️</span><div class="info-bar-content" id="loginErrorMessage"></div></div><div class="form-group"><label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label><input id="username" placeholder="email@domain.com" autocomplete="username"></div><div class="form-group" style="position:relative;"><label>${Utils.t('password')}</label><input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password"><span onclick="Utils.togglePasswordVisibility('password', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;">👁️</span></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;"><input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;"><label for="rememberMe" style="cursor:pointer;">${lang === 'id' ? 'Ingat saya' : '记住我'}</label></div><button onclick="APP.login()" id="loginBtn" class="btn btn--primary btn--block">${Utils.t('login')}</button><p class="login-note">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p></div></div>`;
@@ -701,5 +748,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v3.0 完整版已加载（侧边栏宽度由CSS控制）');
+    console.log('✅ JF.DashboardCore v3.1 修复版已加载（遮罩层清理 + 侧边栏状态修复）');
 })();
