@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.1 (JF 命名空间) - 类名重构
+// app-dashboard-expenses.js - v2.2 (修复版：支出编辑/删除同步现金流)
 // 支出管理页面模块，挂载到 JF.ExpensesPage
 
 'use strict';
@@ -62,7 +62,7 @@
                             actionHtml += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
                         }
 
-                        rows += `<tr>
+                        rows += `</table>
                             <td class="date-cell">${Utils.formatDate(e.expense_date)}</td>
                             <td class="expense-category">${Utils.escapeHtml(e.category)}</td>
                             <td class="amount">${Utils.formatCurrency(e.amount)}</td>
@@ -203,7 +203,7 @@
             }
         },
 
-        // 编辑支出（管理员）
+        // ==================== 【修复 Bug 3】编辑支出（管理员）- 同步更新现金流 ====================
         async editExpense(expenseId) {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -220,19 +220,144 @@
                     Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
                     return;
                 }
-                const newAmount = prompt(lang === 'id' ? 'Masukkan jumlah baru:' : '请输入新金额:', expense.amount);
-                if (newAmount && !isNaN(parseFloat(newAmount))) {
-                    await client.from('expenses').update({ amount: parseFloat(newAmount) }).eq('id', expenseId);
-                    Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
-                    await ExpensesPage.showExpenses();
-                }
+                
+                // 创建编辑弹窗，使用更友好的表单而不是简单的 prompt
+                const oldModal = document.getElementById('editExpenseModal');
+                if (oldModal) oldModal.remove();
+                
+                const modalHtml = `
+                    <div id="editExpenseModal" class="modal-overlay">
+                        <div class="modal-content" style="max-width: 450px;">
+                            <h3>✏️ ${lang === 'id' ? 'Edit Pengeluaran' : '编辑支出'}</h3>
+                            <div class="form-group">
+                                <label>📅 ${lang === 'id' ? 'Tanggal' : '日期'}</label>
+                                <input type="date" id="editExpenseDate" value="${expense.expense_date}" style="width:100%;padding:8px;border-radius:6px;">
+                            </div>
+                            <div class="form-group">
+                                <label>📝 ${lang === 'id' ? 'Kategori' : '类别'}</label>
+                                <input type="text" id="editExpenseCategory" value="${Utils.escapeHtml(expense.category)}" style="width:100%;padding:8px;border-radius:6px;">
+                            </div>
+                            <div class="form-group">
+                                <label>💰 ${lang === 'id' ? 'Jumlah' : '金额'}</label>
+                                <input type="text" id="editExpenseAmount" class="amount-input" value="${Utils.formatNumberWithCommas(expense.amount)}" style="width:100%;padding:8px;border-radius:6px;">
+                            </div>
+                            <div class="form-group">
+                                <label>💬 ${lang === 'id' ? 'Deskripsi' : '描述'}</label>
+                                <textarea id="editExpenseDescription" rows="2" style="width:100%;border-radius:6px;">${Utils.escapeHtml(expense.description || '')}</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>🏦 ${lang === 'id' ? 'Metode Pembayaran' : '支付方式'}</label>
+                                <select id="editExpenseMethod" style="width:100%;padding:8px;border-radius:6px;">
+                                    <option value="cash" ${expense.payment_method === 'cash' ? 'selected' : ''}>🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</option>
+                                    <option value="bank" ${expense.payment_method === 'bank' ? 'selected' : ''}>🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</option>
+                                </select>
+                            </div>
+                            <div class="modal-actions" style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
+                                <button onclick="APP.saveEditedExpense('${expenseId}')" id="saveEditExpenseBtn" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan' : '保存'}</button>
+                                <button onclick="APP.closeEditExpenseModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                
+                // 绑定金额格式化
+                const amountInput = document.getElementById('editExpenseAmount');
+                if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+                
             } catch (error) {
                 console.error("editExpense error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
             }
         },
+        
+        // 关闭编辑支出弹窗
+        closeEditExpenseModal: function() {
+            const modal = document.getElementById('editExpenseModal');
+            if (modal) modal.remove();
+        },
+        
+        // 【修复 Bug 3】保存编辑后的支出 - 使用 SUPABASE.updateExpenseWithCashFlow
+        saveEditedExpense: async function(expenseId) {
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            if (!isAdmin) {
+                Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
+                return;
+            }
+            
+            const expenseDate = document.getElementById('editExpenseDate')?.value;
+            const category = document.getElementById('editExpenseCategory')?.value.trim();
+            const amountStr = document.getElementById('editExpenseAmount')?.value || '0';
+            const amount = Utils.parseNumberFromCommas(amountStr);
+            const description = document.getElementById('editExpenseDescription')?.value.trim();
+            const paymentMethod = document.getElementById('editExpenseMethod')?.value;
+            
+            if (!category) {
+                Utils.toast.warning(lang === 'id' ? 'Kategori harus diisi' : '类别必须填写');
+                return;
+            }
+            
+            if (amount <= 0) {
+                Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
+                return;
+            }
+            
+            const saveBtn = document.getElementById('saveEditExpenseBtn');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
+            }
+            
+            try {
+                // 获取原支出记录以获取旧金额
+                const client = SUPABASE.getClient();
+                const { data: oldExpense, error: fetchError } = await client
+                    .from('expenses').select('amount, payment_method, category').eq('id', expenseId).single();
+                if (fetchError) throw fetchError;
+                
+                // 构建更新对象
+                const updates = {
+                    expense_date: expenseDate,
+                    category: category,
+                    amount: amount,
+                    description: description || null,
+                    payment_method: paymentMethod,
+                    updated_at: Utils.getLocalDateTime()
+                };
+                
+                // 使用新增的方法同步更新现金流
+                await SUPABASE.updateExpenseWithCashFlow(expenseId, updates);
+                
+                const amountChanged = oldExpense.amount !== amount;
+                if (amountChanged) {
+                    const diff = amount - oldExpense.amount;
+                    const diffText = diff > 0 
+                        ? `${lang === 'id' ? 'naik' : '增加'} ${Utils.formatCurrency(diff)}`
+                        : `${lang === 'id' ? 'turun' : '减少'} ${Utils.formatCurrency(Math.abs(diff))}`;
+                    Utils.toast.success(lang === 'id' 
+                        ? `✅ Pengeluaran berhasil diubah (${diffText})`
+                        : `✅ 支出已修改 (${diffText})`);
+                } else {
+                    Utils.toast.success(lang === 'id' ? '✅ Pengeluaran berhasil diubah' : '✅ 支出已修改');
+                }
+                
+                ExpensesPage.closeEditExpenseModal();
+                await ExpensesPage.showExpenses();
+                
+            } catch (error) {
+                console.error("saveEditedExpense error:", error);
+                Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = lang === 'id' ? 'Simpan' : '保存';
+                }
+            }
+        },
 
-        // 删除支出（管理员）
+        // ==================== 【修复 Bug 3】删除支出（管理员）- 同步删除现金流 ====================
         async deleteExpense(expenseId) {
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
@@ -240,12 +365,34 @@
                 Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
                 return;
             }
-            const confirmed = await Utils.toast.confirm(lang === 'id' ? 'Hapus pengeluaran ini?' : '删除此支出记录？');
+            
+            // 先获取支出信息用于显示确认
+            const client = SUPABASE.getClient();
+            const { data: expense, error: fetchError } = await client
+                .from('expenses').select('category, amount, is_reconciled').eq('id', expenseId).single();
+            
+            if (fetchError) {
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat data pengeluaran' : '加载支出数据失败');
+                return;
+            }
+            
+            if (expense.is_reconciled) {
+                Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat dihapus' : '支出已平账，不可删除');
+                return;
+            }
+            
+            const confirmMsg = lang === 'id'
+                ? `⚠️ Hapus pengeluaran ini?\n\nKategori: ${expense.category}\nJumlah: ${Utils.formatCurrency(expense.amount)}\n\nData terkait di arus kas juga akan dihapus.`
+                : `⚠️ 删除此支出记录？\n\n类别: ${expense.category}\n金额: ${Utils.formatCurrency(expense.amount)}\n\n关联的现金流记录也将被删除。`;
+            
+            const confirmed = await Utils.toast.confirm(confirmMsg);
             if (!confirmed) return;
+            
             try {
-                const client = SUPABASE.getClient();
-                await client.from('expenses').delete().eq('id', expenseId);
-                Utils.toast.success(lang === 'id' ? 'Pengeluaran dihapus' : '支出已删除');
+                // 使用新增的方法同步删除现金流
+                await SUPABASE.deleteExpenseWithCashFlow(expenseId);
+                
+                Utils.toast.success(lang === 'id' ? '✅ Pengeluaran dan arus kas terkait telah dihapus' : '✅ 支出及关联现金流已删除');
                 await ExpensesPage.showExpenses();
             } catch (error) {
                 console.error("deleteExpense error:", error);
@@ -253,7 +400,7 @@
             }
         },
 
-        // 平账（管理员）
+        // 平账（管理员）- 保持不变
         async balanceExpenses() {
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
@@ -326,6 +473,8 @@
         window.APP.showExpenses = ExpensesPage.showExpenses.bind(ExpensesPage);
         window.APP.addExpense = ExpensesPage.addExpense.bind(ExpensesPage);
         window.APP.editExpense = ExpensesPage.editExpense.bind(ExpensesPage);
+        window.APP.saveEditedExpense = ExpensesPage.saveEditedExpense.bind(ExpensesPage);
+        window.APP.closeEditExpenseModal = ExpensesPage.closeEditExpenseModal.bind(ExpensesPage);
         window.APP.deleteExpense = ExpensesPage.deleteExpense.bind(ExpensesPage);
         window.APP.balanceExpenses = ExpensesPage.balanceExpenses.bind(ExpensesPage);
     } else {
@@ -333,10 +482,12 @@
             showExpenses: ExpensesPage.showExpenses.bind(ExpensesPage),
             addExpense: ExpensesPage.addExpense.bind(ExpensesPage),
             editExpense: ExpensesPage.editExpense.bind(ExpensesPage),
+            saveEditedExpense: ExpensesPage.saveEditedExpense.bind(ExpensesPage),
+            closeEditExpenseModal: ExpensesPage.closeEditExpenseModal.bind(ExpensesPage),
             deleteExpense: ExpensesPage.deleteExpense.bind(ExpensesPage),
             balanceExpenses: ExpensesPage.balanceExpenses.bind(ExpensesPage),
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.1 重构完成（类名统一）');
+    console.log('✅ JF.ExpensesPage v2.2 修复完成（支出编辑/删除同步现金流）');
 })();
