@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
+// app-dashboard-anomaly.js - v2.1 (JF 命名空间) - 类名重构
 // 异常检测页面模块，挂载到 JF.AnomalyPage
 
 'use strict';
@@ -97,7 +97,6 @@
             let eligibleStores = Object.values(storeStats);
             if (eligibleStores.length === 0) return { top3: [], bottom3: [] };
 
-            // 计算综合排名（多维度加权）
             const rankByField = (field, asc = true) => {
                 eligibleStores.sort((a, b) => asc ? a[field] - b[field] : b[field] - a[field]);
                 for (let i = 0; i < eligibleStores.length; i++) {
@@ -171,12 +170,12 @@
                             <td>${Utils.escapeHtml(o.customer_name)}</td>
                             <td class="text-center expense">${o.overdue_days || 0}</td>
                             <td class="amount">${Utils.formatCurrency(o.loan_amount)}</td>
-                            <td class="text-center"><button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">${lang === 'id' ? 'Lihat' : '查看'}</button></td>
+                            <td class="text-center"><button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm">${lang === 'id' ? 'Lihat' : '查看'}</button></td>
                         </tr>`;
                     }
                     let loadMoreHtml = '';
                     if (overdueTotalCount > overdueOrders.length) {
-                        loadMoreHtml = `<tr id="overdueLoadMoreRow"><td colspan="5" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreOverdueOrders()" class="btn-small primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${overdueTotalCount - overdueOrders.length} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
+                        loadMoreHtml = `<tr id="overdueLoadMoreRow"><td colspan="5" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreOverdueOrders()" class="btn btn--sm btn--primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${overdueTotalCount - overdueOrders.length} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
                     }
                     return `<div class="table-container"><table class="data-table anomaly-table"><thead><tr><th class="col-id">${lang === 'id' ? 'ID Pesanan' : '订单号'}</th><th class="col-name">${lang === 'id' ? 'Nama Nasabah' : '客户姓名'}</th><th class="col-months text-center">${lang === 'id' ? 'Hari Terlambat' : '逾期天数'}</th><th class="col-amount amount">${lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额'}</th><th class="text-center" style="width:60px;">${lang === 'id' ? 'Aksi' : '操作'}</th></tr></thead><tbody>${rows}${loadMoreHtml}</tbody></table></div>`;
                 };
@@ -192,7 +191,7 @@
                     }
                     let loadMoreHtml = '';
                     if (blacklistTotalCount > blacklist.length) {
-                        loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn-small primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${blacklistTotalCount - blacklist.length} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
+                        loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn btn--sm btn--primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${blacklistTotalCount - blacklist.length} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
                     }
                     return `<div class="table-container"><table class="data-table anomaly-table"><thead><tr><th class="col-id">${lang === 'id' ? 'ID Nasabah' : '客户ID'}</th><th class="col-name">${lang === 'id' ? 'Nama' : '姓名'}</th><th class="col-phone">${lang === 'id' ? 'Telepon' : '电话'}</th><th>${lang === 'id' ? 'Alasan' : '原因'}</th></tr></thead><tbody>${rows}${loadMoreHtml}</tbody></table></div>`;
                 };
@@ -259,7 +258,7 @@
                 }
 
                 const content = `
-                    <div class="page-header"><h2>⚠️ ${t('anomaly_title')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button><button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${t('print')}</button></div></div>
+                    <div class="page-header"><h2>⚠️ ${t('anomaly_title')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button></div></div>
                     ${contentGrid}`;
 
                 // 保存状态，供加载更多功能使用
@@ -301,7 +300,7 @@
                 const result = await AnomalyPage._getOverdueOrders(state.profile, nextPage, state.pageSize);
                 let newRows = '';
                 for (const o of result.data) {
-                    newRows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td>${Utils.escapeHtml(o.customer_name)}</td><td class="text-center expense">${o.overdue_days || 0}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="text-center"><button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn-small">${lang === 'id' ? 'Lihat' : '查看'}</button></td></tr>`;
+                    newRows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td>${Utils.escapeHtml(o.customer_name)}</td><td class="text-center expense">${o.overdue_days || 0}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="text-center"><button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm">${lang === 'id' ? 'Lihat' : '查看'}</button></td></tr>`;
                 }
                 const oldRow = document.getElementById('overdueLoadMoreRow');
                 if (oldRow) oldRow.remove();
@@ -312,7 +311,7 @@
                     state.totalCount = result.totalCount;
                     const loadedCount = (nextPage + 1) * state.pageSize;
                     if (result.totalCount > loadedCount) {
-                        const loadMoreHtml = `<tr id="overdueLoadMoreRow"><td colspan="5" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreOverdueOrders()" class="btn-small primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${result.totalCount - loadedCount} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
+                        const loadMoreHtml = `<tr id="overdueLoadMoreRow"><td colspan="5" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreOverdueOrders()" class="btn btn--sm btn--primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${result.totalCount - loadedCount} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
                         tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
                     } else {
                         tbody.insertAdjacentHTML('beforeend', `<tr id="overdueLoadMoreRow"><td colspan="5" style="text-align:center;padding:10px;color:var(--text-muted);">✅ ${lang === 'id' ? `Semua ${result.totalCount} pesanan telah dimuat` : `已加载全部 ${result.totalCount} 条订单`}</td></tr>`);
@@ -348,7 +347,7 @@
                     state.totalCount = result.totalCount;
                     const loadedCount = (nextPage + 1) * state.pageSize;
                     if (result.totalCount > loadedCount) {
-                        const loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn-small primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${result.totalCount - loadedCount} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
+                        const loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn btn--sm btn--primary" style="padding:8px 24px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${result.totalCount - loadedCount} ${lang === 'id' ? 'tersisa' : '剩余'})</button></td></tr>`;
                         tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
                     } else {
                         tbody.insertAdjacentHTML('beforeend', `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;color:var(--text-muted);">✅ ${lang === 'id' ? `Semua ${result.totalCount} data telah dimuat` : `已加载全部 ${result.totalCount} 条数据`}</td></tr>`);
@@ -385,5 +384,5 @@
         };
     }
 
-    console.log('✅ JF.AnomalyPage v2.1 初始化完成（支持外壳渲染，完整版）');
+    console.log('✅ JF.AnomalyPage v2.1 重构完成（类名统一）');
 })();
