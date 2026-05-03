@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
+// app-dashboard-users.js - v2.1 (JF 命名空间) - 类名重构
 // 用户管理页面模块，挂载到 JF.UsersPage
 
 'use strict';
@@ -49,9 +49,9 @@
                                 <option value="store_manager"${u.role === 'store_manager' ? ' selected' : ''}>${lang === 'id' ? 'Manajer Toko' : '店长'}</option>
                                 <option value="staff"${u.role === 'staff' ? ' selected' : ''}>${lang === 'id' ? 'Staf' : '员工'}</option>
                             </select>`;
-                            actionButtons += `<button onclick="APP.editUser('${u.id}')" class="btn-small">✏️ ${t('edit')}</button>`;
-                            actionButtons += `<button onclick="APP.resetUserPassword('${u.id}', '${Utils.escapeAttr(u.name)}')" class="btn-small warning">🔑 ${lang === 'id' ? 'Reset Password' : '重置密码'}</button>`;
-                            actionButtons += `<button onclick="APP.deleteUser('${u.id}')" class="btn-small danger">🗑️ ${t('delete')}</button>`;
+                            actionButtons += `<button onclick="APP.editUser('${u.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>`;
+                            actionButtons += `<button onclick="APP.resetUserPassword('${u.id}', '${Utils.escapeAttr(u.name)}')" class="btn btn--sm btn--warning">🔑 ${lang === 'id' ? 'Reset Password' : '重置密码'}</button>`;
+                            actionButtons += `<button onclick="APP.deleteUser('${u.id}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
                         } else if (AUTH.user && u.id === AUTH.user.id) {
                             actionButtons += `<span style="color:var(--primary);font-weight:600;">👤 ${lang === 'id' ? 'Pengguna saat ini' : '当前用户'}</span>`;
                         } else {
@@ -73,8 +73,8 @@
                     <div class="page-header">
                         <h2>👥 ${lang === 'id' ? 'Manajemen Peran' : '角色管理'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${t('print')}</button>
+                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button>
                         </div>
                     </div>
                     <div class="card">
@@ -96,7 +96,7 @@
                     </div>
                     <div class="card">
                         <h3>${lang === 'id' ? 'Tambah Peran Baru' : '新增角色'}</h3>
-                        <div class="form-grid form-grid-3">
+                        <div class="form-grid form-grid--3">
                             <div class="form-group">
                                 <label>${lang === 'id' ? 'Akun Login (Email)' : '登录账户（邮箱）'} *</label>
                                 <input id="newUsername" placeholder="email@domain.com">
@@ -130,7 +130,7 @@
                                 <div class="form-hint">${lang === 'id' ? 'Kosongkan untuk akun pusat (admin tidak dapat ditambah)' : '留空表示总部账号（不可添加管理员）'}</div>
                             </div>
                             <div class="form-actions">
-                                <button onclick="APP.addUser()" class="success">➕ ${lang === 'id' ? 'Tambah Peran' : '添加角色'}</button>
+                                <button onclick="APP.addUser()" class="btn btn--success">➕ ${lang === 'id' ? 'Tambah Peran' : '添加角色'}</button>
                             </div>
                         </div>
                     </div>`;
@@ -238,8 +238,8 @@
                             <select id="editUserStoreId">${storeOptions}</select>
                         </div>
                         <div class="modal-actions">
-                            <button onclick="APP._saveEditUser('${userId}')" class="success">💾 ${t('save')}</button>
-                            <button onclick="document.getElementById('editUserModal').remove()" class="btn-back">✖ ${t('cancel')}</button>
+                            <button onclick="APP._saveEditUser('${userId}')" class="btn btn--success">💾 ${t('save')}</button>
+                            <button onclick="document.getElementById('editUserModal').remove()" class="btn btn--outline">✖ ${t('cancel')}</button>
                         </div>
                     </div>`;
                 document.body.appendChild(modal);
@@ -349,5 +349,5 @@
         };
     }
 
-    console.log('✅ JF.UsersPage v2.1 初始化完成（支持外壳渲染，完整版）');
+    console.log('✅ JF.UsersPage v2.1 重构完成（类名统一）');
 })();
