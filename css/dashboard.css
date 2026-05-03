@@ -1,8 +1,8 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局
+   dashboard.css - 仪表盘专属布局（已清理移动端死代码）
    包含：仪表盘网格、侧边栏、顶栏、KPI卡片、资金卡片等
-   v2.2 - 统一字号层级 + 收紧内边距 + 增强对比度 + 侧边栏文字加深
-============================*/
+   移动端仪表盘与侧边栏样式已移至 mobile-optimize.css
+   =============================*/
 
 /* ==============================
    一、基础变量覆盖
@@ -39,7 +39,7 @@
 }
 
 /* ==============================
-   三、侧边栏（保持背景，文字加深）
+   三、侧边栏（桌面端）
    ============================*/
 .dash-sidebar {
     grid-area: sidebar;
@@ -79,7 +79,6 @@
     flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(14, 116, 144, 0.4);
 }
-/* Logo 文字：从白色改为深蓝灰，与"典当管理系统"一致 */
 .logo-text {
     font-size: 0.95rem;
     font-weight: 700;
@@ -115,14 +114,12 @@
     color: #fff;
     flex-shrink: 0;
 }
-/* 用户名：加深为深蓝灰 */
 .user-name {
     font-size: 0.8rem;
     font-weight: 600;
     color: #1e293b;
     margin: 0;
 }
-/* 角色：加深 */
 .user-role {
     font-size: 0.65rem;
     color: #475569;
@@ -148,7 +145,6 @@
     flex-direction: column;
     gap: 1px;
 }
-/* 导航分类标签：加深 */
 .nav-section-label {
     font-size: 0.6rem;
     font-weight: 700;
@@ -158,7 +154,6 @@
     padding: 3px 3px 3px;
     margin: 0;
 }
-/* 导航项普通态：深蓝灰 */
 .nav-item {
     display: flex;
     align-items: center;
@@ -334,7 +329,7 @@
 }
 
 /* ==============================
-   五、主内容区（内边距收紧）
+   五、主内容区
    ============================*/
 .dash-main {
     grid-area: main;
@@ -347,7 +342,7 @@
 }
 
 /* ============================================================
-   六、KPI 卡片行（字号层级统一 + 内边距收紧）
+   六、KPI 卡片行（桌面端）
    ============================================================ */
 .kpi-row {
     display: grid;
@@ -384,10 +379,8 @@
 .kpi-card.amber::before  { background: linear-gradient(90deg, #d97706, #f59e0b); }
 .kpi-card.green::before  { background: linear-gradient(90deg, #15803d, #16a34a); }
 
-/* 图标 */
 .kpi-icon { font-size: 16px; margin-bottom: 1px; }
 
-/* 大数值：1.25rem */
 .kpi-val {
     font-size: 1.25rem;
     font-weight: 700;
@@ -398,7 +391,6 @@
 .kpi-val.green  { color: #15803d; }
 .kpi-val.amber  { color: #b45309; }
 
-/* 标签：0.75rem，颜色加深 */
 .kpi-label {
     font-size: 0.75rem;
     font-weight: 600;
@@ -406,7 +398,6 @@
     color: #475569;
 }
 
-/* 辅助：0.65rem */
 .kpi-trend {
     font-size: 0.65rem;
     font-weight: 600;
@@ -416,7 +407,7 @@
 .kpi-trend.down { color: #dc2626; }
 
 /* ==============================
-   七、中间行（资金结构 + 收入构成）- 间距收紧
+   七、中间行（资金结构 + 收入构成）- 桌面端
    ============================*/
 .mid-row {
     display: grid;
@@ -460,7 +451,6 @@
 .fund-block.deployed  { background: #fef9c3; border: 1px solid #fde047; }
 .fund-block.free      { background: #dcfce7; border: 1px solid #86efac; }
 
-/* 标签：0.65rem，颜色加深，字重 600 */
 .fund-block-label {
     font-size: 0.65rem;
     font-weight: 600;
@@ -471,7 +461,6 @@
 .fund-block.deployed  .fund-block-label { color: #475569; }
 .fund-block.free      .fund-block-label { color: #475569; }
 
-/* 大数值：1.25rem */
 .fund-block-val {
     font-size: 1.25rem;
     font-weight: 700;
@@ -482,7 +471,6 @@
 .fund-block.deployed  .fund-block-val { color: #78350f; }
 .fund-block.free      .fund-block-val { color: #14532d; }
 
-/* 辅助：0.65rem */
 .fund-block-sub {
     font-size: 0.65rem;
     color: #64748b;
@@ -534,7 +522,6 @@
     flex-direction: column;
     gap: 3px;
 }
-/* 标签：与 .fund-block-label 统一（0.65rem / 600 / #475569） */
 .cb-label {
     font-size: 0.65rem;
     color: #475569;
@@ -543,7 +530,6 @@
     align-items: center;
     gap: 6px;
 }
-/* 大数值：与 .fund-block-val 统一（1.25rem / 700） */
 .cb-val {
     font-size: 1.25rem;
     font-weight: 700;
@@ -551,7 +537,6 @@
     color: #0c1929;
     margin: 2px 0;
 }
-/* 辅助：与 .fund-block-sub 统一（0.65rem） */
 .cb-flow {
     font-size: 0.65rem;
     color: #64748b;
@@ -605,14 +590,12 @@
     border-radius: 50%;
     flex-shrink: 0;
 }
-/* 中等：0.875rem */
 .income-name {
     font-size: 0.875rem;
     color: #1e3a52;
     font-weight: 500;
     flex: 1;
 }
-/* 大数值：1.25rem */
 .income-amt {
     font-size: 1.25rem;
     font-weight: 700;
@@ -620,7 +603,6 @@
     color: #15803d;
 }
 .income-amt.expense { color: #b91c1c; }
-/* 辅助：0.65rem */
 .income-sub {
     font-size: 0.65rem;
     color: #64748b;
@@ -638,19 +620,16 @@
     align-items: center;
     margin-top: 10px;
 }
-/* 标签：0.75rem */
 .np-label {
     font-size: 0.75rem;
     font-weight: 600;
     color: #0c4a6e;
 }
-/* 辅助：0.6rem */
 .np-sub {
     font-size: 0.6rem;
     color: #475569;
     margin-top: 2px;
 }
-/* 大数值：1.25rem */
 .np-val {
     font-size: 1.25rem;
     font-weight: 700;
@@ -659,7 +638,7 @@
 }
 
 /* ==============================
-   八、底部行（快捷操作 + 订单分布）- 间距收紧
+   八、底部行（快捷操作 + 订单分布）- 桌面端
    ============================*/
 .bottom-row {
     display: grid;
@@ -723,7 +702,6 @@
 .qb-icon {
     font-size: 17px;
 }
-/* 标签：0.75rem */
 .qb-label {
     font-size: 0.75rem;
     font-weight: 600;
@@ -760,20 +738,17 @@
     border-radius: 50%;
     flex-shrink: 0;
 }
-/* 标签：0.75rem */
 .legend-name {
     font-size: 0.75rem;
     color: #1f2937;
     flex: 1;
 }
-/* 大数值：1.25rem */
 .legend-count {
     font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
     color: #1a1a2e;
 }
-/* 辅助：0.65rem */
 .legend-pct {
     font-size: 0.65rem;
     color: #64748b;
@@ -781,7 +756,7 @@
 }
 
 /* ===========================
-   九、侧边栏遮罩（移动端）
+   九、侧边栏遮罩
    ============================*/
 .sidebar-overlay {
     display: none;
@@ -819,10 +794,11 @@
 }
 
 /* ==============================
-   十一、移动端全面优化（≤768px）
+   十一、移动端布局 - 只保留必要的结构状态
+   （仪表盘卡片和侧边栏视觉优化已移至 mobile-optimize.css）
    ============================*/
 @media (max-width: 768px) {
-    /* 基础容器 */
+    /* 基础容器调整 */
     .dashboard-v2 {
         margin: -8px;
         width: calc(100% + 16px);
@@ -861,7 +837,7 @@
         min-width: 0;
     }
     
-    /* 汉堡按钮 */
+    /* 汉堡按钮显示 */
     .hamburger-btn {
         display: flex !important;
         width: 40px;
@@ -873,7 +849,7 @@
         cursor: pointer;
     }
     
-    /* 侧边栏 */
+    /* 侧边栏交互状态 */
     .dash-sidebar {
         position: fixed !important;
         top: 0 !important;
@@ -882,7 +858,6 @@
         width: 72% !important;
         max-width: 280px;
         height: 100% !important;
-        background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
         z-index: 1001;
         transform: translateX(-100%);
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -891,57 +866,6 @@
     }
     .dash-sidebar.open {
         transform: translateX(0) !important;
-    }
-    
-    /* 侧边栏内容 */
-    .sidebar-logo {
-        padding: 16px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .logo-text {
-        color: #64748b !important;
-    }
-    .sidebar-user {
-        padding: 12px 16px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .user-name {
-        color: #1e293b !important;
-        font-size: 0.8rem;
-    }
-    
-    /* 导航菜单 */
-    .sidebar-nav {
-        padding: 6px 8px !important;
-        gap: 0px !important;
-    }
-    .nav-section-label {
-        font-size: 0.65rem !important;
-        padding: 8px 8px 4px !important;
-        color: #475569 !important;
-        letter-spacing: 0.5px;
-    }
-    .nav-item {
-        padding: 6px 12px !important;
-        margin: 2px 0 !important;
-        font-size: 0.85rem !important;
-        border-radius: 8px;
-        color: #334155 !important;
-    }
-    .nav-icon {
-        font-size: 15px !important;
-        width: 22px;
-    }
-    
-    /* 侧边栏底部 */
-    .sidebar-footer {
-        padding: 12px 16px !important;
-        border-top: 1px solid rgba(255,255,255,0.1);
-    }
-    .lang-btn-side {
-        padding: 6px 12px !important;
-        font-size: 0.75rem !important;
-        color: #475569 !important;
     }
     
     /* 遮罩层 */
@@ -960,7 +884,7 @@
         display: block !important;
     }
     
-    /* 主内容区 */
+    /* 主内容区滚动 */
     .dash-main {
         padding: 14px 12px !important;
         margin-top: 0 !important;
@@ -970,58 +894,6 @@
         visibility: visible !important;
         opacity: 1 !important;
         min-height: calc(100vh - 56px);
-        cursor: pointer;
-    }
-    
-    /* 仪表盘卡片文字大小 */
-    .kpi-row {
-        gap: 10px;
-    }
-    .kpi-card {
-        padding: 12px;
-    }
-    .kpi-val {
-        font-size: 1.35rem;
-    }
-    .kpi-label {
-        font-size: 0.7rem;
-    }
-    .kpi-icon {
-        font-size: 16px;
-    }
-    
-    /* 资金结构 */
-    .mid-row {
-        gap: 12px;
-    }
-    .fund-flow-card, .income-card {
-        padding: 14px;
-    }
-    .fund-block-val {
-        font-size: 0.9rem;
-    }
-    .fund-block-label {
-        font-size: 0.6rem;
-    }
-    
-    /* 底部行 */
-    .bottom-row {
-        gap: 12px;
-    }
-    .quick-card, .order-status-card {
-        padding: 14px;
-    }
-    .quick-btn {
-        padding: 8px 6px;
-    }
-    .qb-label {
-        font-size: 0.7rem;
-    }
-    
-    /* 表格容器 */
-    .table-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
     }
     
     /* 打开侧边栏时锁定 body */
@@ -1033,27 +905,14 @@
 }
 
 /* ==============================
-   十二、小屏手机（≤480px）
+   十二、小屏手机（≤480px）- 保留基础调整
    ============================*/
 @media (max-width: 480px) {
     .dash-topbar {
         padding: 0 12px;
     }
-    .kpi-row {
-        gap: 8px;
-    }
-    .kpi-card {
-        padding: 12px 14px;
-    }
-    .kpi-val {
-        font-size: 1.2rem;
-    }
     .dash-main {
         padding: 10px 8px;
-    }
-    .nav-item {
-        padding: 8px 14px;
-        font-size: 0.85rem;
     }
 }
 
