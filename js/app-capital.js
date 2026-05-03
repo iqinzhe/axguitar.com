@@ -1,4 +1,4 @@
-// app-capital.js - 资金管理模块 v2.0 (JF 命名空间统一版)
+// app-capital.js - 资金管理模块 v2.0 (JF 命名空间) - 类名重构
 // 包含：资本注入、利润再投入、资金占用报告、资金健康度评估
 
 'use strict';
@@ -122,8 +122,8 @@
                         </div>
                         
                         <div class="modal-actions" style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
-                            <button onclick="APP.saveCapitalInjection()" id="saveInjectionBtn" class="success" style="padding:8px 20px;">💾 ${lang === 'id' ? 'Simpan' : '保存'}</button>
-                            <button onclick="APP.closeCapitalInjectionModal()" class="btn-back" style="padding:8px 20px;">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                            <button onclick="APP.saveCapitalInjection()" id="saveInjectionBtn" class="btn btn--success" style="padding:8px 20px;">💾 ${lang === 'id' ? 'Simpan' : '保存'}</button>
+                            <button onclick="APP.closeCapitalInjectionModal()" class="btn btn--outline" style="padding:8px 20px;">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
                         </div>
                     </div>
                 </div>
@@ -238,8 +238,8 @@
                     <div class="page-header">
                         <h2>🔄 ${lang === 'id' ? 'Reinvestasi Keuntungan' : '利润再投入'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
+                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </div>
                     </div>
                     
@@ -295,12 +295,12 @@
                         
                         ${analysis.pending_reinvest_profit > 0 ? `
                         <div class="reinvest-action" style="margin-top: var(--spacing-4); text-align: center;">
-                            <button onclick="APP.executeProfitReinvestment()" class="success btn-large" id="reinvestBtn" style="padding:12px 32px;font-size:16px;">
+                            <button onclick="APP.executeProfitReinvestment()" class="btn btn--success btn--lg" id="reinvestBtn" style="padding:12px 32px;font-size:16px;">
                                 🔄 ${lang === 'id' 
                                     ? `Reinvestasikan ${Utils.formatCurrency(analysis.pending_reinvest_profit)} ke Modal`
                                     : `再投入 ${Utils.formatCurrency(analysis.pending_reinvest_profit)} 到资本`}
                             </button>
-                            <button onclick="APP.showPartialReinvestModal()" class="btn-small" style="margin-left: 12px;padding:12px 20px;">
+                            <button onclick="APP.showPartialReinvestModal()" class="btn btn--sm" style="margin-left: 12px;padding:12px 20px;">
                                 ✏️ ${lang === 'id' ? 'Reinvest Sebagian' : '部分再投入'}
                             </button>
                         </div>
@@ -462,5 +462,5 @@
         };
     }
 
-    console.log('✅ JF.CapitalModule v2.1 最终版初始化完成');
+    console.log('✅ JF.CapitalModule v2.1 重构完成（类名统一）');
 })();
