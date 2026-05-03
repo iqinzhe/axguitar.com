@@ -885,7 +885,7 @@
     .donut-area {
         flex-direction: row;
         align-items: center;
-        gap: 12px;
+        gap: 20px;
     }
     .donut-legend {
         width: auto;
