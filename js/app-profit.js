@@ -1,4 +1,4 @@
-// app-profit.js - v2.0 (JF 命名空间)
+// app-profit.js - v2.0 (JF 命名空间) - 类名重构
 // 收益处置页面（利润再投入 / 偿还本金）
 
 'use strict';
@@ -49,7 +49,7 @@
                     <div class="page-header">
                         <h2>💸 ${lang === 'id' ? 'Distribusi Keuntungan' : '收益处置'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
+                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
                         </div>
                     </div>
 
@@ -76,7 +76,7 @@
                             <input type="text" id="reinvestAmount" class="amount-input" placeholder="0">
                         </div>
                         <div class="form-actions">
-                            <button onclick="JF.ProfitPage.executeDistribution('reinvest')" class="success">💾 ${lang === 'id' ? 'Reinvestasikan' : '执行再投入'}</button>
+                            <button onclick="JF.ProfitPage.executeDistribution('reinvest')" class="btn btn--success">💾 ${lang === 'id' ? 'Reinvestasikan' : '执行再投入'}</button>
                         </div>
                     </div>
 
@@ -88,7 +88,7 @@
                             <input type="text" id="returnAmount" class="amount-input" placeholder="0">
                         </div>
                         <div class="form-actions">
-                            <button onclick="JF.ProfitPage.executeDistribution('return_capital')" class="warning">💸 ${lang === 'id' ? 'Kembalikan' : '偿还本金'}</button>
+                            <button onclick="JF.ProfitPage.executeDistribution('return_capital')" class="btn btn--warning">💸 ${lang === 'id' ? 'Kembalikan' : '偿还本金'}</button>
                         </div>
                     </div>
                 `;
@@ -154,5 +154,5 @@
     window.APP = window.APP || {};
     window.APP.showDistributionPage = ProfitPage.showDistributionPage.bind(ProfitPage);
 
-    console.log('✅ JF.ProfitPage v2.0 初始化完成');
+    console.log('✅ JF.ProfitPage v2.0 重构完成（类名统一）');
 })();
