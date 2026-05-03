@@ -1,4 +1,4 @@
-// store.js - v2.1 (JF 命名空间) - 支持外壳渲染，完整版
+// store.js - v2.1 (JF 命名空间) - 类名重构
 // 统一门店管理模块，挂载到 JF.StoreManager，保留 window.StoreManager 别名
 
 'use strict';
@@ -146,7 +146,7 @@
                     `<div class="modal-content" style="max-width:500px;">
                         <h3>✏️ ${lang === 'id' ? 'Edit Toko' : '编辑门店'}</h3>
                         <div style="margin-bottom:16px;">
-                            <span class="badge badge-${statusBadgeClass}">${statusText}</span>
+                            <span class="badge badge--${statusBadgeClass}">${statusText}</span>
                         </div>
                         <div class="form-group">
                             <label>${lang === 'id' ? 'Kode Toko' : '门店编码'}</label>
@@ -171,8 +171,8 @@
                             <div class="form-hint">${lang === 'id' ? 'Contoh: 6281234567890 (tanpa +)' : '示例: 6281234567890 (不带+)'}</div>
                         </div>
                         <div class="modal-actions">
-                            <button onclick="StoreManager._saveEditStore('${storeId}')" class="success">💾 ${t('save')}</button>
-                            <button onclick="document.getElementById('editStoreModal').remove()" class="btn-back">✖ ${t('cancel')}</button>
+                            <button onclick="StoreManager._saveEditStore('${storeId}')" class="btn btn--success">💾 ${t('save')}</button>
+                            <button onclick="document.getElementById('editStoreModal').remove()" class="btn btn--outline">✖ ${t('cancel')}</button>
                         </div>
                     </div>`;
                 document.body.appendChild(modal);
@@ -561,7 +561,7 @@
 
                     let storeStatusBadge = '';
                     if (store.is_active === false) {
-                        storeStatusBadge = ` <span class="badge badge-liquidated">${lang === 'id' ? 'DITUTUP' : '已暂停'}</span>`;
+                        storeStatusBadge = ` <span class="badge badge--liquidated">${lang === 'id' ? 'DITUTUP' : '已暂停'}</span>`;
                     }
                     if (isPractice) {
                         storeStatusBadge += ` <span class="badge" style="background:#a78bfa;color:#fff;">${lang === 'id' ? 'LATIHAN' : '练习'}</span>`;
@@ -610,8 +610,8 @@
                         const isStorePractice = store.is_practice === true;
 
                         let statusBadgeHtml = isActive
-                            ? `<span class="badge badge-active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
-                            : `<span class="badge badge-liquidated">${lang === 'id' ? 'Ditutup' : '已暂停'}</span>`;
+                            ? `<span class="badge badge--active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
+                            : `<span class="badge badge--liquidated">${lang === 'id' ? 'Ditutup' : '已暂停'}</span>`;
                         if (isStorePractice) {
                             statusBadgeHtml += ` <span class="badge" style="background:#a78bfa;color:#fff;">🎓 ${lang === 'id' ? 'Latihan' : '练习'}</span>`;
                         }
@@ -632,19 +632,19 @@
                             ? (lang === 'id' ? '✅ Mode Latihan (Aktif)' : '✅ 练习模式 (已开启)')
                             : (lang === 'id' ? '🎓 Jadikan Toko Latihan' : '🎓 设为练习门店');
                         const practiceBtnStyle = isPractice
-                            ? 'style="background:#a78bfa;color:#fff;"'
-                            : 'style="background:#ede9fe;color:#6d28d9;"';
+                            ? 'background:#a78bfa;color:#fff;'
+                            : 'background:#ede9fe;color:#6d28d9;';
                         const practiceBtnTitle = isPractice
                             ? (lang === 'id' ? 'Kembalikan ke mode normal' : '恢复为正常门店')
                             : (lang === 'id' ? 'Jadikan toko latihan (data tidak dihitung)' : '设为练习门店（数据不计入统计）');
 
                         const actionButtons =
-                            `<button onclick="StoreManager.editStore('${store.id}')" class="btn-small">✏️ ${t('edit')}</button>` +
+                            `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>` +
                             (isActive
-                                ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn-small warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
-                                : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn-small success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`) +
-                            `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn-small" ${practiceBtnStyle} title="${practiceBtnTitle}">${practiceLabel}</button>` +
-                            `<button class="btn-small danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
+                                ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn btn--sm btn--warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
+                                : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn btn--sm btn--success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`) +
+                            `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}" title="${practiceBtnTitle}">${practiceLabel}</button>` +
+                            `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
 
                         storeRows += `<tr class="action-row"${practiceRowStyle2}>
                             <td class="action-label">${t('action')}</td>
@@ -657,8 +657,8 @@
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </div>
                     </div>
                     <div class="card cashflow-card">
@@ -738,7 +738,7 @@
                                 <input id="newStorePhone" placeholder="${lang === 'id' ? 'Telepon' : '电话'}">
                             </div>
                             <div class="form-actions">
-                                <button onclick="APP.addStore()" class="success">➕ ${lang === 'id' ? 'Tambah Toko' : '添加门店'}</button>
+                                <button onclick="APP.addStore()" class="btn btn--success">➕ ${lang === 'id' ? 'Tambah Toko' : '添加门店'}</button>
                             </div>
                         </div>
                     </div>`;
@@ -751,8 +751,8 @@
                 return `<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn-back">↩️ ${Utils.t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn-print">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button>
+                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </div>
                     </div>
                     <div class="card" style="text-align:center;padding:40px;">
@@ -761,8 +761,8 @@
                             <summary style="cursor:pointer;">${lang === 'id' ? 'Detail Error' : '错误详情'}</summary>
                             <pre style="margin-top:8px;padding:8px;background:#f1f5f9;border-radius:4px;overflow:auto;font-size:11px;">${Utils.escapeHtml(error.stack || error.message)}</pre>
                         </details>
-                        <button onclick="StoreManager.renderStoreManagement()" class="btn-small" style="margin-top:16px;">🔄 ${lang === 'id' ? 'Coba Lagi' : '重试'}</button>
-                        <button onclick="APP.goBack()" class="btn-small" style="margin-top:16px;margin-left:8px;">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
+                        <button onclick="StoreManager.renderStoreManagement()" class="btn btn--sm" style="margin-top:16px;">🔄 ${lang === 'id' ? 'Coba Lagi' : '重试'}</button>
+                        <button onclick="APP.goBack()" class="btn btn--sm" style="margin-top:16px;margin-left:8px;">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
                     </div>`;
             }
         },
@@ -813,5 +813,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.1 初始化完成（支持外壳渲染，完整版）');
+    console.log('✅ JF.StoreManager v2.1 重构完成（类名统一）');
 })();
