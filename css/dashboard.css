@@ -806,10 +806,23 @@
     .topbar-title {
         font-size: 1rem !important;
         font-weight: 600;
+        white-space: normal !important;      /* 允许换行 */
+        word-break: keep-all;
+        line-height: 1.2;
+        max-width: 60vw;
     }
     .topbar-sub {
         font-size: 0.7rem !important;
         color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 1;
+    }
+    .topbar-left {
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
     }
     
     /* 汉堡按钮 */
@@ -824,17 +837,17 @@
         cursor: pointer;
     }
     
-    /* 侧边栏 */
+    /* 侧边栏 – 更窄，更紧凑 */
     .dash-sidebar {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
         bottom: 0 !important;
-        width: 85% !important;
-        max-width: 300px;
+        width: 72% !important;               /* 从 85% 改为 72% */
+        max-width: 280px;
         height: 100% !important;
         background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-        z-index: 1000;
+        z-index: 1001;
         transform: translateX(-100%);
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         overflow-y: auto;
@@ -861,10 +874,10 @@
         font-size: 0.8rem;
     }
     
-    /* 导航菜单 - 紧凑版 */
+    /* 导航菜单 – 紧凑版 */
     .sidebar-nav {
-        padding: 8px 12px !important;
-        gap: 2px !important;
+        padding: 6px 8px !important;
+        gap: 0px !important;
     }
     .nav-section-label {
         font-size: 0.65rem !important;
@@ -873,15 +886,14 @@
         letter-spacing: 0.5px;
     }
     .nav-item {
-        padding: 8px 12px !important;
+        padding: 6px 12px !important;       /* 从 8px 12px 减少到 6px 12px */
+        margin: 2px 0 !important;           /* 微间距取代 gap */
         font-size: 0.85rem !important;
         border-radius: 8px;
-        margin: 0 !important;
-        gap: 10px;
     }
     .nav-icon {
-        font-size: 16px !important;
-        width: 20px;
+        font-size: 15px !important;
+        width: 22px;
     }
     
     /* 侧边栏底部 */
@@ -894,22 +906,23 @@
         font-size: 0.75rem !important;
     }
     
-    /* 遮罩层 */
+    /* 遮罩层 – 提高覆盖层级 */
     .sidebar-overlay {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 99;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(2px);
+        z-index: 1000;
         display: none;
     }
     .sidebar-overlay.active {
         display: block !important;
     }
     
-    /* 主内容区 - 确保可见 */
+    /* 主内容区 – 确保可见 */
     .dash-main {
         padding: 14px 12px !important;
         margin-top: 0 !important;
@@ -919,6 +932,7 @@
         visibility: visible !important;
         opacity: 1 !important;
         min-height: calc(100vh - 56px);
+        cursor: pointer;  /* 可选：提示可点击关闭侧边栏 */
     }
     
     /* 仪表盘卡片文字大小 */
@@ -1000,7 +1014,7 @@
         padding: 10px 8px;
     }
     .nav-item {
-        padding: 10px 14px;
+        padding: 8px 14px;
         font-size: 0.85rem;
     }
 }
