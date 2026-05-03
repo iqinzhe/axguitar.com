@@ -272,20 +272,42 @@
             } catch (e) { return 0; }
         },
 
-        _toggleSidebar() {
+        // ---------- 侧边栏控制（增强版） ----------
+        _toggleSidebar(e) {
             const sidebar = document.getElementById('dashSidebar');
             const overlay = document.getElementById('sidebarOverlay');
             if (!sidebar) return;
             const isOpen = sidebar.classList.contains('open');
             if (isOpen) {
                 sidebar.classList.remove('open');
-                overlay?.classList.remove('active');
+                if (overlay) overlay.classList.remove('active');
                 document.body.classList.remove('menu-open');
             } else {
                 sidebar.classList.add('open');
-                overlay?.classList.add('active');
+                if (overlay) overlay.classList.add('active');
                 document.body.classList.add('menu-open');
             }
+            // 阻止事件冒泡，避免立即触发主内容关闭
+            if (e && e.stopPropagation) e.stopPropagation();
+        },
+
+        // 点击主内容区域关闭侧边栏（移动端）
+        _initSidebarCloseOnMain() {
+            const mainEl = document.querySelector('.dash-main');
+            if (!mainEl) return;
+            // 移除旧监听避免重复绑定
+            mainEl.removeEventListener('click', this._handleMainClick);
+            this._handleMainClick = (e) => {
+                const sidebar = document.getElementById('dashSidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                if (sidebar && sidebar.classList.contains('open')) {
+                    // 确保点击的不是侧边栏内部元素
+                    if (!sidebar.contains(e.target)) {
+                        this._toggleSidebar();
+                    }
+                }
+            };
+            mainEl.addEventListener('click', this._handleMainClick);
         },
 
         _setLang(lang) {
@@ -543,6 +565,8 @@
                     </div>
                 </div>`;
                 document.getElementById("app").innerHTML = finalHtml;
+                // 初始化侧边栏点击关闭监听
+                this._initSidebarCloseOnMain();
                 if (!document.getElementById('dashboardV2AnimStyle')) {
                     const style = document.createElement('style');
                     style.id = 'dashboardV2AnimStyle';
@@ -653,6 +677,8 @@
                     await this.renderLogin();
                 }
                 if (AUTH.isLoggedIn()) this._startOverdueInterval();
+                // 在每次渲染后绑定侧边栏关闭事件（如果还没有绑定）
+                this._initSidebarCloseOnMain();
             } catch (error) {
                 console.error("Init error:", error);
                 Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat sistem' : '系统加载失败', 5000);
@@ -699,5 +725,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v3.0 完整版已加载（仪表盘直接渲染，解决无限加载）');
+    console.log('✅ JF.DashboardCore v3.0 完整版已加载（仪表盘直接渲染，侧边栏关闭优化）');
 })();
