@@ -1,6 +1,7 @@
 /* ==============================
    dashboard.css - 仪表盘专属布局
    包含：仪表盘网格、侧边栏、顶栏、KPI卡片、资金卡片等
+   v2.1 - 统一字号层级 + 收紧内边距 + 增强对比度
 ============================*/
 
 /* ==============================
@@ -38,7 +39,7 @@
 }
 
 /* ==============================
-   三、侧边栏
+   三、侧边栏（保持原状）
    ============================*/
 .dash-sidebar {
     grid-area: sidebar;
@@ -230,7 +231,8 @@
 }
 
 /* ==============================
-   四、顶部栏   ============================*/
+   四、顶部栏
+   ============================*/
 .dash-topbar {
     grid-area: topbar;
     background: #ffffff;
@@ -270,9 +272,10 @@
     letter-spacing: -0.01em;
     margin: 0;
 }
+/* 辅助文字对比度增强 */
 .topbar-sub {
     font-size: 0.72rem;
-    color: #94a3b8;
+    color: #64748b;
     margin: 0;
 }
 .topbar-right {
@@ -327,24 +330,25 @@
 }
 
 /* ==============================
-   五、主内容区  ============================*/
+   五、主内容区（内边距收紧）
+   ============================*/
 .dash-main {
     grid-area: main;
-    padding: 16px 20px;
+    padding: 12px 16px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
 /* ============================================================
-   六、KPI 卡片行
+   六、KPI 卡片行（字号层级统一 + 内边距收紧）
    ============================================================ */
 .kpi-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
+    gap: 10px;
 }
 .kpi-card {
     background: #fff;
@@ -352,10 +356,10 @@
     border: 1px solid #c8d8e8;
     box-shadow: 0 1px 3px rgba(14, 116, 144, 0.06);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
-    padding: 14px 16px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     position: relative;
     overflow: hidden;
 }
@@ -375,9 +379,13 @@
 .kpi-card.blue::before   { background: linear-gradient(90deg, #0e7490, #06b6d4); }
 .kpi-card.amber::before  { background: linear-gradient(90deg, #d97706, #f59e0b); }
 .kpi-card.green::before  { background: linear-gradient(90deg, #15803d, #16a34a); }
-.kpi-icon { font-size: 18px; margin-bottom: 1px; }
+
+/* 图标 */
+.kpi-icon { font-size: 16px; margin-bottom: 1px; }
+
+/* 大数值：1.25rem */
 .kpi-val {
-    font-size: 1.55rem;
+    font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: -0.03em;
@@ -385,12 +393,16 @@
 }
 .kpi-val.green  { color: #15803d; }
 .kpi-val.amber  { color: #b45309; }
+
+/* 标签：0.75rem，颜色加深 */
 .kpi-label {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    margin-top: 3px;
-    color: #5a7a94;
+    margin-top: 2px;
+    color: #475569;
 }
+
+/* 辅助：0.65rem */
 .kpi-trend {
     font-size: 0.65rem;
     font-weight: 600;
@@ -400,11 +412,12 @@
 .kpi-trend.down { color: #dc2626; }
 
 /* ==============================
-   七、中间行（资金结构 + 收入构成）  ============================*/
+   七、中间行（资金结构 + 收入构成）- 间距收紧
+   ============================*/
 .mid-row {
     display: grid;
     grid-template-columns: 1fr 320px;
-    gap: 12px;
+    gap: 10px;
     align-items: stretch;
 }
 .fund-flow-card,
@@ -414,7 +427,7 @@
     border: 1px solid #c8d8e8;
     box-shadow: 0 1px 3px rgba(14, 116, 144, 0.06);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
-    padding: 16px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -442,17 +455,21 @@
 .fund-block.injected { background: #e0f2fe; border: 1px solid #7dd3fc; }
 .fund-block.deployed  { background: #fef9c3; border: 1px solid #fde047; }
 .fund-block.free      { background: #dcfce7; border: 1px solid #86efac; }
+
+/* 标签：0.65rem，颜色加深 */
 .fund-block-label {
-    font-size: 0.63rem;
+    font-size: 0.65rem;
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
-.fund-block.injected .fund-block-label { color: #075985; }
-.fund-block.deployed  .fund-block-label { color: #854d0e; }
-.fund-block.free      .fund-block-label { color: #166534; }
+.fund-block.injected .fund-block-label { color: #475569; }
+.fund-block.deployed  .fund-block-label { color: #475569; }
+.fund-block.free      .fund-block-label { color: #475569; }
+
+/* 大数值：1.25rem */
 .fund-block-val {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: -0.02em;
@@ -460,9 +477,11 @@
 .fund-block.injected .fund-block-val { color: #0c4a6e; }
 .fund-block.deployed  .fund-block-val { color: #78350f; }
 .fund-block.free      .fund-block-val { color: #14532d; }
+
+/* 辅助：0.65rem */
 .fund-block-sub {
-    font-size: 0.6rem;
-    color: #5a7a94;
+    font-size: 0.65rem;
+    color: #64748b;
 }
 
 /* 利用率条 */
@@ -476,7 +495,7 @@
     display: flex;
     justify-content: space-between;
     font-size: 0.72rem;
-    color: #64748b;
+    color: #475569;
 }
 .util-bar-pct {
     font-weight: 700;
@@ -511,24 +530,27 @@
     flex-direction: column;
     gap: 3px;
 }
+/* 标签：0.65rem，颜色加深 */
 .cb-label {
     font-size: 0.65rem;
-    color: #5a7a94;
+    color: #475569;
     font-weight: 500;
     display: flex;
     align-items: center;
     gap: 6px;
 }
+/* 大数值：1.25rem */
 .cb-val {
-    font-size: 0.95rem;
+    font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
     color: #0c1929;
     margin: 2px 0;
 }
+/* 辅助：0.6rem */
 .cb-flow {
     font-size: 0.6rem;
-    color: #7a9ab5;
+    color: #64748b;
     line-height: 1.4;
 }
 .cb-flow span.in  { color: #15803d; font-weight: 600; }
@@ -579,22 +601,25 @@
     border-radius: 50%;
     flex-shrink: 0;
 }
+/* 中等：0.875rem */
 .income-name {
-    font-size: 0.76rem;
+    font-size: 0.875rem;
     color: #1e3a52;
     font-weight: 500;
     flex: 1;
 }
+/* 大数值：1.25rem */
 .income-amt {
-    font-size: 0.8rem;
+    font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
     color: #15803d;
 }
 .income-amt.expense { color: #b91c1c; }
+/* 辅助：0.65rem */
 .income-sub {
-    font-size: 0.6rem;
-    color: #7a9ab5;
+    font-size: 0.65rem;
+    color: #64748b;
     margin-top: 1px;
 }
 
@@ -609,31 +634,33 @@
     align-items: center;
     margin-top: 10px;
 }
+/* 标签：0.75rem */
 .np-label {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #0c4a6e;
 }
+/* 辅助：0.6rem */
 .np-sub {
-    font-size: 0.58rem;
-    color: #075985;
-    opacity: 0.85;
+    font-size: 0.6rem;
+    color: #475569;
     margin-top: 2px;
 }
+/* 大数值：1.25rem */
 .np-val {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
     color: #0e7490;
 }
 
 /* ==============================
-   八、底部行（快捷操作 + 订单分布）
-============================*/
+   八、底部行（快捷操作 + 订单分布）- 间距收紧
+   ============================*/
 .bottom-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
     align-items: stretch;
 }
 .quick-card,
@@ -643,7 +670,7 @@
     border: 1px solid #c8d8e8;
     box-shadow: 0 1px 3px rgba(14, 116, 144, 0.06);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
-    padding: 16px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -692,8 +719,9 @@
 .qb-icon {
     font-size: 17px;
 }
+/* 标签：0.75rem */
 .qb-label {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #2d4a63;
     text-align: center;
@@ -728,25 +756,29 @@
     border-radius: 50%;
     flex-shrink: 0;
 }
+/* 标签：0.75rem */
 .legend-name {
     font-size: 0.75rem;
     color: #1f2937;
     flex: 1;
 }
+/* 大数值：1.25rem */
 .legend-count {
-    font-size: 0.78rem;
+    font-size: 1.25rem;
     font-weight: 700;
     font-family: var(--font-mono);
     color: #1a1a2e;
 }
+/* 辅助：0.65rem */
 .legend-pct {
     font-size: 0.65rem;
-    color: #94a3b8;
+    color: #64748b;
     margin-top: 1px;
 }
 
 /* ===========================
-   九、侧边栏遮罩（移动端）  ============================*/
+   九、侧边栏遮罩（移动端）
+   ============================*/
 .sidebar-overlay {
     display: none;
     position: fixed;
@@ -763,7 +795,7 @@
 
 /* ==============================
    十、桌面端微调（≥769px）
-============================*/
+   ============================*/
 @media (min-width: 769px) {
     .dashboard-v2 {
         position: relative;
@@ -784,7 +816,7 @@
 
 /* ==============================
    十一、移动端全面优化（≤768px）- 完整修复版
-============================*/
+   ============================*/
 @media (max-width: 768px) {
     /* 基础容器 */
     .dashboard-v2 {
@@ -806,7 +838,7 @@
     .topbar-title {
         font-size: 1rem !important;
         font-weight: 600;
-        white-space: normal !important;      /* 允许换行 */
+        white-space: normal !important;
         word-break: keep-all;
         line-height: 1.2;
         max-width: 60vw;
@@ -837,13 +869,13 @@
         cursor: pointer;
     }
     
-    /* 侧边栏 – 更窄，更紧凑 */
+    /* 侧边栏 */
     .dash-sidebar {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
         bottom: 0 !important;
-        width: 72% !important;               /* 从 85% 改为 72% */
+        width: 72% !important;
         max-width: 280px;
         height: 100% !important;
         background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
@@ -874,7 +906,7 @@
         font-size: 0.8rem;
     }
     
-    /* 导航菜单 – 紧凑版 */
+    /* 导航菜单 */
     .sidebar-nav {
         padding: 6px 8px !important;
         gap: 0px !important;
@@ -886,8 +918,8 @@
         letter-spacing: 0.5px;
     }
     .nav-item {
-        padding: 6px 12px !important;       /* 从 8px 12px 减少到 6px 12px */
-        margin: 2px 0 !important;           /* 微间距取代 gap */
+        padding: 6px 12px !important;
+        margin: 2px 0 !important;
         font-size: 0.85rem !important;
         border-radius: 8px;
     }
@@ -906,7 +938,7 @@
         font-size: 0.75rem !important;
     }
     
-    /* 遮罩层 – 提高覆盖层级 */
+    /* 遮罩层 */
     .sidebar-overlay {
         position: fixed;
         top: 0;
@@ -922,7 +954,7 @@
         display: block !important;
     }
     
-    /* 主内容区 – 确保可见 */
+    /* 主内容区 */
     .dash-main {
         padding: 14px 12px !important;
         margin-top: 0 !important;
@@ -932,7 +964,7 @@
         visibility: visible !important;
         opacity: 1 !important;
         min-height: calc(100vh - 56px);
-        cursor: pointer;  /* 可选：提示可点击关闭侧边栏 */
+        cursor: pointer;
     }
     
     /* 仪表盘卡片文字大小 */
@@ -996,7 +1028,7 @@
 
 /* ==============================
    十二、小屏手机（≤480px）
-============================*/
+   ============================*/
 @media (max-width: 480px) {
     .dash-topbar {
         padding: 0 12px;
@@ -1021,7 +1053,7 @@
 
 /* ==============================
    十三、动画
-============================*/
+   ============================*/
 @keyframes dashFadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
