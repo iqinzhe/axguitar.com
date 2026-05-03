@@ -178,12 +178,12 @@
                         contentHtml = await JF.StoreManager.buildStoreManagementHTML();
                     }
                } else if (page === 'backupRestore') {
-    if (JF.BackupStorage && typeof JF.BackupStorage.renderBackupUI === 'function') {
-        await JF.BackupStorage.renderBackupUI();
-        return;
-    }
+                if (JF.BackupStorage && typeof JF.BackupStorage.renderBackupUI === 'function') {
+                await JF.BackupStorage.renderBackupUI();
+                return;
+               }
     contentHtml = '<div class="card"><p>备份模块不可用</p></div>';
-}
+
                 } else if (page === 'blacklist') {
                     if (JF.BlacklistPage && typeof JF.BlacklistPage.buildBlacklistHTML === 'function') {
                         contentHtml = await JF.BlacklistPage.buildBlacklistHTML();
