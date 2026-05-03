@@ -1,4 +1,4 @@
-// app-blacklist.js - v2.0 (JF 命名空间)
+// app-blacklist.js - v2.0 (JF 命名空间) - 类名重构
 // 黑名单管理页面模块，挂载到 JF.BlacklistPage
 
 'use strict';
@@ -143,7 +143,7 @@
                             '<td class="col-date">' + Utils.formatDate(item.blacklisted_at) + '</td>';
 
                         if (isAdmin) {
-                            rows += '<td class="text-center"><button onclick="APP.removeFromBlacklist(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn-small danger">🚫 ' + (lang === 'id' ? 'Hapus' : '解除') + '</button></td>';
+                            rows += '<td class="text-center"><button onclick="APP.removeFromBlacklist(\'' + Utils.escapeAttr(customer.id) + '\')" class="btn btn--sm btn--danger">🚫 ' + (lang === 'id' ? 'Hapus' : '解除') + '</button></td>';
                         }
 
                         rows += '</tr>';
@@ -154,8 +154,8 @@
                     '<div class="page-header">' +
                         '<h2>🚫 ' + (lang === 'id' ? 'Daftar Hitam Nasabah' : '客户黑名单') + '</h2>' +
                         '<div class="header-actions">' +
-                            '<button onclick="APP.printCurrentPage()" class="btn-print no-print">🖨️ ' + t('print') + '</button>' +
-                            '<button onclick="APP.goBack()" class="btn-back no-print">↩️ ' + t('back') + '</button>' +
+                            '<button onclick="APP.printCurrentPage()" class="btn btn--outline no-print">🖨️ ' + t('print') + '</button>' +
+                            '<button onclick="APP.goBack()" class="btn btn--outline no-print">↩️ ' + t('back') + '</button>' +
                         '</div>' +
                     '</div>' +
 
@@ -208,5 +208,5 @@
         };
     }
 
-    console.log('✅ JF.BlacklistPage v2.0 初始化完成');
+    console.log('✅ JF.BlacklistPage v2.0 重构完成（类名统一）');
 })();
