@@ -362,7 +362,7 @@
    ============================*/
 .mid-row {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 280px;
     gap: 10px;
     align-items: stretch;
 }
@@ -797,9 +797,9 @@
         top: 0;
         left: 0;
         bottom: 0;
-        width: 80vw;
-        max-width: 280px;
-        min-width: 240px;
+        width: 45vw;
+        min-width: 200px;
+        max-width: 260px;
         height: 100%;
         background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
         z-index: 1001;
