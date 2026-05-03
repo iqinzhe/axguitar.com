@@ -1,7 +1,7 @@
 /* ==============================
    dashboard.css - 仪表盘专属布局
    包含：仪表盘网格、侧边栏、顶栏、KPI卡片、资金卡片等
-   v2.1 - 统一字号层级 + 收紧内边距 + 增强对比度
+   v2.2 - 统一字号层级 + 收紧内边距 + 增强对比度 + 侧边栏文字加深
 ============================*/
 
 /* ==============================
@@ -39,7 +39,7 @@
 }
 
 /* ==============================
-   三、侧边栏（保持原状）
+   三、侧边栏（保持背景，文字加深）
    ============================*/
 .dash-sidebar {
     grid-area: sidebar;
@@ -79,10 +79,11 @@
     flex-shrink: 0;
     box-shadow: 0 2px 8px rgba(14, 116, 144, 0.4);
 }
+/* Logo 文字：从白色改为深蓝灰，与"典当管理系统"一致 */
 .logo-text {
     font-size: 0.95rem;
     font-weight: 700;
-    color: #fff;
+    color: #64748b;
     letter-spacing: -0.01em;
     line-height: 1.2;
     margin: 0;
@@ -114,22 +115,24 @@
     color: #fff;
     flex-shrink: 0;
 }
+/* 用户名：加深为深蓝灰 */
 .user-name {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #e2e8f0;
+    color: #1e293b;
     margin: 0;
 }
+/* 角色：加深 */
 .user-role {
     font-size: 0.65rem;
-    color: #64748b;
+    color: #475569;
     margin: 0;
 }
 .user-badge {
     margin-left: auto;
     background: rgba(14, 116, 144, 0.2);
     border: 1px solid rgba(14, 116, 144, 0.35);
-    color: #67e8f9;
+    color: #0e7490;
     font-size: 0.58rem;
     padding: 2px 6px;
     border-radius: 10px;
@@ -145,15 +148,17 @@
     flex-direction: column;
     gap: 1px;
 }
+/* 导航分类标签：加深 */
 .nav-section-label {
     font-size: 0.6rem;
     font-weight: 700;
-    color: #4a6b8a;
+    color: #475569;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     padding: 3px 3px 3px;
     margin: 0;
 }
+/* 导航项普通态：深蓝灰 */
 .nav-item {
     display: flex;
     align-items: center;
@@ -162,7 +167,7 @@
     border-radius: 7px;
     cursor: pointer;
     transition: all 0.15s ease;
-    color: #8fb3ce;
+    color: #334155;
     font-size: 0.8rem;
     font-weight: 500;
     text-decoration: none;
@@ -170,17 +175,17 @@
     margin: 0;
 }
 .nav-item:hover {
-    background: rgba(14, 116, 144, 0.15);
-    color: #cce8f4;
+    background: rgba(14, 116, 144, 0.12);
+    color: #0e7490;
 }
 .nav-item.active {
     background: linear-gradient(135deg, rgba(14, 116, 144, 0.35), rgba(6, 182, 212, 0.15));
-    color: #67e8f9;
+    color: #0e7490;
     border: 1px solid rgba(14, 116, 144, 0.35);
 }
 .nav-item.danger:hover {
     background: rgba(220, 38, 38, 0.12);
-    color: #fca5a5;
+    color: #dc2626;
 }
 .nav-icon {
     font-size: 15px;
@@ -217,7 +222,7 @@
     display: block;
     padding: 6px 12px;
     font-size: 0.8rem;
-    color: #4a6b8a;
+    color: #475569;
     border-radius: 5px;
     cursor: pointer;
     font-weight: 500;
@@ -227,7 +232,7 @@
 }
 .lang-btn-side.active-lang {
     background: rgba(14, 116, 144, 0.35);
-    color: #67e8f9;
+    color: #0e7490;
 }
 
 /* ==============================
@@ -272,7 +277,6 @@
     letter-spacing: -0.01em;
     margin: 0;
 }
-/* 辅助文字对比度增强 */
 .topbar-sub {
     font-size: 0.72rem;
     color: #64748b;
@@ -456,7 +460,7 @@
 .fund-block.deployed  { background: #fef9c3; border: 1px solid #fde047; }
 .fund-block.free      { background: #dcfce7; border: 1px solid #86efac; }
 
-/* 标签：0.65rem，颜色加深 */
+/* 标签：0.65rem，颜色加深，字重 600 */
 .fund-block-label {
     font-size: 0.65rem;
     font-weight: 600;
@@ -530,16 +534,16 @@
     flex-direction: column;
     gap: 3px;
 }
-/* 标签：0.65rem，颜色加深 */
+/* 标签：与 .fund-block-label 统一（0.65rem / 600 / #475569） */
 .cb-label {
     font-size: 0.65rem;
     color: #475569;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
     gap: 6px;
 }
-/* 大数值：1.25rem */
+/* 大数值：与 .fund-block-val 统一（1.25rem / 700） */
 .cb-val {
     font-size: 1.25rem;
     font-weight: 700;
@@ -547,9 +551,9 @@
     color: #0c1929;
     margin: 2px 0;
 }
-/* 辅助：0.6rem */
+/* 辅助：与 .fund-block-sub 统一（0.65rem） */
 .cb-flow {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     color: #64748b;
     line-height: 1.4;
 }
@@ -815,7 +819,7 @@
 }
 
 /* ==============================
-   十一、移动端全面优化（≤768px）- 完整修复版
+   十一、移动端全面优化（≤768px）
    ============================*/
 @media (max-width: 768px) {
     /* 基础容器 */
@@ -895,14 +899,14 @@
         border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     .logo-text {
-        color: #fff !important;
+        color: #64748b !important;
     }
     .sidebar-user {
         padding: 12px 16px;
         border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     .user-name {
-        color: #e2e8f0 !important;
+        color: #1e293b !important;
         font-size: 0.8rem;
     }
     
@@ -914,7 +918,7 @@
     .nav-section-label {
         font-size: 0.65rem !important;
         padding: 8px 8px 4px !important;
-        color: #94a3b8 !important;
+        color: #475569 !important;
         letter-spacing: 0.5px;
     }
     .nav-item {
@@ -922,6 +926,7 @@
         margin: 2px 0 !important;
         font-size: 0.85rem !important;
         border-radius: 8px;
+        color: #334155 !important;
     }
     .nav-icon {
         font-size: 15px !important;
@@ -936,6 +941,7 @@
     .lang-btn-side {
         padding: 6px 12px !important;
         font-size: 0.75rem !important;
+        color: #475569 !important;
     }
     
     /* 遮罩层 */
