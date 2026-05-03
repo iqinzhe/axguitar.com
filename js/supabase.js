@@ -1,4 +1,4 @@
-// supabase.js - v2.1 (JF 统一命名空间，收益处置完整版)
+// supabase.js - v2.2 (修复版：利润计算、资本分析、支出同步等)
 
 'use strict';
 
@@ -632,6 +632,106 @@
             return data;
         },
 
+        // ==================== 【修复 Bug 3】新增：更新支出时同步现金流 ====================
+        async updateExpenseWithCashFlow(expenseId, updates) {
+            const profile = await this.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
+            if (!isAdmin) throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
+
+            // 获取原支出记录
+            const { data: oldExpense, error: fetchError } = await supabaseClient
+                .from('expenses').select('*').eq('id', expenseId).single();
+            if (fetchError) throw fetchError;
+            if (oldExpense.is_reconciled) {
+                throw new Error(Utils.lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
+            }
+
+            // 更新 expenses 表
+            const updateData = {
+                ...updates,
+                updated_at: Utils.getLocalDateTime(),
+                updated_by: profile.id
+            };
+            const { error: updateError } = await supabaseClient
+                .from('expenses').update(updateData).eq('id', expenseId);
+            if (updateError) throw updateError;
+
+            // 如果金额发生变化，同步更新 cash_flow_records
+            if (updates.amount !== undefined && updates.amount !== oldExpense.amount) {
+                const amountDiff = updates.amount - oldExpense.amount;
+                // 查找对应的现金流记录
+                const { data: cashFlowRecords, error: findError } = await supabaseClient
+                    .from('cash_flow_records')
+                    .select('id, amount')
+                    .eq('reference_id', expenseId)
+                    .eq('flow_type', 'expense')
+                    .eq('is_voided', false)
+                    .limit(1);
+                
+                if (!findError && cashFlowRecords && cashFlowRecords.length > 0) {
+                    const oldCashFlow = cashFlowRecords[0];
+                    const newAmount = oldCashFlow.amount + amountDiff;
+                    await supabaseClient
+                        .from('cash_flow_records')
+                        .update({ amount: newAmount, description: updateData.category || oldExpense.category })
+                        .eq('id', oldCashFlow.id);
+                    console.log(`✅ 支出金额变更已同步到现金流: ${Utils.formatCurrency(oldExpense.amount)} → ${Utils.formatCurrency(updates.amount)}`);
+                } else if (amountDiff !== 0) {
+                    // 如果没有找到关联记录但需要更新金额，则创建一条调整记录
+                    console.warn('未找到关联的现金流记录，创建调整记录');
+                    await this.recordCashFlow({
+                        store_id: oldExpense.store_id,
+                        flow_type: 'expense_adjustment',
+                        direction: amountDiff > 0 ? 'outflow' : 'inflow',
+                        amount: Math.abs(amountDiff),
+                        source_target: oldExpense.payment_method,
+                        description: `支出调整: ${oldExpense.category} (原: ${Utils.formatCurrency(oldExpense.amount)})`,
+                        reference_id: expenseId
+                    });
+                }
+            }
+
+            return true;
+        },
+
+        // ==================== 【修复 Bug 3】新增：删除支出时同步删除现金流 ====================
+        async deleteExpenseWithCashFlow(expenseId) {
+            const profile = await this.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
+            if (!isAdmin) throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
+
+            // 获取支出记录
+            const { data: expense, error: fetchError } = await supabaseClient
+                .from('expenses').select('*').eq('id', expenseId).single();
+            if (fetchError) throw fetchError;
+
+            // 软删除或硬删除关联的现金流记录
+            // 方案：将关联的现金流记录标记为 voided（软删除）
+            const { error: voidError } = await supabaseClient
+                .from('cash_flow_records')
+                .update({ is_voided: true, voided_at: Utils.getLocalDateTime(), voided_by: profile.id })
+                .eq('reference_id', expenseId)
+                .eq('flow_type', 'expense');
+            
+            if (voidError) {
+                console.warn('标记现金流为 voided 失败:', voidError);
+                // 如果软删除失败，尝试硬删除
+                await supabaseClient
+                    .from('cash_flow_records')
+                    .delete()
+                    .eq('reference_id', expenseId)
+                    .eq('flow_type', 'expense');
+            }
+
+            // 删除 expenses 记录
+            const { error: deleteError } = await supabaseClient
+                .from('expenses').delete().eq('id', expenseId);
+            if (deleteError) throw deleteError;
+
+            console.log(`✅ 支出 ${expenseId} 已删除，关联现金流已清理`);
+            return true;
+        },
+
         async recordLoanDisbursement(orderId, amount, source, description) {
             const order = await this.getOrder(orderId);
             const { data: existingFlow } = await supabaseClient
@@ -676,15 +776,162 @@
             return data;
         },
 
-        // ===== 利润分配相关（新增） =====
+        // ===== 【修复 Bug 2】新增：获取完整资本分析数据 =====
+        async getFullCapitalAnalysis(storeIdParam = null) {
+            const profile = await this.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
+            
+            // 确定目标门店
+            let targetStoreId = storeIdParam;
+            if (!targetStoreId) {
+                if (isAdmin) {
+                    // 管理员需要指定门店，否则返回汇总数据
+                    targetStoreId = null;
+                } else {
+                    targetStoreId = profile?.store_id;
+                }
+            }
+
+            // 获取现金流汇总（支持按门店过滤）
+            const cashFlowSummary = await this.getCashFlowSummary(targetStoreId);
+            
+            // 获取资本注入明细
+            let injectionQuery = supabaseClient
+                .from('capital_injections')
+                .select('*')
+                .eq('is_voided', false);
+            
+            if (targetStoreId) {
+                injectionQuery = injectionQuery.eq('store_id', targetStoreId);
+            } else if (!isAdmin && profile?.store_id) {
+                injectionQuery = injectionQuery.eq('store_id', profile.store_id);
+            }
+            
+            const { data: injections } = await injectionQuery;
+            
+            // 区分外部注资和利润再投入
+            const externalInjections = (injections || []).filter(i => i.source !== 'profit');
+            const profitReinvestments = (injections || []).filter(i => i.source === 'profit');
+            
+            const totalExternalCapital = externalInjections.reduce((sum, i) => sum + (i.amount || 0), 0);
+            const totalProfitReinvested = profitReinvestments.reduce((sum, i) => sum + (i.amount || 0), 0);
+            const totalCapital = totalExternalCapital + totalProfitReinvested;
+            
+            // 获取活跃订单（在押资金）
+            let orderQuery = supabaseClient
+                .from('orders')
+                .select('loan_amount, status, store_id')
+                .eq('status', 'active');
+            
+            if (targetStoreId) {
+                orderQuery = orderQuery.eq('store_id', targetStoreId);
+            } else if (!isAdmin && profile?.store_id) {
+                orderQuery = orderQuery.eq('store_id', profile.store_id);
+            }
+            
+            const { data: activeOrders } = await orderQuery;
+            const deployedCapital = (activeOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
+            const availableCapital = totalCapital - deployedCapital;
+            const utilizationRate = totalCapital > 0 ? (deployedCapital / totalCapital) * 100 : 0;
+            
+            // 计算累计利润和再投入
+            const operatingIncome = cashFlowSummary.netProfit?.operatingIncome || 0;
+            const operatingExpense = cashFlowSummary.netProfit?.operatingExpense || 0;
+            const cumulativeProfit = operatingIncome - operatingExpense;
+            const pendingReinvestProfit = cumulativeProfit - totalProfitReinvested;
+            const profitReinvestRate = cumulativeProfit > 0 ? (totalProfitReinvested / cumulativeProfit) * 100 : 0;
+            
+            // 计算杠杆率
+            const leverageRatio = totalExternalCapital > 0 ? totalCapital / totalExternalCapital : 1;
+            
+            // 活跃订单数量
+            const deployedOrdersCount = activeOrders?.length || 0;
+            
+            // 资本构成明细
+            const capitalBreakdown = {
+                external_injections: totalExternalCapital,
+                profit_reinvestments: totalProfitReinvested,
+                total_capital: totalCapital
+            };
+            
+            // 健康度评估
+            let overall = 'healthy';
+            const strengths = [];
+            const issues = [];
+            
+            if (utilizationRate > 75) {
+                issues.push(Utils.lang === 'id' ? 'Utilisasi modal tinggi (>75%), resiko likuiditas' : '资金利用率过高 (>75%)，有流动性风险');
+                overall = 'warning';
+            } else if (utilizationRate < 30) {
+                issues.push(Utils.lang === 'id' ? 'Utilisasi modal rendah (<30%), potensi pertumbuhan terlewat' : '资金利用率偏低 (<30%)，可能错失增长机会');
+                overall = 'warning';
+            } else {
+                strengths.push(Utils.lang === 'id' ? `Utilisasi modal optimal (${utilizationRate.toFixed(1)}%)` : `资金利用率适中 (${utilizationRate.toFixed(1)}%)`);
+            }
+            
+            if (leverageRatio > 2.5) {
+                strengths.push(Utils.lang === 'id' ? `Leverage tinggi (${leverageRatio.toFixed(2)}x), ekspansi agresif` : `杠杆率较高 (${leverageRatio.toFixed(2)}x)，扩张积极`);
+            } else if (leverageRatio < 1.2) {
+                issues.push(Utils.lang === 'id' ? 'Leverage rendah, pertumbuhan lambat' : '杠杆率偏低，增长缓慢');
+            } else {
+                strengths.push(Utils.lang === 'id' ? `Leverage sehat (${leverageRatio.toFixed(2)}x)` : `杠杆率健康 (${leverageRatio.toFixed(2)}x)`);
+            }
+            
+            if (availableCapital < 0) {
+                issues.push(Utils.lang === 'id' ? 'Modal negatif! Segera injeksi modal' : '资本为负！请立即注资');
+                overall = 'critical';
+            } else if (availableCapital > 0 && availableCapital < totalCapital * 0.1) {
+                issues.push(Utils.lang === 'id' ? 'Modal cadangan tipis, perlu injeksi' : '储备资金不足，建议注资');
+                overall = 'warning';
+            } else if (availableCapital > totalCapital * 0.3) {
+                strengths.push(Utils.lang === 'id' ? 'Cadangan modal kuat' : '储备资金充足');
+            }
+            
+            let summary = '';
+            if (overall === 'healthy') {
+                summary = Utils.lang === 'id' 
+                    ? '✅ Struktur modal sehat, operasional stabil'
+                    : '✅ 资本结构健康，运营稳定';
+            } else if (overall === 'warning') {
+                summary = Utils.lang === 'id'
+                    ? '⚠️ Perlu perhatian pada struktur modal'
+                    : '⚠️ 资本结构需关注';
+            } else {
+                summary = Utils.lang === 'id'
+                    ? '🔴 Kondisi modal kritis, perlu tindakan segera'
+                    : '🔴 资本状况危急，需立即处理';
+            }
+            
+            return {
+                capital_breakdown: capitalBreakdown,
+                cumulative_profit: cumulativeProfit,
+                reinvested_profit: totalProfitReinvested,
+                pending_reinvest_profit: Math.max(0, pendingReinvestProfit),
+                profit_reinvest_rate: profitReinvestRate,
+                deployed_capital: deployedCapital,
+                deployed_orders_count: deployedOrdersCount,
+                available_capital: Math.max(0, availableCapital),
+                utilization_rate: utilizationRate,
+                leverage_ratio: leverageRatio,
+                health_assessment: {
+                    overall: overall,
+                    summary: summary,
+                    strengths: strengths,
+                    issues: issues
+                }
+            };
+        },
+
+        // ===== 利润分配相关 =====
         async getDistributableProfit(storeId) {
             const profile = await this.getCurrentProfile();
             const targetStoreId = storeId || profile?.store_id;
             if (!targetStoreId) throw new Error('Store ID missing');
 
-            const cashFlowSummary = await this.getCashFlowSummary();
-            const totalIncome = cashFlowSummary.netProfit.operatingIncome;
-            const totalExpense = cashFlowSummary.netProfit.operatingExpense;
+            // 【修复 Bug 1】传入 storeId 获取指定门店的现金流
+            const cashFlowSummary = await this.getCashFlowSummary(targetStoreId);
+            const totalIncome = cashFlowSummary.netProfit?.operatingIncome || 0;
+            const totalExpense = cashFlowSummary.netProfit?.operatingExpense || 0;
 
             const { data: distributions, error } = await supabaseClient
                 .from('profit_distributions')
@@ -697,16 +944,19 @@
             return Math.max(0, distributable);
         },
 
+        // 【修复 Bug 5】修正 getExternalCapitalBalance 查询条件
         async getExternalCapitalBalance(storeId) {
             const targetStoreId = storeId || (await this.getCurrentProfile())?.store_id;
             if (!targetStoreId) return 0;
 
+            // 修正：查询 source 不是 'profit' 的记录（即外部注入）
+            // 原来的 'external' 不存在，实际存储的是 'cash' 或 'bank'
             const { data: injections } = await supabaseClient
                 .from('capital_injections')
                 .select('amount')
                 .eq('store_id', targetStoreId)
                 .eq('is_voided', false)
-                .eq('source', 'external');
+                .neq('source', 'profit');  // 排除利润再投入
 
             const totalInjected = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
 
@@ -963,6 +1213,7 @@
             return true;
         },
 
+        // 【修复 Bug 4】修正 recordInterestPayment：防止 loan_amount 被累加
         async recordInterestPayment(orderId, months, paymentMethod) {
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const profile = await this.getCurrentProfile();
@@ -977,49 +1228,137 @@
             try {
                 const monthlyRate = currentOrder.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
                 const remainingPrincipal = (currentOrder.loan_amount || 0) - (currentOrder.principal_paid || 0);
-                const totalInterest = remainingPrincipal * monthlyRate * months;
-                const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
-                const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + totalInterest;
-                const maxMonths = currentOrder.max_extension_months || 10;
-                if (newInterestPaidMonths > maxMonths) {
-                    throw new Error(Utils.lang === 'id' ? '❌ Mencapai batas maksimum perpanjangan (' + maxMonths + ' bulan), harap lunasi pokok segera' : '❌ 已达到最大延期期限 (' + maxMonths + '个月)，请尽快结清本金');
+                const theoreticalInterest = remainingPrincipal * monthlyRate * months;
+                
+                // 获取实际缴纳金额（从参数或页面输入）
+                // 注意：调用方需要传入 actualPaid 参数，这里保持原有接口兼容
+                // 实际使用时，调用方应该传入实际支付金额
+                let actualPaid = theoreticalInterest; // 默认全额
+                
+                // 尝试从页面获取实际支付金额（如果存在）
+                const interestAmountInput = document.getElementById('interestAmount');
+                if (interestAmountInput && interestAmountInput.value) {
+                    actualPaid = Utils.parseNumberFromCommas(interestAmountInput.value) || 0;
                 }
+                
+                // 计算实际记录的利息和本金调整
+                let interestToRecord = actualPaid;
+                let principalAdjustment = 0;
+                let shortfallToTrack = 0;
+                
+                if (actualPaid >= theoreticalInterest) {
+                    interestToRecord = theoreticalInterest;
+                    principalAdjustment = actualPaid - theoreticalInterest; // 多出的部分抵扣本金
+                } else {
+                    interestToRecord = actualPaid;
+                    shortfallToTrack = theoreticalInterest - actualPaid; // 少付的部分记录为欠款
+                    // 【修复 Bug 4】不再累加到 loan_amount，而是记录到新字段 interest_shortfall
+                }
+                
+                const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
+                const newInterestPaidTotal = (currentOrder.interest_paid_total || 0) + interestToRecord;
+                const newInterestShortfall = (currentOrder.interest_shortfall || 0) + shortfallToTrack;
+                
+                const maxMonths = currentOrder.max_extension_months || 10;
+                if (newInterestPaidMonths > maxMonths && newInterestShortfall > 0) {
+                    throw new Error(Utils.lang === 'id' ? '❌ Mencapai batas maksimum perpanjangan (' + maxMonths + ' bulan), harap lunasi pokok dan kekurangan bunga' : '❌ 已达到最大延期期限 (' + maxMonths + '个月)，请结清本金和欠息');
+                }
+                
                 const originalOrderState = {
                     interest_paid_months: currentOrder.interest_paid_months,
                     interest_paid_total: currentOrder.interest_paid_total,
                     next_interest_due_date: currentOrder.next_interest_due_date,
                     monthly_interest: currentOrder.monthly_interest,
-                    updated_at: currentOrder.updated_at
+                    updated_at: currentOrder.updated_at,
+                    interest_shortfall: currentOrder.interest_shortfall || 0
                 };
+                
                 const nextDueDate = this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths);
-                const { error: updateError } = await supabaseClient.from('orders').update({
+                
+                // 构建更新对象
+                const updates = {
                     interest_paid_months: newInterestPaidMonths,
                     interest_paid_total: newInterestPaidTotal,
+                    interest_shortfall: newInterestShortfall,
                     next_interest_due_date: nextDueDate,
                     monthly_interest: remainingPrincipal * monthlyRate,
                     fund_status: 'extended',
                     updated_at: Utils.getLocalDateTime()
-                }).eq('order_id', orderId);
-                if (updateError) throw updateError;
-                const paymentData = {
-                    order_id: currentOrder.id, date: Utils.getLocalToday(), type: 'interest',
-                    months: months, amount: totalInterest,
-                    description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(1) + '%)',
-                    recorded_by: profile.id, payment_method: paymentMethod
                 };
-                const { error: paymentError } = await supabaseClient.from('payment_history').insert(paymentData);
-                if (paymentError) {
-                    await supabaseClient.from('orders').update(originalOrderState).eq('order_id', orderId);
-                    throw paymentError;
+                
+                // 如果有本金抵扣，更新本金相关字段
+                if (principalAdjustment > 0) {
+                    const newPrincipalPaid = (currentOrder.principal_paid || 0) + principalAdjustment;
+                    const newPrincipalRemaining = (currentOrder.loan_amount || 0) - newPrincipalPaid;
+                    updates.principal_paid = newPrincipalPaid;
+                    updates.principal_remaining = newPrincipalRemaining;
+                    
+                    // 如果本金结清，更新状态
+                    if (newPrincipalRemaining <= 0) {
+                        updates.status = 'completed';
+                        updates.completed_at = Utils.getLocalDateTime();
+                    }
                 }
-                await this.recordCashFlow({
-                    store_id: currentOrder.store_id, flow_type: 'interest', direction: 'inflow',
-                    amount: totalInterest, source_target: paymentMethod, order_id: currentOrder.id,
-                    customer_id: currentOrder.customer_id,
-                    description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月'),
-                    reference_id: currentOrder.order_id
-                });
-                if (window.Audit) await window.Audit.logPayment(currentOrder.order_id, 'interest', totalInterest, paymentMethod);
+                
+                const { error: updateError } = await supabaseClient
+                    .from('orders')
+                    .update(updates)
+                    .eq('order_id', orderId);
+                if (updateError) throw updateError;
+                
+                // 记录利息 payment_history
+                if (interestToRecord > 0) {
+                    const paymentData = {
+                        order_id: currentOrder.id, date: Utils.getLocalToday(), type: 'interest',
+                        months: months, amount: interestToRecord,
+                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月') + ' (' + (monthlyRate*100).toFixed(1) + '%)',
+                        recorded_by: profile.id, payment_method: paymentMethod
+                    };
+                    const { error: paymentError } = await supabaseClient.from('payment_history').insert(paymentData);
+                    if (paymentError) {
+                        await supabaseClient.from('orders').update(originalOrderState).eq('order_id', orderId);
+                        throw paymentError;
+                    }
+                    
+                    await this.recordCashFlow({
+                        store_id: currentOrder.store_id, flow_type: 'interest', direction: 'inflow',
+                        amount: interestToRecord, source_target: paymentMethod, order_id: currentOrder.id,
+                        customer_id: currentOrder.customer_id,
+                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang === 'id' ? 'bulan' : '个月'),
+                        reference_id: currentOrder.order_id
+                    });
+                }
+                
+                // 如果有本金抵扣，记录本金 payment_history
+                if (principalAdjustment > 0) {
+                    const principalPaymentData = {
+                        order_id: currentOrder.id, date: Utils.getLocalToday(), type: 'principal',
+                        amount: principalAdjustment,
+                        description: (Utils.lang === 'id' ? 'Kelebihan pembayaran bunga dipotong pokok' : '超额利息抵扣本金'),
+                        recorded_by: profile.id, payment_method: paymentMethod
+                    };
+                    await supabaseClient.from('payment_history').insert(principalPaymentData);
+                    
+                    await this.recordCashFlow({
+                        store_id: currentOrder.store_id, flow_type: 'principal', direction: 'inflow',
+                        amount: principalAdjustment, source_target: paymentMethod, order_id: currentOrder.id,
+                        customer_id: currentOrder.customer_id,
+                        description: (Utils.lang === 'id' ? 'Kelebihan bunga dipotong pokok' : '超额利息抵扣本金'),
+                        reference_id: currentOrder.order_id
+                    });
+                }
+                
+                // 如果有欠款，显示警告
+                if (shortfallToTrack > 0) {
+                    console.warn(`订单 ${orderId} 利息少付 ${Utils.formatCurrency(shortfallToTrack)}，已记录为欠款`);
+                    if (window.Toast) {
+                        window.Toast.warning(Utils.lang === 'id' 
+                            ? `⚠️ Kekurangan pembayaran bunga: ${Utils.formatCurrency(shortfallToTrack)} akan ditagihkan nanti`
+                            : `⚠️ 利息少付 ${Utils.formatCurrency(shortfallToTrack)}，将后续追收`, 4000);
+                    }
+                }
+                
+                if (window.Audit) await window.Audit.logPayment(currentOrder.order_id, 'interest', interestToRecord, paymentMethod);
                 return true;
             } finally {
                 if (window.APP && window.APP._releasePaymentLock) window.APP._releasePaymentLock(lockKey);
@@ -1243,15 +1582,44 @@
             return true;
         },
 
+        // 【修复 Bug 6】修正 deleteOrder 中的现金流清理
         async deleteOrder(orderId) {
             const profile = await this.getCurrentProfile();
             if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus pesanan' : '需管理员权限');
             const order = await this.getOrder(orderId);
-            await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
+            
+            // 使用多种条件匹配，确保现金流记录被正确清理
+            // 方案：标记为 voided 软删除，同时保留审计痕迹
+            const { error: voidCashFlowError } = await supabaseClient
+                .from('cash_flow_records')
+                .update({ 
+                    is_voided: true, 
+                    voided_at: Utils.getLocalDateTime(), 
+                    voided_by: profile.id,
+                    description: supabaseClient.sql`${'description'} || ' [DELETED]'`
+                })
+                .eq('order_id', order.id);
+            
+            if (voidCashFlowError) {
+                console.warn('软删除现金流失败，尝试硬删除:', voidCashFlowError);
+                // 软删除失败，尝试硬删除
+                await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
+                // 也尝试用 reference_id 匹配
+                await supabaseClient.from('cash_flow_records').delete().eq('reference_id', order.order_id);
+            }
+            
+            // 同时清理使用 reference_id 的记录（兼容旧数据）
+            await supabaseClient
+                .from('cash_flow_records')
+                .update({ is_voided: true, voided_at: Utils.getLocalDateTime(), voided_by: profile.id })
+                .eq('reference_id', order.order_id);
+            
             const { error: e1 } = await supabaseClient.from('payment_history').delete().eq('order_id', order.id);
             if (e1) throw e1;
+            
             const { error: e2 } = await supabaseClient.from('orders').delete().eq('order_id', orderId);
             if (e2) throw e2;
+            
             if (window.Audit) await window.Audit.logOrderDelete(order.order_id, order.customer_name, order.loan_amount, profile?.name);
             return true;
         },
@@ -1321,32 +1689,39 @@
             return true;
         },
 
-        async getCashFlowRecords(storeId, startDate, endDate) {
+        // 【修复 Bug 1 & Bug 7】改进 getCashFlowSummary 支持按门店过滤，排除利润再投入
+        async getCashFlowSummary(storeIdParam = null) {
             const profile = await this.getCurrentProfile();
-            const targetStoreId = storeId || profile?.store_id;
-            if (!targetStoreId && profile?.role !== 'admin') throw new Error('Unauthorized');
-            let query = supabaseClient.from('cash_flow_records').select('*').eq('is_voided', false).order('recorded_at', { ascending: false });
-            if (profile?.role !== 'admin' && targetStoreId) query = query.eq('store_id', targetStoreId);
-            else if (profile?.role === 'admin' && storeId) query = query.eq('store_id', storeId);
-            if (startDate) query = query.gte('recorded_at', startDate);
-            if (endDate) query = query.lte('recorded_at', endDate);
-            const { data, error } = await query;
-            if (error) throw error;
-            return data;
-        },
-
-        // ===== 获取现金流汇总（含资金池指标） =====
-        async getCashFlowSummary() {
-            const profile = await this.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
+            
+            // 确定目标门店
+            let targetStoreId = storeIdParam;
+            if (!targetStoreId) {
+                if (isAdmin) {
+                    // 管理员未指定门店时返回所有非练习门店的汇总
+                    targetStoreId = null;
+                } else {
+                    targetStoreId = profile?.store_id;
+                }
+            }
+            
             let query = supabaseClient.from('cash_flow_records')
                 .select('direction, amount, source_target, flow_type, store_id')
                 .eq('is_voided', false);
-            if (profile?.role !== 'admin' && profile?.store_id) {
+            
+            // 应用门店过滤
+            if (targetStoreId) {
+                query = query.eq('store_id', targetStoreId);
+            } else if (!isAdmin && profile?.store_id) {
                 query = query.eq('store_id', profile.store_id);
-            } else if (profile?.role === 'admin') {
+            } else if (isAdmin && !targetStoreId) {
+                // 管理员获取所有门店时，排除练习门店
                 const practiceIds = await this._getPracticeStoreIds();
-                if (practiceIds.length > 0) query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                if (practiceIds.length > 0) {
+                    query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                }
             }
+            
             const { data: flows, error } = await query;
             if (error) throw error;
 
@@ -1364,19 +1739,42 @@
                 else if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') operatingIncome += amt;
             }
 
+            // 【修复 Bug 1 & Bug 7】资本注入查询：排除 profit 来源，且支持门店过滤
             let injectionQuery = supabaseClient.from('capital_injections')
-                .select('amount').eq('is_voided', false);
-            if (profile?.role !== 'admin' && profile?.store_id) {
+                .select('amount, source')
+                .eq('is_voided', false)
+                .neq('source', 'profit');  // 排除利润再投入，避免双重计算
+            
+            if (targetStoreId) {
+                injectionQuery = injectionQuery.eq('store_id', targetStoreId);
+            } else if (!isAdmin && profile?.store_id) {
                 injectionQuery = injectionQuery.eq('store_id', profile.store_id);
+            } else if (isAdmin && !targetStoreId) {
+                const practiceIds = await this._getPracticeStoreIds();
+                if (practiceIds.length > 0) {
+                    injectionQuery = injectionQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                }
             }
+            
             const { data: injections } = await injectionQuery;
             const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
 
+            // 在押资金查询（活跃订单）
             let deployedQuery = supabaseClient.from('orders')
-                .select('loan_amount').eq('status', 'active');
-            if (profile?.role !== 'admin' && profile?.store_id) {
+                .select('loan_amount')
+                .eq('status', 'active');
+            
+            if (targetStoreId) {
+                deployedQuery = deployedQuery.eq('store_id', targetStoreId);
+            } else if (!isAdmin && profile?.store_id) {
                 deployedQuery = deployedQuery.eq('store_id', profile.store_id);
+            } else if (isAdmin && !targetStoreId) {
+                const practiceIds = await this._getPracticeStoreIds();
+                if (practiceIds.length > 0) {
+                    deployedQuery = deployedQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                }
             }
+            
             const { data: deployedOrders } = await deployedQuery;
             const deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
 
@@ -1533,10 +1931,15 @@
         async getShopAccount(storeId) {
             const targetStoreId = storeId || await this.getCurrentStoreId();
             if (!targetStoreId) return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
-            const { data: flows, error } = await supabaseClient
-                .from('cash_flow_records').select('direction, amount, source_target')
-                .eq('store_id', targetStoreId).eq('is_voided', false);
+            
+            let query = supabaseClient.from('cash_flow_records')
+                .select('direction, amount, source_target')
+                .eq('store_id', targetStoreId)
+                .eq('is_voided', false);
+            
+            const { data: flows, error } = await query;
             if (error) return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
+            
             let cash = 0, bank = 0;
             for (const f of (flows || [])) {
                 const amt = f.amount || 0;
@@ -1564,12 +1967,42 @@
             });
         },
 
+        // 为 orders 表添加 interest_shortfall 字段的迁移检查（如果不存在）
+        async ensureInterestShortfallColumn() {
+            try {
+                // 检查列是否存在
+                const { data: columns, error } = await supabaseClient
+                    .from('orders')
+                    .select('interest_shortfall')
+                    .limit(1);
+                if (error && error.message && error.message.includes('column "interest_shortfall" does not exist')) {
+                    console.log('正在添加 interest_shortfall 列...');
+                    // 使用 raw SQL 添加列（需要 Supabase 权限）
+                    const { error: alterError } = await supabaseClient.rpc('add_interest_shortfall_column');
+                    if (alterError) {
+                        console.warn('无法添加 interest_shortfall 列，请手动执行: ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
+                    } else {
+                        console.log('✅ interest_shortfall 列已添加');
+                    }
+                }
+            } catch (e) {
+                console.warn('检查 interest_shortfall 列失败:', e.message);
+            }
+        },
+
         formatCurrency(amount) { return Utils.formatCurrency(amount); },
         formatDate(dateStr) { return Utils.formatDate(dateStr); },
     };
 
+    // 执行列检查（非阻塞）
+    setTimeout(() => {
+        if (SupabaseAPI.ensureInterestShortfallColumn) {
+            SupabaseAPI.ensureInterestShortfallColumn().catch(e => console.warn('列检查失败:', e.message));
+        }
+    }, 1000);
+
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
 
-    console.log('✅ JF.Supabase v2.3 最终版初始化完成（含收益处置）');
+    console.log('✅ JF.Supabase v2.2 最终版初始化完成（含全部 Bug 修复）');
 })();
