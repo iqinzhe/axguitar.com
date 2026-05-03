@@ -86,7 +86,7 @@
                 let filter = sessionStorage.getItem('jf_current_filter') || localStorage.getItem('jf_last_filter') || "all";
                 let orderId = sessionStorage.getItem('jf_current_order_id') || localStorage.getItem('jf_last_order_id');
                 let customerId = sessionStorage.getItem('jf_current_customer_id') || localStorage.getItem('jf_last_customer_id');
-                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','backupRestore','customerOrders','customerPaymentHistory','blacklist'];
+                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','','customerOrders','customerPaymentHistory','blacklist'];
                 if (page && validPages.includes(page) && page !== 'login') return { page, filter, orderId, customerId };
                 return { page: null, filter: "all", orderId: null, customerId: null };
             } catch (e) { return { page: null, filter: "all", orderId: null, customerId: null }; }
@@ -177,26 +177,13 @@
                     if (JF.StoreManager && typeof JF.StoreManager.buildStoreManagementHTML === 'function') {
                         contentHtml = await JF.StoreManager.buildStoreManagementHTML();
                     }
-                } else if (page === 'backupRestore') {
-                    if (JF.BackupStorage && typeof JF.BackupStorage.renderBackupUI === 'function') {
-                        const originalApp = document.getElementById('app');
-                        const mockDiv = document.createElement('div');
-                        mockDiv.id = 'mock-backup';
-                        document.body.appendChild(mockDiv);
-                        const originalHtml = originalApp.innerHTML;
-                        originalApp.innerHTML = '';
-                        const originalRender = JF.BackupStorage.renderBackupUI;
-                        JF.BackupStorage.renderBackupUI = async () => {
-                            await originalRender.call(JF.BackupStorage);
-                            const content = mockDiv.innerHTML;
-                            mockDiv.remove();
-                            originalApp.innerHTML = originalHtml;
-                            return content;
-                        };
-                        contentHtml = await JF.BackupStorage.renderBackupUI();
-                        JF.BackupStorage.renderBackupUI = originalRender;
-                        originalApp.innerHTML = originalHtml;
-                    }
+               } else if (page === 'backupRestore') {
+    if (JF.BackupStorage && typeof JF.BackupStorage.renderBackupUI === 'function') {
+        await JF.BackupStorage.renderBackupUI();
+        return;
+    }
+    contentHtml = '<div class="card"><p>备份模块不可用</p></div>';
+}
                 } else if (page === 'blacklist') {
                     if (JF.BlacklistPage && typeof JF.BlacklistPage.buildBlacklistHTML === 'function') {
                         contentHtml = await JF.BlacklistPage.buildBlacklistHTML();
