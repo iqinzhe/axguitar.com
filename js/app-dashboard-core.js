@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v3.0 完整稳定版（仪表盘直接渲染，无无限加载）
+// app-dashboard-core.js - v2.0 完整稳定版
 'use strict';
 
 (function () {
