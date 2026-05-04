@@ -1,4 +1,4 @@
-// app-customers.js - v2.1 (JF 命名空间) 补全缺失方法
+// app-customers.js - v2.3 完整版（补全缺失方法，保留全部创建订单逻辑）
 
 'use strict';
 
@@ -102,12 +102,10 @@
             }
         },
 
-        // 供外壳调用的渲染函数
         async renderCustomersHTML() {
             return await this.buildCustomersHTML();
         },
 
-        // 原有的 showCustomers 兼容直接调用
         async showCustomers() {
             APP.currentPage = 'customers';
             APP.saveCurrentPageState();
@@ -115,13 +113,12 @@
             document.getElementById("app").innerHTML = contentHTML;
         },
 
-        // 切换居住地址
         toggleLivingAddress(value) {
             const el = document.getElementById('customerLivingAddress');
             if (el) el.style.display = value === 'different' ? 'block' : 'none';
         },
 
-        // 添加客户（原有逻辑完整保留）
+        // ==================== 添加客户 ====================
         addCustomer: async function () {
             const isAdmin = PERMISSION.isAdmin();
             const lang = Utils.lang;
@@ -224,7 +221,7 @@
             }
         },
 
-        // 客户详情卡片（弹窗）
+        // ==================== 客户详情卡片 ====================
         showCustomerDetailCard: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -306,306 +303,168 @@
             }
         },
 
-        editCustomerFromCard: async function (customerId) {
-            const modal = document.getElementById('customerDetailCard');
-            if (modal) modal.remove();
-            await CustomersPage.editCustomer(customerId);
-        },
-
+        editCustomerFromCard: async function (customerId) { const modal = document.getElementById('customerDetailCard'); if (modal) modal.remove(); await CustomersPage.editCustomer(customerId); },
         blacklistFromCard: async function (customerUuid, customerName) {
-            const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
-            const modal = document.getElementById('customerDetailCard');
-            if (modal) modal.remove();
-
-            const reason = prompt(lang === 'id'
-                ? `Masukkan alasan blacklist untuk nasabah "${customerName}":\n\nContoh: Telat bayar, Penipuan, dll.`
-                : `请输入拉黑客户 "${customerName}" 的原因：\n\n例如：逾期未还、欺诈等。`,
-                lang === 'id' ? 'Telat bayar' : '逾期未还');
+            const lang = Utils.lang; const t = Utils.t.bind(Utils); const modal = document.getElementById('customerDetailCard'); if (modal) modal.remove();
+            const reason = prompt(lang === 'id' ? `Masukkan alasan blacklist untuk nasabah "${customerName}":\n\nContoh: Telat bayar, Penipuan, dll.` : `请输入拉黑客户 "${customerName}" 的原因：\n\n例如：逾期未还、欺诈等。`, lang === 'id' ? 'Telat bayar' : '逾期未还');
             if (!reason || reason.trim() === '') { Utils.toast.warning(t('fill_all_fields')); return; }
-
-            const confirmMsg = lang === 'id'
-                ? `⚠️ Yakin akan blacklist nasabah ini?\n\nNama: ${customerName}\nAlasan: ${reason}\n\nNasabah yang di-blacklist tidak dapat membuat order baru.`
-                : `⚠️ 确认拉黑此客户？\n\n客户名: ${customerName}\n原因: ${reason}\n\n被拉黑的客户将无法创建新订单。`;
-            const confirmed = await Utils.toast.confirm(confirmMsg);
-            if (!confirmed) return;
-
-            try {
-                await window.APP.addToBlacklist(customerUuid, reason);
-                Utils.toast.success(lang === 'id' ? `Nasabah "${customerName}" telah ditambahkan ke blacklist.` : `客户 "${customerName}" 已加入黑名单。`);
-                await CustomersPage.showCustomers();
-            } catch (error) {
-                Utils.toast.error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + error.message : '拉黑失败：' + error.message);
-            }
+            const confirmMsg = lang === 'id' ? `⚠️ Yakin akan blacklist nasabah ini?\n\nNama: ${customerName}\nAlasan: ${reason}\n\nNasabah yang di-blacklist tidak dapat membuat order baru.` : `⚠️ 确认拉黑此客户？\n\n客户名: ${customerName}\n原因: ${reason}\n\n被拉黑的客户将无法创建新订单。`;
+            const confirmed = await Utils.toast.confirm(confirmMsg); if (!confirmed) return;
+            try { await window.APP.addToBlacklist(customerUuid, reason); Utils.toast.success(lang === 'id' ? `Nasabah "${customerName}" telah ditambahkan ke blacklist.` : `客户 "${customerName}" 已加入黑名单。`); await CustomersPage.showCustomers(); } catch (error) { Utils.toast.error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + error.message : '拉黑失败：' + error.message); }
         },
-
         unblacklistFromCard: async function (customerUuid) {
-            const lang = Utils.lang;
-            const confirmMsg = lang === 'id' ? 'Yakin ingin membuka blacklist nasabah ini?' : '确认解除此客户的拉黑？';
-            const confirmed = await Utils.toast.confirm(confirmMsg);
-            if (!confirmed) return;
-            try {
-                await window.APP.removeFromBlacklist(customerUuid);
-                Utils.toast.success(lang === 'id' ? 'Blacklist berhasil dibuka' : '已解除拉黑');
-                const modal = document.getElementById('customerDetailCard');
-                if (modal) modal.remove();
-                await CustomersPage.showCustomers();
-            } catch (error) {
-                Utils.toast.error(lang === 'id' ? 'Gagal membuka blacklist: ' + error.message : '解除拉黑失败：' + error.message);
-            }
+            const lang = Utils.lang; const confirmMsg = lang === 'id' ? 'Yakin ingin membuka blacklist nasabah ini?' : '确认解除此客户的拉黑？'; const confirmed = await Utils.toast.confirm(confirmMsg); if (!confirmed) return;
+            try { await window.APP.removeFromBlacklist(customerUuid); Utils.toast.success(lang === 'id' ? 'Blacklist berhasil dibuka' : '已解除拉黑'); const modal = document.getElementById('customerDetailCard'); if (modal) modal.remove(); await CustomersPage.showCustomers(); } catch (error) { Utils.toast.error(lang === 'id' ? 'Gagal membuka blacklist: ' + error.message : '解除拉黑失败：' + error.message); }
         },
-
         showCustomerOrdersByStatus: async function (customerId, statusType) {
-            const lang = Utils.lang;
-            try {
-                const customer = await SUPABASE.getCustomer(customerId);
-                if (!customer) return;
-                await SUPABASE.getCustomerOrdersByStatus(customerId, statusType);
-                const modal = document.getElementById('customerDetailCard');
-                if (modal) modal.remove();
-                APP.currentCustomerId = customerId;
-                APP.showCustomerOrders(customerId);
-            } catch (error) {
-                console.error("showCustomerOrdersByStatus error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
-            }
+            const lang = Utils.lang; try { const customer = await SUPABASE.getCustomer(customerId); if (!customer) return; await SUPABASE.getCustomerOrdersByStatus(customerId, statusType); const modal = document.getElementById('customerDetailCard'); if (modal) modal.remove(); APP.currentCustomerId = customerId; APP.showCustomerOrders(customerId); } catch (error) { console.error("showCustomerOrdersByStatus error:", error); Utils.toast.error(lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败'); }
         },
 
-        // 编辑客户（管理员）
+        // ==================== 编辑客户 ====================
         editCustomer: async function (customerId) {
-            const isAdmin = PERMISSION.isAdmin();
-            const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
-            if (!isAdmin) { Utils.toast.warning(t('store_operation')); return; }
-
+            const isAdmin = PERMISSION.isAdmin(); const lang = Utils.lang; const t = Utils.t.bind(Utils); if (!isAdmin) { Utils.toast.warning(t('store_operation')); return; }
             try {
-                const client = SUPABASE.getClient();
-                const { data: c, error } = await client.from('customers').select('*').eq('id', customerId).single();
-                if (error) throw error;
-                const livingSame = c.living_same_as_ktp !== false;
-
-                const modal = document.createElement('div');
-                modal.id = 'editCustomerModal';
-                modal.className = 'modal-overlay';
-                modal.innerHTML =
-                    `<div class="modal-content" style="max-width:600px;">
-                        <h3>✏️ ${t('edit_customer')}</h3>
-                        <div class="form-grid order-first-row">
-                            <div class="form-group"><label>${t('customer_name')} *</label><input id="ec_name" value="${Utils.escapeHtml(c.name)}"></div>
-                            <div class="form-group"><label>${t('phone')} *</label><input id="ec_phone" value="${Utils.escapeHtml(c.phone || '')}"></div>
-                            <div class="form-group"><label>${t('ktp_number')}</label><input id="ec_ktp" value="${Utils.escapeHtml(c.ktp_number || '')}"></div>
-                            <div class="form-group"><label>${t('occupation')}</label><input id="ec_occupation" value="${Utils.escapeHtml(c.occupation || '')}"></div>
-                            <div class="form-group full-width"><label>${t('ktp_address')}</label><textarea id="ec_ktpAddr" rows="2">${Utils.escapeHtml(c.ktp_address || c.address || '')}</textarea></div>
-                            <div class="form-group full-width">
-                                <label>${t('living_address')}</label>
-                                <div class="address-option">
-                                    <label><input type="radio" name="ec_livingOpt" value="same" ${livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('same_as_ktp')}</label>
-                                    <label><input type="radio" name="ec_livingOpt" value="different" ${!livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('different_from_ktp')}</label>
-                                </div>
-                                <textarea id="ec_livingAddr" rows="2" style="margin-top:8px;${livingSame ? 'display:none;' : ''}">${Utils.escapeHtml(c.living_address || '')}</textarea>
-                            </div>
-                            <div class="form-actions">
-                                <button onclick="APP._saveEditCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success">💾 ${t('save')}</button>
-                                <button onclick="document.getElementById('editCustomerModal').remove()" class="btn btn--outline">✖ ${t('cancel')}</button>
-                            </div>
-                        </div>
-                    </div>`;
+                const client = SUPABASE.getClient(); const { data: c, error } = await client.from('customers').select('*').eq('id', customerId).single(); if (error) throw error; const livingSame = c.living_same_as_ktp !== false;
+                const modal = document.createElement('div'); modal.id = 'editCustomerModal'; modal.className = 'modal-overlay';
+                modal.innerHTML = `<div class="modal-content" style="max-width:600px;"><h3>✏️ ${t('edit_customer')}</h3><div class="form-grid order-first-row"><div class="form-group"><label>${t('customer_name')} *</label><input id="ec_name" value="${Utils.escapeHtml(c.name)}"></div><div class="form-group"><label>${t('phone')} *</label><input id="ec_phone" value="${Utils.escapeHtml(c.phone || '')}"></div><div class="form-group"><label>${t('ktp_number')}</label><input id="ec_ktp" value="${Utils.escapeHtml(c.ktp_number || '')}"></div><div class="form-group"><label>${t('occupation')}</label><input id="ec_occupation" value="${Utils.escapeHtml(c.occupation || '')}"></div><div class="form-group full-width"><label>${t('ktp_address')}</label><textarea id="ec_ktpAddr" rows="2">${Utils.escapeHtml(c.ktp_address || c.address || '')}</textarea></div><div class="form-group full-width"><label>${t('living_address')}</label><div class="address-option"><label><input type="radio" name="ec_livingOpt" value="same" ${livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('same_as_ktp')}</label><label><input type="radio" name="ec_livingOpt" value="different" ${!livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('different_from_ktp')}</label></div><textarea id="ec_livingAddr" rows="2" style="margin-top:8px;${livingSame ? 'display:none;' : ''}">${Utils.escapeHtml(c.living_address || '')}</textarea></div><div class="form-actions"><button onclick="APP._saveEditCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success">💾 ${t('save')}</button><button onclick="document.getElementById('editCustomerModal').remove()" class="btn btn--outline">✖ ${t('cancel')}</button></div></div></div>`;
                 document.body.appendChild(modal);
-            } catch (e) {
-                Utils.toast.error(lang === 'id' ? 'Gagal memuat data: ' + e.message : '加载失败：' + e.message);
-            }
+            } catch (e) { Utils.toast.error(lang === 'id' ? 'Gagal memuat data: ' + e.message : '加载失败：' + e.message); }
         },
-
-        _toggleEditLiving(val) {
-            const el = document.getElementById('ec_livingAddr');
-            if (el) el.style.display = val === 'different' ? 'block' : 'none';
-        },
-
+        _toggleEditLiving(val) { const el = document.getElementById('ec_livingAddr'); if (el) el.style.display = val === 'different' ? 'block' : 'none'; },
         _saveEditCustomer: async function (customerId) {
-            const isAdmin = PERMISSION.isAdmin();
-            const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
-            if (!isAdmin) { Utils.toast.warning(t('store_operation')); return; }
-
-            const name = document.getElementById('ec_name').value.trim();
-            const phone = document.getElementById('ec_phone').value.trim();
-            const ktp = document.getElementById('ec_ktp').value.trim();
-            const occupation = document.getElementById('ec_occupation').value.trim();
-            const ktpAddr = document.getElementById('ec_ktpAddr').value.trim();
-            const livingOpt = document.querySelector('input[name="ec_livingOpt"]:checked')?.value || 'same';
-            const livingSame = livingOpt === 'same';
-            const livingAddr = livingSame ? null : document.getElementById('ec_livingAddr').value.trim();
-
+            const isAdmin = PERMISSION.isAdmin(); const lang = Utils.lang; const t = Utils.t.bind(Utils); if (!isAdmin) { Utils.toast.warning(t('store_operation')); return; }
+            const name = document.getElementById('ec_name').value.trim(); const phone = document.getElementById('ec_phone').value.trim(); const ktp = document.getElementById('ec_ktp').value.trim(); const occupation = document.getElementById('ec_occupation').value.trim(); const ktpAddr = document.getElementById('ec_ktpAddr').value.trim(); const livingOpt = document.querySelector('input[name="ec_livingOpt"]:checked')?.value || 'same'; const livingSame = livingOpt === 'same'; const livingAddr = livingSame ? null : document.getElementById('ec_livingAddr').value.trim();
             if (!name || !phone) { Utils.toast.warning(lang === 'id' ? 'Nama dan telepon wajib diisi' : '姓名和手机号必须填写'); return; }
-
             try {
-                const client = SUPABASE.getClient();
-                const { error } = await client.from('customers').update({
-                    name, phone, ktp_number: ktp || null, occupation: occupation || null,
-                    ktp_address: ktpAddr || null, address: ktpAddr || null,
-                    living_same_as_ktp: livingSame, living_address: livingAddr || null,
-                    updated_at: Utils.getLocalDateTime()
-                }).eq('id', customerId);
-                if (error) throw error;
-                document.getElementById('editCustomerModal')?.remove();
-                Utils.toast.success(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新');
-                if (window.APP.clearAnomalyCache) window.APP.clearAnomalyCache();
-                await CustomersPage.showCustomers();
-            } catch (e) {
-                Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message);
-            }
+                const client = SUPABASE.getClient(); const { error } = await client.from('customers').update({ name, phone, ktp_number: ktp || null, occupation: occupation || null, ktp_address: ktpAddr || null, address: ktpAddr || null, living_same_as_ktp: livingSame, living_address: livingAddr || null, updated_at: Utils.getLocalDateTime() }).eq('id', customerId);
+                if (error) throw error; document.getElementById('editCustomerModal')?.remove(); Utils.toast.success(lang === 'id' ? 'Data nasabah diperbarui' : '客户信息已更新'); if (window.APP.clearAnomalyCache) window.APP.clearAnomalyCache(); await CustomersPage.showCustomers();
+            } catch (e) { Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + e.message : '保存失败：' + e.message); }
         },
-
         deleteCustomer: async function (customerId) {
-            const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
-            const confirmed = await Utils.toast.confirm(t('confirm_delete'));
-            if (!confirmed) return;
-
+            const lang = Utils.lang; const t = Utils.t.bind(Utils); const confirmed = await Utils.toast.confirm(t('confirm_delete')); if (!confirmed) return;
             try {
-                const client = SUPABASE.getClient();
-                const { data: orders, error: ordersError } = await client.from('orders').select('id').eq('customer_id', customerId);
-                if (ordersError) throw ordersError;
-                if (orders && orders.length > 0) {
-                    for (const o of orders) {
-                        await client.from('payment_history').delete().eq('order_id', o.id);
-                    }
-                    await client.from('orders').delete().eq('customer_id', customerId);
-                }
-                await client.from('blacklist').delete().eq('customer_id', customerId);
-                const { error: customerError } = await client.from('customers').delete().eq('id', customerId);
-                if (customerError) throw customerError;
-                Utils.toast.success(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除');
-                if (window.APP.clearAnomalyCache) window.APP.clearAnomalyCache();
-                await CustomersPage.showCustomers();
-            } catch (e) {
-                console.error('删除客户异常:', e);
-                Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message);
-            }
+                const client = SUPABASE.getClient(); const { data: orders, error: ordersError } = await client.from('orders').select('id').eq('customer_id', customerId); if (ordersError) throw ordersError;
+                if (orders && orders.length > 0) { for (const o of orders) { await client.from('payment_history').delete().eq('order_id', o.id); } await client.from('orders').delete().eq('customer_id', customerId); }
+                await client.from('blacklist').delete().eq('customer_id', customerId); const { error: customerError } = await client.from('customers').delete().eq('id', customerId); if (customerError) throw customerError;
+                Utils.toast.success(lang === 'id' ? 'Nasabah berhasil dihapus' : '客户已删除'); if (window.APP.clearAnomalyCache) window.APP.clearAnomalyCache(); await CustomersPage.showCustomers();
+            } catch (e) { console.error('删除客户异常:', e); Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + e.message : '删除失败：' + e.message); }
         },
 
-        // ==================== 创建订单（含新计费规则） ====================
+        // ==================== 创建订单（完整保留原逻辑） ====================
         createOrderForCustomer: async function (customerId) {
-            // ... 原有逻辑完整保留，此处省略以避免过长，但原代码必须全量包含
-            // 实际替换文件时请确保这部分与原来完全一致，因之前问题中未涉及修改，此处只保留占位，实际文件已有
-            // 为保持完整性，我将完整代码放在最终答案中。
-        },
-
-        // 保存订单、费用计算等所有方法均完整保留，不在此处重复展示。
-
-        // ==================== 补全：构建客户订单 HTML ====================
-        async buildCustomerOrdersHTML(customerId) {
-            const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
+            const lang = Utils.lang; const t = Utils.t.bind(Utils); const profile = await SUPABASE.getCurrentProfile(); if (!profile) { Utils.toast.error(lang === 'id' ? 'Gagal memuat data user' : '加载用户数据失败'); return; }
+            if (PERMISSION.isAdmin()) { Utils.toast.warning(t('store_operation')); return; } if (!customerId) { Utils.toast.warning(lang === 'id' ? 'ID nasabah tidak valid' : '客户ID无效'); return; }
             try {
-                const customer = await SUPABASE.getCustomer(customerId);
-                const client = SUPABASE.getClient();
-                const { data: orders, error } = await client.from('orders').select('*').eq('customer_id', customerId).order('created_at', { ascending: false });
-                if (error) throw error;
-
-                const statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
-                let rows = '';
-                if (!orders || orders.length === 0) {
-                    rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`;
-                } else {
-                    for (const o of orders) {
-                        const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
-                        const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
-                        const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment');
-                        rows += `<tr>
-                            <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
-                            <td class="date-cell">${Utils.formatDate(o.created_at)}</td>
-                            <td class="amount">${Utils.formatCurrency(o.loan_amount)}</td>
-                            <td class="amount">${Utils.formatCurrency(o.principal_paid)}</td>
-                            <td class="text-center">${o.interest_paid_months} ${t('month')}</td>
-                            <td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}</span></td>
-                            <td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td>
-                        </tr>`;
-                        let actionButtons = '';
-                        if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}</button>`;
-                        actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`;
-                        rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`;
-                    }
-                }
-
-                return `
-                    <div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div>
-                    <div class="card customer-summary">
-                        <p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p>
-                        <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p>
-                        <p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p>
-                        <p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p>
-                        <p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p>
-                    </div>
-                    <div class="card">
-                        <h3>📋 ${t('order_list')}</h3>
-                        <div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></tr></thead><tbody>${rows}</tbody></table></div>
-                    </div>`;
-            } catch (error) {
-                console.error("buildCustomerOrdersHTML error:", error);
-                return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败'}</p></div>`;
-            }
+                const customer = await SUPABASE.getCustomer(customerId); if (!customer) throw new Error(lang === 'id' ? 'Data nasabah tidak ditemukan' : '找不到客户数据');
+                const blacklistCheck = await SUPABASE.checkBlacklist(customer.id).catch(() => ({ isBlacklisted: false }));
+                if (blacklistCheck.isBlacklisted) { Utils.toast.error(lang === 'id' ? 'Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '此客户已被拉黑，无法创建新订单。', 4000); return; }
+                const { data: existingOrders } = await SUPABASE.getClient().from('orders').select('status').eq('customer_id', customerId).eq('status', 'active');
+                if (existingOrders && existingOrders.length > 0) { Utils.toast.warning(lang === 'id' ? 'Nasabah ini masih memiliki pesanan aktif.' : '该客户还有未结清的订单。'); return; }
+                APP.currentPage = 'createOrder'; APP.currentCustomerId = customerId; const occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
+                document.getElementById("app").innerHTML = `<div class="page-header"><h2>📝 ${t('create_order')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card"><div class="form-section"><div class="form-section-title"><span class="section-icon">👤</span> ${t('customer_info')}</div><div class="info-display"><div class="info-display-item"><span class="info-label">${t('customer_id')}</span><span class="info-value">${Utils.escapeHtml(customer.customer_id || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('customer_name')}</span><span class="info-value">${Utils.escapeHtml(customer.name)}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_number')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_number || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('phone')}</span><span class="info-value">${Utils.escapeHtml(customer.phone)}</span></div><div class="info-display-item"><span class="info-label">${t('occupation')}</span><span class="info-value">${occupationDisplay}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_address')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('living_address')}</span><span class="info-value">${customer.living_same_as_ktp !== false ? t('same_as_ktp') : Utils.escapeHtml(customer.living_address || '-')}</span></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💎</span> ${t('collateral_info')}</div><div class="order-first-row"><div class="form-group"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div><div class="form-group"><label>${t('collateral_note')}</label><input id="collateralNote" placeholder="${lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年'}"></div><div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()"></div><div class="form-group"><label>${t('loan_source')}</label><div class="payment-method-selector compact"><label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label></div></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💰</span> ${t('fee_details')}</div><div class="fee-cards-row"><div class="fee-card"><div class="fee-card-label">📋 ${t('admin_fee')}</div><div class="fee-card-body"><input type="text" id="adminFeeInput" value="0" class="amount-input" readonly style="background:#f8fafc;"></div><div class="fee-card-hint">💡 ≤Rp500rb→Rp20rb | Rp500rb~3jt→Rp30rb | >3jt→1%</div></div><div class="fee-card"><div class="fee-card-label">✨ ${t('service_fee')}</div><div class="fee-card-body"><select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">${Utils.getServiceFeePercentOptions(2)}</select><input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()"></div><div class="fee-card-hint" id="serviceFeeHint">💡 ${lang === 'id' ? '≤3jt: 0% | 3jt~5jt: 1% | >5jt: dapat dipilih' : '≤300万: 0% | 301万~500万: 1% | >500万: 可选'}</div></div></div><div class="payment-method-row"><span class="payment-method-label">📥 ${t('fee_payment_method')}</span><div class="payment-method-selector compact" style="padding:0;"><label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ${t('bank')}</label></div><div class="payment-method-hint">💡 ${t('fee_payment_hint')}</div></div><div class="form-group interest-rate-group"><label>📈 ${t('interest_rate_select')}</label><select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">📅</span> ${t('repayment_method')}</div><div class="repayment-cards-row"><div class="repayment-card selected" id="flexibleCard" onclick="document.getElementById('flexibleRadio').checked=true;APP.toggleRepaymentForm('flexible')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="flexibleRadio" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">💰 ${t('flexible_repayment')}</span></div><div class="repayment-card-desc">${t('flexible_desc')}</div><div class="repayment-card-note">${t('max_tenor')}</div></div><div class="repayment-card" id="fixedCard" onclick="document.getElementById('fixedRadio').checked=true;APP.toggleRepaymentForm('fixed')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="fixedRadio" value="fixed" onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">📅 ${t('fixed_repayment')}</span></div><div class="repayment-card-desc">${t('fixed_desc')}</div><div class="repayment-card-note">${lang === 'id' ? 'Pilihan 1-10 bulan' : '可选1-10个月'}</div></div><div id="flexibleMaxMonthsCard" class="repayment-card extension-card"><div class="repayment-card-header"><span class="repayment-card-title">📅 ${t('max_extension')}</span></div><div class="extension-select"><select id="maxExtensionMonths"><option value="6">6 ${t('month')}</option><option value="10" selected>10 ${t('month')}</option><option value="12">12 ${t('month')}</option><option value="24">24 ${t('month')}</option></select></div><div class="repayment-card-note extension-note">${t('extension_limit')}</div></div></div><div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form"><div class="form-grid"><div class="form-group"><label>📅 ${t('term_months')}</label><select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">${Utils.getRepaymentTermOptions(5)}</select></div><div class="form-group"><label>💰 ${t('monthly_payment')}</label><input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()"><div class="form-hint">${t('monthly_payment_rounded')}</div></div></div></div></div><div class="form-section"><div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div><div class="form-actions"><button onclick="APP.saveOrderForCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success" id="saveOrderBtn">💾 ${t('save')}</button><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('cancel')}</button></div></div></div>`;
+                const amountInput = document.getElementById("amount"); if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+                const serviceFeeInput = document.getElementById("serviceFeeInput"); if (serviceFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(serviceFeeInput);
+                const monthlyPaymentInput = document.getElementById("monthlyPaymentInput"); if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
+                APP.recalculateAllFees();
+            } catch (error) { console.error("createOrderForCustomer error:", error); Utils.toast.error(lang === 'id' ? 'Gagal memuat data nasabah: ' + error.message : '加载客户数据失败：' + error.message); if (typeof window.DashboardCore !== 'undefined' && DashboardCore.renderDashboard) DashboardCore.renderDashboard(); }
         },
 
-        async renderCustomerOrdersHTML(customerId) {
-            return await this.buildCustomerOrdersHTML(customerId);
+        saveOrderForCustomer: async function (customerId) {
+            const lang = Utils.lang; const t = Utils.t.bind(Utils); const saveBtn = document.getElementById('saveOrderBtn');
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...'); }
+            const collateral = document.getElementById("collateral").value.trim(); const collateralNote = document.getElementById("collateralNote").value.trim();
+            const amountStr = document.getElementById("amount").value; const amount = Utils.parseNumberFromCommas(amountStr) || 0; const notes = document.getElementById("notes").value;
+            const adminFee = Utils.calculateAdminFee(amount); let serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 2;
+            const serviceFeeStr = document.getElementById("serviceFeeInput").value; let serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
+            if (serviceFee === 0 && amount > 0) { const result = Utils.calculateServiceFee(amount, serviceFeePercent); serviceFee = result.amount; serviceFeePercent = result.percent; }
+            const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
+            const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 8;
+            const repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked'); const repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
+            let repaymentTerm = null, monthlyFixedPayment = null, maxExtensionMonths = 10;
+            if (repaymentType === 'fixed') { repaymentTerm = parseInt(document.getElementById("repaymentTermSelect")?.value) || 5; const monthlyStr = document.getElementById("monthlyPaymentInput").value; monthlyFixedPayment = Utils.parseNumberFromCommas(monthlyStr) || 0; if (monthlyFixedPayment === 0 && amount > 0) { const monthlyRate = agreedInterestRate / 100; monthlyFixedPayment = Utils.roundMonthlyPayment(Utils.calculateFixedMonthlyPayment(amount, monthlyRate, repaymentTerm)); } }
+            else { maxExtensionMonths = parseInt(document.getElementById('maxExtensionMonths')?.value) || 10; }
+            const loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash'; const fullCollateralName = collateralNote ? `${collateral} (${collateralNote})` : collateral;
+            if (!collateral || !amount || amount <= 0) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } Utils.toast.warning(t('fill_all_fields')); return; }
+            try {
+                const profile = await SUPABASE.getCurrentProfile(); const storeId = profile?.store_id; if (!storeId) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } Utils.toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店'); return; }
+                const customer = await SUPABASE.getCustomer(customerId); const blacklistData = await SUPABASE.checkBlacklist(customer.id); if (blacklistData.isBlacklisted) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } Utils.toast.error(lang === 'id' ? 'Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '此客户已被拉黑，无法创建新订单。', 4000); return; }
+                const orderData = { customer: { name: customer.name, ktp: customer.ktp_number || '', phone: customer.phone, address: customer.ktp_address || customer.address || '' }, collateral_name: fullCollateralName, loan_amount: amount, notes, customer_id: customerId, store_id: storeId, admin_fee: adminFee, service_fee_percent: serviceFeePercent, service_fee_amount: serviceFee, agreed_interest_rate: agreedInterestRate, repayment_type: repaymentType, repayment_term: repaymentTerm, monthly_fixed_payment: monthlyFixedPayment, max_extension_months: maxExtensionMonths };
+                const newOrder = await Order.create(orderData);
+                if (adminFee > 0) await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee).catch(e => console.error("管理费收取失败:", e));
+                if (serviceFee > 0) await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod).catch(e => console.error("服务费收取失败:", e));
+                if (amount > 0) { const desc = lang === 'id' ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'}` : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'}`; await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, desc).catch(e => console.error("当金发放记录失败:", e)); }
+                const successMsg = repaymentType === 'fixed' ? (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`) : (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nMaksimal perpanjangan: ${maxExtensionMonths} bulan` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n最长可延期: ${maxExtensionMonths}个月`);
+                Utils.toast.success(successMsg, 5000);
+                document.getElementById("collateral").value = ''; document.getElementById("collateralNote").value = ''; document.getElementById("amount").value = ''; document.getElementById("notes").value = '';
+                const svcSelect = document.getElementById("serviceFeePercentSelect"); if (svcSelect) { svcSelect.value = '2'; delete svcSelect.dataset.manual; }
+                const svcInput = document.getElementById("serviceFeeInput"); if (svcInput) { svcInput.value = '0'; delete svcInput.dataset.manual; }
+                const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); if (cashRadio) cashRadio.checked = true;
+                const loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]'); if (loanCashRadio) loanCashRadio.checked = true;
+                const interestSelect = document.getElementById("agreedInterestRateSelect"); if (interestSelect) interestSelect.value = '8';
+                const flexibleRadio = document.getElementById("flexibleRadio"); if (flexibleRadio) { flexibleRadio.checked = true; APP.toggleRepaymentForm('flexible'); }
+                APP.recalculateAllFees(); const monthlyInput = document.getElementById("monthlyPaymentInput"); if (monthlyInput) { monthlyInput.value = '0'; delete monthlyInput.dataset.manual; }
+                document.getElementById("collateral").focus();
+            } catch (error) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } console.error("saveOrderForCustomer error:", error); Utils.toast.error(t('save_failed') + ': ' + error.message); } finally { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } }
         },
 
-        // 原有的 showCustomerOrders 现在委托给 build 方法
+        recalculateAllFees() {
+            const amountStr = document.getElementById('amount')?.value || '0'; const amount = Utils.parseNumberFromCommas(amountStr) || 0; const adminFee = Utils.calculateAdminFee(amount);
+            const adminFeeInput = document.getElementById('adminFeeInput'); if (adminFeeInput) adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
+            const serviceFeeSelect = document.getElementById('serviceFeePercentSelect'); const serviceFeeInput = document.getElementById('serviceFeeInput');
+            const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
+            if (serviceFeeInput && !serviceFeeInput.dataset.manual) { const result = Utils.calculateServiceFee(amount, percent); serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount); }
+            if (serviceFeeSelect) { const group = serviceFeeSelect.closest('.form-group') || serviceFeeSelect.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; }
+            const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
+            if (repaymentType === 'fixed') { const rateSelect = document.getElementById('agreedInterestRateSelect'); const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08; const termSelect = document.getElementById('repaymentTermSelect'); const months = termSelect ? parseInt(termSelect.value) : 5; if (amount > 0 && months > 0) { const monthly = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months); const rounded = Utils.roundMonthlyPayment(monthly); const monthlyInput = document.getElementById('monthlyPaymentInput'); if (monthlyInput && !monthlyInput.dataset.manual) { monthlyInput.value = Utils.formatNumberWithCommas(rounded); } } }
+        },
+        recalculateServiceFee() { const select = document.getElementById('serviceFeePercentSelect'); if (select) select.dataset.manual = 'true'; const amountStr = document.getElementById('amount')?.value || '0'; const amount = Utils.parseNumberFromCommas(amountStr) || 0; const percent = select ? parseFloat(select.value) : 2; const result = Utils.calculateServiceFee(amount, percent); const input = document.getElementById('serviceFeeInput'); if (input) { input.value = Utils.formatNumberWithCommas(result.amount); input.dataset.manual = 'true'; } const hint = document.getElementById('serviceFeeHint'); if (hint) { hint.innerHTML = amount <= 3000000 ? `💡 ${Utils.lang === 'id' ? '≤3jt: Gratis (0%)' : '≤300万: 免费 (0%)'}` : amount <= 5000000 ? `💡 ${Utils.lang === 'id' ? '3jt~5jt: 1% (otomatis)' : '301万~500万: 1% (自动)'}` : `💡 ${Utils.lang === 'id' ? '>5jt: Pilih 2%-6%' : '>500万: 可选 2%-6%'}`; } if (select) { const group = select.closest('.form-group') || select.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; } },
+        onServiceFeeManualChange() { const input = document.getElementById('serviceFeeInput'); if (input) input.dataset.manual = 'true'; },
+        onMonthlyPaymentManualChange() { const input = document.getElementById('monthlyPaymentInput'); if (input) input.dataset.manual = 'true'; },
+        toggleRepaymentForm(value) { const fixedForm = document.getElementById('fixedRepaymentForm'); const flexibleCard = document.getElementById('flexibleMaxMonthsCard'); const flexibleDiv = document.getElementById('flexibleCard'); const fixedDiv = document.getElementById('fixedCard'); if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none'; if (flexibleCard) flexibleCard.style.display = value === 'flexible' ? 'block' : 'none'; if (flexibleDiv) flexibleDiv.classList.toggle('selected', value === 'flexible'); if (fixedDiv) fixedDiv.classList.toggle('selected', value === 'fixed'); if (value === 'fixed') APP.recalculateAllFees(); },
+
+        // ==================== 客户订单列表 ====================
         async showCustomerOrders(customerId) {
-            APP.currentPage = 'customerOrders';
-            APP.currentCustomerId = customerId;
-            APP.saveCurrentPageState();
+            APP.currentPage = 'customerOrders'; APP.currentCustomerId = customerId; APP.saveCurrentPageState();
             const contentHTML = await this.buildCustomerOrdersHTML(customerId);
             document.getElementById("app").innerHTML = contentHTML;
         },
 
-        // ==================== 补全：构建客户缴费历史 HTML ====================
-        async buildCustomerPaymentHistoryHTML(customerId) {
-            const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
-            const methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+        async buildCustomerOrdersHTML(customerId) {
+            const lang = Utils.lang; const t = Utils.t.bind(Utils);
             try {
-                const customer = await SUPABASE.getCustomer(customerId);
-                const client = SUPABASE.getClient();
-                const { data: orders } = await client.from('orders').select('id, order_id').eq('customer_id', customerId);
-                const orderIds = (orders || []).map(o => o.id);
-                let allPayments = [];
-                if (orderIds.length > 0) {
-                    const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false });
-                    allPayments = data || [];
-                }
-                const typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
+                const customer = await SUPABASE.getCustomer(customerId); const client = SUPABASE.getClient();
+                const { data: orders, error } = await client.from('orders').select('*').eq('customer_id', customerId).order('created_at', { ascending: false }); if (error) throw error;
+                const statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
                 let rows = '';
-                if (allPayments.length === 0) {
-                    rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td>`;
-                } else {
-                    for (const p of allPayments) {
-                        const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                        rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td class="col-type">${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
-                    }
-                }
-                return `
-                    <div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div>
-                    <div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div>
-                    <div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-            } catch (error) {
-                console.error("buildCustomerPaymentHistoryHTML error:", error);
-                return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败'}</p></div>`;
-            }
+                if (!orders || orders.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`; }
+                else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td class="date-cell">${Utils.formatDate(o.created_at)}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="amount">${Utils.formatCurrency(o.principal_paid)}</td><td class="text-center">${o.interest_paid_months} ${t('month')}</td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}</span></td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td></tr>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}</button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`; } }
+                return `<div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>📋 ${t('order_list')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+            } catch (error) { console.error("buildCustomerOrdersHTML error:", error); return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败'}</p></div>`; }
         },
 
-        async renderCustomerPaymentHistoryHTML(customerId) {
-            return await this.buildCustomerPaymentHistoryHTML(customerId);
-        },
+        async renderCustomerOrdersHTML(customerId) { return await this.buildCustomerOrdersHTML(customerId); },
 
+        // ==================== 客户缴费历史 ====================
         async showCustomerPaymentHistory(customerId) {
-            APP.currentPage = 'customerPaymentHistory';
-            APP.currentCustomerId = customerId;
-            APP.saveCurrentPageState();
+            APP.currentPage = 'customerPaymentHistory'; APP.currentCustomerId = customerId; APP.saveCurrentPageState();
             const contentHTML = await this.buildCustomerPaymentHistoryHTML(customerId);
             document.getElementById("app").innerHTML = contentHTML;
         },
+
+        async buildCustomerPaymentHistoryHTML(customerId) {
+            const lang = Utils.lang; const t = Utils.t.bind(Utils); const methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+            try {
+                const customer = await SUPABASE.getCustomer(customerId); const client = SUPABASE.getClient();
+                const { data: orders } = await client.from('orders').select('id, order_id').eq('customer_id', customerId); const orderIds = (orders || []).map(o => o.id); let allPayments = [];
+                if (orderIds.length > 0) { const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false }); allPayments = data || []; }
+                const typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') }; let rows = '';
+                if (allPayments.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td>`; }
+                else { for (const p of allPayments) { const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank'; rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td class="col-type">${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`; } }
+                return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+            } catch (error) { console.error("buildCustomerPaymentHistoryHTML error:", error); return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败'}</p></div>`; }
+        },
+
+        async renderCustomerPaymentHistoryHTML(customerId) { return await this.buildCustomerPaymentHistoryHTML(customerId); }
     };
 
     // 挂载到命名空间
@@ -638,5 +497,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.2 补全完成（客户订单/缴费历史 HTML 构建方法）');
+    console.log('✅ JF.CustomersPage v2.3 完整版（无删减）');
 })();
