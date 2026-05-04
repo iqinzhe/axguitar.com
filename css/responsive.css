@@ -39,6 +39,15 @@
         min-width: auto !important;
         width: 100%;
     }
+
+    /* ---- 收益处置卡片：桌面端三列 ---- */
+    .profit-distribution-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-3);          /* 卡片间距，可根据需要调整 */
+        align-items: stretch;
+    }
+    /* 若实际容器类名不同，请替换 .profit-distribution-grid 为实际类名 */
 }
 
 /* ============================================================
@@ -362,6 +371,13 @@
     .card .text-muted {
         font-size: calc(var(--font-sm) - 0.0625rem);
     }
+
+    /* ---- 收益处置卡片：移动端单列 ---- */
+    .profit-distribution-grid {
+        display: block !important;      /* 恢复块级，自然堆叠 */
+        /* 若需要保留间距，可加 margin-bottom 或 gap（单列时 margin 更简单） */
+    }
+    /* 若实际容器类名不同，请替换 .profit-distribution-grid 为实际类名 */
 }
 
 /* ============================================================
