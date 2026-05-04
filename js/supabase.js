@@ -1,4 +1,4 @@
-// supabase.js - v2.1 (Token 刷新失败优雅处理 + 列检查修复)
+// supabase.js - v2.0
 
 'use strict';
 
