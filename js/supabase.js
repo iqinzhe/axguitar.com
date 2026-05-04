@@ -1,4 +1,4 @@
-// supabase.js - v2.3 (修复版：利息支付参数化、删除订单SQL修复、逾期更新性能优化)
+// supabase.js - v2.0 (利息支付参数化、删除订单SQL修复、逾期更新性能优化)
 
 'use strict';
 
