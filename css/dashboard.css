@@ -209,7 +209,7 @@
     background: rgba(14, 116, 144, 0.1);
     border-radius: 7px;
     padding: 4px;
-    gap: 4px;               /* 按钮之间的间隔 */
+    gap: 4px;
 }
 .lang-btn-side {
     display: block;
@@ -217,7 +217,7 @@
     text-align: center;
     border-radius: 5px;
     background: transparent;
-    border: 1px solid transparent;   /* 给每个按钮独立边框 */
+    border: 1px solid transparent;
     transition: background 0.2s;
     cursor: pointer;
     font-size: 0.8rem;
@@ -333,7 +333,7 @@
 .kpi-icon { font-size: 16px; margin-bottom: 1px; }
 
 .kpi-val {
-    font-size: 1.25rem;
+    font-size: var(--font-xl);
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: -0.03em;
@@ -343,7 +343,7 @@
 .kpi-val.amber  { color: #b45309; }
 
 .kpi-label {
-    font-size: 0.75rem;
+    font-size: var(--font-xs);
     font-weight: 600;
     margin-top: 2px;
     color: #475569;
@@ -403,7 +403,7 @@
 .fund-block--free      { background: #dcfce7; border: 1px solid #86efac; }
 
 .fund-block-label {
-    font-size: 0.65rem;
+    font-size: var(--font-xs);
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -413,7 +413,7 @@
 .fund-block--free      .fund-block-label { color: #475569; }
 
 .fund-block-val {
-    font-size: 1.25rem;
+    font-size: var(--font-xl);
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: -0.02em;
@@ -474,7 +474,7 @@
     gap: 3px;
 }
 .cb-label {
-    font-size: 0.65rem;
+    font-size: var(--font-xs);
     color: #475569;
     font-weight: 600;
     display: flex;
@@ -482,7 +482,7 @@
     gap: 6px;
 }
 .cb-val {
-    font-size: 1.25rem;
+    font-size: var(--font-xl);
     font-weight: 700;
     font-family: var(--font-mono);
     color: #0c1929;
@@ -542,20 +542,20 @@
     flex-shrink: 0;
 }
 .income-name {
-    font-size: 0.875rem;
+    font-size: var(--font-sm);
     color: #1e3a52;
     font-weight: 500;
     flex: 1;
 }
 .income-amt {
-    font-size: 1.25rem;
+    font-size: var(--font-xl);
     font-weight: 700;
     font-family: var(--font-mono);
     color: #15803d;
 }
 .income-amt.expense { color: #b91c1c; }
 .income-sub {
-    font-size: 0.65rem;
+    font-size: var(--font-xs);
     color: #64748b;
     margin-top: 1px;
 }
@@ -582,7 +582,7 @@
     margin-top: 2px;
 }
 .np-val {
-    font-size: 1.25rem;
+    font-size: var(--font-xl);
     font-weight: 700;
     font-family: var(--font-mono);
     color: #0e7490;
@@ -654,7 +654,7 @@
     font-size: 17px;
 }
 .qb-label {
-    font-size: 0.75rem;
+    font-size: var(--font-xs);
     font-weight: 600;
     color: #2d4a63;
     text-align: center;
@@ -690,18 +690,18 @@
     flex-shrink: 0;
 }
 .legend-name {
-    font-size: 0.75rem;
+    font-size: var(--font-xs);
     color: #1f2937;
     flex: 1;
 }
 .legend-count {
-    font-size: 1.25rem;
+    font-size: var(--font-xl);
     font-weight: 700;
     font-family: var(--font-mono);
     color: #1a1a2e;
 }
 .legend-pct {
-    font-size: 0.65rem;
+    font-size: var(--font-xs);
     color: #64748b;
     margin-top: 1px;
 }
@@ -844,22 +844,20 @@
     }
 
     /* ---- 重新排列内容顺序（order） ---- */
-    /* 默认 .dash-main 是 flex 列，子元素按 order 排序 */
     .kpi-row {
         order: 2;
     }
     .mid-row {
         order: 3;
     }
-    /* 将 .bottom-row 变为透明容器，让其子元素参与主 flex 排序 */
     .bottom-row {
         display: contents;
     }
     .quick-card {
-        order: 1;          /* 第一个可见内容块 */
+        order: 1;
     }
     .order-status-card {
-        order: 4;          /* 放在最后 */
+        order: 4;
     }
 
     /* KPI 卡片双列展示 */
@@ -914,13 +912,13 @@
     }
     .kpi-row {
         gap: 8px;
-        grid-template-columns: 1fr 1fr !important; /* 确保持双列 */
+        grid-template-columns: 1fr 1fr !important;
     }
     .kpi-card {
         padding: 8px 10px;
     }
     .kpi-val {
-        font-size: 1.1rem;
+        font-size: calc(var(--font-xl) - 0.125rem);
     }
 }
 
@@ -943,7 +941,6 @@
 .order-status-card {
     animation: dashFadeIn 0.4s ease forwards;
 }
-/* 动画延迟只应用于 KPI 卡片（现在只有4个，双列下第一行2个，第二行2个） */
 .kpi-card:nth-child(2) { animation-delay: 0.05s; }
 .kpi-card:nth-child(3) { animation-delay: 0.10s; }
 .kpi-card:nth-child(4) { animation-delay: 0.15s; }
