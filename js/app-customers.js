@@ -1,5 +1,4 @@
-// app-customers.js - v2.1 (JF 命名空间) - 支持外壳渲染，类名重构
-// 客户管理模块，挂载到 JF.CustomersPage
+// app-customers.js - v2.1 (JF 命名空间)
 
 'use strict';
 
