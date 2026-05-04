@@ -1,5 +1,4 @@
-// store.js - v2.1 (JF 命名空间) - 类名重构
-// 统一门店管理模块，挂载到 JF.StoreManager，保留 window.StoreManager 别名
+// store.js - v2.1 (JF 命名空间) 
 
 'use strict';
 
