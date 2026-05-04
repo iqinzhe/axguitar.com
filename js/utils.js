@@ -100,7 +100,7 @@
             'internal_transfer': 'Transfer Internal',
             'cash_to_bank': 'Brankas→🏧 Bank BNI',
             'bank_to_cash': '🏧 Bank BNI→🏦 Brankas',
-            'submit_to_hq': 'Setor ke Pusat',
+            'submit_to_hq': 'Setor ke HO',
             'cash': 'Kas',
             'bank': 'Bank',
             'inflow': 'Masuk',
