@@ -1,4 +1,4 @@
-// order.js - v2.0 统一订单业务模块 (JF 命名空间)
+// order.js - v2.1 (修复版：利息支付记录增加 actualPaid 参数)
 
 'use strict';
 
@@ -59,10 +59,11 @@
             }
         },
 
-        // ==================== 利息记录（灵活还款） ====================
-        async recordInterestPayment(orderId, monthsPaid, paymentMethod) {
+        // ==================== 利息记录（灵活还款）【修复：增加 actualPaid 参数】 ====================
+        async recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid = null) {
             try {
-                return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod);
+                // 将 actualPaid 参数传递给底层 SUPABASE 方法
+                return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid);
             } catch (error) {
                 console.error("recordInterestPayment error:", error);
                 Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran bunga' : '利息记录失败');
@@ -312,5 +313,5 @@
     JF.Order = Order;
     window.Order = Order; // 向下兼容
 
-    console.log('✅ JF.Order v2.0 初始化完成');
+    console.log('✅ JF.Order v2.1 初始化完成（recordInterestPayment 支持 actualPaid 参数）');
 })();
