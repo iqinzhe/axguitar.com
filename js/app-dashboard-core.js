@@ -493,7 +493,7 @@
                 }
 
                 const userInitial = (profile?.name || 'A').charAt(0).toUpperCase();
-                const userRoleText = isAdmin ? (lang === 'id' ? 'Administrator' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长');
+                const userRoleText = isAdmin ? (lang === 'id' ? 'Admini' : '管理员') : (lang === 'id' ? 'Manajer Toko' : '店长');
                 const storeDisplay = isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : Utils.escapeHtml(profile?.stores?.name || (lang === 'id' ? 'Toko' : '门店'));
                 const topbarSubtitle = isAdmin ? (lang === 'id' ? 'Semua Toko · Data Real-time' : '全部门店 · 实时数据') : (lang === 'id' ? 'Data Toko · Real-time' : '门店数据 · 实时更新');
                 const activeBadgeCount = activeOrders;
