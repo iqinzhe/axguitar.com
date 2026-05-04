@@ -183,17 +183,29 @@
                 await this.forceClearAuth();
             }
 
-            // 【修复】监听认证状态变化
+            // 【修复 v2.2】监听认证状态变化
+            // 注意：INITIAL_SESSION 在页面加载时触发，此时 DashboardCore.init() 正在进行中，
+            // 不能在此处触发任何渲染，否则会造成二次渲染和界面闪烁。
+            // 只处理运行时的 SIGNED_OUT / USER_DELETED / TOKEN_REFRESHED 事件。
             const client = SUPABASE.getClient();
             client.auth.onAuthStateChange(async (event, session) => {
                 console.log('[Auth] 认证状态变化:', event);
-                
+
+                // INITIAL_SESSION：仅在页面首次加载时触发，由 DashboardCore.init() 负责处理，此处只同步 user 状态
+                if (event === 'INITIAL_SESSION') {
+                    if (!session) {
+                        console.log('[Auth] 初始会话为空，用户未登录');
+                        this.user = null;
+                    }
+                    // 不做任何渲染，让 DashboardCore.init() 统一处理
+                    return;
+                }
+
+                // 以下事件只在运行时（登录后）触发，可以安全地操作 UI
                 if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
                     console.log('[Auth] 用户已登出或被删除');
                     this.user = null;
                     SUPABASE.clearCache();
-                    
-                    // 如果当前不在登录页，跳转到登录页
                     if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
                         await JF.DashboardCore.renderLogin();
                     }
@@ -211,17 +223,11 @@
                             }
                         }
                     } else {
-                        // 【修复】Token 刷新失败，没有 session
                         console.warn('[Auth] Token 刷新失败，清除认证状态');
                         await this.forceClearAuth();
                         if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
                             await JF.DashboardCore.renderLogin();
                         }
-                    }
-                } else if (event === 'INITIAL_SESSION') {
-                    if (!session) {
-                        console.log('[Auth] 初始会话为空，用户未登录');
-                        this.user = null;
                     }
                 }
             });
@@ -600,5 +606,5 @@
     JF.Auth = AUTH;
     window.AUTH = AUTH; // 向下兼容
 
-    console.log('✅ JF.Auth v2.1 初始化完成（修复 Token 刷新失败处理）');
+    console.log('✅ JF.Auth v2.2 初始化完成（修复 INITIAL_SESSION 二次渲染闪烁）');
 })();
