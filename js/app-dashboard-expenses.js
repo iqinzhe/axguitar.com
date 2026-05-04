@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js -  v2.0 (JF 命名空间) 
+// app-dashboard-funds.js -  v2.0 (JF 命名空间) 
 
 'use strict';
 
@@ -6,487 +6,479 @@
     const JF = window.JF || {};
     window.JF = JF;
 
-    const ExpensesPage = {
-        // ==================== 构建支出列表 HTML（纯内容） ====================
-        async buildExpensesHTML() {
+    const FundsPage = {
+        // ==================== 获取流水类型翻译映射 ====================
+        _getFlowTypeMap(lang) {
+            return {
+                loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+                admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
+                service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
+                interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
+                principal: lang === 'id' ? '🏦 Pokok' : '🏦 本金',
+                expense: lang === 'id' ? '📝 Pengeluaran' : '📝 运营支出',
+                internal_transfer_out: lang === 'id' ? '🔄 Transfer Keluar' : '🔄 转出',
+                internal_transfer_in: lang === 'id' ? '🔄 Transfer Masuk' : '🔄 转入',
+                interest_reversal: lang === 'id' ? '↩️ Batal Bunga' : '↩️ 利息冲销',
+                principal_reversal: lang === 'id' ? '↩️ Batal Pokok' : '↩️ 本金冲销',
+                admin_fee_reversal: lang === 'id' ? '↩️ Batal Admin Fee' : '↩️ 管理费冲销',
+                service_fee_reversal: lang === 'id' ? '↩️ Batal Service Fee' : '↩️ 服务费冲销',
+                collateral_sale_principal: lang === 'id' ? '💎 Jual Jaminan - Pokok' : '💎 变卖抵押物-本金',
+                collateral_sale_interest: lang === 'id' ? '💎 Jual Jaminan - Bunga' : '💎 变卖抵押物-利息',
+                collateral_sale_surplus: lang === 'id' ? '💎 Jual Jaminan - Surplus' : '💎 变卖抵押物-盈余',
+                collateral_sale_loss: lang === 'id' ? '💎 Jual Jaminan - Rugi' : '💎 变卖抵押物-亏损',
+            };
+        },
+
+        // ==================== 构建资金流水页面 HTML（纯内容） ====================
+        async buildCashFlowPageHTML() {
             const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = PERMISSION.isAdmin();
-            const storeId = profile?.store_id;
 
             try {
-                // 获取门店列表用于显示门店名
-                const storesData = await SUPABASE.getAllStores();
-                const storeMap = {};
-                for (const s of storesData) storeMap[s.id] = s.name;
-
-                // 获取支出数据
+                let transactions = [];
                 const client = SUPABASE.getClient();
-                let query = client.from('expenses').select('*').order('expense_date', { ascending: false });
-                if (!isAdmin && storeId) {
-                    query = query.eq('store_id', storeId);
-                }
-                const { data: expenses, error } = await query;
-                if (error) throw error;
-
-                const finalExpenses = expenses || [];
-                let totalAmount = 0;
-                for (const e of finalExpenses) totalAmount += (e.amount || 0);
-
-                const todayDate = new Date().toISOString().split('T')[0];
-                const totalCols = isAdmin ? 7 : 6;
-
-                // 构建表格行
-                let rows = '';
-                if (finalExpenses.length === 0) {
-                    rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}</td></tr>`;
+                if (isAdmin) {
+                    const { data: allFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('is_voided', false).order('recorded_at', { ascending: false });
+                    transactions = allFlows || [];
                 } else {
-                    for (const e of finalExpenses) {
-                        const methodText = e.payment_method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank BNI' : '银行BNI');
-                        const storeName = storeMap[e.store_id] || e.store_id || '-';
+                    const { data: storeFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('store_id', profile?.store_id).eq('is_voided', false)
+                        .order('recorded_at', { ascending: false });
+                    transactions = storeFlows || [];
+                }
 
-                        let actionHtml = '';
-                        if (isAdmin) {
-                            if (!e.is_reconciled) {
-                                actionHtml += `<button onclick="APP.editExpense('${e.id}')" class="btn btn--sm">✏️ ${t('edit')}</button> `;
-                                actionHtml += `<button class="btn btn--danger btn--sm" onclick="APP.deleteExpense('${e.id}')">🗑️ ${t('delete')}</button> `;
-                            } else {
-                                actionHtml += `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span> `;
-                            }
-                            if (!e.is_reconciled) {
-                                actionHtml += `<button onclick="APP.balanceExpenses()" class="btn btn--warning btn--sm">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
-                            }
-                        } else {
-                            actionHtml += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
-                        }
+                const typeMap = FundsPage._getFlowTypeMap(lang);
+                const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
+                const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
 
-                        rows += `</table>
-                            <td class="date-cell">${Utils.formatDate(e.expense_date)}</td>
-                            <td class="expense-category">${Utils.escapeHtml(e.category)}</td>
-                            <td class="amount">${Utils.formatCurrency(e.amount)}</td>
-                            <td class="text-center">${methodText}</td>
-                            <td class="desc-cell">${Utils.escapeHtml(e.description || '-')}</td>
-                            ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
-                            <td class="text-center" style="white-space:nowrap;">${actionHtml}</td>
+                let rows = '';
+                if (transactions.length === 0) {
+                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                } else {
+                    for (const t of transactions) {
+                        rows += `<tr>
+                            <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
+                            <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                            <td class="text-center">${directionMap[t.direction] || t.direction}</td>
+                            <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
+                            <td class="amount">${Utils.formatCurrency(t.amount)}</td>
+                            <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
+                            ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
                         </tr>`;
                     }
                 }
 
-                // 类别选项
-                const expenseCategories = lang === 'id'
-                    ? ['Listrik', 'Air', 'Internet', 'Gaji Karyawan', 'Sewa Tempat', 'ATK', 'Perbaikan', 'Transportasi', 'Lainnya']
-                    : ['电费', '水费', '网络费', '员工工资', '场地租金', '办公用品', '维修', '交通费', '其他'];
-                const categoryOptions = expenseCategories.map(c => `<option value="${c}">${c}</option>`).join('');
-
                 const content = `
-                    <div class="page-header">
-                        <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
-                        <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                        </div>
-                    </div>
+                    <div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${Utils.t('print')}</button></div></div>
                     <div class="card">
-                        <div class="card card--stat" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">
-                            <div class="stat-value expense">${Utils.formatCurrency(totalAmount)}</div>
-                            <div class="stat-label">${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}</div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;" class="no-print">
+                            <input type="date" id="cashFlowFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
+                            <input type="date" id="cashFlowFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
+                            <button onclick="APP.filterCashFlowPage()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
+                            <button onclick="APP.resetCashFlowPageFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                         </div>
-                    </div>
-                    <div class="card">
-                        <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
                         <div class="table-container">
-                            <table class="data-table expense-table">
-                                <thead>
-                                    <tr>
-                                        <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                        <th class="col-type">${lang === 'id' ? 'Kategori' : '类别'}</th>
-                                        <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                        <th class="col-method text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                        <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                        ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                        <th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>${rows}</tbody>
+                            <table class="data-table cashflow-table">
+                                <thead><tr>
+                                    <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                    <th class="col-type">${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                    <th class="col-status text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
+                                    <th class="col-method text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
+                                    <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                    <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                    ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                </tr></thead>
+                                <tbody id="cashFlowPageBody">${rows}</tbody>
                             </table>
                         </div>
-                    </div>
-                    <div class="card">
-                        <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增运营支出'}</h3>
-                        <div class="form-grid form-grid--4">
-                            <div class="form-group">
-                                <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
-                                <input type="date" id="expenseDate" value="${todayDate}">
-                            </div>
-                            <div class="form-group">
-                                <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
-                                <input type="text" id="expenseAmount" placeholder="0" class="amount-input">
-                            </div>
-                            <div class="form-group">
-                                <label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label>
-                                <select id="expenseCategory">
-                                    <option value="">${lang === 'id' ? 'Pilih kategori' : '选择类别'}</option>
-                                    ${categoryOptions}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>${lang === 'id' ? 'Metode Pembayaran' : '支付方式'} *</label>
-                                <select id="expenseMethod">
-                                    <option value="cash">🏦 ${t('cash')}</option>
-                                    <option value="bank">🏧 ${t('bank')}</option>
-                                </select>
-                            </div>
-                            <div class="form-group full-width">
-                                <label>${lang === 'id' ? 'Deskripsi' : '描述'}</label>
-                                <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}"></textarea>
-                            </div>
-                            <div class="form-actions">
-                                <button onclick="APP.addExpense()" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
-                            </div>
-                        </div>
-                        <p class="info-note">💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}</p>
                     </div>`;
+
+                window._cashFlowPageData = transactions;
                 return content;
             } catch (error) {
-                console.error("buildExpensesHTML error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal memuat pengeluaran: ' + error.message : '加载支出失败：' + error.message);
-                return `<div class="card"><p>❌ ${t('loading_failed', { module: '支出' })}</p></div>`;
+                console.error("buildCashFlowPageHTML error:", error);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
+                return `<div class="card"><p>❌ ${Utils.t('loading_failed', { module: '资金流水' })}</p></div>`;
             }
         },
 
-        // 供外壳调用的渲染函数
-        async renderExpensesHTML() {
-            return await this.buildExpensesHTML();
+        // 供外壳调用
+        async renderCashFlowPageHTML() {
+            return await this.buildCashFlowPageHTML();
         },
 
-        // 原有的 showExpenses 兼容直接调用
-        async showExpenses() {
-            APP.currentPage = 'expenses';
+        // 原有的 showCashFlowPage
+        async showCashFlowPage() {
+            APP.currentPage = 'paymentHistory';
             APP.saveCurrentPageState();
-            const contentHTML = await this.buildExpensesHTML();
+            const contentHTML = await this.buildCashFlowPageHTML();
             document.getElementById("app").innerHTML = contentHTML;
-            // 绑定金额输入格式化
-            const amountInput = document.getElementById("expenseAmount");
-            if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         },
 
-        // 添加支出（保持原有逻辑）
-        async addExpense() {
+        filterCashFlowPage() {
+            const transactions = window._cashFlowPageData || [];
+            const startDate = document.getElementById('cashFlowFilterStart')?.value;
+            const endDate = document.getElementById('cashFlowFilterEnd')?.value;
+            const filtered = transactions.filter(t => {
+                if (startDate && t.recorded_at < startDate) return false;
+                if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+                return true;
+            });
+            FundsPage._renderCashFlowPageTable(filtered);
+        },
+
+        resetCashFlowPageFilters() {
+            document.getElementById('cashFlowFilterStart').value = '';
+            document.getElementById('cashFlowFilterEnd').value = '';
+            FundsPage.filterCashFlowPage();
+        },
+
+        _renderCashFlowPageTable(transactions) {
+            const tbody = document.getElementById('cashFlowPageBody');
+            if (!tbody) return;
             const lang = Utils.lang;
-            const expenseDate = document.getElementById("expenseDate").value || new Date().toISOString().split('T')[0];
-            const category = document.getElementById("expenseCategory").value.trim();
-            const amountStr = document.getElementById("expenseAmount").value;
-            const amount = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(amountStr) : parseInt(amountStr.replace(/[,\s]/g, '')) || 0;
-            const description = document.getElementById("expenseDescription").value;
-            const paymentMethod = document.getElementById("expenseMethod").value;
-
-            if (!category) { Utils.toast.warning(lang === 'id' ? 'Masukkan kategori' : '请输入类别'); return; }
-            if (isNaN(amount) || amount <= 0) { Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
-
-            try {
-                const profile = await SUPABASE.getCurrentProfile();
-                await SUPABASE.addExpense({
-                    store_id: profile.store_id,
-                    expense_date: expenseDate,
-                    category,
-                    amount,
-                    description: description || null,
-                    payment_method: paymentMethod
-                });
-                Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
-                await ExpensesPage.showExpenses();
-            } catch (error) {
-                console.error("addExpense error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+            const isAdmin = PERMISSION.isAdmin();
+            const typeMap = FundsPage._getFlowTypeMap(lang);
+            const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
+            const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
+            let rows = '';
+            if (transactions.length === 0) {
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+            } else {
+                for (const t of transactions) {
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                }
             }
+            tbody.innerHTML = rows;
         },
 
-        // ==================== 【修复 Bug 3】编辑支出（管理员）- 同步更新现金流 ====================
-        async editExpense(expenseId) {
+        // ==================== 原有弹窗、转账、导出等方法（完整保留） ====================
+        async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
-                return;
-            }
             try {
+                let transactions = [];
                 const client = SUPABASE.getClient();
-                const { data: expense, error } = await client.from('expenses').select('*').eq('id', expenseId).single();
-                if (error) throw error;
-                if (expense.is_reconciled) {
-                    Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
-                    return;
+                if (isAdmin) {
+                    const { data: allFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('is_voided', false).order('recorded_at', { ascending: false });
+                    transactions = allFlows || [];
+                } else {
+                    const { data: storeFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('store_id', profile?.store_id).eq('is_voided', false)
+                        .order('recorded_at', { ascending: false });
+                    transactions = storeFlows || [];
                 }
-                
-                // 创建编辑弹窗，使用更友好的表单而不是简单的 prompt
-                const oldModal = document.getElementById('editExpenseModal');
+
+                const typeMap = FundsPage._getFlowTypeMap(lang);
+                const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
+                const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
+
+                let rows = '';
+                if (transactions.length === 0) {
+                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                } else {
+                    for (const t of transactions) {
+                        rows += `<tr>
+                            <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
+                            <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                            <td class="text-center">${directionMap[t.direction] || t.direction}</td>
+                            <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
+                            <td class="amount">${Utils.formatCurrency(t.amount)}</td>
+                            <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
+                            ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                        </tr>`;
+                    }
+                }
+
+                const oldModal = document.getElementById('capitalModal');
                 if (oldModal) oldModal.remove();
-                
+
                 const modalHtml = `
-                    <div id="editExpenseModal" class="modal-overlay">
-                        <div class="modal-content" style="max-width: 450px;">
-                            <h3>✏️ ${lang === 'id' ? 'Edit Pengeluaran' : '编辑支出'}</h3>
-                            <div class="form-group">
-                                <label>📅 ${lang === 'id' ? 'Tanggal' : '日期'}</label>
-                                <input type="date" id="editExpenseDate" value="${expense.expense_date}" style="width:100%;padding:8px;border-radius:6px;">
-                            </div>
-                            <div class="form-group">
-                                <label>📝 ${lang === 'id' ? 'Kategori' : '类别'}</label>
-                                <input type="text" id="editExpenseCategory" value="${Utils.escapeHtml(expense.category)}" style="width:100%;padding:8px;border-radius:6px;">
-                            </div>
-                            <div class="form-group">
-                                <label>💰 ${lang === 'id' ? 'Jumlah' : '金额'}</label>
-                                <input type="text" id="editExpenseAmount" class="amount-input" value="${Utils.formatNumberWithCommas(expense.amount)}" style="width:100%;padding:8px;border-radius:6px;">
-                            </div>
-                            <div class="form-group">
-                                <label>💬 ${lang === 'id' ? 'Deskripsi' : '描述'}</label>
-                                <textarea id="editExpenseDescription" rows="2" style="width:100%;border-radius:6px;">${Utils.escapeHtml(expense.description || '')}</textarea>
-                            </div>
-                            <div class="form-group">
-                                <label>🏦 ${lang === 'id' ? 'Metode Pembayaran' : '支付方式'}</label>
-                                <select id="editExpenseMethod" style="width:100%;padding:8px;border-radius:6px;">
-                                    <option value="cash" ${expense.payment_method === 'cash' ? 'selected' : ''}>🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</option>
-                                    <option value="bank" ${expense.payment_method === 'bank' ? 'selected' : ''}>🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</option>
+                    <div id="capitalModal" class="modal-overlay">
+                        <div class="modal-content" style="max-width:1000px;">
+                            <h3>🏦 ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h3>
+                            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
+                                <input type="text" id="capitalFilterDesc" placeholder="🔍 ${lang === 'id' ? 'Cari deskripsi...' : '搜索描述...'}" style="flex:1;">
+                                <select id="capitalFilterType" style="width:auto;">
+                                    <option value="">${lang === 'id' ? 'Semua tipe' : '全部类型'}</option>
+                                    <option value="loan_disbursement">${lang === 'id' ? 'Pencairan Pinjaman' : '贷款发放'}</option>
+                                    <option value="admin_fee">${lang === 'id' ? 'Admin Fee' : '管理费'}</option>
+                                    <option value="service_fee">${lang === 'id' ? 'Service Fee' : '服务费'}</option>
+                                    <option value="interest">${lang === 'id' ? 'Bunga' : '利息'}</option>
+                                    <option value="principal">${lang === 'id' ? 'Pokok' : '本金'}</option>
+                                    <option value="expense">${lang === 'id' ? 'Pengeluaran' : '运营支出'}</option>
                                 </select>
+                                <input type="date" id="capitalFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
+                                <input type="date" id="capitalFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
+                                <button onclick="APP.filterCapitalTransactions()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
+                                <button onclick="APP.resetCapitalFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                             </div>
-                            <div class="modal-actions" style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
-                                <button onclick="APP.saveEditedExpense('${expenseId}')" id="saveEditExpenseBtn" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan' : '保存'}</button>
-                                <button onclick="APP.closeEditExpenseModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                            <div class="table-container" style="max-height:400px;overflow-y:auto;">
+                                <table class="data-table capital-table" style="min-width:700px;">
+                                    <thead><tr>
+                                        <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                        <th class="col-type">${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                        <th class="col-status text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
+                                        <th class="col-method text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
+                                        <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                        <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                        ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                    </tr></thead>
+                                    <tbody id="capitalTransactionsBody">${rows}</tbody>
+                                </table>
+                            </div>
+                            <div class="modal-actions">
+                                <button onclick="APP.printCapitalTransactions()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                                <button onclick="APP.exportCapitalTransactionsToCSV()" class="btn btn--success">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                                <button onclick="APP.closeCapitalModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button>
                             </div>
                         </div>
-                    </div>
-                `;
-                
+                    </div>`;
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
-                
-                // 绑定金额格式化
-                const amountInput = document.getElementById('editExpenseAmount');
-                if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
-                
+                window._capitalTransactionsData = transactions;
             } catch (error) {
-                console.error("editExpense error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
+                console.error("showCapitalModal error:", error);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat data transaksi' : '加载交易记录失败');
             }
         },
-        
-        // 关闭编辑支出弹窗
-        closeEditExpenseModal: function() {
-            const modal = document.getElementById('editExpenseModal');
+
+        closeCapitalModal() {
+            const modal = document.getElementById('capitalModal');
             if (modal) modal.remove();
         },
-        
-        // 【修复 Bug 3】保存编辑后的支出 - 使用 SUPABASE.updateExpenseWithCashFlow
-        saveEditedExpense: async function(expenseId) {
-            const lang = Utils.lang;
-            const isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
-                return;
-            }
-            
-            const expenseDate = document.getElementById('editExpenseDate')?.value;
-            const category = document.getElementById('editExpenseCategory')?.value.trim();
-            const amountStr = document.getElementById('editExpenseAmount')?.value || '0';
-            const amount = Utils.parseNumberFromCommas(amountStr);
-            const description = document.getElementById('editExpenseDescription')?.value.trim();
-            const paymentMethod = document.getElementById('editExpenseMethod')?.value;
-            
-            if (!category) {
-                Utils.toast.warning(lang === 'id' ? 'Kategori harus diisi' : '类别必须填写');
-                return;
-            }
-            
-            if (amount <= 0) {
-                Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
-                return;
-            }
-            
-            const saveBtn = document.getElementById('saveEditExpenseBtn');
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
-            }
-            
-            try {
-                // 获取原支出记录以获取旧金额
-                const client = SUPABASE.getClient();
-                const { data: oldExpense, error: fetchError } = await client
-                    .from('expenses').select('amount, payment_method, category').eq('id', expenseId).single();
-                if (fetchError) throw fetchError;
-                
-                // 构建更新对象
-                const updates = {
-                    expense_date: expenseDate,
-                    category: category,
-                    amount: amount,
-                    description: description || null,
-                    payment_method: paymentMethod,
-                    updated_at: Utils.getLocalDateTime()
-                };
-                
-                // 使用新增的方法同步更新现金流
-                await SUPABASE.updateExpenseWithCashFlow(expenseId, updates);
-                
-                const amountChanged = oldExpense.amount !== amount;
-                if (amountChanged) {
-                    const diff = amount - oldExpense.amount;
-                    const diffText = diff > 0 
-                        ? `${lang === 'id' ? 'naik' : '增加'} ${Utils.formatCurrency(diff)}`
-                        : `${lang === 'id' ? 'turun' : '减少'} ${Utils.formatCurrency(Math.abs(diff))}`;
-                    Utils.toast.success(lang === 'id' 
-                        ? `Pengeluaran berhasil diubah (${diffText})`
-                        : `支出已修改 (${diffText})`);
-                } else {
-                    Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
-                }
-                
-                ExpensesPage.closeEditExpenseModal();
-                await ExpensesPage.showExpenses();
-                
-            } catch (error) {
-                console.error("saveEditedExpense error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
-            } finally {
-                if (saveBtn) {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = lang === 'id' ? 'Simpan' : '保存';
-                }
-            }
+
+        filterCapitalTransactions() {
+            const transactions = window._capitalTransactionsData || [];
+            const searchDesc = document.getElementById('capitalFilterDesc')?.value.toLowerCase() || '';
+            const filterType = document.getElementById('capitalFilterType')?.value || '';
+            const startDate = document.getElementById('capitalFilterStart')?.value;
+            const endDate = document.getElementById('capitalFilterEnd')?.value;
+            const filtered = transactions.filter(t => {
+                if (filterType && t.flow_type !== filterType) return false;
+                if (searchDesc && !(t.description || '').toLowerCase().includes(searchDesc)) return false;
+                if (startDate && t.recorded_at < startDate) return false;
+                if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+                return true;
+            });
+            FundsPage._renderCapitalTransactionsTable(filtered);
         },
 
-        // ==================== 【修复 Bug 3】删除支出（管理员）- 同步删除现金流 ====================
-        async deleteExpense(expenseId) {
-            const lang = Utils.lang;
-            const isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
-                return;
-            }
-            
-            // 先获取支出信息用于显示确认
-            const client = SUPABASE.getClient();
-            const { data: expense, error: fetchError } = await client
-                .from('expenses').select('category, amount, is_reconciled').eq('id', expenseId).single();
-            
-            if (fetchError) {
-                Utils.toast.error(lang === 'id' ? 'Gagal memuat data pengeluaran' : '加载支出数据失败');
-                return;
-            }
-            
-            if (expense.is_reconciled) {
-                Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat dihapus' : '支出已平账，不可删除');
-                return;
-            }
-            
-            const confirmMsg = lang === 'id'
-                ? `⚠️ Hapus pengeluaran ini?\n\nKategori: ${expense.category}\nJumlah: ${Utils.formatCurrency(expense.amount)}\n\nData terkait di arus kas juga akan dihapus.`
-                : `⚠️ 删除此支出记录？\n\n类别: ${expense.category}\n金额: ${Utils.formatCurrency(expense.amount)}\n\n关联的现金流记录也将被删除。`;
-            
-            const confirmed = await Utils.toast.confirm(confirmMsg);
-            if (!confirmed) return;
-            
-            try {
-                // 使用新增的方法同步删除现金流
-                await SUPABASE.deleteExpenseWithCashFlow(expenseId);
-                
-                Utils.toast.success(lang === 'id' ? 'Pengeluaran dan arus kas terkait telah dihapus' : '支出及关联现金流已删除');
-                await ExpensesPage.showExpenses();
-            } catch (error) {
-                console.error("deleteExpense error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
-            }
+        resetCapitalFilters() {
+            document.getElementById('capitalFilterDesc').value = '';
+            document.getElementById('capitalFilterType').value = '';
+            document.getElementById('capitalFilterStart').value = '';
+            document.getElementById('capitalFilterEnd').value = '';
+            FundsPage.filterCapitalTransactions();
         },
 
-        // 平账（管理员）- 保持不变
-        async balanceExpenses() {
+        _renderCapitalTransactionsTable(transactions) {
+            const tbody = document.getElementById('capitalTransactionsBody');
+            if (!tbody) return;
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat melakukan rekonsiliasi' : '仅管理员可执行平账操作');
-                return;
+            const typeMap = FundsPage._getFlowTypeMap(lang);
+            const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
+            const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
+            let rows = '';
+            if (transactions.length === 0) {
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+            } else {
+                for (const t of transactions) {
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                }
             }
+            tbody.innerHTML = rows;
+        },
 
-            const period = prompt(lang === 'id'
-                ? 'Pilih periode rekonsiliasi:\n1 = Bulan ini\n2 = 6 bulan terakhir\n3 = 12 bulan terakhir\n4 = Tahun ini\n5 = Kustom'
-                : '选择平账周期：\n1 = 本月\n2 = 最近6个月\n3 = 最近12个月\n4 = 本年\n5 = 自定义');
-            if (!period) return;
+        printCapitalTransactions() {
+            const modalContent = document.querySelector('#capitalModal .modal-content');
+            if (!modalContent) return;
+            const lang = Utils.lang;
+            const storeName = AUTH.getCurrentStoreName();
+            const userName = AUTH.user?.name || '-';
+            const printDateTime = new Date().toLocaleString();
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;line-height:1.4;color:#1e293b;padding:15mm}.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #1e293b;padding-bottom:10px}.header h1{font-size:18px;margin:5px 0}.store-info{text-align:center;font-size:10pt;color:#475569;margin:5px 0}.user-info{text-align:center;font-size:9pt;color:#64748b;margin-bottom:15px}table{width:100%;border-collapse:collapse;margin-top:15px}th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;font-size:10px}th{background:#f1f5f9;font-weight:700}.text-right{text-align:right}.text-center{text-align:center}.income{color:#10b981}.expense{color:#ef4444}.footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:8px}.no-print{text-align:center;margin-bottom:15px}.no-print button{margin:0 5px;padding:6px 14px;cursor:pointer;border:none;border-radius:4px}@media print{.no-print{display:none}@page{size:A4;margin:15mm}}</style></head><body><div class="no-print"><button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button><button onclick="window.close()">${lang === 'id' ? 'Tutup' : '关闭'}</button></div><div class="header"><h1>JF! by Gadai</h1><div class="store-info">🏪 ${Utils.escapeHtml(storeName)}</div><div class="user-info">👤 ${Utils.escapeHtml(userName)} | 📅 ${printDateTime}</div><h3>💰 ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h3></div>${modalContent.querySelector('.table-container')?.innerHTML || ''}<div class="footer"><div>JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div><div>${lang === 'id' ? 'Terima kasih' : '感谢您的信任'}</div></div></body></html>`);
+            printWindow.document.close();
+        },
 
-            let startDate, endDate;
-            const today = new Date();
-            const currentYear = today.getFullYear();
-            const currentMonth = today.getMonth();
-            switch (period) {
-                case '1': startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-                case '2': startDate = new Date(currentYear, currentMonth - 5, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-                case '3': startDate = new Date(currentYear - 1, currentMonth, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-                case '4': startDate = new Date(currentYear, 0, 1).toISOString().split('T')[0]; endDate = today.toISOString().split('T')[0]; break;
-                case '5':
-                    startDate = prompt(lang === 'id' ? 'Masukkan tanggal mulai (YYYY-MM-DD):' : '请输入开始日期 (YYYY-MM-DD):');
-                    endDate = prompt(lang === 'id' ? 'Masukkan tanggal akhir (YYYY-MM-DD):' : '请输入结束日期 (YYYY-MM-DD):');
-                    if (!startDate || !endDate) return;
+        exportCapitalTransactionsToCSV() {
+            const transactions = window._capitalTransactionsData || [];
+            const lang = Utils.lang;
+            const headers = lang === 'id' ? ['Tanggal', 'Tipe', 'Arah', 'Sumber', 'Jumlah', 'Deskripsi'] : ['日期', '类型', '方向', '来源/去向', '金额', '描述'];
+            const typeMap = FundsPage._getFlowTypeMap(lang);
+            const rows = transactions.map(t => [t.recorded_at.split('T')[0], typeMap[t.flow_type] || t.flow_type, t.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'), t.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'), t.amount, t.description || '-']);
+            const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `jf_cash_flow_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+            URL.revokeObjectURL(url);
+            Utils.toast.success(lang === 'id' ? 'Ekspor berhasil!' : '导出成功！');
+        },
+
+        async showTransferModal(transferType) {
+            const lang = Utils.lang;
+            let title, fromLabel, toLabel, maxAmount;
+            const cashFlow = await SUPABASE.getCashFlowSummary();
+            switch (transferType) {
+                case 'cash_to_bank':
+                    title = lang === 'id' ? '💰 Transfer Kas ke Bank' : '💰 现金存入银行';
+                    fromLabel = lang === 'id' ? 'Dari Brankas (Tunai)' : '从保险柜（现金）';
+                    toLabel = lang === 'id' ? 'Ke Bank BNI' : '存入银行 BNI';
+                    maxAmount = cashFlow.cash.balance;
+                    break;
+                case 'bank_to_cash':
+                    title = lang === 'id' ? '💰 Tarik Tunai dari Bank' : '💰 银行取现';
+                    fromLabel = lang === 'id' ? 'Dari Bank BNI' : '从银行 BNI';
+                    toLabel = lang === 'id' ? 'Ke Brankas (Tunai)' : '存入保险柜（现金）';
+                    maxAmount = cashFlow.bank.balance;
+                    break;
+                case 'store_to_hq':
+                    title = lang === 'id' ? '🏢 Setoran ke Kantor Pusat' : '🏢 上缴总部';
+                    fromLabel = lang === 'id' ? 'Dari Bank Toko' : '从门店银行';
+                    toLabel = lang === 'id' ? 'Ke Kantor Pusat' : '上缴总部';
+                    const profile = await SUPABASE.getCurrentProfile();
+                    const shopAccount = await SUPABASE.getShopAccount(profile?.store_id);
+                    maxAmount = shopAccount.bank_balance;
                     break;
                 default: return;
             }
-
-            const confirmMsg = lang === 'id'
-                ? `Rekonsiliasi pengeluaran dari ${startDate} sampai ${endDate}?`
-                : `确认平账 ${startDate} 至 ${endDate} 期间的支出？`;
+            if (maxAmount <= 0) { Utils.toast.warning(lang === 'id' ? 'Saldo tidak mencukupi' : '余额不足'); return; }
+            const amountStr = prompt(`${title}\n\n${fromLabel}\n${toLabel}\n\n${lang === 'id' ? 'Maksimal' : '最大'}: ${Utils.formatCurrency(maxAmount)}\n\n${lang === 'id' ? 'Masukkan jumlah:' : '请输入金额:'}`, Utils.formatNumberWithCommas(maxAmount));
+            if (!amountStr) return;
+            const amount = Utils.parseNumberFromCommas(amountStr);
+            if (isNaN(amount) || amount <= 0) { Utils.toast.warning(lang === 'id' ? 'Jumlah tidak valid' : '金额无效'); return; }
+            if (amount > maxAmount) { Utils.toast.warning(lang === 'id' ? 'Jumlah melebihi saldo' : '金额超过余额'); return; }
+            const confirmMsg = lang === 'id' ? `Konfirmasi transfer:\n\n${fromLabel} → ${toLabel}\n${Utils.formatCurrency(amount)}\n\nLanjutkan?` : `确认转账：\n\n${fromLabel} → ${toLabel}\n${Utils.formatCurrency(amount)}\n\n继续吗？`;
             const confirmed = await Utils.toast.confirm(confirmMsg);
-            if (!confirmed) return;
+            if (confirmed) await FundsPage.executeTransfer(transferType, amount);
+        },
 
+        async executeTransfer(transferType, amount) {
+            const lang = Utils.lang;
+            const profile = await SUPABASE.getCurrentProfile();
             try {
-                const client = SUPABASE.getClient();
-                const { data: expensesToUpdate, error: fetchError } = await client
-                    .from('expenses').select('id').gte('expense_date', startDate).lte('expense_date', endDate).eq('is_reconciled', false);
-                if (fetchError) throw fetchError;
-                const count = expensesToUpdate ? expensesToUpdate.length : 0;
-                if (count === 0) {
-                    Utils.toast.info(lang === 'id' ? 'Tidak ada pengeluaran yang perlu direkonsiliasi' : '没有需要平账的支出记录');
-                    return;
+                if (transferType === 'cash_to_bank') {
+                    await SUPABASE.recordInternalTransfer({ transfer_type: 'cash_to_bank', from_account: 'cash', to_account: 'bank', amount, description: lang === 'id' ? 'Transfer kas ke bank' : '现金存入银行', store_id: profile?.store_id });
+                } else if (transferType === 'bank_to_cash') {
+                    await SUPABASE.recordInternalTransfer({ transfer_type: 'bank_to_cash', from_account: 'bank', to_account: 'cash', amount, description: lang === 'id' ? 'Tarik tunai dari bank' : '银行取现', store_id: profile?.store_id });
+                } else if (transferType === 'store_to_hq') {
+                    await SUPABASE.remitToHeadquarters(profile?.store_id, amount, lang === 'id' ? 'Setoran ke kantor pusat' : '上缴总部');
                 }
-                const profile = await SUPABASE.getCurrentProfile();
-                await client.from('expenses').update({
-                    is_reconciled: true,
-                    reconciled_at: new Date().toISOString(),
-                    reconciled_by: profile?.id || null
-                }).gte('expense_date', startDate).lte('expense_date', endDate).eq('is_reconciled', false);
-                const successMsg = lang === 'id'
-                    ? `Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.`
-                    : `平账完成！已平账 ${count} 条支出记录。`;
-                Utils.toast.success(successMsg);
-                await ExpensesPage.showExpenses();
+                Utils.toast.success(lang === 'id' ? 'Transfer berhasil' : '转账成功');
+                await APP.renderDashboard();
             } catch (error) {
-                console.error("balanceExpenses error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal rekonsiliasi: ' + error.message : '平账失败：' + error.message);
+                Utils.toast.error(lang === 'id' ? 'Gagal: ' + error.message : '失败：' + error.message);
             }
-        }
+        },
+
+        async showInternalTransferHistory() {
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            try {
+                const transfers = await SUPABASE.getInternalTransfers();
+                const typeMap = {
+                    cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行',
+                    bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取现',
+                    store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部',
+                };
+                let rows = '';
+                if (transfers.length === 0) {
+                    rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</tr>`;
+                } else {
+                    for (const t of transfers) {
+                        rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td>${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    }
+                }
+                const modalHtml = `<div id="internalTransferModal" class="modal-overlay"><div class="modal-content" style="max-width:800px;"><h3>🔄 ${lang === 'id' ? 'Riwayat Transfer Internal' : '内部转账记录'}</h3><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;"><input type="date" id="transferFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}"><input type="date" id="transferFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}"><button onclick="APP.filterInternalTransferHistory()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button><button onclick="APP.resetInternalTransferFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button></div><div class="table-container" style="max-height:400px;overflow-y:auto;"><table class="data-table transfer-table" style="min-width:600px;"><thead><tr><th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th><th class="col-type">${lang === 'id' ? 'Jenis Transfer' : '转账类型'}</th><th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th><th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th><th class="col-name">${lang === 'id' ? 'Oleh' : '操作人'}</th>${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}</tr></thead><tbody id="internalTransferBody">${rows}</tbody></table></div><div class="modal-actions"><button onclick="APP.exportInternalTransferToCSV()" class="btn btn--success">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button><button onclick="APP.closeInternalTransferModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button></div></div></div>`;
+                const oldModal = document.getElementById('internalTransferModal');
+                if (oldModal) oldModal.remove();
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                window._internalTransfersData = transfers;
+            } catch (error) {
+                console.error("showInternalTransferHistory error:", error);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat transfer' : '加载转账记录失败');
+            }
+        },
+
+        closeInternalTransferModal() { const modal = document.getElementById('internalTransferModal'); if (modal) modal.remove(); },
+        filterInternalTransferHistory() {
+            const transfers = window._internalTransfersData || [];
+            const startDate = document.getElementById('transferFilterStart')?.value;
+            const endDate = document.getElementById('transferFilterEnd')?.value;
+            const filtered = transfers.filter(t => {
+                if (startDate && t.transfer_date < startDate) return false;
+                if (endDate && t.transfer_date > endDate) return false;
+                return true;
+            });
+            FundsPage._renderInternalTransferHistory(filtered);
+        },
+        resetInternalTransferFilters() { document.getElementById('transferFilterStart').value = ''; document.getElementById('transferFilterEnd').value = ''; FundsPage.filterInternalTransferHistory(); },
+
+        _renderInternalTransferHistory(transfers) {
+            const tbody = document.getElementById('internalTransferBody');
+            if (!tbody) return;
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            const typeMap = { cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行', bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取现', store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部' };
+            let rows = '';
+            if (transfers.length === 0) {
+                rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
+            } else {
+                for (const t of transfers) {
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td>${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                }
+            }
+            tbody.innerHTML = rows;
+        },
+
+        exportInternalTransferToCSV() {
+            const transfers = window._internalTransfersData || [];
+            const lang = Utils.lang;
+            const headers = lang === 'id' ? ['Tanggal', 'Jenis Transfer', 'Jumlah', 'Deskripsi', 'Oleh', 'Toko'] : ['日期', '转账类型', '金额', '描述', '操作人', '门店'];
+            const typeMap = { cash_to_bank: lang === 'id' ? 'Kas ke Bank' : '现金存入银行', bank_to_cash: lang === 'id' ? 'Tarik Tunai' : '银行取现', store_to_hq: lang === 'id' ? 'Setoran ke Pusat' : '上缴总部' };
+            const rows = transfers.map(t => [t.transfer_date, typeMap[t.transfer_type] || t.transfer_type, t.amount, t.description || '-', t.created_by_profile?.name || '-', t.stores?.name || '-']);
+            const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `jf_internal_transfers_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+            URL.revokeObjectURL(url);
+            Utils.toast.success(lang === 'id' ? 'Ekspor berhasil!' : '导出成功！');
+        },
     };
 
     // 挂载到命名空间
-    JF.ExpensesPage = ExpensesPage;
+    JF.FundsPage = FundsPage;
 
     // 向下兼容 APP 方法
     if (window.APP) {
-        window.APP.showExpenses = ExpensesPage.showExpenses.bind(ExpensesPage);
-        window.APP.addExpense = ExpensesPage.addExpense.bind(ExpensesPage);
-        window.APP.editExpense = ExpensesPage.editExpense.bind(ExpensesPage);
-        window.APP.saveEditedExpense = ExpensesPage.saveEditedExpense.bind(ExpensesPage);
-        window.APP.closeEditExpenseModal = ExpensesPage.closeEditExpenseModal.bind(ExpensesPage);
-        window.APP.deleteExpense = ExpensesPage.deleteExpense.bind(ExpensesPage);
-        window.APP.balanceExpenses = ExpensesPage.balanceExpenses.bind(ExpensesPage);
-    } else {
-        window.APP = {
-            showExpenses: ExpensesPage.showExpenses.bind(ExpensesPage),
-            addExpense: ExpensesPage.addExpense.bind(ExpensesPage),
-            editExpense: ExpensesPage.editExpense.bind(ExpensesPage),
-            saveEditedExpense: ExpensesPage.saveEditedExpense.bind(ExpensesPage),
-            closeEditExpenseModal: ExpensesPage.closeEditExpenseModal.bind(ExpensesPage),
-            deleteExpense: ExpensesPage.deleteExpense.bind(ExpensesPage),
-            balanceExpenses: ExpensesPage.balanceExpenses.bind(ExpensesPage),
-        };
+        window.APP.showCashFlowPage = FundsPage.showCashFlowPage.bind(FundsPage);
+        window.APP.filterCashFlowPage = FundsPage.filterCashFlowPage.bind(FundsPage);
+        window.APP.resetCashFlowPageFilters = FundsPage.resetCashFlowPageFilters.bind(FundsPage);
+        window.APP.showCapitalModal = FundsPage.showCapitalModal.bind(FundsPage);
+        window.APP.closeCapitalModal = FundsPage.closeCapitalModal.bind(FundsPage);
+        window.APP.filterCapitalTransactions = FundsPage.filterCapitalTransactions.bind(FundsPage);
+        window.APP.resetCapitalFilters = FundsPage.resetCapitalFilters.bind(FundsPage);
+        window.APP.printCapitalTransactions = FundsPage.printCapitalTransactions.bind(FundsPage);
+        window.APP.exportCapitalTransactionsToCSV = FundsPage.exportCapitalTransactionsToCSV.bind(FundsPage);
+        window.APP.showTransferModal = FundsPage.showTransferModal.bind(FundsPage);
+        window.APP.executeTransfer = FundsPage.executeTransfer.bind(FundsPage);
+        window.APP.showInternalTransferHistory = FundsPage.showInternalTransferHistory.bind(FundsPage);
+        window.APP.closeInternalTransferModal = FundsPage.closeInternalTransferModal.bind(FundsPage);
+        window.APP.filterInternalTransferHistory = FundsPage.filterInternalTransferHistory.bind(FundsPage);
+        window.APP.resetInternalTransferFilters = FundsPage.resetInternalTransferFilters.bind(FundsPage);
+        window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
     }
 
-    console.log('✅ JF.ExpensesPage v2.2 修复完成（支出编辑/删除同步现金流，Toast图标清理）');
+    console.log('✅ JF.FundsPage v2.1 重构完成（类名统一，Toast图标清理）');
 })();
