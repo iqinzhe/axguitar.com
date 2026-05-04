@@ -1,5 +1,4 @@
-// store.js - v2.1 (JF 命名空间) 
-// 修改：清理 Toast 中的手动 ✅ ❌ ⚠️ ℹ️ 图标
+// store.js - v2.0 (JF 命名空间) 
 
 'use strict';
 
