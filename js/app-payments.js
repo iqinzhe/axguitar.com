@@ -1,4 +1,4 @@
-// app-payments.js - v2.1 (修复版：利息支付参数传递，解除 DOM 耦合)
+// app-payments.js - v2.0 (利息支付参数传递，解除 DOM 耦合)
 
 'use strict';
 
