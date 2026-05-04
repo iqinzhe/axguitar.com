@@ -612,7 +612,7 @@
   </div>
   ${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}
 </div>
-                                <div class="transfer-row-v2"><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('cash_to_bank')">🏦→🏧 ${lang === 'id' ? 'Kas ke Bank' : '现金转银行'}</div><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Bank ke Kas' : '银行转现金'}</div>${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}</div>
+                            
                             </div>
                             <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfit)}</div></div></div>
                         </div>
