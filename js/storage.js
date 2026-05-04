@@ -1,5 +1,4 @@
 // storage.js - v2.0 统一备份恢复模块 (JF 命名空间)
-// 挂载到 JF.BackupStorage，保留 window.BackupStorage 别名
 
 'use strict';
 
