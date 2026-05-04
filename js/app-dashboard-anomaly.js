@@ -1,6 +1,4 @@
-// app-dashboard-anomaly.js - v2.1 (JF 命名空间) - 类名重构
-// 异常检测页面模块，挂载到 JF.AnomalyPage
-
+// app-dashboard-anomaly.js - v2.0 (JF 命名空间) 
 'use strict';
 
 (function () {
