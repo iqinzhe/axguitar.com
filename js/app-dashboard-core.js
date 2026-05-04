@@ -584,7 +584,7 @@ async originalRenderDashboard() {
             </div>
             <div class="dash-topbar">
                 <div class="topbar-left"><div class="btn btn--outline" id="hamburgerBtn" onclick="JF.DashboardCore._toggleSidebar()">☰</div><div><div class="topbar-title">${lang === 'id' ? 'Dasbor' : '仪表盘总览'}</div><div class="topbar-sub">${topbarSubtitle}</div></div></div>
-                <div class="topbar-right"><div class="btn btn--warning" onclick="JF.DashboardCore.navigateTo('anomaly')">⚠️${overdueOrders > 0 ? '<div class="alert-dot"></div>' : ''}</div><div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div><div class="btn btn--outline" onclick="JF.DashboardCore.invalidateDashboardCache()">🔄</div></div>
+                <div class="topbar-right">${overdueOrders > 0 ? `<div class="btn btn--warning" onclick="JF.DashboardCore.navigateTo('anomaly')">⚠️</div>` : ''}<div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div><div class="btn btn--outline" onclick="JF.DashboardCore.invalidateDashboardCache()">🔄</div></div>
             </div>
             <div class="dash-main">
                 <div class="kpi-row">
