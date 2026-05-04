@@ -488,5 +488,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.2 修复完成（支出编辑/删除同步现金流，Toast图标清理）');
+    console.log('✅ JF.ExpensesPage v2.2 修复完成（支出编辑/删除同步现金流）');
 })();
