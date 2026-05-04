@@ -1,4 +1,4 @@
-// app-profit.js - v2.0 (JF 命名空间) - 类名重构
+// app-profit.js - v2.0 (JF 命名空间) 
 // 收益处置页面（利润再投入 / 偿还本金）
 
 'use strict';
