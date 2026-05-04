@@ -1,6 +1,5 @@
-// toast.js - v2.1 统一重构版
+// toast.js - v2.2 精简版
 // Toast 通知与确认系统
-// 修复：增加错误恢复通知 + 持久化错误提示
 
 'use strict';
 
@@ -12,15 +11,12 @@
     let toastContainer = null;
     let confirmModal = null;
     let toastCounter = 0;
-    let _persistentToasts = [];  // 【修复】持久化 Toast 列表
 
-    // ==================== 安全语言获取（避免循环依赖 Utils） ====================
+    // ==================== 安全语言获取 ====================
     function getLang() {
-        // 优先使用已加载的 Utils
         if (window.Utils && typeof window.Utils.lang !== 'undefined') {
             return window.Utils.lang;
         }
-        // 备用：从 localStorage 读取
         return localStorage.getItem('jf_lang') === 'id' ? 'id' : 'zh';
     }
 
@@ -70,10 +66,6 @@
                 from { transform: translateX(0); opacity: 1; }
                 to   { transform: translateX(100%); opacity: 0; }
             }
-            @keyframes toastPulse {
-                0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-                50% { box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
-            }
             @keyframes confirmFadeIn {
                 from { opacity: 0; }
                 to   { opacity: 1; }
@@ -106,14 +98,12 @@
             error: '❌',
             warning: '⚠️',
             info: 'ℹ️',
-            critical: '🔴',  // 【修复】新增严重错误类型
         };
         const bgColors = {
             success: '#10b981',
             error: '#ef4444',
             warning: '#f59e0b',
             info: '#3b82f6',
-            critical: '#991b1b',  // 【修复】严重错误用深红色
         };
 
         const toast = document.createElement('div');
@@ -135,11 +125,6 @@
             transition: all 0.2s ease;
         `;
 
-        // 【修复】持久化 Toast 添加脉冲动画
-        if (duration === 0 || type === 'critical') {
-            toast.style.animation = 'toastSlideInRight 0.3s ease, toastPulse 2s ease-in-out infinite';
-        }
-
         const messageHtml = String(message)
             .split('\n')
             .map(line => (line.trim() === '' ? '<br>' : escapeHtml(line)))
@@ -155,51 +140,24 @@
         closeBtn.onclick = (e) => {
             e.stopPropagation();
             closeToast(toast);
-            // 【修复】从持久化列表中移除
-            _persistentToasts = _persistentToasts.filter(t => t !== toast);
         };
         toast.onclick = (e) => {
             if (e.target !== closeBtn) closeToast(toast);
-            _persistentToasts = _persistentToasts.filter(t => t !== toast);
         };
 
         toastContainer.appendChild(toast);
 
-        // 【修复】duration 为 0 表示持久化显示
         if (duration > 0) {
             setTimeout(() => {
                 if (toast.parentElement) closeToast(toast);
             }, duration);
-        } else {
-            // 持久化 Toast
-            _persistentToasts.push(toast);
         }
 
         return toast;
     }
 
-    // 【修复】显示持久化错误通知
-    function showPersistentError(message) {
-        return show(message, 'critical', 0);
-    }
-
-    // 【修复】清除所有持久化 Toast
-    function clearPersistentToasts() {
-        for (const toast of _persistentToasts) {
-            if (toast.parentElement) {
-                toast.style.animation = 'toastSlideOutRight 0.2s ease';
-                toast.style.opacity = '0';
-                setTimeout(() => {
-                    if (toast.parentElement) toast.remove();
-                }, 200);
-            }
-        }
-        _persistentToasts = [];
-    }
-
     // ==================== 确认对话框 ====================
     function confirmDialog(message, title, onConfirm, onCancel) {
-        // 移除已有确认框
         if (confirmModal && confirmModal.parentElement) {
             confirmModal.remove();
             confirmModal = null;
@@ -284,7 +242,6 @@
             if (onConfirm) onConfirm();
         };
 
-        // 点击背景关闭
         confirmModal.onclick = (e) => {
             if (e.target === confirmModal) {
                 cleanup();
@@ -292,7 +249,6 @@
             }
         };
 
-        // ESC 键关闭
         const handleEsc = (e) => {
             if (e.key === 'Escape') {
                 cleanup();
@@ -307,35 +263,27 @@
         return { modal: confirmModal, cleanup };
     }
 
-    /**
-     * Promise 风格的确认框（供 Utils.toast.confirm 使用）
-     */
     function confirmPromise(message, title) {
         return new Promise((resolve) => {
             confirmDialog(message, title, () => resolve(true), () => resolve(false));
         });
     }
 
-    /**
-     * 内联确认按钮（用于表格操作行）
-     */
     function createInlineConfirmButtons(onConfirm, onCancel) {
         const container = document.createElement('div');
         container.style.display = 'inline-flex';
         container.style.gap = '4px';
         container.style.marginLeft = '8px';
-
         container.innerHTML = `
             <button class="confirm-yes" style="
                 background:#10b981;color:white;border:none;border-radius:4px;
-                padding:2px 8px;font-size:11px;cursor:pointer;transition:background 0.2s;
-            " onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">✓</button>
+                padding:2px 8px;font-size:11px;cursor:pointer;
+            ">✓</button>
             <button class="confirm-no" style="
                 background:#ef4444;color:white;border:none;border-radius:4px;
-                padding:2px 8px;font-size:11px;cursor:pointer;transition:background 0.2s;
-            " onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">✗</button>
+                padding:2px 8px;font-size:11px;cursor:pointer;
+            ">✗</button>
         `;
-
         container.querySelector('.confirm-yes').onclick = (e) => {
             e.stopPropagation();
             container.remove();
@@ -346,7 +294,6 @@
             container.remove();
             if (onCancel) onCancel();
         };
-
         return container;
     }
 
@@ -355,14 +302,9 @@
     const error = (msg, duration) => show(msg, 'error', duration);
     const warning = (msg, duration) => show(msg, 'warning', duration);
     const info = (msg, duration) => show(msg, 'info', duration);
-    const critical = (msg) => showPersistentError(msg);  // 【修复】严重错误（持久化）
 
-    /**
-     * 清除所有 Toast 和确认框
-     */
     function clearAll() {
         if (toastContainer) toastContainer.innerHTML = '';
-        clearPersistentToasts();
         if (confirmModal && confirmModal.parentElement) {
             confirmModal.remove();
             confirmModal = null;
@@ -376,9 +318,6 @@
         error,
         warning,
         info,
-        critical,                // 【修复】新增严重错误方法
-        showPersistentError,     // 【修复】新增持久化错误方法
-        clearPersistentToasts,   // 【修复】新增清除持久化方法
         confirm: confirmDialog,
         confirmPromise,
         createInlineConfirmButtons,
@@ -388,11 +327,10 @@
 
     // ==================== 挂载到命名空间 ====================
     JF.Toast = Toast;
-    window.Toast = Toast; // 向下兼容
+    window.Toast = Toast;
 
-    // 初始化动画与容器
     addAnimations();
     initContainer();
 
-    console.log('✅ Toast v2.1 初始化完成 (JF namespace + 持久化错误通知)');
+    console.log('✅ Toast v2.2 精简完成');
 })();
