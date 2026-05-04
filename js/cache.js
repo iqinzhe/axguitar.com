@@ -1,5 +1,4 @@
 // cache.js - v2.0 统一缓存模块
-// 挂载到 JF.Cache，向下兼容 JFCache / DashboardCache / AnomalyCache
 
 'use strict';
 
