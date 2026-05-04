@@ -1,5 +1,4 @@
-// app-dashboard-core.js - v3.3 (JF 命名空间) 
-// 修复：认证失败时不恢复页面，直接显示登录页
+// app-dashboard-core.js - v2.0 (JF 命名空间) 
 // 新增消息中心卡片 + 三列布局
 
 'use strict';
