@@ -1,4 +1,5 @@
 // store.js - v2.1 (JF 命名空间) 
+// 修改：清理 Toast 中的手动 ✅ ❌ ⚠️ ℹ️ 图标
 
 'use strict';
 
@@ -92,7 +93,7 @@
                 if (store) store.is_active = false;
 
                 SUPABASE.clearCache();
-                Utils.toast.success(lang === 'id' ? '✅ Toko telah dinonaktifkan' : '✅ 门店已暂停营业');
+                Utils.toast.success(lang === 'id' ? 'Toko telah dinonaktifkan' : '门店已暂停营业');
                 await StoreManager.renderStoreManagement();
             } catch (error) {
                 Utils.toast.error(lang === 'id' ? 'Gagal menonaktifkan: ' + error.message : '暂停失败：' + error.message);
@@ -115,7 +116,7 @@
                 if (store) store.is_active = true;
 
                 SUPABASE.clearCache();
-                Utils.toast.success(lang === 'id' ? '✅ Toko telah diaktifkan kembali' : '✅ 门店已恢复营业');
+                Utils.toast.success(lang === 'id' ? 'Toko telah diaktifkan kembali' : '门店已恢复营业');
                 await StoreManager.renderStoreManagement();
             } catch (error) {
                 Utils.toast.error(lang === 'id' ? 'Gagal mengaktifkan: ' + error.message : '恢复失败：' + error.message);
@@ -229,7 +230,7 @@
 
                 console.log(`[StoreManager] WA号码已更新: ${storeId} -> ${waNumber}`);
                 if (window._debugStoreWA) {
-                    Utils.toast.success(lang === 'id' ? '✅ Nomor WA berhasil diperbarui' : '✅ WA号码已更新');
+                    Utils.toast.success(lang === 'id' ? 'Nomor WA berhasil diperbarui' : 'WA号码已更新');
                 }
             } catch (error) {
                 console.error('updateStoreWANumber 失败:', error);
@@ -323,19 +324,19 @@
                         await StoreManager._cleanPracticeDataEnhanced(storeId);
 
                         if (loadingMsg.parentElement) loadingMsg.remove();
-                        Utils.toast.success(lang === 'id' ? '✅ Data latihan berhasil dibersihkan' : '✅ 练习数据已清理');
+                        Utils.toast.success(lang === 'id' ? 'Data latihan berhasil dibersihkan' : '练习数据已清理');
                     } catch (cleanError) {
                         const errLoading = document.getElementById('cleanPracticeLoading');
                         if (errLoading) errLoading.remove();
                         console.error('清理练习数据失败:', cleanError);
                         const errorMsg = lang === 'id'
-                            ? `⚠️ Gagal membersihkan data: ${cleanError.message}\n\nData mungkin tidak lengkap. Silakan hubungi administrator atau coba lagi.`
-                            : `⚠️ 清理数据失败：${cleanError.message}\n\n数据可能不完整。请联系管理员或重试。`;
+                            ? `Gagal membersihkan data: ${cleanError.message}\n\nData mungkin tidak lengkap. Silakan hubungi administrator atau coba lagi.`
+                            : `清理数据失败：${cleanError.message}\n\n数据可能不完整。请联系管理员或重试。`;
                         Utils.toast.error(errorMsg, 8000);
                         return;
                     }
                 } else {
-                    Utils.toast.info(lang === 'id' ? 'ℹ️ Data latihan dipertahankan, toko akan beroperasi normal' : 'ℹ️ 练习数据已保留，门店将正常运营');
+                    Utils.toast.info(lang === 'id' ? 'Data latihan dipertahankan, toko akan beroperasi normal' : '练习数据已保留，门店将正常运营');
                 }
             }
 
@@ -350,8 +351,8 @@
                 SUPABASE.clearCache();
 
                 const successMsg = newValue
-                    ? (lang === 'id' ? '✅ Toko berhasil dijadikan Toko Latihan' : '✅ 已设为练习门店，数据不再计入总部统计')
-                    : (lang === 'id' ? '✅ Toko kembali ke mode normal' : '✅ 已恢复为正常门店，数据重新计入总部统计');
+                    ? (lang === 'id' ? 'Toko berhasil dijadikan Toko Latihan' : '已设为练习门店，数据不再计入总部统计')
+                    : (lang === 'id' ? 'Toko kembali ke mode normal' : '已恢复为正常门店，数据重新计入总部统计');
                 Utils.toast.success(successMsg);
 
                 await StoreManager.renderStoreManagement();
@@ -628,8 +629,8 @@
 
                         const isPractice = store.is_practice === true;
                         const practiceLabel = isPractice
-                            ? (lang === 'id' ? '✅ Mode Latihan (Aktif)' : '✅ 练习模式 (已开启)')
-                            : (lang === 'id' ? '🎓 Jadikan Toko Latihan' : '🎓 设为练习门店');
+                            ? (lang === 'id' ? 'Mode Latihan (Aktif)' : '练习模式 (已开启)')
+                            : (lang === 'id' ? 'Jadikan Toko Latihan' : '设为练习门店');
                         const practiceBtnStyle = isPractice
                             ? 'background:#a78bfa;color:#fff;'
                             : 'background:#ede9fe;color:#6d28d9;';
@@ -812,5 +813,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.1 重构完成（类名统一）');
+    console.log('✅ JF.StoreManager v2.1 重构完成（类名统一，Toast图标清理）');
 })();
