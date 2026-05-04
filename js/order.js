@@ -1,4 +1,4 @@
-// order.js - v2.1 (修复版：利息支付记录增加 actualPaid 参数)
+// order.js - v2.0 (利息支付记录增加 actualPaid 参数)
 
 'use strict';
 
