@@ -1,4 +1,4 @@
-// supabase.js - v2.0 (利息支付参数化、删除订单SQL修复、逾期更新性能优化)
+// supabase.js - v2.1 (Token 刷新失败优雅处理 + 列检查修复)
 
 'use strict';
 
@@ -186,13 +186,28 @@
 
     try {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: { storage: SafeStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
+            auth: { 
+                storage: SafeStorage, 
+                autoRefreshToken: true, 
+                persistSession: true, 
+                detectSessionInUrl: true 
+            },
+            global: {
+                headers: {
+                    'X-Client-Info': 'jf-gadai-v2.1'
+                }
+            }
         });
         console.log('✅ Supabase 客户端初始化成功（安全存储）');
     } catch (e) {
         console.warn('自定义存储初始化失败，尝试默认配置:', e.message);
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('⚠️ Supabase 客户端初始化使用默认存储');
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            console.log('⚠️ Supabase 客户端初始化使用默认存储');
+        } catch (e2) {
+            console.error('❌ Supabase 客户端初始化完全失败:', e2.message);
+            supabaseClient = null;
+        }
     }
 
     // ==================== 内部缓存 ====================
@@ -211,40 +226,90 @@
         // ---------- 认证 ----------
         async getSession() {
             try {
+                if (!supabaseClient) return null;
                 const { data, error } = await supabaseClient.auth.getSession();
-                if (error) { console.warn('getSession error:', error.message); return null; }
-                return data.session;
-            } catch (e) { console.warn('getSession exception:', e.message); return null; }
+                if (error) { 
+                    console.warn('[Supabase] 获取会话失败，可能需要重新登录');
+                    return null; 
+                }
+                return data?.session || null;
+            } catch (e) { 
+                console.warn('[Supabase] getSession 异常:', e.message); 
+                return null; 
+            }
         },
 
         async getCurrentUser() {
             try {
+                if (!supabaseClient) return null;
                 const { data, error } = await supabaseClient.auth.getUser();
                 if (error) {
-                    if (error.message !== 'Auth session missing!') console.warn('getCurrentUser error:', error.message);
+                    if (error.message?.includes('session') || error.message?.includes('JWT')) {
+                        console.warn('[Supabase] 会话已过期或无效');
+                    } else {
+                        console.warn('[Supabase] getCurrentUser error:', error.message);
+                    }
                     return null;
                 }
                 return data?.user || null;
-            } catch (e) { console.warn('getCurrentUser exception:', e.message); return null; }
+            } catch (e) { 
+                console.warn('[Supabase] getCurrentUser 异常:', e.message); 
+                return null; 
+            }
         },
 
         async getCurrentProfile() {
+            // 先检查是否有 session，避免无效请求
+            try {
+                const session = await this.getSession();
+                if (!session) {
+                    console.log('[Supabase] 无有效会话，跳过加载用户资料');
+                    _profileCache = null;
+                    return null;
+                }
+            } catch (e) {
+                console.warn('[Supabase] 检查会话失败:', e.message);
+                _profileCache = null;
+                return null;
+            }
+            
             if (_profileCache) return _profileCache;
+            
             try {
                 const user = await this.getCurrentUser();
                 if (!user) return null;
+                
                 const { data, error } = await supabaseClient
                     .from('user_profiles').select('*').eq('id', user.id).single();
-                if (error) { console.error('getCurrentProfile error:', error.message); return null; }
-                if (data?.store_id) {
-                    const { data: storeData, error: storeError } = await supabaseClient
-                        .from('stores').select('*').eq('id', data.store_id).single();
-                    if (!storeError && storeData) data.stores = storeData;
+                    
+                if (error) { 
+                    if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+                        console.warn('[Supabase] 认证已过期，需要重新登录');
+                    } else {
+                        console.error('[Supabase] getCurrentProfile error:', error.message); 
+                    }
+                    _profileCache = null;
+                    return null; 
                 }
+                
+                if (data?.store_id) {
+                    try {
+                        const { data: storeData, error: storeError } = await supabaseClient
+                            .from('stores').select('*').eq('id', data.store_id).single();
+                        if (!storeError && storeData) data.stores = storeData;
+                    } catch (e) {
+                        console.warn('[Supabase] 加载门店信息失败:', e.message);
+                    }
+                }
+                
                 _profileCache = data;
                 if (window.AUTH) window.AUTH.user = data;
                 return data;
-            } catch (e) { console.warn('getCurrentProfile exception:', e.message); return null; }
+            } catch (e) { 
+                console.warn('[Supabase] getCurrentProfile 异常:', e.message); 
+                _profileCache = null;
+                return null; 
+            }
         },
 
         clearCache() {
@@ -252,11 +317,18 @@
             _storePrefixCache.clear();
             _storesCache = null;
             _storesCacheTime = 0;
-            if (JF.Cache) JF.Cache.clear();
+            try {
+                if (JF.Cache && typeof JF.Cache.clear === 'function') {
+                    JF.Cache.clear();
+                }
+            } catch (e) {
+                console.warn('[Supabase] 清除 JF.Cache 失败:', e.message);
+            }
         },
 
         async checkStoreStatus(storeId) {
             try {
+                if (!supabaseClient) return { is_active: true, name: 'Unknown' };
                 const { data, error } = await supabaseClient
                     .from('stores').select('is_active, name').eq('id', storeId).single();
                 if (error) { console.warn('检查门店状态失败:', error.message); return { is_active: true, name: 'Unknown' }; }
@@ -269,6 +341,8 @@
         async getCurrentStoreName() { const p = await this.getCurrentProfile(); return p?.stores?.name || 'Kantor'; },
 
         async login(emailOrUsername, password) {
+            if (!supabaseClient) return { error: { message: '客户端未初始化' } };
+            
             let emailToUse = emailOrUsername;
             if (!emailOrUsername.includes('@')) {
                 const { data: profileData, error: profileError } = await supabaseClient
@@ -280,9 +354,11 @@
                 }
                 emailToUse = profileData.email || profileData.username;
             }
+            
             const { data, error } = await supabaseClient.auth.signInWithPassword({
                 email: emailToUse, password: password,
             });
+            
             if (error) return { error };
             this.clearCache();
             if (window.AUTH && data.user) await window.AUTH.loadCurrentUser();
@@ -291,30 +367,43 @@
 
         async logout() {
             this.clearCache();
-            const { error } = await supabaseClient.auth.signOut();
-            if (error) throw error;
+            if (!supabaseClient) return;
+            try {
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) console.warn('[Supabase] 登出错误:', error.message);
+            } catch (e) {
+                console.warn('[Supabase] 登出异常:', e.message);
+            }
         },
 
         // ---------- 门店 ----------
         async getAllStores(forceRefresh = false) {
+            if (!supabaseClient) return [];
             const now = Date.now();
             if (!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_CACHE_TTL) return _storesCache;
-            const { data, error } = await supabaseClient.from('stores').select('*').neq('code', 'STORE_000').order('code');
-            _storesCache = data;
-            _storesCacheTime = now;
-            for (const store of data || []) {
-                if (store.prefix) {
-                    _storePrefixCache.set(store.id, store.prefix);
-                    _storePrefixCache.set(store.code, store.prefix);
+            try {
+                const { data, error } = await supabaseClient.from('stores').select('*').neq('code', 'STORE_000').order('code');
+                if (error) throw error;
+                _storesCache = data;
+                _storesCacheTime = now;
+                for (const store of data || []) {
+                    if (store.prefix) {
+                        _storePrefixCache.set(store.id, store.prefix);
+                        _storePrefixCache.set(store.code, store.prefix);
+                    }
                 }
+                return data;
+            } catch (e) {
+                console.warn('[Supabase] 获取门店列表失败:', e.message);
+                return _storesCache || [];
             }
-            return data;
         },
 
         async _getStorePrefix(storeId) {
             if (!storeId) return 'AD';
             if (_storePrefixCache.has(storeId)) return _storePrefixCache.get(storeId);
             try {
+                if (!supabaseClient) return 'AD';
                 const { data, error } = await supabaseClient
                     .from('stores').select('prefix, code').eq('id', storeId).single();
                 if (error || !data) { console.warn('获取门店前缀失败:', error); return 'AD'; }
@@ -331,6 +420,7 @@
         },
 
         _generateOrderId: async function (role, storeId, maxRetries = 10) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             let prefix = 'AD';
             if (role !== 'admin') prefix = await this._getStorePrefix(storeId);
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -372,6 +462,7 @@
         },
 
         _generateCustomerId: async function (storeId, maxRetries = 10) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const prefix = await this._getStorePrefix(storeId);
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
@@ -405,8 +496,9 @@
 
         // ---------- 客户 ----------
         async createCustomer(customerData) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
-            const storeId = customerData.store_id || profile.store_id;
+            const storeId = customerData.store_id || profile?.store_id;
             let retryCount = 0, maxRetries = 8, lastError = null;
             while (retryCount < maxRetries) {
                 try {
@@ -419,7 +511,7 @@
                         living_address: customerData.living_address || null,
                         occupation: customerData.occupation || null,
                         registered_date: customerData.registered_date || Utils.getLocalToday(),
-                        created_by: profile.id, updated_at: Utils.getLocalDateTime()
+                        created_by: profile?.id, updated_at: Utils.getLocalDateTime()
                     }).select().single();
                     if (error) {
                         if (error.code === '23505') {
@@ -445,6 +537,7 @@
         },
 
         async updateCustomer(customerId, customerData) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const updates = {
                 name: customerData.name, phone: customerData.phone,
@@ -461,19 +554,26 @@
         },
 
         async getCustomers(filters) {
+            if (!supabaseClient) return [];
             if (filters === undefined) filters = {};
             const profile = await this.getCurrentProfile();
-            const { data: blacklistData } = await supabaseClient.from('blacklist').select('customer_id');
-            const blacklistedIds = (blacklistData || []).map(b => b.customer_id);
-            let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-            if (profile?.role !== 'admin' && profile?.store_id) query = query.eq('store_id', profile.store_id);
-            if (blacklistedIds.length > 0) query = query.not('id', 'in', '(' + blacklistedIds.join(',') + ')');
-            const { data, error } = await query;
-            if (error) throw error;
-            return data;
+            try {
+                const { data: blacklistData } = await supabaseClient.from('blacklist').select('customer_id');
+                const blacklistedIds = (blacklistData || []).map(b => b.customer_id);
+                let query = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
+                if (profile?.role !== 'admin' && profile?.store_id) query = query.eq('store_id', profile.store_id);
+                if (blacklistedIds.length > 0) query = query.not('id', 'in', '(' + blacklistedIds.join(',') + ')');
+                const { data, error } = await query;
+                if (error) throw error;
+                return data;
+            } catch (e) {
+                console.warn('[Supabase] 获取客户列表失败:', e.message);
+                return [];
+            }
         },
 
         async getCustomer(customerId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const { data, error } = await supabaseClient.from('customers').select('*').eq('id', customerId).single();
             if (error) throw error;
             return data;
@@ -481,23 +581,30 @@
 
         // ---------- 黑名单 ----------
         async checkBlacklist(customerId) {
-            const { data, error } = await supabaseClient
-                .from('blacklist').select('id, reason').eq('customer_id', customerId).maybeSingle();
-            if (error && error.code === '22P02') {
-                const { data: customer } = await supabaseClient
-                    .from('customers').select('id').eq('customer_id', customerId).single();
-                if (customer) {
-                    const { data: retryData } = await supabaseClient
-                        .from('blacklist').select('id, reason').eq('customer_id', customer.id).maybeSingle();
-                    return retryData ? { isBlacklisted: true, reason: retryData.reason } : { isBlacklisted: false };
+            if (!supabaseClient) return { isBlacklisted: false };
+            try {
+                const { data, error } = await supabaseClient
+                    .from('blacklist').select('id, reason').eq('customer_id', customerId).maybeSingle();
+                if (error && error.code === '22P02') {
+                    const { data: customer } = await supabaseClient
+                        .from('customers').select('id').eq('customer_id', customerId).single();
+                    if (customer) {
+                        const { data: retryData } = await supabaseClient
+                            .from('blacklist').select('id, reason').eq('customer_id', customer.id).maybeSingle();
+                        return retryData ? { isBlacklisted: true, reason: retryData.reason } : { isBlacklisted: false };
+                    }
+                    return { isBlacklisted: false };
                 }
+                if (error) throw error;
+                return data ? { isBlacklisted: true, reason: data.reason } : { isBlacklisted: false };
+            } catch (e) {
+                console.warn('[Supabase] 检查黑名单失败:', e.message);
                 return { isBlacklisted: false };
             }
-            if (error) throw error;
-            return data ? { isBlacklisted: true, reason: data.reason } : { isBlacklisted: false };
         },
 
         async addToBlacklist(customerId, reason, blacklistedBy) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const { data: customer, error: customerError } = await supabaseClient
                 .from('customers').select('id, store_id, customer_id, name, occupation').eq('id', customerId).single();
             if (customerError) throw customerError;
@@ -513,6 +620,7 @@
         },
 
         async removeFromBlacklist(customerId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             let deleteError = null;
             const { error: directError } = await supabaseClient.from('blacklist').delete().eq('customer_id', customerId);
             if (directError && directError.code === '22P02') {
@@ -529,6 +637,7 @@
         },
 
         async getBlacklist(filterStoreId = null, profile = null) {
+            if (!supabaseClient) return [];
             let query = supabaseClient.from('blacklist').select(`
                 *, customers:customer_id (
                     id, customer_id, name, ktp_number, phone, occupation, ktp_address, store_id,
@@ -547,6 +656,7 @@
         },
 
         async checkDuplicateCustomer(name, ktpNumber, phone, excludeCustomerId = null) {
+            if (!supabaseClient) return null;
             const filters = [];
             if (name) filters.push({ column: 'name', value: name });
             if (ktpNumber) filters.push({ column: 'ktp_number', value: ktpNumber });
@@ -568,6 +678,7 @@
         },
 
         async checkBlacklistDuplicate(ktp, phone) {
+            if (!supabaseClient) return null;
             if (!ktp && !phone) return null;
             let query = supabaseClient
                 .from('blacklist').select('customers!blacklist_customer_id_fkey(id, name, ktp_number, phone, customer_id)');
@@ -582,6 +693,7 @@
         },
 
         async getCustomerOrdersStats(customerId) {
+            if (!supabaseClient) return { activeCount: 0, completedCount: 0, abnormalCount: 0, orders: [] };
             const { data: orders, error } = await supabaseClient
                 .from('orders').select('id, order_id, status, created_at')
                 .eq('customer_id', customerId).order('created_at', { ascending: false });
@@ -592,14 +704,17 @@
                 else if (o.status === 'completed') completedCount++;
                 else if (o.status === 'liquidated') abnormalCount++;
             }
-            const { count: overdueCount } = await supabaseClient
-                .from('orders').select('id', { count: 'exact', head: true })
-                .eq('customer_id', customerId).eq('status', 'active').gte('overdue_days', 30);
-            abnormalCount += (overdueCount || 0);
+            try {
+                const { count: overdueCount } = await supabaseClient
+                    .from('orders').select('id', { count: 'exact', head: true })
+                    .eq('customer_id', customerId).eq('status', 'active').gte('overdue_days', 30);
+                abnormalCount += (overdueCount || 0);
+            } catch (e) { /* ignore */ }
             return { activeCount, completedCount, abnormalCount, orders: orders || [] };
         },
 
         async getCustomerOrdersByStatus(customerId, statusType) {
+            if (!supabaseClient) return [];
             let query = supabaseClient.from('orders').select('*')
                 .eq('customer_id', customerId).order('created_at', { ascending: false });
             if (statusType === 'active') query = query.eq('status', 'active');
@@ -616,6 +731,7 @@
 
         // ---------- 资金流水 ----------
         async recordCashFlow(flowData) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const storeId = flowData.store_id || profile?.store_id;
             if (!storeId) throw new Error(Utils.lang === 'id' ? 'ID toko tidak ditemukan' : '门店ID缺失');
@@ -632,13 +748,12 @@
             return data;
         },
 
-        // ==================== 【修复 Bug 3】新增：更新支出时同步现金流 ====================
         async updateExpenseWithCashFlow(expenseId, updates) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             if (!isAdmin) throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
 
-            // 获取原支出记录
             const { data: oldExpense, error: fetchError } = await supabaseClient
                 .from('expenses').select('*').eq('id', expenseId).single();
             if (fetchError) throw fetchError;
@@ -646,7 +761,6 @@
                 throw new Error(Utils.lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
             }
 
-            // 更新 expenses 表
             const updateData = {
                 ...updates,
                 updated_at: Utils.getLocalDateTime(),
@@ -656,10 +770,8 @@
                 .from('expenses').update(updateData).eq('id', expenseId);
             if (updateError) throw updateError;
 
-            // 如果金额发生变化，同步更新 cash_flow_records
             if (updates.amount !== undefined && updates.amount !== oldExpense.amount) {
                 const amountDiff = updates.amount - oldExpense.amount;
-                // 查找对应的现金流记录
                 const { data: cashFlowRecords, error: findError } = await supabaseClient
                     .from('cash_flow_records')
                     .select('id, amount')
@@ -675,10 +787,7 @@
                         .from('cash_flow_records')
                         .update({ amount: newAmount, description: updateData.category || oldExpense.category })
                         .eq('id', oldCashFlow.id);
-                    console.log(`✅ 支出金额变更已同步到现金流: ${Utils.formatCurrency(oldExpense.amount)} → ${Utils.formatCurrency(updates.amount)}`);
                 } else if (amountDiff !== 0) {
-                    // 如果没有找到关联记录但需要更新金额，则创建一条调整记录
-                    console.warn('未找到关联的现金流记录，创建调整记录');
                     await this.recordCashFlow({
                         store_id: oldExpense.store_id,
                         flow_type: 'expense_adjustment',
@@ -694,19 +803,16 @@
             return true;
         },
 
-        // ==================== 【修复 Bug 3】新增：删除支出时同步删除现金流 ====================
         async deleteExpenseWithCashFlow(expenseId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             if (!isAdmin) throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
 
-            // 获取支出记录
             const { data: expense, error: fetchError } = await supabaseClient
                 .from('expenses').select('*').eq('id', expenseId).single();
             if (fetchError) throw fetchError;
 
-            // 软删除或硬删除关联的现金流记录
-            // 方案：将关联的现金流记录标记为 voided（软删除）
             const { error: voidError } = await supabaseClient
                 .from('cash_flow_records')
                 .update({ is_voided: true, voided_at: Utils.getLocalDateTime(), voided_by: profile.id })
@@ -714,8 +820,6 @@
                 .eq('flow_type', 'expense');
             
             if (voidError) {
-                console.warn('标记现金流为 voided 失败:', voidError);
-                // 如果软删除失败，尝试硬删除
                 await supabaseClient
                     .from('cash_flow_records')
                     .delete()
@@ -723,16 +827,15 @@
                     .eq('flow_type', 'expense');
             }
 
-            // 删除 expenses 记录
             const { error: deleteError } = await supabaseClient
                 .from('expenses').delete().eq('id', expenseId);
             if (deleteError) throw deleteError;
 
-            console.log(`✅ 支出 ${expenseId} 已删除，关联现金流已清理`);
             return true;
         },
 
         async recordLoanDisbursement(orderId, amount, source, description) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const order = await this.getOrder(orderId);
             const { data: existingFlow } = await supabaseClient
                 .from('cash_flow_records').select('id').eq('order_id', order.id)
@@ -748,8 +851,8 @@
             return flowRecord;
         },
 
-        // ===== 资本注入 =====
         async recordCapitalInjection(storeId, amount, source, description) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const targetStoreId = storeId || profile?.store_id;
             if (!targetStoreId) throw new Error(Utils.lang === 'id' ? 'ID toko tidak ditemukan' : '门店ID缺失');
@@ -772,30 +875,25 @@
                 reference_id: data.id
             });
 
-            console.log(`✅ 资本注入记录成功: ${Utils.formatCurrency(amount)} -> ${targetStoreId}`);
             return data;
         },
 
-        // ===== 【修复 Bug 2】新增：获取完整资本分析数据 =====
         async getFullCapitalAnalysis(storeIdParam = null) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
-            // 确定目标门店
             let targetStoreId = storeIdParam;
             if (!targetStoreId) {
                 if (isAdmin) {
-                    // 管理员需要指定门店，否则返回汇总数据
                     targetStoreId = null;
                 } else {
                     targetStoreId = profile?.store_id;
                 }
             }
 
-            // 获取现金流汇总（支持按门店过滤）
             const cashFlowSummary = await this.getCashFlowSummary(targetStoreId);
             
-            // 获取资本注入明细
             let injectionQuery = supabaseClient
                 .from('capital_injections')
                 .select('*')
@@ -809,7 +907,6 @@
             
             const { data: injections } = await injectionQuery;
             
-            // 区分外部注资和利润再投入
             const externalInjections = (injections || []).filter(i => i.source !== 'profit');
             const profitReinvestments = (injections || []).filter(i => i.source === 'profit');
             
@@ -817,7 +914,6 @@
             const totalProfitReinvested = profitReinvestments.reduce((sum, i) => sum + (i.amount || 0), 0);
             const totalCapital = totalExternalCapital + totalProfitReinvested;
             
-            // 获取活跃订单（在押资金）
             let orderQuery = supabaseClient
                 .from('orders')
                 .select('loan_amount, status, store_id')
@@ -834,27 +930,21 @@
             const availableCapital = totalCapital - deployedCapital;
             const utilizationRate = totalCapital > 0 ? (deployedCapital / totalCapital) * 100 : 0;
             
-            // 计算累计利润和再投入
             const operatingIncome = cashFlowSummary.netProfit?.operatingIncome || 0;
             const operatingExpense = cashFlowSummary.netProfit?.operatingExpense || 0;
             const cumulativeProfit = operatingIncome - operatingExpense;
             const pendingReinvestProfit = cumulativeProfit - totalProfitReinvested;
             const profitReinvestRate = cumulativeProfit > 0 ? (totalProfitReinvested / cumulativeProfit) * 100 : 0;
             
-            // 计算杠杆率
             const leverageRatio = totalExternalCapital > 0 ? totalCapital / totalExternalCapital : 1;
-            
-            // 活跃订单数量
             const deployedOrdersCount = activeOrders?.length || 0;
             
-            // 资本构成明细
             const capitalBreakdown = {
                 external_injections: totalExternalCapital,
                 profit_reinvestments: totalProfitReinvested,
                 total_capital: totalCapital
             };
             
-            // 健康度评估
             let overall = 'healthy';
             const strengths = [];
             const issues = [];
@@ -922,13 +1012,12 @@
             };
         },
 
-        // ===== 利润分配相关 =====
         async getDistributableProfit(storeId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const targetStoreId = storeId || profile?.store_id;
             if (!targetStoreId) throw new Error('Store ID missing');
 
-            // 【修复 Bug 1】传入 storeId 获取指定门店的现金流
             const cashFlowSummary = await this.getCashFlowSummary(targetStoreId);
             const totalIncome = cashFlowSummary.netProfit?.operatingIncome || 0;
             const totalExpense = cashFlowSummary.netProfit?.operatingExpense || 0;
@@ -944,19 +1033,17 @@
             return Math.max(0, distributable);
         },
 
-        // 【修复 Bug 5】修正 getExternalCapitalBalance 查询条件
         async getExternalCapitalBalance(storeId) {
+            if (!supabaseClient) return 0;
             const targetStoreId = storeId || (await this.getCurrentProfile())?.store_id;
             if (!targetStoreId) return 0;
 
-            // 修正：查询 source 不是 'profit' 的记录（即外部注入）
-            // 原来的 'external' 不存在，实际存储的是 'cash' 或 'bank'
             const { data: injections } = await supabaseClient
                 .from('capital_injections')
                 .select('amount')
                 .eq('store_id', targetStoreId)
                 .eq('is_voided', false)
-                .neq('source', 'profit');  // 排除利润再投入
+                .neq('source', 'profit');
 
             const totalInjected = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
 
@@ -971,6 +1058,7 @@
         },
 
         async distributeProfit(storeId, amount, type, description) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             if (profile?.role !== 'admin') throw new Error('Admin only');
             const targetStoreId = storeId || profile.store_id;
@@ -1036,14 +1124,17 @@
 
         // ---------- 订单核心 ----------
         async getOrders(filters, from, to) {
+            if (!supabaseClient) return { data: [], totalCount: 0 };
             if (filters === undefined) filters = {};
             const profile = await this.getCurrentProfile();
             let query = supabaseClient.from('orders').select('*', { count: 'exact' });
             if (profile?.role !== 'admin' && profile?.store_id) {
                 query = query.eq('store_id', profile.store_id);
             } else if (profile?.role === 'admin' && !filters.includePractice) {
-                const practiceIds = await this._getPracticeStoreIds();
-                if (practiceIds.length > 0) query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                try {
+                    const practiceIds = await this._getPracticeStoreIds();
+                    if (practiceIds.length > 0) query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                } catch (e) { /* ignore */ }
             }
             if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
             if (from !== undefined && to !== undefined) query = query.range(from, to);
@@ -1061,6 +1152,7 @@
         async getOrdersLegacy(filters) { const result = await this.getOrders(filters); return result.data; },
 
         async getOrder(orderId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const { data, error } = await supabaseClient.from('orders').select('*').eq('order_id', orderId).single();
             if (error) throw error;
             const profile = await this.getCurrentProfile();
@@ -1071,6 +1163,7 @@
         },
 
         async getPaymentHistory(orderId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const order = await this.getOrder(orderId);
             const { data, error } = await supabaseClient
                 .from('payment_history').select('*').eq('order_id', order.id).order('date', { ascending: false });
@@ -1079,6 +1172,7 @@
         },
 
         async createOrder(orderData) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const nowDate = Utils.getLocalToday();
             const adminFee = orderData.admin_fee || Utils.calculateAdminFee(orderData.loan_amount);
@@ -1156,6 +1250,7 @@
         },
 
         async recordAdminFee(orderId, paymentMethod, adminFeeAmount) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const order = await this.getOrder(orderId);
             const profile = await this.getCurrentProfile();
@@ -1184,6 +1279,7 @@
         },
 
         async recordServiceFee(orderId, months, paymentMethod) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const order = await this.getOrder(orderId);
             const profile = await this.getCurrentProfile();
@@ -1213,8 +1309,8 @@
             return true;
         },
 
-        // 【修复 Bug 4 + 本次修复】recordInterestPayment 增加 actualPaid 参数，不再访问 DOM
         async recordInterestPayment(orderId, months, paymentMethod, actualPaid = null) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
@@ -1231,20 +1327,18 @@
                 const remainingPrincipal = (currentOrder.loan_amount || 0) - (currentOrder.principal_paid || 0);
                 const theoreticalInterest = remainingPrincipal * monthlyRate * months;
                 
-                // **关键修复**：actualPaid 必须由调用方传入，不再从 DOM 读取
                 let paidAmount = (actualPaid !== null && !isNaN(actualPaid) && actualPaid > 0) ? actualPaid : theoreticalInterest;
                 
-                // 计算实际记录的利息和本金调整
                 let interestToRecord = paidAmount;
                 let principalAdjustment = 0;
                 let shortfallToTrack = 0;
                 
                 if (paidAmount >= theoreticalInterest) {
                     interestToRecord = theoreticalInterest;
-                    principalAdjustment = paidAmount - theoreticalInterest; // 多出的部分抵扣本金
+                    principalAdjustment = paidAmount - theoreticalInterest;
                 } else {
                     interestToRecord = paidAmount;
-                    shortfallToTrack = theoreticalInterest - paidAmount; // 少付的部分记录为欠款
+                    shortfallToTrack = theoreticalInterest - paidAmount;
                 }
                 
                 const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
@@ -1267,7 +1361,6 @@
                 
                 const nextDueDate = this.calculateNextDueDate(currentOrder.created_at, newInterestPaidMonths);
                 
-                // 构建更新对象
                 const updates = {
                     interest_paid_months: newInterestPaidMonths,
                     interest_paid_total: newInterestPaidTotal,
@@ -1278,14 +1371,12 @@
                     updated_at: Utils.getLocalDateTime()
                 };
                 
-                // 如果有本金抵扣，更新本金相关字段
                 if (principalAdjustment > 0) {
                     const newPrincipalPaid = (currentOrder.principal_paid || 0) + principalAdjustment;
                     const newPrincipalRemaining = (currentOrder.loan_amount || 0) - newPrincipalPaid;
                     updates.principal_paid = newPrincipalPaid;
                     updates.principal_remaining = newPrincipalRemaining;
                     
-                    // 如果本金结清，更新状态
                     if (newPrincipalRemaining <= 0) {
                         updates.status = 'completed';
                         updates.completed_at = Utils.getLocalDateTime();
@@ -1298,7 +1389,6 @@
                     .eq('order_id', orderId);
                 if (updateError) throw updateError;
                 
-                // 记录利息 payment_history
                 if (interestToRecord > 0) {
                     const paymentData = {
                         order_id: currentOrder.id, date: Utils.getLocalToday(), type: 'interest',
@@ -1321,7 +1411,6 @@
                     });
                 }
                 
-                // 如果有本金抵扣，记录本金 payment_history
                 if (principalAdjustment > 0) {
                     const principalPaymentData = {
                         order_id: currentOrder.id, date: Utils.getLocalToday(), type: 'principal',
@@ -1340,14 +1429,8 @@
                     });
                 }
                 
-                // 如果有欠款，显示警告
                 if (shortfallToTrack > 0) {
                     console.warn(`订单 ${orderId} 利息少付 ${Utils.formatCurrency(shortfallToTrack)}，已记录为欠款`);
-                    if (window.Toast) {
-                        window.Toast.warning(Utils.lang === 'id' 
-                            ? `Kekurangan pembayaran bunga: ${Utils.formatCurrency(shortfallToTrack)} akan ditagihkan nanti`
-                            : `利息少付 ${Utils.formatCurrency(shortfallToTrack)}，将后续追收`, 4000);
-                    }
                 }
                 
                 if (window.Audit) await window.Audit.logPayment(currentOrder.order_id, 'interest', interestToRecord, paymentMethod);
@@ -1358,6 +1441,7 @@
         },
 
         async recordPrincipalPayment(orderId, amount, paymentMethod) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
@@ -1406,6 +1490,7 @@
         },
 
         async recordFixedPayment(orderId, paymentMethod) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
@@ -1474,6 +1559,7 @@
         },
 
         async earlySettleFixedOrder(orderId, paymentMethod) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
@@ -1507,8 +1593,8 @@
             return true;
         },
 
-        // ==================== 【性能优化】逾期更新 - 分批并发，消除 N+1 问题 ====================
         async updateOverdueDays() {
+            if (!supabaseClient) return false;
             const { data: activeOrders, error } = await supabaseClient
                 .from('orders')
                 .select('id, next_interest_due_date, overdue_days, liquidation_status, fund_status')
@@ -1520,7 +1606,6 @@
             const todayLocal = new Date();
             todayLocal.setHours(0, 0, 0, 0);
 
-            // 预计算所有需要更新的订单数据
             const updates = [];
             for (const order of activeOrders) {
                 const dueDate = order.next_interest_due_date;
@@ -1533,7 +1618,6 @@
                     overdueDays = Math.floor((todayLocal - due) / 86400000);
                 }
 
-                // 根据逾期天数设定三阶段状态
                 let newLiquidationStatus = order.liquidation_status || 'normal';
                 let newFundStatus = order.fund_status;
 
@@ -1548,7 +1632,6 @@
                     newLiquidationStatus = 'normal';
                 }
 
-                // 仅在状态有变化时更新
                 if (overdueDays !== order.overdue_days ||
                     newLiquidationStatus !== order.liquidation_status ||
                     newFundStatus !== order.fund_status) {
@@ -1563,7 +1646,6 @@
 
             if (updates.length === 0) return true;
 
-            // 分批并发更新（每批 20 条）
             const BATCH_SIZE = 20;
             const batches = [];
             for (let i = 0; i < updates.length; i += BATCH_SIZE) {
@@ -1585,11 +1667,11 @@
             });
 
             await Promise.all(updatePromises);
-            console.log(`✅ 逾期更新完成: 共处理 ${updates.length} 条订单`);
             return true;
         },
 
         async updateOrder(orderId, updateData, customerId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const currentOrder = await this.getOrder(orderId);
             const sensitiveFields = ['customer_name','customer_ktp','customer_phone','customer_address','collateral_name','loan_amount','admin_fee','service_fee_percent'];
             let isUpdatingSensitive = false;
@@ -1612,6 +1694,7 @@
         },
 
         async unlockOrder(orderId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat membuka kunci' : '需管理员权限');
             const { error } = await supabaseClient.from('orders').update({ is_locked: false, locked_at: null, locked_by: null, updated_at: Utils.getLocalDateTime() }).eq('order_id', orderId);
@@ -1620,20 +1703,19 @@
         },
 
         async relockOrder(orderId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const { error } = await supabaseClient.from('orders').update({ is_locked: true, locked_at: Utils.getLocalDateTime(), locked_by: profile.id, updated_at: Utils.getLocalDateTime() }).eq('order_id', orderId);
             if (error) throw error;
             return true;
         },
 
-        // ==================== 【修复】删除订单 - 移除无效的 sql 调用 ====================
         async deleteOrder(orderId) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus pesanan' : '需管理员权限');
             const order = await this.getOrder(orderId);
             
-            // **修复**：原先使用了无效的 supabaseClient.sql，现已移除，只更新必要字段
-            // 软删除现金流记录（标记为 voided，保留审计痕迹）
             const { error: voidCashFlowError } = await supabaseClient
                 .from('cash_flow_records')
                 .update({ 
@@ -1644,13 +1726,9 @@
                 .eq('order_id', order.id);
             
             if (voidCashFlowError) {
-                console.warn('软删除现金流失败，尝试硬删除:', voidCashFlowError);
-                // 软删除失败，尝试硬删除
                 await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
-                // 也尝试用 reference_id 匹配
                 await supabaseClient.from('cash_flow_records').delete().eq('reference_id', order.order_id);
             } else {
-                // 同时清理使用 reference_id 的记录
                 await supabaseClient
                     .from('cash_flow_records')
                     .update({ is_voided: true, voided_at: Utils.getLocalDateTime(), voided_by: profile.id })
@@ -1668,6 +1746,7 @@
         },
 
         async getReport() {
+            if (!supabaseClient) return { total_orders: 0, active_orders: 0, completed_orders: 0, total_loan_amount: 0, total_admin_fees: 0, total_service_fees: 0, total_interest: 0, total_principal: 0 };
             const orders = await this.getOrdersLegacy();
             let totalLoanAmount = 0, totalAdminFees = 0, totalServiceFees = 0, totalInterest = 0, totalPrincipal = 0, activeCount = 0;
             for (const o of orders) {
@@ -1687,6 +1766,7 @@
         },
 
         async getAllPayments() {
+            if (!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
             let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
             if (profile?.role !== 'admin' && profile?.store_id) orderQuery = orderQuery.eq('store_id', profile.store_id);
@@ -1703,12 +1783,14 @@
         },
 
         async getAllUsers() {
+            if (!supabaseClient) return [];
             const { data, error } = await supabaseClient.from('user_profiles').select('*, stores(*)').order('name');
             if (error) throw error;
             return data;
         },
 
         async createStore(code, name, address, phone) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const { data, error } = await supabaseClient.from('stores').insert({ code, name, address, phone }).select().single();
             if (error) throw error;
             if (window.Audit) await window.Audit.logStoreCreate(code, name, AUTH.user?.id);
@@ -1716,6 +1798,7 @@
         },
 
         async updateStore(id, updates) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const { data, error } = await supabaseClient.from('stores').update(updates).eq('id', id).select().single();
             if (error) throw error;
             if (window.Audit) await window.Audit.logStoreAction(id, 'update', JSON.stringify(updates));
@@ -1723,6 +1806,7 @@
         },
 
         async deleteStore(id) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const { data: orders, error: ordersError } = await supabaseClient.from('orders').select('id', { count: 'exact', head: true }).eq('store_id', id);
             if (ordersError) throw ordersError;
             if (orders && orders.length > 0) throw new Error(Utils.lang === 'id' ? 'Toko memiliki pesanan, tidak dapat dihapus' : '门店有订单，无法删除');
@@ -1732,16 +1816,15 @@
             return true;
         },
 
-        // 【修复 Bug 1 & Bug 7】改进 getCashFlowSummary 支持按门店过滤，排除利润再投入
         async getCashFlowSummary(storeIdParam = null) {
+            if (!supabaseClient) return { cash: { balance: 0 }, bank: { balance: 0 }, total: { balance: 0 }, netProfit: { operatingIncome: 0, operatingExpense: 0 }, total_injected_capital: 0, deployed_capital: 0, available_capital: 0 };
+            
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
-            // 确定目标门店
             let targetStoreId = storeIdParam;
             if (!targetStoreId) {
                 if (isAdmin) {
-                    // 管理员未指定门店时返回所有非练习门店的汇总
                     targetStoreId = null;
                 } else {
                     targetStoreId = profile?.store_id;
@@ -1752,17 +1835,17 @@
                 .select('direction, amount, source_target, flow_type, store_id')
                 .eq('is_voided', false);
             
-            // 应用门店过滤
             if (targetStoreId) {
                 query = query.eq('store_id', targetStoreId);
             } else if (!isAdmin && profile?.store_id) {
                 query = query.eq('store_id', profile.store_id);
             } else if (isAdmin && !targetStoreId) {
-                // 管理员获取所有门店时，排除练习门店
-                const practiceIds = await this._getPracticeStoreIds();
-                if (practiceIds.length > 0) {
-                    query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                }
+                try {
+                    const practiceIds = await this._getPracticeStoreIds();
+                    if (practiceIds.length > 0) {
+                        query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                    }
+                } catch (e) { /* ignore */ }
             }
             
             const { data: flows, error } = await query;
@@ -1782,27 +1865,27 @@
                 else if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') operatingIncome += amt;
             }
 
-            // 【修复 Bug 1 & Bug 7】资本注入查询：排除 profit 来源，且支持门店过滤
             let injectionQuery = supabaseClient.from('capital_injections')
                 .select('amount, source')
                 .eq('is_voided', false)
-                .neq('source', 'profit');  // 排除利润再投入，避免双重计算
+                .neq('source', 'profit');
             
             if (targetStoreId) {
                 injectionQuery = injectionQuery.eq('store_id', targetStoreId);
             } else if (!isAdmin && profile?.store_id) {
                 injectionQuery = injectionQuery.eq('store_id', profile.store_id);
             } else if (isAdmin && !targetStoreId) {
-                const practiceIds = await this._getPracticeStoreIds();
-                if (practiceIds.length > 0) {
-                    injectionQuery = injectionQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                }
+                try {
+                    const practiceIds = await this._getPracticeStoreIds();
+                    if (practiceIds.length > 0) {
+                        injectionQuery = injectionQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                    }
+                } catch (e) { /* ignore */ }
             }
             
             const { data: injections } = await injectionQuery;
             const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
 
-            // 在押资金查询（活跃订单）
             let deployedQuery = supabaseClient.from('orders')
                 .select('loan_amount')
                 .eq('status', 'active');
@@ -1812,10 +1895,12 @@
             } else if (!isAdmin && profile?.store_id) {
                 deployedQuery = deployedQuery.eq('store_id', profile.store_id);
             } else if (isAdmin && !targetStoreId) {
-                const practiceIds = await this._getPracticeStoreIds();
-                if (practiceIds.length > 0) {
-                    deployedQuery = deployedQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                }
+                try {
+                    const practiceIds = await this._getPracticeStoreIds();
+                    if (practiceIds.length > 0) {
+                        deployedQuery = deployedQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                    }
+                } catch (e) { /* ignore */ }
             }
             
             const { data: deployedOrders } = await deployedQuery;
@@ -1833,6 +1918,7 @@
         },
 
         async addExpense(expenseData) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             const { data, error } = await supabaseClient.from('expenses').insert({
                 store_id: expenseData.store_id || profile?.store_id,
@@ -1853,18 +1939,21 @@
         },
 
         async getStoreWANumber(storeId) {
+            if (!supabaseClient) return null;
             const { data, error } = await supabaseClient.from('stores').select('wa_number').eq('id', storeId).single();
             if (error && error.code !== 'PGRST116') return null;
             return data?.wa_number || null;
         },
 
         async updateStoreWANumber(storeId, waNumber) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const { error } = await supabaseClient.from('stores').update({ wa_number: waNumber || null, updated_at: Utils.getLocalDateTime() }).eq('id', storeId);
             if (error) throw error;
             return true;
         },
 
         async hasReminderSentToday(orderId) {
+            if (!supabaseClient) return false;
             const today = Utils.getLocalToday();
             const { data, error } = await supabaseClient.from('reminder_logs').select('id').eq('order_id', orderId).eq('reminder_date', today).maybeSingle();
             if (error) throw error;
@@ -1872,6 +1961,7 @@
         },
 
         async hasSentRemindersToday() {
+            if (!supabaseClient) return false;
             try {
                 const today = Utils.getLocalToday();
                 const { data, error } = await supabaseClient.from('reminder_logs').select('id', { count: 'exact' }).eq('reminder_date', today);
@@ -1881,6 +1971,7 @@
         },
 
         async logReminder(orderId) {
+            if (!supabaseClient) return false;
             const profile = await this.getCurrentProfile();
             const today = Utils.getLocalToday();
             const { error } = await supabaseClient.from('reminder_logs').insert({ order_id: orderId, reminder_date: today, sent_by: profile?.id || null, created_at: Utils.getLocalDateTime() });
@@ -1889,6 +1980,7 @@
         },
 
         async getOrdersNeedReminder() {
+            if (!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
             const reminderDays = 2;
             let query = supabaseClient.from('orders').select('*').eq('status', 'active');
@@ -1910,12 +2002,14 @@
         },
 
         async getStoreName(storeId) {
+            if (!supabaseClient) return '-';
             const { data, error } = await supabaseClient.from('stores').select('name').eq('id', storeId).single();
             if (error) return '-';
             return data?.name || '-';
         },
 
         async recordInternalTransfer(transferData) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             if (transferData.amount <= 0) throw new Error(Utils.t('invalid_amount'));
             if (transferData.transfer_type === 'cash_to_bank') {
@@ -1958,6 +2052,7 @@
         },
 
         async getInternalTransfers(storeId, startDate, endDate) {
+            if (!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
             let query = supabaseClient.from('internal_transfers')
                 .select('*, stores(name, code), created_by_profile:user_profiles!internal_transfers_created_by_fkey(name)')
@@ -1972,6 +2067,7 @@
         },
 
         async getShopAccount(storeId) {
+            if (!supabaseClient) return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
             const targetStoreId = storeId || await this.getCurrentStoreId();
             if (!targetStoreId) return { cash_balance: 0, bank_balance: 0, total_balance: 0 };
             
@@ -1998,6 +2094,7 @@
         },
 
         async remitToHeadquarters(storeId, amount, description) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menyetor ke pusat' : '需管理员权限');
             const shop = await this.getShopAccount(storeId);
@@ -2010,26 +2107,45 @@
             });
         },
 
-        // 为 orders 表添加 interest_shortfall 字段的迁移检查（如果不存在）
+        // ==================== 【修复】interest_shortfall 列检查 ====================
         async ensureInterestShortfallColumn() {
             try {
+                // 先检查是否有有效的认证会话
+                const session = await this.getSession();
+                if (!session) {
+                    console.log('[Supabase] 无有效会话，跳过列检查');
+                    return;
+                }
+                
                 // 检查列是否存在
-                const { data: columns, error } = await supabaseClient
+                const { data, error } = await supabaseClient
                     .from('orders')
                     .select('interest_shortfall')
                     .limit(1);
-                if (error && error.message && error.message.includes('column "interest_shortfall" does not exist')) {
-                    console.log('正在添加 interest_shortfall 列...');
-                    // 使用 raw SQL 添加列（需要 Supabase 权限）
-                    const { error: alterError } = await supabaseClient.rpc('add_interest_shortfall_column');
-                    if (alterError) {
-                        console.warn('无法添加 interest_shortfall 列，请手动执行: ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
+                    
+                if (error) {
+                    if (error.message && error.message.includes('column "interest_shortfall" does not exist')) {
+                        console.log('[Supabase] interest_shortfall 列不存在，尝试添加...');
+                        try {
+                            const { error: alterError } = await supabaseClient.rpc('add_interest_shortfall_column');
+                            if (alterError) {
+                                console.warn('[Supabase] 无法自动添加 interest_shortfall 列');
+                                console.warn('[Supabase] 请在 Supabase SQL Editor 中执行:');
+                                console.warn('ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
+                            } else {
+                                console.log('[Supabase] ✅ interest_shortfall 列已添加');
+                            }
+                        } catch (alterException) {
+                            console.warn('[Supabase] RPC 添加列失败:', alterException.message);
+                        }
+                    } else if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+                        console.log('[Supabase] 认证已过期，跳过列检查');
                     } else {
-                        console.log('✅ interest_shortfall 列已添加');
+                        console.warn('[Supabase] 列检查查询失败:', error.message);
                     }
                 }
             } catch (e) {
-                console.warn('检查 interest_shortfall 列失败:', e.message);
+                console.warn('[Supabase] 检查 interest_shortfall 列异常:', e.message);
             }
         },
 
@@ -2037,15 +2153,17 @@
         formatDate(dateStr) { return Utils.formatDate(dateStr); },
     };
 
-    // 执行列检查（非阻塞）
+    // 执行列检查（延迟以确保认证初始化完成）
     setTimeout(() => {
-        if (SupabaseAPI.ensureInterestShortfallColumn) {
-            SupabaseAPI.ensureInterestShortfallColumn().catch(e => console.warn('列检查失败:', e.message));
-        }
-    }, 1000);
+        setTimeout(() => {
+            if (SupabaseAPI.ensureInterestShortfallColumn) {
+                SupabaseAPI.ensureInterestShortfallColumn().catch(e => console.warn('[Supabase] 列检查失败:', e.message));
+            }
+        }, 3000);
+    }, 2000);
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
 
-    console.log('✅ JF.Supabase v2.3 最终版初始化完成（含三项关键修复）');
+    console.log('✅ JF.Supabase v2.1 初始化完成（Token 刷新优雅处理）');
 })();
