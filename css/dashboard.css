@@ -91,19 +91,17 @@
     font-weight: 400;
 }
 
-/* ========= 侧边栏用户区 - 头像 + 两行文字布局 ========= */
+/* 侧边栏用户区 */
 .sidebar-user {
     padding: 12px 16px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
     display: flex;
-    align-items: center;        /* 头像垂直居中 */
+    align-items: center;
     gap: 12px;
     flex-wrap: nowrap;
 }
-
-/* 头像容器：保持原有样式，确保居中 */
 .user-av {
-    width: 36px;                /* 稍微放大一点更好看 */
+    width: 36px;
     height: 36px;
     background: linear-gradient(135deg, #0e7490, #06b6d4);
     border-radius: 50%;
@@ -116,17 +114,13 @@
     flex-shrink: 0;
     box-shadow: 0 2px 6px rgba(14, 116, 144, 0.2);
 }
-
-/* 右侧文字区 */
 .user-info {
     flex: 1;
-    min-width: 0;               /* 防止溢出 */
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;                  /* 行间距紧密但不拥挤 */
+    gap: 4px;
 }
-
-/* 第一行：用户名 */
 .user-name-top {
     font-size: 0.8rem;
     font-weight: 700;
@@ -136,22 +130,18 @@
     text-overflow: ellipsis;
     line-height: 1.3;
 }
-
-/* 第二行：左侧角色 + 右侧门店（左右分布） */
 .user-detail-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     gap: 8px;
 }
-
 .user-role {
     font-size: 0.68rem;
     color: #475569;
     font-weight: 500;
     white-space: nowrap;
 }
-
 .user-store-badge {
     background: rgba(14, 116, 144, 0.12);
     border: 1px solid rgba(14, 116, 144, 0.25);
@@ -165,7 +155,6 @@
     flex-shrink: 0;
 }
 
-/* 移动端微调（宽度较小时确保可读） */
 @media (max-width: 768px) {
     .sidebar-user {
         padding: 10px 12px;
@@ -255,7 +244,6 @@
     padding: 5px 15px;
     border-top: 1px solid rgba(14, 116, 144, 0.2);
 }
-
 .lang-toggle {
     display: flex;
     flex-direction: column;
@@ -265,10 +253,9 @@
     padding: 3px;
     gap: 4px;
 }
-
 .lang-btn-side {
     display: block;
-    padding: 2px 8px; 
+    padding: 2px 8px;
     text-align: center;
     border-radius: 5px;
     background: transparent;
@@ -276,20 +263,14 @@
     transition: background 0.2s, transform 0.1s;
     cursor: pointer;
     font-size: 0.8rem;
-    color: #334155; /* ↑ 提高对比度 */
+    color: #334155;
 }
-
-/* hover 状态（新增） */
 .lang-btn-side:hover {
     background: rgba(14, 116, 144, 0.2);
 }
-
-/* 点击反馈（新增） */
 .lang-btn-side:active {
     transform: scale(0.98);
 }
-
-/* 激活状态 */
 .lang-btn-side.active-lang {
     background: rgba(14, 116, 144, 0.35);
     color: #0e7490;
@@ -398,7 +379,6 @@
 .kpi-card--green::before  { background: linear-gradient(90deg, #15803d, #16a34a); }
 
 .kpi-icon { font-size: 16px; margin-bottom: 1px; }
-
 .kpi-val {
     font-size: var(--font-xl);
     font-weight: 700;
@@ -408,14 +388,12 @@
 }
 .kpi-val.green  { color: #15803d; }
 .kpi-val.amber  { color: #b45309; }
-
 .kpi-label {
     font-size: var(--font-xs);
     font-weight: 600;
     margin-top: 2px;
     color: #475569;
 }
-
 .kpi-trend {
     font-size: 0.65rem;
     font-weight: 600;
@@ -656,16 +634,18 @@
 }
 
 /* ==============================
-   八、底部行（快捷操作 + 订单分布）
+   八、底部行（快捷操作 + 订单状态分布 + 消息中心）
+   注意：桌面端通过 order 互换消息中心和订单状态分布的位置
    ============================*/
 .bottom-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
     align-items: stretch;
 }
 .quick-card,
-.order-status-card {
+.order-status-card,
+.message-center-card {
     background: #fff;
     border-radius: 12px;
     border: 1px solid #c8d8e8;
@@ -677,7 +657,8 @@
     justify-content: space-between;
 }
 .quick-card:hover,
-.order-status-card:hover {
+.order-status-card:hover,
+.message-center-card:hover {
     box-shadow: 0 4px 14px rgba(14, 116, 144, 0.1);
     transform: translateY(-1px);
 }
@@ -791,247 +772,8 @@
 }
 
 /* ==============================
-   十、桌面端微调（≥769px）
+   十、消息中心卡片样式
    ============================*/
-@media (min-width: 769px) {
-    .dashboard-v2 {
-        position: relative;
-    }
-    .dash-main {
-        overflow-y: auto;
-        overflow-x: hidden;
-        height: calc(100vh - var(--topbar-height));
-        scrollbar-width: thin;
-    }
-    .dash-sidebar {
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-    }
-}
-
-/* ============================================================
-   十一、移动端布局（≤768px）
-   包含侧边栏收窄、语言按钮分离、KPI双列、快捷操作提前等优化
-   ============================================================ */
-@media (max-width: 768px) {
-    .dashboard-v2 {
-        margin: -8px;
-        width: calc(100% + 16px);
-        display: block !important;
-        min-height: 100vh;
-    }
-    
-    .dash-topbar {
-        position: sticky;
-        top: 0;
-        z-index: 90;
-        background: #fff;
-        padding: 0 12px;
-        height: 56px;
-    }
-    .topbar-title {
-        font-size: 1rem !important;
-        font-weight: 600;
-        white-space: normal !important;
-        word-break: keep-all;
-        line-height: 1.2;
-        max-width: 60vw;
-    }
-    .topbar-sub {
-        font-size: 0.7rem !important;
-        color: #64748b;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        flex-shrink: 1;
-    }
-    .topbar-left {
-        gap: 6px;
-        flex: 1;
-        min-width: 0;
-    }
-    
-    /* 隐藏顶部三角警示按钮 */
-    .dash-topbar .btn--warning {
-        display: none;
-    }
-    
-    /* ---- 侧边栏（移动端）宽度调整 ---- */
-    .dash-sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: 45vw;
-        min-width: 160px;
-        max-width: 200px;
-        height: 100%;
-        background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
-        z-index: 1001;
-        transform: translateX(-100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        overflow-y: auto;
-        box-shadow: 2px 0 12px rgba(0,0,0,0.15);
-    }
-    .dash-sidebar.open {
-        transform: translateX(0);
-    }
-    
-    .sidebar-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.6);
-        backdrop-filter: blur(2px);
-        z-index: 1000;
-        display: none;
-    }
-    .sidebar-overlay.active {
-        display: block;
-    }
-    
-    .dash-main {
-        padding: 14px 12px;
-        margin-top: 0;
-        overflow-x: visible;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        min-height: calc(100vh - 56px);
-    }
-    
-    body.menu-open {
-        overflow: hidden;
-        position: fixed;
-        width: 100%;
-    }
-
-    /* ---- 重新排列内容顺序（order） ---- */
-    .kpi-row {
-        order: 2;
-    }
-    .mid-row {
-        order: 3;
-    }
-    .bottom-row {
-        display: contents;
-    }
-    .quick-card {
-        order: 1;
-    }
-    .order-status-card {
-        order: 4;
-    }
-
-    /* KPI 卡片双列展示 */
-    .kpi-row {
-        grid-template-columns: 1fr 1fr !important;
-    }
-
-    /* 中间行、现金银行等仍保持单列 */
-    .mid-row,
-    .fund-total-row,
-    .cash-bank-row {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-
-    .income-card {
-        margin-top: 10px;
-        border-top: 2px solid var(--border-light);
-        padding-top: 18px;
-    }
-
-    /* 订单分布改为水平排列 */
-    .donut-area {
-        flex-direction: row;
-        align-items: center;
-        gap: 20px;
-    }
-    .donut-legend {
-        width: auto;
-        flex: 1;
-    }
-
-    .transfer-row-v2 {
-        flex-wrap: wrap;
-    }
-
-    /* 快捷操作双列保持不变 */
-    .quick-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
-/* ==============================
-   十二、小屏手机额外适配（≤480px）
-   ============================*/
-@media (max-width: 480px) {
-    .dash-topbar {
-        padding: 0 12px;
-    }
-    .dash-main {
-        padding: 10px 8px;
-    }
-    .kpi-row {
-        gap: 8px;
-        grid-template-columns: 1fr 1fr !important;
-    }
-    .kpi-card {
-        padding: 8px 10px;
-    }
-    .kpi-val {
-        font-size: calc(var(--font-xl) - 0.125rem);
-    }
-}
-
-/* ==============================
-   十三、动画
-   ============================*/
-@keyframes dashFadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeSlideUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-.kpi-card,
-.fund-flow-card,
-.income-card,
-.quick-card,
-.order-status-card {
-    animation: dashFadeIn 0.4s ease forwards;
-}
-.kpi-card:nth-child(2) { animation-delay: 0.05s; }
-.kpi-card:nth-child(3) { animation-delay: 0.10s; }
-.kpi-card:nth-child(4) { animation-delay: 0.15s; }
-
-.main-content-transition {
-    animation: fadeSlideUp 0.25s ease-out;
-}
-
-/* ==============================
-   十四、消息中心卡片样式
-   ============================*/
-.message-center-card {
-    background: #fff;
-    border-radius: 12px;
-    border: 1px solid #c8d8e8;
-    box-shadow: 0 1px 3px rgba(14, 116, 144, 0.06);
-    padding: 12px;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-.message-center-card:hover {
-    box-shadow: 0 4px 14px rgba(14, 116, 144, 0.1);
-    transform: translateY(-1px);
-}
-
 .message-badge {
     background: #ef4444;
     color: white;
@@ -1041,25 +783,21 @@
     border-radius: 20px;
     margin-left: 8px;
 }
-
 .message-preview {
     margin-top: 8px;
     flex: 1;
 }
-
 .empty-preview {
     text-align: center;
     padding: 20px;
     color: #94a3b8;
     font-size: 13px;
 }
-
 .preview-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
-
 .preview-item {
     display: flex;
     align-items: center;
@@ -1106,10 +844,281 @@
     text-decoration: underline;
 }
 
-/* 移动端三列变单列 */
-@media (max-width: 768px) {
+/* ==============================
+   十一、桌面端微调（≥769px）- 互换消息中心和订单状态分布的位置
+   ============================*/
+@media (min-width: 769px) {
+    .dashboard-v2 {
+        position: relative;
+    }
+    .dash-main {
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: calc(100vh - var(--topbar-height));
+        scrollbar-width: thin;
+    }
+    .dash-sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    }
+
+    /* 关键调整：互换位置 */
     .bottom-row {
-        grid-template-columns: 1fr !important;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    /* 让消息中心显示在第一列，订单状态分布显示在第二列 */
+    .bottom-row .message-center-card {
+        order: 1;
+    }
+    .bottom-row .order-status-card {
+        order: 2;
+    }
+    /* 快捷操作卡片（如果有）保持自然顺序为0，通常会单独占一整行？根据实际布局确定 */
+    /* 实际上 .bottom-row 中通常只有两个卡片（快捷操作卡片可能在上方），但如果快捷操作卡片也在 .bottom-row 中，则 order:0 让它排在左边第一个 */
+    .bottom-row .quick-card {
+        order: 0;
+    }
+}
+
+/* ==============================
+   十二、移动端布局（≤768px）- 完全重排顺序：
+   顺序：消息中心 → 快捷操作 → 收入构成 → 其他所有内容 → 订单状态分布（最底部）
+   ============================*/
+@media (max-width: 768px) {
+    .dashboard-v2 {
+        margin: -8px;
+        width: calc(100% + 16px);
+        display: block !important;
+        min-height: 100vh;
+    }
+    
+    .dash-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 90;
+        background: #fff;
+        padding: 0 12px;
+        height: 56px;
+    }
+    .topbar-title {
+        font-size: 1rem !important;
+        font-weight: 600;
+        white-space: normal !important;
+        word-break: keep-all;
+        line-height: 1.2;
+        max-width: 60vw;
+    }
+    .topbar-sub {
+        font-size: 0.7rem !important;
+        color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 1;
+    }
+    .topbar-left {
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    /* 隐藏顶部三角警示按钮 */
+    .dash-topbar .btn--warning {
+        display: none;
+    }
+    
+    /* 侧边栏（移动端） */
+    .dash-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 45vw;
+        min-width: 160px;
+        max-width: 200px;
+        height: 100%;
+        background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
+        z-index: 1001;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow-y: auto;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+    }
+    .dash-sidebar.open {
+        transform: translateX(0);
+    }
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(2px);
+        z-index: 1000;
+        display: none;
+    }
+    .sidebar-overlay.active {
+        display: block;
+    }
+    
+    /* 主内容区作为 flex 列容器，支持 order 排序 */
+    .dash-main {
+        padding: 14px 12px;
+        margin-top: 0;
+        overflow-x: visible;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: calc(100vh - 56px);
+    }
+    
+    body.menu-open {
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+    }
+    
+    /* 重置所有直接子元素的 order，避免历史干扰 */
+    .dash-main > * {
+        order: 0;
+    }
+    
+    /* 
+       重新排序（按照需求）：
+       1. 消息中心 
+       2. 快捷操作 
+       3. 收入构成 
+       4. 其他区域（KPI行、中间行、资金结构、现金银行行、转账按钮、利用率条等）
+       5. 订单状态分布（最底部）
+    */
+    .message-center-card {
+        order: 1 !important;
+    }
+    .quick-card {
+        order: 2 !important;
+    }
+    .income-card {
+        order: 3 !important;
+    }
+    /* 其他区域统一 order 4 */
+    .kpi-row,
+    .mid-row:not(:has(.income-card)),  /* 排除已单独处理的 income 所在父级 */
+    .fund-flow-card,
+    .cash-bank-row,
+    .transfer-row-v2,
+    .util-bar-wrap,
+    .profit-distribution-grid {
+        order: 4 !important;
+    }
+    /* 订单状态分布置底 */
+    .order-status-card {
+        order: 999 !important;
+        margin-top: 10px;
+    }
+    
+    /* 关键：让 .bottom-row 不再作为网格容器，使其子元素直接参与 .dash-main 的 flex 排序 */
+    .bottom-row {
+        display: contents !important;
+    }
+    
+    /* KPI 卡片双列展示 */
+    .kpi-row {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px;
+    }
+    
+    /* 中间行、现金银行等单列 */
+    .mid-row,
+    .fund-total-row,
+    .cash-bank-row {
+        grid-template-columns: 1fr;
         gap: 12px;
     }
+    
+    /* 收入构成卡片上方加间距 */
+    .income-card {
+        margin-top: 10px;
+        border-top: 2px solid var(--border-light);
+        padding-top: 18px;
+    }
+    
+    /* 订单分布水平排列 */
+    .donut-area {
+        flex-direction: row;
+        align-items: center;
+        gap: 20px;
+    }
+    .donut-legend {
+        width: auto;
+        flex: 1;
+    }
+    
+    .transfer-row-v2 {
+        flex-wrap: wrap;
+    }
+    
+    /* 快捷操作双列保持不变 */
+    .quick-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    /* 移动端时底部行中如果还有其他卡片（如快捷操作卡可能在别处），确保不冲突 */
+    .quick-card {
+        order: 2 !important;
+    }
+}
+
+/* ==============================
+   十三、小屏手机额外适配（≤480px）
+   ============================*/
+@media (max-width: 480px) {
+    .dash-topbar {
+        padding: 0 12px;
+    }
+    .dash-main {
+        padding: 10px 8px;
+    }
+    .kpi-row {
+        gap: 8px;
+        grid-template-columns: 1fr 1fr !important;
+    }
+    .kpi-card {
+        padding: 8px 10px;
+    }
+    .kpi-val {
+        font-size: calc(var(--font-xl) - 0.125rem);
+    }
+}
+
+/* ==============================
+   十四、动画
+   ============================*/
+@keyframes dashFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.kpi-card,
+.fund-flow-card,
+.income-card,
+.quick-card,
+.order-status-card,
+.message-center-card {
+    animation: dashFadeIn 0.4s ease forwards;
+}
+.kpi-card:nth-child(2) { animation-delay: 0.05s; }
+.kpi-card:nth-child(3) { animation-delay: 0.10s; }
+.kpi-card:nth-child(4) { animation-delay: 0.15s; }
+
+.main-content-transition {
+    animation: fadeSlideUp 0.25s ease-out;
 }
