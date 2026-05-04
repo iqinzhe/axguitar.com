@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.0 (JF 命名空间) 
+// app-dashboard-orders.js - v2.1 (JF 命名空间) 补全 printOrder 方法
 
 'use strict';
 
@@ -410,9 +410,103 @@
             }
         },
 
-        // ==================== 打印订单（不变） ====================
+        // ==================== 补全：打印单个订单 ====================
         async printOrder(orderId) {
-            // ... 保持原有的打印逻辑，内部没有类名改动，此处省略
+            const lang = Utils.lang;
+            try {
+                const result = await SUPABASE.getPaymentHistory(orderId);
+                const order = result.order;
+                if (!order) {
+                    Utils.toast.error(Utils.t('order_not_found'));
+                    return;
+                }
+
+                const profile = await SUPABASE.getCurrentProfile();
+                const isAdmin = PERMISSION.isAdmin();
+                const storeName = isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (profile?.stores?.name || '-');
+                const userName = profile?.name || '-';
+                const printDateTime = new Date().toLocaleString();
+
+                const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+                const monthlyRate = order.agreed_interest_rate || 0.08;
+                const currentMonthlyInterest = remainingPrincipal * monthlyRate;
+                const statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
+                                   order.status === 'completed' ? (lang === 'id' ? 'Lunas' : '已结清') :
+                                   (lang === 'id' ? 'Likuidasi' : '已变卖');
+                const repaymentText = order.repayment_type === 'fixed' ? (lang === 'id' ? 'Cicilan Tetap' : '固定还款') :
+                                     (lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款');
+
+                let paymentRows = '';
+                if (result.payments && result.payments.length > 0) {
+                    for (const p of result.payments) {
+                        paymentRows += `<tr>
+                            <td>${Utils.formatDate(p.date)}</td>
+                            <td>${Utils.escapeHtml(p.type)}</td>
+                            <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                            <td>${Utils.escapeHtml(p.payment_method || '-')}</td>
+                            <td>${Utils.escapeHtml(p.description || '')}</td>
+                        </tr>`;
+                    }
+                } else {
+                    paymentRows = `<tr><td colspan="5" class="text-center">${lang === 'id' ? 'Tidak ada' : '无'}</td></tr>`;
+                }
+
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Print Order - ${Utils.escapeHtml(order.order_id)}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; font-size: 11pt; padding: 2cm; }
+                            h1 { font-size: 16pt; margin-bottom: 0.5cm; }
+                            table { width: 100%; border-collapse: collapse; margin: 1cm 0; }
+                            th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+                            th { background: #eee; font-weight: bold; }
+                            .text-right { text-align: right; }
+                            .text-center { text-align: center; }
+                            @media print { body { padding: 0; } }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>${lang === 'id' ? 'Detail Pesanan' : '订单详情'}</h1>
+                        <table>
+                            <tr><td><strong>${Utils.t('order_id')}</strong></td><td>${Utils.escapeHtml(order.order_id)}</td></tr>
+                            <tr><td><strong>${Utils.t('customer_name')}</strong></td><td>${Utils.escapeHtml(order.customer_name)}</td></tr>
+                            <tr><td><strong>${Utils.t('collateral_name')}</strong></td><td>${Utils.escapeHtml(order.collateral_name)}</td></tr>
+                            <tr><td><strong>${Utils.t('loan_amount')}</strong></td><td>${Utils.formatCurrency(order.loan_amount)}</td></tr>
+                            <tr><td><strong>${Utils.t('repayment_type')}</strong></td><td>${repaymentText}</td></tr>
+                            <tr><td><strong>${Utils.t('status')}</strong></td><td>${statusText}</td></tr>
+                            <tr><td><strong>${Utils.t('agreed_rate')}</strong></td><td>${(monthlyRate * 100).toFixed(0)}%</td></tr>
+                            <tr><td><strong>${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</strong></td><td>${Utils.formatCurrency(currentMonthlyInterest)}</td></tr>
+                            <tr><td><strong>${Utils.t('remaining_principal')}</strong></td><td>${Utils.formatCurrency(remainingPrincipal)}</td></tr>
+                        </table>
+                        <h2>${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>${Utils.t('date')}</th>
+                                    <th>${Utils.t('type')}</th>
+                                    <th>${Utils.t('amount')}</th>
+                                    <th>${Utils.t('payment_method')}</th>
+                                    <th>${Utils.t('description')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>${paymentRows}</tbody>
+                        </table>
+                        <p style="text-align:center; font-size:9pt; margin-top:1cm;">
+                            ${lang === 'id' ? 'Dicetak dari' : '打印自'} JF! by Gadai - ${printDateTime}
+                        </p>
+                        <script>window.print(); setTimeout(function(){ window.close(); }, 500);</script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            } catch (error) {
+                console.error("printOrder error:", error);
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
+            }
         },
 
         // ==================== 显示缴费历史汇总 ====================
@@ -482,5 +576,5 @@
         window.APP.showPaymentHistory = OrdersPage.showPaymentHistory.bind(OrdersPage);
     }
 
-    console.log('✅ JF.OrdersPage v2.1 重构完成（类名统一）');
+    console.log('✅ JF.OrdersPage v2.1 补全完成（printOrder 实现，移除空方法）');
 })();
