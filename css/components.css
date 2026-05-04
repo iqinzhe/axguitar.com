@@ -949,6 +949,13 @@
   color: var(--text-primary);
 }
 
+.login-note {
+    font-size: 0.7rem;      /* 可按需调整：0.65rem、0.75rem 等 */
+    color: #64748b;         /* 可选：设为更柔和的灰色 */
+    margin-top: 12px;       /* 可选：调整上边距 */
+    text-align: center;     /* 已有的居中样式可保留 */
+}
+
 /* 门店财务汇总卡片 */
 .cashflow-stats {
   display: flex;
