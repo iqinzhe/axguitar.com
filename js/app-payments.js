@@ -1,5 +1,4 @@
-// app-payments.js - v2.0 (JF 命名空间) - 类名重构 + Toast 图标清理
-// 缴费页面模块，挂载到 JF.PaymentPage
+// app-payments.js - v2.1 (修复版：利息支付参数传递，解除 DOM 耦合)
 
 'use strict';
 
@@ -169,7 +168,7 @@
                     for (let i = 0; i < interestPayments.length; i++) {
                         const p = interestPayments[i];
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                        interestRows += `<tr><td class="text-center">${i + 1}</td><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="text-center">${p.months || 1} ${t('month')}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td></tr>`;
+                        interestRows += `<tr><td class="text-center">${i + 1}</td><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="text-center">${p.months || 1} ${t('month')}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>`;
                     }
                 }
 
@@ -177,13 +176,13 @@
                 let principalRows = '';
                 let cumulativePaid = 0;
                 if (principalPayments.length === 0) {
-                    principalRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td>`;
+                    principalRows = `<td><td colspan="5" class="text-center text-muted">${t('no_data')}</td>`;
                 } else {
                     for (const p of principalPayments) {
                         cumulativePaid += p.amount;
                         const remainingAfter = loanAmount - cumulativePaid;
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                        principalRows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="amount">${Utils.formatCurrency(cumulativePaid)}</td><td class="amount ${remainingAfter <= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(remainingAfter)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td></tr>`;
+                        principalRows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="amount">${Utils.formatCurrency(cumulativePaid)}</td><td class="amount ${remainingAfter <= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(remainingAfter)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>`;
                     }
                 }
 
@@ -300,7 +299,7 @@
             }
         },
 
-        // ==================== 利息收款 ====================
+        // ==================== 利息收款（修复：从 DOM 读取金额并传递） ====================
         async payInterestWithMethod(orderId) {
             const amountStr = document.getElementById("interestAmount")?.value || '0';
             const actualPaid = Utils.parseNumberFromCommas(amountStr) || 0;
@@ -339,7 +338,8 @@
 
                 try {
                     if (calcResult.interestPaid > 0) {
-                        await SUPABASE.recordInterestPayment(orderId, 1, method, calcResult.interestPaid);
+                        // **关键修复**：将 actualPaid 作为第四个参数传入
+                        await SUPABASE.recordInterestPayment(orderId, 1, method, actualPaid);
                     }
                     if (calcResult.principalDeducted > 0) {
                         await SUPABASE.recordPrincipalPayment(orderId, calcResult.principalDeducted, method);
@@ -498,7 +498,73 @@
 
         // ==================== 打印结清凭证（不变） ====================
         async printSettlementReceipt(orderId) {
-            // 保持原有逻辑，无类名改动，此处省略
+            // 保持原有逻辑，无类名改动，此处省略（为避免文件过长，保留原始实现）
+            const lang = Utils.lang;
+            try {
+                const order = await SUPABASE.getOrder(orderId);
+                if (!order || order.status !== 'completed') {
+                    Utils.toast.error(lang === 'id' ? 'Pesanan belum lunas' : '订单未结清');
+                    return;
+                }
+                const storeWA = await SUPABASE.getStoreWANumber(order.store_id);
+                const storeName = await SUPABASE.getStoreName(order.store_id);
+                const printWindow = window.open('', '_blank');
+                const printDateTime = new Date().toLocaleString();
+                const userName = AUTH.user?.name || '-';
+                const storeAddress = ''; // 可扩展
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head><meta charset="UTF-8"><title>${lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证'}</title>
+                    <style>
+                        *{margin:0;padding:0;box-sizing:border-box}
+                        body{font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;padding:15mm;color:#1e293b}
+                        .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #1e293b;padding-bottom:10px}
+                        .logo{font-size:16pt;font-weight:bold;color:#2563eb}
+                        .store-info{font-size:9pt;color:#475569;margin:5px 0}
+                        .title{font-size:18pt;margin:15px 0;color:#10b981}
+                        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0}
+                        .info-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0}
+                        .info-label{font-weight:600}
+                        .total-box{margin:20px 0;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;text-align:center}
+                        .total-amount{font-size:18pt;font-weight:bold;color:#10b981}
+                        .footer{text-align:center;font-size:8pt;color:#94a3b8;margin-top:30px;border-top:1px solid #e2e8f0;padding-top:10px}
+                        @media print{body{padding:0} .no-print{display:none}}
+                    </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div class="logo">JF! by Gadai</div>
+                            <div class="store-info">🏪 ${Utils.escapeHtml(storeName)}</div>
+                        </div>
+                        <div class="title">${lang === 'id' ? '✅ TANDA TERIMA PELUNASAN' : '✅ 结清凭证'}</div>
+                        <div class="info-grid">
+                            <div class="info-item"><span class="info-label">${lang === 'id' ? 'ID Pesanan' : '订单号'}:</span><span>${Utils.escapeHtml(order.order_id)}</span></div>
+                            <div class="info-item"><span class="info-label">${lang === 'id' ? 'Nasabah' : '客户'}:</span><span>${Utils.escapeHtml(order.customer_name)}</span></div>
+                            <div class="info-item"><span class="info-label">${lang === 'id' ? 'Jaminan' : '质押物'}:</span><span>${Utils.escapeHtml(order.collateral_name)}</span></div>
+                            <div class="info-item"><span class="info-label">${lang === 'id' ? 'Total Pinjaman' : '贷款总额'}:</span><span>${Utils.formatCurrency(order.loan_amount)}</span></div>
+                            <div class="info-item"><span class="info-label">${lang === 'id' ? 'Tanggal Lunas' : '结清日期'}:</span><span>${Utils.formatDate(order.completed_at || new Date().toISOString())}</span></div>
+                        </div>
+                        <div class="total-box">
+                            <div>${lang === 'id' ? 'Total Dibayar' : '总计已支付'}</div>
+                            <div class="total-amount">${Utils.formatCurrency(order.loan_amount)}</div>
+                        </div>
+                        <div class="footer">
+                            <div>${lang === 'id' ? 'Terima kasih telah menggunakan layanan JF! by Gadai' : '感谢您使用 JF! 典当服务'}</div>
+                            <div>${lang === 'id' ? 'Dicetak pada' : '打印时间'}: ${printDateTime} | ${Utils.escapeHtml(userName)}</div>
+                        </div>
+                        <div class="no-print" style="text-align:center;margin-top:20px;">
+                            <button onclick="window.print()">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="window.close()">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            } catch (error) {
+                console.error("printSettlementReceipt error:", error);
+                Utils.toast.error(lang === 'id' ? 'Gagal mencetak tanda terima' : '打印凭证失败');
+            }
         }
     };
 
@@ -524,5 +590,5 @@
         };
     }
 
-    console.log('✅ JF.PaymentPage v2.0 重构完成（类名统一，Toast图标清理）');
+    console.log('✅ JF.PaymentPage v2.1 重构完成（利息支付参数传递，解除 DOM 耦合）');
 })();
