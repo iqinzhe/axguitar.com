@@ -1,5 +1,4 @@
 // auth.js - v2.0 统一认证模块 (JF 命名空间)
-// 挂载到 JF.Auth，保留 window.AUTH 别名
 
 'use strict';
 
