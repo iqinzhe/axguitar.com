@@ -7,19 +7,16 @@
 <meta name="theme-color" content="#ffffff">
 <title>JF! by Gadai - Sistem Manajemen Gadai</title>
 
-<!-- Favicon -->
 <link rel="icon" href="icons/favicon-192x192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest?v=1">
 
-<!-- ========== CSS 加载顺序（5层精简架构） ========== -->
 <link rel="stylesheet" href="css/variables.css">
 <link rel="stylesheet" href="css/reset.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/dashboard.css">
 <link rel="stylesheet" href="css/responsive.css">
 
-<!-- 预加载关键资源 -->
 <link rel="preconnect" href="https://hiupsvsbcdsgoyiieqiv.supabase.co">
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 </head>
@@ -31,66 +28,59 @@
     </div>
 </div>
 
-<!-- ========== 脚本加载顺序 ========== -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- 0. 配置文件 -->
-    <script src="config.js"></script>
+<script defer src="js/utils.js"></script>
+<script defer src="js/toast.js"></script>
+<script defer src="js/cache.js"></script>
+<script defer src="js/supabase.js"></script>
+<script defer src="js/auth.js"></script>
+<script defer src="js/permission.js"></script>
+<script defer src="js/audit.js"></script>
+<script defer src="js/order.js"></script>
+<script defer src="js/store.js"></script>
+<script defer src="js/storage.js"></script>
+<script defer src="js/migration.js"></script>
 
-    <!-- 1. 基础库 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="js/app-dashboard-core.js"></script>
+<script defer src="js/app-capital.js"></script>
+<script defer src="js/app-profit.js"></script>
+<script defer src="js/app-dashboard-anomaly.js"></script>
+<script defer src="js/app-dashboard-expenses.js"></script>
+<script defer src="js/app-dashboard-funds.js"></script>
+<script defer src="js/app-dashboard-orders.js"></script>
+<script defer src="js/app-dashboard-print.js"></script>
+<script defer src="js/app-dashboard-users.js"></script>
+<script defer src="js/app-dashboard-wa.js"></script>
+<script defer src="js/app-message-center.js"></script>
+<script defer src="js/app-customers.js"></script>
+<script defer src="js/app-blacklist.js"></script>
+<script defer src="js/app-payments.js"></script>
 
-    <!-- 2. 核心模块 -->
-    <script defer src="js/utils.js"></script>
-    <script defer src="js/toast.js"></script>
-    <script defer src="js/cache.js"></script>
-    <script defer src="js/supabase.js"></script>
-    <script defer src="js/auth.js"></script>
-    <script defer src="js/permission.js"></script>
-    <script defer src="js/audit.js"></script>
-    <script defer src="js/order.js"></script>
-    <script defer src="js/store.js"></script>
-    <script defer src="js/storage.js"></script>
-    <script defer src="js/migration.js"></script>
+<script defer src="js/app-state-init.js"></script>
+<script defer src="js/app.js"></script>
 
-    <!-- 3. 页面组件 -->
-    <script defer src="js/app-dashboard-core.js"></script>
-    <script defer src="js/app-capital.js"></script>
-    <script defer src="js/app-profit.js"></script>
-    <script defer src="js/app-dashboard-anomaly.js"></script>
-    <script defer src="js/app-dashboard-expenses.js"></script>
-    <script defer src="js/app-dashboard-funds.js"></script>
-    <script defer src="js/app-dashboard-orders.js"></script>
-    <script defer src="js/app-dashboard-print.js"></script>
-    <script defer src="js/app-dashboard-users.js"></script>
-    <script defer src="js/app-dashboard-wa.js"></script>
-    <script defer src="js/app-message-center.js"></script>
-    <script defer src="js/app-customers.js"></script>
-    <script defer src="js/app-blacklist.js"></script>
-    <script defer src="js/app-payments.js"></script>
-
-    <!-- 4. 状态初始化 + 主入口 -->
-    <script defer src="js/app-state-init.js"></script>
-    <script defer src="js/app.js"></script>
-
-    <!-- 5. 启动 -->
-    <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-        // 等所有 defer 脚本执行完
-        setTimeout(async () => {
-            if (JF && JF.DashboardCore && JF.DashboardCore.init) {
-                console.log('[Boot] 启动应用');
-                await JF.DashboardCore.init();
-            } else {
-                console.error('[Boot] DashboardCore 未找到，尝试 APP.init');
-                if (APP && APP.init) {
-                    await APP.init();
-                } else {
-                    location.reload();
-                }
-            }
-        }, 200);
-    });
-    </script>
+<script>
+// 唯一的启动脚本
+(function boot() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(tryBoot, 300));
+    } else {
+        setTimeout(tryBoot, 300);
+    }
+    
+    function tryBoot() {
+        if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
+            console.log('[Boot] 启动应用');
+            JF.DashboardCore.init();
+        } else {
+            console.warn('[Boot] DashboardCore 未就绪，1秒后重试');
+            setTimeout(tryBoot, 1000);
+        }
+    }
+})();
+</script>
 
 </body>
 </html>
