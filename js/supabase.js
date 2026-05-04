@@ -1516,34 +1516,57 @@
         },
 
         async updateOverdueDays() {
-            const { data: activeOrders, error } = await supabaseClient.from('orders').select('*').eq('status', 'active');
-            if (error) throw error;
-            const todayLocal = new Date(); todayLocal.setHours(0, 0, 0, 0);
-            for (const order of activeOrders) {
-                const dueDate = order.next_interest_due_date;
-                if (!dueDate) continue;
-                const due = new Date(dueDate); due.setHours(0, 0, 0, 0);
-                let overdueDays = 0;
-                if (todayLocal > due) overdueDays = Math.floor((todayLocal - due) / 86400000);
-                let liquidationStatus = order.liquidation_status || 'normal';
-                let fundStatusUpdate = {};
-                if (overdueDays >= 30) {
-                    liquidationStatus = 'liquidated';
-                    fundStatusUpdate.fund_status = 'forfeited';
-                } else if (overdueDays >= 15) {
-                    liquidationStatus = 'warning';
-                } else {
-                    liquidationStatus = 'normal';
-                }
-                if (overdueDays !== order.overdue_days || liquidationStatus !== order.liquidation_status) {
-                    await supabaseClient.from('orders').update({
-                        overdue_days: overdueDays, liquidation_status: liquidationStatus,
-                        ...fundStatusUpdate, updated_at: Utils.getLocalDateTime()
-                    }).eq('id', order.id);
-                }
-            }
-            return true;
-        },
+    const { data: activeOrders, error } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .eq('status', 'active');
+
+    if (error) throw error;
+
+    const todayLocal = new Date();
+    todayLocal.setHours(0, 0, 0, 0);
+
+    for (const order of activeOrders) {
+        const dueDate = order.next_interest_due_date;
+        if (!dueDate) continue;
+
+        const due = new Date(dueDate);
+        due.setHours(0, 0, 0, 0);
+        let overdueDays = 0;
+        if (todayLocal > due) {
+            overdueDays = Math.floor((todayLocal - due) / 86400000);
+        }
+
+        // 根据逾期天数设定三阶段状态
+        let newLiquidationStatus = order.liquidation_status || 'normal';
+        let newFundStatus = order.fund_status;
+
+        if (overdueDays >= 30) {
+            newLiquidationStatus = 'auction';
+            newFundStatus = 'forfeited';
+        } else if (overdueDays >= 20) {
+            newLiquidationStatus = 'pre_auction';
+        } else if (overdueDays >= 10) {
+            newLiquidationStatus = 'collection';
+        } else {
+            newLiquidationStatus = 'normal';
+        }
+
+        // 仅在状态有变化时更新
+        if (overdueDays !== order.overdue_days ||
+            newLiquidationStatus !== order.liquidation_status ||
+            newFundStatus !== order.fund_status) {
+
+            await supabaseClient.from('orders').update({
+                overdue_days: overdueDays,
+                liquidation_status: newLiquidationStatus,
+                fund_status: newFundStatus,
+                updated_at: Utils.getLocalDateTime()
+            }).eq('id', order.id);
+        }
+    }
+    return true;
+},
 
         async updateOrder(orderId, updateData, customerId) {
             const currentOrder = await this.getOrder(orderId);
