@@ -1353,8 +1353,8 @@
                     console.warn(`订单 ${orderId} 利息少付 ${Utils.formatCurrency(shortfallToTrack)}，已记录为欠款`);
                     if (window.Toast) {
                         window.Toast.warning(Utils.lang === 'id' 
-                            ? `⚠️ Kekurangan pembayaran bunga: ${Utils.formatCurrency(shortfallToTrack)} akan ditagihkan nanti`
-                            : `⚠️ 利息少付 ${Utils.formatCurrency(shortfallToTrack)}，将后续追收`, 4000);
+                            ? `Kekurangan pembayaran bunga: ${Utils.formatCurrency(shortfallToTrack)} akan ditagihkan nanti`
+                            : `利息少付 ${Utils.formatCurrency(shortfallToTrack)}，将后续追收`, 4000);
                     }
                 }
                 
@@ -1373,7 +1373,7 @@
             const loanAmount = currentOrder.loan_amount || 0;
             const principalPaid = currentOrder.principal_paid || 0;
             const remainingPrincipal = loanAmount - principalPaid;
-            if (remainingPrincipal <= 0) throw new Error(Utils.lang === 'id' ? '❌ Pokok sudah lunas' : '❌ 本金已结清');
+            if (remainingPrincipal <= 0) throw new Error(Utils.lang === 'id' ? 'Pokok sudah lunas' : '本金已结清');
             let paidAmount = Math.min(amount, remainingPrincipal);
             if (paidAmount <= 0) throw new Error(Utils.t('invalid_amount'));
             const newPrincipalPaid = principalPaid + paidAmount;
@@ -1418,12 +1418,12 @@
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
             if (order.status === 'completed') throw new Error(Utils.t('order_completed'));
-            if (order.repayment_type !== 'fixed') throw new Error(Utils.lang === 'id' ? '❌ Pesanan ini bukan cicilan tetap' : '❌ 此订单不是固定还款模式');
+            if (order.repayment_type !== 'fixed') throw new Error(Utils.lang === 'id' ? 'Pesanan ini bukan cicilan tetap' : '此订单不是固定还款模式');
             const fixedPayment = order.monthly_fixed_payment;
             const paidMonths = order.fixed_paid_months || 0;
             const remainingMonths = order.repayment_term - paidMonths;
-            if (remainingMonths <= 0) throw new Error(Utils.lang === 'id' ? '❌ Pesanan sudah lunas' : '❌ 订单已结清');
-            if (fixedPayment <= 0) throw new Error(Utils.lang === 'id' ? '❌ Jumlah angsuran tidak valid' : '❌ 还款金额无效');
+            if (remainingMonths <= 0) throw new Error(Utils.lang === 'id' ? 'Pesanan sudah lunas' : '订单已结清');
+            if (fixedPayment <= 0) throw new Error(Utils.lang === 'id' ? 'Jumlah angsuran tidak valid' : '还款金额无效');
             const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
             const remainingPrincipal = order.principal_remaining;
             const interestAmount = remainingPrincipal * monthlyRate;
@@ -1511,7 +1511,7 @@
             }).eq('order_id', orderId);
             if (error) throw error;
             if (window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remainingPrincipal, paymentMethod);
-            Utils.toast.success(Utils.lang === 'id' ? '✅ Pelunasan dipercepat berhasil!' : '✅ 提前结清成功！');
+            Utils.toast.success(Utils.lang === 'id' ? 'Pelunasan dipercepat berhasil!' : '提前结清成功！');
             return true;
         },
 
