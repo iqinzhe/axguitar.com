@@ -124,7 +124,7 @@
     margin: 0;
 }
 .user-badge {
-    margin-left: auto;
+    margin-left: 0;
     background: rgba(14, 116, 144, 0.2);
     border: 1px solid rgba(14, 116, 144, 0.35);
     color: #0e7490;
