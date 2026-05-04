@@ -1,4 +1,4 @@
-// app-payments.js - v2.0 (JF 命名空间) - 类名重构
+// app-payments.js - v2.0 (JF 命名空间) - 类名重构 + Toast 图标清理
 // 缴费页面模块，挂载到 JF.PaymentPage
 
 'use strict';
@@ -321,7 +321,7 @@
                 const calcResult = Utils.calculateInterestPartialPayment(order, actualPaid);
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', calcResult.interestPaid, method);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '⚠️ 此笔付款已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '此笔付款已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
 
@@ -355,7 +355,7 @@
                             await window.Audit.log('interest_adjustment', JSON.stringify({ order_id: order.order_id, actual_paid: actualPaid, interest_recorded: calcResult.interestPaid, principal_adjustment: calcResult.principalDeducted, description: calcResult.description }));
                         }
                     }
-                    Utils.toast.success(lang === 'id' ? '✅ Pembayaran bunga berhasil!' : '✅ 利息收款成功！');
+                    Utils.toast.success(lang === 'id' ? 'Pembayaran bunga berhasil!' : '利息收款成功！');
                     await PaymentPage.showPayment(orderId);
                 } catch (error) {
                     console.error('payInterestWithMethod 事务失败:', error);
@@ -398,7 +398,7 @@
 
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'principal', actualAmount, target);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '⚠️ 此笔付款已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '此笔付款已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
 
@@ -414,11 +414,11 @@
                     if (window.Audit) await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
 
                     if (isFullSettlement) {
-                        const printConfirm = lang === 'id' ? '✅ LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '✅ 结清成功！\n\n' + Utils.t('print_receipt_confirm');
+                        const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
                         const printConfirmed = await Utils.toast.confirm(printConfirm);
                         if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
                     }
-                    Utils.toast.success(lang === 'id' ? '✅ Pembayaran pokok berhasil!' : '✅ 本金还款成功！');
+                    Utils.toast.success(lang === 'id' ? 'Pembayaran pokok berhasil!' : '本金还款成功！');
                     await PaymentPage.showPayment(orderId);
                 } catch (error) {
                     console.error('payPrincipalWithMethod 事务失败:', error);
@@ -449,7 +449,7 @@
                 const fixedPaymentBefore = orderBefore.monthly_fixed_payment || 0;
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'fixed_installment', fixedPaymentBefore, method);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? '⚠️ Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '⚠️ 此笔付款已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '此笔付款已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
                 await SUPABASE.recordFixedPayment(orderId, method);
@@ -480,7 +480,7 @@
                 const remainingPrincipal = orderBefore.principal_remaining || orderBefore.loan_amount || 0;
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'early_settlement', remainingPrincipal, method);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? '⚠️ Pelunasan ini sudah tercatat, tidak perlu diproses ulang.' : '⚠️ 此笔结清已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pelunasan ini sudah tercatat, tidak perlu diproses ulang.' : '此笔结清已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
                 await SUPABASE.earlySettleFixedOrder(orderId, method);
@@ -524,5 +524,5 @@
         };
     }
 
-    console.log('✅ JF.PaymentPage v2.0 重构完成（类名统一）');
+    console.log('✅ JF.PaymentPage v2.0 重构完成（类名统一，Toast图标清理）');
 })();
