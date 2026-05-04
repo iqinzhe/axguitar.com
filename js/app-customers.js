@@ -156,12 +156,12 @@
                             let reason = '';
                             if (ktp && blacklistedCustomer.ktp_number === ktp) {
                                 reason = lang === 'id'
-                                    ? `❌ Nomor KTP ${ktp} sudah terdaftar di blacklist (Nasabah: ${blacklistedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
-                                    : `❌ 身份证号 ${ktp} 已被拉黑（客户：${blacklistedCustomer.name}）\n\n无法添加相同信息的客户。`;
+                                    ? `Nomor KTP ${ktp} sudah terdaftar di blacklist (Nasabah: ${blacklistedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
+                                    : `身份证号 ${ktp} 已被拉黑（客户：${blacklistedCustomer.name}）\n\n无法添加相同信息的客户。`;
                             } else if (phone && blacklistedCustomer.phone === phone) {
                                 reason = lang === 'id'
-                                    ? `❌ Nomor telepon ${phone} sudah terdaftar di blacklist (Nasabah: ${blacklistedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
-                                    : `❌ 手机号 ${phone} 已被拉黑（客户：${blacklistedCustomer.name}）\n\n无法添加相同信息的客户。`;
+                                    ? `Nomor telepon ${phone} sudah terdaftar di blacklist (Nasabah: ${blacklistedCustomer.name})\n\nTidak dapat menambahkan nasabah baru dengan data yang sama.`
+                                    : `手机号 ${phone} 已被拉黑（客户：${blacklistedCustomer.name}）\n\n无法添加相同信息的客户。`;
                             }
                             Utils.toast.error(reason, 5000);
                             if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); }
@@ -333,7 +333,7 @@
 
             try {
                 await window.APP.addToBlacklist(customerUuid, reason);
-                Utils.toast.success(lang === 'id' ? `✅ Nasabah "${customerName}" telah ditambahkan ke blacklist.` : `✅ 客户 "${customerName}" 已加入黑名单。`);
+                Utils.toast.success(lang === 'id' ? `Nasabah "${customerName}" telah ditambahkan ke blacklist.` : `客户 "${customerName}" 已加入黑名单。`);
                 await CustomersPage.showCustomers();
             } catch (error) {
                 Utils.toast.error(lang === 'id' ? 'Gagal menambahkan ke blacklist: ' + error.message : '拉黑失败：' + error.message);
@@ -347,7 +347,7 @@
             if (!confirmed) return;
             try {
                 await window.APP.removeFromBlacklist(customerUuid);
-                Utils.toast.success(lang === 'id' ? '✅ Blacklist berhasil dibuka' : '✅ 已解除拉黑');
+                Utils.toast.success(lang === 'id' ? 'Blacklist berhasil dibuka' : '已解除拉黑');
                 const modal = document.getElementById('customerDetailCard');
                 if (modal) modal.remove();
                 await CustomersPage.showCustomers();
@@ -500,7 +500,7 @@
 
                 const blacklistCheck = await SUPABASE.checkBlacklist(customer.id).catch(() => ({ isBlacklisted: false }));
                 if (blacklistCheck.isBlacklisted) {
-                    Utils.toast.error(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。', 4000);
+                    Utils.toast.error(lang === 'id' ? 'Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '此客户已被拉黑，无法创建新订单。', 4000);
                     return;
                 }
 
@@ -653,7 +653,7 @@
                 const blacklistData = await SUPABASE.checkBlacklist(customer.id);
                 if (blacklistData.isBlacklisted) {
                     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
-                    Utils.toast.error(lang === 'id' ? '❌ Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '❌ 此客户已被拉黑，无法创建新订单。', 4000);
+                    Utils.toast.error(lang === 'id' ? 'Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '此客户已被拉黑，无法创建新订单。', 4000);
                     return;
                 }
 
@@ -676,11 +676,11 @@
 
                 const successMsg = repaymentType === 'fixed'
                     ? (lang === 'id'
-                        ? `✅ Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}`
-                        : `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`)
+                        ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}`
+                        : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`)
                     : (lang === 'id'
-                        ? `✅ Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nMaksimal perpanjangan: ${maxExtensionMonths} bulan`
-                        : `✅ 订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n最长可延期: ${maxExtensionMonths}个月`);
+                        ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nMaksimal perpanjangan: ${maxExtensionMonths} bulan`
+                        : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n最长可延期: ${maxExtensionMonths}个月`);
                 Utils.toast.success(successMsg, 5000);
 
                 // 重置表单
@@ -941,5 +941,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.1 重构完成（类名统一）');
+    console.log('✅ JF.CustomersPage v2.1 重构完成（类名统一，Toast图标清理）');
 })();
