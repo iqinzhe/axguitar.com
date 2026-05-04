@@ -1,5 +1,6 @@
-// toast.js - v2.0 统一重构版
+// toast.js - v2.1 统一重构版
 // Toast 通知与确认系统
+// 修复：增加错误恢复通知 + 持久化错误提示
 
 'use strict';
 
@@ -11,6 +12,7 @@
     let toastContainer = null;
     let confirmModal = null;
     let toastCounter = 0;
+    let _persistentToasts = [];  // 【修复】持久化 Toast 列表
 
     // ==================== 安全语言获取（避免循环依赖 Utils） ====================
     function getLang() {
@@ -68,6 +70,10 @@
                 from { transform: translateX(0); opacity: 1; }
                 to   { transform: translateX(100%); opacity: 0; }
             }
+            @keyframes toastPulse {
+                0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+                50% { box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+            }
             @keyframes confirmFadeIn {
                 from { opacity: 0; }
                 to   { opacity: 1; }
@@ -100,12 +106,14 @@
             error: '❌',
             warning: '⚠️',
             info: 'ℹ️',
+            critical: '🔴',  // 【修复】新增严重错误类型
         };
         const bgColors = {
             success: '#10b981',
             error: '#ef4444',
             warning: '#f59e0b',
             info: '#3b82f6',
+            critical: '#991b1b',  // 【修复】严重错误用深红色
         };
 
         const toast = document.createElement('div');
@@ -124,7 +132,13 @@
             animation: toastSlideInRight 0.3s ease;
             cursor: pointer;
             line-height: 1.4;
+            transition: all 0.2s ease;
         `;
+
+        // 【修复】持久化 Toast 添加脉冲动画
+        if (duration === 0 || type === 'critical') {
+            toast.style.animation = 'toastSlideInRight 0.3s ease, toastPulse 2s ease-in-out infinite';
+        }
 
         const messageHtml = String(message)
             .split('\n')
@@ -141,20 +155,46 @@
         closeBtn.onclick = (e) => {
             e.stopPropagation();
             closeToast(toast);
+            // 【修复】从持久化列表中移除
+            _persistentToasts = _persistentToasts.filter(t => t !== toast);
         };
         toast.onclick = (e) => {
             if (e.target !== closeBtn) closeToast(toast);
+            _persistentToasts = _persistentToasts.filter(t => t !== toast);
         };
 
         toastContainer.appendChild(toast);
 
+        // 【修复】duration 为 0 表示持久化显示
         if (duration > 0) {
             setTimeout(() => {
                 if (toast.parentElement) closeToast(toast);
             }, duration);
+        } else {
+            // 持久化 Toast
+            _persistentToasts.push(toast);
         }
 
         return toast;
+    }
+
+    // 【修复】显示持久化错误通知
+    function showPersistentError(message) {
+        return show(message, 'critical', 0);
+    }
+
+    // 【修复】清除所有持久化 Toast
+    function clearPersistentToasts() {
+        for (const toast of _persistentToasts) {
+            if (toast.parentElement) {
+                toast.style.animation = 'toastSlideOutRight 0.2s ease';
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    if (toast.parentElement) toast.remove();
+                }, 200);
+            }
+        }
+        _persistentToasts = [];
     }
 
     // ==================== 确认对话框 ====================
@@ -315,12 +355,14 @@
     const error = (msg, duration) => show(msg, 'error', duration);
     const warning = (msg, duration) => show(msg, 'warning', duration);
     const info = (msg, duration) => show(msg, 'info', duration);
+    const critical = (msg) => showPersistentError(msg);  // 【修复】严重错误（持久化）
 
     /**
      * 清除所有 Toast 和确认框
      */
     function clearAll() {
         if (toastContainer) toastContainer.innerHTML = '';
+        clearPersistentToasts();
         if (confirmModal && confirmModal.parentElement) {
             confirmModal.remove();
             confirmModal = null;
@@ -334,6 +376,9 @@
         error,
         warning,
         info,
+        critical,                // 【修复】新增严重错误方法
+        showPersistentError,     // 【修复】新增持久化错误方法
+        clearPersistentToasts,   // 【修复】新增清除持久化方法
         confirm: confirmDialog,
         confirmPromise,
         createInlineConfirmButtons,
@@ -349,5 +394,5 @@
     addAnimations();
     initContainer();
 
-    console.log('✅ Toast v2.0 初始化完成 (JF namespace)');
+    console.log('✅ Toast v2.1 初始化完成 (JF namespace + 持久化错误通知)');
 })();
