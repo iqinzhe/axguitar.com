@@ -1,4 +1,5 @@
 // auth.js - v2.0 统一认证模块 (JF 命名空间)
+// 修改：清理 Toast 中手动添加的 ✅ ❌ ⚠️ 图标，Enter 键登录增加防重复触发
 
 'use strict';
 
@@ -41,8 +42,8 @@
             if (until && until > now) {
                 const remainingMinutes = Math.ceil((until - now) / 60000);
                 const msg = Utils.lang === 'id'
-                    ? `⚠️ Akun telah dikunci. Silakan coba lagi setelah ${remainingMinutes} menit.`
-                    : `⚠️ 账号已锁定，请 ${remainingMinutes} 分钟后重试。`;
+                    ? `Akun telah dikunci. Silakan coba lagi setelah ${remainingMinutes} menit.`
+                    : `账号已锁定，请 ${remainingMinutes} 分钟后重试。`;
                 Utils.toast.warning(msg, 5000);
                 return true;
             }
@@ -75,8 +76,8 @@
                 this._setLoginAttempts(attempts);
 
                 const msg = Utils.lang === 'id'
-                    ? '⚠️ Terlalu banyak percobaan login. Akun dikunci selama 15 menit.'
-                    : '⚠️ 登录尝试次数过多，账号已锁定15分钟。';
+                    ? 'Terlalu banyak percobaan login. Akun dikunci selama 15 menit.'
+                    : '登录尝试次数过多，账号已锁定15分钟。';
                 Utils.toast.warning(msg, 8000);
                 return true;
             }
@@ -183,7 +184,7 @@
             window.addEventListener('offline', showOfflineBanner);
             window.addEventListener('online', () => {
                 hideOfflineBanner();
-                Utils.toast.info(Utils.lang === 'id' ? '✅ Koneksi Pulih' : '✅ 网络已恢复', 2000);
+                Utils.toast.info(Utils.lang === 'id' ? 'Koneksi Pulih' : '网络已恢复', 2000);
             });
 
             if (!navigator.onLine) {
@@ -194,6 +195,9 @@
         _bindEnterKeyLogin() {
             document.addEventListener('keypress', async (e) => {
                 if (e.key === 'Enter' && document.getElementById('app')?.querySelector('.login-box')) {
+                    const loginBtn = document.getElementById('loginBtn');
+                    // 如果登录按钮已被禁用，说明正在登录中，忽略 Enter
+                    if (loginBtn && loginBtn.disabled) return;
                     if (typeof window.APP?.login === 'function') await window.APP.login();
                 }
             });
@@ -233,8 +237,8 @@
 
                 if (!isNetworkAvailable) {
                     Utils.toast.error(Utils.lang === 'id'
-                        ? '❌ Tidak ada koneksi internet. Periksa jaringan Anda.'
-                        : '❌ 无网络连接，请检查网络设置。', 4000);
+                        ? 'Tidak ada koneksi internet. Periksa jaringan Anda.'
+                        : '无网络连接，请检查网络设置。', 4000);
                     return null;
                 }
 
@@ -272,8 +276,8 @@
                         if (!storeStatus.is_active) {
                             await this.logout();
                             Utils.toast.warning(Utils.lang === 'id'
-                                ? `⚠️ Toko "${storeStatus.name}" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.`
-                                : `⚠️ 门店 "${storeStatus.name}" 已暂停营业。\n\n请联系管理员获取更多信息。`, 6000);
+                                ? `Toko "${storeStatus.name}" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.`
+                                : `门店 "${storeStatus.name}" 已暂停营业。\n\n请联系管理员获取更多信息。`, 6000);
                             return null;
                         }
                     } catch (e) {
@@ -422,8 +426,8 @@
 
             if (!authCleaned) {
                 const msg = Utils.lang === 'id'
-                    ? '⚠️ Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.\n\nHubungi administrator untuk pembersihan manual.'
-                    : '⚠️ 用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。\n\n请联系管理员进行手动清理。';
+                    ? 'Pengguna telah dihapus dari sistem, tetapi akun Auth perlu dibersihkan secara manual oleh administrator.\n\nHubungi administrator untuk pembersihan manual.'
+                    : '用户已从系统删除，但 Auth 账号需要管理员在后台手动清理。\n\n请联系管理员进行手动清理。';
                 Utils.toast.warning(msg, 8000);
             }
 
@@ -474,8 +478,8 @@
 
             if (!edgeSuccess) {
                 const errorMsg = lang === 'id'
-                    ? '❌ Fungsi reset password tidak tersedia. Hubungi administrator untuk mengaktifkan Edge Function atau lakukan reset manual di Supabase Dashboard.'
-                    : '❌ 密码重置功能不可用。请联系管理员部署 Edge Function，或在 Supabase 后台手动重置密码。';
+                    ? 'Fungsi reset password tidak tersedia. Hubungi administrator untuk mengaktifkan Edge Function atau lakukan reset manual di Supabase Dashboard.'
+                    : '密码重置功能不可用。请联系管理员部署 Edge Function，或在 Supabase 后台手动重置密码。';
                 Utils.toast.error(errorMsg, 8000);
                 throw new Error(errorMsg);
             }
@@ -484,7 +488,7 @@
                 await window.Audit.logPasswordReset(userId, this.user?.id);
             }
 
-            Utils.toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
+            Utils.toast.success(lang === 'id' ? 'Password berhasil direset' : '密码已重置');
             return true;
         },
 
