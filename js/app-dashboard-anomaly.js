@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.0（三阶段逾期分类 + 排名 + 黑名单）
+// app-dashboard-anomaly.js - v2.1 清理废弃方法
 
 'use strict';
 
@@ -122,7 +122,6 @@
                 const profile = await SUPABASE.getCurrentProfile();
                 const isAdmin = PERMISSION.isAdmin();
 
-                // 三个逾期阶段（缓存3分钟）
                 const cacheKeyBase = `overdue_range_${isAdmin ? 'admin' : profile?.store_id}`;
                 const [collectionOrders, preAuctionOrders, auctionOrders] = await Promise.all([
                     JF.Cache.get(`${cacheKeyBase}_10_19`, () => this._getOverdueOrdersRange(profile, 10, 19), { ttl: 3 * 60 * 1000 }),
@@ -130,7 +129,6 @@
                     JF.Cache.get(`${cacheKeyBase}_30_999`, () => this._getOverdueOrdersRange(profile, 30, 999), { ttl: 3 * 60 * 1000 })
                 ]);
 
-                // 黑名单
                 const blacklistResult = await JF.Cache.get('blacklist_customers_0',
                     () => AnomalyPage._getBlacklistCustomers(0, 50),
                     { ttl: 3 * 60 * 1000 }
@@ -138,7 +136,6 @@
                 const blacklist = blacklistResult.data;
                 const blacklistTotalCount = blacklistResult.totalCount;
 
-                // 管理员排名
                 let top3 = [], bottom3 = [];
                 if (isAdmin) {
                     const stores = await SUPABASE.getAllStores();
@@ -150,7 +147,6 @@
                     bottom3 = rankingResult.bottom3;
                 }
 
-                // ---- 构建阶段卡片 ----
                 const buildStageCard = (cfg) => {
                     const { orders, stageKey, titleId, titleZh, icon, color, showAuctionBtn } = cfg;
                     if (orders.length === 0) {
@@ -191,7 +187,6 @@
                     { stageKey:'auction', titleId:'Likuidasi (30+ Hari)', titleZh:'正式变卖期 (≥30天)', icon:'⚖️', color:'#ef4444', orders:auctionOrders, showAuctionBtn:true }
                 ].map(buildStageCard).join('');
 
-                // 黑名单表格
                 const buildBlacklistTable = () => {
                     if (!blacklist.length) return `<div class="empty-state"><div class="empty-state-icon">👍</div><div class="empty-state-text">${lang==='id'?'Tidak ada nasabah di blacklist':'暂无黑名单客户'}</div></div>`;
                     let rows = '';
@@ -205,7 +200,6 @@
                     return `<div class="table-container"><table class="data-table anomaly-table"><thead><tr><th class="col-id">${lang==='id'?'ID Nasabah':'客户ID'}</th><th class="col-name">${lang==='id'?'Nama':'姓名'}</th><th class="col-phone">${lang==='id'?'Telepon':'电话'}</th><th>${lang==='id'?'Alasan':'原因'}</th></tr></thead><tbody>${rows}${loadMoreHtml}</tbody></table></div>`;
                 };
 
-                // 排名列表
                 const buildRankingList = (stores, type) => {
                     if (!stores.length) return `<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-text">${lang==='id'?'Belum ada data toko bulan ini':'本月暂无门店数据'}</div></div>`;
                     let items = '';
@@ -221,7 +215,6 @@
                     return `<div class="ranking-list">${items}</div>`;
                 };
 
-                // 组合界面
                 let contentGrid = '';
                 if (!isAdmin) {
                     contentGrid = `
@@ -264,7 +257,6 @@
             }
         },
 
-        // ---------- 业务操作 ----------
         async sendWAForStage(orderId, stage) {
             const lang = Utils.lang;
             try {
@@ -284,7 +276,6 @@
                         ? `📣 *PEMBERITAHUAN PENTING*\n\nKepada Yth. ${order.customer_name},\nPesanan Anda *${order.order_id}* telah *terlambat ${order.overdue_days} hari*.\n\nJika dalam *10 hari* ke depan tidak dilunasi, kami akan memulai proses *likuidasi barang jaminan*.\n\nSegera hubungi kami.\n- JF! by Gadai`
                         : `📣 *重要公告*\n\n尊敬的 ${order.customer_name}，\n您的订单 *${order.order_id}* 已逾期 *${order.overdue_days}* 天。若 *10天内* 仍未结清，将依法启动 *抵押物变卖*。\n\n请速联系处理。\n- JF! by Gadai`;
                 } else {
-                    // fallback
                     msg = JF.WAPage.generateWAText(order, storeWA);
                 }
 
@@ -337,7 +328,6 @@
             }
         },
 
-        // 加载更多黑名单（保留）
         async loadMoreBlacklist() {
             const state = window._anomalyBlacklistState;
             if (!state) return;
@@ -377,7 +367,6 @@
             Utils.toast.info('缓存已清除', 2000);
         },
 
-        // 外壳渲染
         async renderAnomalyHTML() { return await this.buildAnomalyHTML(); },
         async showAnomaly() {
             APP.currentPage = 'anomaly';
@@ -393,8 +382,5 @@
     window.APP.loadMoreBlacklist = AnomalyPage.loadMoreBlacklist.bind(AnomalyPage);
     window.APP.clearAnomalyCache = AnomalyPage.clearAnomalyCache.bind(AnomalyPage);
 
-    // 兼容旧有的 loadMoreOverdueOrders（不再使用，但保留空函数避免报错）
-    window.APP.loadMoreOverdueOrders = function() {};
-
-    console.log('✅ JF.AnomalyPage v2.1 完整版（三阶段逾期分类）已加载');
+    console.log('✅ JF.AnomalyPage v2.1 已清理（移除废弃方法）');
 })();
