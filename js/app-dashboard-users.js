@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v2.1 (JF 命名空间) - 类名重构
+// app-dashboard-users.js - v2.1 (JF 命名空间)
 // 用户管理页面模块，挂载到 JF.UsersPage
 
 'use strict';
