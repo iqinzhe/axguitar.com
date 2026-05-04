@@ -1,5 +1,4 @@
-// app-dashboard-print.js - v2.0 (JF 命名空间)
-// 打印功能模块，挂载到 JF.PrintPage
+// app-dashboard-print.js - v2.1 (修复打印时侧边栏和顶部栏的隐藏问题)
 
 'use strict';
 
@@ -13,135 +12,307 @@
         },
 
         _doPrint() {
-            const printContent = document.getElementById("app").cloneNode(true);
+            const originalApp = document.getElementById("app");
+            if (!originalApp) return;
 
-            // 移除所有交互元素
+            // 深度克隆需要打印的内容
+            const printContent = originalApp.cloneNode(true);
+
+            // ========== 移除所有不需要打印的元素 ==========
+            
+            // 1. 移除侧边栏（Dashboard 专用）- 使用多种选择器确保覆盖
+            const sidebarSelectors = [
+                '.dashboard-v2 .dash-sidebar',
+                '.dash-sidebar',
+                '.sidebar',
+                '#dashSidebar',
+                '[class*="sidebar"]',
+                '[class*="Sidebar"]'
+            ];
+            for (const selector of sidebarSelectors) {
+                const elements = printContent.querySelectorAll(selector);
+                elements.forEach(el => el.remove());
+            }
+
+            // 2. 移除顶部栏（Dashboard 专用）
+            const topbarSelectors = [
+                '.dashboard-v2 .dash-topbar',
+                '.dash-topbar',
+                '.topbar',
+                '#dashTopbar',
+                '[class*="topbar"]',
+                '[class*="Topbar"]'
+            ];
+            for (const selector of topbarSelectors) {
+                const elements = printContent.querySelectorAll(selector);
+                elements.forEach(el => el.remove());
+            }
+
+            // 3. 移除侧边栏遮罩层
+            const overlaySelectors = [
+                '.sidebar-overlay',
+                '#sidebarOverlay',
+                '[class*="overlay"]'
+            ];
+            for (const selector of overlaySelectors) {
+                const elements = printContent.querySelectorAll(selector);
+                elements.forEach(el => el.remove());
+            }
+
+            // 4. 移除页眉中的操作按钮（但不移除页眉本身）
             const pageHeader = printContent.querySelector('.page-header');
             if (pageHeader) {
                 const headerActions = pageHeader.querySelector('.header-actions');
                 if (headerActions) headerActions.remove();
+                // 移除页眉中的所有按钮
                 const buttons = pageHeader.querySelectorAll('button');
                 for (const btn of buttons) btn.remove();
             }
 
-            const toolbars = printContent.querySelectorAll('.toolbar');
+            // 5. 移除所有工具栏
+            const toolbars = printContent.querySelectorAll('.toolbar, .no-print');
             for (const tb of toolbars) tb.remove();
 
+            // 6. 移除所有操作行（表格中的按钮行）
             const actionRows = printContent.querySelectorAll('.action-row');
             for (const ar of actionRows) ar.remove();
 
+            // 7. 移除所有按钮
             const allButtons = printContent.querySelectorAll('button');
             for (const btn of allButtons) btn.remove();
 
-            // 移除新增表单卡片
+            // 8. 移除新增/编辑表单卡片
             const formCards = printContent.querySelectorAll('.card');
             for (let i = formCards.length - 1; i >= 0; i--) {
                 const card = formCards[i];
                 const cardText = card.textContent || card.innerText || '';
-                if (cardText.indexOf('Tambah Nasabah Baru') !== -1 ||
-                    cardText.indexOf('新增客户') !== -1 ||
-                    cardText.indexOf('Tambah Operator Baru') !== -1 ||
-                    cardText.indexOf('新增操作员') !== -1 ||
-                    cardText.indexOf('Tambah Toko Baru') !== -1 ||
-                    cardText.indexOf('新增门店') !== -1 ||
-                    cardText.indexOf('Tambah Pengeluaran Baru') !== -1 ||
-                    cardText.indexOf('新增运营支出') !== -1) {
+                const removeKeywords = [
+                    'Tambah Nasabah Baru', '新增客户',
+                    'Tambah Operator Baru', '新增操作员',
+                    'Tambah Toko Baru', '新增门店',
+                    'Tambah Pengeluaran Baru', '新增运营支出',
+                    'Tambah Peran Baru', '新增角色',
+                    'Tambah Toko', '添加门店',
+                    'Edit Toko', '编辑门店'
+                ];
+                if (removeKeywords.some(keyword => cardText.includes(keyword))) {
                     card.remove();
                 }
             }
 
+            // 9. 移除表单操作区
             const formActions = printContent.querySelectorAll('.form-actions');
             for (const fa of formActions) fa.remove();
 
+            // 10. 移除包含表单网格且无有效数据的卡片
             const formGrids = printContent.querySelectorAll('.form-grid');
             for (const fg of formGrids) {
                 const parentCard = fg.closest('.card');
-                if (parentCard) parentCard.remove();
+                if (parentCard) {
+                    const hasDataRows = parentCard.querySelector('.data-table, table') !== null;
+                    if (!hasDataRows) parentCard.remove();
+                }
             }
 
+            // 11. 移除语言切换按钮
+            const langToggles = printContent.querySelectorAll('.lang-toggle, .lang-btn-side, [onclick*="toggleLanguage"], [onclick*="setLanguage"]');
+            for (const lt of langToggles) lt.remove();
+
+            // 12. 移除汉堡菜单按钮
+            const hamburgerBtns = printContent.querySelectorAll('#hamburgerBtn, [onclick*="_toggleSidebar"]');
+            for (const btn of hamburgerBtns) btn.remove();
+
+            // 13. 移除刷新按钮
+            const refreshBtns = printContent.querySelectorAll('[onclick*="invalidateDashboardCache"], [onclick*="forceRecovery"]');
+            for (const btn of refreshBtns) btn.remove();
+
+            // 14. 移除模态框（如果意外包含）
+            const modals = printContent.querySelectorAll('.modal-overlay, .modal-content');
+            for (const modal of modals) modal.remove();
+
+            // 15. 移除包含 "加载更多" 按钮的行
+            const loadMoreRows = printContent.querySelectorAll('[id*="loadMore"], [onclick*="loadMore"]');
+            for (const row of loadMoreRows) {
+                const tr = row.closest('tr');
+                if (tr) tr.remove();
+                else row.remove();
+            }
+
+            // 16. 移除侧边栏底部区域
+            const sidebarFooters = printContent.querySelectorAll('.sidebar-footer, [class*="sidebar-footer"]');
+            for (const footer of sidebarFooters) footer.remove();
+
+            // 17. 移除导航徽章（小红点）
+            const navBadges = printContent.querySelectorAll('.nav-badge');
+            for (const badge of navBadges) badge.remove();
+
+            // 获取当前语言、用户和门店信息
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
-            const storeName = AUTH.getCurrentStoreName();
-            const roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
-                             AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工');
-            const userName = AUTH.user?.name || '-';
+            let storeName = '';
+            let roleText = '';
+            let userName = '';
+
+            try {
+                storeName = AUTH.getCurrentStoreName();
+                roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                           AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                           (lang === 'id' ? 'Staf' : '员工');
+                userName = AUTH.user?.name || '-';
+            } catch (e) {
+                storeName = '-';
+                roleText = '-';
+                userName = '-';
+            }
+
             const printDateTime = new Date().toLocaleString();
 
+            // 构建打印页面
             const printWindow = window.open('', '_blank');
             printWindow.document.write(
                 `<!DOCTYPE html>
                 <html>
                 <head>
                     <meta charset="UTF-8">
-                    <title>JF! by Gadai - Print</title>
+                    <title>JF! by Gadai - ${lang === 'id' ? 'Cetak' : '打印'}</title>
                     <style>
                         * { box-sizing: border-box; margin: 0; padding: 0; }
-                        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; padding: 0; margin: 0; }
-                        .print-container { padding: 3mm; }
-                        .print-header { text-align: center; margin-bottom: 6px; padding-bottom: 3px; border-bottom: 1px solid #ccc; }
-                        .print-header .logo { font-size: 12pt; font-weight: bold; color: #2563eb; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
+                        body { 
+                            font-family: 'Segoe UI', Arial, sans-serif; 
+                            font-size: 9pt; 
+                            line-height: 1.3; 
+                            color: #1e293b; 
+                            padding: 0; 
+                            margin: 0; 
+                        }
+                        .print-container { padding: 5mm; }
+                        .print-header { 
+                            text-align: center; 
+                            margin-bottom: 8px; 
+                            padding-bottom: 6px; 
+                            border-bottom: 2px solid #1e293b;
+                        }
+                        .print-header .logo { 
+                            font-size: 14pt; 
+                            font-weight: bold; 
+                            color: #0e7490;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                        }
                         .print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
-                        .print-store-info { font-size: 8pt; color: #475569; margin: 2px 0; text-align: center; }
-                        .print-user-info { font-size: 7pt; color: #64748b; margin-bottom: 3px; text-align: center; }
-                        .print-footer { text-align: center; font-size: 6pt; color: #94a3b8; margin-top: 4px; padding-top: 3px; border-top: 1px solid #e2e8f0; }
-                        table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+                        .print-store-info { 
+                            font-size: 9pt; 
+                            color: #475569; 
+                            margin: 4px 0; 
+                            text-align: center; 
+                        }
+                        .print-user-info { 
+                            font-size: 8pt; 
+                            color: #64748b; 
+                            margin-bottom: 4px; 
+                            text-align: center; 
+                        }
+                        .print-footer { 
+                            text-align: center; 
+                            font-size: 7pt; 
+                            color: #94a3b8; 
+                            margin-top: 12px; 
+                            padding-top: 6px; 
+                            border-top: 1px solid #e2e8f0; 
+                        }
+                        table { width: 100%; border-collapse: collapse; margin: 6px 0; }
                         th { background: #f1f5f9; font-weight: 600; text-align: left; }
-                        th, td { border: 1px solid #cbd5e1; padding: 3px 5px; text-align: left; font-size: 7.5pt; vertical-align: top; }
-                        .stats-grid-optimized { display: flex; flex-wrap: wrap; gap: 5px; }
-                        .stat-card { flex: 1 1 auto; min-width: 100px; border: 1px solid #ccc; padding: 3px 5px; text-align: left; }
-                        .stat-card .stat-value { font-size: 9pt; font-weight: 600; text-align: left; }
-                        .stat-card .stat-label { font-size: 6.5pt; text-align: left; }
-                        .anomaly-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
-                        .anomaly-card { break-inside: avoid; }
-                        .anomaly-card-header h3 { text-align: left; }
-                        .cashflow-stats { display: flex; flex-wrap: wrap; gap: 6px; }
-                        .cashflow-item { flex: 1; min-width: 120px; text-align: left; }
-                        .cashflow-item .label { text-align: left; }
-                        .cashflow-item .value { text-align: left; }
-                        .card { border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px; margin-bottom: 6px; break-inside: avoid; text-align: left; }
-                        .card h3 { font-size: 9pt; margin-bottom: 3px; border-bottom: none; text-align: left; }
-                        .card p { text-align: left; }
-                        .summary-grid { text-align: left; }
-                        .summary-item { text-align: left; }
-                        .summary-item .label { text-align: left; }
-                        .summary-item .value { text-align: left; }
-                        .info-column h3 { text-align: left; }
-                        .info-column p { text-align: left; }
-                        .customer-info-display p { text-align: left; }
-                        .store-item { text-align: left; }
-                        .ranking-item { text-align: left; }
-                        .dashboard-footer-card p { text-align: left; }
-                        .anomaly-table th { text-align: left; }
-                        .anomaly-table td { text-align: left; }
-                        .empty-state { text-align: left; }
-                        .info-bar { text-align: left; }
-                        .info-note { text-align: left; }
-                        .order-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-                        .page-header h1, .page-header h2 { text-align: left; }
+                        th, td { 
+                            border: 1px solid #cbd5e1; 
+                            padding: 5px 8px; 
+                            text-align: left; 
+                            font-size: 8pt; 
+                            vertical-align: top; 
+                        }
+                        .amount { text-align: right; }
+                        .text-center { text-align: center; }
+                        .card { 
+                            border: 1px solid #e2e8f0; 
+                            border-radius: 6px; 
+                            padding: 8px; 
+                            margin-bottom: 10px; 
+                            break-inside: avoid;
+                        }
+                        .card h3 { 
+                            font-size: 10pt; 
+                            margin-bottom: 6px; 
+                            border-bottom: 1px solid #e2e8f0;
+                            padding-bottom: 4px;
+                        }
+                        .stats-grid { 
+                            display: flex; 
+                            flex-wrap: wrap; 
+                            gap: 8px; 
+                            margin-bottom: 12px;
+                        }
+                        .card--stat { 
+                            flex: 1; 
+                            min-width: 100px; 
+                            border: 1px solid #ccc; 
+                            padding: 6px 10px; 
+                            text-align: left;
+                        }
+                        .card--stat .stat-value { font-size: 11pt; font-weight: 700; }
+                        .card--stat .stat-label { font-size: 7pt; color: #64748b; }
+                        .badge { 
+                            display: inline-block; 
+                            padding: 2px 8px; 
+                            border-radius: 4px; 
+                            font-size: 7pt; 
+                            font-weight: 600;
+                        }
+                        .info-bar { 
+                            padding: 8px 12px; 
+                            margin-bottom: 10px; 
+                            border-radius: 6px;
+                            background: #f0f9ff;
+                            border-left: 3px solid #0284c7;
+                        }
+                        .order-detail-grid { 
+                            display: grid; 
+                            grid-template-columns: 1fr 1fr; 
+                            gap: 12px; 
+                        }
                         @media print {
-                            @page { size: A4 landscape; margin: 5mm 8mm; }
+                            @page { size: A4; margin: 8mm; }
                             body { margin: 0; padding: 0; }
                             .print-container { padding: 0; }
-                            .card, .anomaly-card, .cashflow-item { break-inside: avoid; }
+                            .card, .anomaly-card { break-inside: avoid; }
                         }
                     </style>
                 </head>
                 <body>
                     <div class="print-container">
                         <div class="print-header">
-                            <div class="logo"><img src="icons/pagehead-logo.png" alt="JF!"> JF! by Gadai</div>
-                            <div class="print-store-info">🏪 ${Utils.escapeHtml(storeName)} ${isAdmin ? '(' + (lang === 'id' ? 'Kantor Pusat' : '总部') + ')' : ''}</div>
-                            <div class="print-user-info">👤 ${Utils.escapeHtml(userName)} (${roleText}) | 📅 ${printDateTime}</div>
+                            <div class="logo">
+                                <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
+                                JF! by Gadai
+                            </div>
+                            <div class="print-store-info">
+                                🏪 ${Utils.escapeHtml(storeName)} ${isAdmin ? (lang === 'id' ? '(Kantor Pusat)' : '(总部)') : ''}
+                            </div>
+                            <div class="print-user-info">
+                                👤 ${Utils.escapeHtml(userName)} (${roleText}) | 📅 ${printDateTime}
+                            </div>
                         </div>
                         ${printContent.innerHTML}
-                        <div class="print-footer">JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
+                        <div class="print-footer">
+                            JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+                        </div>
                     </div>
                     <script>
                         window.onload = function() {
                             window.print();
                             setTimeout(function() { window.close(); }, 800);
                         };
-                    </script>
+                    <\/script>
                 </body>
                 </html>`
             );
@@ -159,5 +330,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.0 初始化完成');
+    console.log('✅ JF.PrintPage v2.1 打印模块已修复（侧边栏/顶部栏已隐藏）');
 })();
