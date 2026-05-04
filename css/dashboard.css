@@ -269,7 +269,7 @@
 
 .lang-btn-side {
     display: block;
-    padding: 2px 10px; /* ↓ 原来是 3px → 压缩上下间距 */
+    padding: 2px 8px; 
     text-align: center;
     border-radius: 5px;
     background: transparent;
