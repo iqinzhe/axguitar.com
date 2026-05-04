@@ -1,5 +1,4 @@
 // order.js - v2.0 统一订单业务模块 (JF 命名空间)
-// 挂载到 JF.Order，保留 window.Order 别名
 
 'use strict';
 
