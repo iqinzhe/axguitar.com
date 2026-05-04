@@ -18,8 +18,8 @@
                 if (!this._degradedModules[moduleKey]) {
                     this._degradedModules[moduleKey] = true;
                     const msg = lang === 'id'
-                        ? `⚠️ Modul "${moduleName}" gagal dimuat, kembali ke dashboard.`
-                        : `⚠️ 模块 "${moduleName}" 加载失败，已返回仪表盘。`;
+                        ? `Modul "${moduleName}" gagal dimuat, kembali ke dashboard.`
+                        : `模块 "${moduleName}" 加载失败，已返回仪表盘。`;
                     if (window.Toast) window.Toast.warning(msg, 5000);
                     this._showBanner(moduleName, error.message);
                 }
@@ -630,23 +630,30 @@
         },
 
         async login() {
-            const username = document.getElementById("username")?.value.trim();
-            const password = document.getElementById("password")?.value;
-            const rememberMe = document.getElementById("rememberMe")?.checked;
-            const errorDiv = document.getElementById("loginError");
-            const errorMsg = document.getElementById("loginErrorMessage");
-            const btn = document.getElementById("loginBtn");
-            if (errorDiv) errorDiv.style.display = 'none';
-            if (!username || !password) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.t('fill_all_fields'); } return; }
-            if (btn) { btn.disabled = true; btn.textContent = '...'; }
-            AUTH.setRememberMe(rememberMe);
-            const user = await AUTH.login(username, password);
-            if (!user) {
-                if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.lang === 'id' ? 'Login gagal. Periksa kembali email/username dan password Anda.' : '登录失败，请检查邮箱/用户名和密码。'; }
-                if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); }
-                return;
+            // 防重入锁
+            if (this._loginLock) return;
+            this._loginLock = true;
+            try {
+                const username = document.getElementById("username")?.value.trim();
+                const password = document.getElementById("password")?.value;
+                const rememberMe = document.getElementById("rememberMe")?.checked;
+                const errorDiv = document.getElementById("loginError");
+                const errorMsg = document.getElementById("loginErrorMessage");
+                const btn = document.getElementById("loginBtn");
+                if (errorDiv) errorDiv.style.display = 'none';
+                if (!username || !password) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.t('fill_all_fields'); } return; }
+                if (btn) { btn.disabled = true; btn.textContent = '...'; }
+                AUTH.setRememberMe(rememberMe);
+                const user = await AUTH.login(username, password);
+                if (!user) {
+                    if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.lang === 'id' ? 'Login gagal. Periksa kembali email/username dan password Anda.' : '登录失败，请检查邮箱/用户名和密码。'; }
+                    if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); }
+                    return;
+                }
+                await this.renderDashboard();
+            } finally {
+                this._loginLock = false;
             }
-            await this.renderDashboard();
         },
 
         async logout() {
@@ -748,5 +755,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v3.1 修复版已加载（遮罩层清理 + 侧边栏状态修复）');
+    console.log('✅ JF.DashboardCore v3.1 修复版已加载（遮罩层清理 + 侧边栏状态修复 + 登录防重入）');
 })();
