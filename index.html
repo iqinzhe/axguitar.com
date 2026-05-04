@@ -13,7 +13,6 @@
 <link rel="manifest" href="/site.webmanifest?v=1">
 
 <!-- ========== CSS 加载顺序（5层精简架构） ========== -->
-<!-- 原则：变量 → 重置 → 组件 → 布局 → 响应式 -->
 <link rel="stylesheet" href="css/variables.css">
 <link rel="stylesheet" href="css/reset.css">
 <link rel="stylesheet" href="css/components.css">
@@ -32,74 +31,66 @@
     </div>
 </div>
 
-<!-- ========== 脚本加载顺序（v2.0 JF 命名空间，请勿调整） ========== -->
+<!-- ========== 脚本加载顺序 ========== -->
 
-    <!-- 0. 配置文件（Supabase 密钥等） -->
+    <!-- 0. 配置文件 -->
     <script src="config.js"></script>
 
-    <!-- 1. 基础库（同步加载） -->
+    <!-- 1. 基础库 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- 2. 核心模块（defer，严格按依赖顺序） -->
-    <script defer src="js/utils.js"></script>           <!-- 工具类 + 语言 + 翻译字典，无依赖 -->
-    <script defer src="js/toast.js"></script>          <!-- Toast 通知系统，依赖 utils -->
-    <script defer src="js/cache.js"></script>          <!-- 统一缓存模块，无依赖 -->
-    <script defer src="js/supabase.js"></script>       <!-- 数据层，依赖 utils, auth -->
-    <script defer src="js/auth.js"></script>           <!-- 认证模块，依赖 utils, toast -->
-    <script defer src="js/permission.js"></script>     <!-- 权限模块，依赖 auth, supabase -->
-    <script defer src="js/audit.js"></script>          <!-- 审计日志，依赖 auth, supabase -->
-    <script defer src="js/order.js"></script>          <!-- 订单业务模块，依赖 supabase, utils -->
-    <script defer src="js/store.js"></script>          <!-- 门店管理，依赖 supabase -->
-    <script defer src="js/storage.js"></script>        <!-- 备份恢复，依赖 supabase, audit -->
-    <script defer src="js/migration.js"></script>      <!-- 数据迁移，依赖 supabase -->
+    <!-- 2. 核心模块 -->
+    <script defer src="js/utils.js"></script>
+    <script defer src="js/toast.js"></script>
+    <script defer src="js/cache.js"></script>
+    <script defer src="js/supabase.js"></script>
+    <script defer src="js/auth.js"></script>
+    <script defer src="js/permission.js"></script>
+    <script defer src="js/audit.js"></script>
+    <script defer src="js/order.js"></script>
+    <script defer src="js/store.js"></script>
+    <script defer src="js/storage.js"></script>
+    <script defer src="js/migration.js"></script>
 
-    <!-- 3. 页面组件模块（defer，依赖核心模块和缓存） -->
-    script defer src="js/app-dashboard-core.js"></script>     <!-- 核心仪表盘 + 路由 -->
-    <script defer src="js/app-capital.js"></script>            <!-- 资本注入 + 利润再投入 ← 新增 -->
+    <!-- 3. 页面组件 -->
+    <script defer src="js/app-dashboard-core.js"></script>
+    <script defer src="js/app-capital.js"></script>
     <script defer src="js/app-profit.js"></script>
-    <script defer src="js/app-dashboard-anomaly.js"></script>  <!-- 异常检测 -->
-    <script defer src="js/app-dashboard-expenses.js"></script> <!-- 支出管理 -->
-    <script defer src="js/app-dashboard-funds.js"></script>    <!-- 资金管理 -->
-    <script defer src="js/app-dashboard-orders.js"></script>   <!-- 订单管理 -->
-    <script defer src="js/app-dashboard-print.js"></script>    <!-- 打印功能 -->
-    <script defer src="js/app-dashboard-users.js"></script>    <!-- 用户管理 -->
-    <script defer src="js/app-dashboard-wa.js"></script>       <!-- WA 提醒 -->
-    <script defer src="js/app-message-center.js"></script>     <!-- 消息中心 WA 批量管理（新增） -->
-    <script defer src="js/app-customers.js"></script>          <!-- 客户管理 -->
-    <script defer src="js/app-blacklist.js"></script>          <!-- 黑名单管理 -->
-    <script defer src="js/app-payments.js"></script>           <!-- 支付管理 -->
+    <script defer src="js/app-dashboard-anomaly.js"></script>
+    <script defer src="js/app-dashboard-expenses.js"></script>
+    <script defer src="js/app-dashboard-funds.js"></script>
+    <script defer src="js/app-dashboard-orders.js"></script>
+    <script defer src="js/app-dashboard-print.js"></script>
+    <script defer src="js/app-dashboard-users.js"></script>
+    <script defer src="js/app-dashboard-wa.js"></script>
+    <script defer src="js/app-message-center.js"></script>
+    <script defer src="js/app-customers.js"></script>
+    <script defer src="js/app-blacklist.js"></script>
+    <script defer src="js/app-payments.js"></script>
 
-    <!-- 4. 状态初始化（预加载恢复状态） -->
+    <!-- 4. 状态初始化 + 主入口 -->
     <script defer src="js/app-state-init.js"></script>
-
-    <!-- 5. 主入口（依赖所有模块） -->
     <script defer src="js/app.js"></script>
 
-    <!-- 6. 启动应用 -->
-<script defer>
-    (async function boot() {
-        for (let i = 0; i < 30; i++) {
-            if (typeof JF !== 'undefined' && 
-                typeof JF.DashboardCore !== 'undefined' && 
-                typeof JF.DashboardCore.init === 'function') {
-                console.log('[Boot] DashboardCore 已就绪，启动应用');
+    <!-- 5. 启动 -->
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 等所有 defer 脚本执行完
+        setTimeout(async () => {
+            if (JF && JF.DashboardCore && JF.DashboardCore.init) {
+                console.log('[Boot] 启动应用');
                 await JF.DashboardCore.init();
-                return;
+            } else {
+                console.error('[Boot] DashboardCore 未找到，尝试 APP.init');
+                if (APP && APP.init) {
+                    await APP.init();
+                } else {
+                    location.reload();
+                }
             }
-            await new Promise(r => setTimeout(r, 100));
-        }
-        console.error('[Boot] DashboardCore.init 未在 3 秒内出现');
-        if (typeof APP !== 'undefined' && typeof APP.init === 'function') {
-            APP.init();
-        } else {
-            document.getElementById('app').innerHTML = 
-                '<div class="card" style="text-align:center;padding:40px;">' +
-                '<p>⚠️ Sistem gagal dimuat. Silakan muat ulang halaman.</p>' +
-                '<button onclick="location.reload()" style="margin-top:12px;">🔄 Muat Ulang</button>' +
-                '</div>';
-        }
-    })();
-</script>
+        }, 200);
+    });
+    </script>
 
 </body>
 </html>
