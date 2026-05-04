@@ -1,4 +1,4 @@
-// supabase.js - v2.0 (修复版：利润计算、资本分析、支出同步等)
+// supabase.js - v2.3 (修复版：利息支付参数化、删除订单SQL修复、逾期更新性能优化)
 
 'use strict';
 
@@ -1213,12 +1213,13 @@
             return true;
         },
 
-        // 【修复 Bug 4】修正 recordInterestPayment：防止 loan_amount 被累加
-        async recordInterestPayment(orderId, months, paymentMethod) {
+        // 【修复 Bug 4 + 本次修复】recordInterestPayment 增加 actualPaid 参数，不再访问 DOM
+        async recordInterestPayment(orderId, months, paymentMethod, actualPaid = null) {
             if (paymentMethod === undefined) paymentMethod = 'cash';
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
             if (currentOrder.status === 'completed') throw new Error(Utils.t('order_completed'));
+            
             const lockKey = orderId + '_interest_supabase';
             if (window.APP && window.APP._acquirePaymentLock) {
                 if (!window.APP._acquirePaymentLock(lockKey)) {
@@ -1230,29 +1231,20 @@
                 const remainingPrincipal = (currentOrder.loan_amount || 0) - (currentOrder.principal_paid || 0);
                 const theoreticalInterest = remainingPrincipal * monthlyRate * months;
                 
-                // 获取实际缴纳金额（从参数或页面输入）
-                // 注意：调用方需要传入 actualPaid 参数，这里保持原有接口兼容
-                // 实际使用时，调用方应该传入实际支付金额
-                let actualPaid = theoreticalInterest; // 默认全额
-                
-                // 尝试从页面获取实际支付金额（如果存在）
-                const interestAmountInput = document.getElementById('interestAmount');
-                if (interestAmountInput && interestAmountInput.value) {
-                    actualPaid = Utils.parseNumberFromCommas(interestAmountInput.value) || 0;
-                }
+                // **关键修复**：actualPaid 必须由调用方传入，不再从 DOM 读取
+                let paidAmount = (actualPaid !== null && !isNaN(actualPaid) && actualPaid > 0) ? actualPaid : theoreticalInterest;
                 
                 // 计算实际记录的利息和本金调整
-                let interestToRecord = actualPaid;
+                let interestToRecord = paidAmount;
                 let principalAdjustment = 0;
                 let shortfallToTrack = 0;
                 
-                if (actualPaid >= theoreticalInterest) {
+                if (paidAmount >= theoreticalInterest) {
                     interestToRecord = theoreticalInterest;
-                    principalAdjustment = actualPaid - theoreticalInterest; // 多出的部分抵扣本金
+                    principalAdjustment = paidAmount - theoreticalInterest; // 多出的部分抵扣本金
                 } else {
-                    interestToRecord = actualPaid;
-                    shortfallToTrack = theoreticalInterest - actualPaid; // 少付的部分记录为欠款
-                    // 【修复 Bug 4】不再累加到 loan_amount，而是记录到新字段 interest_shortfall
+                    interestToRecord = paidAmount;
+                    shortfallToTrack = theoreticalInterest - paidAmount; // 少付的部分记录为欠款
                 }
                 
                 const newInterestPaidMonths = (currentOrder.interest_paid_months || 0) + months;
@@ -1515,58 +1507,87 @@
             return true;
         },
 
+        // ==================== 【性能优化】逾期更新 - 分批并发，消除 N+1 问题 ====================
         async updateOverdueDays() {
-    const { data: activeOrders, error } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .eq('status', 'active');
+            const { data: activeOrders, error } = await supabaseClient
+                .from('orders')
+                .select('id, next_interest_due_date, overdue_days, liquidation_status, fund_status')
+                .eq('status', 'active');
 
-    if (error) throw error;
+            if (error) throw error;
+            if (!activeOrders || activeOrders.length === 0) return true;
 
-    const todayLocal = new Date();
-    todayLocal.setHours(0, 0, 0, 0);
+            const todayLocal = new Date();
+            todayLocal.setHours(0, 0, 0, 0);
 
-    for (const order of activeOrders) {
-        const dueDate = order.next_interest_due_date;
-        if (!dueDate) continue;
+            // 预计算所有需要更新的订单数据
+            const updates = [];
+            for (const order of activeOrders) {
+                const dueDate = order.next_interest_due_date;
+                if (!dueDate) continue;
 
-        const due = new Date(dueDate);
-        due.setHours(0, 0, 0, 0);
-        let overdueDays = 0;
-        if (todayLocal > due) {
-            overdueDays = Math.floor((todayLocal - due) / 86400000);
-        }
+                const due = new Date(dueDate);
+                due.setHours(0, 0, 0, 0);
+                let overdueDays = 0;
+                if (todayLocal > due) {
+                    overdueDays = Math.floor((todayLocal - due) / 86400000);
+                }
 
-        // 根据逾期天数设定三阶段状态
-        let newLiquidationStatus = order.liquidation_status || 'normal';
-        let newFundStatus = order.fund_status;
+                // 根据逾期天数设定三阶段状态
+                let newLiquidationStatus = order.liquidation_status || 'normal';
+                let newFundStatus = order.fund_status;
 
-        if (overdueDays >= 30) {
-            newLiquidationStatus = 'auction';
-            newFundStatus = 'forfeited';
-        } else if (overdueDays >= 20) {
-            newLiquidationStatus = 'pre_auction';
-        } else if (overdueDays >= 10) {
-            newLiquidationStatus = 'collection';
-        } else {
-            newLiquidationStatus = 'normal';
-        }
+                if (overdueDays >= 30) {
+                    newLiquidationStatus = 'auction';
+                    newFundStatus = 'forfeited';
+                } else if (overdueDays >= 20) {
+                    newLiquidationStatus = 'pre_auction';
+                } else if (overdueDays >= 10) {
+                    newLiquidationStatus = 'collection';
+                } else {
+                    newLiquidationStatus = 'normal';
+                }
 
-        // 仅在状态有变化时更新
-        if (overdueDays !== order.overdue_days ||
-            newLiquidationStatus !== order.liquidation_status ||
-            newFundStatus !== order.fund_status) {
+                // 仅在状态有变化时更新
+                if (overdueDays !== order.overdue_days ||
+                    newLiquidationStatus !== order.liquidation_status ||
+                    newFundStatus !== order.fund_status) {
+                    updates.push({
+                        id: order.id,
+                        overdue_days: overdueDays,
+                        liquidation_status: newLiquidationStatus,
+                        fund_status: newFundStatus
+                    });
+                }
+            }
 
-            await supabaseClient.from('orders').update({
-                overdue_days: overdueDays,
-                liquidation_status: newLiquidationStatus,
-                fund_status: newFundStatus,
-                updated_at: Utils.getLocalDateTime()
-            }).eq('id', order.id);
-        }
-    }
-    return true;
-},
+            if (updates.length === 0) return true;
+
+            // 分批并发更新（每批 20 条）
+            const BATCH_SIZE = 20;
+            const batches = [];
+            for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+                batches.push(updates.slice(i, i + BATCH_SIZE));
+            }
+
+            const updatePromises = batches.map(batch => {
+                const updateQueries = batch.map(order => 
+                    supabaseClient.from('orders')
+                        .update({
+                            overdue_days: order.overdue_days,
+                            liquidation_status: order.liquidation_status,
+                            fund_status: order.fund_status,
+                            updated_at: Utils.getLocalDateTime()
+                        })
+                        .eq('id', order.id)
+                );
+                return Promise.all(updateQueries);
+            });
+
+            await Promise.all(updatePromises);
+            console.log(`✅ 逾期更新完成: 共处理 ${updates.length} 条订单`);
+            return true;
+        },
 
         async updateOrder(orderId, updateData, customerId) {
             const currentOrder = await this.getOrder(orderId);
@@ -1605,21 +1626,20 @@
             return true;
         },
 
-        // 【修复 Bug 6】修正 deleteOrder 中的现金流清理
+        // ==================== 【修复】删除订单 - 移除无效的 sql 调用 ====================
         async deleteOrder(orderId) {
             const profile = await this.getCurrentProfile();
             if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin yang dapat menghapus pesanan' : '需管理员权限');
             const order = await this.getOrder(orderId);
             
-            // 使用多种条件匹配，确保现金流记录被正确清理
-            // 方案：标记为 voided 软删除，同时保留审计痕迹
+            // **修复**：原先使用了无效的 supabaseClient.sql，现已移除，只更新必要字段
+            // 软删除现金流记录（标记为 voided，保留审计痕迹）
             const { error: voidCashFlowError } = await supabaseClient
                 .from('cash_flow_records')
                 .update({ 
                     is_voided: true, 
                     voided_at: Utils.getLocalDateTime(), 
-                    voided_by: profile.id,
-                    description: supabaseClient.sql`${'description'} || ' [DELETED]'`
+                    voided_by: profile.id
                 })
                 .eq('order_id', order.id);
             
@@ -1629,13 +1649,13 @@
                 await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
                 // 也尝试用 reference_id 匹配
                 await supabaseClient.from('cash_flow_records').delete().eq('reference_id', order.order_id);
+            } else {
+                // 同时清理使用 reference_id 的记录
+                await supabaseClient
+                    .from('cash_flow_records')
+                    .update({ is_voided: true, voided_at: Utils.getLocalDateTime(), voided_by: profile.id })
+                    .eq('reference_id', order.order_id);
             }
-            
-            // 同时清理使用 reference_id 的记录（兼容旧数据）
-            await supabaseClient
-                .from('cash_flow_records')
-                .update({ is_voided: true, voided_at: Utils.getLocalDateTime(), voided_by: profile.id })
-                .eq('reference_id', order.order_id);
             
             const { error: e1 } = await supabaseClient.from('payment_history').delete().eq('order_id', order.id);
             if (e1) throw e1;
@@ -2027,5 +2047,5 @@
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
 
-    console.log('✅ JF.Supabase v2.2 最终版初始化完成（含全部 Bug 修复）');
+    console.log('✅ JF.Supabase v2.3 最终版初始化完成（含三项关键修复）');
 })();
