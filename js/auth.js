@@ -1,4 +1,4 @@
-// auth.js - v2.1 统一认证模块 (JF 命名空间) - 修复 Token 刷新失败处理
+// auth.js - v2.0 统一认证模块 (JF 命名空间)
 
 'use strict';
 
