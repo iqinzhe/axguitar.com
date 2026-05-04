@@ -1,4 +1,4 @@
-// app-customers.js - v2.1 (JF 命名空间)
+// app-customers.js - v2.0 (JF 命名空间)
 
 'use strict';
 
