@@ -368,6 +368,7 @@
 
          // 【关键】立即显示完整骨架屏，覆盖整个页面
             const appDiv = document.getElementById("app");
+            const showSkeletonTime = Date.now();  // 记录显示时间
             if (appDiv && !appDiv.innerHTML.includes('dashboard-skeleton')) {
                 appDiv.innerHTML = Utils.renderSkeleton('dashboard');
             }
