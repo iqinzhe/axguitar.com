@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.2 完整版（修复仪表盘渲染缺失）
+// app-dashboard-core.js - v2.2 全面加固版（刷新保留当前页面）
 
 'use strict';
 
@@ -83,43 +83,54 @@
             document.body.style.position = '';
         },
 
-        // ---------- 页面状态持久化 ----------
-        saveCurrentPageState() {
+        // ---------- 页面状态持久化（升级为JSON对象）----------
+        saveCurrentPageState(extraParams = {}) {
             try {
                 if (!AUTH.isLoggedIn() || this.currentPage === 'login') return;
-                sessionStorage.setItem('jf_current_page', this.currentPage);
-                sessionStorage.setItem('jf_current_filter', this.currentFilter);
-                if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
-                else sessionStorage.removeItem('jf_current_order_id');
-                if (this.currentCustomerId) sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
-                else sessionStorage.removeItem('jf_current_customer_id');
-                localStorage.setItem('jf_last_page', this.currentPage);
-                localStorage.setItem('jf_last_filter', this.currentFilter);
-                if (this.currentOrderId) localStorage.setItem('jf_last_order_id', this.currentOrderId);
-                else localStorage.removeItem('jf_last_order_id');
-                if (this.currentCustomerId) localStorage.setItem('jf_last_customer_id', this.currentCustomerId);
-                else localStorage.removeItem('jf_last_customer_id');
+                const state = {
+                    page: this.currentPage,
+                    filter: this.currentFilter,
+                    orderId: this.currentOrderId || null,
+                    customerId: this.currentCustomerId || null,
+                    ...extraParams
+                };
+                sessionStorage.setItem('jf_current_state', JSON.stringify(state));
+                localStorage.setItem('jf_last_state', JSON.stringify(state));
             } catch (e) { /* ignore */ }
         },
+
         restorePageState() {
             try {
-                let page = sessionStorage.getItem('jf_current_page') || localStorage.getItem('jf_last_page');
-                let filter = sessionStorage.getItem('jf_current_filter') || localStorage.getItem('jf_last_filter') || "all";
-                let orderId = sessionStorage.getItem('jf_current_order_id') || localStorage.getItem('jf_last_order_id');
-                let customerId = sessionStorage.getItem('jf_current_customer_id') || localStorage.getItem('jf_last_customer_id');
+                let raw = sessionStorage.getItem('jf_current_state') || localStorage.getItem('jf_last_state');
+                if (!raw) return { page: null, filter: "all", orderId: null, customerId: null };
+
+                const state = JSON.parse(raw);
                 const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist'];
-                if (page && validPages.includes(page) && AUTH.isLoggedIn()) {
-                    return { page, filter, orderId, customerId };
+
+                if (state.page && validPages.includes(state.page) && AUTH.isLoggedIn()) {
+                    // 参数完整性校验：必须携带 orderId 的页面
+                    if (['viewOrder','payment'].includes(state.page) && !state.orderId) {
+                        return { page: null, filter: "all", orderId: null, customerId: null };
+                    }
+                    // 必须携带 customerId 的页面
+                    if (['customerOrders','customerPaymentHistory'].includes(state.page) && !state.customerId) {
+                        return { page: null, filter: "all", orderId: null, customerId: null };
+                    }
+                    return {
+                        page: state.page,
+                        filter: state.filter || "all",
+                        orderId: state.orderId || null,
+                        customerId: state.customerId || null
+                    };
                 }
                 return { page: null, filter: "all", orderId: null, customerId: null };
             } catch (e) { return { page: null, filter: "all", orderId: null, customerId: null }; }
         },
+
         clearPageState() {
             try {
-                sessionStorage.removeItem('jf_current_page');
-                sessionStorage.removeItem('jf_current_filter');
-                sessionStorage.removeItem('jf_current_order_id');
-                sessionStorage.removeItem('jf_current_customer_id');
+                sessionStorage.removeItem('jf_current_state');
+                localStorage.removeItem('jf_last_state');
             } catch (e) { /* ignore */ }
             this.currentOrderId = null;
             this.currentCustomerId = null;
@@ -159,7 +170,7 @@
             mainEl.scrollTop = 0;
         },
 
-        // ========== 刷新当前页面 ==========
+        // ========== 刷新当前页面（核心）==========
         async refreshCurrentPage() {
             if (!AUTH.isLoggedIn()) {
                 console.log('[DashboardCore] 用户未登录，显示登录页');
@@ -174,6 +185,7 @@
             const page = this.currentPage;
             if (page === 'dashboard') {
                 await this.originalRenderDashboard();
+                // 仪表盘渲染成功后自动保存状态（在 originalRenderDashboard 末尾处理）
                 return;
             }
 
@@ -210,6 +222,7 @@
                 } else if (page === 'backupRestore') {
                     if (JF.BackupStorage && typeof JF.BackupStorage.renderBackupUI === 'function') {
                         await JF.BackupStorage.renderBackupUI();
+                        this.saveCurrentPageState(); // 备份页面特殊处理：渲染后保存
                         return;
                     }
                     contentHtml = '<div class="card"><p>备份模块不可用</p></div>';
@@ -220,6 +233,7 @@
                 } else if (page === 'messageCenter') {
                     if (JF.MessageCenter && typeof JF.MessageCenter.showMessageCenter === 'function') {
                         await JF.MessageCenter.showMessageCenter();
+                        this.saveCurrentPageState(); // 消息中心渲染后保存
                         return;
                     }
                     contentHtml = '<div class="card"><p>消息中心模块不可用</p></div>';
@@ -230,6 +244,7 @@
                 } else if (page === 'payment' && this.currentOrderId) {
                     if (JF.PaymentPage && typeof JF.PaymentPage.showPayment === 'function') {
                         await JF.PaymentPage.showPayment(this.currentOrderId);
+                        this.saveCurrentPageState(); // 缴费页面渲染后保存
                         return;
                     }
                 } else if (page === 'customerOrders' && this.currentCustomerId) {
@@ -245,9 +260,15 @@
                 }
                 await this._updateMainContent(contentHtml);
                 document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
+                // 渲染成功后自动保存状态，刷新可恢复
+                this.saveCurrentPageState();
             } catch (err) {
-                console.error('[refreshCurrentPage] error:', err);
-                await this._updateMainContent('<div class="card"><p>❌ ' + (Utils.lang === 'id' ? 'Gagal memuat halaman' : '页面加载失败') + '</p><button onclick="location.reload()" class="btn btn--sm btn--primary">🔄 Refresh</button></div>');
+                console.error('[refreshCurrentPage] 渲染失败，自动返回仪表盘:', err);
+                // 清除可能损坏的状态，避免下次刷新死循环
+                this.currentOrderId = null;
+                this.currentCustomerId = null;
+                this.clearPageState();
+                await this.originalRenderDashboard(); // 降级到仪表盘
             }
         },
 
@@ -750,6 +771,9 @@
                     `;
                     document.head.appendChild(style);
                 }
+
+                // 仪表盘渲染成功后保存状态
+                this.saveCurrentPageState();
             } catch (err) {
                 console.error("originalRenderDashboard error:", err);
                 document.getElementById("app").innerHTML = '<div class="card" style="padding:40px;text-align:center;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '仪表盘加载失败: ' + err.message) + '</p><button onclick="APP.forceRecovery()" class="btn btn--warning" style="margin-right:8px;">🔄 ' + (Utils.lang === 'id' ? 'Pulihkan Paksa' : '强制恢复') + '</button><button onclick="location.reload()" class="btn btn--outline">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
@@ -940,5 +964,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.2 完整版已加载');
+    console.log('✅ JF.DashboardCore v2.2 全面加固版已加载（刷新保留当前页面）');
 })();
