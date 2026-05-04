@@ -1,5 +1,4 @@
-// app-dashboard-expenses.js - v2.2 (修复版：支出编辑/删除同步现金流)
-// 支出管理页面模块，挂载到 JF.ExpensesPage
+// app-dashboard-expenses.js -  v2.0 (JF 命名空间) 
 
 'use strict';
 
