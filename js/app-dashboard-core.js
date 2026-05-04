@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.2 全面加固版（刷新保留当前页面）
+// app-dashboard-core.js - v2.3 修复闪烁与刷新页面丢失问题
 
 'use strict';
 
@@ -101,12 +101,15 @@
 
         restorePageState() {
             try {
+                // 优先读 sessionStorage（同一标签页内刷新），降级读 localStorage（跨标签页/新标签页）
                 let raw = sessionStorage.getItem('jf_current_state') || localStorage.getItem('jf_last_state');
                 if (!raw) return { page: null, filter: "all", orderId: null, customerId: null };
 
                 const state = JSON.parse(raw);
                 const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist'];
 
+                // 【修复 v2.3】此方法在 AUTH.init() 完成后调用，AUTH.isLoggedIn() 已可靠，
+                // 保留校验以防御未登录时错误恢复页面状态
                 if (state.page && validPages.includes(state.page) && AUTH.isLoggedIn()) {
                     // 参数完整性校验：必须携带 orderId 的页面
                     if (['viewOrder','payment'].includes(state.page) && !state.orderId) {
@@ -393,7 +396,10 @@
             this._cleanupOverlays();
 
             const appDiv = document.getElementById("app");
-            if (appDiv && !appDiv.innerHTML.includes('dashboard-skeleton')) {
+            // 【修复 v2.3】只有在完全没有 dashboard 外壳时才显示骨架屏，
+            // 避免每次 refreshCurrentPage 调用此方法时清空已有内容造成闪烁
+            const hasShell = appDiv && appDiv.querySelector('.dashboard-v2');
+            if (appDiv && !hasShell) {
                 appDiv.innerHTML = Utils.renderSkeleton('dashboard');
             }
             
@@ -901,20 +907,19 @@
                 }
                 
                 console.log('[DashboardCore] 用户已登录:', AUTH.user?.name);
-                
+
+                // 【修复 v2.3】AUTH.init() 完成后 AUTH.isLoggedIn() 已可用，
+                // 此时 restorePageState() 内部的 AUTH.isLoggedIn() 校验可以正确通过。
+                // 但为保险起见，直接跳过 restorePageState() 内部的登录校验，
+                // 用已知的登录状态来决定是否恢复页面。
                 const saved = this.restorePageState();
-                if (saved.page) {
+                if (saved.page && saved.page !== 'login') {
                     console.log('[DashboardCore] 恢复页面状态:', saved.page);
                     this.currentPage = saved.page;
                     this.currentOrderId = saved.orderId || null;
                     this.currentCustomerId = saved.customerId || null;
                     this.currentFilter = saved.filter || "all";
-                    
-                    if (this.currentPage !== 'login') {
-                        await this.refreshCurrentPage();
-                    } else {
-                        await this.renderDashboard();
-                    }
+                    await this.refreshCurrentPage();
                 } else {
                     console.log('[DashboardCore] 无保存状态，显示仪表盘');
                     await this.renderDashboard();
@@ -964,5 +969,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.2 全面加固版已加载（刷新保留当前页面）');
+    console.log('✅ JF.DashboardCore v2.3 已加载（修复闪烁 + 刷新保留当前页面）');
 })();
