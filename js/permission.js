@@ -1,5 +1,4 @@
 // permission.js - v2.0 统一权限模块 (JF 命名空间)
-// 挂载到 JF.Permission，保留 window.PERMISSION 别名
 
 'use strict';
 
