@@ -23,7 +23,7 @@
     .data-table tbody td { font-size: var(--font-sm); }
 
     .btn { font-size: var(--font-sm); }
-    .btn--sm { font-size: var(--font-sm); }   /* 小按钮桌面仍保持 sm 尺寸，也可不额外定义 */
+    .btn--sm { font-size: var(--font-sm); }
 
     .toolbar .btn { font-size: var(--font-sm); }
 
@@ -53,7 +53,7 @@
     .page-header h1,
     .page-header h2 { font-size: var(--font-lg); }
 
-    .card h3 { font-size: var(--font-md); }
+    .card h3 { font-size: calc(var(--font-md) - 0.0625rem); }
 
     /* 统计卡片：保持 2 列 */
     .stats-grid,
@@ -69,8 +69,8 @@
         padding: var(--spacing-2) var(--spacing-3);
     }
 
-    .card--stat .stat-value { font-size: var(--font-md); }
-    .card--stat .stat-label { font-size: var(--font-xs); }
+    .card--stat .stat-value { font-size: calc(var(--font-xl) - 0.125rem); }
+    .card--stat .stat-label { font-size: calc(var(--font-xs) - 0.03125rem); }
 
     /* 信息卡片：堆叠 */
     .info-cards-row { flex-direction: column; }
@@ -303,6 +303,65 @@
     .modal-content > div:first-of-type {
         flex-wrap: nowrap;
         overflow-x: auto;
+    }
+
+    /* 卡片内部文字统一缩小（移动端比桌面小一号） */
+    .card h3,
+    .card-header .card-title,
+    .modal-content h3,
+    .repayment-card-title,
+    .anomaly-card-header h3,
+    .backup-card h3 {
+        font-size: calc(var(--font-md) - 0.0625rem);
+        margin-bottom: var(--spacing-1);
+    }
+
+    .stat-value,
+    .kpi-val,
+    .fund-block-val,
+    .info-item-value,
+    .cashflow-item-card .value,
+    .repayment-card .repayment-amount,
+    .fee-card .fee-card-body input,
+    .amount-highlight,
+    .card .card-value-main,
+    .summary-item .value,
+    .legend-count {
+        font-size: calc(var(--font-lg) - 0.0625rem);
+    }
+
+    .stat-label,
+    .card-action,
+    .info-label,
+    .repayment-card-desc,
+    .repayment-card-note,
+    .card .info-bar,
+    .card .form-hint,
+    .cashflow-item-card .label,
+    .legend-name,
+    .legend-pct,
+    .kpi-label,
+    .fund-block-label,
+    .cb-label,
+    .income-name,
+    .income-sub,
+    .info-item-card .info-item-detail,
+    .card .card-history .history-title,
+    .anomaly-badge,
+    .util-bar-label,
+    .np-label,
+    .np-sub,
+    .quick-btn .qb-label,
+    .order-status-card .legend-name {
+        font-size: calc(var(--font-xs) - 0.03125rem);
+    }
+
+    .card p,
+    .card .desc-text,
+    .repayment-card-desc,
+    .info-bar-content,
+    .card .text-muted {
+        font-size: calc(var(--font-sm) - 0.0625rem);
     }
 }
 
@@ -572,7 +631,7 @@
         border-left: 4px solid #999 !important;
     }
 
-    /* 隐藏打印时不需要的按钮（现在按钮已经有 no-print 类，此处保留以防万一） */
+    /* 隐藏打印时不需要的按钮 */
     .btn-backup-primary,
     .btn-restore,
     .btn-blacklist,
