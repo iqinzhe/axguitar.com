@@ -584,7 +584,34 @@
                                     <div class="fund-block fund-block--free"><div class="fund-block-label">${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</div><div class="fund-block-val">${Utils.formatCurrency(available)}</div><div class="fund-block-sub">${lang === 'id' ? 'Kas + Bank' : '现金 + 银行'}</div></div>
                                 </div>
                                 <div class="util-bar-wrap"><div class="util-bar-label"><span>${lang === 'id' ? 'Tingkat Utilisasi' : '资金利用率'}</span><span class="util-bar-pct">${utilizationRate}%</span></div><div class="util-bar-track"><div class="util-bar-fill" style="width:${Math.min(utilizationRate, 100)}%;"></div></div></div>
-                                <div class="cash-bank-row"><div class="cash-bank-item"><div class="cb-label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</div><div class="cb-val">${Utils.formatCurrency(cashBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(cashIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(cashExpense)}</span></div></div><div class="cash-bank-item"><div class="cb-label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div><div class="cb-val">${Utils.formatCurrency(bankBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(bankIncome)}</span> <span class="out">↓ −${Utils.formatCurrency(bankExpense)}</span></div></div></div>
+                                <div class="cash-bank-row">
+  <div class="cash-bank-item">
+    <div class="cb-label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</div>
+    <div class="cb-val">${Utils.formatCurrency(cashBalance)}</div>
+    <div class="cb-flow">
+      <span class="in">↑ +${Utils.formatCurrency(cashIncome)}</span>
+      <span class="out">↓ −${Utils.formatCurrency(cashExpense)}</span>
+    </div>
+  </div>
+  <div class="cash-bank-item">
+    <div class="cb-label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
+    <div class="cb-val">${Utils.formatCurrency(bankBalance)}</div>
+    <div class="cb-flow">
+      <span class="in">↑ +${Utils.formatCurrency(bankIncome)}</span>
+      <span class="out">↓ −${Utils.formatCurrency(bankExpense)}</span>
+    </div>
+  </div>
+</div>
+
+<div class="transfer-row-v2">
+  <div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('cash_to_bank')">
+    🏦→🏧 ${lang === 'id' ? 'Setor ke Bank' : '现金存入银行'}
+  </div>
+  <div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">
+    🏧→🏦 ${lang === 'id' ? 'Tarik ke Kas' : '银行取现'}
+  </div>
+  ${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}
+</div>
                                 <div class="transfer-row-v2"><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('cash_to_bank')">🏦→🏧 ${lang === 'id' ? 'Kas ke Bank' : '现金转银行'}</div><div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Bank ke Kas' : '银行转现金'}</div>${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}</div>
                             </div>
                             <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfit)}</div></div></div>
