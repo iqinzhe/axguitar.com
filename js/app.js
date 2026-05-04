@@ -1,4 +1,4 @@
-// app.js - v2.0 最终完整版（修复版 - 语言判断和状态管理委托）
+// app.js - v2.1 最终完整版（修复登录状态检查 + 错误恢复）
 // JF 命名空间下的主入口，提供全局 APP 方法与协调功能
 
 'use strict';
@@ -9,57 +9,121 @@
 
     // 主协调对象（挂载到 window.APP 以兼容旧版 onClick 绑定）
     const APP = {
-        currentPage: 'dashboard',
+        currentPage: 'login',  // 【修复】初始状态改为 login
         currentFilter: 'all',
         currentOrderId: null,
         currentCustomerId: null,
         historyStack: [],
+        _isInitialized: false,  // 【修复】新增初始化标志
 
-        // ==================== 强制恢复（修复语言判断） ====================
+        // ==================== 【修复】强制恢复 ====================
         forceRecovery() {
             console.log('[Recovery] 手动强制恢复');
             const appDiv = document.getElementById('app');
             if (!appDiv) return;
-            // 修复：印尼语显示印尼语，中文显示中文
-            const loadingText = Utils.lang === 'id' ? 'Sedang memulihkan...' : '正在恢复...';
+            
+            // 【修复】显示恢复中的提示
+            const lang = Utils.lang || 'zh';
+            const loadingText = lang === 'id' ? 'Sedang memulihkan...' : '正在恢复...';
             appDiv.innerHTML = `<div class="card" style="text-align:center;padding:40px;margin:20px;">
                 <div class="loader" style="margin:20px auto;"></div>
                 <p>${loadingText}</p>
             </div>`;
-            setTimeout(() => {
+            
+            setTimeout(async () => {
                 try {
-                    if (AUTH.isLoggedIn()) {
-                        if (JF.DashboardCore?.renderDashboard) {
-                            JF.DashboardCore.renderDashboard();
+                    // 【修复】先检查登录状态
+                    const isLoggedIn = AUTH && AUTH.isLoggedIn && AUTH.isLoggedIn();
+                    
+                    if (isLoggedIn) {
+                        // 已登录，尝试刷新当前页面
+                        if (JF.DashboardCore && typeof JF.DashboardCore.refreshCurrentPage === 'function') {
+                            await JF.DashboardCore.refreshCurrentPage();
+                        } else if (JF.DashboardCore && typeof JF.DashboardCore.renderDashboard === 'function') {
+                            await JF.DashboardCore.renderDashboard();
                         } else {
                             location.reload();
                         }
                     } else {
-                        APP.showLogin();
+                        // 未登录，显示登录页
+                        if (JF.DashboardCore && typeof JF.DashboardCore.renderLogin === 'function') {
+                            JF.DashboardCore.renderLogin();
+                        } else {
+                            APP.showLogin();
+                        }
                     }
                 } catch (e) {
-                    console.error(e);
-                    location.reload();
+                    console.error('[Recovery] 恢复失败:', e);
+                    appDiv.innerHTML = `<div class="card" style="text-align:center;padding:40px;">
+                        <p style="color:var(--danger);">⚠️ ${lang === 'id' ? 'Pemulihan gagal' : '恢复失败'}</p>
+                        <button onclick="location.reload()" class="btn btn--primary" style="margin-top:12px;">🔄 ${lang === 'id' ? 'Muat Ulang' : '刷新页面'}</button>
+                        <button onclick="APP.forceClearAndReload()" class="btn btn--warning" style="margin-top:12px;margin-left:8px;">🗑️ ${lang === 'id' ? 'Hapus Cache & Muat Ulang' : '清除缓存并刷新'}</button>
+                    </div>`;
                 }
             }, 100);
         },
 
+        // ==================== 【修复】新增：强制清除并重新加载 ====================
+        forceClearAndReload() {
+            console.log('[APP] 强制清除所有存储并重新加载');
+            try {
+                // 清除所有 Supabase 相关存储
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (
+                        key.startsWith('supabase.') ||
+                        key.startsWith('sb-') ||
+                        key.startsWith('jf_')
+                    )) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+                
+                // 清除 sessionStorage
+                sessionStorage.clear();
+                
+                // 清除所有 cookies
+                document.cookie.split(";").forEach(c => {
+                    document.cookie = c.replace(/^ +/, "")
+                        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+                
+                console.log('[APP] 已清除 ' + keysToRemove.length + ' 个存储项');
+            } catch (e) {
+                console.warn('[APP] 清除存储失败:', e.message);
+            }
+            
+            // 延迟重新加载
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        },
+
         // ==================== 页面状态持久化（委托给 DashboardCore） ====================
         saveCurrentPageState() {
+            // 【修复】增加登录检查
+            if (!AUTH || !AUTH.isLoggedIn || !AUTH.isLoggedIn()) {
+                return;
+            }
+            
             // 统一委托给 DashboardCore 处理，避免状态不同步
             if (JF.DashboardCore && typeof JF.DashboardCore.saveCurrentPageState === 'function') {
                 JF.DashboardCore.saveCurrentPageState();
             } else {
                 // 降级：直接保存到 sessionStorage
                 try {
-                    sessionStorage.setItem('jf_current_page', this.currentPage);
-                    sessionStorage.setItem('jf_current_filter', this.currentFilter || 'all');
-                    if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
-                    if (this.currentCustomerId) sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
-                    localStorage.setItem('jf_last_page', this.currentPage);
-                    localStorage.setItem('jf_last_filter', this.currentFilter || 'all');
-                    if (this.currentOrderId) localStorage.setItem('jf_last_order_id', this.currentOrderId);
-                    if (this.currentCustomerId) localStorage.setItem('jf_last_customer_id', this.currentCustomerId);
+                    if (this.currentPage && this.currentPage !== 'login') {
+                        sessionStorage.setItem('jf_current_page', this.currentPage);
+                        sessionStorage.setItem('jf_current_filter', this.currentFilter || 'all');
+                        if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
+                        if (this.currentCustomerId) sessionStorage.setItem('jf_current_customer_id', this.currentCustomerId);
+                        localStorage.setItem('jf_last_page', this.currentPage);
+                        localStorage.setItem('jf_last_filter', this.currentFilter || 'all');
+                        if (this.currentOrderId) localStorage.setItem('jf_last_order_id', this.currentOrderId);
+                        if (this.currentCustomerId) localStorage.setItem('jf_last_customer_id', this.currentCustomerId);
+                    }
                 } catch (e) { /* ignore */ }
             }
         },
@@ -75,8 +139,10 @@
                 let filter = sessionStorage.getItem('jf_current_filter') || localStorage.getItem('jf_last_filter') || "all";
                 let orderId = sessionStorage.getItem('jf_current_order_id') || localStorage.getItem('jf_last_order_id');
                 let customerId = sessionStorage.getItem('jf_current_customer_id') || localStorage.getItem('jf_last_customer_id');
-                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','backupRestore','customerOrders','customerPaymentHistory','blacklist'];
-                if (page && validPages.includes(page) && page !== 'login') {
+                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','backupRestore','customerOrders','customerPaymentHistory','blacklist','messageCenter'];
+                
+                // 【修复】增加登录检查
+                if (page && validPages.includes(page) && page !== 'login' && AUTH && AUTH.isLoggedIn && AUTH.isLoggedIn()) {
                     return { page, filter, orderId, customerId };
                 }
                 return { page: null, filter: "all", orderId: null, customerId: null };
@@ -101,10 +167,13 @@
 
         // ==================== 语言切换 ====================
         toggleLanguage() {
-            Utils.setLanguage(Utils.lang === 'id' ? 'zh' : 'id');
+            const newLang = Utils.lang === 'id' ? 'zh' : 'id';
+            Utils.setLanguage(newLang);
             Utils.forceSyncLanguage();
-            if (AUTH.isLoggedIn()) {
-                if (JF.DashboardCore?.refreshCurrentPage) {
+            
+            // 【修复】增加登录状态检查
+            if (AUTH && AUTH.isLoggedIn && AUTH.isLoggedIn()) {
+                if (JF.DashboardCore && typeof JF.DashboardCore.refreshCurrentPage === 'function') {
                     JF.DashboardCore.refreshCurrentPage();
                 } else if (this.currentPage === 'dashboard') {
                     this.renderDashboard();
@@ -118,7 +187,7 @@
 
         // ==================== 导航 ====================
         goBack() {
-            if (JF.DashboardCore?.goBack) {
+            if (JF.DashboardCore && typeof JF.DashboardCore.goBack === 'function') {
                 JF.DashboardCore.goBack();
             } else if (window.history.length > 1 && document.referrer) {
                 window.history.back();
@@ -128,7 +197,14 @@
         },
 
         navigateTo(page, params) {
-            if (JF.DashboardCore?.navigateTo) {
+            // 【修复】如果未登录，不允许导航
+            if (!AUTH || !AUTH.isLoggedIn || !AUTH.isLoggedIn()) {
+                console.log('[APP] 用户未登录，重定向到登录页');
+                this.showLogin();
+                return;
+            }
+            
+            if (JF.DashboardCore && typeof JF.DashboardCore.navigateTo === 'function') {
                 JF.DashboardCore.navigateTo(page, params);
                 return;
             }
@@ -144,10 +220,11 @@
 
         // ==================== 登录 ====================
         showLogin() {
-            if (JF.DashboardCore?.renderLogin) {
+            if (JF.DashboardCore && typeof JF.DashboardCore.renderLogin === 'function') {
                 JF.DashboardCore.renderLogin();
             } else {
-                document.getElementById('app').innerHTML = `<div class="login-container"><div class="login-box"><h2>JF! by Gadai</h2><p>Loading...</p></div></div>`;
+                const lang = Utils.lang || 'zh';
+                document.getElementById('app').innerHTML = `<div class="login-container"><div class="login-box"><h2>JF! by Gadai</h2><p>${lang === 'id' ? 'Memuat...' : '加载中...'}</p></div></div>`;
             }
         },
 
@@ -175,6 +252,7 @@
                 }
 
                 try {
+                    // 【修复】使用 AUTH 模块登录
                     const result = await AUTH.login(username, password);
                     if (result) {
                         if (rememberMe) {
@@ -184,10 +262,14 @@
                             AUTH.setRememberMe(false);
                             localStorage.removeItem('jf_remembered_user');
                         }
-                        // Toast 组件会自动添加 ✅，所以不再手动加
+                        
                         Utils.toast.success(lang === 'id' ? 'Login berhasil' : '登录成功');
-                        if (JF.DashboardCore?.router) {
-                            await JF.DashboardCore.router();
+                        
+                        // 【修复】登录成功后清除旧的恢复状态
+                        this.clearPageState();
+                        
+                        if (JF.DashboardCore && typeof JF.DashboardCore.renderDashboard === 'function') {
+                            await JF.DashboardCore.renderDashboard();
                         } else {
                             APP.renderDashboard();
                         }
@@ -213,16 +295,35 @@
         async logout() {
             const confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
             if (confirmed) {
-                await AUTH.logout();
+                // 【修复】使用 AUTH 模块登出
+                if (AUTH && typeof AUTH.logout === 'function') {
+                    await AUTH.logout();
+                }
+                
                 APP.clearPageState();
+                
+                // 【修复】清除 sessionStorage
+                try {
+                    sessionStorage.clear();
+                } catch (e) { /* ignore */ }
+                
                 APP.showLogin();
-                Utils.toast.success(Utils.lang === 'id' ? 'Berhasil keluar' : '已退出登录');
+                
+                if (Utils && Utils.toast) {
+                    Utils.toast.success(Utils.lang === 'id' ? 'Berhasil keluar' : '已退出登录');
+                }
             }
         },
 
         // ==================== 仪表盘（降级备用） ====================
         async renderDashboard() {
-            if (JF.DashboardCore?.renderDashboard) {
+            // 【修复】增加登录检查
+            if (!AUTH || !AUTH.isLoggedIn || !AUTH.isLoggedIn()) {
+                this.showLogin();
+                return;
+            }
+            
+            if (JF.DashboardCore && typeof JF.DashboardCore.renderDashboard === 'function') {
                 return await JF.DashboardCore.renderDashboard();
             }
             document.getElementById('app').innerHTML = `<div class="card"><p>Dashboard unavailable</p></div>`;
@@ -279,7 +380,7 @@
                 if (cleanPhone.startsWith('0')) {
                     cleanPhone = '62' + cleanPhone.substring(1);
                 }
-                const waMessage = JF.WAPage.generateWAText(order, storeWA);
+                const waMessage = JF.WAPage ? JF.WAPage.generateWAText(order, storeWA) : '';
                 const encodedMessage = encodeURIComponent(waMessage);
                 const waUrl = 'https://wa.me/' + cleanPhone + '?text=' + encodedMessage;
                 window.open(waUrl, '_blank');
@@ -293,7 +394,7 @@
 
         // ==================== 打印 ====================
         printCurrentPage() {
-            if (JF.PrintPage?.printCurrentPage) {
+            if (JF.PrintPage && typeof JF.PrintPage.printCurrentPage === 'function') {
                 JF.PrintPage.printCurrentPage();
             } else {
                 window.print();
@@ -305,14 +406,22 @@
     window.APP = Object.assign(window.APP || {}, APP);
     JF.APP = window.APP;
 
-    console.log('[APP] app.js v2.0 最终版加载完成');
-    console.log('[APP] 如果出现白板，请在控制台执行 APP.forceRecovery() 恢复页面');
+    console.log('[APP] app.js v2.1 加载完成');
+    console.log('[APP] 快捷键: Alt+R 恢复页面 | 如果白板请执行 APP.forceRecovery()');
 
     // Alt+R 快捷键恢复
     document.addEventListener('keydown', (e) => {
         if (e.altKey && e.key === 'r') {
             e.preventDefault();
             APP.forceRecovery();
+        }
+    });
+    
+    // 【修复】增加 Alt+Shift+R 强制清除并重新加载
+    document.addEventListener('keydown', (e) => {
+        if (e.altKey && e.shiftKey && e.key === 'R') {
+            e.preventDefault();
+            APP.forceClearAndReload();
         }
     });
 })();
