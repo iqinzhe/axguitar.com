@@ -1,5 +1,6 @@
-// utils.js - v2.0 统一重构版
+// utils.js - v2.1 统一重构版
 // 基础工具模块，挂载到 JF.Utils
+// 修复：增加网络监控 + 错误恢复工具
 'use strict';
 
 (function () {
@@ -247,6 +248,7 @@
             'login_required': 'Silakan login terlebih dahulu',
             'force_recovery': 'Pulihkan Paksa',
             'error_recovery_failed': 'Pemulihan otomatis gagal, silakan segarkan halaman',
+            'login_failed': 'Login gagal',
         };
 
         _translations.zh = {
@@ -456,6 +458,7 @@
             'login_required': '请先登录',
             'force_recovery': '强制恢复',
             'error_recovery_failed': '自动恢复失败，请刷新页面',
+            'login_failed': '登录失败',
         };
     }
 
@@ -608,7 +611,7 @@
             if (window.Toast && window.Toast.confirmPromise) {
                 return window.Toast.confirmPromise(msg, title);
             }
-            // 备用：返回一个等待的 Promise (开发期间不应该走到这里)
+            // 备用：使用原生 confirm
             console.warn('Toast.confirmPromise 不可用，使用原生 confirm');
             return Promise.resolve(confirm(msg));
         },
@@ -829,7 +832,7 @@
         }
     };
 
-     /* 骨架屏生成 */
+    /* 骨架屏生成 */
     Utils.renderSkeleton = function (type) {
         // 仪表盘完整骨架屏
         if (type === 'dashboard') {
@@ -920,15 +923,86 @@
         </div>`;
     };
 
+    /* ==================== 【修复】网络监控 ==================== */
+    Utils.NetworkMonitor = {
+        _initialized: false,
+        _isOnline: true,
+        _checkUrl: null,
+        
+        init(checkUrl) {
+            if (this._initialized) return;
+            this._initialized = true;
+            this._checkUrl = checkUrl || window.APP_CONFIG?.SUPABASE?.URL;
+            this._isOnline = navigator.onLine;
+            
+            // 监听网络状态变化
+            window.addEventListener('online', () => {
+                console.log('[NetworkMonitor] 网络已恢复');
+                this._isOnline = true;
+            });
+            
+            window.addEventListener('offline', () => {
+                console.log('[NetworkMonitor] 网络已断开');
+                this._isOnline = false;
+            });
+            
+            // 定期检查实际连通性
+            this._startPeriodicCheck();
+            
+            console.log('[NetworkMonitor] 网络监控已启动');
+        },
+        
+        _startPeriodicCheck() {
+            // 每 60 秒检查一次实际连通性
+            setInterval(async () => {
+                const online = await this._checkRealConnectivity();
+                if (online !== this._isOnline) {
+                    this._isOnline = online;
+                    if (online) {
+                        console.log('[NetworkMonitor] 实际连通性: 在线');
+                    } else {
+                        console.warn('[NetworkMonitor] 实际连通性: 离线');
+                    }
+                }
+            }, 60000);
+        },
+        
+        async _checkRealConnectivity() {
+            if (!this._checkUrl) return navigator.onLine;
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(this._checkUrl + '/rest/v1/', {
+                    method: 'HEAD',
+                    signal: controller.signal,
+                });
+                
+                clearTimeout(timeoutId);
+                return response.ok || response.status === 401 || response.status === 403;
+            } catch (e) {
+                return false;
+            }
+        },
+        
+        isOnline() {
+            return this._isOnline;
+        },
+    };
+
     /* 错误收集器 */
     Utils.ErrorHandler = {
         _errors: [],
         _maxErrors: 50,
+        
         init() {
             const handler = (error, context) => this.capture(error, context);
             window.addEventListener('error', (e) => handler(e.error || e.message, 'uncaught'));
             window.addEventListener('unhandledrejection', (e) => handler(e.reason, 'unhandled_promise'));
+            console.log('[ErrorHandler] 全局错误收集已启动');
         },
+        
         capture(error, context) {
             if (!error) return;
             const entry = {
@@ -939,9 +1013,24 @@
             };
             this._errors.unshift(entry);
             if (this._errors.length > this._maxErrors) this._errors.pop();
-            console.error('[ErrorHandler]', context + ':', entry.message);
+            
+            // 只对关键错误输出到控制台
+            if (context === 'uncaught' || context === 'unhandled_promise') {
+                console.error('[ErrorHandler]', context + ':', entry.message);
+            }
+        },
+        
+        getErrors() {
+            return this._errors.slice();
+        },
+        
+        clear() {
+            this._errors = [];
         },
     };
 
-    console.log('✅ Utils v2.0 初始化完成 (JF namespace)');
+    // 【修复】初始化错误收集器
+    Utils.ErrorHandler.init();
+
+    console.log('✅ Utils v2.1 初始化完成 (JF namespace + 网络监控)');
 })();
