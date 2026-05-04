@@ -366,6 +366,12 @@
             this.saveCurrentPageState();
             this._cleanupOverlays();
 
+         // 【关键】立即显示完整骨架屏，覆盖整个页面
+            const appDiv = document.getElementById("app");
+            if (appDiv && !appDiv.innerHTML.includes('dashboard-skeleton')) {
+                appDiv.innerHTML = Utils.renderSkeleton('dashboard');
+            }
+            
             try {
                 const lang = Utils.lang;
                 const t = Utils.t.bind(Utils);
