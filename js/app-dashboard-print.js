@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.1 (修复打印时侧边栏和顶部栏的隐藏问题)
+// app-dashboard-print.js - v2.0
 
 'use strict';
 
