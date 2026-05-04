@@ -152,53 +152,61 @@
         },
 
         async login() {
-            const lang = Utils.lang;
-            const t = Utils.t.bind(Utils);
-            const username = document.getElementById('username')?.value.trim();
-            const password = document.getElementById('password')?.value;
-            const rememberMe = document.getElementById('rememberMe')?.checked || false;
-
-            if (!username || !password) {
-                Utils.toast.warning(t('fill_all_fields'));
-                return;
-            }
-
-            const loginBtn = document.querySelector('.login-btn');
-            const originalText = loginBtn?.innerHTML || '';
-            if (loginBtn) {
-                loginBtn.disabled = true;
-                loginBtn.innerHTML = '⏳ ' + (lang === 'id' ? 'Memproses...' : '登录中...');
-            }
-
+            // ---------- 防重入锁 ----------
+            if (this._loginLock) return;
+            this._loginLock = true;
             try {
-                const result = await AUTH.login(username, password);
-                if (result) {
-                    if (rememberMe) {
-                        AUTH.setRememberMe(true);
-                        localStorage.setItem('jf_remembered_user', username);
+                const lang = Utils.lang;
+                const t = Utils.t.bind(Utils);
+                const username = document.getElementById('username')?.value.trim();
+                const password = document.getElementById('password')?.value;
+                const rememberMe = document.getElementById('rememberMe')?.checked || false;
+
+                if (!username || !password) {
+                    Utils.toast.warning(t('fill_all_fields'));
+                    return;
+                }
+
+                const loginBtn = document.querySelector('.login-btn');
+                const originalText = loginBtn?.innerHTML || '';
+                if (loginBtn) {
+                    loginBtn.disabled = true;
+                    loginBtn.innerHTML = '⏳ ' + (lang === 'id' ? 'Memproses...' : '登录中...');
+                }
+
+                try {
+                    const result = await AUTH.login(username, password);
+                    if (result) {
+                        if (rememberMe) {
+                            AUTH.setRememberMe(true);
+                            localStorage.setItem('jf_remembered_user', username);
+                        } else {
+                            AUTH.setRememberMe(false);
+                            localStorage.removeItem('jf_remembered_user');
+                        }
+                        // Toast 组件会自动添加 ✅，所以不再手动加
+                        Utils.toast.success(lang === 'id' ? 'Login berhasil' : '登录成功');
+                        if (JF.DashboardCore?.router) {
+                            await JF.DashboardCore.router();
+                        } else {
+                            APP.renderDashboard();
+                        }
                     } else {
-                        AUTH.setRememberMe(false);
-                        localStorage.removeItem('jf_remembered_user');
+                        if (loginBtn) {
+                            loginBtn.disabled = false;
+                            loginBtn.innerHTML = originalText;
+                        }
                     }
-                    Utils.toast.success(lang === 'id' ? '✅ Login berhasil' : '✅ 登录成功');
-                    if (JF.DashboardCore?.router) {
-                        await JF.DashboardCore.router();
-                    } else {
-                        APP.renderDashboard();
-                    }
-                } else {
+                } catch (error) {
+                    console.error('Login error:', error);
                     if (loginBtn) {
                         loginBtn.disabled = false;
                         loginBtn.innerHTML = originalText;
                     }
+                    Utils.toast.error(lang === 'id' ? 'Login gagal: ' + error.message : '登录失败：' + error.message);
                 }
-            } catch (error) {
-                console.error('Login error:', error);
-                if (loginBtn) {
-                    loginBtn.disabled = false;
-                    loginBtn.innerHTML = originalText;
-                }
-                Utils.toast.error(lang === 'id' ? 'Login gagal: ' + error.message : '登录失败：' + error.message);
+            } finally {
+                this._loginLock = false;
             }
         },
 
@@ -208,7 +216,7 @@
                 await AUTH.logout();
                 APP.clearPageState();
                 APP.showLogin();
-                Utils.toast.success(Utils.lang === 'id' ? '✅ Berhasil keluar' : '✅ 已退出登录');
+                Utils.toast.success(Utils.lang === 'id' ? 'Berhasil keluar' : '已退出登录');
             }
         },
 
@@ -276,7 +284,7 @@
                 const waUrl = 'https://wa.me/' + cleanPhone + '?text=' + encodedMessage;
                 window.open(waUrl, '_blank');
                 await SUPABASE.logReminder(order.id);
-                Utils.toast.success(Utils.lang === 'id' ? '✅ Membuka WhatsApp...' : '✅ 正在打开 WhatsApp...');
+                Utils.toast.success(Utils.lang === 'id' ? 'Membuka WhatsApp...' : '正在打开 WhatsApp...');
             } catch (error) {
                 console.error("sendWAReminder error:", error);
                 Utils.toast.error(Utils.lang === 'id' ? 'Gagal mengirim pengingat' : '发送提醒失败');
