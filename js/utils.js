@@ -1,6 +1,5 @@
 // utils.js - v2.0 统一重构版
-// 基础工具模块，挂载到 JF.Utils，保留 window.Utils 别名
-
+// 基础工具模块，挂载到 JF.Utils
 'use strict';
 
 (function () {
