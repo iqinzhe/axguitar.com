@@ -1,5 +1,4 @@
 // audit.js - v2.0 统一审计日志模块 (JF 命名空间)
-// 挂载到 JF.Audit，保留 window.Audit 别名
 
 'use strict';
 
