@@ -256,6 +256,7 @@
     padding: 5px 15px;
     border-top: 1px solid rgba(14, 116, 144, 0.2);
 }
+
 .lang-toggle {
     display: flex;
     flex-direction: column;
@@ -265,18 +266,31 @@
     padding: 4px;
     gap: 4px;
 }
+
 .lang-btn-side {
     display: block;
-    padding: 3px 10px;
+    padding: 2px 10px; /* ↓ 原来是 3px → 压缩上下间距 */
     text-align: center;
     border-radius: 5px;
     background: transparent;
     border: 1px solid transparent;
-    transition: background 0.2s;
+    transition: background 0.2s, transform 0.1s;
     cursor: pointer;
     font-size: 0.8rem;
-    color: #475569;
+    color: #334155; /* ↑ 提高对比度 */
 }
+
+/* hover 状态（新增） */
+.lang-btn-side:hover {
+    background: rgba(14, 116, 144, 0.2);
+}
+
+/* 点击反馈（新增） */
+.lang-btn-side:active {
+    transform: scale(0.98);
+}
+
+/* 激活状态 */
 .lang-btn-side.active-lang {
     background: rgba(14, 116, 144, 0.35);
     color: #0e7490;
