@@ -1,4 +1,4 @@
-// app-capital.js - v2.2 (修复版：完善利润再投入页面)
+// app-capital.js -  v2.0 (JF 命名空间) 
 // 包含：资本注入、利润再投入、资金占用报告、资金健康度评估
 
 'use strict';
