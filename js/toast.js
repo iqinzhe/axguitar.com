@@ -1,5 +1,5 @@
 // toast.js - v2.0 统一重构版
-// Toast 通知与确认系统，挂载到 JF.Toast，保留 window.Toast
+// Toast 通知与确认系统
 
 'use strict';
 
