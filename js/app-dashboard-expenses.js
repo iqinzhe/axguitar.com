@@ -336,10 +336,10 @@
                         ? `${lang === 'id' ? 'naik' : '增加'} ${Utils.formatCurrency(diff)}`
                         : `${lang === 'id' ? 'turun' : '减少'} ${Utils.formatCurrency(Math.abs(diff))}`;
                     Utils.toast.success(lang === 'id' 
-                        ? `✅ Pengeluaran berhasil diubah (${diffText})`
-                        : `✅ 支出已修改 (${diffText})`);
+                        ? `Pengeluaran berhasil diubah (${diffText})`
+                        : `支出已修改 (${diffText})`);
                 } else {
-                    Utils.toast.success(lang === 'id' ? '✅ Pengeluaran berhasil diubah' : '✅ 支出已修改');
+                    Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
                 }
                 
                 ExpensesPage.closeEditExpenseModal();
@@ -391,7 +391,7 @@
                 // 使用新增的方法同步删除现金流
                 await SUPABASE.deleteExpenseWithCashFlow(expenseId);
                 
-                Utils.toast.success(lang === 'id' ? '✅ Pengeluaran dan arus kas terkait telah dihapus' : '✅ 支出及关联现金流已删除');
+                Utils.toast.success(lang === 'id' ? 'Pengeluaran dan arus kas terkait telah dihapus' : '支出及关联现金流已删除');
                 await ExpensesPage.showExpenses();
             } catch (error) {
                 console.error("deleteExpense error:", error);
@@ -453,8 +453,8 @@
                     reconciled_by: profile?.id || null
                 }).gte('expense_date', startDate).lte('expense_date', endDate).eq('is_reconciled', false);
                 const successMsg = lang === 'id'
-                    ? `✅ Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.`
-                    : `✅ 平账完成！已平账 ${count} 条支出记录。`;
+                    ? `Rekonsiliasi selesai! ${count} pengeluaran telah direkonsiliasi.`
+                    : `平账完成！已平账 ${count} 条支出记录。`;
                 Utils.toast.success(successMsg);
                 await ExpensesPage.showExpenses();
             } catch (error) {
@@ -488,5 +488,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.2 修复完成（支出编辑/删除同步现金流）');
+    console.log('✅ JF.ExpensesPage v2.2 修复完成（支出编辑/删除同步现金流，Toast图标清理）');
 })();
