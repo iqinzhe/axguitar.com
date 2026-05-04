@@ -1,4 +1,4 @@
-// auth.js - v2.0 统一认证模块 (JF 命名空间)
+// auth.js - v2.1 统一认证模块 (JF 命名空间) - 修复 Token 刷新失败处理
 
 'use strict';
 
@@ -97,15 +97,6 @@
             this._setLockedUntil(lockedUntil);
         },
 
-        // 跨标签页同步 - 监听 storage 事件
-        _initStorageSync() {
-            window.addEventListener('storage', (e) => {
-                if (e.key === 'jf_login_attempts' || e.key === 'jf_locked_until') {
-                    console.log('[Auth] 登录锁定状态已同步');
-                }
-            });
-        },
-
         // ==================== 记住我功能 ====================
         _rememberMeKey: 'jf_remember_me',
 
@@ -121,8 +112,54 @@
             }
         },
 
-        // ==================== 初始化 ====================
+        // ==================== 【修复】强制清除认证状态 ====================
+        async forceClearAuth() {
+            console.log('[Auth] 强制清除认证状态');
+            this.user = null;
+            SUPABASE.clearCache();
+            
+            // 清除所有 Supabase 存储的 token
+            try {
+                // 尝试清除 localStorage
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (
+                        key.startsWith('supabase.auth.') ||
+                        key.startsWith('sb-') ||
+                        key.includes('token')
+                    )) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+                
+                // 尝试清除 sessionStorage
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key && (
+                        key.startsWith('supabase.auth.') ||
+                        key.startsWith('sb-')
+                    )) {
+                        sessionStorage.removeItem(key);
+                    }
+                }
+            } catch (e) {
+                console.warn('[Auth] 清除存储失败:', e.message);
+            }
+            
+            // 尝试登出 Supabase（忽略错误）
+            try {
+                await SUPABASE.getClient().auth.signOut();
+            } catch (e) {
+                console.warn('[Auth] Supabase signOut 失败:', e.message);
+            }
+        },
+
+        // ==================== 【修复】初始化 ====================
         async init() {
+            console.log('[Auth] 初始化认证模块...');
+            
             // 初始化网络监控（如果存在）
             if (Utils.NetworkMonitor && !Utils.NetworkMonitor._initialized) {
                 Utils.NetworkMonitor.init();
@@ -133,27 +170,64 @@
                 this._initLegacyNetworkListener();
             }
 
-            this._initStorageSync();
-
             try {
                 await this.loadCurrentUser();
+                if (this.user) {
+                    console.log('[Auth] 用户已登录:', this.user.name);
+                } else {
+                    console.log('[Auth] 用户未登录');
+                }
             } catch (e) {
-                console.warn('Auth init error (user not logged in):', e.message);
-                this.user = null;
+                console.warn('[Auth] 加载用户失败，清除认证状态:', e.message);
+                // 【修复】加载失败时强制清除
+                await this.forceClearAuth();
             }
 
+            // 【修复】监听认证状态变化
             const client = SUPABASE.getClient();
-            client.auth.onAuthStateChange((event) => {
-                if (event === 'SIGNED_OUT') {
+            client.auth.onAuthStateChange(async (event, session) => {
+                console.log('[Auth] 认证状态变化:', event);
+                
+                if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+                    console.log('[Auth] 用户已登出或被删除');
                     this.user = null;
                     SUPABASE.clearCache();
-                } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-                    SUPABASE.clearCache();
-                    this.loadCurrentUser();
+                    
+                    // 如果当前不在登录页，跳转到登录页
+                    if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
+                        await JF.DashboardCore.renderLogin();
+                    }
+                } else if (event === 'TOKEN_REFRESHED') {
+                    if (session) {
+                        console.log('[Auth] Token 已刷新');
+                        SUPABASE.clearCache();
+                        try {
+                            await this.loadCurrentUser();
+                        } catch (e) {
+                            console.warn('[Auth] Token 刷新后加载用户失败:', e.message);
+                            await this.forceClearAuth();
+                            if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
+                                await JF.DashboardCore.renderLogin();
+                            }
+                        }
+                    } else {
+                        // 【修复】Token 刷新失败，没有 session
+                        console.warn('[Auth] Token 刷新失败，清除认证状态');
+                        await this.forceClearAuth();
+                        if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
+                            await JF.DashboardCore.renderLogin();
+                        }
+                    }
+                } else if (event === 'INITIAL_SESSION') {
+                    if (!session) {
+                        console.log('[Auth] 初始会话为空，用户未登录');
+                        this.user = null;
+                    }
                 }
             });
 
             this._bindEnterKeyLogin();
+            console.log('[Auth] 认证模块初始化完成');
         },
 
         // 降级方案：原有简单网络监听
@@ -226,6 +300,8 @@
         // ==================== 登录逻辑 ====================
         async login(usernameOrEmail, password) {
             try {
+                console.log('[Auth] 开始登录:', usernameOrEmail);
+                
                 // 1. 检查锁定状态
                 if (this._isLocked(usernameOrEmail)) return null;
 
@@ -241,11 +317,14 @@
                     return null;
                 }
 
-                // 3. 登录
+                // 3. 登录前先清除旧的认证状态，避免 token 冲突
+                await this.forceClearAuth();
+
+                // 4. 登录
                 const result = await SUPABASE.login(usernameOrEmail, password);
 
                 if (!result || result.error) {
-                    console.error('Login error:', result?.error);
+                    console.error('[Auth] 登录失败:', result?.error);
                     this._recordLoginFailure(usernameOrEmail);
                     Utils.toast.error(Utils.lang === 'id'
                         ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah')
@@ -256,19 +335,21 @@
                     return null;
                 }
 
-                // 4. 重置失败计数
+                // 5. 重置失败计数
                 this._resetLoginFailure(usernameOrEmail);
 
-                // 5. 加载资料
+                // 6. 加载资料
                 await this.loadCurrentUser();
 
                 if (!this.user) {
-                    console.error('Failed to load user profile after login');
+                    console.error('[Auth] 登录后加载用户资料失败');
                     Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败', 4000);
                     return null;
                 }
 
-                // 6. 检查门店状态
+                console.log('[Auth] 登录成功:', this.user.name);
+
+                // 7. 检查门店状态
                 if (this.user.store_id) {
                     try {
                         const storeStatus = await SUPABASE.checkStoreStatus(this.user.store_id);
@@ -280,40 +361,59 @@
                             return null;
                         }
                     } catch (e) {
-                        console.warn('检查门店状态失败:', e.message);
+                        console.warn('[Auth] 检查门店状态失败:', e.message);
                     }
                 }
 
-                // 7. 审计
+                // 8. 审计
                 if (window.Audit) {
                     await window.Audit.logLoginSuccess(this.user.id, this.user.name);
                 }
 
                 return this.user;
             } catch (error) {
-                console.error('LOGIN ERROR:', error);
+                console.error('[Auth] 登录异常:', error);
                 this._recordLoginFailure(usernameOrEmail);
                 Utils.toast.error(Utils.lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误', 4000);
                 return null;
             }
         },
 
+        // ==================== 【修复】加载当前用户 ====================
         async loadCurrentUser() {
             try {
-                this.user = (await SUPABASE.getCurrentProfile()) || null;
+                const profile = await SUPABASE.getCurrentProfile();
+                if (profile) {
+                    this.user = profile;
+                    console.log('[Auth] 用户资料已加载:', profile.name);
+                } else {
+                    this.user = null;
+                    console.log('[Auth] 无用户资料');
+                }
             } catch (e) {
-                console.warn('loadCurrentUser error:', e.message);
+                console.warn('[Auth] loadCurrentUser 失败:', e.message);
                 this.user = null;
+                // 【修复】加载失败时不清除 token，因为可能是网络问题
+                // 只有在确认是 token 无效时才清除
             }
         },
 
         async logout() {
+            console.log('[Auth] 执行登出');
             if (this.user && window.Audit) {
-                await window.Audit.logLogout(this.user.id, this.user.name);
+                await window.Audit.logLogout(this.user.id, this.user.name).catch(() => {});
             }
             this._clearAllLoginFailures();
             this.user = null;
-            await SUPABASE.logout();
+            
+            try {
+                await SUPABASE.logout();
+            } catch (e) {
+                console.warn('[Auth] Supabase logout 失败:', e.message);
+            }
+            
+            // 清除本地存储
+            await this.forceClearAuth();
         },
 
         async getAllUsers() { return await SUPABASE.getAllUsers(); },
@@ -500,5 +600,5 @@
     JF.Auth = AUTH;
     window.AUTH = AUTH; // 向下兼容
 
-    console.log('✅ JF.Auth v2.0 初始化完成');
+    console.log('✅ JF.Auth v2.1 初始化完成（修复 Token 刷新失败处理）');
 })();
