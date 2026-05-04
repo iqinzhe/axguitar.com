@@ -983,48 +983,48 @@
         width: 100%;
     }
     
-    /* 重置所有直接子元素的 order，避免历史干扰 */
-    .dash-main > * {
-        order: 0;
-    }
-    
-    /* 
-       重新排序（按照需求）：
-       1. 消息中心 
-       2. 快捷操作 
-       3. 收入构成 
-       4. 其他区域（KPI行、中间行、资金结构、现金银行行、转账按钮、利用率条等）
-       5. 订单状态分布（最底部）
-    */
-    .message-center-card {
-        order: 1 !important;
-    }
-    .quick-card {
-        order: 2 !important;
-    }
-    .income-card {
-        order: 3 !important;
-    }
-    /* 其他区域统一 order 4 */
-    .kpi-row,
-    .mid-row:not(:has(.income-card)),  /* 排除已单独处理的 income 所在父级 */
-    .fund-flow-card,
-    .cash-bank-row,
-    .transfer-row-v2,
-    .util-bar-wrap,
-    .profit-distribution-grid {
-        order: 4 !important;
-    }
-    /* 订单状态分布置底 */
-    .order-status-card {
-        order: 999 !important;
-        margin-top: 10px;
-    }
-    
-    /* 关键：让 .bottom-row 不再作为网格容器，使其子元素直接参与 .dash-main 的 flex 排序 */
-    .bottom-row {
-        display: contents !important;
-    }
+   /* 重置所有直接子元素的 order，避免历史干扰 */
+.dash-main > * {
+    order: 0;
+}
+
+/* 
+   重新排序（按照需求）：
+   1. 消息中心 
+   2. 快捷操作 
+   3. 收入构成 
+   4. 其他区域（KPI行、中间行、资金结构、现金银行等）
+   5. 订单状态分布（最底部）
+*/
+.message-center-card {
+    order: 1 !important;
+}
+.quick-card {
+    order: 2 !important;
+}
+.income-card {
+    order: 3 !important;
+}
+/* 其他所有内容统一 order 4（不再使用 :has()） */
+.kpi-row,
+.mid-row,
+.fund-flow-card,
+.cash-bank-row,
+.transfer-row-v2,
+.util-bar-wrap,
+.profit-distribution-grid {
+    order: 4 !important;
+}
+/* 订单状态分布置底 */
+.order-status-card {
+    order: 999 !important;
+    margin-top: 10px;
+}
+
+/* 让 .bottom-row 不再作为网格容器，其子元素直接参与排序 */
+.bottom-row {
+    display: contents !important;
+}
     
     /* KPI 卡片双列展示 */
     .kpi-row {
