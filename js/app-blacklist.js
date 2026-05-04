@@ -1,5 +1,4 @@
-// app-blacklist.js - v2.0 (JF 命名空间) - 类名重构
-// 黑名单管理页面模块，挂载到 JF.BlacklistPage
+// app-blacklist.js - v2.0 (JF 命名空间) 
 
 'use strict';
 
