@@ -91,17 +91,18 @@
     font-weight: 400;
 }
 
-/* 用户信息 —— 修复：强制一行排列 */
+/* 用户信息 —— 修复：徽章与用户名水平对齐 + 减少拥挤 */
 .sidebar-user {
-    padding: 10px 16px;
+    padding: 8px 16px;          /* 上下稍收紧，不拥挤 */
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
     display: flex;
-    align-items: center;
+    align-items: center;        /* 头像和文本容器保持居中 */
     gap: 8px;
-    flex-wrap: nowrap;           /* 禁止换行 */
-    overflow-x: auto;            /* 如果内容过多，允许水平滚动 */
+    flex-wrap: nowrap;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
+
 .user-av {
     width: 30px;
     height: 30px;
@@ -115,11 +116,13 @@
     color: #fff;
     flex-shrink: 0;
 }
-/* 包含用户名和角色的容器 */
+
+/* 用户名 + 角色的容器 */
 .sidebar-user > div:first-of-type {
     flex: 1;
-    min-width: 0;                /* 允许收缩 */
+    min-width: 0;
 }
+
 .user-name {
     font-size: 0.8rem;
     font-weight: 600;
@@ -128,24 +131,30 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.3;           /* 固定行高便于对齐 */
 }
+
 .user-role {
     font-size: 0.65rem;
     color: #475569;
     margin: 0;
-    white-space: nowrap;         /* 角色文本不换行 */
+    white-space: nowrap;
+    line-height: 1.3;
 }
+
+/* 关键修复：门店徽章与用户名水平对齐，不再上下漂浮 */
 .user-badge {
     background: rgba(14, 116, 144, 0.2);
     border: 1px solid rgba(14, 116, 144, 0.35);
     color: #0e7490;
     font-size: 0.58rem;
-    padding: 2px 6px;
-    border-radius: 10px;
+    padding: 2px 8px;           /* 左右稍宽，阅读更舒服 */
+    border-radius: 12px;        /* 更圆润一点 */
     font-weight: 600;
-    white-space: nowrap;         /* 门店名称不换行 */
+    white-space: nowrap;
     flex-shrink: 0;
-    margin-left: auto;           /* 徽章靠右，保持一行 */
+    align-self: flex-start;     /* 徽章靠上，与用户名第一行对齐 */
+    margin-top: 2px;            /* 微调视觉，与「Administrator」完美水平 */
 }
 
 /* 导航菜单 */
