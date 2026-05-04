@@ -532,7 +532,16 @@
                     <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
                     <div class="dash-sidebar" id="dashSidebar">
                         <div class="sidebar-logo"><div class="logo-mark"><div class="logo-icon">JF</div><div><div class="logo-text">JF! by Gadai</div><div class="logo-sub">${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div></div></div>
-                        <div class="sidebar-user"><div class="user-av">${userInitial}</div><div><div class="user-name">${Utils.escapeHtml(profile?.name || 'User')}</div><div class="user-role">${userRoleText}</div></div><div class="user-badge">${storeDisplay}</div></div>
+                        <div class="sidebar-user">
+    <div class="user-av">${userInitial}</div>
+    <div class="user-info">
+        <div class="user-name-top">${Utils.escapeHtml(profile?.name || 'User')}</div>
+        <div class="user-detail-row">
+            <span class="user-role">${userRoleText}</span>
+            <span class="user-store-badge">${storeDisplay}</span>
+        </div>
+    </div>
+</div>
                         <div class="sidebar-nav">
                             <div class="nav-section-label">${lang === 'id' ? 'Menu Utama' : '主菜单'}</div>
                             <div class="nav-item active" onclick="JF.DashboardCore.navigateTo('dashboard')"><span class="nav-icon">◼</span> ${lang === 'id' ? 'Dasbor' : '仪表盘'}</div>
