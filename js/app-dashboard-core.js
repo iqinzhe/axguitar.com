@@ -1,4 +1,5 @@
-// app-dashboard-core.js - v3.2 (JF 命名空间) 
+// app-dashboard-core.js - v3.3 (JF 命名空间) 
+// 修复：认证失败时不恢复页面，直接显示登录页
 // 新增消息中心卡片 + 三列布局
 
 'use strict';
@@ -61,9 +62,10 @@
     const DashboardCore = {
         currentFilter: "all",
         historyStack: [],
-        currentPage: "dashboard",
+        currentPage: "login",    // 【修复】初始状态改为 login，避免误恢复
         currentOrderId: null,
         currentCustomerId: null,
+        _isInitialized: false,   // 【修复】新增初始化完成标志
 
         // ========== 清理残留遮罩层 ==========
         _cleanupOverlays() {
@@ -81,12 +83,15 @@
             modals.forEach(modal => modal.remove());
             document.body.style.overflow = '';
             document.body.style.position = '';
-            console.log('[DashboardCore] 遮罩层清理完成');
         },
 
         // ---------- 页面状态持久化 ----------
         saveCurrentPageState() {
             try {
+                // 【修复】只有在已登录且非登录页时才保存
+                if (!AUTH.isLoggedIn() || this.currentPage === 'login') {
+                    return;
+                }
                 sessionStorage.setItem('jf_current_page', this.currentPage);
                 sessionStorage.setItem('jf_current_filter', this.currentFilter);
                 if (this.currentOrderId) sessionStorage.setItem('jf_current_order_id', this.currentOrderId);
@@ -108,7 +113,10 @@
                 let orderId = sessionStorage.getItem('jf_current_order_id') || localStorage.getItem('jf_last_order_id');
                 let customerId = sessionStorage.getItem('jf_current_customer_id') || localStorage.getItem('jf_last_customer_id');
                 const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist'];
-                if (page && validPages.includes(page) && page !== 'login') return { page, filter, orderId, customerId };
+                // 【修复】只有确认登录后才恢复，排除 login 页
+                if (page && validPages.includes(page) && AUTH.isLoggedIn()) {
+                    return { page, filter, orderId, customerId };
+                }
                 return { page: null, filter: "all", orderId: null, customerId: null };
             } catch (e) { return { page: null, filter: "all", orderId: null, customerId: null }; }
         },
@@ -159,6 +167,13 @@
 
         // ========== 刷新当前页面 ==========
         async refreshCurrentPage() {
+            // 【修复】如果未登录，直接显示登录页
+            if (!AUTH.isLoggedIn()) {
+                console.log('[DashboardCore] 用户未登录，显示登录页');
+                await this.renderLogin();
+                return;
+            }
+            
             this._cleanupOverlays();
             await this._ensureShell();
             await this._updateSidebarActive();
@@ -221,23 +236,8 @@
                     }
                 } else if (page === 'payment' && this.currentOrderId) {
                     if (JF.PaymentPage && typeof JF.PaymentPage.showPayment === 'function') {
-                        const originalApp = document.getElementById('app');
-                        const mockDiv = document.createElement('div');
-                        mockDiv.id = 'mock-payment';
-                        document.body.appendChild(mockDiv);
-                        const originalHtml = originalApp.innerHTML;
-                        originalApp.innerHTML = '';
-                        const originalShow = JF.PaymentPage.showPayment;
-                        JF.PaymentPage.showPayment = async (oid) => {
-                            await originalShow.call(JF.PaymentPage, oid);
-                            const content = mockDiv.innerHTML;
-                            mockDiv.remove();
-                            originalApp.innerHTML = originalHtml;
-                            return content;
-                        };
-                        contentHtml = await JF.PaymentPage.showPayment(this.currentOrderId);
-                        JF.PaymentPage.showPayment = originalShow;
-                        originalApp.innerHTML = originalHtml;
+                        await JF.PaymentPage.showPayment(this.currentOrderId);
+                        return;
                     }
                 } else if (page === 'customerOrders' && this.currentCustomerId) {
                     if (JF.CustomersPage && typeof JF.CustomersPage.buildCustomerOrdersHTML === 'function') {
@@ -325,6 +325,13 @@
 
         // ========== 路由和导航 ==========
         navigateTo(page, params) {
+            // 【修复】如果未登录，不允许导航到非登录页
+            if (!AUTH.isLoggedIn() && page !== 'login') {
+                console.log('[DashboardCore] 用户未登录，重定向到登录页');
+                this.renderLogin();
+                return;
+            }
+            
             this._cleanupOverlays();
             window.scrollTo(0, 0);
             this.historyStack.push({
@@ -362,13 +369,19 @@
 
         // ========== 仪表盘渲染（核心） ==========
         async originalRenderDashboard() {
+            // 【修复】如果未登录，显示登录页
+            if (!AUTH.isLoggedIn()) {
+                console.log('[DashboardCore] 用户未登录，显示登录页');
+                await this.renderLogin();
+                return;
+            }
+            
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
             this._cleanupOverlays();
 
-         // 【关键】立即显示完整骨架屏，覆盖整个页面
+            // 【关键】立即显示完整骨架屏，覆盖整个页面
             const appDiv = document.getElementById("app");
-            const showSkeletonTime = Date.now();  // 记录显示时间
             if (appDiv && !appDiv.innerHTML.includes('dashboard-skeleton')) {
                 appDiv.innerHTML = Utils.renderSkeleton('dashboard');
             }
@@ -821,6 +834,11 @@
         },
 
         async renderDashboard() {
+            // 【修复】检查登录状态
+            if (!AUTH.isLoggedIn()) {
+                await this.renderLogin();
+                return;
+            }
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
             this._cleanupOverlays();
@@ -835,6 +853,8 @@
             this.currentPage = 'login';
             this.clearPageState();
             this._cleanupOverlays();
+            this._clearOverdueInterval();  // 【修复】清理逾期定时器
+            
             const lang = Utils.lang;
             document.getElementById("app").innerHTML = `
                 <div class="login-container"><div class="login-box"><div class="lang-toggle"><button onclick="APP.toggleLanguage()" class="btn btn--outline">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button></div><div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;"><img src="icons/pagehead-logo.png" alt="JF!" style="height:36px;"><h2 class="login-title" style="margin:0;">JF! by Gadai</h2></div><h3>${Utils.t('login')}</h3><div id="loginError" class="info-bar danger" style="display:none;margin-bottom:16px;"><span class="info-bar-icon">⚠️</span><div class="info-bar-content" id="loginErrorMessage"></div></div><div class="form-group"><label>${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label><input id="username" placeholder="email@domain.com" autocomplete="username"></div><div class="form-group" style="position:relative;"><label>${Utils.t('password')}</label><input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password"><span onclick="Utils.togglePasswordVisibility('password', this)" style="position:absolute;right:12px;top:38px;cursor:pointer;font-size:18px;">👁️</span></div><div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;"><input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer;"><label for="rememberMe" style="cursor:pointer;">${lang === 'id' ? 'Ingat saya' : '记住我'}</label></div><button onclick="APP.login()" id="loginBtn" class="btn btn--primary btn--block">${Utils.t('login')}</button><p class="login-note">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p></div></div>`;
@@ -853,16 +873,35 @@
                 if (errorDiv) errorDiv.style.display = 'none';
                 if (!username || !password) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.t('fill_all_fields'); } return; }
                 if (btn) { btn.disabled = true; btn.textContent = '...'; }
+                
+                // 【修复】设置记住我
                 AUTH.setRememberMe(rememberMe);
+                if (rememberMe) {
+                    localStorage.setItem('jf_remembered_user', username);
+                } else {
+                    localStorage.removeItem('jf_remembered_user');
+                }
+                
                 const user = await AUTH.login(username, password);
                 if (!user) {
                     if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.lang === 'id' ? 'Login gagal. Periksa kembali email/username dan password Anda.' : '登录失败，请检查邮箱/用户名和密码。'; }
                     if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); }
                     return;
                 }
+                // 【修复】登录成功，清除恢复状态
+                this.clearPageState();
+                this._isInitialized = true;
+                this._startOverdueInterval();
                 await this.renderDashboard();
+            } catch (error) {
+                console.error('[DashboardCore] 登录异常:', error);
+                const errorDiv = document.getElementById("loginError");
+                const errorMsg = document.getElementById("loginErrorMessage");
+                if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = error.message || Utils.t('login_failed'); }
             } finally {
                 this._loginLock = false;
+                const btn = document.getElementById("loginBtn");
+                if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); }
             }
         },
 
@@ -872,6 +911,7 @@
             if (!confirmed) return;
             this.clearPageState();
             sessionStorage.clear();
+            this._isInitialized = false;  // 【修复】重置初始化状态
             await AUTH.logout();
             await this.renderLogin();
         },
@@ -891,9 +931,15 @@
             appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;margin:20px;"><div class="loader" style="margin:20px auto;"></div><p>' + loadingText + '</p></div>';
             setTimeout(async () => {
                 try {
-                    if (AUTH.isLoggedIn()) await this.refreshCurrentPage();
-                    else await this.renderLogin();
-                } catch (err) { appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Pemulihan gagal, muat ulang halaman.' : '恢复失败，请刷新页面。') + '</p><button onclick="location.reload()" class="btn btn--primary" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>'; }
+                    // 【修复】先检查登录状态
+                    if (AUTH.isLoggedIn()) {
+                        await this.refreshCurrentPage();
+                    } else {
+                        await this.renderLogin();
+                    }
+                } catch (err) { 
+                    appDiv.innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Pemulihan gagal, muat ulang halaman.' : '恢复失败，请刷新页面。') + '</p><button onclick="location.reload()" class="btn btn--primary" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>'; 
+                }
             }, 100);
         },
 
@@ -903,29 +949,65 @@
             Utils.toast.info(Utils.lang === 'id' ? 'Cache dihapus, data diperbarui' : '缓存已清除，数据已刷新', 2000);
         },
 
+        // ========== 【修复】初始化方法 ==========
         async init() {
+            console.log('[DashboardCore] 开始初始化...');
             ModuleFallback.clearAll();
             document.getElementById("app").innerHTML = Utils.renderSkeleton('default');
+            
             try {
+                // 1. 初始化认证模块
                 await AUTH.init();
+                
+                // 2. 【关键修复】检查登录状态
+                if (!AUTH.isLoggedIn()) {
+                    console.log('[DashboardCore] 用户未登录，显示登录页面');
+                    await this.renderLogin();
+                    return;
+                }
+                
+                // 3. 用户已登录，检查是否有保存的页面状态
+                console.log('[DashboardCore] 用户已登录:', AUTH.user?.name);
+                
                 const saved = this.restorePageState();
-                if (saved.page && AUTH.isLoggedIn()) {
+                if (saved.page) {
+                    console.log('[DashboardCore] 恢复页面状态:', saved.page);
                     this.currentPage = saved.page;
                     this.currentOrderId = saved.orderId || null;
                     this.currentCustomerId = saved.customerId || null;
                     this.currentFilter = saved.filter || "all";
-                    await this.refreshCurrentPage();
-                } else if (AUTH.isLoggedIn()) {
-                    await this.renderDashboard();
+                    
+                    // 4. 验证恢复的页面是否需要登录
+                    if (this.currentPage !== 'login') {
+                        await this.refreshCurrentPage();
+                    } else {
+                        await this.renderDashboard();
+                    }
                 } else {
-                    await this.renderLogin();
+                    console.log('[DashboardCore] 无保存状态，显示仪表盘');
+                    await this.renderDashboard();
                 }
-                if (AUTH.isLoggedIn()) this._startOverdueInterval();
-                this._initSidebarCloseOnMain();
+                
+                // 5. 启动逾期更新定时器
+                this._startOverdueInterval();
+                this._isInitialized = true;
+                
             } catch (error) {
-                console.error("Init error:", error);
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat sistem' : '系统加载失败', 5000);
-                document.getElementById("app").innerHTML = '<div class="card" style="text-align:center;padding:40px;"><p>' + (Utils.lang === 'id' ? 'Gagal memuat sistem, silakan muat ulang.' : '系统加载失败，请刷新页面。') + '</p><button onclick="location.reload()" class="btn btn--primary" style="margin-top:12px;">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
+                console.error('[DashboardCore] 初始化异常:', error);
+                
+                // 【修复】初始化失败时，清除状态并显示登录页
+                try {
+                    await AUTH.forceClearAuth();
+                } catch (e) {
+                    console.warn('[DashboardCore] 清除认证状态失败:', e);
+                }
+                
+                this.clearPageState();
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat sistem, silakan login ulang' : '系统加载失败，请重新登录', 5000);
+                
+                setTimeout(() => {
+                    this.renderLogin();
+                }, 1000);
             }
         },
     };
@@ -965,5 +1047,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v3.2 已加载（三列布局 + 消息中心）');
+    console.log('✅ JF.DashboardCore v3.3 已加载（修复认证状态检查 + 三列布局 + 消息中心）');
 })();
