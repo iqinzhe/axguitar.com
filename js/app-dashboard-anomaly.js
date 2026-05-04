@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.1（完整版：三阶段逾期分类 + 排名 + 黑名单）
+// app-dashboard-anomaly.js - v2.0（三阶段逾期分类 + 排名 + 黑名单）
 
 'use strict';
 
