@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v3.1 修复版（遮罩层清理 + 侧边栏状态修复）
+// app-dashboard-core.js -  v2.0 (JF 命名空间) 
 'use strict';
 
 (function () {
