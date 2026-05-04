@@ -1,5 +1,4 @@
-// app-dashboard-funds.js - v2.1 (JF 命名空间) - 类名重构
-// 资金管理与转账模块，挂载到 JF.FundsPage
+// app-dashboard-funds.js -  v2.0 (JF 命名空间) 
 
 'use strict';
 
