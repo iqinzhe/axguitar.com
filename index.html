@@ -113,14 +113,6 @@
     } else {
         setTimeout(startApp, 100);
     }
-    
-    // 兜底：5秒后强制隐藏加载动画（防止卡死）
-    setTimeout(function() {
-        if (loadingOverlay && loadingOverlay.style.display !== 'none') {
-            console.warn('[Boot] 强制隐藏加载动画（超时）');
-            hideLoadingAndShowContent();
-        }
-    }, 5000);
 })();
 </script>
 
