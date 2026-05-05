@@ -665,7 +665,7 @@
     border: 1px solid #c8d8e8;
     box-shadow: 0 1px 3px rgba(14, 116, 144, 0.06);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
-    padding: 12px;
+    padding: 8px 12px;  /* 上下8px、左右12px */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
