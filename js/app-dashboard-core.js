@@ -135,6 +135,7 @@
         currentOrderId: null,
         currentCustomerId: null,
         _isInitialized: false,
+        _popStateNavigation: false,
 
         // ========== 清理残留遮罩层 ==========
         _cleanupOverlays() {
@@ -152,6 +153,113 @@
             modals.forEach(modal => modal.remove());
             document.body.style.overflow = '';
             document.body.style.position = '';
+        },
+
+        // ========== 全局键盘管理器 ==========
+        _initGlobalKeyboard() {
+            document.addEventListener('keydown', (e) => {
+                // 1. Esc — 统一关闭弹窗/侧边栏
+                if (e.key === 'Escape') {
+                    this._handleGlobalEsc();
+                    return;
+                }
+
+                // 2. Enter — 弹窗确认 / 搜索触发
+                if (e.key === 'Enter') {
+                    this._handleGlobalEnter(e);
+                    return;
+                }
+            });
+
+            // 3. 浏览器返回 — popstate 监听
+            window.addEventListener('popstate', (e) => {
+                if (this.historyStack.length === 0) return;
+                this._popStateNavigation = true;
+                this.goBack();
+            });
+
+            console.log('[Keyboard] 全局快捷键已就绪: Esc=关闭弹窗 | Enter=确认/搜索 | 浏览器返回=app内返回');
+        },
+
+        // ---------- Esc 处理 ----------
+        _handleGlobalEsc() {
+            // 优先级1: 关闭模态弹窗
+            const modal = document.querySelector('.modal-overlay');
+            if (modal) {
+                const closeBtn = modal.querySelector('button[onclick*="remove"]') ||
+                                 modal.querySelector('.confirm-cancel-btn') ||
+                                 modal.querySelector('[onclick*="close"]') ||
+                                 modal.querySelector('[onclick*="Close"]');
+                if (closeBtn) {
+                    closeBtn.click();
+                } else {
+                    modal.remove();
+                }
+                return;
+            }
+
+            // 优先级2: 关闭侧边栏
+            const sidebar = document.getElementById('dashSidebar');
+            if (sidebar && sidebar.classList.contains('open')) {
+                this._toggleSidebar();
+                return;
+            }
+
+            // 优先级3: 关闭 toast 确认弹窗
+            const confirmModal = document.querySelector('.confirm-modal-overlay');
+            if (confirmModal) {
+                const cancelBtn = confirmModal.querySelector('.confirm-cancel-btn');
+                if (cancelBtn) cancelBtn.click();
+                else confirmModal.remove();
+                return;
+            }
+        },
+
+        // ---------- Enter 处理 ----------
+        _handleGlobalEnter(e) {
+            // 情况1: toast 确认弹窗 → 触发"确认"
+            const confirmModal = document.querySelector('.confirm-modal-overlay');
+            if (confirmModal) {
+                const okBtn = confirmModal.querySelector('.confirm-ok-btn');
+                if (okBtn) okBtn.click();
+                return;
+            }
+
+            // 情况2: 登录页 → 触发表单提交
+            const loginBox = document.querySelector('.login-box');
+            if (loginBox) {
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn && !loginBtn.disabled) {
+                    e.preventDefault();
+                    loginBtn.click();
+                }
+                return;
+            }
+
+            // 情况3: 搜索/筛选输入框 → 触发对应搜索
+            const activeEl = document.activeElement;
+            if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'text') {
+                const id = activeEl.id || '';
+                if (id.includes('Filter') || id.includes('Search') || id.includes('search')) {
+                    const filterBtn = document.querySelector(`button[onclick*="${id}"]`) ||
+                                      activeEl.closest('.card')?.querySelector('button.btn--sm');
+                    if (filterBtn) {
+                        e.preventDefault();
+                        filterBtn.click();
+                    }
+                    return;
+                }
+                if (id.includes('Desc') || id.includes('desc')) {
+                    const parent = activeEl.closest('.modal-content') || activeEl.closest('.card') || document;
+                    const searchBtn = parent.querySelector('button[onclick*="Filter"]') ||
+                                      parent.querySelector('button[onclick*="filter"]');
+                    if (searchBtn) {
+                        e.preventDefault();
+                        searchBtn.click();
+                    }
+                    return;
+                }
+            }
         },
 
         // ---------- 页面状态持久化（升级为JSON对象）----------
@@ -434,6 +542,18 @@
                 if (params.customerId) this.currentCustomerId = params.customerId;
             }
             this.saveCurrentPageState();
+
+            // ======== 浏览器历史同步 ========
+            if (!this._popStateNavigation) {
+                window.history.pushState(
+                    { page, orderId: this.currentOrderId, customerId: this.currentCustomerId },
+                    '',
+                    window.location.href
+                );
+            }
+            this._popStateNavigation = false;
+            // ================================
+
             this.refreshCurrentPage().catch(err => {
                 console.error('导航失败', err);
                 this.renderDashboard();
@@ -449,6 +569,18 @@
                 this.currentCustomerId = prev.customerId || null;
                 this.currentFilter = prev.filter || "all";
                 this.saveCurrentPageState();
+
+                // ======== 浏览器历史同步 ========
+                if (!this._popStateNavigation) {
+                    window.history.pushState(
+                        { page: this.currentPage },
+                        '',
+                        window.location.href
+                    );
+                }
+                this._popStateNavigation = false;
+                // ================================
+
                 this.refreshCurrentPage();
             } else {
                 this.navigateTo('dashboard');
@@ -1012,7 +1144,6 @@
         async init() {
             console.log('[DashboardCore] 开始初始化...');
             ModuleFallback.clearAll();
-            document.getElementById("app").innerHTML = Utils.renderSkeleton('default');
             
             try {
                 await AUTH.init();
@@ -1024,6 +1155,10 @@
                 }
                 
                 console.log('[DashboardCore] 用户已登录:', AUTH.user?.name);
+
+                // ======== 初始化全局键盘监听和浏览器返回 ========
+                this._initGlobalKeyboard();
+                // ===================================================
 
                 const saved = this.restorePageState();
                 if (saved.page && saved.page !== 'login') {
@@ -1082,5 +1217,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.3.2 已修复 filter 验证 + 集成工作日历');
+    console.log('✅ JF.DashboardCore v2.3.2 已修复 filter 验证 + 集成工作日历 + 全局键盘(Esc/Enter/浏览器返回)');
 })();
