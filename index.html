@@ -21,10 +21,20 @@
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 </head>
 <body>
-<div id="app">
-    <div class="loading-container">
-        <div class="loader"></div>
-        <p class="loading-text" id="loadingStatus">Memuat sistem...</p>
+
+<!-- ========== 加载动画层（替换原骨架屏） ========== -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Memuat</div>
+</div>
+
+<!-- ========== 主内容区域 ========== -->
+<div class="dashboard-content" id="dashboardContent">
+    <div id="app">
+        <div class="loading-container" style="display: none;">
+            <div class="loader"></div>
+            <p class="loading-text" id="loadingStatus">Memuat sistem...</p>
+        </div>
     </div>
 </div>
 
@@ -62,23 +72,55 @@
 <script defer src="js/app.js"></script>
 
 <script>
-// 唯一的启动脚本
-(function boot() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => setTimeout(tryBoot, 300));
-    } else {
-        setTimeout(tryBoot, 300);
+// 加载动画控制 + 应用启动
+(function() {
+    'use strict';
+    
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const dashboardContent = document.getElementById('dashboardContent');
+    
+    // 隐藏加载动画，显示主内容
+    function hideLoadingAndShowContent() {
+        if (loadingOverlay) {
+            loadingOverlay.style.transition = 'opacity 0.3s ease';
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 300);
+        }
+        
+        if (dashboardContent) {
+            dashboardContent.classList.add('loaded');
+        }
     }
     
-    function tryBoot() {
+    // 启动应用（保留原有启动逻辑）
+    function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             console.log('[Boot] 启动应用');
             JF.DashboardCore.init();
+            // 应用启动后隐藏加载动画
+            setTimeout(hideLoadingAndShowContent, 100);
         } else {
-            console.warn('[Boot] DashboardCore 未就绪，1秒后重试');
-            setTimeout(tryBoot, 1000);
+            console.warn('[Boot] DashboardCore 未就绪，等待中...');
+            setTimeout(startApp, 200);
         }
     }
+    
+    // 页面加载完成后启动
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(startApp, 100));
+    } else {
+        setTimeout(startApp, 100);
+    }
+    
+    // 兜底：5秒后强制隐藏加载动画（防止卡死）
+    setTimeout(function() {
+        if (loadingOverlay && loadingOverlay.style.display !== 'none') {
+            console.warn('[Boot] 强制隐藏加载动画（超时）');
+            hideLoadingAndShowContent();
+        }
+    }, 5000);
 })();
 </script>
 
