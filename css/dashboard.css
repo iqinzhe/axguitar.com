@@ -687,7 +687,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 2px;
     cursor: pointer;
     transition: all 0.18s ease;
     text-decoration: none;
@@ -715,20 +715,8 @@
 .legend-count { font-size: var(--font-xl); font-weight: 700; font-family: var(--font-mono); color: #1a1a2e; }
 .legend-pct { font-size: var(--font-xs); color: #64748b; margin-top: 1px; }
 
-/* ===========================
-   九、侧边栏遮罩
-   ============================*/
-.sidebar-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 99;
-}
-.sidebar-overlay.active { display: block; }
-
 /* ==============================
-   十、消息中心卡片样式
+   九、消息中心卡片样式
    ============================*/
 .message-badge {
     background: #ef4444;
@@ -760,6 +748,18 @@
 .preview-item.urgent .preview-badge { background: #fee2e2; color: #dc2626; }
 .preview-more { text-align: center; font-size: 11px; color: #64748b; padding: 6px; cursor: pointer; }
 .preview-more:hover { color: #0e7490; text-decoration: underline; }
+
+/* ===========================
+   十、侧边栏遮罩
+   ============================*/
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+}
+.sidebar-overlay.active { display: block; }
 
 /* ==============================
    十一、桌面端对齐布局（44列系统 - 修复版）
