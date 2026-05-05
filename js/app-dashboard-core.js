@@ -766,6 +766,7 @@
                         { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "JF.DashboardCore.navigateTo('orderTable');setTimeout(function(){if(window.APP && APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
                         { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' },
                         { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
+                        ...(profile?.role === 'store_manager' ? [{ icon: '💸', label: lang === 'id' ? 'Distribusi Laba' : '收益处置', action: "JF.ProfitPage.showDistributionPage()", cls: '' }] : []),
                         { icon: '📦', label: t('backup_restore'), action: "JF.DashboardCore.navigateTo('backupRestore')", cls: '' },
                     ];
                 }
@@ -864,6 +865,7 @@
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeManagement')"><span class="nav-icon">🏪</span> ${t('store_management')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>` : `
                     <div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
+                    ${profile?.role === 'store_manager' ? `<div class="nav-item" onclick="JF.ProfitPage.showDistributionPage()"><span class="nav-icon">💸</span> ${lang === 'id' ? 'Distribusi Laba' : '收益处置'}</div>` : ''}
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>`}
                     <div style="flex:1;"></div>
