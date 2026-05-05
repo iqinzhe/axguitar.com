@@ -48,6 +48,10 @@
         align-items: stretch;
     }
 }
+/* 3. 隐藏快捷操作中的“备份恢复”按钮（保留侧边栏菜单） */
+    .quick-card .quick-btn[onclick*="backupRestore"] {
+        display: none !important;
+    }
 
 /* ============================================================
    二、手机端响应式（≤768px）
