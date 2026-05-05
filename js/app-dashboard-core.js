@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.3 修复闪烁与刷新页面丢失问题
+// app-dashboard-core.js - v2.3.1 集成工作日历
 
 'use strict';
 
@@ -55,6 +55,77 @@
     JF.ModuleFallback = ModuleFallback;
 
     let _overdueInterval = null;
+
+    // ========== 工作日历构建函数（新增） ==========
+    function buildWorkCalendarHTML(dueOrders, lang, dueMap) {
+        const today = Utils.getJakartaDate();
+        const year = today.getUTCFullYear();
+        const month = today.getUTCMonth(); // 0~11
+
+        const monthNames = lang === 'id'
+            ? ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
+            : ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+        const weekDays = lang === 'id'
+            ? ['Sen','Sel','Rab','Kam','Jum','Sab','Min']
+            : ['一','二','三','四','五','六','日'];
+
+        const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        const firstDay = new Date(Date.UTC(year, month, 1)).getUTCDay(); // 0=Sunday
+        const startIndex = (firstDay + 6) % 7; // 周一为0
+
+        if (!dueMap) {
+            dueMap = {};
+            dueOrders.forEach(o => {
+                const d = o.next_interest_due_date;
+                if (!d) return;
+                if (!dueMap[d]) dueMap[d] = [];
+                dueMap[d].push(o);
+            });
+        }
+
+        let tableRows = '<tr>';
+        for (let i = 0; i < 7; i++) {
+            tableRows += `<th>${weekDays[i]}</th>`;
+        }
+        tableRows += '</tr>';
+
+        let day = 1;
+        for (let r = 0; r < 6; r++) {
+            let row = '<tr>';
+            for (let c = 0; c < 7; c++) {
+                if (r === 0 && c < startIndex) {
+                    row += '<td></td>';
+                    continue;
+                }
+                if (day > totalDays) {
+                    row += '<td></td>';
+                    continue;
+                }
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                const ordersOnDay = dueMap[dateStr] || [];
+                const count = ordersOnDay.length;
+                let cellContent = `<span class="cal-date">${day}</span>`;
+                if (count > 0) {
+                    cellContent += `<span class="cal-due-count" data-date="${dateStr}" title="${count} ${lang==='id'?'pesanan':'orders'}">${count}</span>`;
+                }
+                row += `<td class="cal-cell${count>0?' has-due':''}">${cellContent}</td>`;
+                day++;
+            }
+            row += '</tr>';
+            tableRows += row;
+            if (day > totalDays) break;
+        }
+
+        return `
+            <div class="work-calendar">
+                <div class="calendar-header">${monthNames[month]} ${year}</div>
+                <table class="cal-table">
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </div>
+        `;
+    }
 
     // ========== DashboardCore 主模块 ==========
     const DashboardCore = {
@@ -419,13 +490,15 @@
                         else if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                         return q;
                     };
-                    const [totalRes, activeRes, completedRes, overdueRes, activeOrdersData, allOrdersData] = await Promise.all([
+                    const [totalRes, activeRes, completedRes, overdueRes, activeOrdersData, allOrdersData, dueOrdersRes] = await Promise.all([
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active'),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'completed'),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active').gte('overdue_days', 1),
                         applyFilter(client.from('orders').select('loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid')).eq('status', 'active'),
                         applyFilter(client.from('orders').select('loan_amount')),
+                        // 新增：获取所有活跃订单的下次还款日期
+                        applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active'))
                     ]);
                     let totalLoanActive = 0, adminFeesCollected = 0, serviceFeesCollected = 0, interestCollected = 0, principalCollected = 0;
                     for (const o of (activeOrdersData.data || [])) {
@@ -481,6 +554,7 @@
                         total_injected_capital: totalInjectedCapital,
                         deployed_capital: deployedCapital,
                         available_capital: totalInjectedCapital - deployedCapital,
+                        due_orders: dueOrdersRes.data || []  // 新增字段
                     };
                 }, { ttl: 3 * 60 * 1000 });
 
@@ -597,6 +671,42 @@
                     `;
                 }
 
+                // 工作日历数据准备
+                const dueOrders = report.due_orders || [];
+                const dueMap = {};
+                dueOrders.forEach(o => {
+                    const d = o.next_interest_due_date;
+                    if (!d) return;
+                    if (!dueMap[d]) dueMap[d] = [];
+                    dueMap[d].push(o);
+                });
+
+                // 构建 KPI 行（替换第四个卡片为日历）
+                const kpiRowHTML = `
+                <div class="kpi-row kpi-row--calendar">
+                    <div class="kpi-card kpi-card--blue">
+                        <div class="kpi-icon">📋</div>
+                        <div class="kpi-val">${totalOrders}</div>
+                        <div class="kpi-label">${lang === 'id' ? 'Total Pesanan' : '累计订单总数'}</div>
+                        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月新增 +'}${newThisMonth}</div>
+                    </div>
+                    <div class="kpi-card kpi-card--green">
+                        <div class="kpi-icon">💵</div>
+                        <div class="kpi-val green">${Utils.formatCurrency(report.total_loan_amount)}</div>
+                        <div class="kpi-label">${lang === 'id' ? 'Total Pinjaman' : '累计放贷总额'}</div>
+                        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月发放 +'}${Utils.formatCurrency(newLoanThisMonth)}</div>
+                    </div>
+                    <div class="kpi-card kpi-card--amber">
+                        <div class="kpi-icon">🔄</div>
+                        <div class="kpi-val green">${activeOrders}</div>
+                        <div class="kpi-label">${lang === 'id' ? 'Pesanan Aktif' : '活跃在押订单'}</div>
+                        ${overdueOrders > 0 ? `<div class="kpi-trend down">${lang === 'id' ? 'Terlambat' : '逾期'} ${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'} ⚠️</div>` : `<div class="kpi-trend">${lang === 'id' ? 'Semua normal' : '全部正常'} ✅</div>`}
+                    </div>
+                    <div class="kpi-card kpi-card--calendar">
+                        ${buildWorkCalendarHTML(dueOrders, lang, dueMap)}
+                    </div>
+                </div>`;
+
                 const finalHtml = `
         <div class="dashboard-v2">
             <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
@@ -640,32 +750,7 @@
                 <div class="topbar-right">${overdueOrders > 0 ? `<div class="btn btn--warning" onclick="JF.DashboardCore.navigateTo('anomaly')">⚠️</div>` : ''}<div class="topbar-store-badge">${storeDisplay} · ${userRoleText}</div><div class="btn btn--outline" onclick="JF.DashboardCore.invalidateDashboardCache()">🔄</div></div>
             </div>
             <div class="dash-main">
-                <div class="kpi-row">
-                    <div class="kpi-card kpi-card--blue">
-                        <div class="kpi-icon">📋</div>
-                        <div class="kpi-val">${totalOrders}</div>
-                        <div class="kpi-label">${lang === 'id' ? 'Total Pesanan' : '累计订单总数'}</div>
-                        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月新增 +'}${newThisMonth}</div>
-                    </div>
-                    <div class="kpi-card kpi-card--green">
-                        <div class="kpi-icon">💵</div>
-                        <div class="kpi-val green">${Utils.formatCurrency(report.total_loan_amount)}</div>
-                        <div class="kpi-label">${lang === 'id' ? 'Total Pinjaman' : '累计放贷总额'}</div>
-                        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月发放 +'}${Utils.formatCurrency(newLoanThisMonth)}</div>
-                    </div>
-                    <div class="kpi-card kpi-card--amber">
-                        <div class="kpi-icon">🔄</div>
-                        <div class="kpi-val amber">${activeOrders}</div>
-                        <div class="kpi-label">${lang === 'id' ? 'Pesanan Aktif' : '活跃在押订单'}</div>
-                        ${overdueOrders > 0 ? `<div class="kpi-trend down">${lang === 'id' ? 'Terlambat' : '逾期'} ${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'} ⚠️</div>` : `<div class="kpi-trend">${lang === 'id' ? 'Semua normal' : '全部正常'} ✅</div>`}
-                    </div>
-                    <div class="kpi-card kpi-card--green">
-                        <div class="kpi-icon">✅</div>
-                        <div class="kpi-val green">${completedOrders}</div>
-                        <div class="kpi-label">${lang === 'id' ? 'Sudah Ditebus' : '已完成赎回'}</div>
-                        <div class="kpi-trend">${lang === 'id' ? 'Tingkat Selesai' : '完成率'} ${completionRate}%</div>
-                    </div>
-                </div>
+                ${kpiRowHTML}
                 <div class="mid-row">
                     <div class="fund-flow-card">
                         <div class="card-header"><div class="card-title">💰 ${lang === 'id' ? 'Struktur Dana' : '资金结构总览'}</div></div>
@@ -776,6 +861,44 @@
                         .kpi-card:nth-child(2) { animation-delay: 0.05s; } .kpi-card:nth-child(3) { animation-delay: 0.10s; } .kpi-card:nth-child(4) { animation-delay: 0.15s; }
                     `;
                     document.head.appendChild(style);
+                }
+
+                // 绑定日历点击事件
+                const dashMain = document.querySelector('.dash-main');
+                if (dashMain) {
+                    dashMain.addEventListener('click', function(e) {
+                        const target = e.target.closest('.cal-due-count');
+                        if (!target) return;
+                        e.stopPropagation();
+                        const date = target.dataset.date;
+                        const orders = dueMap[date];
+                        if (!orders || !orders.length) return;
+                        let listHtml = `<div class="cal-popup" id="calPopup"><div class="cal-popup-title">📅 ${Utils.formatDate(date)}</div><ul>`;
+                        orders.forEach(o => {
+                            const safeOrderId = Utils.escapeAttr(o.order_id);
+                            listHtml += `<li><a href="#" onclick="event.preventDefault(); JF.DashboardCore.navigateTo('viewOrder',{orderId:'${safeOrderId}'})">${Utils.escapeHtml(o.order_id)} - ${Utils.escapeHtml(o.customer_name)}</a></li>`;
+                        });
+                        listHtml += '</ul></div>';
+                        const oldPopup = document.querySelector('.cal-popup');
+                        if (oldPopup) oldPopup.remove();
+                        document.body.insertAdjacentHTML('beforeend', listHtml);
+                        const popup = document.getElementById('calPopup');
+                        if (!popup) return;
+                        const rect = target.getBoundingClientRect();
+                        popup.style.position = 'fixed';
+                        popup.style.top = (rect.bottom + 5) + 'px';
+                        popup.style.left = Math.min(rect.left, window.innerWidth - 260) + 'px';
+                        popup.style.zIndex = '10000';
+                        setTimeout(() => {
+                            const closeHandler = function(ev) {
+                                if (popup && !popup.contains(ev.target) && ev.target !== target) {
+                                    popup.remove();
+                                    document.removeEventListener('click', closeHandler);
+                                }
+                            };
+                            document.addEventListener('click', closeHandler);
+                        }, 10);
+                    });
                 }
 
                 // 仪表盘渲染成功后保存状态
@@ -908,10 +1031,6 @@
                 
                 console.log('[DashboardCore] 用户已登录:', AUTH.user?.name);
 
-                // 【修复 v2.3】AUTH.init() 完成后 AUTH.isLoggedIn() 已可用，
-                // 此时 restorePageState() 内部的 AUTH.isLoggedIn() 校验可以正确通过。
-                // 但为保险起见，直接跳过 restorePageState() 内部的登录校验，
-                // 用已知的登录状态来决定是否恢复页面。
                 const saved = this.restorePageState();
                 if (saved.page && saved.page !== 'login') {
                     console.log('[DashboardCore] 恢复页面状态:', saved.page);
@@ -969,5 +1088,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.3 已加载（修复闪烁 + 刷新保留当前页面）');
+    console.log('✅ JF.DashboardCore v2.3.1 已加载（集成工作日历）');
 })();
