@@ -749,6 +749,22 @@
 .preview-more { text-align: center; font-size: 11px; color: #64748b; padding: 6px; cursor: pointer; }
 .preview-more:hover { color: #0e7490; text-decoration: underline; }
 
+/* 三列卡片：减少上下内边距，保持高度一致 */
+.quick-card,
+.order-status-card,
+.message-center-card {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* 确保底部行三列等高 */
+.bottom-row {
+    align-items: stretch;
+}
+
 /* ===========================
    十、侧边栏遮罩
    ============================*/
