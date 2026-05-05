@@ -709,9 +709,16 @@
 
         async distributeProfit(storeId, amount, type, description) {
             const profile = await this.getCurrentProfile();
-            if(profile?.role!=='admin') throw new Error('Admin only');
+            const isAdmin = profile?.role === 'admin';
+            const isStoreManager = profile?.role === 'store_manager';
+            // 权限检查：仅 admin 和 store_manager 可操作
+            if (!isAdmin && !isStoreManager) throw new Error('Admin or store manager only');
             const targetStoreId = storeId || profile.store_id;
             if(!targetStoreId) throw new Error('Store ID missing');
+            // store_manager 只能操作本店，不可操作其他门店
+            if (isStoreManager && targetStoreId !== profile.store_id) {
+                throw new Error('Store manager can only distribute profit for their own store');
+            }
             if(!amount || amount<=0) throw new Error('Invalid amount');
             if(type==='reinvest'){
                 const available = await this.getDistributableProfit(targetStoreId);

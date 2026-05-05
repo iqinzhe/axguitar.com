@@ -1,5 +1,6 @@
-// permission.js - v2.1 统一权限模块 (JF 命名空间)
-// 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
+// permission.js - v2.2 统一权限模块 (JF 命名空间)
+// v2.1 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
+// v2.2 新增：store_manager 与 staff 权限规则拆分；store_manager 可处置本店收益
 
 'use strict';
 
@@ -12,7 +13,8 @@
         // ==================== 权限规则表（单一来源） ====================
         _rules: {
             admin: true,
-            'store_manager|staff': {
+            // store_manager：分店经理，可处置本店收益
+            store_manager: {
                 // 订单
                 order_create: true,
                 order_view: true,
@@ -49,6 +51,49 @@
                 internal_transfer: true,
                 // 备份恢复（仅管理员）
                 backup_restore: false,
+                // 收益处置：分店经理可处置本店收益
+                profit_distribute: true,
+            },
+            // staff：普通员工，不可处置收益
+            staff: {
+                // 订单
+                order_create: true,
+                order_view: true,
+                order_payment: true,
+                order_edit: false,
+                order_delete: false,
+                // 客户
+                customer_manage: true,
+                customer_create: true,
+                customer_edit: true,
+                customer_delete: false,
+                // 支出
+                expense_add: true,
+                expense_edit: false,
+                expense_delete: false,
+                // 报表
+                report_view: false,
+                // 用户管理（仅管理员）
+                user_manage: false,
+                user_create: false,
+                user_edit: false,
+                user_delete: false,
+                // 门店管理（仅管理员）
+                store_manage: false,
+                store_create: false,
+                store_edit: false,
+                store_delete: false,
+                // 黑名单
+                blacklist_add: true,
+                blacklist_remove: false,
+                blacklist_view: true,
+                // 资金流水
+                cash_flow_view: true,
+                internal_transfer: true,
+                // 备份恢复（仅管理员）
+                backup_restore: false,
+                // 收益处置：员工不可操作
+                profit_distribute: false,
             },
         },
 
@@ -61,8 +106,11 @@
         _checkByRole(role, action) {
             if (!role) return false;
             if (role === 'admin') return true;
-            if (role === 'store_manager' || role === 'staff') {
-                return this._rules['store_manager|staff'][action] ?? false;
+            if (role === 'store_manager') {
+                return this._rules['store_manager'][action] ?? false;
+            }
+            if (role === 'staff') {
+                return this._rules['staff'][action] ?? false;
             }
             return false;
         },
@@ -178,6 +226,10 @@
         // ==================== 平账 ====================
         canReconcile()       { return AUTH.user?.role === 'admin'; },
 
+        // ==================== 收益处置 ====================
+        // admin 始终可操作；store_manager 可处置本店收益；staff 不可操作
+        canDistributeProfit() { return this.isAdmin() || this.can('profit_distribute'); },
+
         // ==================== 角色判断 ====================
         isAdmin()            { return AUTH.user?.role === 'admin'; },
         isStoreManager()     { return AUTH.user?.role === 'store_manager'; },
@@ -233,5 +285,5 @@
     JF.Permission = PERMISSION;
     window.PERMISSION = PERMISSION; // 向下兼容
 
-    console.log('✅ JF.Permission v2.1 初始化完成（新增统一门店权限检查）');
+    console.log('✅ JF.Permission v2.2 初始化完成（store_manager/staff 规则拆分，store_manager 可处置本店收益）');
 })();
