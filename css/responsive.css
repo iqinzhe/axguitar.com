@@ -48,7 +48,7 @@
         align-items: stretch;
     }
 }
-/* 3. 隐藏快捷操作中的“备份恢复”按钮（保留侧边栏菜单） */
+/* 1. 隐藏快捷操作中的“备份恢复”按钮（保留侧边栏菜单） */
     .quick-card .quick-btn[onclick*="backupRestore"] {
         display: none !important;
     }
@@ -381,11 +381,11 @@
     }
 
     /* ===== 手机端隐藏以下元素（仅为移动端）===== */
-    /* 1. 隐藏“活跃在押订单”卡片（KPI 第二个卡片） */
+    /* 2. 隐藏“活跃在押订单”卡片（KPI 第二个卡片） */
     .kpi-card--green {
         display: none !important;
     }
-    /* 2. 隐藏“订单状态分布”卡片 */
+    /* 3. 隐藏“订单状态分布”卡片 */
     .order-status-card {
         display: none !important;
     }
