@@ -1,4 +1,5 @@
-// permission.js - v2.0 统一权限模块 (JF 命名空间)
+// permission.js - v2.1 统一权限模块 (JF 命名空间)
+// 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
 
 'use strict';
 
@@ -83,6 +84,48 @@
             } catch (error) {
                 console.error('权限检查失败:', error);
                 return false;
+            }
+        },
+
+        // ==================== 【新增】门店访问权限检查 ====================
+        /**
+         * 异步检查当前登录用户是否有权访问指定门店
+         * @param {string|null} storeId - 要访问的门店ID，null 表示无门店（如总部）
+         * @returns {Promise<boolean>} true: 有权限；false: 无权限
+         */
+        async checkStoreAccess(storeId) {
+            // 管理员总有权限
+            if (this.isAdmin()) return true;
+
+            // 非管理员：必须有自己的 storeId，且与目标 storeId 一致
+            try {
+                const profile = await SUPABASE.getCurrentProfile();
+                const userStoreId = profile?.store_id || null;
+                // 如果用户没有门店，无法访问任何门店数据
+                if (!userStoreId) return false;
+                // 要求目标门店ID与用户门店ID相同
+                return storeId === userStoreId;
+            } catch (error) {
+                console.warn('checkStoreAccess 异常:', error);
+                return false;
+            }
+        },
+
+        /**
+         * 异步检查门店访问权限，若权限不足则抛出错误
+         * @param {string|null} storeId
+         * @param {string} [customMessage] - 可选自定义错误信息
+         * @returns {Promise<void>}
+         */
+        async requireStoreAccess(storeId, customMessage) {
+            const hasAccess = await this.checkStoreAccess(storeId);
+            if (!hasAccess) {
+                const msg = customMessage || (
+                    Utils.lang === 'id'
+                        ? 'Anda tidak memiliki akses ke toko ini'
+                        : '您没有访问该门店的权限'
+                );
+                throw new Error(msg);
             }
         },
 
@@ -190,5 +233,5 @@
     JF.Permission = PERMISSION;
     window.PERMISSION = PERMISSION; // 向下兼容
 
-    console.log('✅ JF.Permission v2.0 初始化完成');
+    console.log('✅ JF.Permission v2.1 初始化完成（新增统一门店权限检查）');
 })();
