@@ -1,6 +1,7 @@
-// utils.js - v2.1 统一重构版
+// utils.js - v2.2 统一重构版
 // 基础工具模块，挂载到 JF.Utils
-// 修复：增加网络监控 + 错误恢复工具
+// 修复：增加网络监控 + 错误恢复工具 + 金额提取统一函数
+
 'use strict';
 
 (function () {
@@ -923,6 +924,18 @@
         </div>`;
     };
 
+    /* ==================== 【新增】金额输入统一提取 ==================== */
+    /**
+     * 从指定 ID 的输入框获取并解析为数字金额
+     * @param {string} elementId - 输入框元素的 ID
+     * @returns {number} 解析后的数字，无效时返回 0
+     */
+    Utils.getAmountFromInput = function (elementId) {
+        const el = document.getElementById(elementId);
+        if (!el || !el.value) return 0;
+        return Utils.parseNumberFromCommas(el.value);
+    };
+
     /* ==================== 【修复】网络监控 ==================== */
     Utils.NetworkMonitor = {
         _initialized: false,
@@ -1032,5 +1045,5 @@
     // 【修复】初始化错误收集器
     Utils.ErrorHandler.init();
 
-    console.log('✅ Utils v2.1 初始化完成 (JF namespace + 网络监控)');
+    console.log('✅ Utils v2.2 初始化完成 (JF namespace + 金额提取函数)');
 })();
