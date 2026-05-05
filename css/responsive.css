@@ -377,17 +377,18 @@
     }
 }
 
-/* 手机端隐藏活跃在押订单卡片 */
-.kpi-card--green {
-    display: none !important;
-}
-/* 手机端隐藏订单状态分布卡片 */
-.order-status-card {
-    display: none !important;
-}
-/* 手机端隐藏快捷操作中的备份恢复按钮 */
-.quick-card .quick-btn[onclick*="backupRestore"] {
-    display: none !important;
+    /* 手机端隐藏：活跃在押订单卡片 */
+    .kpi-card--green {
+        display: none !important;
+    }
+    /* 手机端隐藏：订单状态分布卡片 */
+    .order-status-card {
+        display: none !important;
+    }
+    /* 手机端隐藏：快捷操作中的备份恢复按钮 */
+    .quick-card .quick-btn[onclick*="backupRestore"] {
+        display: none !important;
+    }
 }
 
 /* ============================================================
