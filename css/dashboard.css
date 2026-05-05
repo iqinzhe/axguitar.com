@@ -1,5 +1,5 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局（v3.2 右侧三卡统一加宽）
+   dashboard.css - 仪表盘专属布局（v3.5 独立三列）
    =============================*/
 
 /* ==============================
@@ -341,7 +341,7 @@
 }
 
 /* ============================================================
-   六、KPI 卡片（第一行）— 移动端仍四等分，桌面端会在 @media 中改为右宽列
+   六、KPI 卡片
    ============================================================ */
 .kpi-row {
     display: grid;
@@ -506,7 +506,7 @@
     transform: translateY(-1px);
 }
 
-/* 资金结构内部 */
+/* 资金结构 */
 .fund-total-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -727,7 +727,7 @@
 .preview-more:hover { color: #0e7490; text-decoration: underline; }
 
 /* ==============================
-   十一、桌面端布局（≥769px）— 右列加宽，一行三卡片
+   十一、桌面端布局（≥769px）
    ============================*/
 @media (min-width: 769px) {
     .dashboard-v2 { position: relative; }
@@ -744,8 +744,7 @@
         box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
     }
 
-    /* ---- 统一列宽：前三列等宽，第四列（右侧）加宽 ---- */
-    /* 使用比例 1fr 1fr 1fr 1.4fr（可根据需要调整） */
+    /* 第一行：四列等宽 → 改为右侧加宽 */
     .kpi-row {
         grid-template-columns: 1fr 1fr 1fr 1.4fr;
     }
@@ -762,27 +761,29 @@
         grid-column: span 1;
     }
 
-    /* 第三行：保持一行三列 */
+    /* 第三行：独立三列，右侧加宽与上方对齐 */
     .bottom-row {
-        grid-template-columns: 1fr 1fr 1fr 1.4fr;
+        grid-template-columns: 1fr 1fr 1.4fr; /* 关键：三列网格 */
         gap: 10px;
-        /* 排列顺序：快捷操作 (span 2) → 消息中心 (span 1) → 订单状态分布 (span 1) */
     }
+    /* 顺序：快捷操作 → 订单状态分布 → 消息中心 */
     .bottom-row .quick-card {
         order: 1;
-        grid-column: span 2;  /* 跨越前两列 */
-    }
-    .bottom-row .message-center-card {
-        order: 2;
-        grid-column: span 1;  /* 第三列 */
+        grid-column: auto; /* 复位，不跨列 */
     }
     .bottom-row .order-status-card {
+        order: 2;
+        grid-column: auto;
+    }
+    .bottom-row .message-center-card {
         order: 3;
-        grid-column: span 1;  /* 第四列（加宽列） */
+        grid-column: auto;
     }
 }
 
-/* 移动端布局（≤768px）保持不变 */
+/* ==============================
+   十二、移动端布局（≤768px）完全保留
+   ============================*/
 @media (max-width: 768px) {
     .dashboard-v2 {
         margin: -8px;
@@ -880,7 +881,7 @@
 }
 
 /* ==============================
-   十二、小屏手机额外适配（≤480px）
+   十三、小屏手机额外适配（≤480px）
    ============================*/
 @media (max-width: 480px) {
     .dash-topbar { padding: 0 12px; }
@@ -891,7 +892,7 @@
 }
 
 /* ==============================
-   十三、动画
+   十四、动画
    ============================*/
 @keyframes dashFadeIn {
     from { opacity: 0; transform: translateY(8px); }
