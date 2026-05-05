@@ -653,3 +653,32 @@
         display: none !important;
     }
 }
+
+/* ============================================================
+   五、收益处置三列网格（桌面端三列，移动端单列）
+   ============================================================ */
+.profit-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-3);
+}
+
+.profit-cards-grid .card {
+    margin-bottom: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.profit-cards-grid .card .form-actions {
+    margin-top: auto;
+}
+
+/* 移动端适配（复用 responsive.css 已有的断点） */
+@media (max-width: 768px) {
+    .profit-cards-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-2);
+    }
+}
