@@ -1,5 +1,5 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局（v3.7 最终对齐版）
+   dashboard.css - 仪表盘专属布局（v3.8 宽度精确对齐版）
    =============================*/
 
 /* ==============================
@@ -614,7 +614,7 @@
 .np-val { font-size: var(--font-xl); font-weight: 700; font-family: var(--font-mono); color: #0e7490; }
 
 /* ==============================
-   八、底部行（最终四列对齐）
+   八、底部行（最终四列对齐 —— 快捷/订单等宽，消息与右侧对齐）
    ============================*/
 .bottom-row {
     display: grid;
@@ -727,7 +727,7 @@
 .preview-more:hover { color: #0e7490; text-decoration: underline; }
 
 /* ==============================
-   十一、桌面端对齐布局（最终修正）
+   十一、桌面端对齐布局（最终四列精准对齐版）
    ============================*/
 @media (min-width: 769px) {
     .dashboard-v2 { position: relative; }
@@ -744,7 +744,7 @@
         box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
     }
 
-    /* 第一行：四列，右侧加宽 */
+    /* 第一行：四列，右侧加宽（日历/收入对齐） */
     .kpi-row {
         grid-template-columns: 1fr 1fr 1fr 1.4fr;
     }
@@ -761,27 +761,32 @@
         grid-column: span 1;
     }
 
-    /* 第三行：四列网格，三个卡片精确分配，第三列留空 */
+    /* 第三行：四列网格 —— 快捷操作卡片 + 订单状态卡片 等宽，两者总宽与资金结构总览一致；信息中心卡片与右侧对齐 */
     .bottom-row {
-        grid-template-columns: 1fr 1fr 1fr 1.4fr;
+        display: grid;
+        grid-template-columns: 1fr 1fr 0.8fr 1.4fr;  /* 第三列留作自然过渡，前两列等宽，第四列与上方右侧列对齐 */
         gap: 10px;
     }
     .quick-card {
-        grid-column: 1;   /* 第一列 */
+        grid-column: 1 / 2;   /* 占用第一列 */
         order: 1;
     }
     .order-status-card {
-        grid-column: 2;   /* 第二列，与快捷操作等宽 */
+        grid-column: 2 / 3;   /* 占用第二列，与快捷操作等宽 */
         order: 2;
     }
     .message-center-card {
-        grid-column: 4;   /* 第四列，与上方日历/收入构成对齐 */
+        grid-column: 4 / 5;   /* 占用第四列，与上方的收入结构/日历严格等宽 */
         order: 3;
+    }
+    /* 确保快捷卡片和订单卡片内部内容也能自然撑开等宽高度 */
+    .quick-card, .order-status-card {
+        min-width: 0;  /* 防止内容溢出撑开宽度不等 */
     }
 }
 
 /* ==============================
-   十二、移动端布局（不变）
+   十二、移动端布局（不变，仅保留原有顺序，宽度由 flex 决定，消息卡片仍优先）
    ============================*/
 @media (max-width: 768px) {
     .dashboard-v2 {
