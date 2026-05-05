@@ -1,4 +1,4 @@
-// app-customers.js - v2.3 完整版（补全缺失方法，保留全部创建订单逻辑）
+// app-customers.js - v2.3 完整版（统一金额提取）
 
 'use strict';
 
@@ -373,7 +373,8 @@
             const lang = Utils.lang; const t = Utils.t.bind(Utils); const saveBtn = document.getElementById('saveOrderBtn');
             if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...'); }
             const collateral = document.getElementById("collateral").value.trim(); const collateralNote = document.getElementById("collateralNote").value.trim();
-            const amountStr = document.getElementById("amount").value; const amount = Utils.parseNumberFromCommas(amountStr) || 0; const notes = document.getElementById("notes").value;
+            const amount = Utils.getAmountFromInput("amount");   // 统一提取
+            const notes = document.getElementById("notes").value;
             const adminFee = Utils.calculateAdminFee(amount); let serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 2;
             const serviceFeeStr = document.getElementById("serviceFeeInput").value; let serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
             if (serviceFee === 0 && amount > 0) { const result = Utils.calculateServiceFee(amount, serviceFeePercent); serviceFee = result.amount; serviceFeePercent = result.percent; }
@@ -408,7 +409,8 @@
         },
 
         recalculateAllFees() {
-            const amountStr = document.getElementById('amount')?.value || '0'; const amount = Utils.parseNumberFromCommas(amountStr) || 0; const adminFee = Utils.calculateAdminFee(amount);
+            const amount = Utils.getAmountFromInput('amount');   // 统一提取
+            const adminFee = Utils.calculateAdminFee(amount);
             const adminFeeInput = document.getElementById('adminFeeInput'); if (adminFeeInput) adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
             const serviceFeeSelect = document.getElementById('serviceFeePercentSelect'); const serviceFeeInput = document.getElementById('serviceFeeInput');
             const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
@@ -417,7 +419,7 @@
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
             if (repaymentType === 'fixed') { const rateSelect = document.getElementById('agreedInterestRateSelect'); const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08; const termSelect = document.getElementById('repaymentTermSelect'); const months = termSelect ? parseInt(termSelect.value) : 5; if (amount > 0 && months > 0) { const monthly = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months); const rounded = Utils.roundMonthlyPayment(monthly); const monthlyInput = document.getElementById('monthlyPaymentInput'); if (monthlyInput && !monthlyInput.dataset.manual) { monthlyInput.value = Utils.formatNumberWithCommas(rounded); } } }
         },
-        recalculateServiceFee() { const select = document.getElementById('serviceFeePercentSelect'); if (select) select.dataset.manual = 'true'; const amountStr = document.getElementById('amount')?.value || '0'; const amount = Utils.parseNumberFromCommas(amountStr) || 0; const percent = select ? parseFloat(select.value) : 2; const result = Utils.calculateServiceFee(amount, percent); const input = document.getElementById('serviceFeeInput'); if (input) { input.value = Utils.formatNumberWithCommas(result.amount); input.dataset.manual = 'true'; } const hint = document.getElementById('serviceFeeHint'); if (hint) { hint.innerHTML = amount <= 3000000 ? `💡 ${Utils.lang === 'id' ? '≤3jt: Gratis (0%)' : '≤300万: 免费 (0%)'}` : amount <= 5000000 ? `💡 ${Utils.lang === 'id' ? '3jt~5jt: 1% (otomatis)' : '301万~500万: 1% (自动)'}` : `💡 ${Utils.lang === 'id' ? '>5jt: Pilih 2%-6%' : '>500万: 可选 2%-6%'}`; } if (select) { const group = select.closest('.form-group') || select.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; } },
+        recalculateServiceFee() { const select = document.getElementById('serviceFeePercentSelect'); if (select) select.dataset.manual = 'true'; const amount = Utils.getAmountFromInput('amount'); const percent = select ? parseFloat(select.value) : 2; const result = Utils.calculateServiceFee(amount, percent); const input = document.getElementById('serviceFeeInput'); if (input) { input.value = Utils.formatNumberWithCommas(result.amount); input.dataset.manual = 'true'; } const hint = document.getElementById('serviceFeeHint'); if (hint) { hint.innerHTML = amount <= 3000000 ? `💡 ${Utils.lang === 'id' ? '≤3jt: Gratis (0%)' : '≤300万: 免费 (0%)'}` : amount <= 5000000 ? `💡 ${Utils.lang === 'id' ? '3jt~5jt: 1% (otomatis)' : '301万~500万: 1% (自动)'}` : `💡 ${Utils.lang === 'id' ? '>5jt: Pilih 2%-6%' : '>500万: 可选 2%-6%'}`; } if (select) { const group = select.closest('.form-group') || select.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; } },
         onServiceFeeManualChange() { const input = document.getElementById('serviceFeeInput'); if (input) input.dataset.manual = 'true'; },
         onMonthlyPaymentManualChange() { const input = document.getElementById('monthlyPaymentInput'); if (input) input.dataset.manual = 'true'; },
         toggleRepaymentForm(value) { const fixedForm = document.getElementById('fixedRepaymentForm'); const flexibleCard = document.getElementById('flexibleMaxMonthsCard'); const flexibleDiv = document.getElementById('flexibleCard'); const fixedDiv = document.getElementById('fixedCard'); if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none'; if (flexibleCard) flexibleCard.style.display = value === 'flexible' ? 'block' : 'none'; if (flexibleDiv) flexibleDiv.classList.toggle('selected', value === 'flexible'); if (fixedDiv) fixedDiv.classList.toggle('selected', value === 'fixed'); if (value === 'fixed') APP.recalculateAllFees(); },
@@ -497,5 +499,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.3 完整版（无删减）');
+    console.log('✅ JF.CustomersPage v2.3 完整版（统一金额提取）');
 })();
