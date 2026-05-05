@@ -755,19 +755,14 @@
                     { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
                     { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
                     { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
-                    { icon: '💉', label: lang === 'id' ? 'Injeksi Modal' : '资本注入', action: "JF.CapitalModule.showCapitalInjectionModal()", cls: '' },
-                    { icon: '💸', label: lang === 'id' ? 'Distribusi Laba' : '收益处置', action: "JF.ProfitPage.showDistributionPage()", cls: '' },  
-                    { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' }, 
+                    { icon: '💸', label: lang === 'id' ? 'Distribusi Laba' : '收益处置', action: "JF.ProfitPage.showDistributionPage()", cls: '' },   
                 ];
                 } else {
                     quickActions = [
                         { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
                         { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
                         { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "JF.DashboardCore.navigateTo('orderTable');setTimeout(function(){if(window.APP && APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
-                        { icon: '⚠️', label: t('anomaly_title'), action: "JF.DashboardCore.navigateTo('anomaly')", cls: '' },
-                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
-                        ...(profile?.role === 'store_manager' ? [{ icon: '💸', label: lang === 'id' ? 'Distribusi Laba' : '收益处置', action: "JF.ProfitPage.showDistributionPage()", cls: '' }] : []),
-                        { icon: '📦', label: t('backup_restore'), action: "JF.DashboardCore.navigateTo('backupRestore')", cls: '' },
+                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },   
                     ];
                 }
                 const quickActionsHtml = quickActions.map(q => `<div class="quick-btn${q.cls ? ' ' + q.cls : ''}" onclick="${q.action}"><span class="qb-icon">${q.icon}</span><span class="qb-label">${q.label}</span></div>`).join('');
