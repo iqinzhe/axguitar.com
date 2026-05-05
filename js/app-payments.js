@@ -1,4 +1,4 @@
-// app-payments.js - v2.1 修复利息支付幂等性检查和审计日志
+// app-payments.js - v2.2 统一金额提取 + 幂等性检查和审计日志
 
 'use strict';
 
@@ -299,10 +299,9 @@
             }
         },
 
-        // ==================== 利息收款（修复：幂等性检查与审计日志） ====================
+        // ==================== 利息收款（统一使用 Utils.getAmountFromInput） ====================
         async payInterestWithMethod(orderId) {
-            const amountStr = document.getElementById("interestAmount")?.value || '0';
-            const actualPaid = Utils.parseNumberFromCommas(amountStr) || 0;
+            const actualPaid = Utils.getAmountFromInput('interestAmount');   // 统一提取
             const method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
             const methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
@@ -380,10 +379,9 @@
             }
         },
 
-        // ==================== 本金收款 ====================
+        // ==================== 本金收款（统一使用 Utils.getAmountFromInput） ====================
         async payPrincipalWithMethod(orderId) {
-            const amountStr = document.getElementById("principalAmount").value;
-            const amount = Utils.parseNumberFromCommas(amountStr) || 0;
+            const amount = Utils.getAmountFromInput('principalAmount');   // 统一提取
             const target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
             const targetName = target === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
@@ -598,5 +596,5 @@
         };
     }
 
-    console.log('✅ JF.PaymentPage v2.2 修复完成（增强幂等性检查，审计日志）');
+    console.log('✅ JF.PaymentPage v2.2 修复完成（统一金额提取，幂等性检查，审计日志）');
 })();
