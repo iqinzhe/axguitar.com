@@ -783,7 +783,7 @@
                     </div>
                     <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfit)}</div></div></div>
                 </div>
-                <div class="bottom-row" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="bottom-row">
                     <div class="quick-card">
                         <div class="card-header"><div class="card-title">⚡ ${lang === 'id' ? 'Aksi Cepat' : '快捷操作'}</div></div>
                         <div class="quick-grid">${quickActionsHtml}</div>
