@@ -833,6 +833,97 @@
         }
     };
 
+    /* 骨架屏生成 */
+    Utils.renderSkeleton = function (type) {
+        // 仪表盘完整骨架屏
+        if (type === 'dashboard') {
+            return `
+            <div class="dashboard-skeleton" style="padding: 12px 16px;">
+                <!-- 顶部栏骨架 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 8px 0;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 30px; height: 30px; background: #e2e8f0; border-radius: 6px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                        <div style="width: 150px; height: 24px; background: #e2e8f0; border-radius: 6px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 80px; height: 32px; background: #e2e8f0; border-radius: 20px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                        <div style="width: 60px; height: 32px; background: #e2e8f0; border-radius: 6px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                    </div>
+                </div>
+                
+                <!-- KPI 卡片行 (4个) -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
+                    ${Array(4).fill(`
+                        <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                            <div style="width: 40px; height: 40px; background: #e2e8f0; border-radius: 8px; margin-bottom: 12px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                            <div style="width: 80%; height: 28px; background: #e2e8f0; border-radius: 6px; margin-bottom: 8px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                            <div style="width: 60%; height: 16px; background: #e2e8f0; border-radius: 4px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <!-- 中间行 (2列) -->
+                <div style="display: grid; grid-template-columns: 1fr 280px; gap: 12px; margin-bottom: 20px;">
+                    <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                        <div style="width: 120px; height: 20px; background: #e2e8f0; border-radius: 4px; margin-bottom: 16px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+                            ${Array(3).fill(`<div style="height: 60px; background: #e2e8f0; border-radius: 8px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>`).join('')}
+                        </div>
+                        <div style="height: 8px; background: #e2e8f0; border-radius: 4px; margin: 16px 0; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                            ${Array(2).fill(`<div style="height: 70px; background: #e2e8f0; border-radius: 8px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>`).join('')}
+                        </div>
+                    </div>
+                    <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                        <div style="width: 100px; height: 20px; background: #e2e8f0; border-radius: 4px; margin-bottom: 16px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                        ${Array(4).fill(`
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                                <div style="width: 8px; height: 8px; background: #e2e8f0; border-radius: 4px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                                <div style="flex: 1; height: 14px; background: #e2e8f0; border-radius: 4px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                                <div style="width: 80px; height: 18px; background: #e2e8f0; border-radius: 4px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                            </div>
+                        `).join('')}
+                        <div style="height: 60px; background: #e2e8f0; border-radius: 8px; margin-top: 12px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                    </div>
+                </div>
+                
+                <!-- 底部行 (3列) -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                    ${Array(3).fill(`
+                        <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                            <div style="width: 80px; height: 20px; background: #e2e8f0; border-radius: 4px; margin-bottom: 16px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                                ${Array(6).fill(`<div style="height: 50px; background: #e2e8f0; border-radius: 8px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>`).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <style>
+                    @keyframes skeleton-pulse {
+                        0%, 100% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                    }
+                </style>
+            </div>`;
+        }
+        
+        // 默认骨架屏（用于其他页面）
+        return `
+        <div class="default-skeleton" style="padding: 20px;">
+            <div style="width: 200px; height: 28px; background: #e2e8f0; border-radius: 6px; margin-bottom: 20px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+            ${Array(5).fill(`
+                <div style="height: 50px; background: #e2e8f0; border-radius: 8px; margin-bottom: 12px; animation: skeleton-pulse 1.2s ease-in-out infinite;"></div>
+            `).join('')}
+            <style>
+                @keyframes skeleton-pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+            </style>
+        </div>`;
+    };
+
     /* ==================== 【新增】金额输入统一提取 ==================== */
     /**
      * 从指定 ID 的输入框获取并解析为数字金额
