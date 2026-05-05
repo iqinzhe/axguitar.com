@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.3.2 修复页面恢复状态 filter 验证 + 集成工作日历
+// app-dashboard-core.js - v2.0 验证 + 集成工作日历
 
 'use strict';
 
