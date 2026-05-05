@@ -726,65 +726,60 @@
 .preview-more:hover { color: #0e7490; text-decoration: underline; }
 
 /* ==============================
-   十一、桌面端对齐布局（44列系统 - 完全精准版）
+   十一、桌面端对齐布局（44列系统 - 修复版）
    ============================*/
 @media (min-width: 769px) {
 
-    /* ===== 全局统一网格（核心升级）===== */
-    .dash-main {
+    /* ===== 第一行 KPI ===== */
+    .kpi-row {
         display: grid;
         grid-template-columns: repeat(44, 1fr);
         gap: 10px;
     }
 
-    /* ===== KPI 行 ===== */
-    .kpi-row {
-        grid-column: span 44;
-        display: contents;
-    }
     .kpi-card {
-        grid-column: span 10; /* 1fr */
+        grid-column: span 10;
     }
+
     .kpi-card--calendar {
-        grid-column: span 14; /* 1.4fr */
+        grid-column: span 14;
     }
 
     /* ===== 第二行 ===== */
     .mid-row {
-        grid-column: span 44;
-        display: contents;
+        display: grid;
+        grid-template-columns: repeat(44, 1fr);
+        gap: 10px;
     }
 
     .fund-flow-card {
-        grid-column: span 30; /* 3fr */
+        grid-column: span 30;
     }
 
     .income-card {
-        grid-column: span 14; /* 1.4fr */
+        grid-column: span 14;
     }
 
-    /* ===== 第三行（关键优化）===== */
+    /* ===== 第三行（恢复三列结构）===== */
     .bottom-row {
-        grid-column: span 44;
-        display: contents;
+        display: grid;
+        grid-template-columns: repeat(44, 1fr);
+        gap: 10px;
     }
 
     .quick-card {
         grid-column: span 15;
-        order: 1;
     }
 
     .order-status-card {
         grid-column: span 15;
-        order: 2;
     }
 
     .message-center-card {
         grid-column: span 14;
-        order: 3;
     }
 
-    /* 防止溢出 */
+    /* 防止内容撑爆 */
     .quick-card,
     .order-status-card,
     .message-center-card {
