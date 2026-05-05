@@ -22,7 +22,7 @@
 </head>
 <body>
 
-<!-- ========== 加载动画层（替换原骨架屏） ========== -->
+<!-- ========== 加载动画层 ========== -->
 <div class="loading-overlay" id="loadingOverlay">
     <div class="loading-spinner"></div>
     <div class="loading-text">Memuat</div>
@@ -38,9 +38,74 @@
     </div>
 </div>
 
-<script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!--
+  ==================== 【优化】脚本加载策略 ====================
+  
+  第 0 层：立即执行
+    - app-state-init（内联）：Token 检查，不依赖 DOM
+  
+  第 1 层：CDN + 核心基础（defer，按序执行）
+    - config.js → supabase-js → utils.js → toast.js → cache.js
+    - supabase.js → auth.js → permission.js → audit.js
+    - order.js → store.js → storage.js → migration.js
+  
+  第 2 层：核心应用（defer，在第 1 层之后）
+    - app-dashboard-core.js（首屏仪表盘）
+  
+  第 3 层：内联启动（defer，在 app-dashboard-core.js 之后）
+    - 合并了原 app.js 的逻辑 + 应用启动控制
+  
+  第 4 层：非核心模块（由 lazy-loader.js 在 load 事件后动态加载）
+    - 所有 app-*.js 页面模块
+-->
 
+<!-- ========== 第 0 层：Token 状态初始化（立即执行，不依赖 DOM） ========== -->
+<script>
+// app-state-init.js - v2.3 内联版
+// 在页面加载时检查 token 有效性，无有效 token 则清除所有页面恢复状态
+(function () {
+    'use strict';
+    try {
+        var hasValidToken = false;
+        for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.indexOf('-auth-token') !== -1) {
+                try {
+                    var tokenData = JSON.parse(localStorage.getItem(key));
+                    if (tokenData && tokenData.expires_at) {
+                        var expiresAt = new Date(tokenData.expires_at * 1000);
+                        if (expiresAt > new Date()) {
+                            hasValidToken = true;
+                        }
+                    }
+                } catch (e) { /* 数据损坏，忽略 */ }
+                break;
+            }
+        }
+        if (!hasValidToken) {
+            try {
+                sessionStorage.removeItem('jf_current_state');
+                localStorage.removeItem('jf_last_state');
+                sessionStorage.removeItem('jf_current_page');
+                sessionStorage.removeItem('jf_current_filter');
+                sessionStorage.removeItem('jf_current_order_id');
+                sessionStorage.removeItem('jf_current_customer_id');
+                localStorage.removeItem('jf_last_page');
+                localStorage.removeItem('jf_last_filter');
+                localStorage.removeItem('jf_last_order_id');
+                localStorage.removeItem('jf_last_customer_id');
+                console.log('[StateInit] 无有效 token，已清除所有页面恢复状态');
+            } catch (e) { /* ignore */ }
+        } else {
+            console.log('[StateInit] 检测到有效 token，保留页面恢复状态');
+        }
+    } catch (e) { /* 静默处理 */ }
+})();
+</script>
+
+<!-- ========== 第 1 层：核心基础脚本（defer，按序执行） ========== -->
+<script defer src="config.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="js/utils.js"></script>
 <script defer src="js/toast.js"></script>
 <script defer src="js/cache.js"></script>
@@ -53,63 +118,177 @@
 <script defer src="js/storage.js"></script>
 <script defer src="js/migration.js"></script>
 
+<!-- ========== 第 2 层：核心应用（首屏仪表盘） ========== -->
 <script defer src="js/app-dashboard-core.js"></script>
-<script defer src="js/app-capital.js"></script>
-<script defer src="js/app-profit.js"></script>
-<script defer src="js/app-dashboard-anomaly.js"></script>
-<script defer src="js/app-dashboard-expenses.js"></script>
-<script defer src="js/app-dashboard-funds.js"></script>
-<script defer src="js/app-dashboard-orders.js"></script>
-<script defer src="js/app-dashboard-print.js"></script>
-<script defer src="js/app-dashboard-users.js"></script>
-<script defer src="js/app-dashboard-wa.js"></script>
-<script defer src="js/app-message-center.js"></script>
-<script defer src="js/app-customers.js"></script>
-<script defer src="js/app-blacklist.js"></script>
-<script defer src="js/app-payments.js"></script>
 
-<script defer src="js/app-state-init.js"></script>
-<script defer src="js/app.js"></script>
+<!-- ========== 第 3 层：延迟加载器（加载非核心模块） ========== -->
+<script defer src="js/lazy-loader.js"></script>
 
+<!-- ========== 第 4 层：内联启动逻辑（合并原 app.js + 启动控制） ========== -->
 <script>
-// 加载动画控制 + 应用启动
-(function() {
+// 合并了原 app.js 和 index.html 中的启动逻辑
+(function () {
     'use strict';
-    
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    const dashboardContent = document.getElementById('dashboardContent');
-    
-    // 隐藏加载动画，显示主内容
+
+    // ==================== app.js 逻辑（门面层） ====================
+    var JF = window.JF || {};
+    window.JF = JF;
+
+    var APP = {
+        forceClearAndReload: function () {
+            console.log('[APP] 强制清除所有存储并重新加载');
+            try {
+                var keysToRemove = [];
+                for (var i = 0; i < localStorage.length; i++) {
+                    var key = localStorage.key(i);
+                    if (key && (
+                        key.indexOf('supabase.') === 0 ||
+                        key.indexOf('sb-') === 0 ||
+                        key.indexOf('jf_') === 0
+                    )) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(function (k) { localStorage.removeItem(k); });
+                sessionStorage.clear();
+                document.cookie.split(";").forEach(function (c) {
+                    document.cookie = c.replace(/^ +/, "")
+                        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+                console.log('[APP] 已清除 ' + keysToRemove.length + ' 个存储项');
+            } catch (e) {
+                console.warn('[APP] 清除存储失败:', e.message);
+            }
+            setTimeout(function () { location.reload(); }, 500);
+        },
+
+        exportData: function () {
+            if (typeof BackupStorage !== 'undefined' && BackupStorage.backup) {
+                BackupStorage.backup();
+            } else {
+                Utils.toast.error(Utils.t('backup_restore') + ' ' + (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
+            }
+        },
+
+        importData: function () {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function (e) {
+                if (e.target.files && e.target.files[0]) {
+                    if (typeof BackupStorage !== 'undefined' && BackupStorage.restore) {
+                        BackupStorage.restore(e.target.files[0]);
+                    } else {
+                        Utils.toast.error(Utils.t('backup_restore') + ' ' + (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
+                    }
+                }
+            };
+            input.click();
+        },
+
+        sendWAReminder: async function (orderId) {
+            try {
+                var result = await SUPABASE.getPaymentHistory(orderId);
+                var order = result.order;
+                if (!order) {
+                    Utils.toast.error(Utils.t('order_not_found'));
+                    return;
+                }
+                var storeWA = await SUPABASE.getStoreWANumber(order.store_id);
+                if (!storeWA) {
+                    Utils.toast.warning(Utils.lang === 'id' ? 'Nomor WhatsApp toko belum diatur' : '门店 WhatsApp 号码未设置');
+                    return;
+                }
+                var customerPhone = order.customer_phone;
+                if (!customerPhone) {
+                    Utils.toast.warning(Utils.lang === 'id' ? 'Nomor telepon nasabah tidak tersedia' : '客户电话不存在');
+                    return;
+                }
+                var cleanPhone = customerPhone.replace(/[^0-9]/g, '');
+                if (cleanPhone.indexOf('62') !== 0 && cleanPhone.indexOf('0') !== 0) {
+                    cleanPhone = '62' + cleanPhone;
+                }
+                if (cleanPhone.indexOf('0') === 0) {
+                    cleanPhone = '62' + cleanPhone.substring(1);
+                }
+                var waMessage = JF.WAPage ? JF.WAPage.generateWAText(order, storeWA) : '';
+                var encodedMessage = encodeURIComponent(waMessage);
+                window.open('https://wa.me/' + cleanPhone + '?text=' + encodedMessage, '_blank');
+                await SUPABASE.logReminder(order.id);
+                Utils.toast.success(Utils.lang === 'id' ? 'Membuka WhatsApp...' : '正在打开 WhatsApp...');
+            } catch (error) {
+                console.error("sendWAReminder error:", error);
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal mengirim pengingat' : '发送提醒失败');
+            }
+        },
+
+        printCurrentPage: function () {
+            if (JF.PrintPage && typeof JF.PrintPage.printCurrentPage === 'function') {
+                JF.PrintPage.printCurrentPage();
+            } else {
+                window.print();
+            }
+        }
+    };
+
+    window.APP = Object.assign(window.APP || {}, APP);
+    JF.APP = window.APP;
+
+    // ==================== 全局快捷键 ====================
+    document.addEventListener('keydown', function (e) {
+        if (e.altKey && e.key === 'r') {
+            e.preventDefault();
+            if (JF.DashboardCore && typeof JF.DashboardCore.forceRecovery === 'function') {
+                JF.DashboardCore.forceRecovery();
+            } else if (window.APP && typeof window.APP.forceRecovery === 'function') {
+                window.APP.forceRecovery();
+            } else {
+                location.reload();
+            }
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.altKey && e.shiftKey && e.key === 'R') {
+            e.preventDefault();
+            APP.forceClearAndReload();
+        }
+    });
+
+    console.log('[Boot] 核心模块 + 门面层已就绪');
+
+    // ==================== 应用启动 ====================
+    var loadingOverlay = document.getElementById('loadingOverlay');
+    var dashboardContent = document.getElementById('dashboardContent');
+
     function hideLoadingAndShowContent() {
         if (loadingOverlay) {
             loadingOverlay.style.transition = 'opacity 0.3s ease';
             loadingOverlay.style.opacity = '0';
-            setTimeout(() => {
+            setTimeout(function () {
                 loadingOverlay.style.display = 'none';
             }, 300);
         }
-        
         if (dashboardContent) {
             dashboardContent.classList.add('loaded');
         }
     }
-    
-    // 启动应用（保留原有启动逻辑）
+
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             console.log('[Boot] 启动应用');
             JF.DashboardCore.init();
-            // 应用启动后隐藏加载动画
             setTimeout(hideLoadingAndShowContent, 100);
         } else {
             console.warn('[Boot] DashboardCore 未就绪，等待中...');
             setTimeout(startApp, 200);
         }
     }
-    
-    // 页面加载完成后启动
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => setTimeout(startApp, 100));
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(startApp, 100);
+        });
     } else {
         setTimeout(startApp, 100);
     }
