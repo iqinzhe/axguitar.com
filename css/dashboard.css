@@ -341,30 +341,33 @@
 }
 
 /* ============================================================
-   六、KPI 卡片
+   六、KPI 卡片（图标居中 + 标题靠左 + 数字居中）
    ============================================================ */
 .kpi-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
 }
+
 .kpi-card {
     background: #fff;
     border-radius: 12px;
     border: 1px solid #c8d8e8;
     box-shadow: 0 1px 3px rgba(14, 116, 144, 0.06);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
-    padding: 10px 12px;
+    padding: 14px 12px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
     position: relative;
     overflow: hidden;
 }
+
 .kpi-card:hover {
     box-shadow: 0 4px 14px rgba(14, 116, 144, 0.1);
     transform: translateY(-1px);
 }
+
 .kpi-card::before {
     content: '';
     position: absolute;
@@ -374,30 +377,63 @@
     height: 3px;
     border-radius: 12px 12px 0 0;
 }
+
 .kpi-card--blue::before   { background: linear-gradient(90deg, #0e7490, #06b6d4); }
 .kpi-card--amber::before  { background: linear-gradient(90deg, #d97706, #f59e0b); }
 .kpi-card--green::before  { background: linear-gradient(90deg, #15803d, #16a34a); }
 
-.kpi-icon { font-size: 16px; margin-bottom: 1px; }
+/* 图标：居中 */
+.kpi-icon {
+    font-size: 28px;
+    text-align: center;
+    display: block;
+    margin-bottom: 6px;
+}
+
+/* 指标条目容器 */
+.kpi-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* 标题：靠左 */
+.kpi-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #475569;
+    text-align: left;
+    letter-spacing: 0.02em;
+}
+
+/* 数字：居中 */
 .kpi-val {
-    font-size: var(--font-xl);
+    font-size: 1.6rem;
     font-weight: 700;
     font-family: var(--font-mono);
-    letter-spacing: -0.03em;
-    line-height: 1;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-align: center;
+    color: #0c1929;
 }
+
+/* 数值颜色覆盖（保持语义） */
 .kpi-val.green  { color: #15803d; }
 .kpi-val.amber  { color: #b45309; }
-.kpi-label {
-    font-size: var(--font-xs);
-    font-weight: 600;
-    margin-top: 2px;
-    color: #475569;
+
+/* 第二个指标的上边距（视觉分隔） */
+.kpi-item + .kpi-item {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #e2e8f0;
 }
+
+/* 可选：趋势标签（保留但调整样式） */
 .kpi-trend {
     font-size: 0.65rem;
     font-weight: 600;
-    margin-top: 1px;
+    margin-top: 4px;
+    text-align: center;
     color: #16a34a;
 }
 .kpi-trend.down { color: #dc2626; }
