@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.3.1 集成工作日历
+// app-dashboard-core.js - v2.3.2 修复页面恢复状态 filter 验证 + 集成工作日历
 
 'use strict';
 
@@ -178,8 +178,13 @@
 
                 const state = JSON.parse(raw);
                 const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist'];
+                // filter 值有效性验证
+                const validFilters = ['all', 'active', 'completed', 'liquidated'];
+                if (!state.filter || !validFilters.includes(state.filter)) {
+                    state.filter = 'all';
+                }
 
-                // 【修复 v2.3】此方法在 AUTH.init() 完成后调用，AUTH.isLoggedIn() 已可靠，
+                // 此方法在 AUTH.init() 完成后调用，AUTH.isLoggedIn() 已可靠，
                 // 保留校验以防御未登录时错误恢复页面状态
                 if (state.page && validPages.includes(state.page) && AUTH.isLoggedIn()) {
                     // 参数完整性校验：必须携带 orderId 的页面
@@ -192,7 +197,7 @@
                     }
                     return {
                         page: state.page,
-                        filter: state.filter || "all",
+                        filter: state.filter,
                         orderId: state.orderId || null,
                         customerId: state.customerId || null
                     };
@@ -259,7 +264,6 @@
             const page = this.currentPage;
             if (page === 'dashboard') {
                 await this.originalRenderDashboard();
-                // 仪表盘渲染成功后自动保存状态（在 originalRenderDashboard 末尾处理）
                 return;
             }
 
@@ -296,7 +300,7 @@
                 } else if (page === 'backupRestore') {
                     if (JF.BackupStorage && typeof JF.BackupStorage.renderBackupUI === 'function') {
                         await JF.BackupStorage.renderBackupUI();
-                        this.saveCurrentPageState(); // 备份页面特殊处理：渲染后保存
+                        this.saveCurrentPageState();
                         return;
                     }
                     contentHtml = '<div class="card"><p>备份模块不可用</p></div>';
@@ -307,7 +311,7 @@
                 } else if (page === 'messageCenter') {
                     if (JF.MessageCenter && typeof JF.MessageCenter.showMessageCenter === 'function') {
                         await JF.MessageCenter.showMessageCenter();
-                        this.saveCurrentPageState(); // 消息中心渲染后保存
+                        this.saveCurrentPageState();
                         return;
                     }
                     contentHtml = '<div class="card"><p>消息中心模块不可用</p></div>';
@@ -318,7 +322,7 @@
                 } else if (page === 'payment' && this.currentOrderId) {
                     if (JF.PaymentPage && typeof JF.PaymentPage.showPayment === 'function') {
                         await JF.PaymentPage.showPayment(this.currentOrderId);
-                        this.saveCurrentPageState(); // 缴费页面渲染后保存
+                        this.saveCurrentPageState();
                         return;
                     }
                 } else if (page === 'customerOrders' && this.currentCustomerId) {
@@ -334,15 +338,13 @@
                 }
                 await this._updateMainContent(contentHtml);
                 document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
-                // 渲染成功后自动保存状态，刷新可恢复
                 this.saveCurrentPageState();
             } catch (err) {
                 console.error('[refreshCurrentPage] 渲染失败，自动返回仪表盘:', err);
-                // 清除可能损坏的状态，避免下次刷新死循环
                 this.currentOrderId = null;
                 this.currentCustomerId = null;
                 this.clearPageState();
-                await this.originalRenderDashboard(); // 降级到仪表盘
+                await this.originalRenderDashboard();
             }
         },
 
@@ -414,7 +416,6 @@
         // ========== 路由和导航 ==========
         navigateTo(page, params) {
             if (!AUTH.isLoggedIn() && page !== 'login') {
-                console.log('[DashboardCore] 用户未登录，重定向到登录页');
                 this.renderLogin();
                 return;
             }
@@ -457,7 +458,6 @@
         // ========== 仪表盘渲染（核心） ==========
         async originalRenderDashboard() {
             if (!AUTH.isLoggedIn()) {
-                console.log('[DashboardCore] 用户未登录，显示登录页');
                 await this.renderLogin();
                 return;
             }
@@ -467,8 +467,6 @@
             this._cleanupOverlays();
 
             const appDiv = document.getElementById("app");
-            // 【修复 v2.3】只有在完全没有 dashboard 外壳时才显示骨架屏，
-            // 避免每次 refreshCurrentPage 调用此方法时清空已有内容造成闪烁
             const hasShell = appDiv && appDiv.querySelector('.dashboard-v2');
             if (appDiv && !hasShell) {
                 appDiv.innerHTML = Utils.renderSkeleton('dashboard');
@@ -497,7 +495,6 @@
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active').gte('overdue_days', 1),
                         applyFilter(client.from('orders').select('loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid')).eq('status', 'active'),
                         applyFilter(client.from('orders').select('loan_amount')),
-                        // 新增：获取所有活跃订单的下次还款日期
                         applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active'))
                     ]);
                     let totalLoanActive = 0, adminFeesCollected = 0, serviceFeesCollected = 0, interestCollected = 0, principalCollected = 0;
@@ -554,7 +551,7 @@
                         total_injected_capital: totalInjectedCapital,
                         deployed_capital: deployedCapital,
                         available_capital: totalInjectedCapital - deployedCapital,
-                        due_orders: dueOrdersRes.data || []  // 新增字段
+                        due_orders: dueOrdersRes.data || []
                     };
                 }, { ttl: 3 * 60 * 1000 });
 
@@ -1088,5 +1085,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.3.1 已加载（集成工作日历）');
+    console.log('✅ JF.DashboardCore v2.3.2 已修复 filter 验证 + 集成工作日历');
 })();
