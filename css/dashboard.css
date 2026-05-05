@@ -403,6 +403,119 @@
 .kpi-trend.down { color: #dc2626; }
 
 /* ==============================
+   日历卡片专属 KPI 行
+   ============================== */
+.kpi-row--calendar {
+    grid-template-columns: 1fr 1fr 1fr 1.4fr;  /* 日历列稍宽 */
+}
+
+@media (max-width: 768px) {
+    .kpi-row--calendar {
+        grid-template-columns: 1fr 1fr;
+    }
+    .kpi-card--calendar {
+        grid-column: span 2;  /* 日历单独占一整行 */
+    }
+}
+
+/* 工作日历内部样式 */
+.work-calendar {
+    width: 100%;
+    font-size: 10px;
+}
+
+.calendar-header {
+    text-align: center;
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+
+.cal-table {
+    width: 100%;
+    text-align: center;
+    border-collapse: collapse;
+}
+
+.cal-table th,
+.cal-table td {
+    padding: 1px 0;
+    font-weight: normal;
+    color: var(--text-secondary);
+    border: none;
+}
+
+.cal-cell {
+    position: relative;
+}
+
+.cal-date {
+    display: block;
+    font-size: 11px;
+    color: var(--text-primary);
+}
+
+.cal-due-count {
+    display: inline-block;
+    background: #ef4444;
+    color: #fff;
+    border-radius: 10px;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 1px;
+    transition: background 0.2s;
+    line-height: 1.4;
+}
+
+.cal-due-count:hover {
+    background: #dc2626;
+}
+
+/* 弹出浮层 */
+.cal-popup {
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    padding: 12px;
+    max-width: 260px;
+    font-size: 12px;
+    z-index: 10000;
+}
+
+.cal-popup-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.cal-popup ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.cal-popup li {
+    margin: 5px 0;
+}
+
+.cal-popup a {
+    color: #0e7490;
+    text-decoration: none;
+    display: block;
+    padding: 2px 0;
+}
+
+.cal-popup a:hover {
+    color: #0369a1;
+    text-decoration: underline;
+}
+
+/* ==============================
    七、中间行（资金结构 + 收入构成）
    ============================*/
 .mid-row {
@@ -877,8 +990,6 @@
     .bottom-row .order-status-card {
         order: 2;
     }
-    /* 快捷操作卡片（如果有）保持自然顺序为0，通常会单独占一整行？根据实际布局确定 */
-    /* 实际上 .bottom-row 中通常只有两个卡片（快捷操作卡片可能在上方），但如果快捷操作卡片也在 .bottom-row 中，则 order:0 让它排在左边第一个 */
     .bottom-row .quick-card {
         order: 0;
     }
@@ -1122,3 +1233,4 @@
 .main-content-transition {
     animation: fadeSlideUp 0.25s ease-out;
 }
+
