@@ -85,32 +85,7 @@
         }
     };
 
-    const SafeSessionStorage = {
-        _memoryStore: {},
-        _ok: null,
-        _check() {
-            if(this._ok===null){
-                try { sessionStorage.setItem('_t','1'); sessionStorage.removeItem('_t'); this._ok=true; }
-                catch(e){ this._ok=false; }
-            }
-            return this._ok;
-        },
-        getItem(key) {
-            if(this._check()){ try { return sessionStorage.getItem(key); } catch(e){} }
-            return this._memoryStore[key] || null;
-        },
-        setItem(key, value) {
-            if(this._check()){ try { sessionStorage.setItem(key, value); } catch(e){} }
-            if(value==null) delete this._memoryStore[key];
-            else this._memoryStore[key] = String(value);
-        },
-        removeItem(key) {
-            if(this._check()){ try { sessionStorage.removeItem(key); } catch(e){} }
-            delete this._memoryStore[key];
-        }
-    };
-
-    JF.Storage = { safe: SafeStorage, session: SafeSessionStorage };
+    JF.Storage = { safe: SafeStorage };
 
     // ==================== Supabase 客户端初始化 ====================
     const SUPABASE_URL = window.APP_CONFIG?.SUPABASE?.URL || '';
@@ -162,7 +137,6 @@
     const SupabaseAPI = {
         getClient: () => supabaseClient,
         getSafeStorage: () => SafeStorage,
-        getSafeSessionStorage: () => SafeSessionStorage,
 
         // ---------- 认证 ----------
         async getSession() {
@@ -1253,26 +1227,6 @@
             return true;
         },
 
-         async getReport() {
-            if (!supabaseClient) return { total_orders: 0, active_orders: 0, completed_orders: 0, total_loan_amount: 0, total_admin_fees: 0, total_service_fees: 0, total_interest: 0, total_principal: 0 };
-            const orders = await this.getOrdersLegacy();
-            let totalLoanAmount = 0, totalAdminFees = 0, totalServiceFees = 0, totalInterest = 0, totalPrincipal = 0, activeCount = 0;
-            for (const o of orders) {
-                totalLoanAmount += (o.loan_amount || 0);
-                if (o.admin_fee_paid) totalAdminFees += (o.admin_fee || 0);
-                totalServiceFees += (o.service_fee_paid || 0);
-                totalInterest += (o.interest_paid_total || 0);
-                totalPrincipal += (o.principal_paid || 0);
-                if (o.status === 'active') activeCount++;
-            }
-            return {
-                total_orders: orders.length, active_orders: activeCount,
-                completed_orders: orders.length - activeCount, total_loan_amount: totalLoanAmount,
-                total_admin_fees: totalAdminFees, total_service_fees: totalServiceFees,
-                total_interest: totalInterest, total_principal: totalPrincipal
-            };
-        },
-
         async getAllPayments() {
             if (!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
@@ -1468,16 +1422,6 @@
             return !!data;
         },
 
-        async hasSentRemindersToday() {
-            if (!supabaseClient) return false;
-            try {
-                const today = Utils.getLocalToday();
-                const { data, error } = await supabaseClient.from('reminder_logs').select('id', { count: 'exact' }).eq('reminder_date', today);
-                if (error) return false;
-                return (data?.length || 0) > 0;
-            } catch (e) { return false; }
-        },
-
         async logReminder(orderId) {
             if (!supabaseClient) return false;
             const profile = await this.getCurrentProfile();
@@ -1615,17 +1559,15 @@
             });
         },
 
-        // ==================== 【修复】interest_shortfall 列检查 ====================
+        // ==================== interest_shortfall 列检查 ====================
         async ensureInterestShortfallColumn() {
             try {
-                // 先检查是否有有效的认证会话
                 const session = await this.getSession();
                 if (!session) {
                     console.log('[Supabase] 无有效会话，跳过列检查');
                     return;
                 }
                 
-                // 检查列是否存在
                 const { data, error } = await supabaseClient
                     .from('orders')
                     .select('interest_shortfall')
@@ -1655,9 +1597,7 @@
             } catch (e) {
                 console.warn('[Supabase] 检查 interest_shortfall 列异常:', e.message);
             }
-        }, 
-        formatCurrency: amt => Utils.formatCurrency(amt),
-        formatDate: d => Utils.formatDate(d),
+        },
     };
 
     // 延迟列检查
