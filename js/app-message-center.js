@@ -1,4 +1,4 @@
-// app-message-center.js - 消息中心（半自动通知管理）
+// app-message-center.js - v1.1 修复消息去重逻辑
 
 'use strict';
 
@@ -119,9 +119,20 @@
                 }
             }
             
-            // 按逾期天数排序
+            // 按逾期天数排序（逾期多的在前）
             messages.sort((a, b) => (b.overdueDays || 0) - (a.overdueDays || 0));
-            return messages;
+            
+            // 去重：同一订单只保留第一条（逾期提醒优先）
+            const seen = new Set();
+            const uniqueMessages = [];
+            for (const msg of messages) {
+                if (!seen.has(msg.orderId)) {
+                    seen.add(msg.orderId);
+                    uniqueMessages.push(msg);
+                }
+            }
+            
+            return uniqueMessages;
         },
         
         _getPaymentAmount(order) {
@@ -286,5 +297,5 @@
         window.APP = { showMessageCenter: MessageCenter.showMessageCenter.bind(MessageCenter) };
     }
 
-    console.log('✅ JF.MessageCenter v1.0 初始化完成');
+    console.log('✅ JF.MessageCenter v1.1 修复完成（消息去重）');
 })();
