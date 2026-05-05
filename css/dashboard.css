@@ -768,15 +768,15 @@
     }
 
     .quick-card {
-        grid-column: span 15 !important;;
+        grid-column: span 15;
     }
 
     .order-status-card {
-        grid-column: span 15 !important;;
+        grid-column: span 15;
     }
 
     .message-center-card {
-        grid-column: span 14 !important;;
+        grid-column: span 14;
     }
 
     /* 防止内容撑爆 */
