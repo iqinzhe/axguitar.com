@@ -468,9 +468,6 @@
 
             const appDiv = document.getElementById("app");
             const hasShell = appDiv && appDiv.querySelector('.dashboard-v2');
-            if (appDiv && !hasShell) {
-                appDiv.innerHTML = Utils.renderSkeleton('dashboard');
-            }
             
             try {
                 const lang = Utils.lang;
