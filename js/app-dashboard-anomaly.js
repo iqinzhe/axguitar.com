@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.1 清理废弃方法
+// app-dashboard-anomaly.js - v2.2 修复黑名单加载重复问题
 
 'use strict';
 
@@ -129,6 +129,7 @@
                     JF.Cache.get(`${cacheKeyBase}_30_999`, () => this._getOverdueOrdersRange(profile, 30, 999), { ttl: 3 * 60 * 1000 })
                 ]);
 
+                // 初始加载黑名单第一页
                 const blacklistResult = await JF.Cache.get('blacklist_customers_0',
                     () => AnomalyPage._getBlacklistCustomers(0, 50),
                     { ttl: 3 * 60 * 1000 }
@@ -248,7 +249,13 @@
                     <div class="page-header"><h2>⚠️ ${t('anomaly_title')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button></div></div>
                     ${contentGrid}`;
 
-                window._anomalyBlacklistState = { page: 0, pageSize: 50, totalCount: blacklistTotalCount };
+                // 初始化黑名单加载状态（包含加载锁）
+                window._anomalyBlacklistState = { 
+                    page: 0, 
+                    pageSize: 50, 
+                    totalCount: blacklistTotalCount,
+                    isLoadingMore: false   // 增加加载锁标志
+                };
                 return content;
             } catch (error) {
                 console.error("buildAnomalyHTML error:", error);
@@ -331,34 +338,55 @@
         async loadMoreBlacklist() {
             const state = window._anomalyBlacklistState;
             if (!state) return;
+            
+            // 防止重复点击加载
+            if (state.isLoadingMore) return;
+            state.isLoadingMore = true;
+            
             const lang = Utils.lang;
             const btn = document.querySelector('#blacklistLoadMoreRow button');
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + (lang==='id'?'Memuat...':'加载中...'); }
+            if (btn) { 
+                btn.disabled = true; 
+                btn.textContent = '⏳ ' + (lang==='id'?'Memuat...':'加载中...'); 
+            }
+            
             try {
                 const nextPage = state.page + 1;
+                // 直接请求数据，不使用缓存，确保获取最新结果
                 const result = await AnomalyPage._getBlacklistCustomers(nextPage, state.pageSize);
                 let newRows = '';
                 for (const b of result.data) {
                     newRows += `<tr><td>${Utils.escapeHtml(b.customers?.customer_id||'-')}</td><td>${Utils.escapeHtml(b.customers?.name||'-')}</td><td>${Utils.escapeHtml(b.customers?.phone||'-')}</td><td>${Utils.escapeHtml(b.reason)}</td></tr>`;
                 }
+                // 移除旧的加载行
                 const oldRow = document.getElementById('blacklistLoadMoreRow');
                 if (oldRow) oldRow.remove();
+                
                 const tbody = document.querySelector('.anomaly-card-warning table tbody');
                 if (tbody) {
                     tbody.insertAdjacentHTML('beforeend', newRows);
+                    // 更新状态
                     state.page = nextPage;
                     state.totalCount = result.totalCount;
+                    
                     const loadedCount = (nextPage + 1) * state.pageSize;
                     if (result.totalCount > loadedCount) {
                         const loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn btn--sm btn--primary">⬇️ ${lang==='id'?'Muat Lebih Banyak':'加载更多'} (${result.totalCount - loadedCount} ${lang==='id'?'tersisa':'剩余'})</button></td></tr>`;
                         tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
                     } else {
+                        // 全部加载完毕
                         tbody.insertAdjacentHTML('beforeend', `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;color:var(--text-muted);">✅ ${lang==='id'?`Semua ${result.totalCount} data telah dimuat`:`已加载全部 ${result.totalCount} 条数据`}</td></tr>`);
                     }
                 }
             } catch (err) {
                 console.error("loadMoreBlacklist error:", err);
-                if (btn) { btn.disabled = false; btn.textContent = '⬇️ ' + (lang==='id'?'Muat Lebih Banyak':'加载更多'); }
+                if (btn) { 
+                    btn.disabled = false; 
+                    btn.textContent = '⬇️ ' + (lang==='id'?'Muat Lebih Banyak':'加载更多'); 
+                }
+            } finally {
+                // 释放加载锁
+                state.isLoadingMore = false;
             }
         },
 
@@ -382,5 +410,5 @@
     window.APP.loadMoreBlacklist = AnomalyPage.loadMoreBlacklist.bind(AnomalyPage);
     window.APP.clearAnomalyCache = AnomalyPage.clearAnomalyCache.bind(AnomalyPage);
 
-    console.log('✅ JF.AnomalyPage v2.1 已清理（移除废弃方法）');
+    console.log('✅ JF.AnomalyPage v2.2 已修复（黑名单加载锁、防重复）');
 })();
