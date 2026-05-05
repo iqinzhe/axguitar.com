@@ -1,5 +1,5 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局（v3.1 经典行 · 右侧列宽统一）
+   dashboard.css - 仪表盘专属布局（v3.2 右侧三卡统一加宽）
    =============================*/
 
 /* ==============================
@@ -341,7 +341,7 @@
 }
 
 /* ============================================================
-   六、KPI 卡片行（第一行）
+   六、KPI 卡片（第一行）— 移动端仍四等分，桌面端会在 @media 中改为右宽列
    ============================================================ */
 .kpi-row {
     display: grid;
@@ -402,7 +402,7 @@
 }
 .kpi-trend.down { color: #dc2626; }
 
-/* 日历卡片专属 KPI 行（保留，移动端可能用到） */
+/* 日历卡片专属 KPI 行（移动端备用） */
 .kpi-row--calendar {
     grid-template-columns: 1fr 1fr 1fr 1.4fr;
 }
@@ -506,7 +506,7 @@
     transform: translateY(-1px);
 }
 
-/* 资金结构内部布局 */
+/* 资金结构内部 */
 .fund-total-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -727,7 +727,7 @@
 .preview-more:hover { color: #0e7490; text-decoration: underline; }
 
 /* ==============================
-   十一、桌面端微调（≥769px）- 右侧列宽统一布局
+   十一、桌面端布局（≥769px）— 右列加宽，一行三卡片
    ============================*/
 @media (min-width: 769px) {
     .dashboard-v2 { position: relative; }
@@ -744,17 +744,15 @@
         box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
     }
 
-    /* ---- 第一行保持四列等分，不变 ---- */
+    /* ---- 统一列宽：前三列等宽，第四列（右侧）加宽 ---- */
+    /* 使用比例 1fr 1fr 1fr 1.4fr（可根据需要调整） */
     .kpi-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
+        grid-template-columns: 1fr 1fr 1fr 1.4fr;
     }
 
-    /* ---- 第二行：资金结构跨3列，收入构成跨1列（右侧列宽与日历一致） ---- */
+    /* 第二行：资金结构跨前三列，收入构成跨第四列 */
     .mid-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: 1fr 1fr 1fr 1.4fr;
         gap: 10px;
     }
     .fund-flow-card {
@@ -764,28 +762,27 @@
         grid-column: span 1;
     }
 
-    /* ---- 第三行：快捷操作跨2列，消息中心和订单状态分布各占1列 ---- */
+    /* 第三行：保持一行三列 */
     .bottom-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: 1fr 1fr 1fr 1.4fr;
         gap: 10px;
+        /* 排列顺序：快捷操作 (span 2) → 消息中心 (span 1) → 订单状态分布 (span 1) */
     }
-    /* 调整顺序：快捷操作 -> 消息中心 -> 订单状态分布 */
     .bottom-row .quick-card {
         order: 1;
-        grid-column: span 2;
+        grid-column: span 2;  /* 跨越前两列 */
     }
     .bottom-row .message-center-card {
         order: 2;
-        grid-column: span 1;
+        grid-column: span 1;  /* 第三列 */
     }
     .bottom-row .order-status-card {
         order: 3;
-        grid-column: span 1;
+        grid-column: span 1;  /* 第四列（加宽列） */
     }
 }
 
-/* 移动端布局（≤768px）保持不变，沿用之前已完善的重排逻辑 */
+/* 移动端布局（≤768px）保持不变 */
 @media (max-width: 768px) {
     .dashboard-v2 {
         margin: -8px;
