@@ -1,4 +1,4 @@
-// app-payments.js - v2.0 (利息支付参数传递，解除 DOM 耦合)
+// app-payments.js - v2.1 修复利息支付幂等性检查和审计日志
 
 'use strict';
 
@@ -234,7 +234,7 @@
                             <div class="card" style="min-width:0;overflow-x:hidden;">
                                 <div class="card-header"><h3>💰 ${t('pay_interest')}</h3></div>
                                 <div class="card-body">
-                                    <div class="info-box"><div class="info-row"><span>📌 ${t('interest_payment_num')}<strong>${nextInterestNumber}</strong> ${t('times')}</span></div><div class="info-row"><span>💰 ${t('amount_due')}:</span><strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></div><div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(0)}%</strong></div></div>
+                                    <div class="info-box"><div class="info-row"><span>📌 ${lang === 'id' ? 'Pembayaran Bunga ke-' : '第'}${nextInterestNumber} ${lang === 'id' ? 'kali' : '次'}</span></div><div class="info-row"><span>💰 ${t('amount_due')}:</span><strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></div><div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(0)}%</strong></div></div>
                                     <div class="action-input-group"><label class="action-label">${lang === 'id' ? 'Jumlah Dibayar' : '缴纳金额'}:</label><input type="text" id="interestAmount" class="amount-input" placeholder="${Utils.formatCurrency(currentMonthlyInterest)}" value="${Utils.formatNumberWithCommas(Math.round(currentMonthlyInterest))}"><div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Bunga 1 bln: ${Utils.formatCurrency(currentMonthlyInterest)} | Bisa kurang/lebih` : `1个月利息: ${Utils.formatCurrency(currentMonthlyInterest)} | 可少缴/多缴`}</div></div>
                                     <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label></div></div>
                                     <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="interestConfirmBtn">✅ ${t('confirm_payment')}</button>
@@ -299,7 +299,7 @@
             }
         },
 
-        // ==================== 利息收款（修复：从 DOM 读取金额并传递） ====================
+        // ==================== 利息收款（修复：幂等性检查与审计日志） ====================
         async payInterestWithMethod(orderId) {
             const amountStr = document.getElementById("interestAmount")?.value || '0';
             const actualPaid = Utils.parseNumberFromCommas(amountStr) || 0;
@@ -318,7 +318,9 @@
             try {
                 const order = await SUPABASE.getOrder(orderId);
                 const calcResult = Utils.calculateInterestPartialPayment(order, actualPaid);
-                const isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', calcResult.interestPaid, method);
+
+                // 增强的幂等性检查：使用实际支付金额
+                const isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', actualPaid, method);
                 if (isDuplicate) {
                     Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '此笔付款已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
@@ -338,7 +340,7 @@
 
                 try {
                     if (calcResult.interestPaid > 0) {
-                        // **关键修复**：将 actualPaid 作为第四个参数传入
+                        // 传入实际支付金额
                         await SUPABASE.recordInterestPayment(orderId, 1, method, actualPaid);
                     }
                     if (calcResult.principalDeducted > 0) {
@@ -351,6 +353,13 @@
                     }
                     if (window.Audit) {
                         await window.Audit.logPayment(order.order_id, 'interest', actualPaid, method);
+                        // 额外记录计算详情用于审计
+                        await window.Audit.log('interest_payment_calc', JSON.stringify({
+                            order_id: order.order_id,
+                            actualPaid,
+                            calcResult,
+                            timestamp: new Date().toISOString()
+                        }));
                         if (calcResult.principalDeducted !== 0) {
                             await window.Audit.log('interest_adjustment', JSON.stringify({ order_id: order.order_id, actual_paid: actualPaid, interest_recorded: calcResult.interestPaid, principal_adjustment: calcResult.principalDeducted, description: calcResult.description }));
                         }
@@ -498,7 +507,6 @@
 
         // ==================== 打印结清凭证（不变） ====================
         async printSettlementReceipt(orderId) {
-            // 保持原有逻辑，无类名改动，此处省略（为避免文件过长，保留原始实现）
             const lang = Utils.lang;
             try {
                 const order = await SUPABASE.getOrder(orderId);
@@ -590,5 +598,5 @@
         };
     }
 
-    console.log('✅ JF.PaymentPage v2.1 重构完成（利息支付参数传递，解除 DOM 耦合）');
+    console.log('✅ JF.PaymentPage v2.2 修复完成（增强幂等性检查，审计日志）');
 })();
