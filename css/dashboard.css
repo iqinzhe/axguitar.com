@@ -726,60 +726,68 @@
 .preview-more:hover { color: #0e7490; text-decoration: underline; }
 
 /* ==============================
-   十一、桌面端对齐布局（三列精准对齐版 - 比例修正）
+   十一、桌面端对齐布局（44列系统 - 完全精准版）
    ============================*/
 @media (min-width: 769px) {
-    .dashboard-v2 { position: relative; }
+
+    /* ===== 全局统一网格（核心升级）===== */
     .dash-main {
-        overflow-y: auto;
-        overflow-x: hidden;
-        height: calc(100vh - var(--topbar-height));
-        scrollbar-width: thin;
-    }
-    .dash-sidebar {
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-    }
-
-    /* 第一行：四列，右侧加宽（日历/收入对齐） */
-    .kpi-row {
-        grid-template-columns: 1fr 1fr 1fr 1.4fr;
-    }
-
-    /* 第二行：同样四列，资金结构跨前三列，收入构成在第四列 */
-    .mid-row {
-        grid-template-columns: 1fr 1fr 1fr 1.4fr;
-        gap: 10px;
-    }
-    .fund-flow-card {
-        grid-column: span 3;
-    }
-    .income-card {
-        grid-column: span 1;
-    }
-
-    /* 第三行：三列网格 —— 前两列各1.5fr（总宽3fr，与资金结构卡片等宽），第三列1.4fr（与收入构成卡片等宽） */
-    .bottom-row {
         display: grid;
-        grid-template-columns: 1.5fr 1.5fr 1.4fr;  /* 关键修正：前两列总宽 = 3fr，与资金结构一致 */
+        grid-template-columns: repeat(44, 1fr);
         gap: 10px;
     }
+
+    /* ===== KPI 行 ===== */
+    .kpi-row {
+        grid-column: span 44;
+        display: contents;
+    }
+    .kpi-card {
+        grid-column: span 10; /* 1fr */
+    }
+    .kpi-card--calendar {
+        grid-column: span 14; /* 1.4fr */
+    }
+
+    /* ===== 第二行 ===== */
+    .mid-row {
+        grid-column: span 44;
+        display: contents;
+    }
+
+    .fund-flow-card {
+        grid-column: span 30; /* 3fr */
+    }
+
+    .income-card {
+        grid-column: span 14; /* 1.4fr */
+    }
+
+    /* ===== 第三行（关键优化）===== */
+    .bottom-row {
+        grid-column: span 44;
+        display: contents;
+    }
+
     .quick-card {
-        grid-column: 1 / 2;
+        grid-column: span 15;
         order: 1;
     }
+
     .order-status-card {
-        grid-column: 2 / 3;
+        grid-column: span 15;
         order: 2;
     }
+
     .message-center-card {
-        grid-column: 3 / 4;
+        grid-column: span 14;
         order: 3;
     }
-    /* 确保卡片内部内容不会破坏宽度 */
-    .quick-card, .order-status-card, .message-center-card {
+
+    /* 防止溢出 */
+    .quick-card,
+    .order-status-card,
+    .message-center-card {
         min-width: 0;
     }
 }
