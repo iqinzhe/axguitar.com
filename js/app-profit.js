@@ -1,5 +1,6 @@
-// app-profit.js - v2.0 (JF 命名空间) 
+// app-profit.js - v2.1 (JF 命名空间)
 // 收益处置页面（利润再投入 / 偿还本金）
+// v2.1：store_manager 可处置本店收益（admin 可处置所有门店）
 
 'use strict';
 
@@ -15,14 +16,24 @@
             try {
                 const profile = await SUPABASE.getCurrentProfile();
                 const isAdmin = profile?.role === 'admin';
-                if (!isAdmin) {
-                    Utils.toast.warning(lang === 'id' ? 'Hanya admin' : '仅管理员可操作');
+                const isStoreManager = profile?.role === 'store_manager';
+
+                // 仅 admin 和 store_manager 可操作
+                if (!isAdmin && !isStoreManager) {
+                    Utils.toast.warning(lang === 'id' ? 'Hanya admin atau manajer toko' : '仅管理员或分店经理可操作');
                     return;
                 }
 
-                // 管理员可能无 store_id，需要从门店列表选择
-                const stores = await SUPABASE.getAllStores();
-                const firstStoreId = profile?.store_id || stores[0]?.id;
+                // admin 可选择任意门店；store_manager 锁定本店
+                const stores = isAdmin ? await SUPABASE.getAllStores() : null;
+                const firstStoreId = isAdmin
+                    ? (profile?.store_id || stores[0]?.id)
+                    : profile?.store_id;
+
+                if (!firstStoreId) {
+                    Utils.toast.warning(lang === 'id' ? 'Toko tidak ditemukan' : '未找到关联门店，请联系管理员');
+                    return;
+                }
 
                 let distributableProfit = 0;
                 let externalCapitalBalance = 0;
@@ -33,7 +44,8 @@
                 }
 
                 let storeSelectorHtml = '';
-                if (!profile?.store_id) {
+                if (isAdmin && !profile?.store_id) {
+                    // admin 无固定门店：显示下拉选择器
                     storeSelectorHtml = `
                         <div class="form-group">
                             <label>🏪 ${lang === 'id' ? 'Pilih Toko' : '选择门店'}</label>
@@ -42,7 +54,11 @@
                             </select>
                         </div>`;
                 } else {
-                    storeSelectorHtml = `<p><strong>🏪 ${lang === 'id' ? 'Toko' : '门店'}:</strong> ${Utils.escapeHtml(profile.stores?.name || '')}</p>`;
+                    // admin 绑定了门店 或 store_manager：显示只读门店名，不允许切换
+                    const storeName = profile?.stores?.name || profile?.store_name || firstStoreId;
+                    storeSelectorHtml = `
+                        <p><strong>🏪 ${lang === 'id' ? 'Toko' : '门店'}:</strong> ${Utils.escapeHtml(storeName)}</p>
+                        <input type="hidden" id="distStoreSelect" value="${firstStoreId}">`;
                 }
 
                 const content = `
@@ -154,5 +170,5 @@
     window.APP = window.APP || {};
     window.APP.showDistributionPage = ProfitPage.showDistributionPage.bind(ProfitPage);
 
-    console.log('✅ JF.ProfitPage v2.0 重构完成（类名统一）');
+    console.log('✅ JF.ProfitPage v2.1 更新完成（store_manager 可处置本店收益）');
 })();
