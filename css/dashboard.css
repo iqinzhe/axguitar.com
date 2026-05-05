@@ -763,7 +763,7 @@
     /* 第三行：三列网格 —— 前两列各1.5fr（总宽3fr，与资金结构卡片等宽），第三列1.4fr（与收入构成卡片等宽） */
     .bottom-row {
         display: grid;
-        grid-template-columns: 1.5fr 1.5fr 1.4fr;  /* 关键修正：前两列总宽 = 3fr，与资金结构一致 */
+        grid-template-columns: 1.5fr 1.5fr 1.3fr;  /* 关键修正：前两列总宽 = 3fr，与资金结构一致 */
         gap: 10px;
     }
     .quick-card {
