@@ -1,5 +1,5 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局
+   dashboard.css - 仪表盘专属布局（v3.1 经典行 · 右侧列宽统一）
    =============================*/
 
 /* ==============================
@@ -341,7 +341,7 @@
 }
 
 /* ============================================================
-   六、KPI 卡片行
+   六、KPI 卡片行（第一行）
    ============================================================ */
 .kpi-row {
     display: grid;
@@ -402,11 +402,9 @@
 }
 .kpi-trend.down { color: #dc2626; }
 
-/* ==============================
-   日历卡片专属 KPI 行
-   ============================== */
+/* 日历卡片专属 KPI 行（保留，移动端可能用到） */
 .kpi-row--calendar {
-    grid-template-columns: 1fr 1fr 1fr 1.4fr;  /* 日历列稍宽 */
+    grid-template-columns: 1fr 1fr 1fr 1.4fr;
 }
 
 @media (max-width: 768px) {
@@ -414,7 +412,7 @@
         grid-template-columns: 1fr 1fr;
     }
     .kpi-card--calendar {
-        grid-column: span 2;  /* 日历单独占一整行 */
+        grid-column: span 2;
     }
 }
 
@@ -423,7 +421,6 @@
     width: 100%;
     font-size: 10px;
 }
-
 .calendar-header {
     text-align: center;
     font-weight: 700;
@@ -431,13 +428,11 @@
     margin-bottom: 4px;
     color: var(--text-primary);
 }
-
 .cal-table {
     width: 100%;
     text-align: center;
     border-collapse: collapse;
 }
-
 .cal-table th,
 .cal-table td {
     padding: 1px 0;
@@ -445,17 +440,8 @@
     color: var(--text-secondary);
     border: none;
 }
-
-.cal-cell {
-    position: relative;
-}
-
-.cal-date {
-    display: block;
-    font-size: 11px;
-    color: var(--text-primary);
-}
-
+.cal-cell { position: relative; }
+.cal-date { display: block; font-size: 11px; color: var(--text-primary); }
 .cal-due-count {
     display: inline-block;
     background: #ef4444;
@@ -469,10 +455,7 @@
     transition: background 0.2s;
     line-height: 1.4;
 }
-
-.cal-due-count:hover {
-    background: #dc2626;
-}
+.cal-due-count:hover { background: #dc2626; }
 
 /* 弹出浮层 */
 .cal-popup {
@@ -485,35 +468,16 @@
     font-size: 12px;
     z-index: 10000;
 }
-
 .cal-popup-title {
     font-weight: 600;
     margin-bottom: 6px;
     padding-bottom: 4px;
     border-bottom: 1px solid #e2e8f0;
 }
-
-.cal-popup ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.cal-popup li {
-    margin: 5px 0;
-}
-
-.cal-popup a {
-    color: #0e7490;
-    text-decoration: none;
-    display: block;
-    padding: 2px 0;
-}
-
-.cal-popup a:hover {
-    color: #0369a1;
-    text-decoration: underline;
-}
+.cal-popup ul { list-style: none; padding: 0; margin: 0; }
+.cal-popup li { margin: 5px 0; }
+.cal-popup a { color: #0e7490; text-decoration: none; display: block; padding: 2px 0; }
+.cal-popup a:hover { color: #0369a1; text-decoration: underline; }
 
 /* ==============================
    七、中间行（资金结构 + 收入构成）
@@ -542,7 +506,7 @@
     transform: translateY(-1px);
 }
 
-/* 资金结构 */
+/* 资金结构内部布局 */
 .fund-total-row {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -559,7 +523,6 @@
 .fund-block--injected { background: #e0f2fe; border: 1px solid #7dd3fc; }
 .fund-block--deployed  { background: #fef9c3; border: 1px solid #fde047; }
 .fund-block--free      { background: #dcfce7; border: 1px solid #86efac; }
-
 .fund-block-label {
     font-size: var(--font-xs);
     font-weight: 600;
@@ -569,7 +532,6 @@
 .fund-block--injected .fund-block-label { color: #475569; }
 .fund-block--deployed  .fund-block-label { color: #475569; }
 .fund-block--free      .fund-block-label { color: #475569; }
-
 .fund-block-val {
     font-size: var(--font-xl);
     font-weight: 700;
@@ -579,35 +541,13 @@
 .fund-block--injected .fund-block-val { color: #0c4a6e; }
 .fund-block--deployed  .fund-block-val { color: #78350f; }
 .fund-block--free      .fund-block-val { color: #14532d; }
-
-.fund-block-sub {
-    font-size: 0.65rem;
-    color: #64748b;
-}
+.fund-block-sub { font-size: 0.65rem; color: #64748b; }
 
 /* 利用率条 */
-.util-bar-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin: 12px 0;
-}
-.util-bar-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.72rem;
-    color: #475569;
-}
-.util-bar-pct {
-    font-weight: 700;
-    color: #f59e0b;
-}
-.util-bar-track {
-    height: 8px;
-    background: #f1f5f9;
-    border-radius: 8px;
-    overflow: hidden;
-}
+.util-bar-wrap { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.util-bar-label { display: flex; justify-content: space-between; font-size: 0.72rem; color: #475569; }
+.util-bar-pct { font-weight: 700; color: #f59e0b; }
+.util-bar-track { height: 8px; background: #f1f5f9; border-radius: 8px; overflow: hidden; }
 .util-bar-fill {
     height: 100%;
     background: linear-gradient(90deg, #f59e0b, #fbbf24);
@@ -616,12 +556,7 @@
 }
 
 /* 现金银行行 */
-.cash-bank-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 10px;
-}
+.cash-bank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
 .cash-bank-item {
     background: #f4f8fb;
     border: 1px solid #c8d8e8;
@@ -631,35 +566,14 @@
     flex-direction: column;
     gap: 3px;
 }
-.cb-label {
-    font-size: var(--font-xs);
-    color: #475569;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.cb-val {
-    font-size: var(--font-xl);
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #0c1929;
-    margin: 2px 0;
-}
-.cb-flow {
-    font-size: 0.65rem;
-    color: #64748b;
-    line-height: 1.4;
-}
+.cb-label { font-size: var(--font-xs); color: #475569; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.cb-val { font-size: var(--font-xl); font-weight: 700; font-family: var(--font-mono); color: #0c1929; margin: 2px 0; }
+.cb-flow { font-size: 0.65rem; color: #64748b; line-height: 1.4; }
 .cb-flow span.in  { color: #15803d; font-weight: 600; }
 .cb-flow span.out { color: #b91c1c; font-weight: 600; }
 
 /* 转账按钮 */
-.transfer-row-v2 {
-    display: flex;
-    gap: 7px;
-    margin-top: 7px;
-}
+.transfer-row-v2 { display: flex; gap: 7px; margin-top: 7px; }
 .tx-btn-v2 {
     flex: 1;
     background: #f4f8fb;
@@ -673,50 +587,16 @@
     cursor: pointer;
     transition: all 0.15s ease;
 }
-.tx-btn-v2:hover {
-    background: #e0f2fe;
-    border-color: #7dd3fc;
-    color: #0e7490;
-}
+.tx-btn-v2:hover { background: #e0f2fe; border-color: #7dd3fc; color: #0e7490; }
 
 /* 收入构成 */
-.income-items {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.income-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: #f4f8fb;
-    border-radius: 9px;
-}
-.income-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-.income-name {
-    font-size: var(--font-sm);
-    color: #1e3a52;
-    font-weight: 500;
-    flex: 1;
-}
-.income-amt {
-    font-size: var(--font-xl);
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #15803d;
-}
+.income-items { display: flex; flex-direction: column; gap: 6px; }
+.income-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f4f8fb; border-radius: 9px; }
+.income-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.income-name { font-size: var(--font-sm); color: #1e3a52; font-weight: 500; flex: 1; }
+.income-amt { font-size: var(--font-xl); font-weight: 700; font-family: var(--font-mono); color: #15803d; }
 .income-amt.expense { color: #b91c1c; }
-.income-sub {
-    font-size: var(--font-xs);
-    color: #64748b;
-    margin-top: 1px;
-}
+.income-sub { font-size: var(--font-xs); color: #64748b; margin-top: 1px; }
 
 /* 净利润盒子 */
 .net-profit-box {
@@ -729,26 +609,12 @@
     align-items: center;
     margin-top: 10px;
 }
-.np-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #0c4a6e;
-}
-.np-sub {
-    font-size: 0.6rem;
-    color: #475569;
-    margin-top: 2px;
-}
-.np-val {
-    font-size: var(--font-xl);
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #0e7490;
-}
+.np-label { font-size: 0.75rem; font-weight: 600; color: #0c4a6e; }
+.np-sub { font-size: 0.6rem; color: #475569; margin-top: 2px; }
+.np-val { font-size: var(--font-xl); font-weight: 700; font-family: var(--font-mono); color: #0e7490; }
 
 /* ==============================
    八、底部行（快捷操作 + 订单状态分布 + 消息中心）
-   注意：桌面端通过 order 互换消息中心和订单状态分布的位置
    ============================*/
 .bottom-row {
     display: grid;
@@ -777,12 +643,7 @@
 }
 
 /* 快捷操作网格 */
-.quick-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 6px;
-}
+.quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
 .quick-btn {
     background: #f4f8fb;
     border: 1px solid #c8d8e8;
@@ -796,24 +657,11 @@
     transition: all 0.18s ease;
     text-decoration: none;
 }
-.quick-btn:hover {
-    border-color: #7dd3fc;
-    background: #e0f2fe;
-    transform: translateY(-2px);
-}
-.quick-btn:hover .qb-label {
-    color: #0e7490;
-}
-.quick-btn.red-hover:hover {
-    border-color: #fecaca;
-    background: #fff1f2;
-}
-.quick-btn.red-hover:hover .qb-label {
-    color: #b91c1c;
-}
-.qb-icon {
-    font-size: 17px;
-}
+.quick-btn:hover { border-color: #7dd3fc; background: #e0f2fe; transform: translateY(-2px); }
+.quick-btn:hover .qb-label { color: #0e7490; }
+.quick-btn.red-hover:hover { border-color: #fecaca; background: #fff1f2; }
+.quick-btn.red-hover:hover .qb-label { color: #b91c1c; }
+.qb-icon { font-size: 17px; }
 .qb-label {
     font-size: var(--font-xs);
     font-weight: 600;
@@ -823,49 +671,14 @@
 }
 
 /* 环形图区域 */
-.donut-area {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    margin-top: 8px;
-    flex-wrap: wrap;
-}
-.donut-svg {
-    flex-shrink: 0;
-}
-.donut-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1;
-}
-.legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-.legend-name {
-    font-size: var(--font-xs);
-    color: #1f2937;
-    flex: 1;
-}
-.legend-count {
-    font-size: var(--font-xl);
-    font-weight: 700;
-    font-family: var(--font-mono);
-    color: #1a1a2e;
-}
-.legend-pct {
-    font-size: var(--font-xs);
-    color: #64748b;
-    margin-top: 1px;
-}
+.donut-area { display: flex; align-items: center; gap: 20px; margin-top: 8px; flex-wrap: wrap; }
+.donut-svg { flex-shrink: 0; }
+.donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-name { font-size: var(--font-xs); color: #1f2937; flex: 1; }
+.legend-count { font-size: var(--font-xl); font-weight: 700; font-family: var(--font-mono); color: #1a1a2e; }
+.legend-pct { font-size: var(--font-xs); color: #64748b; margin-top: 1px; }
 
 /* ===========================
    九、侧边栏遮罩
@@ -873,16 +686,11 @@
 .sidebar-overlay {
     display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, 0.4);
     z-index: 99;
 }
-.sidebar-overlay.active {
-    display: block;
-}
+.sidebar-overlay.active { display: block; }
 
 /* ==============================
    十、消息中心卡片样式
@@ -896,74 +704,33 @@
     border-radius: 20px;
     margin-left: 8px;
 }
-.message-preview {
-    margin-top: 8px;
-    flex: 1;
-}
-.empty-preview {
-    text-align: center;
-    padding: 20px;
-    color: #94a3b8;
-    font-size: 13px;
-}
-.preview-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
+.message-preview { margin-top: 8px; flex: 1; }
+.empty-preview { text-align: center; padding: 20px; color: #94a3b8; font-size: 13px; }
+.preview-list { display: flex; flex-direction: column; gap: 8px; }
 .preview-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     padding: 8px 10px;
     background: #f8fafc;
     border-radius: 8px;
     font-size: 12px;
     border-left: 3px solid #cbd5e1;
 }
-.preview-item.urgent {
-    border-left-color: #ef4444;
-    background: #fef2f2;
-}
-.preview-order {
-    font-weight: 600;
-    color: #0e7490;
-    min-width: 80px;
-}
-.preview-name {
-    flex: 1;
-    color: #1e293b;
-}
+.preview-item.urgent { border-left-color: #ef4444; background: #fef2f2; }
+.preview-order { font-weight: 600; color: #0e7490; min-width: 80px; }
+.preview-name { flex: 1; color: #1e293b; }
 .preview-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 12px;
-    background: #e2e8f0;
-    white-space: nowrap;
+    font-size: 10px; padding: 2px 6px; border-radius: 12px;
+    background: #e2e8f0; white-space: nowrap;
 }
-.preview-item.urgent .preview-badge {
-    background: #fee2e2;
-    color: #dc2626;
-}
-.preview-more {
-    text-align: center;
-    font-size: 11px;
-    color: #64748b;
-    padding: 6px;
-    cursor: pointer;
-}
-.preview-more:hover {
-    color: #0e7490;
-    text-decoration: underline;
-}
+.preview-item.urgent .preview-badge { background: #fee2e2; color: #dc2626; }
+.preview-more { text-align: center; font-size: 11px; color: #64748b; padding: 6px; cursor: pointer; }
+.preview-more:hover { color: #0e7490; text-decoration: underline; }
 
 /* ==============================
-   十一、桌面端微调（≥769px）- 互换消息中心和订单状态分布的位置
+   十一、桌面端微调（≥769px）- 右侧列宽统一布局
    ============================*/
 @media (min-width: 769px) {
-    .dashboard-v2 {
-        position: relative;
-    }
+    .dashboard-v2 { position: relative; }
     .dash-main {
         overflow-y: auto;
         overflow-x: hidden;
@@ -977,28 +744,48 @@
         box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
     }
 
-    /* 关键调整：互换位置 */
-    .bottom-row {
+    /* ---- 第一行保持四列等分，不变 ---- */
+    .kpi-row {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 10px;
     }
-    /* 让消息中心显示在第一列，订单状态分布显示在第二列 */
-    .bottom-row .message-center-card {
+
+    /* ---- 第二行：资金结构跨3列，收入构成跨1列（右侧列宽与日历一致） ---- */
+    .mid-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+    }
+    .fund-flow-card {
+        grid-column: span 3;
+    }
+    .income-card {
+        grid-column: span 1;
+    }
+
+    /* ---- 第三行：快捷操作跨2列，消息中心和订单状态分布各占1列 ---- */
+    .bottom-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+    }
+    /* 调整顺序：快捷操作 -> 消息中心 -> 订单状态分布 */
+    .bottom-row .quick-card {
         order: 1;
+        grid-column: span 2;
+    }
+    .bottom-row .message-center-card {
+        order: 2;
+        grid-column: span 1;
     }
     .bottom-row .order-status-card {
-        order: 2;
-    }
-    .bottom-row .quick-card {
-        order: 0;
+        order: 3;
+        grid-column: span 1;
     }
 }
 
-/* ==============================
-   十二、移动端布局（≤768px）- 完全重排顺序：
-   顺序：消息中心 → 快捷操作 → 收入构成 → 其他所有内容 → 订单状态分布（最底部）
-   ============================*/
+/* 移动端布局（≤768px）保持不变，沿用之前已完善的重排逻辑 */
 @media (max-width: 768px) {
     .dashboard-v2 {
         margin: -8px;
@@ -1031,26 +818,13 @@
         text-overflow: ellipsis;
         flex-shrink: 1;
     }
-    .topbar-left {
-        gap: 6px;
-        flex: 1;
-        min-width: 0;
-    }
+    .topbar-left { gap: 6px; flex: 1; min-width: 0; }
     
-    /* 隐藏顶部三角警示按钮 */
-    .dash-topbar .btn--warning {
-        display: none;
-    }
+    .dash-topbar .btn--warning { display: none; }
     
-    /* 侧边栏（移动端） */
     .dash-sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: 45vw;
-        min-width: 160px;
-        max-width: 200px;
+        position: fixed; top: 0; left: 0; bottom: 0;
+        width: 45vw; min-width: 160px; max-width: 200px;
         height: 100%;
         background: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
         z-index: 1001;
@@ -1059,25 +833,16 @@
         overflow-y: auto;
         box-shadow: 2px 0 12px rgba(0,0,0,0.15);
     }
-    .dash-sidebar.open {
-        transform: translateX(0);
-    }
+    .dash-sidebar.open { transform: translateX(0); }
     .sidebar-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(0,0,0,0.6);
         backdrop-filter: blur(2px);
         z-index: 1000;
         display: none;
     }
-    .sidebar-overlay.active {
-        display: block;
-    }
+    .sidebar-overlay.active { display: block; }
     
-    /* 主内容区作为 flex 列容器，支持 order 排序 */
     .dash-main {
         padding: 14px 12px;
         margin-top: 0;
@@ -1088,126 +853,48 @@
         min-height: calc(100vh - 56px);
     }
     
-    body.menu-open {
-        overflow: hidden;
-        position: fixed;
-        width: 100%;
-    }
+    body.menu-open { overflow: hidden; position: fixed; width: 100%; }
     
-   /* 重置所有直接子元素的 order，避免历史干扰 */
-.dash-main > * {
-    order: 0;
-}
+    .dash-main > * { order: 0; }
 
-/* 
-   重新排序（按照需求）：
-   1. 消息中心 
-   2. 快捷操作 
-   3. 收入构成 
-   4. 其他区域（KPI行、中间行、资金结构、现金银行等）
-   5. 订单状态分布（最底部）
-*/
-.message-center-card {
-    order: 1 !important;
-}
-.quick-card {
-    order: 2 !important;
-}
-.income-card {
-    order: 3 !important;
-}
-/* 其他所有内容统一 order 4（不再使用 :has()） */
-.kpi-row,
-.mid-row,
-.fund-flow-card,
-.cash-bank-row,
-.transfer-row-v2,
-.util-bar-wrap,
-.profit-distribution-grid {
-    order: 4 !important;
-}
-/* 订单状态分布置底 */
-.order-status-card {
-    order: 999 !important;
-    margin-top: 10px;
-}
+    .message-center-card { order: 1 !important; }
+    .quick-card { order: 2 !important; }
+    .income-card { order: 3 !important; }
+    .kpi-row, .mid-row, .fund-flow-card, .cash-bank-row, .transfer-row-v2, .util-bar-wrap, .profit-distribution-grid { order: 4 !important; }
+    .order-status-card { order: 999 !important; margin-top: 10px; }
 
-/* 让 .bottom-row 不再作为网格容器，其子元素直接参与排序 */
-.bottom-row {
-    display: contents !important;
-}
+    .bottom-row { display: contents !important; }
     
-    /* KPI 卡片双列展示 */
-    .kpi-row {
-        grid-template-columns: 1fr 1fr !important;
-        gap: 8px;
-    }
+    .kpi-row { grid-template-columns: 1fr 1fr !important; gap: 8px; }
     
-    /* 中间行、现金银行等单列 */
-    .mid-row,
-    .fund-total-row,
-    .cash-bank-row {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
+    .mid-row, .fund-total-row, .cash-bank-row { grid-template-columns: 1fr; gap: 12px; }
     
-    /* 收入构成卡片上方加间距 */
     .income-card {
         margin-top: 10px;
         border-top: 2px solid var(--border-light);
         padding-top: 18px;
     }
     
-    /* 订单分布水平排列 */
-    .donut-area {
-        flex-direction: row;
-        align-items: center;
-        gap: 20px;
-    }
-    .donut-legend {
-        width: auto;
-        flex: 1;
-    }
+    .donut-area { flex-direction: row; align-items: center; gap: 20px; }
+    .donut-legend { width: auto; flex: 1; }
     
-    .transfer-row-v2 {
-        flex-wrap: wrap;
-    }
-    
-    /* 快捷操作双列保持不变 */
-    .quick-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-    
-    /* 移动端时底部行中如果还有其他卡片（如快捷操作卡可能在别处），确保不冲突 */
-    .quick-card {
-        order: 2 !important;
-    }
+    .transfer-row-v2 { flex-wrap: wrap; }
+    .quick-grid { grid-template-columns: 1fr 1fr; }
 }
 
 /* ==============================
-   十三、小屏手机额外适配（≤480px）
+   十二、小屏手机额外适配（≤480px）
    ============================*/
 @media (max-width: 480px) {
-    .dash-topbar {
-        padding: 0 12px;
-    }
-    .dash-main {
-        padding: 10px 8px;
-    }
-    .kpi-row {
-        gap: 8px;
-        grid-template-columns: 1fr 1fr !important;
-    }
-    .kpi-card {
-        padding: 8px 10px;
-    }
-    .kpi-val {
-        font-size: calc(var(--font-xl) - 0.125rem);
-    }
+    .dash-topbar { padding: 0 12px; }
+    .dash-main { padding: 10px 8px; }
+    .kpi-row { gap: 8px; grid-template-columns: 1fr 1fr !important; }
+    .kpi-card { padding: 8px 10px; }
+    .kpi-val { font-size: calc(var(--font-xl) - 0.125rem); }
 }
 
 /* ==============================
-   十四、动画
+   十三、动画
    ============================*/
 @keyframes dashFadeIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -1218,19 +905,11 @@
     to   { opacity: 1; transform: translateY(0); }
 }
 
-.kpi-card,
-.fund-flow-card,
-.income-card,
-.quick-card,
-.order-status-card,
-.message-center-card {
+.kpi-card, .fund-flow-card, .income-card, .quick-card, .order-status-card, .message-center-card {
     animation: dashFadeIn 0.4s ease forwards;
 }
 .kpi-card:nth-child(2) { animation-delay: 0.05s; }
 .kpi-card:nth-child(3) { animation-delay: 0.10s; }
 .kpi-card:nth-child(4) { animation-delay: 0.15s; }
 
-.main-content-transition {
-    animation: fadeSlideUp 0.25s ease-out;
-}
-
+.main-content-transition { animation: fadeSlideUp 0.25s ease-out; }
