@@ -810,29 +810,29 @@
 
                 // 构建 KPI 行（替换第四个卡片为日历）
                 const kpiRowHTML = `
-                <div class="kpi-row kpi-row--calendar">
-                    <div class="kpi-card kpi-card--blue">
-                        <div class="kpi-icon">📋</div>
-                        <div class="kpi-val">${totalOrders}</div>
-                        <div class="kpi-label">${lang === 'id' ? 'Total Pesanan' : '累计订单总数'}</div>
-                        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月新增 +'}${newThisMonth}</div>
-                    </div>
-                    <div class="kpi-card kpi-card--green">
-                        <div class="kpi-icon">💵</div>
-                        <div class="kpi-val green">${Utils.formatCurrency(report.total_loan_amount)}</div>
-                        <div class="kpi-label">${lang === 'id' ? 'Total Pinjaman' : '累计放贷总额'}</div>
-                        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月发放 +'}${Utils.formatCurrency(newLoanThisMonth)}</div>
-                    </div>
-                    <div class="kpi-card kpi-card--amber">
-                        <div class="kpi-icon">🔄</div>
-                        <div class="kpi-val green">${activeOrders}</div>
-                        <div class="kpi-label">${lang === 'id' ? 'Pesanan Aktif' : '活跃在押订单'}</div>
-                        ${overdueOrders > 0 ? `<div class="kpi-trend down">${lang === 'id' ? 'Terlambat' : '逾期'} ${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'} ⚠️</div>` : `<div class="kpi-trend">${lang === 'id' ? 'Semua normal' : '全部正常'} ✅</div>`}
-                    </div>
-                    <div class="kpi-card kpi-card--calendar">
-                        ${buildWorkCalendarHTML(dueOrders, lang, dueMap)}
-                    </div>
-                </div>`;
+<div class="kpi-row kpi-row--calendar">
+    <div class="kpi-card kpi-card--blue">
+        <div class="kpi-icon">📋</div>
+        <div class="kpi-label">${lang === 'id' ? 'Total Pesanan' : '累计订单总数'}</div>
+        <div class="kpi-val">${totalOrders}</div>
+        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月新增 +'}${newThisMonth}</div>
+    </div>
+    <div class="kpi-card kpi-card--green">
+        <div class="kpi-icon">💵</div>
+        <div class="kpi-label">${lang === 'id' ? 'Total Pinjaman' : '累计放贷总额'}</div>
+        <div class="kpi-val green">${Utils.formatCurrency(report.total_loan_amount)}</div>
+        <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月发放 +'}${Utils.formatCurrency(newLoanThisMonth)}</div>
+    </div>
+    <div class="kpi-card kpi-card--amber">
+        <div class="kpi-icon">🔄</div>
+        <div class="kpi-label">${lang === 'id' ? 'Pesanan Aktif' : '活跃在押订单'}</div>
+        <div class="kpi-val green">${activeOrders}</div>
+        ${overdueOrders > 0 ? `<div class="kpi-trend down">${lang === 'id' ? 'Terlambat' : '逾期'} ${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'} ⚠️</div>` : `<div class="kpi-trend">${lang === 'id' ? 'Semua normal' : '全部正常'} ✅</div>`}
+    </div>
+    <div class="kpi-card kpi-card--calendar">
+        ${buildWorkCalendarHTML(dueOrders, lang, dueMap)}
+    </div>
+</div>`;
 
                 const finalHtml = `
         <div class="dashboard-v2">
