@@ -1,7 +1,9 @@
-// permission.js - v2.3 统一权限模块 (JF 命名空间)
+// permission.js - v2.5 统一权限模块 (JF 命名空间)
 // v2.1 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
 // v2.2 新增：store_manager 与 staff 权限规则拆分；store_manager 可处置本店收益
 // v2.3 修复：禁止员工发起内部转账（internal_transfer 仅限 store_manager 及以上）
+// v2.4 修复：店长可查看本店报表（report_view 对 store_manager 开放）；新增 cross_store_report_view 权限
+// v2.5 新增：审计日志查看权限项（audit_view 仅 admin）；员工支出金额上限阈值常量
 
 'use strict';
 
@@ -11,10 +13,14 @@
 
     const PERMISSION = {
 
+        // ==================== 业务常量 ====================
+        /** 员工单笔支出上限（超过此金额需店长确认） */
+        STAFF_EXPENSE_MAX_AMOUNT: 5000000,
+
         // ==================== 权限规则表（单一来源） ====================
         _rules: {
             admin: true,
-            // store_manager：分店经理，可处置本店收益
+            // store_manager：分店经理，可查看本店报表，可处置本店收益，可发起内部转账
             store_manager: {
                 // 订单
                 order_create: true,
@@ -31,8 +37,10 @@
                 expense_add: true,
                 expense_edit: false,
                 expense_delete: false,
-                // 报表
-                report_view: false,
+                // 报表：店长可查看本店经营报表
+                report_view: true,
+                // 跨店汇总报表（仅管理员）
+                cross_store_report_view: false,
                 // 用户管理（仅管理员）
                 user_manage: false,
                 user_create: false,
@@ -57,7 +65,7 @@
                 // 审计日志查看（仅管理员）
                 audit_view: false,
             },
-            // staff：普通员工，不可处置收益，不可发起内部转账
+            // staff：普通员工，不可处置收益，不可发起内部转账，不可查看跨店报表
             staff: {
                 // 订单
                 order_create: true,
@@ -70,12 +78,14 @@
                 customer_create: true,
                 customer_edit: true,
                 customer_delete: false,
-                // 支出
+                // 支出（添加受金额上限约束，见 STAFF_EXPENSE_MAX_AMOUNT）
                 expense_add: true,
                 expense_edit: false,
                 expense_delete: false,
                 // 报表
                 report_view: false,
+                // 跨店汇总报表（仅管理员）
+                cross_store_report_view: false,
                 // 用户管理（仅管理员）
                 user_manage: false,
                 user_create: false,
@@ -90,9 +100,8 @@
                 blacklist_add: true,
                 blacklist_remove: false,
                 blacklist_view: true,
-                // 资金流水
+                // 资金流水：员工可查看本店流水，但不可发起内部转账
                 cash_flow_view: true,
-                // 【v2.3 修复】禁止员工发起内部转账，资金调拨需店长及以上权限
                 internal_transfer: false,
                 // 备份恢复（仅管理员）
                 backup_restore: false,
@@ -148,16 +157,12 @@
          * @returns {Promise<boolean>} true: 有权限；false: 无权限
          */
         async checkStoreAccess(storeId) {
-            // 管理员总有权限
             if (this.isAdmin()) return true;
 
-            // 非管理员：必须有自己的 storeId，且与目标 storeId 一致
             try {
                 const profile = await SUPABASE.getCurrentProfile();
                 const userStoreId = profile?.store_id || null;
-                // 如果用户没有门店，无法访问任何门店数据
                 if (!userStoreId) return false;
-                // 要求目标门店ID与用户门店ID相同
                 return storeId === userStoreId;
             } catch (error) {
                 console.warn('checkStoreAccess 异常:', error);
@@ -183,11 +188,30 @@
             }
         },
 
+        // ==================== 支出金额阈值检查 ====================
+        /**
+         * 检查支出金额是否超过员工单笔上限
+         * @param {number} amount - 支出金额
+         * @returns {boolean} true: 未超限或用户非员工；false: 超过上限
+         */
+        canAddExpenseAmount(amount) {
+            if (this.isAdmin() || this.isStoreManager()) return true;
+            return amount <= this.STAFF_EXPENSE_MAX_AMOUNT;
+        },
+
+        /**
+         * 获取员工支出上限（用于 UI 提示）
+         * @returns {number}
+         */
+        getStaffExpenseMaxAmount() {
+            return this.STAFF_EXPENSE_MAX_AMOUNT;
+        },
+
         // ==================== 订单相关便捷方法 ====================
         canCreateOrder()     { return this.can('order_create'); },
         canViewOrder()       { return this.can('order_view'); },
         canPayOrder()        { return this.can('order_payment'); },
-        canEditOrder()       { return false; },  // 订单保存后不可编辑
+        canEditOrder()       { return false; },
         canDeleteOrder()     { return this.can('order_delete'); },
 
         // ==================== 客户相关 ====================
@@ -202,7 +226,8 @@
         canDeleteExpense()   { return this.can('expense_delete'); },
 
         // ==================== 报表 ====================
-        canViewReport()      { return this.can('report_view'); },
+        canViewReport()              { return this.can('report_view'); },
+        canViewCrossStoreReport()    { return this.isAdmin(); },
 
         // ==================== 用户管理 ====================
         canManageUsers()     { return this.can('user_manage'); },
@@ -217,27 +242,26 @@
         canDeleteStore()     { return this.can('store_delete'); },
 
         // ==================== 黑名单 ====================
-        canAddToBlacklist()  { return this.can('blacklist_add'); },
-        canRemoveFromBlacklist() { return this.can('blacklist_remove'); },
-        canViewBlacklist()   { return this.can('blacklist_view'); },
+        canAddToBlacklist()     { return this.can('blacklist_add'); },
+        canRemoveFromBlacklist(){ return this.can('blacklist_remove'); },
+        canViewBlacklist()      { return this.can('blacklist_view'); },
 
         // ==================== 资金流水 ====================
-        canViewCashFlow()    { return this.can('cash_flow_view'); },
-        canDoInternalTransfer() { return this.can('internal_transfer'); },
+        canViewCashFlow()        { return this.can('cash_flow_view'); },
+        canDoInternalTransfer()  { return this.can('internal_transfer'); },
 
         // ==================== 审计日志 ====================
-        canViewAuditLog()    { return this.can('audit_view'); },
+        canViewAuditLog()        { return this.can('audit_view'); },
 
         // ==================== 备份恢复 ====================
-        canBackup()          { return this.can('backup_restore'); },
-        canRestore()         { return this.can('backup_restore'); },
+        canBackup()              { return this.can('backup_restore'); },
+        canRestore()             { return this.can('backup_restore'); },
 
         // ==================== 平账 ====================
-        canReconcile()       { return AUTH.user?.role === 'admin'; },
+        canReconcile()           { return AUTH.user?.role === 'admin'; },
 
         // ==================== 收益处置 ====================
-        // admin 始终可操作；store_manager 可处置本店收益；staff 不可操作
-        canDistributeProfit() { return this.isAdmin() || this.can('profit_distribute'); },
+        canDistributeProfit()    { return this.isAdmin() || this.can('profit_distribute'); },
 
         // ==================== 角色判断 ====================
         isAdmin()            { return AUTH.user?.role === 'admin'; },
@@ -292,7 +316,7 @@
 
     // 挂载到命名空间
     JF.Permission = PERMISSION;
-    window.PERMISSION = PERMISSION; // 向下兼容
+    window.PERMISSION = PERMISSION;
 
-    console.log('✅ JF.Permission v2.3 初始化完成（禁止员工发起内部转账，预留审计日志权限项）');
+    console.log('✅ JF.Permission v2.5 初始化完成（内部转账仅店长+、店长可看本店报表、员工支出上限IDR 5,000,000、审计日志权限项）');
 })();
