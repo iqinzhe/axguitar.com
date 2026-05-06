@@ -1,4 +1,5 @@
-// storage.js - v2.0 统一备份恢复模块 (JF 命名空间)
+// storage.js - v2.1 统一备份恢复模块 (JF 命名空间)
+// v2.1: 审计日志查看增加权限检查
 
 'use strict';
 
@@ -164,7 +165,6 @@
             const results = { stores: 0, customers: 0, orders: 0, expenses: 0, payments: 0, cashFlows: 0, blacklist: 0 };
             const client = SUPABASE.getClient();
 
-            // 门店
             if (backupData.stores?.length > 0) {
                 const existingStores = await SUPABASE.getAllStores();
                 const existingIds = new Set(existingStores.map(s => s.id));
@@ -183,7 +183,6 @@
                 }
             }
 
-            // 客户
             if (backupData.customers?.length > 0) {
                 for (const customer of backupData.customers) {
                     const { data: existing } = await client.from('customers').select('id').eq('customer_id', customer.customer_id).maybeSingle();
@@ -206,7 +205,6 @@
                 }
             }
 
-            // 订单
             if (backupData.orders?.length > 0) {
                 for (const order of backupData.orders) {
                     const { data: existing } = await client.from('orders').select('id').eq('order_id', order.order_id).maybeSingle();
@@ -254,7 +252,6 @@
                 }
             }
 
-            // 缴费记录
             if (backupData.payments?.length > 0) {
                 for (const payment of backupData.payments) {
                     const { data: order } = await client.from('orders').select('id').eq('order_id', payment.orders?.order_id).maybeSingle();
@@ -273,7 +270,6 @@
                 }
             }
 
-            // 支出
             if (backupData.expenses?.length > 0) {
                 for (const expense of backupData.expenses) {
                     const { data: existing } = await client.from('expenses').select('id')
@@ -290,7 +286,6 @@
                 }
             }
 
-            // 资金流水
             if (backupData.cash_flows?.length > 0) {
                 for (const flow of backupData.cash_flows) {
                     const { error } = await client.from('cash_flow_records').insert({
@@ -304,7 +299,6 @@
                 }
             }
 
-            // 黑名单
             if (backupData.blacklist?.length > 0) {
                 for (const bl of backupData.blacklist) {
                     const { error } = await client.from('blacklist').insert({
@@ -544,9 +538,18 @@
             this.restore(fileInput.files[0]);
         },
 
-        // ==================== 审计日志 ====================
+        // ==================== 审计日志（v2.1 增加权限检查） ====================
         async showAuditLog() {
             const lang = Utils.lang;
+
+            // 【v2.1】权限检查：仅管理员可查看审计日志
+            if (!PERMISSION.canViewAuditLog()) {
+                Utils.toast.warning(lang === 'id'
+                    ? 'Hanya administrator yang dapat melihat log audit.'
+                    : '仅管理员可查看审计日志。');
+                return;
+            }
+
             const oldModal = document.getElementById('auditLogModal');
             if (oldModal) oldModal.remove();
 
@@ -561,6 +564,8 @@
                     order_create: lang === 'id' ? '📋 Buat Pesanan' : '📋 创建订单',
                     order_delete: lang === 'id' ? '🗑️ Hapus Pesanan' : '🗑️ 删除订单',
                     payment: lang === 'id' ? '💰 Pembayaran' : '💰 缴费',
+                    interest_payment_calc: lang === 'id' ? '🧮 Kalkulasi Bunga' : '🧮 利息计算',
+                    interest_adjustment: lang === 'id' ? '⚙️ Penyesuaian Bunga' : '⚙️ 利息调整',
                     user_create: lang === 'id' ? '👤 Tambah User' : '👤 新增用户',
                     user_delete: lang === 'id' ? '👤 Hapus User' : '👤 删除用户',
                     user_update: lang === 'id' ? '✏️ Ubah User' : '✏️ 修改用户',
@@ -573,6 +578,9 @@
                     backup: lang === 'id' ? '💾 Cadangan' : '💾 备份',
                     restore: lang === 'id' ? '📥 Pemulihan' : '📥 恢复',
                     export: lang === 'id' ? '📎 Ekspor' : '📎 导出',
+                    customer_delete: lang === 'id' ? '🗑️ Hapus Nasabah' : '🗑️ 删除客户',
+                    profit_distribution: lang === 'id' ? '💸 Distribusi Laba' : '💸 收益处置',
+                    payment_page_view: lang === 'id' ? '👁️ Lihat Halaman Bayar' : '👁️ 查看缴费页',
                 };
 
                 let rows = '';
@@ -589,6 +597,7 @@
                                 else if (details.username) detailsText = '👤 ' + Utils.escapeHtml(details.username);
                                 else if (details.store_name) detailsText = '🏪 ' + Utils.escapeHtml(details.store_name);
                                 else if (details.filename) detailsText = '📄 ' + Utils.escapeHtml(details.filename);
+                                else if (details.amount) detailsText = '💰 ' + Utils.formatCurrency(details.amount);
                                 else detailsText = Utils.escapeHtml(log.details || '').substring(0, 80);
                             }
                         } catch (e) { detailsText = Utils.escapeHtml(String(log.details || '')).substring(0, 80); }
@@ -668,6 +677,8 @@
                 order_create: lang === 'id' ? '📋 Buat Pesanan' : '📋 创建订单',
                 order_delete: lang === 'id' ? '🗑️ Hapus Pesanan' : '🗑️ 删除订单',
                 payment: lang === 'id' ? '💰 Pembayaran' : '💰 缴费',
+                interest_payment_calc: lang === 'id' ? '🧮 Kalkulasi Bunga' : '🧮 利息计算',
+                interest_adjustment: lang === 'id' ? '⚙️ Penyesuaian Bunga' : '⚙️ 利息调整',
                 user_create: lang === 'id' ? '👤 Tambah User' : '👤 新增用户',
                 user_delete: lang === 'id' ? '👤 Hapus User' : '👤 删除用户',
                 user_update: lang === 'id' ? '✏️ Ubah User' : '✏️ 修改用户',
@@ -680,6 +691,9 @@
                 backup: lang === 'id' ? '💾 Cadangan' : '💾 备份',
                 restore: lang === 'id' ? '📥 Pemulihan' : '📥 恢复',
                 export: lang === 'id' ? '📎 Ekspor' : '📎 导出',
+                customer_delete: lang === 'id' ? '🗑️ Hapus Nasabah' : '🗑️ 删除客户',
+                profit_distribution: lang === 'id' ? '💸 Distribusi Laba' : '💸 收益处置',
+                payment_page_view: lang === 'id' ? '👁️ Lihat Halaman Bayar' : '👁️ 查看缴费页',
             };
             let rows = '';
             if (logs.length === 0) {
@@ -694,6 +708,7 @@
                             else if (details.username) detailsText = '👤 ' + Utils.escapeHtml(details.username);
                             else if (details.store_name) detailsText = '🏪 ' + Utils.escapeHtml(details.store_name);
                             else if (details.filename) detailsText = '📄 ' + Utils.escapeHtml(details.filename);
+                            else if (details.amount) detailsText = '💰 ' + Utils.formatCurrency(details.amount);
                             else detailsText = Utils.escapeHtml(log.details || '').substring(0, 80);
                         }
                     } catch (e) { detailsText = Utils.escapeHtml(String(log.details || '')).substring(0, 80); }
@@ -743,5 +758,5 @@
     JF.BackupStorage = BackupStorage;
     window.BackupStorage = BackupStorage; // 向下兼容
 
-    console.log('✅ JF.BackupStorage v2.0 初始化完成');
+    console.log('✅ JF.BackupStorage v2.1 更新完成（审计日志增加权限检查及新增操作类型映射）');
 })();
