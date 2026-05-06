@@ -1107,7 +1107,7 @@
     const lang = Utils.lang;
     document.getElementById("app").innerHTML = `
         <div class="login-container" style="background: linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%);">
-            <div class="login-box" style="max-width: 360px; width: 100%; padding: 28px 24px 32px 24px; border-radius: var(--radius-xl); background: var(--bg-card); box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.03); border: 1px solid rgba(14, 116, 144, 0.15); transition: box-shadow 0.2s ease;">
+            <div class="login-box" style="max-width: 360px; width: 100%; padding: 28px 25px 28px 25px; border-radius: var(--radius-xl); box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.03); border: 1px solid rgba(14, 116, 144, 0.15); transition: box-shadow 0.2s ease;">
                 <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
                     <button onclick="APP.toggleLanguage()" class="btn btn--sm btn--outline" style="padding: 4px 12px; font-size: var(--font-xs); border-radius: var(--radius-sm);">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
                 </div>
