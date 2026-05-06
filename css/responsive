@@ -200,3 +200,8 @@
     .profit-cards-grid { grid-template-columns: 1fr; gap: var(--spacing-2); }
   }
 }
+/* 手机端隐藏“活跃在押订单”卡片 */
+    .kpi-card--amber {
+        display: none !important;
+    }
+}
