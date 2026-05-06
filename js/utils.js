@@ -619,15 +619,36 @@
     };
 
     /* ==================== 货币工具 ==================== */
-    Utils.formatCurrency = function (amount) {
-        if (amount === null || amount === undefined || isNaN(amount)) return 'Rp 0';
-        const num = Math.round(amount);
-        const neg = num < 0;
-        const abs = Math.abs(num);
-        const parts = abs.toString().split('.');
-        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-        return (neg ? '-Rp ' : 'Rp ') + parts.join(',');
-    };
+    // ==================== 货币格式化缓存 ====================
+const _currencyCache = new Map();
+const _CACHE_MAX_SIZE = 500; // 缓存上限，防止无限增长
+
+Utils.formatCurrency = function (amount) {
+    if (amount === null || amount === undefined || isNaN(amount)) return 'Rp 0';
+    const num = Math.round(amount);
+    
+    // 命中缓存直接返回
+    if (_currencyCache.has(num)) return _currencyCache.get(num);
+    
+    // 未命中则计算
+    const neg = num < 0;
+    const abs = Math.abs(num);
+    const parts = abs.toString().split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const formatted = (neg ? '-Rp ' : 'Rp ') + parts.join(',');
+    
+    // 存入缓存（超过上限时清除一半）
+    if (_currencyCache.size >= _CACHE_MAX_SIZE) {
+        let count = 0;
+        for (const key of _currencyCache.keys()) {
+            _currencyCache.delete(key);
+            if (++count >= _CACHE_MAX_SIZE / 2) break;
+        }
+    }
+    _currencyCache.set(num, formatted);
+    
+    return formatted;
+};
 
     Utils.formatNumberWithCommas = function (num) {
         if (num === null || num === undefined) return '0';
