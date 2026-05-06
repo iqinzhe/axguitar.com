@@ -133,39 +133,155 @@
     .btn--sm { font-size: 10px; padding: 6px 10px; }
   }
 
-  /* 打印样式 */
+  /* 打印样式 — A4竖版统一规范 */
   @media print {
-    @page { size: A4 landscape; margin: 5mm 8mm; }
-    body { background: var(--white) !important; color: #000 !important; font-size: 9pt !important; }
+    /* ===== 页面设置：A4竖版 ===== */
+    @page {
+      size: A4 portrait;
+      margin: 12mm 10mm 18mm 10mm; /* 下边留给固定页脚 */
+    }
+
+    /* ===== 基础重置 ===== */
+    body {
+      background: #fff !important;
+      color: #000 !important;
+      font-size: 9pt !important;
+      font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif !important;
+    }
     #app { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
-    .no-print, .toolbar, .action-buttons, .action-row, .modal-overlay, .form-actions, .lang-toggle { display: none !important; }
+
+    /* ===== 隐藏非打印元素 ===== */
+    .no-print, .toolbar, .action-buttons, .action-row,
+    .modal-overlay, .form-actions, .lang-toggle,
+    .btn-backup-primary, .btn-restore, .btn-blacklist,
+    .capital-btn, .btn-capital-inject { display: none !important; }
     .print-only { display: block !important; }
     a { color: #000 !important; text-decoration: none !important; }
-    .card, .cashflow-summary, .kpi-card, .fund-flow-card, .income-card, .quick-card, .order-status-card, .message-center-card {
-      box-shadow: none !important; border: 1px solid #ccc !important; margin-bottom: 6px !important; padding: 6px 8px !important;
-      break-inside: avoid !important; page-break-inside: avoid !important;
+
+    /* ===== 卡片 ===== */
+    .card, .cashflow-summary, .kpi-card, .fund-flow-card,
+    .income-card, .quick-card, .order-status-card, .message-center-card {
+      box-shadow: none !important;
+      border: 1px solid #ccc !important;
+      margin-bottom: 6px !important;
+      padding: 6px 8px !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
     }
-    .card h3 { font-size: 9pt !important; margin-bottom: 3px !important; border-bottom: none !important; text-align: left !important; }
-    .card p { text-align: left !important; }
-    .page-header h1, .page-header h2 { text-align: left !important; }
+    .card h3 { font-size: 9pt !important; margin-bottom: 3px !important; border-bottom: none !important; }
+    .card p, .page-header h1, .page-header h2 { text-align: left !important; }
+
+    /* ===== 表格：固定列宽，A4竖版均衡 ===== */
     .table-container { border: none; overflow: visible; }
-    .data-table, .anomaly-table { font-size: 7.5pt !important; table-layout: fixed !important; width: 100% !important; }
-    .data-table thead th, .data-table tbody td, .anomaly-table th, .anomaly-table td {
-      padding: 4px 6px !important; font-size: 7pt !important; line-height: 1.2 !important; border: 1px solid #999 !important;
-      text-align: left !important; white-space: normal !important; word-break: break-word !important;
+    .data-table, .anomaly-table, .capital-table, .cashflow-table,
+    .payment-table, .store-table, .user-table, .expense-table,
+    .order-table, .history-table {
+      font-size: 7.5pt !important;
+      table-layout: fixed !important;   /* 关键：固定布局，列宽均衡 */
+      width: 100% !important;
+      border-collapse: collapse !important;
+      white-space: normal !important;
     }
-    .badge { border: 1px solid #999 !important; background: none !important; }
-    .data-table .desc-cell, .cashflow-table .flow-desc, .capital-table .flow-desc, .expense-table .expense-desc {
-      max-width: none !important; overflow: visible !important; text-overflow: clip !important; white-space: normal !important; word-break: break-word !important;
+
+    /* ===== 表头行高统一 ===== */
+    .data-table thead th, .data-table tbody td,
+    .anomaly-table th, .anomaly-table td,
+    .capital-table th, .capital-table td,
+    .cashflow-table th, .cashflow-table td,
+    .payment-table th, .payment-table td,
+    .expense-table th, .expense-table td,
+    .order-table th, .order-table td,
+    .history-table th, .history-table td {
+      padding: 4px 5px !important;
+      font-size: 7.5pt !important;
+      border: 1px solid #999 !important;
+      text-align: left !important;
+      white-space: normal !important;
+      word-break: break-word !important;
+      overflow: hidden !important;
     }
-    .stats-grid { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; }
-    .card--stat { flex: 1 1 auto !important; min-width: 90px !important; border: 1px solid #ccc !important; padding: 3px 5px !important; text-align: left !important; box-shadow: none !important; }
+    /* 表头固定行高 */
+    .data-table thead th, .anomaly-table th,
+    .capital-table th, .cashflow-table th,
+    .payment-table th, .expense-table th,
+    .order-table th, .history-table th {
+      height: 20pt !important;
+      line-height: 1.3 !important;
+      background: #f1f5f9 !important;
+      font-weight: 600 !important;
+      white-space: nowrap !important;
+    }
+    /* 数据行：统一行高，最多换行一次（约2行） */
+    .data-table tbody td, .anomaly-table td,
+    .capital-table td, .cashflow-table td,
+    .payment-table td, .expense-table td,
+    .order-table td, .history-table td {
+      height: 20pt !important;       /* 标准单行高 */
+      max-height: 40pt !important;   /* 最多2行 */
+      line-height: 1.35 !important;
+      vertical-align: middle !important;
+    }
+
+    /* ===== 列宽（打印专属，A4竖版 190mm 可用） ===== */
+    .col-id, .col-id-narrow   { width: 9% !important; }
+    .col-date                  { width: 10% !important; white-space: nowrap !important; }
+    .col-status, .col-status-wide { width: 9% !important; }
+    .col-months                { width: 6% !important; text-align: center !important; }
+    .col-amount                { width: 11% !important; text-align: right !important; }
+    .col-type                  { width: 10% !important; }
+    .col-method                { width: 9% !important; }
+    .col-store                 { width: 9% !important; }
+    .col-name                  { width: 13% !important; }
+    .col-ktp                   { width: 13% !important; }
+    .col-phone                 { width: 10% !important; }
+    .col-occupation            { width: 10% !important; }
+    .col-collateral            { width: 14% !important; }
+    .col-desc                  { width: auto !important; }
+    .col-action                { display: none !important; width: 0 !important; }
+
+    /* ===== 空行填充（内容少时补充线框，可手写） ===== */
+    .print-empty-rows td {
+      height: 20pt !important;
+      border: 1px solid #ccc !important;
+      background: #fff !important;
+    }
+
+    /* ===== 金额列 ===== */
+    .amount, .data-table .amount, .order-table .amount,
+    .expense-table .amount, .capital-table .amount,
+    .cashflow-table .amount, .payment-table .amount {
+      text-align: right !important;
+      font-variant-numeric: tabular-nums !important;
+    }
+
+    /* ===== 徽章扁平化 ===== */
+    .badge { border: 1px solid #999 !important; background: none !important; color: #334155 !important; }
+
+    /* ===== 描述单元格（允许换行，最多2行） ===== */
+    .data-table .desc-cell, .cashflow-table .flow-desc,
+    .capital-table .flow-desc, .expense-table .expense-desc {
+      max-width: none !important;
+      overflow: hidden !important;
+      text-overflow: clip !important;
+      white-space: normal !important;
+      word-break: break-word !important;
+    }
+
+    /* ===== 统计卡片 ===== */
+    .stats-grid { display: flex !important; flex-wrap: wrap !important; gap: 5px !important; }
+    .card--stat {
+      flex: 1 1 auto !important; min-width: 80px !important;
+      border: 1px solid #ccc !important; padding: 3px 5px !important;
+      box-shadow: none !important;
+    }
     .card--stat .stat-value { font-size: 9pt !important; font-weight: 600 !important; text-align: left !important; }
     .card--stat .stat-label { font-size: 6.5pt !important; text-align: left !important; }
+
+    /* ===== 布局网格 ===== */
     .kpi-row { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
     .kpi-card { flex: 1 !important; min-width: 120px !important; }
     .kpi-val { font-size: 11pt !important; }
-    .form-grid, .form-grid.form-grid--3, .form-grid.form-grid--4 { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+    .form-grid, .form-grid.form-grid--3, .form-grid.form-grid--4 { grid-template-columns: repeat(2, 1fr) !important; gap: 6px !important; }
     .order-first-row { grid-template-columns: repeat(2, 1fr) !important; }
     .fee-cards-row { grid-template-columns: repeat(2, 1fr) !important; }
     .repayment-cards-row { grid-template-columns: repeat(3, 1fr) !important; }
@@ -183,7 +299,6 @@
     .backup-card { border: 1px solid #ccc !important; box-shadow: none !important; }
     .backup-card-primary { background: #fff !important; border-left: 4px solid #999 !important; }
     .fixed-repayment-card { background: #fff !important; border-left: 4px solid #999 !important; }
-    .btn-backup-primary, .btn-restore, .btn-blacklist, .capital-btn, .btn-capital-inject { display: none !important; }
   }
 
   /* 收益处置网格 */
