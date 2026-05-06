@@ -1164,7 +1164,7 @@
             this.style.boxShadow = 'none';
         });
     });
-}
+},
 
         async login() {
             if (this._loginLock) return;
