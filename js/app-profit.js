@@ -1,6 +1,7 @@
-// app-profit.js - v2.1 (JF 命名空间)
+// app-profit.js - v2.2 (JF 命名空间)
 // 收益处置页面（利润再投入 / 偿还本金）
 // v2.1：store_manager 可处置本店收益（admin 可处置所有门店）
+// v2.2：电脑端3列布局，手机端单列布局
 
 'use strict';
 
@@ -47,9 +48,9 @@
                 if (isAdmin && !profile?.store_id) {
                     // admin 无固定门店：显示下拉选择器
                     storeSelectorHtml = `
-                        <div class="form-group">
+                        <div class="form-group" style="margin-top: 12px;">
                             <label>🏪 ${lang === 'id' ? 'Pilih Toko' : '选择门店'}</label>
-                            <select id="distStoreSelect" onchange="JF.ProfitPage.refreshDistributionStats()">
+                            <select id="distStoreSelect" onchange="JF.ProfitPage.refreshDistributionStats()" style="width:100%;padding:8px;border-radius:6px;">
                                 ${stores.map(s => `<option value="${s.id}">${Utils.escapeHtml(s.name)} (${s.code})</option>`).join('')}
                             </select>
                         </div>`;
@@ -57,8 +58,32 @@
                     // admin 绑定了门店 或 store_manager：显示只读门店名，不允许切换
                     const storeName = profile?.stores?.name || profile?.store_name || firstStoreId;
                     storeSelectorHtml = `
-                        <p><strong>🏪 ${lang === 'id' ? 'Toko' : '门店'}:</strong> ${Utils.escapeHtml(storeName)}</p>
-                        <input type="hidden" id="distStoreSelect" value="${firstStoreId}">`;
+                        <p style="margin-top: 12px; margin-bottom: 0; padding: 8px; background: var(--bg-hover); border-radius: 6px;">
+                            <strong>🏪 ${lang === 'id' ? 'Toko' : '门店'}:</strong> ${Utils.escapeHtml(storeName)}
+                        </p>
+                        <input type="hidden" id="distStoreSelect" value="${firstStoreId}">
+                    `;
+                }
+
+                // 添加响应式样式（如果还没有添加过）
+                if (!document.getElementById('profitPageStyles')) {
+                    const style = document.createElement('style');
+                    style.id = 'profitPageStyles';
+                    style.textContent = `
+                        .profit-cards-grid {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 16px;
+                            align-items: stretch;
+                        }
+                        @media (max-width: 768px) {
+                            .profit-cards-grid {
+                                grid-template-columns: 1fr !important;
+                                gap: 12px !important;
+                            }
+                        }
+                    `;
+                    document.head.appendChild(style);
                 }
 
                 const content = `
@@ -69,42 +94,43 @@
                         </div>
                     </div>
 
-                    <div class="card">
-                        <h3>📊 ${lang === 'id' ? 'Ringkasan' : '汇总'}</h3>
-                        <div class="info-cards-row" style="margin-bottom:16px;">
-                            <div class="info-item-card">
-                                <div class="info-item-label">💰 ${lang === 'id' ? 'Keuntungan Dapat Dialokasi' : '可分配利润'}</div>
-                                <div class="info-item-value" id="distributableValue">${Utils.formatCurrency(distributableProfit)}</div>
+                    <div class="profit-cards-grid">
+                        <!-- 汇总卡片 -->
+                        <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column;">
+                            <h3>📊 ${lang === 'id' ? 'Ringkasan' : '汇总'}</h3>
+                            <div style="flex: 1;">
+                                <div class="info-item-card">
+                                    <div class="info-item-label">💰 ${lang === 'id' ? 'Keuntungan Dapat Dialokasi' : '可分配利润'}</div>
+                                    <div class="info-item-value" id="distributableValue">${Utils.formatCurrency(distributableProfit)}</div>
+                                </div>
+                                <div class="info-item-card" style="margin-top: 16px;">
+                                    <div class="info-item-label">🏦 ${lang === 'id' ? 'Modal Eksternal Tersedia' : '可偿还外部本金'}</div>
+                                    <div class="info-item-value" id="externalBalanceValue">${Utils.formatCurrency(externalCapitalBalance)}</div>
+                                </div>
                             </div>
-                            <div class="info-item-card">
-                                <div class="info-item-label">🏦 ${lang === 'id' ? 'Modal Eksternal Tersedia' : '可偿还外部本金'}</div>
-                                <div class="info-item-value" id="externalBalanceValue">${Utils.formatCurrency(externalCapitalBalance)}</div>
+                            ${storeSelectorHtml}
+                        </div>
+                        
+                        <!-- 利润再投入卡片 -->
+                        <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column;">
+                            <h3>🔄 ${lang === 'id' ? 'Reinvestasi Keuntungan' : '利润再投入'}</h3>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; flex: 1;">${lang === 'id' ? 'Ubah keuntungan menjadi modal tambahan untuk operasional gadai.' : '将利润转为资本，扩大可放贷资金池。'}</p>
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label>${t('amount')} *</label>
+                                <input type="text" id="reinvestAmount" class="amount-input" placeholder="0" style="width: 100%;">
                             </div>
+                            <button onclick="JF.ProfitPage.executeDistribution('reinvest')" class="btn btn--success" style="width: 100%;">💾 ${lang === 'id' ? 'Reinvestasikan' : '执行再投入'}</button>
                         </div>
-                        ${storeSelectorHtml}
-                    </div>
-
-                    <div class="card">
-                        <h3>🔄 ${lang === 'id' ? 'Reinvestasi Keuntungan' : '利润再投入'}</h3>
-                        <p>${lang === 'id' ? 'Ubah keuntungan menjadi modal tambahan untuk operasional gadai.' : '将利润转为资本，扩大可放贷资金池。'}</p>
-                        <div class="form-group" style="max-width:300px;">
-                            <label>${t('amount')} *</label>
-                            <input type="text" id="reinvestAmount" class="amount-input" placeholder="0">
-                        </div>
-                        <div class="form-actions">
-                            <button onclick="JF.ProfitPage.executeDistribution('reinvest')" class="btn btn--success">💾 ${lang === 'id' ? 'Reinvestasikan' : '执行再投入'}</button>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <h3>📤 ${lang === 'id' ? 'Pengembalian Modal' : '偿还投资本金'}</h3>
-                        <p>${lang === 'id' ? 'Kembalikan sebagian modal kepada investor.' : '返还部分投资给股东，回收本金。'}</p>
-                        <div class="form-group" style="max-width:300px;">
-                            <label>${t('amount')} *</label>
-                            <input type="text" id="returnAmount" class="amount-input" placeholder="0">
-                        </div>
-                        <div class="form-actions">
-                            <button onclick="JF.ProfitPage.executeDistribution('return_capital')" class="btn btn--warning">💸 ${lang === 'id' ? 'Kembalikan' : '偿还本金'}</button>
+                        
+                        <!-- 偿还投资本金卡片 -->
+                        <div class="card" style="margin-bottom: 0; display: flex; flex-direction: column;">
+                            <h3>📤 ${lang === 'id' ? 'Pengembalian Modal' : '偿还投资本金'}</h3>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; flex: 1;">${lang === 'id' ? 'Kembalikan sebagian modal kepada investor.' : '返还部分投资给股东，回收本金。'}</p>
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label>${t('amount')} *</label>
+                                <input type="text" id="returnAmount" class="amount-input" placeholder="0" style="width: 100%;">
+                            </div>
+                            <button onclick="JF.ProfitPage.executeDistribution('return_capital')" class="btn btn--warning" style="width: 100%;">💸 ${lang === 'id' ? 'Kembalikan' : '偿还本金'}</button>
                         </div>
                     </div>
                 `;
@@ -112,8 +138,10 @@
                 document.getElementById('app').innerHTML = content;
 
                 // 绑定金额输入格式化
-                Utils.bindAmountFormat(document.getElementById('reinvestAmount'));
-                Utils.bindAmountFormat(document.getElementById('returnAmount'));
+                const reinvestInput = document.getElementById('reinvestAmount');
+                const returnInput = document.getElementById('returnAmount');
+                if (reinvestInput && Utils.bindAmountFormat) Utils.bindAmountFormat(reinvestInput);
+                if (returnInput && Utils.bindAmountFormat) Utils.bindAmountFormat(returnInput);
 
             } catch (error) {
                 console.error(error);
@@ -170,5 +198,5 @@
     window.APP = window.APP || {};
     window.APP.showDistributionPage = ProfitPage.showDistributionPage.bind(ProfitPage);
 
-    console.log('✅ JF.ProfitPage v2.1 更新完成（store_manager 可处置本店收益）');
+    console.log('✅ JF.ProfitPage v2.2 更新完成（电脑端3列布局，手机端单列）');
 })();
