@@ -1,4 +1,5 @@
-// app-dashboard-core.js - v2.0 验证 + 集成工作日历
+// app-dashboard-core.js - v2.4 优化版（分步加载仪表盘数据）
+// 验证 + 集成工作日历 + 仪表盘数据分批加载
 
 'use strict';
 
@@ -56,11 +57,11 @@
 
     let _overdueInterval = null;
 
-    // ========== 工作日历构建函数（新增） ==========
+    // ========== 工作日历构建函数 ==========
     function buildWorkCalendarHTML(dueOrders, lang, dueMap) {
         const today = Utils.getJakartaDate();
         const year = today.getUTCFullYear();
-        const month = today.getUTCMonth(); // 0~11
+        const month = today.getUTCMonth();
 
         const monthNames = lang === 'id'
             ? ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
@@ -71,8 +72,8 @@
             : ['一','二','三','四','五','六','日'];
 
         const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-        const firstDay = new Date(Date.UTC(year, month, 1)).getUTCDay(); // 0=Sunday
-        const startIndex = (firstDay + 6) % 7; // 周一为0
+        const firstDay = new Date(Date.UTC(year, month, 1)).getUTCDay();
+        const startIndex = (firstDay + 6) % 7;
 
         if (!dueMap) {
             dueMap = {};
@@ -158,20 +159,16 @@
         // ========== 全局键盘管理器 ==========
         _initGlobalKeyboard() {
             document.addEventListener('keydown', (e) => {
-                // 1. Esc — 统一关闭弹窗/侧边栏
                 if (e.key === 'Escape') {
                     this._handleGlobalEsc();
                     return;
                 }
-
-                // 2. Enter — 弹窗确认 / 搜索触发
                 if (e.key === 'Enter') {
                     this._handleGlobalEnter(e);
                     return;
                 }
             });
 
-            // 3. 浏览器返回 — popstate 监听
             window.addEventListener('popstate', (e) => {
                 if (this.historyStack.length === 0) return;
                 this._popStateNavigation = true;
@@ -181,9 +178,7 @@
             console.log('[Keyboard] 全局快捷键已就绪: Esc=关闭弹窗 | Enter=确认/搜索 | 浏览器返回=app内返回');
         },
 
-        // ---------- Esc 处理 ----------
         _handleGlobalEsc() {
-            // 优先级1: 关闭模态弹窗
             const modal = document.querySelector('.modal-overlay');
             if (modal) {
                 const closeBtn = modal.querySelector('button[onclick*="remove"]') ||
@@ -198,14 +193,12 @@
                 return;
             }
 
-            // 优先级2: 关闭侧边栏
             const sidebar = document.getElementById('dashSidebar');
             if (sidebar && sidebar.classList.contains('open')) {
                 this._toggleSidebar();
                 return;
             }
 
-            // 优先级3: 关闭 toast 确认弹窗
             const confirmModal = document.querySelector('.confirm-modal-overlay');
             if (confirmModal) {
                 const cancelBtn = confirmModal.querySelector('.confirm-cancel-btn');
@@ -215,9 +208,7 @@
             }
         },
 
-        // ---------- Enter 处理 ----------
         _handleGlobalEnter(e) {
-            // 情况1: toast 确认弹窗 → 触发"确认"
             const confirmModal = document.querySelector('.confirm-modal-overlay');
             if (confirmModal) {
                 const okBtn = confirmModal.querySelector('.confirm-ok-btn');
@@ -225,7 +216,6 @@
                 return;
             }
 
-            // 情况2: 登录页 → 触发表单提交
             const loginBox = document.querySelector('.login-box');
             if (loginBox) {
                 const loginBtn = document.getElementById('loginBtn');
@@ -236,7 +226,6 @@
                 return;
             }
 
-            // 情况3: 搜索/筛选输入框 → 触发对应搜索
             const activeEl = document.activeElement;
             if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'text') {
                 const id = activeEl.id || '';
@@ -262,7 +251,7 @@
             }
         },
 
-        // ---------- 页面状态持久化（升级为JSON对象）----------
+        // ========== 页面状态持久化 ==========
         saveCurrentPageState(extraParams = {}) {
             try {
                 if (!AUTH.isLoggedIn() || this.currentPage === 'login') return;
@@ -280,26 +269,20 @@
 
         restorePageState() {
             try {
-                // 优先读 sessionStorage（同一标签页内刷新），降级读 localStorage（跨标签页/新标签页）
                 let raw = sessionStorage.getItem('jf_current_state') || localStorage.getItem('jf_last_state');
                 if (!raw) return { page: null, filter: "all", orderId: null, customerId: null };
 
                 const state = JSON.parse(raw);
                 const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist'];
-                // filter 值有效性验证
                 const validFilters = ['all', 'active', 'completed', 'liquidated'];
                 if (!state.filter || !validFilters.includes(state.filter)) {
                     state.filter = 'all';
                 }
 
-                // 此方法在 AUTH.init() 完成后调用，AUTH.isLoggedIn() 已可靠，
-                // 保留校验以防御未登录时错误恢复页面状态
                 if (state.page && validPages.includes(state.page) && AUTH.isLoggedIn()) {
-                    // 参数完整性校验：必须携带 orderId 的页面
                     if (['viewOrder','payment'].includes(state.page) && !state.orderId) {
                         return { page: null, filter: "all", orderId: null, customerId: null };
                     }
-                    // 必须携带 customerId 的页面
                     if (['customerOrders','customerPaymentHistory'].includes(state.page) && !state.customerId) {
                         return { page: null, filter: "all", orderId: null, customerId: null };
                     }
@@ -323,7 +306,7 @@
             this.currentCustomerId = null;
         },
 
-        // ---------- 逾期更新定时器 ----------
+        // ========== 逾期更新定时器 ==========
         _clearOverdueInterval() { if (_overdueInterval) { clearInterval(_overdueInterval); _overdueInterval = null; } },
         _startOverdueInterval() {
             this._clearOverdueInterval();
@@ -357,7 +340,7 @@
             mainEl.scrollTop = 0;
         },
 
-        // ========== 刷新当前页面（核心）==========
+        // ========== 刷新当前页面 ==========
         async refreshCurrentPage() {
             if (!AUTH.isLoggedIn()) {
                 console.log('[DashboardCore] 用户未登录，显示登录页');
@@ -481,7 +464,7 @@
             } catch (e) { return 0; }
         },
 
-        // ---------- 侧边栏控制 ----------
+        // ========== 侧边栏控制 ==========
         _toggleSidebar(e) {
             const sidebar = document.getElementById('dashSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -543,7 +526,6 @@
             }
             this.saveCurrentPageState();
 
-            // ======== 浏览器历史同步 ========
             if (!this._popStateNavigation) {
                 window.history.pushState(
                     { page, orderId: this.currentOrderId, customerId: this.currentCustomerId },
@@ -552,7 +534,6 @@
                 );
             }
             this._popStateNavigation = false;
-            // ================================
 
             this.refreshCurrentPage().catch(err => {
                 console.error('导航失败', err);
@@ -570,7 +551,6 @@
                 this.currentFilter = prev.filter || "all";
                 this.saveCurrentPageState();
 
-                // ======== 浏览器历史同步 ========
                 if (!this._popStateNavigation) {
                     window.history.pushState(
                         { page: this.currentPage },
@@ -579,12 +559,74 @@
                     );
                 }
                 this._popStateNavigation = false;
-                // ================================
 
                 this.refreshCurrentPage();
             } else {
                 this.navigateTo('dashboard');
             }
+        },
+
+        // ========== 仪表盘局部更新函数（第二步优化新增） ==========
+        _updateDashboardDetails(details, lang, isAdmin, kpiReport) {
+            const cashFlow = details.cashFlow;
+            const totalExpenses = details.totalExpenses;
+            const messages = details.messages || [];
+            
+            // 更新现金流卡片
+            const cashBalance = (cashFlow.cash && cashFlow.cash.balance) ? cashFlow.cash.balance : 0;
+            const bankBalance = (cashFlow.bank && cashFlow.bank.balance) ? cashFlow.bank.balance : 0;
+            const cashIncome = (cashFlow.cash && cashFlow.cash.income) ? cashFlow.cash.income : 0;
+            const cashExpense = (cashFlow.cash && cashFlow.cash.expense) ? cashFlow.cash.expense : 0;
+            const bankIncome = (cashFlow.bank && cashFlow.bank.income) ? cashFlow.bank.income : 0;
+            const bankExpense = (cashFlow.bank && cashFlow.bank.expense) ? cashFlow.bank.expense : 0;
+            
+            // 更新保险柜余额
+            const cashValEl = document.querySelector('.cash-bank-item:nth-child(1) .cb-val');
+            if (cashValEl) cashValEl.textContent = Utils.formatCurrency(cashBalance);
+            const cashFlowEl = document.querySelector('.cash-bank-item:nth-child(1) .cb-flow');
+            if (cashFlowEl) {
+                cashFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(cashIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(cashExpense) + '</span>';
+            }
+            
+            // 更新银行余额
+            const bankValEl = document.querySelector('.cash-bank-item:nth-child(2) .cb-val');
+            if (bankValEl) bankValEl.textContent = Utils.formatCurrency(bankBalance);
+            const bankFlowEl = document.querySelector('.cash-bank-item:nth-child(2) .cb-flow');
+            if (bankFlowEl) {
+                bankFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(bankIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(bankExpense) + '</span>';
+            }
+            
+            // 更新净收入
+            const totalIncome = (kpiReport.admin_fees_collected || 0) + (kpiReport.service_fees_collected || 0) + (kpiReport.interest_collected || 0);
+            const netProfit = totalIncome - totalExpenses;
+            const npValEl = document.querySelector('.np-val');
+            if (npValEl) npValEl.textContent = Utils.formatCurrency(netProfit);
+            
+            // 更新收入构成中的支出项
+            const expenseAmtEl = document.querySelector('.income-item .income-amt.expense');
+            if (expenseAmtEl) expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses);
+            
+            // 更新消息中心预览
+            const messagePreview = document.querySelector('.message-preview');
+            if (messagePreview) {
+                const pendingCount = messages.length;
+                if (pendingCount === 0) {
+                    messagePreview.innerHTML = '<div class="empty-preview">✅ ' + (lang === 'id' ? 'Tidak ada pesan tertunda' : '暂无待发送消息') + '</div>';
+                } else {
+                    const topMessages = messages.slice(0, 3);
+                    let previewHtml = '<div class="preview-list">';
+                    for (const m of topMessages) {
+                        previewHtml += '<div class="preview-item' + (m.overdueDays > 0 ? ' urgent' : '') + '"><span class="preview-order">' + Utils.escapeHtml(m.orderId) + '</span><span class="preview-name">' + Utils.escapeHtml(m.customerName) + '</span><span class="preview-badge">' + m.typeLabel + '</span></div>';
+                    }
+                    if (pendingCount > 3) {
+                        previewHtml += '<div class="preview-more" onclick="JF.MessageCenter.showMessageCenter()">' + (lang === 'id' ? 'dan ' + (pendingCount - 3) + ' pesan lainnya...' : '还有 ' + (pendingCount - 3) + ' 条消息...') + '</div>';
+                    }
+                    previewHtml += '</div>';
+                    messagePreview.innerHTML = previewHtml;
+                }
+            }
+            
+            console.log('[Dashboard] 详细信息已更新');
         },
 
         // ========== 仪表盘渲染（核心） ==========
@@ -599,7 +641,6 @@
             this._cleanupOverlays();
 
             const appDiv = document.getElementById("app");
-            const hasShell = appDiv && appDiv.querySelector('.dashboard-v2');
             
             try {
                 const lang = Utils.lang;
@@ -608,8 +649,9 @@
                 const isAdmin = PERMISSION.isAdmin();
                 const storeId = profile?.store_id;
 
-                const cacheKey = `dashboard_v2_${isAdmin ? 'admin' : storeId}`;
-                const report = await JF.Cache.get(cacheKey, async () => {
+                // ==================== 【第二步优化】第一批请求：核心KPI数据 ====================
+                const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
+                const kpiReport = await JF.Cache.get(kpiCacheKey, async () => {
                     const client = SUPABASE.getClient();
                     const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
                     const applyFilter = function(q) {
@@ -617,15 +659,67 @@
                         else if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                         return q;
                     };
-                    const [totalRes, activeRes, completedRes, overdueRes, activeOrdersData, allOrdersData, dueOrdersRes] = await Promise.all([
+
+                    const [
+                        totalRes,
+                        activeRes,
+                        completedRes,
+                        overdueRes,
+                        activeOrdersData,
+                        allOrdersData,
+                        dueOrdersRes,
+                        newThisMonthRes,
+                        newLoanThisMonthRes,
+                        injectedCapitalRes,
+                        deployedCapitalRes
+                    ] = await Promise.all([
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active'),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'completed'),
                         applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active').gte('overdue_days', 1),
                         applyFilter(client.from('orders').select('loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid')).eq('status', 'active'),
                         applyFilter(client.from('orders').select('loan_amount')),
-                        applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active'))
+                        applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active')),
+                        // 本月新增订单数
+                        (async () => {
+                            try {
+                                const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+                                let q = client.from('orders').select('*', { count: 'exact', head: true }).gte('created_at', monthStart);
+                                if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                                const r = await q;
+                                return r.count || 0;
+                            } catch (e) { return 0; }
+                        })(),
+                        // 本月新增贷款额
+                        (async () => {
+                            try {
+                                const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+                                let q = client.from('orders').select('loan_amount').gte('created_at', monthStart);
+                                if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                                const r = await q;
+                                return (r.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
+                            } catch (e) { return 0; }
+                        })(),
+                        // 注入资本总额
+                        (async () => {
+                            try {
+                                let injQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
+                                if (!isAdmin && storeId) injQuery = injQuery.eq('store_id', storeId);
+                                const injResult = await injQuery;
+                                return (injResult.data || []).reduce((s, i) => s + (i.amount || 0), 0);
+                            } catch (e) { return 0; }
+                        })(),
+                        // 在押资金
+                        (async () => {
+                            try {
+                                let depQuery = client.from('orders').select('loan_amount').eq('status', 'active');
+                                if (!isAdmin && storeId) depQuery = depQuery.eq('store_id', storeId);
+                                const depResult = await depQuery;
+                                return (depResult.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
+                            } catch (e) { return 0; }
+                        })()
                     ]);
+
                     let totalLoanActive = 0, adminFeesCollected = 0, serviceFeesCollected = 0, interestCollected = 0, principalCollected = 0;
                     for (const o of (activeOrdersData.data || [])) {
                         totalLoanActive += (o.loan_amount || 0);
@@ -636,96 +730,51 @@
                     }
                     let totalLoanAll = 0;
                     for (const o of (allOrdersData.data || [])) totalLoanAll += (o.loan_amount || 0);
-                    let totalInjectedCapital = 0;
-                    try {
-                        let injQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
-                        if (!isAdmin && storeId) injQuery = injQuery.eq('store_id', storeId);
-                        const injResult = await injQuery;
-                        totalInjectedCapital = (injResult.data || []).reduce((s, i) => s + (i.amount || 0), 0);
-                    } catch (e) { /* ignore */ }
-                    let deployedCapital = 0;
-                    try {
-                        let depQuery = client.from('orders').select('loan_amount').eq('status', 'active');
-                        if (!isAdmin && storeId) depQuery = depQuery.eq('store_id', storeId);
-                        const depResult = await depQuery;
-                        deployedCapital = (depResult.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
-                    } catch (e) { /* ignore */ }
 
-                    let newThisMonth = 0;
-                    let newLoanThisMonth = 0;
-                    try {
-                        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-                        let newQuery = client.from('orders').select('*', { count: 'exact', head: true }).gte('created_at', monthStart);
-                        if (!isAdmin && storeId) newQuery = newQuery.eq('store_id', storeId);
-                        const newResult = await newQuery;
-                        newThisMonth = newResult.count || 0;
-                        let loanQuery = client.from('orders').select('loan_amount').gte('created_at', monthStart);
-                        if (!isAdmin && storeId) loanQuery = loanQuery.eq('store_id', storeId);
-                        const loanResult = await loanQuery;
-                        newLoanThisMonth = (loanResult.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
-                    } catch (e) { /* ignore */ }
+                    const injected = injectedCapitalRes || 0;
+                    const deployed = deployedCapitalRes || 0;
 
                     return {
                         total_orders: totalRes.count || 0,
                         active_orders: activeRes.count || 0,
                         completed_orders: completedRes.count || 0,
                         overdue_orders: overdueRes.count || 0,
-                        new_this_month: newThisMonth,
-                        new_loan_this_month: newLoanThisMonth,
+                        new_this_month: newThisMonthRes,
+                        new_loan_this_month: newLoanThisMonthRes,
                         total_loan_amount: totalLoanAll,
                         admin_fees_collected: adminFeesCollected,
                         service_fees_collected: serviceFeesCollected,
                         interest_collected: interestCollected,
                         principal_collected: principalCollected,
-                        total_injected_capital: totalInjectedCapital,
-                        deployed_capital: deployedCapital,
-                        available_capital: totalInjectedCapital - deployedCapital,
+                        total_injected_capital: injected,
+                        deployed_capital: deployed,
+                        available_capital: injected - deployed,
                         due_orders: dueOrdersRes.data || []
                     };
                 }, { ttl: 3 * 60 * 1000 });
 
-                const cashFlowCacheKey = 'cashflow_v2_' + (isAdmin ? 'admin' : storeId);
-                const cashFlow = await JF.Cache.get(cashFlowCacheKey, () => SUPABASE.getCashFlowSummary(), { ttl: 3 * 60 * 1000 });
-                const expensesCacheKey = 'expenses_v2_' + (isAdmin ? 'admin' : storeId);
-                const totalExpenses = await JF.Cache.get(expensesCacheKey, async () => {
-                    const client = SUPABASE.getClient();
-                    let q = client.from('expenses').select('amount, store_id');
-                    if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-                    else if (isAdmin) { const practiceIds = await SUPABASE._getPracticeStoreIds(); if (practiceIds.length) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')'); }
-                    const expResult = await q;
-                    return (expResult.data || []).reduce((s, e) => s + (e.amount || 0), 0);
-                }, { ttl: 3 * 60 * 1000 });
-
-                // 消息中心
-                let pendingCount = 0;
-                let topMessages = [];
-                try {
-                    if (JF.MessageCenter && typeof JF.MessageCenter.getPendingMessages === 'function') {
-                        const messages = await JF.MessageCenter.getPendingMessages();
-                        pendingCount = messages.length;
-                        topMessages = messages.slice(0, 3);
-                    }
-                } catch (e) { /* ignore */ }
-
-                const totalOrders = report.total_orders;
-                const activeOrders = report.active_orders;
-                const completedOrders = report.completed_orders;
-                const overdueOrders = report.overdue_orders;
-                const newThisMonth = report.new_this_month;
-                const newLoanThisMonth = report.new_loan_this_month;
+                // ==================== 使用 KPI 数据立即渲染仪表盘 ====================
+                // 构建 kpiReport 中的变量供渲染使用
+                const totalOrders = kpiReport.total_orders;
+                const activeOrders = kpiReport.active_orders;
+                const completedOrders = kpiReport.completed_orders;
+                const overdueOrders = kpiReport.overdue_orders;
+                const newThisMonth = kpiReport.new_this_month;
+                const newLoanThisMonth = kpiReport.new_loan_this_month;
                 const completionRate = totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : '0';
-                const totalIncome = report.admin_fees_collected + report.service_fees_collected + report.interest_collected;
-                const netProfit = totalIncome - totalExpenses;
-                const injected = report.total_injected_capital;
-                const deployed = report.deployed_capital;
-                const available = report.available_capital;
+                const injected = kpiReport.total_injected_capital;
+                const deployed = kpiReport.deployed_capital;
+                const available = kpiReport.available_capital;
                 const utilizationRate = injected > 0 ? ((deployed / injected) * 100).toFixed(1) : '0';
-                const cashBalance = (cashFlow.cash && cashFlow.cash.balance) ? cashFlow.cash.balance : 0;
-                const bankBalance = (cashFlow.bank && cashFlow.bank.balance) ? cashFlow.bank.balance : 0;
-                const cashIncome = (cashFlow.cash && cashFlow.cash.income) ? cashFlow.cash.income : 0;
-                const cashExpense = (cashFlow.cash && cashFlow.cash.expense) ? cashFlow.cash.expense : 0;
-                const bankIncome = (cashFlow.bank && cashFlow.bank.income) ? cashFlow.bank.income : 0;
-                const bankExpense = (cashFlow.bank && cashFlow.bank.expense) ? cashFlow.bank.expense : 0;
+
+                // 现金流先用默认值（占位），等第二批数据就绪后更新
+                const cashBalance = 0;
+                const bankBalance = 0;
+                const cashIncome = 0;
+                const cashExpense = 0;
+                const bankIncome = 0;
+                const bankExpense = 0;
+                
                 const activeNormal = activeOrders - overdueOrders;
                 
                 const donutData = [
@@ -766,35 +815,25 @@
                     ];
                 }
                 const quickActionsHtml = quickActions.map(q => `<div class="quick-btn${q.cls ? ' ' + q.cls : ''}" onclick="${q.action}"><span class="qb-icon">${q.icon}</span><span class="qb-label">${q.label}</span></div>`).join('');
-                
+
+                // 收入构成（支出先用 0）
+                const totalIncomeInitial = kpiReport.admin_fees_collected + kpiReport.service_fees_collected + kpiReport.interest_collected;
                 const incomeItems = [
-                    { dot: '#6366f1', label: t('admin_fee'), sub: lang === 'id' ? 'Terkumpul' : '已收取', amt: report.admin_fees_collected, cls: '' },
-                    { dot: '#8b5cf6', label: t('service_fee'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: report.service_fees_collected, cls: '' },
-                    { dot: '#06b6d4', label: t('interest'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: report.interest_collected, cls: '' },
-                    { dot: '#ef4444', label: lang === 'id' ? 'Pengeluaran' : '支出合计', sub: lang === 'id' ? 'Biaya Operasional' : '运营成本', amt: totalExpenses, cls: 'expense' },
+                    { dot: '#6366f1', label: t('admin_fee'), sub: lang === 'id' ? 'Terkumpul' : '已收取', amt: kpiReport.admin_fees_collected, cls: '' },
+                    { dot: '#8b5cf6', label: t('service_fee'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: kpiReport.service_fees_collected, cls: '' },
+                    { dot: '#06b6d4', label: t('interest'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: kpiReport.interest_collected, cls: '' },
+                    { dot: '#ef4444', label: lang === 'id' ? 'Pengeluaran' : '支出合计', sub: lang === 'id' ? 'Memuat...' : '加载中...', amt: 0, cls: 'expense' },
                 ];
                 const incomeItemsHtml = incomeItems.map(item => `<div class="income-item"><div class="income-dot" style="background:${item.dot}"></div><div><div class="income-name">${item.label}</div><div class="income-sub">${item.sub}</div></div><div class="income-amt${item.cls === 'expense' ? ' expense' : ''}">${item.cls === 'expense' ? '−' : ''}${Utils.formatCurrency(item.amt)}</div></div>`).join('');
 
-                let previewHtml = '';
-                if (pendingCount === 0) {
-                    previewHtml = `<div class="empty-preview">✅ ${lang === 'id' ? 'Tidak ada pesan tertunda' : '暂无待发送消息'}</div>`;
-                } else {
-                    previewHtml = `
-                        <div class="preview-list">
-                            ${topMessages.map(m => `
-                                <div class="preview-item ${m.overdueDays > 0 ? 'urgent' : ''}">
-                                    <span class="preview-order">${Utils.escapeHtml(m.orderId)}</span>
-                                    <span class="preview-name">${Utils.escapeHtml(m.customerName)}</span>
-                                    <span class="preview-badge">${m.typeLabel}</span>
-                                </div>
-                            `).join('')}
-                            ${pendingCount > 3 ? `<div class="preview-more" onclick="JF.MessageCenter.showMessageCenter()">${lang === 'id' ? `dan ${pendingCount - 3} pesan lainnya...` : `还有 ${pendingCount - 3} 条消息...`}</div>` : ''}
-                        </div>
-                    `;
-                }
+                // 消息中心预览（占位）
+                let previewHtml = '<div class="empty-preview">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</div>';
+
+                // 净收入（先用0占位）
+                const netProfitInitial = 0;
 
                 // 工作日历数据准备
-                const dueOrders = report.due_orders || [];
+                const dueOrders = kpiReport.due_orders || [];
                 const dueMap = {};
                 dueOrders.forEach(o => {
                     const d = o.next_interest_due_date;
@@ -803,7 +842,7 @@
                     dueMap[d].push(o);
                 });
 
-                // 构建 KPI 行（替换第四个卡片为日历）
+                // 构建 KPI 行
                 const kpiRowHTML = `
 <div class="kpi-row kpi-row--calendar">
     <div class="kpi-card kpi-card--blue">
@@ -815,7 +854,7 @@
     <div class="kpi-card kpi-card--green">
         <div class="kpi-icon">💵</div>
         <div class="kpi-label">${lang === 'id' ? 'Total Pinjaman' : '累计放贷总额'}</div>
-        <div class="kpi-val green">${Utils.formatCurrency(report.total_loan_amount)}</div>
+        <div class="kpi-val green">${Utils.formatCurrency(kpiReport.total_loan_amount)}</div>
         <div class="kpi-trend">${lang === 'id' ? 'Bulan ini +' : '本月发放 +'}${Utils.formatCurrency(newLoanThisMonth)}</div>
     </div>
     <div class="kpi-card kpi-card--amber">
@@ -851,7 +890,7 @@
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('orderTable')"><span class="nav-icon">📋</span> ${t('order_list')}${activeBadgeCount > 0 ? `<span class="nav-badge">${activeBadgeCount}</span>` : ''}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('paymentHistory')"><span class="nav-icon">💰</span> ${lang === 'id' ? 'Arus Kas' : '资金流水'}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('expenses')"><span class="nav-icon">📝</span> ${t('expenses')}</div>
-                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('messageCenter')"><span class="nav-icon">💬</span> ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}${pendingCount > 0 ? `<span class="nav-badge" style="background:#ef4444;">${pendingCount > 99 ? '99+' : pendingCount}</span>` : ''}</div>
+                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('messageCenter')"><span class="nav-icon">💬</span> ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</div>
                     ${isAdmin ? `<div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
                     <div class="nav-item" onclick="JF.CapitalModule.showCapitalInjectionModal()"><span class="nav-icon">💉</span> ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</div>
                     <div class="nav-item" onclick="JF.ProfitPage.showDistributionPage()"><span class="nav-icon">💸</span> ${lang === 'id' ? 'Distribusi Laba' : '收益处置'}</div>
@@ -907,7 +946,7 @@
                             ${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}
                         </div>
                     </div>
-                    <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfit)}</div></div></div>
+                    <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfitInitial)}</div></div></div>
                 </div>
                 <div class="bottom-row">
                     <div class="quick-card">
@@ -924,7 +963,6 @@
                     <div class="message-center-card" style="display:flex; flex-direction:column;">
                         <div class="card-header">
                             <div class="card-title">💬 ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</div>
-                            ${pendingCount > 0 ? `<span class="message-badge">${pendingCount}</span>` : ''}
                             <div class="card-action" onclick="JF.MessageCenter.showMessageCenter()">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div>
                         </div>
                         <div class="message-preview">
@@ -1026,6 +1064,44 @@
 
                 // 仪表盘渲染成功后保存状态
                 this.saveCurrentPageState();
+
+                // ==================== 【第二步优化】第二批请求：详细数据（异步更新） ====================
+                const detailCacheKey = 'dashboard_details_' + (isAdmin ? 'admin' : storeId);
+                JF.Cache.get(detailCacheKey, async () => {
+                    const [cashFlowResult, totalExpensesResult, messageDataResult] = await Promise.all([
+                        SUPABASE.getCashFlowSummary(),
+                        (async () => {
+                            const client = SUPABASE.getClient();
+                            let q = client.from('expenses').select('amount, store_id');
+                            if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                            else if (isAdmin) {
+                                const practiceIds = await SUPABASE._getPracticeStoreIds();
+                                if (practiceIds.length) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                            }
+                            const expResult = await q;
+                            return (expResult.data || []).reduce((s, e) => s + (e.amount || 0), 0);
+                        })(),
+                        (async () => {
+                            try {
+                                if (JF.MessageCenter && typeof JF.MessageCenter.getPendingMessages === 'function') {
+                                    return await JF.MessageCenter.getPendingMessages();
+                                }
+                            } catch (e) { /* ignore */ }
+                            return [];
+                        })()
+                    ]);
+                    return {
+                        cashFlow: cashFlowResult,
+                        totalExpenses: totalExpensesResult,
+                        messages: messageDataResult
+                    };
+                }, { ttl: 3 * 60 * 1000 }).then(details => {
+                    // 数据就绪，局部更新仪表盘
+                    this._updateDashboardDetails(details, lang, isAdmin, kpiReport);
+                }).catch(err => {
+                    console.warn('[Dashboard] 详细信息加载失败:', err);
+                });
+
             } catch (err) {
                 console.error("originalRenderDashboard error:", err);
                 document.getElementById("app").innerHTML = '<div class="card" style="padding:40px;text-align:center;"><p>⚠️ ' + (Utils.lang === 'id' ? 'Gagal memuat dashboard: ' + err.message : '仪表盘加载失败: ' + err.message) + '</p><button onclick="APP.forceRecovery()" class="btn btn--warning" style="margin-right:8px;">🔄 ' + (Utils.lang === 'id' ? 'Pulihkan Paksa' : '强制恢复') + '</button><button onclick="location.reload()" class="btn btn--outline">🔄 ' + (Utils.lang === 'id' ? 'Muat Ulang' : '刷新') + '</button></div>';
@@ -1153,9 +1229,7 @@
                 
                 console.log('[DashboardCore] 用户已登录:', AUTH.user?.name);
 
-                // ======== 初始化全局键盘监听和浏览器返回 ========
                 this._initGlobalKeyboard();
-                // ===================================================
 
                 const saved = this.restorePageState();
                 if (saved.page && saved.page !== 'login') {
@@ -1214,5 +1288,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.3.2 已修复 filter 验证 + 集成工作日历 + 全局键盘(Esc/Enter/浏览器返回)');
+    console.log('✅ JF.DashboardCore v2.4 优化版（分步加载仪表盘数据）');
 })();
