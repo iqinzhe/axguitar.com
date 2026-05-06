@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="css/variables.css">
 <link rel="stylesheet" href="css/critical.css">          <!-- 首屏动画 -->
 <link rel="stylesheet" href="css/reset.css">
-<link rel="stylesheet" href="css/utilities.css">         <!-- 新增工具类 -->
+<link rel="stylesheet" href="css/utilities.css">         <!-- 工具类 -->
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/dashboard.css">
 <link rel="stylesheet" href="css/responsive.css">
@@ -41,24 +41,24 @@
 </div>
 
 <!--
-  ==================== 【优化】脚本加载策略 ====================
+  ==================== 脚本加载策略 ====================
   
   第 0 层：立即执行
-    - app-state-init（内联）：Token 检查，不依赖 DOM
+    - token 状态检查内联代码
   
   第 1 层：CDN + 核心基础（defer，按序执行）
     - config.js → supabase-js → utils.js → toast.js → cache.js
     - supabase.js → auth.js → permission.js → audit.js
     - order.js → store.js → storage.js → migration.js
   
-  第 2 层：核心应用（defer，在第 1 层之后）
+  第 2 层：核心应用（defer）
     - app-dashboard-core.js（首屏仪表盘）
   
-  第 3 层：内联启动（defer，在 app-dashboard-core.js 之后）
-    - 合并了原 app.js 的逻辑 + 应用启动控制
-  
-  第 4 层：非核心模块（由 lazy-loader.js 在 load 事件后动态加载）
+  第 3 层：非核心模块（defer，浏览器自动按序加载，不阻塞首屏）
     - 所有 app-*.js 页面模块
+  
+  第 4 层：内联启动逻辑（defer）
+    - 应用启动控制
 -->
 
 <!-- ========== 第 0 层：Token 状态初始化（立即执行，不依赖 DOM） ========== -->
@@ -123,8 +123,20 @@
 <!-- ========== 第 2 层：核心应用（首屏仪表盘） ========== -->
 <script defer src="js/app-dashboard-core.js"></script>
 
-<!-- ========== 第 3 层：延迟加载器（加载非核心模块） ========== -->
-<script defer src="js/lazy-loader.js"></script>
+<!-- ========== 第 3 层：非核心模块（defer，浏览器自动按序加载，不阻塞首屏） ========== -->
+<script defer src="js/app-capital.js"></script>
+<script defer src="js/app-profit.js"></script>
+<script defer src="js/app-dashboard-anomaly.js"></script>
+<script defer src="js/app-dashboard-expenses.js"></script>
+<script defer src="js/app-dashboard-funds.js"></script>
+<script defer src="js/app-dashboard-orders.js"></script>
+<script defer src="js/app-dashboard-print.js"></script>
+<script defer src="js/app-dashboard-users.js"></script>
+<script defer src="js/app-dashboard-wa.js"></script>
+<script defer src="js/app-message-center.js"></script>
+<script defer src="js/app-customers.js"></script>
+<script defer src="js/app-blacklist.js"></script>
+<script defer src="js/app-payments.js"></script>
 
 <!-- ========== 第 4 层：内联启动逻辑（合并原 app.js + 启动控制） ========== -->
 <script>
