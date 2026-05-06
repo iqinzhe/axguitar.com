@@ -3,7 +3,7 @@
    加载方式：<link rel="stylesheet" href="critical.css">
    ============================================================ */
 
-@import url('./variables.css');
+@import url('./2-variables.css');
 
 @layer base, components;
 
