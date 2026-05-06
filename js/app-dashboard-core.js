@@ -1099,59 +1099,61 @@
         },
 
         async renderLogin() {
-            this.currentPage = 'login';
-            this.clearPageState();
-            this._cleanupOverlays();
-            this._clearOverdueInterval();
-            
-            const lang = Utils.lang;
-            document.getElementById("app").innerHTML = `
-                <div class="login-container" style="background: linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%);">
-                    <div class="login-box" style="max-width: 340px; width: 100%; padding: 28px 24px 32px 24px; border-radius: var(--radius-xl); background: var(--bg-card); box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.03); border: 1px solid rgba(14, 116, 144, 0.15); transition: box-shadow 0.2s ease;">
-                        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-                            <button onclick="APP.toggleLanguage()" class="btn btn--sm btn--outline" style="padding: 4px 12px; font-size: var(--font-xs); border-radius: var(--radius-sm);">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px;">
-                            <img src="icons/pagehead-logo.png" alt="JF!" style="height: 32px; width: auto;">
-                            <h2 class="login-title" style="margin: 0; font-size: 1.35rem; font-weight: 600; color: var(--text-primary);">JF! by Gadai</h2>
-                        </div>
-                        <div id="loginError" class="info-bar danger" style="display: none; margin-bottom: 16px; padding: 8px 12px; border-radius: var(--radius-md);">
-                            <span class="info-bar-icon">⚠️</span>
-                            <div class="info-bar-content" id="loginErrorMessage" style="font-size: var(--font-xs);"></div>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 14px;">
-                            <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary);">${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
-                            <input id="username" placeholder="email@domain.com" autocomplete="username" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); transition: border-color 0.2s, box-shadow 0.2s;">
-                        </div>
-                        <div class="form-group" style="position: relative; margin-bottom: 16px;">
-                            <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary);">${Utils.t('password')}</label>
-                            <input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); padding-right: 36px;">
-                            <span onclick="Utils.togglePasswordVisibility('password', this)" style="position: absolute; right: 12px; bottom: 10px; cursor: pointer; font-size: 16px; opacity: 0.6;">👁️</span>
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px;">
-                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: var(--font-xs); color: var(--text-secondary);">
-                                <input type="checkbox" id="rememberMe" style="width: 14px; height: 14px; cursor: pointer; margin: 0; accent-color: var(--primary);"> ${lang === 'id' ? 'Ingat saya' : '记住我'}
-                            </label>
-                            <span style="font-size: var(--font-xs); color: var(--text-muted);">${lang === 'id' ? 'Lupa password? Hubungi admin' : '忘记密码？请联系管理员'}</span>
-                        </div>
-                        <button onclick="APP.login()" id="loginBtn" class="btn btn--primary btn--block" style="padding: 10px 16px; font-size: var(--font-sm); font-weight: 600; border-radius: var(--radius-md); background: linear-gradient(135deg, #0e7490, #06b6d4); border: none; color: white; cursor: pointer; transition: transform 0.1s, opacity 0.2s;">${Utils.t('login')}</button>
-                        <p class="login-note" style="font-size: var(--font-xs); color: var(--text-muted); text-align: center; margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--border-light);">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p>
+    this.currentPage = 'login';
+    this.clearPageState();
+    this._cleanupOverlays();
+    this._clearOverdueInterval();
+    
+    const lang = Utils.lang;
+    document.getElementById("app").innerHTML = `
+        <div class="login-container" style="background: linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%);">
+            <div class="login-box" style="max-width: 360px; width: 100%; padding: 28px 24px 32px 24px; border-radius: var(--radius-xl); background: var(--bg-card); box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.03); border: 1px solid rgba(14, 116, 144, 0.15); transition: box-shadow 0.2s ease;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                    <button onclick="APP.toggleLanguage()" class="btn btn--sm btn--outline" style="padding: 4px 12px; font-size: var(--font-xs); border-radius: var(--radius-sm);">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px;">
+                    <img src="icons/pagehead-logo.png" alt="JF!" style="height: 32px; width: auto;">
+                    <h2 class="login-title" style="margin: 0; font-size: 1.35rem; font-weight: 600; color: var(--text-primary);">JF! by Gadai</h2>
+                </div>
+                <div id="loginError" class="info-bar danger" style="display: none; margin-bottom: 16px; padding: 8px 12px; border-radius: var(--radius-md);">
+                    <span class="info-bar-icon">⚠️</span>
+                    <div class="info-bar-content" id="loginErrorMessage" style="font-size: var(--font-xs);"></div>
+                </div>
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary); display: block;">${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
+                    <input id="username" placeholder="email@domain.com" autocomplete="username" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); box-sizing: border-box;">
+                </div>
+                <div class="form-group" style="position: relative; margin-bottom: 16px;">
+                    <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary); display: block;">${Utils.t('password')}</label>
+                    <div style="position: relative;">
+                        <input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); box-sizing: border-box;">
+                        <span onclick="Utils.togglePasswordVisibility('password', this)" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 16px; opacity: 0.6;">👁️</span>
                     </div>
-                </div>`;
-            
-            const inputs = document.querySelectorAll('#username, #password');
-            inputs.forEach(input => {
-                input.addEventListener('focus', function() {
-                    this.style.borderColor = 'var(--primary)';
-                    this.style.boxShadow = '0 0 0 2px rgba(14, 116, 144, 0.1)';
-                    this.style.outline = 'none';
-                });
-                input.addEventListener('blur', function() {
-                    this.style.borderColor = 'var(--border-medium)';
-                    this.style.boxShadow = 'none';
-                });
-            });
-        },
+                </div>
+                <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 22px;">
+                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: var(--font-xs); color: var(--text-secondary);">
+                        <input type="checkbox" id="rememberMe" style="width: 14px; height: 14px; cursor: pointer; margin: 0; accent-color: var(--primary);"> ${lang === 'id' ? 'Ingat saya' : '记住我'}
+                    </label>
+                </div>
+                <button onclick="APP.login()" id="loginBtn" class="btn btn--primary btn--block" style="padding: 10px 16px; font-size: var(--font-sm); font-weight: 600; border-radius: var(--radius-md); background: linear-gradient(135deg, #0e7490, #06b6d4); border: none; color: white; cursor: pointer; transition: transform 0.1s, opacity 0.2s; width: 100%;">${Utils.t('login')}</button>
+                <p class="login-note" style="font-size: var(--font-xs); color: var(--text-muted); text-align: center; margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--border-light);">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p>
+            </div>
+        </div>`;
+    
+    // 绑定输入框聚焦样式
+    const inputs = document.querySelectorAll('#username, #password');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.style.borderColor = 'var(--primary)';
+            this.style.boxShadow = '0 0 0 2px rgba(14, 116, 144, 0.1)';
+            this.style.outline = 'none';
+        });
+        input.addEventListener('blur', function() {
+            this.style.borderColor = 'var(--border-medium)';
+            this.style.boxShadow = 'none';
+        });
+    });
+},
 
         async login() {
             if (this._loginLock) return;
