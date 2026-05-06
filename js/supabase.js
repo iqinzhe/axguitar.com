@@ -1,5 +1,5 @@
-// supabase.js - v2.1 增强版
-// 缓存过期检查 + 自动清理
+// supabase.js - v2.2 修复版
+// 修复 addExpense 方法：简化插入数据，让数据库自动处理默认值
 
 'use strict';
 
@@ -108,10 +108,10 @@
     let _profileCache = null;
     const _storePrefixCache = new Map();
     let _storesCache = null, _storesCacheTime = 0;
-    const STORES_TTL = 43200000; // 12小时（覆盖一个完整工作日）
+    const STORES_TTL = 43200000; // 12小时
     const USERS_TTL = 43200000;   // 12小时
 
-    // 安全查询包装器：自动捕获异常，处理401/会话过期
+    // 安全查询包装器
     const safeQuery = async (fn, fallback = null, silent = false) => {
         try {
             return await fn();
@@ -124,7 +124,7 @@
         }
     };
 
-    // 自动应用门店过滤（根据角色和参数）
+    // 自动应用门店过滤
     const applyStoreFilter = (query, profile, storeIdParam) => {
         if(!profile) return query;
         if(profile.role !== 'admin' && profile.store_id) return query.eq('store_id', profile.store_id);
@@ -184,7 +184,6 @@
             _storePrefixCache.clear();
             _storesCache = null;
             _storesCacheTime = 0;
-            // 清除 localStorage 中的持久化缓存
             try {
                 SafeStorage.removeItem('jf_cache_stores');
                 SafeStorage.removeItem('jf_cache_users');
@@ -225,23 +224,19 @@
         async getAllStores(forceRefresh = false) {
             if(!supabaseClient) return [];
             const now = Date.now();
-            // 1. 优先内存缓存
             if(!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_TTL) return _storesCache;
             
-            // 2. 检查 localStorage 缓存（跨标签页持久化）- 增强过期检查
             if(!forceRefresh) {
                 try {
                     const lsData = SafeStorage.getItem('jf_cache_stores');
                     if(lsData) {
                         const parsed = JSON.parse(lsData);
-                        // 检查 time 字段是否过期
                         if(parsed && parsed.data && (now - parsed.time) < STORES_TTL) {
                             _storesCache = parsed.data;
                             _storesCacheTime = parsed.time;
                             (parsed.data||[]).forEach(s=>{ if(s.prefix){ _storePrefixCache.set(s.id, s.prefix); _storePrefixCache.set(s.code, s.prefix); } });
                             return parsed.data;
                         } else if(parsed && parsed.data) {
-                            // 缓存已过期，主动删除
                             SafeStorage.removeItem('jf_cache_stores');
                             console.log('[Supabase] 门店缓存已过期，已删除');
                         }
@@ -249,20 +244,35 @@
                 } catch(e) { /* ignore */ }
             }
             
-            // 3. 发起网络请求
             try {
                 const { data } = await supabaseClient.from('stores').select('*').neq('code','STORE_000').order('code');
                 _storesCache = data;
                 _storesCacheTime = now;
                 (data||[]).forEach(s=>{ if(s.prefix){ _storePrefixCache.set(s.id, s.prefix); _storePrefixCache.set(s.code, s.prefix); } });
-                
-                // 持久化到 localStorage
                 try {
                     SafeStorage.setItem('jf_cache_stores', JSON.stringify({ data, time: now }));
                 } catch(e) { /* ignore */ }
-                
                 return data;
             } catch(e){ return _storesCache || []; }
+        },
+
+        async checkStoreStatus(storeId) {
+            if (!supabaseClient) return { is_active: true, name: '' };
+            try {
+                const { data, error } = await supabaseClient
+                    .from('stores')
+                    .select('is_active, name')
+                    .eq('id', storeId)
+                    .single();
+                if (error) throw error;
+                return { 
+                    is_active: data?.is_active !== false, 
+                    name: data?.name || '' 
+                };
+            } catch (error) {
+                console.warn('[Supabase] checkStoreStatus failed:', error.message);
+                return { is_active: true, name: '' };
+            }
         },
 
         async _getStorePrefix(storeId) {
@@ -587,6 +597,77 @@
             return true;
         },
 
+        // ========== 支出管理（修复版 - 简化插入，让数据库自动处理默认值） ==========
+        async addExpense(expenseData) {
+            if (!supabaseClient) throw new Error('客户端未初始化');
+            const profile = await this.getCurrentProfile();
+            const targetStoreId = expenseData.store_id || profile?.store_id;
+            
+            if (!targetStoreId) {
+                throw new Error(Utils.lang === 'id' ? 'ID toko tidak ditemukan' : '门店ID缺失');
+            }
+            
+            // 确保 amount 是数字
+            const amountValue = typeof expenseData.amount === 'number' 
+                ? expenseData.amount 
+                : parseFloat(expenseData.amount);
+            
+            if (isNaN(amountValue) || amountValue <= 0) {
+                throw new Error(Utils.t('invalid_amount'));
+            }
+            
+            // 【关键修复】只传必要字段，让数据库自动处理 created_at, updated_at, is_locked, is_reconciled 等
+            const insertData = {
+                store_id: targetStoreId,
+                expense_date: expenseData.expense_date || Utils.getLocalToday(),
+                category: expenseData.category,
+                amount: amountValue,
+                description: expenseData.description || null,
+                payment_method: expenseData.payment_method || 'cash',
+                created_by: profile?.id
+            };
+            
+            console.log('[addExpense] 插入数据:', insertData);
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from('expenses')
+                    .insert(insertData)
+                    .select()
+                    .single();
+                    
+                if (error) {
+                    console.error('[addExpense] Supabase错误:', {
+                        code: error.code,
+                        message: error.message,
+                        details: error.details,
+                        hint: error.hint
+                    });
+                    throw error;
+                }
+                
+                // 记录现金流（捕获错误但不阻断主流程）
+                try {
+                    await this.recordCashFlow({
+                        store_id: targetStoreId,
+                        flow_type: 'expense',
+                        direction: 'outflow',
+                        amount: amountValue,
+                        source_target: expenseData.payment_method || 'cash',
+                        description: expenseData.category,
+                        reference_id: data.id
+                    });
+                } catch (flowError) {
+                    console.warn('[addExpense] 现金流记录失败（支出已保存）:', flowError.message);
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('[addExpense] 失败:', error);
+                throw error;
+            }
+        },
+
         async recordLoanDisbursement(orderId, amount, source, description) {
             const order = await this.getOrder(orderId);
             const { data: exist } = await supabaseClient.from('cash_flow_records')
@@ -748,11 +829,9 @@
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             const isStoreManager = profile?.role === 'store_manager';
-            // 权限检查：仅 admin 和 store_manager 可操作
             if (!isAdmin && !isStoreManager) throw new Error('Admin or store manager only');
             const targetStoreId = storeId || profile.store_id;
             if(!targetStoreId) throw new Error('Store ID missing');
-            // store_manager 只能操作本店，不可操作其他门店
             if (isStoreManager && targetStoreId !== profile.store_id) {
                 throw new Error('Store manager can only distribute profit for their own store');
             }
@@ -761,8 +840,6 @@
                 const available = await this.getDistributableProfit(targetStoreId);
                 if(amount>available) throw new Error('Insufficient distributable profit');
             }
-            // return_capital：不硬拦截，超出注资余额部分自动视为红利提取
-            // 拆分逻辑在下方处理，此处不做金额校验
 
             const { data: distribution, error: distError } = await supabaseClient
                 .from('profit_distributions').insert({
@@ -782,10 +859,9 @@
                     description:'利润再投入', recorded_by: profile.id, is_voided: false
                 });
             } else if(type==='return_capital'){
-                // ── 自动拆分：本金偿还 + 超额红利提取 ──────────────────────────
                 const externalBalance = await this.getExternalCapitalBalance(targetStoreId);
-                const principalPart = Math.min(amount, externalBalance);   // 本金部分
-                const dividendPart  = amount - principalPart;              // 超额红利部分
+                const principalPart = Math.min(amount, externalBalance);
+                const dividendPart  = amount - principalPart;
 
                 if(principalPart > 0){
                     await this.recordCashFlow({
@@ -806,8 +882,6 @@
                         reference_id: distribution.id
                     });
                 }
-                // ── 拆分结束 ────────────────────────────────────────────────────
-                // 在 distribution 记录上补充备注，方便日后对账
                 const splitNote = dividendPart > 0
                     ? (Utils.lang==='id'
                         ? `Modal: ${Utils.formatCurrency(principalPart)}, Dividen: ${Utils.formatCurrency(dividendPart)}`
@@ -1183,7 +1257,6 @@
             if(order.status==='completed') throw new Error(Utils.t('order_completed'));
             if(order.repayment_type!=='fixed') throw new Error(Utils.lang==='id'?'Bukan cicilan tetap':'不是固定还款');
             const remaining = order.principal_remaining;
-            // 确认弹窗统一由调用方（app-payments.js）负责，此处不重复弹出
             await supabaseClient.from('payment_history').insert({
                 order_id: order.id, date: todayStr(), type:'principal',
                 amount: remaining, description: Utils.lang==='id'?'Pelunasan dipercepat':'提前结清',
@@ -1318,19 +1391,15 @@
         async getAllUsers(forceRefresh = false) {
             if (!supabaseClient) return [];
             const now = Date.now();
-            const USERS_TTL = 43200000; // 12小时
             
-            // 1. 检查 localStorage 缓存 - 增强过期检查
             if(!forceRefresh) {
                 try {
                     const lsData = SafeStorage.getItem('jf_cache_users');
                     if(lsData) {
                         const parsed = JSON.parse(lsData);
-                        // 检查 time 字段是否过期
                         if(parsed && parsed.data && (now - parsed.time) < USERS_TTL) {
                             return parsed.data;
                         } else if(parsed && parsed.data) {
-                            // 缓存已过期，主动删除
                             SafeStorage.removeItem('jf_cache_users');
                             console.log('[Supabase] 用户缓存已过期，已删除');
                         }
@@ -1338,11 +1407,9 @@
                 } catch(e) { /* ignore */ }
             }
             
-            // 2. 发起网络请求
             const { data, error } = await supabaseClient.from('user_profiles').select('*, stores(*)').order('name');
             if (error) throw error;
             
-            // 3. 持久化到 localStorage
             try {
                 SafeStorage.setItem('jf_cache_users', JSON.stringify({ data, time: now }));
             } catch(e) { /* ignore */ }
@@ -1478,26 +1545,7 @@
             };
         },
 
-        async addExpense(expenseData) {
-            if (!supabaseClient) throw new Error('客户端未初始化');
-            const profile = await this.getCurrentProfile();
-            const { data, error } = await supabaseClient.from('expenses').insert({
-                store_id: expenseData.store_id || profile?.store_id,
-                expense_date: expenseData.expense_date || Utils.getLocalToday(),
-                category: expenseData.category, amount: expenseData.amount,
-                description: expenseData.description || null, payment_method: expenseData.payment_method,
-                created_by: profile?.id, is_locked: true, is_reconciled: false,
-                created_at: Utils.getLocalDateTime(), updated_at: Utils.getLocalDateTime()
-            }).select().single();
-            if (error) throw error;
-            await this.recordCashFlow({
-                store_id: expenseData.store_id || profile?.store_id,
-                flow_type: 'expense', direction: 'outflow',
-                amount: expenseData.amount, source_target: expenseData.payment_method,
-                description: expenseData.category, reference_id: data.id
-            });
-            return data;
-        },
+        // ========== 注意：addExpense 方法已在上方修复 ==========
 
         async getStoreWANumber(storeId) {
             if (!supabaseClient) return null;
@@ -1704,5 +1752,5 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
-    console.log('✅ JF.Supabase v2.1 初始化完成（缓存过期检查 + 自动清理）');
+    console.log('✅ JF.Supabase v2.2 修复完成（addExpense 简化插入，支持练习门店）');
 })();
