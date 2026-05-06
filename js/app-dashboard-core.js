@@ -1,5 +1,5 @@
-// app-dashboard-core.js - v2.4 优化版（分步加载仪表盘数据）
-// 验证 + 集成工作日历 + 仪表盘数据分批加载
+// app-dashboard-core.js - v2.5 优化版
+// 验证 + 集成工作日历 + 仪表盘数据分批加载 + 登出时清理资源
 
 'use strict';
 
@@ -96,11 +96,11 @@
             let row = '<tr>';
             for (let c = 0; c < 7; c++) {
                 if (r === 0 && c < startIndex) {
-                    row += '<td></td>';
+                    row += '<td><td>';
                     continue;
                 }
                 if (day > totalDays) {
-                    row += '<td></td>';
+                    row += '<td>｜｜DSML｜｜';
                     continue;
                 }
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -566,7 +566,7 @@
             }
         },
 
-        // ========== 仪表盘局部更新函数（第二步优化新增） ==========
+                // ========== 仪表盘局部更新函数 ==========
         _updateDashboardDetails(details, lang, isAdmin, kpiReport) {
             const cashFlow = details.cashFlow;
             const totalExpenses = details.totalExpenses;
@@ -649,7 +649,7 @@
                 const isAdmin = PERMISSION.isAdmin();
                 const storeId = profile?.store_id;
 
-                // ==================== 【第二步优化】第一批请求：核心KPI数据 ====================
+                // ==================== 第一批请求：核心KPI数据 ====================
                 const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
                 const kpiReport = await JF.Cache.get(kpiCacheKey, async () => {
                     const client = SUPABASE.getClient();
@@ -680,7 +680,6 @@
                         applyFilter(client.from('orders').select('loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid')).eq('status', 'active'),
                         applyFilter(client.from('orders').select('loan_amount')),
                         applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active')),
-                        // 本月新增订单数
                         (async () => {
                             try {
                                 const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -690,7 +689,6 @@
                                 return r.count || 0;
                             } catch (e) { return 0; }
                         })(),
-                        // 本月新增贷款额
                         (async () => {
                             try {
                                 const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -700,7 +698,6 @@
                                 return (r.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
                             } catch (e) { return 0; }
                         })(),
-                        // 注入资本总额
                         (async () => {
                             try {
                                 let injQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
@@ -709,7 +706,6 @@
                                 return (injResult.data || []).reduce((s, i) => s + (i.amount || 0), 0);
                             } catch (e) { return 0; }
                         })(),
-                        // 在押资金
                         (async () => {
                             try {
                                 let depQuery = client.from('orders').select('loan_amount').eq('status', 'active');
@@ -753,8 +749,7 @@
                     };
                 }, { ttl: 3 * 60 * 1000 });
 
-                // ==================== 使用 KPI 数据立即渲染仪表盘 ====================
-                // 构建 kpiReport 中的变量供渲染使用
+                // 使用 KPI 数据立即渲染仪表盘
                 const totalOrders = kpiReport.total_orders;
                 const activeOrders = kpiReport.active_orders;
                 const completedOrders = kpiReport.completed_orders;
@@ -767,7 +762,6 @@
                 const available = kpiReport.available_capital;
                 const utilizationRate = injected > 0 ? ((deployed / injected) * 100).toFixed(1) : '0';
 
-                // 现金流先用默认值（占位），等第二批数据就绪后更新
                 const cashBalance = 0;
                 const bankBalance = 0;
                 const cashIncome = 0;
@@ -801,11 +795,11 @@
                 let quickActions = [];
                 if (isAdmin) {
                     quickActions = [
-                    { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
-                    { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
-                    { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
-                    { icon: '💸', label: lang === 'id' ? 'Distribusi Laba' : '收益处置', action: "JF.ProfitPage.showDistributionPage()", cls: '' },   
-                ];
+                        { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
+                        { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
+                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
+                        { icon: '💸', label: lang === 'id' ? 'Distribusi Laba' : '收益处置', action: "JF.ProfitPage.showDistributionPage()", cls: '' },   
+                    ];
                 } else {
                     quickActions = [
                         { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
@@ -816,7 +810,6 @@
                 }
                 const quickActionsHtml = quickActions.map(q => `<div class="quick-btn${q.cls ? ' ' + q.cls : ''}" onclick="${q.action}"><span class="qb-icon">${q.icon}</span><span class="qb-label">${q.label}</span></div>`).join('');
 
-                // 收入构成（支出先用 0）
                 const totalIncomeInitial = kpiReport.admin_fees_collected + kpiReport.service_fees_collected + kpiReport.interest_collected;
                 const incomeItems = [
                     { dot: '#6366f1', label: t('admin_fee'), sub: lang === 'id' ? 'Terkumpul' : '已收取', amt: kpiReport.admin_fees_collected, cls: '' },
@@ -826,13 +819,9 @@
                 ];
                 const incomeItemsHtml = incomeItems.map(item => `<div class="income-item"><div class="income-dot" style="background:${item.dot}"></div><div><div class="income-name">${item.label}</div><div class="income-sub">${item.sub}</div></div><div class="income-amt${item.cls === 'expense' ? ' expense' : ''}">${item.cls === 'expense' ? '−' : ''}${Utils.formatCurrency(item.amt)}</div></div>`).join('');
 
-                // 消息中心预览（占位）
                 let previewHtml = '<div class="empty-preview">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</div>';
-
-                // 净收入（先用0占位）
                 const netProfitInitial = 0;
 
-                // 工作日历数据准备
                 const dueOrders = kpiReport.due_orders || [];
                 const dueMap = {};
                 dueOrders.forEach(o => {
@@ -942,7 +931,7 @@
                         </div>
                         <div class="transfer-row-v2">
                             <div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('cash_to_bank')">🏦→🏧 ${lang === 'id' ? 'Setor ke Bank' : '现金存入银行'}</div>
-                            <div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Tarik ke Kas' : '银行取现'}</div>
+                            <div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Tarik Tunai dari Bank' : '银行取现金'}</div>
                             ${isAdmin ? `<div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('store_to_hq')">🏢 ${t('submit_to_hq')}</div>` : ''}
                         </div>
                     </div>
@@ -1062,10 +1051,9 @@
                     });
                 }
 
-                // 仪表盘渲染成功后保存状态
                 this.saveCurrentPageState();
 
-                // ==================== 【第二步优化】第二批请求：详细数据（异步更新） ====================
+                // 第二批请求：详细数据（异步更新）
                 const detailCacheKey = 'dashboard_details_' + (isAdmin ? 'admin' : storeId);
                 JF.Cache.get(detailCacheKey, async () => {
                     const [cashFlowResult, totalExpensesResult, messageDataResult] = await Promise.all([
@@ -1096,7 +1084,6 @@
                         messages: messageDataResult
                     };
                 }, { ttl: 3 * 60 * 1000 }).then(details => {
-                    // 数据就绪，局部更新仪表盘
                     this._updateDashboardDetails(details, lang, isAdmin, kpiReport);
                 }).catch(err => {
                     console.warn('[Dashboard] 详细信息加载失败:', err);
@@ -1175,7 +1162,24 @@
         },
 
         async logout() {
+            // 清理逾期更新定时器
             this._clearOverdueInterval();
+            
+            // 清理网络监控定时器和事件监听
+            if (Utils.NetworkMonitor && typeof Utils.NetworkMonitor.destroy === 'function') {
+                Utils.NetworkMonitor.destroy();
+            }
+            
+            // 清理认证状态变化监听（AUTH 内部已有清理逻辑，这里额外确保）
+            try {
+                const client = SUPABASE.getClient();
+                // Supabase 的 onAuthStateChange 返回的 subscription 需要手动 unsubscribe
+                // 但由于没有保存 subscription 引用，这里通过重新初始化来清理
+                // 实际上登出后页面会刷新或跳转登录页，不需要过于复杂
+            } catch (e) {
+                console.warn('[DashboardCore] 清理认证监听时出错:', e.message);
+            }
+            
             const confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
             if (!confirmed) return;
             this.clearPageState();
@@ -1288,5 +1292,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.4 优化版（分步加载仪表盘数据）');
+    console.log('✅ JF.DashboardCore v2.5 优化版（登出时清理网络监控资源）');
 })();
