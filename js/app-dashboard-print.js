@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.2 订单详情打印优化（3列3行网格布局）
+// app-dashboard-print.js - v2.0
 
 'use strict';
 
