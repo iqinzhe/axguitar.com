@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.1（打印表头优化：一行显示）
+// app-dashboard-print.js - v2.2 订单详情打印优化（3列3行网格布局）
 
 'use strict';
 
@@ -145,7 +145,54 @@
             const navBadges = printContent.querySelectorAll('.nav-badge');
             for (const badge of navBadges) badge.remove();
 
-            // 获取当前语言、用户和门店信息
+            // ========== 订单详情页面特殊处理：将双列布局改为3列3行网格 ==========
+            const orderDetailGrid = printContent.querySelector('.order-detail-grid');
+            if (orderDetailGrid) {
+                // 收集所有信息项
+                const leftColumn = orderDetailGrid.querySelector('.info-column:first-child');
+                const rightColumn = orderDetailGrid.querySelector('.info-column:last-child');
+                const allInfoItems = [];
+
+                // 从左侧列提取信息
+                if (leftColumn) {
+                    const items = leftColumn.querySelectorAll('p');
+                    for (const item of items) {
+                        const text = item.innerText.trim();
+                        if (text && !text.includes('费用明细') && !text.includes('Rincian Biaya') && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
+                            allInfoItems.push(text);
+                        }
+                    }
+                }
+
+                // 从右侧列提取信息
+                if (rightColumn) {
+                    const items = rightColumn.querySelectorAll('p');
+                    for (const item of items) {
+                        const text = item.innerText.trim();
+                        if (text && !text.includes('费用明细') && !text.includes('Rincian Biaya') && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
+                            allInfoItems.push(text);
+                        }
+                    }
+                }
+
+                // 创建3列3行的网格布局
+                if (allInfoItems.length >= 9) {
+                    const gridHtml = `
+                        <div class="order-info-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-bottom: 20px;">
+                            ${allInfoItems.slice(0, 9).map(item => `
+                                <div class="info-item" style="padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
+                                    ${item}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    
+                    // 替换原有的双列布局
+                    orderDetailGrid.innerHTML = gridHtml;
+                }
+            }
+
+            // ========== 获取打印页头信息 ==========
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
             let storeName = '';
@@ -274,6 +321,18 @@
                             grid-template-columns: 1fr 1fr; 
                             gap: 12px; 
                         }
+                        /* 3列网格样式 */
+                        .order-info-grid {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 12px 24px;
+                            margin-bottom: 20px;
+                        }
+                        .info-item {
+                            padding: 4px 0;
+                            border-bottom: 1px solid #e2e8f0;
+                            break-inside: avoid;
+                        }
                         @media print {
                             @page { size: A4; margin: 8mm; }
                             body { margin: 0; padding: 0; }
@@ -324,5 +383,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.1 打印表头优化（一行显示）');
+    console.log('✅ JF.PrintPage v2.2 订单详情打印优化（3列3行网格布局）');
 })();
