@@ -1035,3 +1035,129 @@
     margin-bottom: var(--spacing-4);
   }
 }
+/* ============================================================
+   移动端适配 - 修复创建订单等页面的布局
+   ============================================================ */
+@media (max-width: 768px) {
+    /* 创建订单页面移动端布局修复 */
+    .order-first-row {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3);
+    }
+    
+    .fee-cards-row {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3);
+    }
+    
+    .repayment-cards-row {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3);
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3);
+    }
+    
+    .form-grid.form-grid--3,
+    .form-grid.form-grid--4 {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* 统计卡片网格修复 */
+    .stats-grid,
+    .stats-grid--2,
+    .stats-grid--3,
+    .stats-grid--auto {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* 异常页面网格修复 */
+    .anomaly-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3);
+    }
+    
+    /* 备份页面网格修复 */
+    .backup-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3);
+    }
+    
+    /* 订单详情双列布局修复 */
+    .order-detail-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3);
+    }
+    
+    /* 支付双列布局修复 */
+    .payment-double-column {
+        flex-direction: column !important;
+    }
+    
+    .payment-double-column .card {
+        min-width: auto !important;
+    }
+    
+    /* 还款卡片内联修复 */
+    .repayment-card {
+        margin-bottom: var(--spacing-2);
+    }
+    
+    .repayment-card .repayment-card-header {
+        flex-wrap: wrap;
+    }
+    
+    /* 弹窗内容宽度修复 */
+    .modal-content {
+        width: 95%;
+        max-width: none;
+        margin: var(--spacing-3);
+        padding: var(--spacing-4);
+    }
+    
+    /* 按钮组换行修复 */
+    .action-buttons {
+        flex-wrap: wrap;
+        gap: var(--spacing-2);
+    }
+    
+    /* 表格容器滚动修复 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .data-table {
+        min-width: 650px;
+    }
+    
+    /* 门店管理表格修复 */
+    .store-stats-table {
+        min-width: 800px;
+    }
+    
+    /* 工具条修复 */
+    .toolbar.admin-grid,
+    .toolbar.store-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: var(--spacing-2);
+    }
+    
+    /* 信息显示网格修复 */
+    .info-display {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* 汇总网格修复 */
+    .summary-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* 利润页面卡片网格修复 */
+    .profit-cards-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-3) !important;
+    }
+}
