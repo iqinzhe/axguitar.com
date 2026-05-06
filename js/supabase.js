@@ -1183,12 +1183,7 @@
             if(order.status==='completed') throw new Error(Utils.t('order_completed'));
             if(order.repayment_type!=='fixed') throw new Error(Utils.lang==='id'?'Bukan cicilan tetap':'不是固定还款');
             const remaining = order.principal_remaining;
-            const confirmed = await Utils.toast.confirm(
-                Utils.lang==='id'?
-                    `⚠️ Konfirmasi Pelunasan Dipercepat\n\nPesanan: ${order.order_id}\nSisa Pokok: ${Utils.formatCurrency(remaining)}\n\nLanjutkan?` :
-                    `⚠️ 提前结清确认\n\n订单号: ${order.order_id}\n剩余本金: ${Utils.formatCurrency(remaining)}\n\n确认结清？`
-            );
-            if(!confirmed) return false;
+            // 确认弹窗统一由调用方（app-payments.js）负责，此处不重复弹出
             await supabaseClient.from('payment_history').insert({
                 order_id: order.id, date: todayStr(), type:'principal',
                 amount: remaining, description: Utils.lang==='id'?'Pelunasan dipercepat':'提前结清',

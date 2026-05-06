@@ -604,9 +604,21 @@
                     return;
                 }
                 
+                // 取门店名称（优先从下拉框，否则查接口）
+                let storeName = storeId;
+                const storeSelectEl = document.getElementById('reinvestStoreSelect');
+                if (storeSelectEl && storeSelectEl.selectedOptions?.[0]?.text) {
+                    storeName = storeSelectEl.selectedOptions[0].text;
+                } else {
+                    try {
+                        const allStores = await SUPABASE.getAllStores();
+                        const found = allStores.find(s => s.id === storeId);
+                        if (found) storeName = found.name;
+                    } catch(e) { /* 取不到名称时降级显示 ID */ }
+                }
                 const confirmMsg = lang === 'id'
-                    ? `⚠️ Konfirmasi Reinvestasi Keuntungan\n\nToko: ${storeId}\nJumlah: ${Utils.formatCurrency(pendingProfit)}\n\nKeuntungan akan ditambahkan ke modal toko. Lanjutkan?`
-                    : `⚠️ 确认利润再投入\n\n门店: ${storeId}\n金额: ${Utils.formatCurrency(pendingProfit)}\n\n利润将转化为门店资本。确认继续？`;
+                    ? `⚠️ Konfirmasi Reinvestasi Keuntungan\n\nToko: ${storeName}\nJumlah: ${Utils.formatCurrency(pendingProfit)}\n\nKeuntungan akan ditambahkan ke modal toko. Lanjutkan?`
+                    : `⚠️ 确认利润再投入\n\n门店: ${storeName}\n金额: ${Utils.formatCurrency(pendingProfit)}\n\n利润将转化为门店资本。确认继续？`;
                 
                 const confirmed = await Utils.toast.confirm(confirmMsg);
                 if (!confirmed) return;
