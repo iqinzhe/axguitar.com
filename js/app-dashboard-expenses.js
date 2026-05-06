@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.3 修复编辑支出后现金流验证与一致性问题
+// app-dashboard-expenses.js - v2.4 修复练习门店支出保存问题
 
 'use strict';
 
@@ -68,7 +68,7 @@
                             <td class="text-center">${methodText}</td>
                             <td class="desc-cell">${Utils.escapeHtml(e.description || '-')}</td>
                             ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
-                            <td class="text-center" style="white-space:nowrap;">${actionHtml}</td>
+                            <td class="text-center" style="white-space:nowrap;">${actionHtml}</tr>
                         </tr>`;
                     }
                 }
@@ -79,6 +79,26 @@
                     : ['电费', '水费', '网络费', '员工工资', '场地租金', '办公用品', '维修', '交通费', '其他'];
                 const categoryOptions = expenseCategories.map(c => `<option value="${c}">${c}</option>`).join('');
 
+                // 获取门店练习状态提示
+                let practiceWarningHtml = '';
+                if (!isAdmin && storeId) {
+                    const storesData = await SUPABASE.getAllStores();
+                    const myStore = storesData.find(s => s.id === storeId);
+                    if (myStore?.is_practice === true) {
+                        practiceWarningHtml = `
+                            <div class="info-bar info" style="margin-bottom: 16px;">
+                                <span class="info-bar-icon">🎓</span>
+                                <div class="info-bar-content">
+                                    <strong>${lang === 'id' ? 'Mode Latihan' : '练习模式'}</strong><br>
+                                    ${lang === 'id' 
+                                        ? 'Anda sedang dalam mode latihan. Semua data pengeluaran akan dicatat dan dapat dihapus nanti.'
+                                        : '您当前处于练习模式。所有支出数据将被记录，后续可删除。'}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
                 const content = `
                     <div class="page-header">
                         <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
@@ -87,6 +107,7 @@
                             <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </div>
                     </div>
+                    ${practiceWarningHtml}
                     <div class="card">
                         <div class="card card--stat" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">
                             <div class="stat-value expense">${Utils.formatCurrency(totalAmount)}</div>
@@ -142,7 +163,7 @@
                                 <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}"></textarea>
                             </div>
                             <div class="form-actions">
-                                <button onclick="APP.addExpense()" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
+                                <button onclick="APP.addExpense()" id="addExpenseBtn" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
                             </div>
                         </div>
                         <p class="info-note">💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}</p>
@@ -171,7 +192,7 @@
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         },
 
-        // 添加支出
+        // ==================== 添加支出（修复版 - 支持练习门店） ====================
         async addExpense() {
             const lang = Utils.lang;
             const expenseDate = document.getElementById("expenseDate").value || new Date().toISOString().split('T')[0];
@@ -181,24 +202,80 @@
             const description = document.getElementById("expenseDescription").value;
             const paymentMethod = document.getElementById("expenseMethod").value;
 
-            if (!category) { Utils.toast.warning(lang === 'id' ? 'Masukkan kategori' : '请输入类别'); return; }
-            if (isNaN(amount) || amount <= 0) { Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); return; }
+            if (!category) { 
+                Utils.toast.warning(lang === 'id' ? 'Masukkan kategori' : '请输入类别'); 
+                return; 
+            }
+            if (isNaN(amount) || amount <= 0) { 
+                Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); 
+                return; 
+            }
+
+            const addBtn = document.getElementById('addExpenseBtn');
+            if (addBtn) {
+                addBtn.disabled = true;
+                addBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
+            }
 
             try {
                 const profile = await SUPABASE.getCurrentProfile();
-                await SUPABASE.addExpense({
+                
+                // 验证门店
+                if (!profile?.store_id) {
+                    throw new Error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
+                }
+                
+                // 获取门店信息（仅用于日志，不拦截）
+                const stores = await SUPABASE.getAllStores();
+                const myStore = stores.find(s => s.id === profile.store_id);
+                
+                console.log('[addExpense] 保存支出:', {
+                    store_id: profile.store_id,
+                    store_name: myStore?.name,
+                    is_practice: myStore?.is_practice,
+                    category: category,
+                    amount: amount,
+                    payment_method: paymentMethod
+                });
+                
+                // 直接调用 SUPABASE.addExpense（RLS 策略已允许所有门店）
+                const result = await SUPABASE.addExpense({
                     store_id: profile.store_id,
                     expense_date: expenseDate,
-                    category,
-                    amount,
+                    category: category,
+                    amount: amount,
                     description: description || null,
                     payment_method: paymentMethod
                 });
+                
+                console.log('[addExpense] 保存成功:', result);
+                
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
+                
+                // 刷新页面
                 await ExpensesPage.showExpenses();
+                
             } catch (error) {
-                console.error("addExpense error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
+                console.error("[addExpense] 保存失败:", error);
+                
+                // 输出完整错误信息
+                let errorMsg = error.message;
+                if (error.details) {
+                    errorMsg += '\n' + (lang === 'id' ? 'Detail: ' : '详情: ') + error.details;
+                }
+                if (error.hint) {
+                    errorMsg += '\n' + (lang === 'id' ? 'Petunjuk: ' : '提示: ') + error.hint;
+                }
+                if (error.code) {
+                    errorMsg += '\n' + (lang === 'id' ? 'Kode: ' : '代码: ') + error.code;
+                }
+                
+                Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + errorMsg : '保存失败：' + errorMsg);
+            } finally {
+                if (addBtn) {
+                    addBtn.disabled = false;
+                    addBtn.textContent = lang === 'id' ? '💾 Simpan Pengeluaran' : '💾 保存支出';
+                }
             }
         },
 
@@ -275,7 +352,7 @@
         },
         
         // ==================== 保存编辑后的支出（带现金流验证） ====================
-        saveEditedExpense: async function(expenseId) {
+        async saveEditedExpense(expenseId) {
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
             if (!isAdmin) {
@@ -537,5 +614,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.3 修复完成（现金流验证与自动修复）');
+    console.log('✅ JF.ExpensesPage v2.4 修复完成（练习门店支出保存支持）');
 })();
