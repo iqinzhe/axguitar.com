@@ -1,5 +1,7 @@
-// supabase.js - v2.2 修复版
-// 修复 addExpense 方法：简化插入数据，让数据库自动处理默认值
+// supabase.js - v2.3 完整修复版
+// 1. 管理员可查看所有门店数据（包括练习门店）
+// 2. 管理员可为总部创建支出
+// 3. 移除练习门店数据排除逻辑
 
 'use strict';
 
@@ -124,11 +126,19 @@
         }
     };
 
-    // 自动应用门店过滤
+    // 自动应用门店过滤（管理员不过滤，可查看所有门店）
     const applyStoreFilter = (query, profile, storeIdParam) => {
         if(!profile) return query;
-        if(profile.role !== 'admin' && profile.store_id) return query.eq('store_id', profile.store_id);
-        if(profile.role === 'admin' && storeIdParam && storeIdParam !== 'all') return query.eq('store_id', storeIdParam);
+        // 管理员不应用店铺过滤，可查看所有数据
+        if(profile.role === 'admin') {
+            // 如果指定了特定门店ID，则过滤
+            if(storeIdParam && storeIdParam !== 'all') {
+                return query.eq('store_id', storeIdParam);
+            }
+            return query;
+        }
+        // 非管理员：只能看自己门店
+        if(profile.store_id) return query.eq('store_id', profile.store_id);
         return query;
     };
 
@@ -245,7 +255,7 @@
             }
             
             try {
-                const { data } = await supabaseClient.from('stores').select('*').neq('code','STORE_000').order('code');
+                const { data } = await supabaseClient.from('stores').select('*').order('code');
                 _storesCache = data;
                 _storesCacheTime = now;
                 (data||[]).forEach(s=>{ if(s.prefix){ _storePrefixCache.set(s.id, s.prefix); _storePrefixCache.set(s.code, s.prefix); } });
@@ -397,7 +407,8 @@
                 const { data: bl } = await supabaseClient.from('blacklist').select('customer_id');
                 const blackIds = (bl||[]).map(b=>b.customer_id);
                 let q = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-                if(profile?.role!=='admin' && profile?.store_id) q = q.eq('store_id', profile.store_id);
+                // 管理员不过滤门店，可查看所有客户
+                if(profile?.role !== 'admin' && profile?.store_id) q = q.eq('store_id', profile.store_id);
                 if(blackIds.length) q = q.not('id','in',`(${blackIds.join(',')})`);
                 const { data } = await q;
                 return data;
@@ -460,7 +471,8 @@
                     stores:store_id (name, code)
                 ), blacklisted_by_profile:blacklisted_by (name)
             `).order('blacklisted_at', { ascending: false });
-            if(profile?.role!=='admin' && filterStoreId) q = q.eq('customers.store_id', filterStoreId);
+            // 管理员不过滤门店
+            if(profile?.role !== 'admin' && filterStoreId) q = q.eq('customers.store_id', filterStoreId);
             const { data, error } = await q;
             if(error) throw error;
             return data;
@@ -597,11 +609,27 @@
             return true;
         },
 
-        // ========== 支出管理（修复版 - 简化插入，让数据库自动处理默认值） ==========
+        // ========== 支出管理（修复版 - 支持管理员/总部） ==========
         async addExpense(expenseData) {
             if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
-            const targetStoreId = expenseData.store_id || profile?.store_id;
+            
+            // 确定门店ID
+            let targetStoreId = expenseData.store_id || profile?.store_id;
+            
+            // 如果是管理员且没有指定门店，获取总部门店ID
+            if (profile?.role === 'admin' && !targetStoreId) {
+                const stores = await this.getAllStores();
+                const hqStore = stores.find(s => s.code === 'STORE_000');
+                if (hqStore) {
+                    targetStoreId = hqStore.id;
+                } else {
+                    // 如果没有总部门店，返回友好错误
+                    throw new Error(Utils.lang === 'id' 
+                        ? 'Tidak dapat menentukan toko. Silakan pilih toko terlebih dahulu.'
+                        : '无法确定门店，请先选择门店');
+                }
+            }
             
             if (!targetStoreId) {
                 throw new Error(Utils.lang === 'id' ? 'ID toko tidak ditemukan' : '门店ID缺失');
@@ -616,7 +644,7 @@
                 throw new Error(Utils.t('invalid_amount'));
             }
             
-            // 【关键修复】只传必要字段，让数据库自动处理 created_at, updated_at, is_locked, is_reconciled 等
+            // 只传必要字段，让数据库自动处理默认值
             const insertData = {
                 store_id: targetStoreId,
                 expense_date: expenseData.expense_date || Utils.getLocalToday(),
@@ -637,16 +665,11 @@
                     .single();
                     
                 if (error) {
-                    console.error('[addExpense] Supabase错误:', {
-                        code: error.code,
-                        message: error.message,
-                        details: error.details,
-                        hint: error.hint
-                    });
+                    console.error('[addExpense] Supabase错误:', error);
                     throw error;
                 }
                 
-                // 记录现金流（捕获错误但不阻断主流程）
+                // 记录现金流
                 try {
                     await this.recordCashFlow({
                         store_id: targetStoreId,
@@ -658,7 +681,7 @@
                         reference_id: data.id
                     });
                 } catch (flowError) {
-                    console.warn('[addExpense] 现金流记录失败（支出已保存）:', flowError.message);
+                    console.warn('[addExpense] 现金流记录失败:', flowError.message);
                 }
                 
                 return data;
@@ -703,7 +726,7 @@
             return data;
         },
 
-        // ===== 完整业务方法：利润分配、现金流分析等 =====
+        // ===== 完整业务方法 =====
         async getFullCapitalAnalysis(storeIdParam = null) {
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
@@ -900,10 +923,11 @@
         async getOrders(filters={}, from, to) {
             const profile = await this.getCurrentProfile();
             let q = supabaseClient.from('orders').select('*', { count:'exact' });
-            if(profile?.role!=='admin' && profile?.store_id) q = q.eq('store_id', profile.store_id);
-            else if(profile?.role==='admin' && !filters.includePractice){
-                try { const practices = await this._getPracticeStoreIds(); if(practices.length) q = q.not('store_id','in',`(${practices.join(',')})`); } catch(e){}
+            // 管理员不过滤门店（包括练习门店），可查看所有数据
+            if(profile?.role !== 'admin' && profile?.store_id) {
+                q = q.eq('store_id', profile.store_id);
             }
+            // 注意：管理员不再排除练习门店，可以看到所有数据
             if(filters.status && filters.status!=='all') q = q.eq('status', filters.status);
             if(from!==undefined && to!==undefined) q = q.range(from, to);
             q = q.order('created_at', { ascending: false });
@@ -1375,7 +1399,10 @@
             if (!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
             let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
-            if (profile?.role !== 'admin' && profile?.store_id) orderQuery = orderQuery.eq('store_id', profile.store_id);
+            // 管理员不过滤门店
+            if(profile?.role !== 'admin' && profile?.store_id) {
+                orderQuery = orderQuery.eq('store_id', profile.store_id);
+            }
             const { data: accessibleOrders, error: orderError } = await orderQuery;
             if (orderError) return [];
             const accessibleOrderIds = accessibleOrders.map(o => o.id);
@@ -1467,14 +1494,8 @@
                 query = query.eq('store_id', targetStoreId);
             } else if (!isAdmin && profile?.store_id) {
                 query = query.eq('store_id', profile.store_id);
-            } else if (isAdmin && !targetStoreId) {
-                try {
-                    const practiceIds = await this._getPracticeStoreIds();
-                    if (practiceIds.length > 0) {
-                        query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                    }
-                } catch (e) { /* ignore */ }
             }
+            // 管理员不排除任何数据（包括练习门店）- 移除了 practice 排除逻辑
             
             const { data: flows, error } = await query;
             if (error) throw error;
@@ -1502,14 +1523,8 @@
                 injectionQuery = injectionQuery.eq('store_id', targetStoreId);
             } else if (!isAdmin && profile?.store_id) {
                 injectionQuery = injectionQuery.eq('store_id', profile.store_id);
-            } else if (isAdmin && !targetStoreId) {
-                try {
-                    const practiceIds = await this._getPracticeStoreIds();
-                    if (practiceIds.length > 0) {
-                        injectionQuery = injectionQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                    }
-                } catch (e) { /* ignore */ }
             }
+            // 管理员不排除练习门店
             
             const { data: injections } = await injectionQuery;
             const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
@@ -1522,14 +1537,8 @@
                 deployedQuery = deployedQuery.eq('store_id', targetStoreId);
             } else if (!isAdmin && profile?.store_id) {
                 deployedQuery = deployedQuery.eq('store_id', profile.store_id);
-            } else if (isAdmin && !targetStoreId) {
-                try {
-                    const practiceIds = await this._getPracticeStoreIds();
-                    if (practiceIds.length > 0) {
-                        deployedQuery = deployedQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                    }
-                } catch (e) { /* ignore */ }
             }
+            // 管理员不排除练习门店
             
             const { data: deployedOrders } = await deployedQuery;
             const deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
@@ -1544,8 +1553,6 @@
                 available_capital: totalInjectedCapital - deployedCapital
             };
         },
-
-        // ========== 注意：addExpense 方法已在上方修复 ==========
 
         async getStoreWANumber(storeId) {
             if (!supabaseClient) return null;
@@ -1752,5 +1759,5 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
-    console.log('✅ JF.Supabase v2.2 修复完成（addExpense 简化插入，支持练习门店）');
+    console.log('✅ JF.Supabase v2.3 完整修复版（管理员可查看所有门店数据，支持总部支出）');
 })();
