@@ -1161,3 +1161,212 @@
         gap: var(--spacing-3) !important;
     }
 }
+
+/* ============================================================
+   表格响应式优化 - 手机端支持左右滑动，禁止内容换行
+   ============================================================ */
+
+/* 所有表格容器：支持水平滚动，不换行 */
+.table-container {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    margin: var(--spacing-3) 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    width: 100%;
+}
+
+/* 表格基础样式：不换行，保持内容在一行 */
+.data-table,
+.anomaly-table,
+.capital-table,
+.cashflow-table,
+.payment-table,
+.store-table,
+.user-table,
+.expense-table,
+.order-table,
+.history-table {
+    min-width: 800px;
+    width: max-content;
+    white-space: nowrap;
+    border-collapse: collapse;
+    font-size: var(--font-sm);
+    background: var(--bg-card);
+}
+
+/* 表头单元格：不换行 */
+.data-table th,
+.anomaly-table th,
+.capital-table th,
+.cashflow-table th,
+.payment-table th,
+.store-table th,
+.user-table th,
+.expense-table th,
+.order-table th,
+.history-table th {
+    white-space: nowrap;
+    padding: 10px 12px;
+}
+
+/* 数据单元格：默认不换行，文字超出显示截断 */
+.data-table td,
+.anomaly-table td,
+.capital-table td,
+.cashflow-table td,
+.payment-table td,
+.store-table td,
+.user-table td,
+.expense-table td,
+.order-table td,
+.history-table td {
+    white-space: nowrap;
+    padding: 10px 12px;
+}
+
+/* 描述类单元格：可换行（但保持最小宽度） */
+.data-table .desc-cell,
+.anomaly-table .desc-cell,
+.capital-table .desc-cell,
+.cashflow-table .desc-cell,
+.payment-table .desc-cell {
+    white-space: normal;
+    word-break: break-word;
+    min-width: 150px;
+    max-width: 250px;
+}
+
+/* 金额单元格：右对齐，等宽字体 */
+.data-table .amount,
+.anomaly-table .amount,
+.capital-table .amount,
+.cashflow-table .amount,
+.payment-table .amount,
+.expense-table .amount,
+.order-table .amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+}
+
+/* 日期单元格：不换行 */
+.data-table .date-cell,
+.anomaly-table .date-cell,
+.capital-table .date-cell,
+.cashflow-table .date-cell,
+.payment-table .date-cell,
+.expense-table .date-cell,
+.order-table .date-cell {
+    white-space: nowrap;
+}
+
+/* 订单号单元格：等宽字体，不换行 */
+.data-table .order-id,
+.anomaly-table .order-id {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+    white-space: nowrap;
+}
+
+/* 操作按钮区域：允许换行（按钮可以换行） */
+.data-table .action-buttons,
+.anomaly-table .action-buttons {
+    white-space: normal;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-1);
+}
+
+/* 列宽辅助类 - 保持合理的默认宽度 */
+.data-table .col-id       { min-width: 80px; width: auto; }
+.data-table .col-name     { min-width: 100px; width: auto; }
+.data-table .col-order-id { min-width: 100px; width: auto; }
+.data-table .col-ktp      { min-width: 130px; width: auto; }
+.data-table .col-phone    { min-width: 110px; width: auto; }
+.data-table .col-address  { min-width: 150px; width: auto; }
+.data-table .col-date     { min-width: 90px; width: auto; }
+.data-table .col-status   { min-width: 80px; width: auto; }
+.data-table .col-store    { min-width: 100px; width: auto; }
+.data-table .col-amount   { min-width: 100px; width: auto; }
+.data-table .col-type     { min-width: 100px; width: auto; }
+.data-table .col-months   { min-width: 60px; width: auto; }
+.data-table .col-method   { min-width: 80px; width: auto; }
+.data-table .col-desc     { min-width: 150px; width: auto; }
+.data-table .col-action   { min-width: 120px; width: auto; }
+
+/* ========== 移动端优化 ========== */
+@media (max-width: 768px) {
+    /* 表格容器支持手势滑动 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: var(--spacing-2) 0;
+        border-radius: var(--radius-md);
+    }
+    
+    /* 表格设置最小宽度，强制水平滚动 */
+    .data-table,
+    .anomaly-table,
+    .capital-table,
+    .cashflow-table,
+    .payment-table,
+    .store-table,
+    .user-table,
+    .expense-table,
+    .order-table,
+    .history-table {
+        min-width: 700px;
+        white-space: nowrap;
+    }
+    
+    /* 表头和数据单元格都不换行 */
+    .data-table th,
+    .data-table td,
+    .anomaly-table th,
+    .anomaly-table td {
+        white-space: nowrap;
+    }
+    
+    /* 描述单元格在移动端也可以保持不换行（通过滚动查看） */
+    .data-table .desc-cell,
+    .anomaly-table .desc-cell {
+        white-space: nowrap;
+        min-width: 180px;
+    }
+    
+    /* 操作按钮在移动端允许换行（按钮可以折行） */
+    .data-table .action-buttons {
+        white-space: normal;
+        flex-wrap: wrap;
+    }
+    
+    /* 操作行标签不换行 */
+    .action-row .action-label {
+        white-space: nowrap;
+    }
+    
+    /* 门店管理表格移动端 */
+    .store-stats-table {
+        min-width: 900px;
+    }
+    
+    /* 异常页面表格移动端 */
+    .anomaly-table {
+        min-width: 550px;
+    }
+    
+    /* 弹窗内的表格也要支持滚动 */
+    .modal-content .table-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    
+    .modal-content table {
+        min-width: 500px;
+    }
+}
