@@ -1,6 +1,7 @@
-// utils.js - v2.3 统一重构版
+// utils.js - v2.4 统一重构版
 // 基础工具模块，挂载到 JF.Utils
 // 修复：增加网络监控 + 错误恢复工具 + 金额提取统一函数 + 移除货币缓存 + NetworkMonitor.destroy
+// v2.4: 费用配置集中管理，引用 FeeConfig
 
 'use strict';
 
@@ -14,8 +15,9 @@
     window.Utils = Utils;
 
     /* ==================== 常量 ==================== */
-    Utils.DEFAULT_AGREED_INTEREST_RATE = 0.08;
-    Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = 8;
+    // 从 FeeConfig 读取配置，如果未加载则使用默认值（8.5%）
+    Utils.DEFAULT_AGREED_INTEREST_RATE = (window.JF?.FeeConfig?.DEFAULT_INTEREST_RATE) || 0.085;
+    Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = (window.JF?.FeeConfig?.DEFAULT_INTEREST_RATE_PERCENT) || 8.5;
     Utils.DEFAULT_MAX_EXTENSION_MONTHS = 10;
     Utils.CURRENCY_SYMBOL = 'Rp';
     const JAKARTA_UTC_OFFSET = 7 * 60; // 分钟
@@ -687,8 +689,12 @@
     Utils.isValidPhone = (phone) => /^\+?[\d\s\-()]{6,20}$/.test(phone);
     Utils.isValidKtp = (ktp) => /^\d{16}$/.test(ktp);
 
-    /* ==================== 业务计算 ==================== */
+    /* ==================== 业务计算（优先使用 FeeConfig） ==================== */
     Utils.calculateAdminFee = function (loanAmount) {
+        if (window.JF?.FeeConfig?.calculateAdminFee) {
+            return window.JF.FeeConfig.calculateAdminFee(loanAmount);
+        }
+        // 降级逻辑（保持原行为）
         if (!loanAmount || loanAmount <= 0) return 0;
         if (loanAmount <= 500000) return 20000;
         if (loanAmount <= 3000000) return 30000;
@@ -696,6 +702,10 @@
     };
 
     Utils.calculateServiceFee = function (loanAmount, percent) {
+        if (window.JF?.FeeConfig?.calculateServiceFee) {
+            return window.JF.FeeConfig.calculateServiceFee(loanAmount, percent);
+        }
+        // 降级逻辑
         if (!loanAmount || loanAmount <= 0) return { percent: 0, amount: 0 };
         if (loanAmount <= 3000000) return { percent: 0, amount: 0 };
         if (loanAmount <= 5000000) {
@@ -756,13 +766,22 @@
         return result;
     };
 
-    /* ==================== 下拉选项生成 ==================== */
-    Utils.getInterestRateOptions = function (defaultRate = 8) {
-        const rates = [10, 9, 8, 7, 6];
-        return rates.map(r => `<option value="${r}"${r === defaultRate ? ' selected' : ''}>${r}%</option>`).join('');
+    /* ==================== 下拉选项生成（优先使用 FeeConfig） ==================== */
+    Utils.getInterestRateOptions = function (defaultRate = null) {
+        if (window.JF?.FeeConfig?.getInterestRateOptionsHtml) {
+            return window.JF.FeeConfig.getInterestRateOptionsHtml();
+        }
+        // 降级
+        const rates = [10, 9.5, 9, 8.5, 8, 7.5];
+        const defaultVal = (defaultRate !== null) ? defaultRate : Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT;
+        return rates.map(r => `<option value="${r}"${r === defaultVal ? ' selected' : ''}>${r}%</option>`).join('');
     };
 
     Utils.getServiceFeePercentOptions = function (defaultPercent = 2) {
+        if (window.JF?.FeeConfig?.getServiceFeePercentOptionsHtml) {
+            return window.JF.FeeConfig.getServiceFeePercentOptionsHtml();
+        }
+        // 降级
         const options = [2, 3, 4, 5, 6];
         return options.map(o => `<option value="${o}"${o === defaultPercent ? ' selected' : ''}>${o}%</option>`).join('');
     };
@@ -973,5 +992,11 @@
     // 初始化错误收集器
     Utils.ErrorHandler.init();
 
-    console.log('✅ Utils v2.3 初始化完成 (移除货币缓存 + NetworkMonitor.destroy)');
+    // 如果有 FeeConfig，同步更新默认利率常量（确保一致）
+    if (window.JF?.FeeConfig) {
+        Utils.DEFAULT_AGREED_INTEREST_RATE = window.JF.FeeConfig.DEFAULT_INTEREST_RATE;
+        Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = window.JF.FeeConfig.DEFAULT_INTEREST_RATE_PERCENT;
+    }
+
+    console.log('✅ Utils v2.4 初始化完成 (费用配置集中管理，默认利率8.5%)');
 })();
