@@ -760,10 +760,10 @@
             if(type==='reinvest'){
                 const available = await this.getDistributableProfit(targetStoreId);
                 if(amount>available) throw new Error('Insufficient distributable profit');
-            } else if(type==='return_capital'){
-                const available = await this.getExternalCapitalBalance(targetStoreId);
-                if(amount>available) throw new Error('Insufficient external capital to return');
             }
+            // return_capital：不硬拦截，超出注资余额部分自动视为红利提取
+            // 拆分逻辑在下方处理，此处不做金额校验
+
             const { data: distribution, error: distError } = await supabaseClient
                 .from('profit_distributions').insert({
                     store_id: targetStoreId, amount, type,
@@ -782,10 +782,42 @@
                     description:'利润再投入', recorded_by: profile.id, is_voided: false
                 });
             } else if(type==='return_capital'){
-                await this.recordCashFlow({
-                    store_id: targetStoreId, flow_type:'return_of_capital', direction:'outflow',
-                    amount, source_target:'cash', description:'偿还投资本金', reference_id: distribution.id
-                });
+                // ── 自动拆分：本金偿还 + 超额红利提取 ──────────────────────────
+                const externalBalance = await this.getExternalCapitalBalance(targetStoreId);
+                const principalPart = Math.min(amount, externalBalance);   // 本金部分
+                const dividendPart  = amount - principalPart;              // 超额红利部分
+
+                if(principalPart > 0){
+                    await this.recordCashFlow({
+                        store_id: targetStoreId, flow_type:'return_of_capital', direction:'outflow',
+                        amount: principalPart, source_target:'cash',
+                        description: (Utils.lang==='id' ? 'Pengembalian modal' : '偿还投资本金')
+                            + (dividendPart > 0 ? ` (${Utils.formatCurrency(principalPart)})` : ''),
+                        reference_id: distribution.id
+                    });
+                }
+                if(dividendPart > 0){
+                    await this.recordCashFlow({
+                        store_id: targetStoreId, flow_type:'dividend_withdrawal', direction:'outflow',
+                        amount: dividendPart, source_target:'cash',
+                        description: (Utils.lang==='id'
+                            ? `Penarikan dividen (${Utils.formatCurrency(dividendPart)})`
+                            : `红利提取 (${Utils.formatCurrency(dividendPart)})`),
+                        reference_id: distribution.id
+                    });
+                }
+                // ── 拆分结束 ────────────────────────────────────────────────────
+                // 在 distribution 记录上补充备注，方便日后对账
+                const splitNote = dividendPart > 0
+                    ? (Utils.lang==='id'
+                        ? `Modal: ${Utils.formatCurrency(principalPart)}, Dividen: ${Utils.formatCurrency(dividendPart)}`
+                        : `本金: ${Utils.formatCurrency(principalPart)}，红利: ${Utils.formatCurrency(dividendPart)}`)
+                    : null;
+                if(splitNote){
+                    await supabaseClient.from('profit_distributions')
+                        .update({ description: splitNote })
+                        .eq('id', distribution.id);
+                }
             }
             return distribution;
         },
