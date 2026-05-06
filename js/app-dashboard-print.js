@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.0
+// app-dashboard-print.js - v2.3 订单详情打印优化（智能识别订单信息）
 
 'use strict';
 
@@ -19,178 +19,42 @@
             const printContent = originalApp.cloneNode(true);
 
             // ========== 移除所有不需要打印的元素 ==========
+            const removeSelectors = [
+                '.dashboard-v2 .dash-sidebar', '.dash-sidebar', '.sidebar', '#dashSidebar',
+                '.dashboard-v2 .dash-topbar', '.dash-topbar', '.topbar', '#dashTopbar',
+                '.sidebar-overlay', '#sidebarOverlay', '.toolbar', '.no-print',
+                '.action-row', 'button', '.form-actions', '.form-grid', '.lang-toggle',
+                '.lang-btn-side', '#hamburgerBtn', '[onclick*="toggleLanguage"]',
+                '[onclick*="invalidateDashboardCache"]', '[onclick*="forceRecovery"]',
+                '.modal-overlay', '.modal-content', '[id*="loadMore"]', '.sidebar-footer',
+                '.nav-badge', '.header-actions', '.page-header button'
+            ];
             
-            // 1. 移除侧边栏（Dashboard 专用）
-            const sidebarSelectors = [
-                '.dashboard-v2 .dash-sidebar',
-                '.dash-sidebar',
-                '.sidebar',
-                '#dashSidebar',
-                '[class*="sidebar"]',
-                '[class*="Sidebar"]'
-            ];
-            for (const selector of sidebarSelectors) {
+            for (const selector of removeSelectors) {
                 const elements = printContent.querySelectorAll(selector);
                 elements.forEach(el => el.remove());
             }
 
-            // 2. 移除顶部栏（Dashboard 专用）
-            const topbarSelectors = [
-                '.dashboard-v2 .dash-topbar',
-                '.dash-topbar',
-                '.topbar',
-                '#dashTopbar',
-                '[class*="topbar"]',
-                '[class*="Topbar"]'
-            ];
-            for (const selector of topbarSelectors) {
-                const elements = printContent.querySelectorAll(selector);
-                elements.forEach(el => el.remove());
-            }
-
-            // 3. 移除侧边栏遮罩层
-            const overlaySelectors = [
-                '.sidebar-overlay',
-                '#sidebarOverlay',
-                '[class*="overlay"]'
-            ];
-            for (const selector of overlaySelectors) {
-                const elements = printContent.querySelectorAll(selector);
-                elements.forEach(el => el.remove());
-            }
-
-            // 4. 移除页眉中的操作按钮
+            // 移除页眉中的操作按钮区域
             const pageHeader = printContent.querySelector('.page-header');
             if (pageHeader) {
                 const headerActions = pageHeader.querySelector('.header-actions');
                 if (headerActions) headerActions.remove();
-                const buttons = pageHeader.querySelectorAll('button');
-                for (const btn of buttons) btn.remove();
             }
 
-            // 5. 移除所有工具栏
-            const toolbars = printContent.querySelectorAll('.toolbar, .no-print');
-            for (const tb of toolbars) tb.remove();
-
-            // 6. 移除所有操作行
-            const actionRows = printContent.querySelectorAll('.action-row');
-            for (const ar of actionRows) ar.remove();
-
-            // 7. 移除所有按钮
-            const allButtons = printContent.querySelectorAll('button');
-            for (const btn of allButtons) btn.remove();
-
-            // 8. 移除新增/编辑表单卡片
+            // 移除新增/编辑表单卡片
             const formCards = printContent.querySelectorAll('.card');
-            for (let i = formCards.length - 1; i >= 0; i--) {
-                const card = formCards[i];
-                const cardText = card.textContent || card.innerText || '';
-                const removeKeywords = [
-                    'Tambah Nasabah Baru', '新增客户',
-                    'Tambah Operator Baru', '新增操作员',
-                    'Tambah Toko Baru', '新增门店',
-                    'Tambah Pengeluaran Baru', '新增运营支出',
-                    'Tambah Peran Baru', '新增角色',
-                    'Tambah Toko', '添加门店',
-                    'Edit Toko', '编辑门店'
-                ];
-                if (removeKeywords.some(keyword => cardText.includes(keyword))) {
+            const removeKeywords = ['Tambah', '新增', 'Edit', '编辑', 'Tambah Pengeluaran', '新增运营支出'];
+            for (const card of formCards) {
+                const cardText = card.textContent || '';
+                if (removeKeywords.some(kw => cardText.includes(kw)) && 
+                    !cardText.includes('订单号') && !cardText.includes('ID Pesanan')) {
                     card.remove();
                 }
             }
 
-            // 9. 移除表单操作区
-            const formActions = printContent.querySelectorAll('.form-actions');
-            for (const fa of formActions) fa.remove();
-
-            // 10. 移除包含表单网格且无有效数据的卡片
-            const formGrids = printContent.querySelectorAll('.form-grid');
-            for (const fg of formGrids) {
-                const parentCard = fg.closest('.card');
-                if (parentCard) {
-                    const hasDataRows = parentCard.querySelector('.data-table, table') !== null;
-                    if (!hasDataRows) parentCard.remove();
-                }
-            }
-
-            // 11. 移除语言切换按钮
-            const langToggles = printContent.querySelectorAll('.lang-toggle, .lang-btn-side, [onclick*="toggleLanguage"], [onclick*="setLanguage"]');
-            for (const lt of langToggles) lt.remove();
-
-            // 12. 移除汉堡菜单按钮
-            const hamburgerBtns = printContent.querySelectorAll('#hamburgerBtn, [onclick*="_toggleSidebar"]');
-            for (const btn of hamburgerBtns) btn.remove();
-
-            // 13. 移除刷新按钮
-            const refreshBtns = printContent.querySelectorAll('[onclick*="invalidateDashboardCache"], [onclick*="forceRecovery"]');
-            for (const btn of refreshBtns) btn.remove();
-
-            // 14. 移除模态框
-            const modals = printContent.querySelectorAll('.modal-overlay, .modal-content');
-            for (const modal of modals) modal.remove();
-
-            // 15. 移除包含"加载更多"按钮的行
-            const loadMoreRows = printContent.querySelectorAll('[id*="loadMore"], [onclick*="loadMore"]');
-            for (const row of loadMoreRows) {
-                const tr = row.closest('tr');
-                if (tr) tr.remove();
-                else row.remove();
-            }
-
-            // 16. 移除侧边栏底部区域
-            const sidebarFooters = printContent.querySelectorAll('.sidebar-footer, [class*="sidebar-footer"]');
-            for (const footer of sidebarFooters) footer.remove();
-
-            // 17. 移除导航徽章
-            const navBadges = printContent.querySelectorAll('.nav-badge');
-            for (const badge of navBadges) badge.remove();
-
-            // ========== 订单详情页面特殊处理：将双列布局改为3列3行网格 ==========
-            const orderDetailGrid = printContent.querySelector('.order-detail-grid');
-            if (orderDetailGrid) {
-                // 收集所有信息项
-                const leftColumn = orderDetailGrid.querySelector('.info-column:first-child');
-                const rightColumn = orderDetailGrid.querySelector('.info-column:last-child');
-                const allInfoItems = [];
-
-                // 从左侧列提取信息
-                if (leftColumn) {
-                    const items = leftColumn.querySelectorAll('p');
-                    for (const item of items) {
-                        const text = item.innerText.trim();
-                        if (text && !text.includes('费用明细') && !text.includes('Rincian Biaya') && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
-                            allInfoItems.push(text);
-                        }
-                    }
-                }
-
-                // 从右侧列提取信息
-                if (rightColumn) {
-                    const items = rightColumn.querySelectorAll('p');
-                    for (const item of items) {
-                        const text = item.innerText.trim();
-                        if (text && !text.includes('费用明细') && !text.includes('Rincian Biaya') && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
-                            allInfoItems.push(text);
-                        }
-                    }
-                }
-
-                // 创建3列3行的网格布局
-                if (allInfoItems.length >= 9) {
-                    const gridHtml = `
-                        <div class="order-info-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-bottom: 20px;">
-                            ${allInfoItems.slice(0, 9).map(item => `
-                                <div class="info-item" style="padding: 4px 0; border-bottom: 1px solid #e2e8f0;">
-                                    ${item}
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                    
-                    // 替换原有的双列布局
-                    orderDetailGrid.innerHTML = gridHtml;
-                }
-            }
+            // ========== 订单详情页面特殊处理：将订单信息改为3列3行网格 ==========
+            this._reformatOrderInfoForPrint(printContent);
 
             // ========== 获取打印页头信息 ==========
             const lang = Utils.lang;
@@ -287,40 +151,6 @@
                             border-bottom: 1px solid #e2e8f0;
                             padding-bottom: 4px;
                         }
-                        .stats-grid { 
-                            display: flex; 
-                            flex-wrap: wrap; 
-                            gap: 8px; 
-                            margin-bottom: 12px;
-                        }
-                        .card--stat { 
-                            flex: 1; 
-                            min-width: 100px; 
-                            border: 1px solid #ccc; 
-                            padding: 6px 10px; 
-                            text-align: left;
-                        }
-                        .card--stat .stat-value { font-size: 11pt; font-weight: 700; }
-                        .card--stat .stat-label { font-size: 7pt; color: #64748b; }
-                        .badge { 
-                            display: inline-block; 
-                            padding: 2px 8px; 
-                            border-radius: 4px; 
-                            font-size: 7pt; 
-                            font-weight: 600;
-                        }
-                        .info-bar { 
-                            padding: 8px 12px; 
-                            margin-bottom: 10px; 
-                            border-radius: 6px;
-                            background: #f0f9ff;
-                            border-left: 3px solid #0284c7;
-                        }
-                        .order-detail-grid { 
-                            display: grid; 
-                            grid-template-columns: 1fr 1fr; 
-                            gap: 12px; 
-                        }
                         /* 3列网格样式 */
                         .order-info-grid {
                             display: grid;
@@ -333,11 +163,21 @@
                             border-bottom: 1px solid #e2e8f0;
                             break-inside: avoid;
                         }
+                        .info-item .label {
+                            font-size: 7pt;
+                            color: #64748b;
+                            margin-bottom: 2px;
+                        }
+                        .info-item .value {
+                            font-size: 10pt;
+                            font-weight: 500;
+                            color: #1e293b;
+                        }
                         @media print {
                             @page { size: A4; margin: 8mm; }
                             body { margin: 0; padding: 0; }
                             .print-container { padding: 0; }
-                            .card, .anomaly-card { break-inside: avoid; }
+                            .card { break-inside: avoid; }
                         }
                     </style>
                 </head>
@@ -370,6 +210,144 @@
                 </html>`
             );
             printWindow.document.close();
+        },
+
+        // 重新格式化订单信息为3列3行网格
+        _reformatOrderInfoForPrint(printContent) {
+            // 查找包含订单信息的卡片
+            const cards = printContent.querySelectorAll('.card');
+            let orderInfoCard = null;
+            let orderInfoHtml = '';
+            
+            for (const card of cards) {
+                const text = card.textContent || '';
+                // 检查是否包含订单关键信息
+                if ((text.includes('订单号') || text.includes('ID Pesanan')) &&
+                    (text.includes('客户姓名') || text.includes('Nama Nasabah')) &&
+                    (text.includes('贷款金额') || text.includes('Jumlah Pinjaman'))) {
+                    orderInfoCard = card;
+                    break;
+                }
+            }
+            
+            if (!orderInfoCard) return;
+            
+            // 提取订单信息（从 p 标签或直接文本中）
+            const lines = [];
+            const paragraphs = orderInfoCard.querySelectorAll('p');
+            
+            if (paragraphs.length > 0) {
+                for (const p of paragraphs) {
+                    const text = p.innerText.trim();
+                    if (text && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
+                        lines.push(text);
+                    }
+                }
+            } else {
+                // 如果没有 p 标签，从纯文本中提取
+                const text = orderInfoCard.innerText;
+                const textLines = text.split('\n');
+                for (const line of textLines) {
+                    const trimmed = line.trim();
+                    if (trimmed && !trimmed.includes('缴费记录') && !trimmed.includes('订单详情') &&
+                        !trimmed.includes('📄') && !trimmed.includes('💰') && !trimmed.includes('打印自')) {
+                        lines.push(trimmed);
+                    }
+                }
+            }
+            
+            // 定义需要提取的字段映射
+            const fieldMap = {
+                '订单号': 'order_id',
+                'ID Pesanan': 'order_id',
+                '客户姓名': 'customer_name',
+                'Nama Nasabah': 'customer_name',
+                '质押物名称': 'collateral_name',
+                'Nama Jaminan': 'collateral_name',
+                '贷款金额': 'loan_amount',
+                'Jumlah Pinjaman': 'loan_amount',
+                '还款方式': 'repayment_type',
+                'Jenis Cicilan': 'repayment_type',
+                '状态': 'status',
+                'Status': 'status',
+                '约定利率': 'interest_rate',
+                'Suku Bunga': 'interest_rate',
+                '月利息': 'monthly_interest',
+                'Bunga Bulanan': 'monthly_interest',
+                '剩余本金': 'remaining_principal',
+                'Sisa Pokok': 'remaining_principal'
+            };
+            
+            // 解析字段值
+            const fields = {};
+            for (const line of lines) {
+                for (const [label, key] of Object.entries(fieldMap)) {
+                    if (line.startsWith(label) || line.includes(label + ' ')) {
+                        let value = line.replace(label, '').replace(/^[:：\s]+/, '').trim();
+                        if (value) {
+                            fields[key] = value;
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // 语言判断
+            const lang = Utils.lang;
+            const labels = {
+                order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
+                customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
+                collateral_name: lang === 'id' ? 'Nama Jaminan' : '质押物名称',
+                loan_amount: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
+                repayment_type: lang === 'id' ? 'Jenis Cicilan' : '还款方式',
+                status: lang === 'id' ? 'Status' : '状态',
+                interest_rate: lang === 'id' ? 'Suku Bunga' : '约定利率',
+                monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
+                remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
+            };
+            
+            // 构建3列网格
+            const infoItems = [
+                { label: labels.order_id, value: fields.order_id || '-' },
+                { label: labels.customer_name, value: fields.customer_name || '-' },
+                { label: labels.collateral_name, value: fields.collateral_name || '-' },
+                { label: labels.loan_amount, value: fields.loan_amount || '-' },
+                { label: labels.repayment_type, value: fields.repayment_type || '-' },
+                { label: labels.status, value: fields.status || '-' },
+                { label: labels.interest_rate, value: fields.interest_rate || '-' },
+                { label: labels.monthly_interest, value: fields.monthly_interest || '-' },
+                { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
+            ];
+            
+            const gridHtml = `
+                <div class="order-info-grid">
+                    ${infoItems.map(item => `
+                        <div class="info-item">
+                            <div class="label">${Utils.escapeHtml(item.label)}</div>
+                            <div class="value">${Utils.escapeHtml(item.value)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            // 保存原始卡片中的其他内容（如缴费记录表格）
+            const otherContent = [];
+            const children = orderInfoCard.children;
+            for (const child of children) {
+                if (child.tagName === 'H3' && (child.innerText.includes('缴费记录') || child.innerText.includes('Riwayat Pembayaran'))) {
+                    // 保留缴费记录标题和后续内容
+                    otherContent.push(child.outerHTML);
+                    let next = child.nextElementSibling;
+                    while (next && (!next.tagName === 'H3' || !next.innerText.includes('订单'))) {
+                        otherContent.push(next.outerHTML);
+                        next = next.nextElementSibling;
+                    }
+                    break;
+                }
+            }
+            
+            // 替换卡片内容
+            orderInfoCard.innerHTML = gridHtml + otherContent.join('');
         }
     };
 
@@ -383,5 +361,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.2 订单详情打印优化（3列3行网格布局）');
+    console.log('✅ JF.PrintPage v2.3 订单详情打印优化（智能识别订单信息，3列3行网格布局）');
 })();
