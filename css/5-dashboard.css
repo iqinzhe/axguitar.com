@@ -1,0 +1,374 @@
+/* ============================================================
+   dashboard.css - 仪表盘专属布局 v3.10（优化版）
+   ============================================================ */
+
+@import url('./variables.css');
+
+@layer components {
+  /* === 仪表盘外壳布局 === */
+  .dashboard-v2 {
+    margin: -16px;
+    width: calc(100% + 32px);
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: var(--topbar-height) 1fr;
+    grid-template-areas:
+      "sidebar topbar"
+      "sidebar main";
+    min-height: 100vh;
+    max-height: 100vh;
+    background: var(--bg-page);
+    font-family: var(--font-sans);
+  }
+
+  /* === 侧边栏 === */
+  .dash-sidebar {
+    grid-area: sidebar;
+    background: var(--gradient-sidebar);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: var(--z-fixed);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    border-right: 1px solid rgba(14, 116, 144, var(--alpha-border));
+  }
+
+  .sidebar-logo {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(14, 116, 144, var(--alpha-border));
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--gradient-primary);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-white);
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(14, 116, 144, 0.4);
+  }
+
+  /* === 导航菜单 === */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 10px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    margin: 0;
+  }
+
+  .nav-item:hover {
+    background: rgba(14, 116, 144, var(--alpha-hover));
+    color: var(--primary);
+  }
+
+  .nav-item.active {
+    background: linear-gradient(135deg, 
+      rgba(14, 116, 144, var(--alpha-focus)), 
+      rgba(6, 182, 212, var(--alpha-hover)));
+    color: var(--primary);
+    border: 1px solid rgba(14, 116, 144, var(--alpha-focus));
+  }
+
+  /* === 顶部栏 === */
+  .dash-topbar {
+    grid-area: topbar;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-light);
+    padding: 10px 20px;
+    height: var(--topbar-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+  }
+
+  /* === 主内容区 === */
+  .dash-main {
+    grid-area: main;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* === KPI 卡片（改进） === */
+  .kpi-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-medium);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .kpi-card--blue::before {
+    background: var(--gradient-primary-h);
+  }
+
+  .kpi-card--amber::before {
+    background: var(--gradient-warning);
+  }
+
+  .kpi-card--green::before {
+    background: var(--gradient-success);
+  }
+
+  /* === 中间行 === */
+  .mid-row {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .fund-flow-card,
+  .income-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-medium);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .fund-flow-card:hover,
+  .income-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+
+  /* === 资金块 === */
+  .fund-block {
+    border-radius: var(--radius-md);
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .fund-block--injected {
+    background: #e0f2fe;
+    border: 1px solid #7dd3fc;
+  }
+
+  .fund-block--deployed {
+    background: #fef9c3;
+    border: 1px solid #fde047;
+  }
+
+  .fund-block--free {
+    background: var(--success-light);
+    border: 1px solid #86efac;
+  }
+
+  /* === 底部行 === */
+  .bottom-row {
+    display: grid;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .quick-card,
+  .order-status-card,
+  .message-center-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-medium);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+    padding: 8px 12px;
+    margin-bottom: 2px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .quick-card:hover,
+  .order-status-card:hover,
+  .message-center-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+
+  /* === 快捷按钮 === */
+  .quick-btn {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    padding: 3px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    text-decoration: none;
+  }
+
+  .quick-btn:hover {
+    border-color: #7dd3fc;
+    background: #e0f2fe;
+    transform: translateY(-2px);
+  }
+
+  .quick-btn.red-hover:hover {
+    border-color: #fecaca;
+    background: #fff1f2;
+  }
+
+  /* === 动画 === */
+  @keyframes dashFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .kpi-card,
+  .fund-flow-card,
+  .income-card,
+  .quick-card,
+  .order-status-card,
+  .message-center-card {
+    animation: dashFadeIn 0.4s ease forwards;
+  }
+
+  /* === 移动端适配 === */
+  @media (max-width: 768px) {
+    .dashboard-v2 {
+      display: block;
+      min-height: 100vh;
+    }
+
+    .dash-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 45vw;
+      min-width: 160px;
+      max-width: 200px;
+      height: 100%;
+      background: var(--gradient-sidebar);
+      z-index: 1001;
+      transform: translateX(-100%);
+      transition: transform var(--transition-normal);
+    }
+
+    .dash-sidebar.open {
+      transform: translateX(0);
+    }
+
+    .dash-main {
+      padding: 14px 12px;
+      min-height: calc(100vh - var(--topbar-height));
+    }
+
+    .mid-row {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .bottom-row {
+      display: contents;
+    }
+  }
+
+  /* === 44 列栅格（桌面端） === */
+  @media (min-width: 769px) {
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(44, 1fr);
+      gap: 10px;
+    }
+
+    .kpi-card {
+      grid-column: span 10;
+    }
+
+    .kpi-card--calendar {
+      grid-column: span 14;
+    }
+
+    .mid-row {
+      display: grid;
+      grid-template-columns: repeat(44, 1fr);
+      gap: 10px;
+    }
+
+    .fund-flow-card {
+      grid-column: span 30;
+    }
+
+    .income-card {
+      grid-column: span 14;
+    }
+
+    .bottom-row {
+      display: grid;
+      grid-template-columns: repeat(44, 1fr);
+      gap: 10px;
+    }
+
+    .quick-card {
+      grid-column: span 15;
+    }
+
+    .order-status-card {
+      grid-column: span 15;
+    }
+
+    .message-center-card {
+      grid-column: span 14;
+    }
+  }
+}
