@@ -89,18 +89,18 @@
         for (let i = 0; i < 7; i++) {
             tableRows += `<th>${weekDays[i]}</th>`;
         }
-        tableRows += '</tr>';
+        tableRows += '<tr>';
 
         let day = 1;
         for (let r = 0; r < 6; r++) {
             let row = '<tr>';
             for (let c = 0; c < 7; c++) {
                 if (r === 0 && c < startIndex) {
-                    row += '<td><td>';
+                    row += '<td></td>';
                     continue;
                 }
                 if (day > totalDays) {
-                    row += '<td>｜｜DSML｜｜';
+                    row += '<td></td>';
                     continue;
                 }
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -566,13 +566,12 @@
             }
         },
 
-                // ========== 仪表盘局部更新函数 ==========
+        // ========== 仪表盘局部更新函数 ==========
         _updateDashboardDetails(details, lang, isAdmin, kpiReport) {
             const cashFlow = details.cashFlow;
             const totalExpenses = details.totalExpenses;
             const messages = details.messages || [];
             
-            // 更新现金流卡片
             const cashBalance = (cashFlow.cash && cashFlow.cash.balance) ? cashFlow.cash.balance : 0;
             const bankBalance = (cashFlow.bank && cashFlow.bank.balance) ? cashFlow.bank.balance : 0;
             const cashIncome = (cashFlow.cash && cashFlow.cash.income) ? cashFlow.cash.income : 0;
@@ -580,7 +579,6 @@
             const bankIncome = (cashFlow.bank && cashFlow.bank.income) ? cashFlow.bank.income : 0;
             const bankExpense = (cashFlow.bank && cashFlow.bank.expense) ? cashFlow.bank.expense : 0;
             
-            // 更新保险柜余额
             const cashValEl = document.querySelector('.cash-bank-item:nth-child(1) .cb-val');
             if (cashValEl) cashValEl.textContent = Utils.formatCurrency(cashBalance);
             const cashFlowEl = document.querySelector('.cash-bank-item:nth-child(1) .cb-flow');
@@ -588,7 +586,6 @@
                 cashFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(cashIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(cashExpense) + '</span>';
             }
             
-            // 更新银行余额
             const bankValEl = document.querySelector('.cash-bank-item:nth-child(2) .cb-val');
             if (bankValEl) bankValEl.textContent = Utils.formatCurrency(bankBalance);
             const bankFlowEl = document.querySelector('.cash-bank-item:nth-child(2) .cb-flow');
@@ -596,17 +593,14 @@
                 bankFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(bankIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(bankExpense) + '</span>';
             }
             
-            // 更新净收入
             const totalIncome = (kpiReport.admin_fees_collected || 0) + (kpiReport.service_fees_collected || 0) + (kpiReport.interest_collected || 0);
             const netProfit = totalIncome - totalExpenses;
             const npValEl = document.querySelector('.np-val');
             if (npValEl) npValEl.textContent = Utils.formatCurrency(netProfit);
             
-            // 更新收入构成中的支出项
             const expenseAmtEl = document.querySelector('.income-item .income-amt.expense');
             if (expenseAmtEl) expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses);
             
-            // 更新消息中心预览
             const messagePreview = document.querySelector('.message-preview');
             if (messagePreview) {
                 const pendingCount = messages.length;
@@ -649,7 +643,6 @@
                 const isAdmin = PERMISSION.isAdmin();
                 const storeId = profile?.store_id;
 
-                // ==================== 第一批请求：核心KPI数据 ====================
                 const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
                 const kpiReport = await JF.Cache.get(kpiCacheKey, async () => {
                     const client = SUPABASE.getClient();
@@ -749,14 +742,12 @@
                     };
                 }, { ttl: 3 * 60 * 1000 });
 
-                // 使用 KPI 数据立即渲染仪表盘
                 const totalOrders = kpiReport.total_orders;
                 const activeOrders = kpiReport.active_orders;
                 const completedOrders = kpiReport.completed_orders;
                 const overdueOrders = kpiReport.overdue_orders;
                 const newThisMonth = kpiReport.new_this_month;
                 const newLoanThisMonth = kpiReport.new_loan_this_month;
-                const completionRate = totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : '0';
                 const injected = kpiReport.total_injected_capital;
                 const deployed = kpiReport.deployed_capital;
                 const available = kpiReport.available_capital;
@@ -831,7 +822,6 @@
                     dueMap[d].push(o);
                 });
 
-                // 构建 KPI 行
                 const kpiRowHTML = `
 <div class="kpi-row kpi-row--calendar">
     <div class="kpi-card kpi-card--blue">
@@ -1013,7 +1003,6 @@
                     document.head.appendChild(style);
                 }
 
-                // 绑定日历点击事件
                 const dashMain = document.querySelector('.dash-main');
                 if (dashMain) {
                     dashMain.addEventListener('click', function(e) {
@@ -1053,7 +1042,6 @@
 
                 this.saveCurrentPageState();
 
-                // 第二批请求：详细数据（异步更新）
                 const detailCacheKey = 'dashboard_details_' + (isAdmin ? 'admin' : storeId);
                 JF.Cache.get(detailCacheKey, async () => {
                     const [cashFlowResult, totalExpensesResult, messageDataResult] = await Promise.all([
@@ -1110,61 +1098,60 @@
             }
         },
 
-       async renderLogin() {
-    this.currentPage = 'login';
-    this.clearPageState();
-    this._cleanupOverlays();
-    this._clearOverdueInterval();
-    
-    const lang = Utils.lang;
-    document.getElementById("app").innerHTML = `
-        <div class="login-container" style="background: linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%);">
-            <div class="login-box" style="max-width: 340px; width: 100%; padding: 28px 24px 32px 24px; border-radius: var(--radius-xl); background: var(--bg-card); box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.03); border: 1px solid rgba(14, 116, 144, 0.15); transition: box-shadow 0.2s ease;">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-                    <button onclick="APP.toggleLanguage()" class="btn btn--sm btn--outline" style="padding: 4px 12px; font-size: var(--font-xs); border-radius: var(--radius-sm);">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px;">
-                    <img src="icons/pagehead-logo.png" alt="JF!" style="height: 32px; width: auto;">
-                    <h2 class="login-title" style="margin: 0; font-size: 1.35rem; font-weight: 600; color: var(--text-primary);">JF! by Gadai</h2>
-                </div>
-                <div id="loginError" class="info-bar danger" style="display: none; margin-bottom: 16px; padding: 8px 12px; border-radius: var(--radius-md);">
-                    <span class="info-bar-icon">⚠️</span>
-                    <div class="info-bar-content" id="loginErrorMessage" style="font-size: var(--font-xs);"></div>
-                </div>
-                <div class="form-group" style="margin-bottom: 14px;">
-                    <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary);">${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
-                    <input id="username" placeholder="email@domain.com" autocomplete="username" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); transition: border-color 0.2s, box-shadow 0.2s;">
-                </div>
-                <div class="form-group" style="position: relative; margin-bottom: 16px;">
-                    <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary);">${Utils.t('password')}</label>
-                    <input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); padding-right: 36px;">
-                    <span onclick="Utils.togglePasswordVisibility('password', this)" style="position: absolute; right: 12px; bottom: 10px; cursor: pointer; font-size: 16px; opacity: 0.6;">👁️</span>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px;">
-                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: var(--font-xs); color: var(--text-secondary);">
-                        <input type="checkbox" id="rememberMe" style="width: 14px; height: 14px; cursor: pointer; margin: 0; accent-color: var(--primary);"> ${lang === 'id' ? 'Ingat saya' : '记住我'}
-                    </label>
-                    <span style="font-size: var(--font-xs); color: var(--text-muted);">${lang === 'id' ? 'Lupa password? Hubungi admin' : '忘记密码？请联系管理员'}</span>
-                </div>
-                <button onclick="APP.login()" id="loginBtn" class="btn btn--primary btn--block" style="padding: 10px 16px; font-size: var(--font-sm); font-weight: 600; border-radius: var(--radius-md); background: linear-gradient(135deg, #0e7490, #06b6d4); border: none; color: white; cursor: pointer; transition: transform 0.1s, opacity 0.2s;">${Utils.t('login')}</button>
-                <p class="login-note" style="font-size: var(--font-xs); color: var(--text-muted); text-align: center; margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--border-light);">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p>
-            </div>
-        </div>`;
-    
-    // 绑定输入框聚焦样式
-    const inputs = document.querySelectorAll('#username, #password');
-    inputs.forEach(input => {
-        input.addEventListener('focus', function() {
-            this.style.borderColor = 'var(--primary)';
-            this.style.boxShadow = '0 0 0 2px rgba(14, 116, 144, 0.1)';
-            this.style.outline = 'none';
-        });
-        input.addEventListener('blur', function() {
-            this.style.borderColor = 'var(--border-medium)';
-            this.style.boxShadow = 'none';
-        });
-    });
-},
+        async renderLogin() {
+            this.currentPage = 'login';
+            this.clearPageState();
+            this._cleanupOverlays();
+            this._clearOverdueInterval();
+            
+            const lang = Utils.lang;
+            document.getElementById("app").innerHTML = `
+                <div class="login-container" style="background: linear-gradient(135deg, #e0f2fe 0%, #f1f5f9 100%);">
+                    <div class="login-box" style="max-width: 340px; width: 100%; padding: 28px 24px 32px 24px; border-radius: var(--radius-xl); background: var(--bg-card); box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.03); border: 1px solid rgba(14, 116, 144, 0.15); transition: box-shadow 0.2s ease;">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                            <button onclick="APP.toggleLanguage()" class="btn btn--sm btn--outline" style="padding: 4px 12px; font-size: var(--font-xs); border-radius: var(--radius-sm);">🌐 ${lang === 'id' ? '中文' : 'Bahasa Indonesia'}</button>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px;">
+                            <img src="icons/pagehead-logo.png" alt="JF!" style="height: 32px; width: auto;">
+                            <h2 class="login-title" style="margin: 0; font-size: 1.35rem; font-weight: 600; color: var(--text-primary);">JF! by Gadai</h2>
+                        </div>
+                        <div id="loginError" class="info-bar danger" style="display: none; margin-bottom: 16px; padding: 8px 12px; border-radius: var(--radius-md);">
+                            <span class="info-bar-icon">⚠️</span>
+                            <div class="info-bar-content" id="loginErrorMessage" style="font-size: var(--font-xs);"></div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 14px;">
+                            <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary);">${lang === 'id' ? 'Email / Username' : '邮箱 / 用户名'}</label>
+                            <input id="username" placeholder="email@domain.com" autocomplete="username" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); transition: border-color 0.2s, box-shadow 0.2s;">
+                        </div>
+                        <div class="form-group" style="position: relative; margin-bottom: 16px;">
+                            <label style="font-size: var(--font-sm); margin-bottom: 4px; color: var(--text-secondary);">${Utils.t('password')}</label>
+                            <input id="password" type="password" placeholder="${Utils.t('password')}" autocomplete="current-password" style="padding: 10px 12px; font-size: var(--font-sm); width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-card); padding-right: 36px;">
+                            <span onclick="Utils.togglePasswordVisibility('password', this)" style="position: absolute; right: 12px; bottom: 10px; cursor: pointer; font-size: 16px; opacity: 0.6;">👁️</span>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: var(--font-xs); color: var(--text-secondary);">
+                                <input type="checkbox" id="rememberMe" style="width: 14px; height: 14px; cursor: pointer; margin: 0; accent-color: var(--primary);"> ${lang === 'id' ? 'Ingat saya' : '记住我'}
+                            </label>
+                            <span style="font-size: var(--font-xs); color: var(--text-muted);">${lang === 'id' ? 'Lupa password? Hubungi admin' : '忘记密码？请联系管理员'}</span>
+                        </div>
+                        <button onclick="APP.login()" id="loginBtn" class="btn btn--primary btn--block" style="padding: 10px 16px; font-size: var(--font-sm); font-weight: 600; border-radius: var(--radius-md); background: linear-gradient(135deg, #0e7490, #06b6d4); border: none; color: white; cursor: pointer; transition: transform 0.1s, opacity 0.2s;">${Utils.t('login')}</button>
+                        <p class="login-note" style="font-size: var(--font-xs); color: var(--text-muted); text-align: center; margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--border-light);">ℹ️ ${lang === 'id' ? 'Hubungi administrator untuk akun' : '请联系管理员获取账号'}</p>
+                    </div>
+                </div>`;
+            
+            const inputs = document.querySelectorAll('#username, #password');
+            inputs.forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.style.borderColor = 'var(--primary)';
+                    this.style.boxShadow = '0 0 0 2px rgba(14, 116, 144, 0.1)';
+                    this.style.outline = 'none';
+                });
+                input.addEventListener('blur', function() {
+                    this.style.borderColor = 'var(--border-medium)';
+                    this.style.boxShadow = 'none';
+                });
+            });
+        },
 
         async login() {
             if (this._loginLock) return;
@@ -1207,22 +1194,10 @@
         },
 
         async logout() {
-            // 清理逾期更新定时器
             this._clearOverdueInterval();
             
-            // 清理网络监控定时器和事件监听
             if (Utils.NetworkMonitor && typeof Utils.NetworkMonitor.destroy === 'function') {
                 Utils.NetworkMonitor.destroy();
-            }
-            
-            // 清理认证状态变化监听（AUTH 内部已有清理逻辑，这里额外确保）
-            try {
-                const client = SUPABASE.getClient();
-                // Supabase 的 onAuthStateChange 返回的 subscription 需要手动 unsubscribe
-                // 但由于没有保存 subscription 引用，这里通过重新初始化来清理
-                // 实际上登出后页面会刷新或跳转登录页，不需要过于复杂
-            } catch (e) {
-                console.warn('[DashboardCore] 清理认证监听时出错:', e.message);
             }
             
             const confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
@@ -1309,7 +1284,6 @@
         },
     };
 
-    // ========== 挂载到命名空间 ==========
     JF.DashboardCore = DashboardCore;
 
     if (!window.APP) {
