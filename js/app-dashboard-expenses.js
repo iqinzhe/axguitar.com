@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.4 修复练习门店支出保存问题
+// app-dashboard-expenses.js - v2.5 修复员工支出上限阈值
 
 'use strict';
 
@@ -99,6 +99,23 @@
                     }
                 }
 
+                // 【v2.5 新增】员工支出上限提示
+                let staffExpenseInfoHtml = '';
+                if (PERMISSION.isStaff()) {
+                    const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
+                    staffExpenseInfoHtml = `
+                        <div class="info-bar info" style="margin-bottom: 16px;">
+                            <span class="info-bar-icon">💡</span>
+                            <div class="info-bar-content">
+                                <strong>${lang === 'id' ? 'Batas Pengeluaran Staf' : '员工支出限额'}</strong><br>
+                                ${lang === 'id' 
+                                    ? `Anda hanya dapat mencatat pengeluaran hingga ${Utils.formatCurrency(maxAmount)} per transaksi. Pengeluaran di atas batas ini memerlukan persetujuan manajer toko.`
+                                    : `您每笔支出上限为 ${Utils.formatCurrency(maxAmount)}，超出部分需店长审批。`}
+                            </div>
+                        </div>
+                    `;
+                }
+
                 const content = `
                     <div class="page-header">
                         <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
@@ -108,6 +125,7 @@
                         </div>
                     </div>
                     ${practiceWarningHtml}
+                    ${staffExpenseInfoHtml}
                     <div class="card">
                         <div class="card card--stat" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">
                             <div class="stat-value expense">${Utils.formatCurrency(totalAmount)}</div>
@@ -192,7 +210,7 @@
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         },
 
-        // ==================== 添加支出（修复版 - 支持练习门店） ====================
+        // ==================== 添加支出（v2.5 - 员工金额上限检查） ====================
         async addExpense() {
             const lang = Utils.lang;
             const expenseDate = document.getElementById("expenseDate").value || new Date().toISOString().split('T')[0];
@@ -209,6 +227,16 @@
             if (isNaN(amount) || amount <= 0) { 
                 Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); 
                 return; 
+            }
+
+            // 【v2.5 新增】员工支出金额上限检查
+            if (!PERMISSION.canAddExpenseAmount(amount)) {
+                const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
+                const warningMsg = lang === 'id'
+                    ? `⚠️ Jumlah pengeluaran melebihi batas staf!\n\nBatas maksimal: ${Utils.formatCurrency(maxAmount)}\nJumlah Anda: ${Utils.formatCurrency(amount)}\n\nPengeluaran di atas ${Utils.formatCurrency(maxAmount)} memerlukan persetujuan manajer toko. Silakan hubungi manajer toko Anda.`
+                    : `⚠️ 支出金额超过员工限额！\n\n上限: ${Utils.formatCurrency(maxAmount)}\n当前金额: ${Utils.formatCurrency(amount)}\n\n超出 ${Utils.formatCurrency(maxAmount)} 的支出需要店长审批。请联系您的店长。`;
+                Utils.toast.warning(warningMsg, 6000);
+                return;
             }
 
             const addBtn = document.getElementById('addExpenseBtn');
@@ -614,5 +642,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.4 修复完成（练习门店支出保存支持）');
+    console.log('✅ JF.ExpensesPage v2.5 修复完成（员工支出上限 IDR 5,000,000）');
 })();
