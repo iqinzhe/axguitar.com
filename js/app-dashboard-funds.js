@@ -337,7 +337,7 @@
                     maxAmount = cashFlow.cash.balance;
                     break;
                 case 'bank_to_cash':
-                    title = lang === 'id' ? '💰 Tarik Tunai dari Bank' : '💰 银行取现';
+                    title = lang === 'id' ? '💰 Tarik Tunai dari Bank' : '💰 银行取出现金';
                     fromLabel = lang === 'id' ? 'Dari Bank BNI' : '从银行 BNI';
                     toLabel = lang === 'id' ? 'Ke Brankas (Tunai)' : '存入保险柜（现金）';
                     maxAmount = cashFlow.bank.balance;
@@ -370,7 +370,7 @@
                 if (transferType === 'cash_to_bank') {
                     await SUPABASE.recordInternalTransfer({ transfer_type: 'cash_to_bank', from_account: 'cash', to_account: 'bank', amount, description: lang === 'id' ? 'Transfer kas ke bank' : '现金存入银行', store_id: profile?.store_id });
                 } else if (transferType === 'bank_to_cash') {
-                    await SUPABASE.recordInternalTransfer({ transfer_type: 'bank_to_cash', from_account: 'bank', to_account: 'cash', amount, description: lang === 'id' ? 'Tarik tunai dari bank' : '银行取现', store_id: profile?.store_id });
+                    await SUPABASE.recordInternalTransfer({ transfer_type: 'bank_to_cash', from_account: 'bank', to_account: 'cash', amount, description: lang === 'id' ? 'Tarik tunai dari bank' : '银行取出现金', store_id: profile?.store_id });
                 } else if (transferType === 'store_to_hq') {
                     await SUPABASE.remitToHeadquarters(profile?.store_id, amount, lang === 'id' ? 'Setoran ke kantor pusat' : '上缴总部');
                 }
@@ -388,7 +388,7 @@
                 const transfers = await SUPABASE.getInternalTransfers();
                 const typeMap = {
                     cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行',
-                    bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取现',
+                    bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取出现金',
                     store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部',
                 };
                 let rows = '';
@@ -429,7 +429,7 @@
             if (!tbody) return;
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
-            const typeMap = { cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行', bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取现', store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部' };
+            const typeMap = { cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行', bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取出现金', store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部' };
             let rows = '';
             if (transfers.length === 0) {
                 rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
@@ -445,7 +445,7 @@
             const transfers = window._internalTransfersData || [];
             const lang = Utils.lang;
             const headers = lang === 'id' ? ['Tanggal', 'Jenis Transfer', 'Jumlah', 'Deskripsi', 'Oleh', 'Toko'] : ['日期', '转账类型', '金额', '描述', '操作人', '门店'];
-            const typeMap = { cash_to_bank: lang === 'id' ? 'Kas ke Bank' : '现金存入银行', bank_to_cash: lang === 'id' ? 'Tarik Tunai' : '银行取现', store_to_hq: lang === 'id' ? 'Setoran ke Pusat' : '上缴总部' };
+            const typeMap = { cash_to_bank: lang === 'id' ? 'Kas ke Bank' : '现金存入银行', bank_to_cash: lang === 'id' ? 'Tarik Tunai' : '银行取出现金', store_to_hq: lang === 'id' ? 'Setoran ke Pusat' : '上缴总部' };
             const rows = transfers.map(t => [t.transfer_date, typeMap[t.transfer_type] || t.transfer_type, t.amount, t.description || '-', t.created_by_profile?.name || '-', t.stores?.name || '-']);
             const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
