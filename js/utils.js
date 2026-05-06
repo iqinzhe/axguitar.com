@@ -1,6 +1,6 @@
-// utils.js - v2.2 统一重构版
+// utils.js - v2.3 统一重构版
 // 基础工具模块，挂载到 JF.Utils
-// 修复：增加网络监控 + 错误恢复工具 + 金额提取统一函数
+// 修复：增加网络监控 + 错误恢复工具 + 金额提取统一函数 + 移除货币缓存 + NetworkMonitor.destroy
 
 'use strict';
 
@@ -618,16 +618,16 @@
         },
     };
 
-    // ==================== 货币格式化缓存 ====================
-Utils.formatCurrency = function (amount) {
-    if (amount === null || amount === undefined || isNaN(amount)) return 'Rp 0';
-    const num = Math.round(amount);
-    const neg = num < 0;
-    const abs = Math.abs(num);
-    const parts = abs.toString().split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return (neg ? '-Rp ' : 'Rp ') + parts.join(',');
-};
+    /* ==================== 货币工具（已移除缓存，优化版） ==================== */
+    Utils.formatCurrency = function (amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) return 'Rp 0';
+        const num = Math.round(amount);
+        const neg = num < 0;
+        const abs = Math.abs(num);
+        const parts = abs.toString().split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return (neg ? '-Rp ' : 'Rp ') + parts.join(',');
+    };
 
     Utils.formatNumberWithCommas = function (num) {
         if (num === null || num === undefined) return '0';
@@ -833,7 +833,7 @@ Utils.formatCurrency = function (amount) {
         }
     };
 
-    /* ==================== 【新增】金额输入统一提取 ==================== */
+    /* ==================== 金额输入统一提取 ==================== */
     /**
      * 从指定 ID 的输入框获取并解析为数字金额
      * @param {string} elementId - 输入框元素的 ID
@@ -845,11 +845,14 @@ Utils.formatCurrency = function (amount) {
         return Utils.parseNumberFromCommas(el.value);
     };
 
-    /* ==================== 【修复】网络监控 ==================== */
+    /* ==================== 网络监控（增强版，支持 destroy） ==================== */
     Utils.NetworkMonitor = {
         _initialized: false,
         _isOnline: true,
         _checkUrl: null,
+        _intervalId: null,
+        _onlineHandler: null,
+        _offlineHandler: null,
         
         init(checkUrl) {
             if (this._initialized) return;
@@ -857,26 +860,27 @@ Utils.formatCurrency = function (amount) {
             this._checkUrl = checkUrl || window.APP_CONFIG?.SUPABASE?.URL;
             this._isOnline = navigator.onLine;
             
-            // 监听网络状态变化
-            window.addEventListener('online', () => {
+            // 保存事件处理函数以便后续移除
+            this._onlineHandler = () => {
                 console.log('[NetworkMonitor] 网络已恢复');
                 this._isOnline = true;
-            });
-            
-            window.addEventListener('offline', () => {
+            };
+            this._offlineHandler = () => {
                 console.log('[NetworkMonitor] 网络已断开');
                 this._isOnline = false;
-            });
+            };
             
-            // 定期检查实际连通性
+            window.addEventListener('online', this._onlineHandler);
+            window.addEventListener('offline', this._offlineHandler);
+            
             this._startPeriodicCheck();
             
             console.log('[NetworkMonitor] 网络监控已启动');
         },
         
         _startPeriodicCheck() {
-            // 每 60 秒检查一次实际连通性
-            setInterval(async () => {
+            // 保存 interval ID
+            this._intervalId = setInterval(async () => {
                 const online = await this._checkRealConnectivity();
                 if (online !== this._isOnline) {
                     this._isOnline = online;
@@ -891,16 +895,13 @@ Utils.formatCurrency = function (amount) {
         
         async _checkRealConnectivity() {
             if (!this._checkUrl) return navigator.onLine;
-            
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
-                
                 const response = await fetch(this._checkUrl + '/rest/v1/', {
                     method: 'HEAD',
                     signal: controller.signal,
                 });
-                
                 clearTimeout(timeoutId);
                 return response.ok || response.status === 401 || response.status === 403;
             } catch (e) {
@@ -910,6 +911,24 @@ Utils.formatCurrency = function (amount) {
         
         isOnline() {
             return this._isOnline;
+        },
+        
+        // 销毁方法，清理所有资源
+        destroy() {
+            if (this._intervalId) {
+                clearInterval(this._intervalId);
+                this._intervalId = null;
+            }
+            if (this._onlineHandler) {
+                window.removeEventListener('online', this._onlineHandler);
+                this._onlineHandler = null;
+            }
+            if (this._offlineHandler) {
+                window.removeEventListener('offline', this._offlineHandler);
+                this._offlineHandler = null;
+            }
+            this._initialized = false;
+            console.log('[NetworkMonitor] 网络监控已销毁');
         },
     };
 
@@ -951,8 +970,8 @@ Utils.formatCurrency = function (amount) {
         },
     };
 
-    // 【修复】初始化错误收集器
+    // 初始化错误收集器
     Utils.ErrorHandler.init();
 
-    console.log('✅ Utils v2.2 初始化完成 (JF namespace + 金额提取函数)');
+    console.log('✅ Utils v2.3 初始化完成 (移除货币缓存 + NetworkMonitor.destroy)');
 })();
