@@ -1,6 +1,7 @@
-// permission.js - v2.2 统一权限模块 (JF 命名空间)
+// permission.js - v2.3 统一权限模块 (JF 命名空间)
 // v2.1 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
 // v2.2 新增：store_manager 与 staff 权限规则拆分；store_manager 可处置本店收益
+// v2.3 修复：禁止员工发起内部转账（internal_transfer 仅限 store_manager 及以上）
 
 'use strict';
 
@@ -53,8 +54,10 @@
                 backup_restore: false,
                 // 收益处置：分店经理可处置本店收益
                 profit_distribute: true,
+                // 审计日志查看（仅管理员）
+                audit_view: false,
             },
-            // staff：普通员工，不可处置收益
+            // staff：普通员工，不可处置收益，不可发起内部转账
             staff: {
                 // 订单
                 order_create: true,
@@ -89,11 +92,14 @@
                 blacklist_view: true,
                 // 资金流水
                 cash_flow_view: true,
-                internal_transfer: true,
+                // 【v2.3 修复】禁止员工发起内部转账，资金调拨需店长及以上权限
+                internal_transfer: false,
                 // 备份恢复（仅管理员）
                 backup_restore: false,
                 // 收益处置：员工不可操作
                 profit_distribute: false,
+                // 审计日志查看（仅管理员）
+                audit_view: false,
             },
         },
 
@@ -135,7 +141,7 @@
             }
         },
 
-        // ==================== 【新增】门店访问权限检查 ====================
+        // ==================== 门店访问权限检查 ====================
         /**
          * 异步检查当前登录用户是否有权访问指定门店
          * @param {string|null} storeId - 要访问的门店ID，null 表示无门店（如总部）
@@ -219,6 +225,9 @@
         canViewCashFlow()    { return this.can('cash_flow_view'); },
         canDoInternalTransfer() { return this.can('internal_transfer'); },
 
+        // ==================== 审计日志 ====================
+        canViewAuditLog()    { return this.can('audit_view'); },
+
         // ==================== 备份恢复 ====================
         canBackup()          { return this.can('backup_restore'); },
         canRestore()         { return this.can('backup_restore'); },
@@ -285,5 +294,5 @@
     JF.Permission = PERMISSION;
     window.PERMISSION = PERMISSION; // 向下兼容
 
-    console.log('✅ JF.Permission v2.2 初始化完成（store_manager/staff 规则拆分，store_manager 可处置本店收益）');
+    console.log('✅ JF.Permission v2.3 初始化完成（禁止员工发起内部转账，预留审计日志权限项）');
 })();
