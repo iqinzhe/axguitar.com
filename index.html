@@ -11,11 +11,16 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest?v=1">
 
-<link rel="stylesheet" href="css/variables.css">
-<link rel="stylesheet" href="css/reset.css">
-<link rel="stylesheet" href="css/components.css">
-<link rel="stylesheet" href="css/dashboard.css">
-<link rel="stylesheet" href="css/responsive.css">
+<!-- 第一步：加载 critical CSS（首屏关键样式） -->
+  <link rel="stylesheet" href="css/1-critical.css">
+  
+  <!-- 第二步：延迟加载其他样式 -->
+  <link rel="stylesheet" href="css/2-variables.css">
+  <link rel="stylesheet" href="css/3-base.css">
+  <link rel="stylesheet" href="css/4-components.css">
+  <link rel="stylesheet" href="css/5-dashboard.css">
+  <link rel="stylesheet" href="css/6-responsive.css">
+  <link rel="stylesheet" href="css/7-utilities.css">
 
 <link rel="preconnect" href="https://hiupsvsbcdsgoyiieqiv.supabase.co">
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
