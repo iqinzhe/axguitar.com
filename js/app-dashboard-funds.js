@@ -1,4 +1,5 @@
-// app-dashboard-funds.js -  v2.0 (JF 命名空间) 
+// app-dashboard-funds.js - v2.1 (JF 命名空间) 
+// v2.1: 员工仅可查看本人操作的资金流水记录
 
 'use strict';
 
@@ -26,6 +27,10 @@
                 collateral_sale_interest: lang === 'id' ? '💎 Jual Jaminan - Bunga' : '💎 变卖抵押物-利息',
                 collateral_sale_surplus: lang === 'id' ? '💎 Jual Jaminan - Surplus' : '💎 变卖抵押物-盈余',
                 collateral_sale_loss: lang === 'id' ? '💎 Jual Jaminan - Rugi' : '💎 变卖抵押物-亏损',
+                capital_injection: lang === 'id' ? '💉 Injeksi Modal' : '💉 资本注入',
+                profit_reinvest: lang === 'id' ? '🔄 Reinvestasi Laba' : '🔄 利润再投入',
+                return_of_capital: lang === 'id' ? '📤 Pengembalian Modal' : '📤 偿还本金',
+                dividend_withdrawal: lang === 'id' ? '💸 Penarikan Dividen' : '💸 红利提取',
             };
         },
 
@@ -34,16 +39,28 @@
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = PERMISSION.isAdmin();
+            const isStaff = PERMISSION.isStaff();
 
             try {
                 let transactions = [];
                 const client = SUPABASE.getClient();
+
                 if (isAdmin) {
                     const { data: allFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('recorded_at', { ascending: false });
                     transactions = allFlows || [];
+                } else if (isStaff) {
+                    // 【v2.1】员工仅可查看本人操作的资金流水记录
+                    const { data: staffFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('store_id', profile?.store_id)
+                        .eq('is_voided', false)
+                        .eq('recorded_by', profile?.id)
+                        .order('recorded_at', { ascending: false });
+                    transactions = staffFlows || [];
                 } else {
+                    // 店长：查看本店全部流水
                     const { data: storeFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id).eq('is_voided', false)
@@ -72,8 +89,25 @@
                     }
                 }
 
+                // 【v2.1 新增】员工受限提示
+                let staffRestrictionHtml = '';
+                if (isStaff) {
+                    staffRestrictionHtml = `
+                        <div class="info-bar info" style="margin-bottom: 16px;">
+                            <span class="info-bar-icon">🔒</span>
+                            <div class="info-bar-content">
+                                <strong>${lang === 'id' ? 'Akses Terbatas' : '访问受限'}</strong><br>
+                                ${lang === 'id'
+                                    ? 'Anda hanya dapat melihat riwayat transaksi yang Anda buat sendiri. Untuk melihat arus kas toko lengkap, hubungi manajer toko.'
+                                    : '您仅可查看本人操作的交易记录。如需查看完整门店资金流水，请联系店长。'}
+                            </div>
+                        </div>
+                    `;
+                }
+
                 const content = `
                     <div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${Utils.t('print')}</button></div></div>
+                    ${staffRestrictionHtml}
                     <div class="card">
                         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;" class="no-print">
                             <input type="date" id="cashFlowFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
@@ -161,6 +195,7 @@
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = PERMISSION.isAdmin();
+            const isStaff = PERMISSION.isStaff();
             try {
                 let transactions = [];
                 const client = SUPABASE.getClient();
@@ -169,6 +204,15 @@
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('recorded_at', { ascending: false });
                     transactions = allFlows || [];
+                } else if (isStaff) {
+                    // 【v2.1】员工在弹窗中也仅查看本人记录
+                    const { data: staffFlows } = await client
+                        .from('cash_flow_records').select('*, stores(name)')
+                        .eq('store_id', profile?.store_id)
+                        .eq('is_voided', false)
+                        .eq('recorded_by', profile?.id)
+                        .order('recorded_at', { ascending: false });
+                    transactions = staffFlows || [];
                 } else {
                     const { data: storeFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
@@ -205,6 +249,16 @@
                     <div id="capitalModal" class="modal-overlay">
                         <div class="modal-content" style="max-width:1000px;">
                             <h3>🏦 ${lang === 'id' ? 'Riwayat Transaksi Kas' : '资金流水记录'}</h3>
+                            ${isStaff ? `
+                            <div class="info-bar info" style="margin-bottom: 12px;">
+                                <span class="info-bar-icon">🔒</span>
+                                <div class="info-bar-content">
+                                    ${lang === 'id'
+                                        ? 'Anda hanya dapat melihat transaksi yang Anda buat sendiri.'
+                                        : '您仅可查看本人操作的交易记录。'}
+                                </div>
+                            </div>
+                            ` : ''}
                             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
                                 <input type="text" id="capitalFilterDesc" placeholder="🔍 ${lang === 'id' ? 'Cari deskripsi...' : '搜索描述...'}" style="flex:1;">
                                 <select id="capitalFilterType" style="width:auto;">
@@ -236,8 +290,8 @@
                                 </table>
                             </div>
                             <div class="modal-actions">
-                                <button onclick="APP.printCapitalTransactions()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
-                                <button onclick="APP.exportCapitalTransactionsToCSV()" class="btn btn--success">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>
+                                ${!isStaff ? `<button onclick="APP.printCapitalTransactions()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                                <button onclick="APP.exportCapitalTransactionsToCSV()" class="btn btn--success">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button>` : ''}
                                 <button onclick="APP.closeCapitalModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button>
                             </div>
                         </div>
@@ -327,6 +381,15 @@
 
         async showTransferModal(transferType) {
             const lang = Utils.lang;
+            
+            // 【v2.1】员工禁止发起内部转账（双重保险：UI层也拦截）
+            if (PERMISSION.isStaff()) {
+                Utils.toast.warning(lang === 'id'
+                    ? 'Hanya manajer toko dan administrator yang dapat melakukan transfer internal.'
+                    : '仅店长和管理员可发起内部转账。');
+                return;
+            }
+            
             let title, fromLabel, toLabel, maxAmount;
             const cashFlow = await SUPABASE.getCashFlowSummary();
             switch (transferType) {
@@ -365,6 +428,15 @@
 
         async executeTransfer(transferType, amount) {
             const lang = Utils.lang;
+            
+            // 【v2.1】员工禁止执行内部转账（双重保险）
+            if (PERMISSION.isStaff()) {
+                Utils.toast.warning(lang === 'id'
+                    ? 'Hanya manajer toko dan administrator yang dapat melakukan transfer internal.'
+                    : '仅店长和管理员可发起内部转账。');
+                return;
+            }
+            
             const profile = await SUPABASE.getCurrentProfile();
             try {
                 if (transferType === 'cash_to_bank') {
@@ -480,5 +552,5 @@
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
     }
 
-    console.log('✅ JF.FundsPage v2.1 重构完成（类名统一）');
+    console.log('✅ JF.FundsPage v2.1 更新完成（员工仅查看本人操作流水，禁止导出/打印，内部转账双重拦截）');
 })();
