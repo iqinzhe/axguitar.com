@@ -5,7 +5,7 @@
 (function () {
     const JF = window.JF || {};
     window.JF = JF;
-    const MAX_RENDER_COUNT = 500; // 【新增】页面最大渲染行数，超出提示使用筛选
+
     const OrdersPage = {
         // ==================== 获取订单数据 ====================
         async _fetchOrderData(filters, from, to) {
@@ -321,32 +321,26 @@
 
         // ==================== 加载更多订单 ====================
         async loadMoreOrders() {
-    const state = window._orderTableState;
-    if (!state) return;
-    const lang = Utils.lang;
-    const loadMoreBtn = document.querySelector('#loadMoreRow button');
-    if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...'); }
+            const state = window._orderTableState;
+            if (!state) return;
+            const lang = Utils.lang;
+            const loadMoreBtn = document.querySelector('#loadMoreRow button');
+            if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...'); }
 
-    try {
-        const { orders, totalCount } = await this._fetchOrderData(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
-        state.allOrders = state.allOrders.concat(orders);
-        state.currentFrom += orders.length;
-        state.totalCount = totalCount;
+            try {
+                const { orders, totalCount } = await this._fetchOrderData(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
+                state.allOrders = state.allOrders.concat(orders);
+                state.currentFrom += orders.length;
+                state.totalCount = totalCount;
 
-        this._renderOrdersIntoTable(orders, true);
-
-        // 【新增】检查是否超过渲染上限
-        if (state.allOrders.length >= MAX_RENDER_COUNT) {
-            this._showRenderLimitReached();
-        } else {
-            this._updateLoadMoreRow();
-        }
-    } catch (err) {
-        console.error("loadMoreOrders error:", err);
-        if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
-        Utils.toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
-    }
-},
+                this._renderOrdersIntoTable(orders, true);
+                this._updateLoadMoreRow();
+            } catch (err) {
+                console.error("loadMoreOrders error:", err);
+                if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
+            }
+        },
 
         _updateLoadMoreRow() {
             const state = window._orderTableState;
@@ -371,26 +365,6 @@
                 tbody.appendChild(row);
             }
         },
-
-        // 【新增】渲染上限提示
-_showRenderLimitReached() {
-    const state = window._orderTableState;
-    if (!state) return;
-    const tbody = document.getElementById('orderTableBody');
-    if (!tbody) return;
-    const existingRow = document.getElementById('loadMoreRow');
-    if (existingRow) existingRow.remove();
-
-    const lang = Utils.lang;
-    const row = document.createElement('tr');
-    row.id = 'loadMoreRow';
-    row.innerHTML = `<td colspan="${state.totalCols}" style="text-align:center;padding:14px;color:var(--text-muted);">
-        💡 ${lang === 'id'
-            ? `已加载 ${state.allOrders.length} 条记录。数据过多时，请使用上方的「状态筛选」缩小范围。`
-            : `已加载 ${state.allOrders.length} 条记录。数据过多时，请使用上方的「状态筛选」缩小范围。`}
-    </td>`;
-    tbody.appendChild(row);
-},
 
         // 快捷跳转到缴费页
         payOrder(orderId) {
