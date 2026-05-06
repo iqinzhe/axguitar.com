@@ -1,4 +1,4 @@
-// app-message-center.js - v1.1 修复消息去重逻辑
+// app-message-center.js - v1.2 修复印尼文显示 + 返回按钮
 
 'use strict';
 
@@ -91,7 +91,7 @@
                         messages.push({
                             orderId: order.order_id,
                             type: 'upcoming',
-                            typeLabel: lang === 'id' ? '🔔 即将到期 (2天后)' : '🔔 即将到期 (2天后)',
+                            typeLabel: lang === 'id' ? '🔔 Segera Jatuh Tempo (2 hari lagi)' : '🔔 即将到期 (2天后)',
                             customerName: order.customer_name,
                             customerPhone: order.customer_phone,
                             dueDate: Utils.formatDate(dueDate),
@@ -108,7 +108,7 @@
                     messages.push({
                         orderId: order.order_id,
                         type: 'overdue',
-                        typeLabel: lang === 'id' ? `⚠️ 逾期 ${overdueDays} 天` : `⚠️ 逾期 ${overdueDays} 天`,
+                        typeLabel: lang === 'id' ? `⚠️ Terlambat ${overdueDays} hari` : `⚠️ 逾期 ${overdueDays} 天`,
                         customerName: order.customer_name,
                         customerPhone: order.customer_phone,
                         overdueDays: overdueDays,
@@ -187,7 +187,7 @@
                     <div class="page-header">
                         <h2>💬 ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                            <button id="messageCenterBackBtn" class="btn btn--outline">↩️ ${t('back')}</button>
                             <button onclick="MessageCenter.refresh()" class="btn btn--outline">🔄 ${lang === 'id' ? 'Refresh' : '刷新'}</button>
                         </div>
                     </div>
@@ -197,7 +197,7 @@
                         <div class="info-bar-content">
                             <strong>${lang === 'id' ? 'Panduan:' : '使用说明：'}</strong><br>
                             ${lang === 'id' 
-                                ? '1. 点击「Salin Pesan」复制消息 → 2. 打开 WhatsApp → 3. 粘贴并发送<br>4. 发送后点击「Tandai Terkirim」避免重复提醒'
+                                ? '1. Klik 「Salin Pesan」 → 2. Buka WhatsApp → 3. Tempel dan kirim<br>4. Setelah terkirim, klik 「Tandai Terkirim」 untuk menghindari pengingat ganda'
                                 : '1. 点击「复制消息」→ 2. 打开 WhatsApp → 3. 粘贴并发送<br>4. 发送后点击「标记已发送」避免重复提醒'}
                         </div>
                     </div>
@@ -205,7 +205,7 @@
                     ${messages.length > 0 ? `
                     <div class="card" style="margin-bottom: 12px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <div><strong>📊 ${lang === 'id' ? '待发送消息' : '待发送消息'}: ${messages.length} 条</strong></div>
+                            <div><strong>📊 ${lang === 'id' ? 'Pesan Tertunda' : '待发送消息'}: ${messages.length} ${lang === 'id' ? 'pesan' : '条'}</strong></div>
                             <button onclick="MessageCenter.copyAllToClipboard()" class="btn btn--success" id="copyAllBtn">📋 ${lang === 'id' ? 'Salin Semua Pesan' : '复制全部消息'}</button>
                         </div>
                     </div>
@@ -233,6 +233,22 @@
                 `;
                 
                 document.getElementById("app").innerHTML = content;
+                
+                // 修复返回按钮：手动绑定事件
+                const backBtn = document.getElementById('messageCenterBackBtn');
+                if (backBtn) {
+                    backBtn.onclick = function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (typeof APP !== 'undefined' && APP.goBack) {
+                            APP.goBack();
+                        } else if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.goBack) {
+                            JF.DashboardCore.goBack();
+                        } else {
+                            window.history.back();
+                        }
+                    };
+                }
                 
             } catch (error) {
                 console.error("showMessageCenter error:", error);
@@ -297,5 +313,5 @@
         window.APP = { showMessageCenter: MessageCenter.showMessageCenter.bind(MessageCenter) };
     }
 
-    console.log('✅ JF.MessageCenter v1.1 修复完成（消息去重）');
+    console.log('✅ JF.MessageCenter v1.2 修复完成（印尼文显示 + 返回按钮）');
 })();
