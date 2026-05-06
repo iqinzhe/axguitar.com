@@ -1,35 +1,25 @@
 /* ============================================================
-   variables.css - 设计令牌（完整系统）v2.0
+   variables.css - 设计令牌（全系统唯一变量源）
    ============================================================ */
-
-@layer tokens {
-  :root {
-    /* ============================================================
-       主色调（深青蓝 — 专业沉稳）
-       ============================================================ */
+:root {
+    /* ---------- 主色调 ---------- */
     --primary: #0e7490;
     --primary-light: #22d3ee;
     --primary-soft: #cffafe;
     --primary-dark: #0c4a6e;
 
-    /* ============================================================
-       功能色（调低饱和度，更专业）
-       ============================================================ */
+    /* ---------- 功能色 ---------- */
     --success: #16a34a;
     --success-dark: #15803d;
-    --success-light: #dcfce7;
-
+    --success-light: #f0fdf4;
     --warning: #d97706;
     --warning-dark: #b45309;
-    --warning-light: #fef3c7;
-
+    --warning-light: #fffbeb;
     --danger: #dc2626;
     --danger-dark: #b91c1c;
-    --danger-light: #fee2e2;
+    --danger-light: #fff1f2;
 
-    /* ============================================================
-       背景色系（暖灰调 — 减少视觉疲劳）
-       ============================================================ */
+    /* ---------- 背景色系 ---------- */
     --bg-page: #f4f6f9;
     --bg-card: #ffffff;
     --bg-highlight: #f0f9ff;
@@ -37,60 +27,31 @@
     --bg-modal: rgba(7, 22, 48, 0.55);
     --bg-input-readonly: #f8fafc;
 
-    /* ============================================================
-       文字色系（增强对比度）
-       ============================================================ */
+    /* ---------- 文字色系 ---------- */
     --text-primary: #0c1929;
     --text-secondary: #3d5068;
     --text-muted: #6b7e95;
     --text-white: #ffffff;
 
-    /* ============================================================
-       边框色（更有层次）
-       ============================================================ */
+    /* ---------- 边框色 ---------- */
     --border-light: #dde3ec;
     --border-medium: #c4cedb;
 
-    /* ============================================================
-       【NEW】阴影优化版
-       ============================================================ */
+    /* ---------- 阴影 ---------- */
     --shadow-none: none;
     --shadow-sm: 0 1px 3px 0 rgb(14 116 144 / 0.06);
     --shadow-md: 0 2px 6px 0 rgb(14 116 144 / 0.09);
     --shadow-lg: 0 4px 12px -1px rgb(14 116 144 / 0.12);
     --shadow-xl: 0 8px 20px -2px rgb(14 116 144 / 0.15);
 
-    /* ============================================================
-       【NEW】渐变色系（替代硬编码）
-       ============================================================ */
-    --gradient-primary: linear-gradient(135deg, var(--primary-dark), var(--primary));
-    --gradient-primary-h: linear-gradient(90deg, var(--primary-dark), var(--primary-light));
-    --gradient-success: linear-gradient(135deg, var(--success-dark), var(--success));
-    --gradient-warning: linear-gradient(135deg, var(--warning-dark), var(--warning));
-    --gradient-danger: linear-gradient(135deg, var(--danger-dark), var(--danger));
-    --gradient-sidebar: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
-
-    /* ============================================================
-       【NEW】透明度系统
-       ============================================================ */
-    --alpha-disabled: 0.6;
-    --alpha-hover: 0.08;
-    --alpha-focus: 0.12;
-    --alpha-border: 0.15;
-    --alpha-shadow: 0.09;
-
-    /* ============================================================
-       圆角系统
-       ============================================================ */
+    /* ---------- 圆角 ---------- */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-2xl: 20px;
 
-    /* ============================================================
-       间距系统（缩减外边距基础单位）
-       ============================================================ */
+    /* ---------- 间距 ---------- */
     --spacing-1: 3px;
     --spacing-1-5: 5px;
     --spacing-2: 6px;
@@ -101,52 +62,70 @@
     --spacing-7: 26px;
     --spacing-8: 30px;
 
-    /* ============================================================
-       【NEW】过渡系统
-       ============================================================ */
+    /* ---------- 过渡 ---------- */
     --transition-fast: 0.15s ease;
-    --transition-normal: 0.2s ease;
     --transition-slow: 0.3s ease;
 
-    /* ============================================================
-       字体大小系统
-       ============================================================ */
-    --font-xs: 0.75rem;      /* 12px */
-    --font-sm: 0.875rem;     /* 14px */
-    --font-md: 1rem;         /* 16px */
-    --font-lg: 1.125rem;     /* 18px */
-    --font-xl: 1.25rem;      /* 20px */
-    --font-2xl: 1.5rem;      /* 24px */
+    /* ---------- 字体大小 ---------- */
+    --font-xs: 0.75rem;
+    --font-sm: 0.875rem;
+    --font-md: 1rem;
+    --font-lg: 1.125rem;
+    --font-xl: 1.25rem;
+    --font-2xl: 1.5rem;
 
-    /* ============================================================
-       【NEW】字体族
-       ============================================================ */
-    --font-sans: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
-    --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    /* ========= 新增变量 ========= */
 
-    /* ============================================================
-       【NEW】行高系统
-       ============================================================ */
-    --line-height-tight: 1.2;
-    --line-height-normal: 1.6;
-    --line-height-relaxed: 1.8;
+    /* --- 通用色板 (Tailwind 风格) --- */
+    --white: #ffffff;
+    --gray-50:  #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --red-500:  #ef4444;
+    --red-600:  #dc2626;
+    --red-700:  #b91c1c;
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --green-700: #15803d;
+    --blue-500:  #3b82f6;
+    --blue-600:  #2563eb;
+    --blue-700:  #1d4ed8;
+    --purple-600: #7c3aed;
+    --purple-700: #6d28d9;
+    --amber-600: #d97706;
+    --amber-700: #b45309;
+    --cyan-600:  #0891b2;
+    --teal-600:  #0d9488;
+    --sky-500:   #0ea5e9;
+    --sky-600:   #0284c7;
 
-    /* ============================================================
-       【NEW】Z-index 系统（防止冲突）
-       ============================================================ */
-    --z-dropdown: 100;
-    --z-sticky: 50;
-    --z-fixed: 90;
-    --z-modal-overlay: 9999;
-    --z-modal: 10000;
-    --z-tooltip: 1000;
-    --z-notification: 5000;
+    /* --- 渐变 --- */
+    --gradient-sidebar: linear-gradient(180deg, #eef3f9 0%, #e3edf7 50%, #d6e6f5 100%);
+    --gradient-primary: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    --gradient-cta: linear-gradient(135deg, #0e7490, #06b6d4);
+    --gradient-kpi-blue: linear-gradient(90deg, #0e7490, #06b6d4);
+    --gradient-kpi-amber: linear-gradient(90deg, #d97706, #f59e0b);
+    --gradient-kpi-green: linear-gradient(90deg, #15803d, #16a34a);
+    --gradient-util-bar: linear-gradient(90deg, #f59e0b, #fbbf24);
+    --gradient-net-profit: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+    --gradient-backup-card: linear-gradient(135deg, #e8f4e8 0%, #d4ecd4 100%);
 
-    /* ============================================================
-       【NEW】布局尺寸
-       ============================================================ */
-    --sidebar-width: 210px;
-    --topbar-height: 50px;
-    --container-max: 1400px;
-  }
+    /* --- 透明度 --- */
+    --opacity-disabled: 0.6;
+    --opacity-icon: 0.4;
+    --opacity-overlay: 0.55;
+
+    /* --- Z-index 系统 --- */
+    --z-sidebar:       100;
+    --z-sidebar-overlay: 99;
+    --z-topbar:        50;
+    --z-modal:         9999;
+    --z-tooltip:       10000;
 }
