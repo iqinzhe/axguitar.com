@@ -882,7 +882,7 @@
   .info-box.success-box { border-left: 4px solid var(--success); background: var(--success-light); }
   .info-box.warning-box { border-left: 4px solid var(--warning); background: var(--warning-light); }
 
-  /* ---------- 异常页面专属布局 ---------- */
+/* ---------- 异常页面专属布局 ---------- */
   .anomaly-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -897,24 +897,24 @@
     transition: var(--transition-fast);
     display: flex;
     flex-direction: column;
-    min-height: 380px;
+    min-height: 200px;  /* 原 380px，减少约47% */
   }
   .anomaly-card:hover { box-shadow: var(--shadow-md); }
   .anomaly-card-header {
     display: flex;
     align-items: center;
     gap: var(--spacing-3);
-    padding: var(--spacing-3) var(--spacing-4);
+    padding: var(--spacing-2) var(--spacing-4);  /* 原 spacing-3 spacing-4 */
     border-bottom: 1px solid var(--border-light);
     flex-shrink: 0;
   }
   .anomaly-icon { font-size: var(--font-xl); }
-  .anomaly-card-header h3 { flex: 1; margin: 0; font-size: var(--font-md); border-bottom: none; padding-bottom: 0; }
+  .anomaly-card-header h3 { flex: 1; margin: 0; font-size: var(--font-sm); border-bottom: none; padding-bottom: 0; }  /* 原 font-md */
 
   .anomaly-badge {
     background: var(--primary-soft);
     color: var(--primary-dark);
-    padding: 4px 10px;
+    padding: 2px 8px;  /* 原 4px 10px */
     border-radius: 20px;
     font-size: var(--font-xs);
     font-weight: 600;
@@ -924,12 +924,13 @@
   .anomaly-card-info    .anomaly-badge { background: #e0f2fe; color: #0284c7; }
 
   .anomaly-card-body {
-    padding: var(--spacing-4) var(--spacing-5);
+    padding: var(--spacing-3) var(--spacing-4);  /* 原 spacing-4 spacing-5 */
     flex: 1;
     overflow-y: auto;
+    max-height: 260px;  /* 新增：限制最大高度 */
   }
   .anomaly-card-footer {
-    padding: var(--spacing-3) var(--spacing-5);
+    padding: var(--spacing-2) var(--spacing-4);  /* 原 spacing-3 spacing-5 */
     background: var(--bg-hover);
     border-top: 1px solid var(--border-light);
     font-size: var(--font-xs);
@@ -938,7 +939,7 @@
 
   .anomaly-table { width: 100%; border-collapse: collapse; font-size: var(--font-xs); }
   .anomaly-table th, .anomaly-table td {
-    padding: var(--spacing-2);
+    padding: 4px 6px;  /* 原 var(--spacing-2) */
     border-bottom: 1px solid var(--border-light);
     text-align: left;
   }
@@ -970,6 +971,17 @@
   .ranking-name { font-weight: 600; font-size: var(--font-sm); }
   .ranking-item.first { background: #fef3c7; border-left: 3px solid var(--warning); }
   .ranking-item.last  { background: #fee2e2; border-left: 3px solid var(--danger); }
+
+/* 手机端保持原有舒适间距 */
+@media (max-width: 768px) {
+  .anomaly-grid .anomaly-card {
+    min-height: auto;
+  }
+  .anomaly-grid .anomaly-card-body {
+    max-height: none;
+    padding: var(--spacing-4) var(--spacing-4);
+  }
+}
 
   /* ---------- 备份恢复页面专属布局 ---------- */
   .backup-grid {
