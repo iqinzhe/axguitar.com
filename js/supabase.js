@@ -1,4 +1,5 @@
-// supabase.js - v2.0 
+// supabase.js - v2.1 增强版
+// 缓存过期检查 + 自动清理
 
 'use strict';
 
@@ -108,6 +109,7 @@
     const _storePrefixCache = new Map();
     let _storesCache = null, _storesCacheTime = 0;
     const STORES_TTL = 43200000; // 12小时（覆盖一个完整工作日）
+    const USERS_TTL = 43200000;   // 12小时
 
     // 安全查询包装器：自动捕获异常，处理401/会话过期
     const safeQuery = async (fn, fallback = null, silent = false) => {
@@ -178,17 +180,17 @@
         },
 
         clearCache() {
-    _profileCache = null;
-    _storePrefixCache.clear();
-    _storesCache = null;
-    _storesCacheTime = 0;
-    // 清除 localStorage 中的持久化缓存
-    try {
-        SafeStorage.removeItem('jf_cache_stores');
-        SafeStorage.removeItem('jf_cache_users');
-    } catch(e) { /* ignore */ }
-    JF.Cache?.clear?.();
-},
+            _profileCache = null;
+            _storePrefixCache.clear();
+            _storesCache = null;
+            _storesCacheTime = 0;
+            // 清除 localStorage 中的持久化缓存
+            try {
+                SafeStorage.removeItem('jf_cache_stores');
+                SafeStorage.removeItem('jf_cache_users');
+            } catch(e) { /* ignore */ }
+            JF.Cache?.clear?.();
+        },
 
         async isAdmin() { const p = await this.getCurrentProfile(); return p?.role === 'admin'; },
         async getCurrentStoreId() { const p = await this.getCurrentProfile(); return p?.store_id; },
@@ -221,42 +223,47 @@
 
         // ---------- 门店 ----------
         async getAllStores(forceRefresh = false) {
-    if(!supabaseClient) return [];
-    const now = Date.now();
-    // 1. 优先内存缓存
-    if(!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_TTL) return _storesCache;
-    
-    // 2. 检查 localStorage 缓存（跨标签页持久化）
-    if(!forceRefresh) {
-        try {
-            const lsData = SafeStorage.getItem('jf_cache_stores');
-            if(lsData) {
-                const parsed = JSON.parse(lsData);
-                if(parsed && parsed.data && (now - parsed.time) < STORES_TTL) {
-                    _storesCache = parsed.data;
-                    _storesCacheTime = parsed.time;
-                    (parsed.data||[]).forEach(s=>{ if(s.prefix){ _storePrefixCache.set(s.id, s.prefix); _storePrefixCache.set(s.code, s.prefix); } });
-                    return parsed.data;
-                }
+            if(!supabaseClient) return [];
+            const now = Date.now();
+            // 1. 优先内存缓存
+            if(!forceRefresh && _storesCache && (now - _storesCacheTime) < STORES_TTL) return _storesCache;
+            
+            // 2. 检查 localStorage 缓存（跨标签页持久化）- 增强过期检查
+            if(!forceRefresh) {
+                try {
+                    const lsData = SafeStorage.getItem('jf_cache_stores');
+                    if(lsData) {
+                        const parsed = JSON.parse(lsData);
+                        // 检查 time 字段是否过期
+                        if(parsed && parsed.data && (now - parsed.time) < STORES_TTL) {
+                            _storesCache = parsed.data;
+                            _storesCacheTime = parsed.time;
+                            (parsed.data||[]).forEach(s=>{ if(s.prefix){ _storePrefixCache.set(s.id, s.prefix); _storePrefixCache.set(s.code, s.prefix); } });
+                            return parsed.data;
+                        } else if(parsed && parsed.data) {
+                            // 缓存已过期，主动删除
+                            SafeStorage.removeItem('jf_cache_stores');
+                            console.log('[Supabase] 门店缓存已过期，已删除');
+                        }
+                    }
+                } catch(e) { /* ignore */ }
             }
-        } catch(e) { /* ignore */ }
-    }
-    
-    // 3. 发起网络请求
-    try {
-        const { data } = await supabaseClient.from('stores').select('*').neq('code','STORE_000').order('code');
-        _storesCache = data;
-        _storesCacheTime = now;
-        (data||[]).forEach(s=>{ if(s.prefix){ _storePrefixCache.set(s.id, s.prefix); _storePrefixCache.set(s.code, s.prefix); } });
-        
-        // 持久化到 localStorage
-        try {
-            SafeStorage.setItem('jf_cache_stores', JSON.stringify({ data, time: now }));
-        } catch(e) { /* ignore */ }
-        
-        return data;
-    } catch(e){ return _storesCache || []; }
-},
+            
+            // 3. 发起网络请求
+            try {
+                const { data } = await supabaseClient.from('stores').select('*').neq('code','STORE_000').order('code');
+                _storesCache = data;
+                _storesCacheTime = now;
+                (data||[]).forEach(s=>{ if(s.prefix){ _storePrefixCache.set(s.id, s.prefix); _storePrefixCache.set(s.code, s.prefix); } });
+                
+                // 持久化到 localStorage
+                try {
+                    SafeStorage.setItem('jf_cache_stores', JSON.stringify({ data, time: now }));
+                } catch(e) { /* ignore */ }
+                
+                return data;
+            } catch(e){ return _storesCache || []; }
+        },
 
         async _getStorePrefix(storeId) {
             if(!storeId) return 'AD';
@@ -1282,34 +1289,39 @@
         },
 
         async getAllUsers(forceRefresh = false) {
-    if (!supabaseClient) return [];
-    const now = Date.now();
-    const USERS_TTL = 43200000; // 12小时（覆盖一个完整工作日）
-    
-    // 1. 检查 localStorage 缓存
-    if(!forceRefresh) {
-        try {
-            const lsData = SafeStorage.getItem('jf_cache_users');
-            if(lsData) {
-                const parsed = JSON.parse(lsData);
-                if(parsed && parsed.data && (now - parsed.time) < USERS_TTL) {
-                    return parsed.data;
-                }
+            if (!supabaseClient) return [];
+            const now = Date.now();
+            const USERS_TTL = 43200000; // 12小时
+            
+            // 1. 检查 localStorage 缓存 - 增强过期检查
+            if(!forceRefresh) {
+                try {
+                    const lsData = SafeStorage.getItem('jf_cache_users');
+                    if(lsData) {
+                        const parsed = JSON.parse(lsData);
+                        // 检查 time 字段是否过期
+                        if(parsed && parsed.data && (now - parsed.time) < USERS_TTL) {
+                            return parsed.data;
+                        } else if(parsed && parsed.data) {
+                            // 缓存已过期，主动删除
+                            SafeStorage.removeItem('jf_cache_users');
+                            console.log('[Supabase] 用户缓存已过期，已删除');
+                        }
+                    }
+                } catch(e) { /* ignore */ }
             }
-        } catch(e) { /* ignore */ }
-    }
-    
-    // 2. 发起网络请求
-    const { data, error } = await supabaseClient.from('user_profiles').select('*, stores(*)').order('name');
-    if (error) throw error;
-    
-    // 3. 持久化到 localStorage
-    try {
-        SafeStorage.setItem('jf_cache_users', JSON.stringify({ data, time: now }));
-    } catch(e) { /* ignore */ }
-    
-    return data;
-},
+            
+            // 2. 发起网络请求
+            const { data, error } = await supabaseClient.from('user_profiles').select('*, stores(*)').order('name');
+            if (error) throw error;
+            
+            // 3. 持久化到 localStorage
+            try {
+                SafeStorage.setItem('jf_cache_users', JSON.stringify({ data, time: now }));
+            } catch(e) { /* ignore */ }
+            
+            return data;
+        },
 
         async createStore(code, name, address, phone) {
             if (!supabaseClient) throw new Error('客户端未初始化');
@@ -1665,5 +1677,5 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
-    console.log('✅ JF.Supabase v2.0 初始化完成');
+    console.log('✅ JF.Supabase v2.1 初始化完成（缓存过期检查 + 自动清理）');
 })();
