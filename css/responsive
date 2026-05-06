@@ -1,412 +1,202 @@
 /* ============================================================
-   responsive.css - 统一响应式设计 v2.0（优化版）
+   responsive.css - 统一响应式与打印样式（优化版）
    ============================================================ */
-
-@import url('./variables.css');
-
-/* ============================================================
-   一、桌面端微调（≥769px）
-   ============================================================ */
-@media (min-width: 769px) {
-  html {
-    font-size: 17px;
+@layer pages {
+  /* 桌面端 */
+  @media (min-width: 769px) {
+    html { font-size: 17px; }
+    #app { padding: var(--spacing-3) var(--spacing-4); }
+    .page-header h1, .page-header h2 { font-size: var(--font-xl); }
+    .card h3 { font-size: var(--font-md); }
+    .card--stat .stat-value { font-size: var(--font-lg); }
+    .card--stat .stat-label { font-size: var(--font-xs); }
+    .data-table thead th, .data-table tbody td { font-size: var(--font-sm); }
+    .btn { font-size: var(--font-sm); }
+    .btn--sm { font-size: var(--font-sm); }
+    .toolbar .btn { font-size: var(--font-sm); }
+    .form-group label { font-size: var(--font-sm); }
+    .form-group input, .form-group select, .form-group textarea { font-size: var(--font-md); }
+    .table-container { overflow-x: visible; }
+    .data-table { table-layout: auto !important; min-width: auto !important; width: 100%; }
+    .profit-distribution-grid { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-3); align-items: stretch; }
   }
 
-  #app {
-    padding: var(--spacing-3) var(--spacing-4);
+  /* 手机端 */
+  @media (max-width: 768px) {
+    html { font-size: 16px; }
+    #app { padding: var(--spacing-2); }
+    .page-header h1, .page-header h2 { font-size: var(--font-lg); }
+    .card h3 { font-size: calc(var(--font-md) - 0.0625rem); }
+
+    .stats-grid,
+    .stats-grid.stats-grid--2,
+    .stats-grid.stats-grid--3,
+    .stats-grid.stats-grid--auto {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: var(--spacing-2);
+    }
+    .card--stat { min-height: 64px; padding: var(--spacing-2) var(--spacing-3); }
+    .card--stat .stat-value { font-size: calc(var(--font-xl) - 0.125rem); }
+    .card--stat .stat-label { font-size: calc(var(--font-xs) - 0.03125rem); }
+
+    .info-cards-row { flex-direction: column; }
+    .info-cards-row .info-item-card { min-width: auto; }
+
+    .fee-cards-row { grid-template-columns: 1fr; gap: var(--spacing-3); }
+    .fee-card .fee-card-body { flex-direction: column; align-items: stretch; gap: var(--spacing-2); }
+    .fee-card .fee-card-body select { width: 100%; min-width: auto; }
+    .fee-card .fee-card-body input { width: 100%; text-align: right; }
+
+    .btn { font-size: var(--font-xs); padding: 8px 14px; }
+    .btn--sm { padding: 6px 12px; font-size: 11px; }
+    .toolbar .btn { font-size: var(--font-xs); overflow: hidden; text-overflow: ellipsis; padding: var(--spacing-3) var(--spacing-1); }
+
+    .btn--primary, .btn--success, .btn--warning, .btn--danger, .btn--outline { width: 100%; text-align: center; }
+
+    .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .data-table { font-size: var(--font-xs); table-layout: fixed; min-width: 700px; width: max-content; }
+    .data-table thead th, .data-table tbody td { padding: 6px 5px; font-size: var(--font-xs); line-height: 1.3; height: auto; min-height: 32px; white-space: nowrap; }
+    .data-table .desc-cell { white-space: normal; word-break: break-word; min-width: 120px; max-width: 160px; }
+
+    .action-row td { padding: 6px 5px !important; }
+    .action-row .action-label { font-size: var(--font-xs); width: 40px; min-width: 40px; padding-right: var(--spacing-1); }
+    .action-row .action-buttons { flex-direction: row; flex-wrap: nowrap; gap: 12px; overflow-x: auto; padding: 2px 0; }
+    .action-row .action-buttons .btn--sm { flex-shrink: 0; padding: 8px 14px; font-size: 11px; border-radius: var(--radius-sm); max-width: 120px; }
+
+    .badge { font-size: 10px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0; }
+    .locked-badge, .reconciled-badge { font-size: 10px; padding: 2px 8px; }
+
+    .toolbar.admin-grid, .toolbar.store-grid { grid-template-columns: repeat(2, 1fr); }
+
+    .summary-grid { grid-template-columns: repeat(2, 1fr); gap: var(--spacing-1); }
+    .summary-item { padding: var(--spacing-1); gap: var(--spacing-1); }
+    .summary-item .label, .summary-item .value { font-size: var(--font-xs); }
+
+    .payment-double-column { flex-direction: column; gap: var(--spacing-2); }
+    .payment-double-column .card { flex: none; width: 100%; max-width: 100%; min-width: 0; margin-bottom: 0; overflow-x: hidden; }
+
+    .form-grid, .form-grid.form-grid--3, .form-grid.form-grid--4 { grid-template-columns: 1fr; gap: var(--spacing-2); }
+    .form-grid-mobile-2 { grid-template-columns: repeat(2, 1fr) !important; }
+    .order-first-row { grid-template-columns: 1fr; }
+    .repayment-cards-row { grid-template-columns: 1fr; gap: var(--spacing-2); }
+    .info-display { grid-template-columns: 1fr; }
+    .info-display-item .info-label { min-width: 70px; }
+
+    .payment-method-selector { flex-direction: column; gap: var(--spacing-1); }
+    .payment-method-row { flex-direction: column; align-items: flex-start; gap: var(--spacing-2); }
+    .address-option { flex-direction: column; gap: var(--spacing-1); }
+
+    .form-group label { font-size: var(--font-xs); }
+    .form-group input, .form-group select, .form-group textarea { font-size: var(--font-sm); }
+
+    .order-detail-grid { grid-template-columns: 1fr; gap: 0; }
+    .anomaly-grid { grid-template-columns: 1fr; gap: var(--spacing-4); }
+    .anomaly-card { min-height: auto; }
+    .backup-grid, .backup-grid-store { grid-template-columns: 1fr !important; gap: var(--spacing-4); }
+    .cashflow-stats { flex-direction: column; }
+    .cashflow-item-card { min-width: auto; }
+    .cashflow-table .flow-desc, .capital-table .flow-desc { max-width: 150px; }
+    .expense-table .expense-desc { max-width: 100px; }
+    .mobile-hide { display: none; }
+
+    /* 移动端隐藏指定卡片（合并冗余） */
+    .kpi-card--green,
+    .order-status-card {
+      display: none !important;
+    }
+
+    /* 通用字体缩小 */
+    .card h3, .card-header .card-title, .modal-content h3, .repayment-card-title, .anomaly-card-header h3, .backup-card h3 {
+      font-size: calc(var(--font-md) - 0.0625rem);
+      margin-bottom: var(--spacing-1);
+    }
+    .stat-value, .kpi-val, .fund-block-val, .info-item-value, .cashflow-item-card .value, .repayment-card .repayment-amount,
+    .fee-card .fee-card-body input, .amount-highlight, .card .card-value-main, .summary-item .value, .legend-count {
+      font-size: calc(var(--font-lg) - 0.0625rem);
+    }
+    .stat-label, .card-action, .info-label, .repayment-card-desc, .repayment-card-note, .card .info-bar, .card .form-hint,
+    .cashflow-item-card .label, .legend-name, .legend-pct, .kpi-label, .fund-block-label, .cb-label, .income-name, .income-sub,
+    .info-item-card .info-item-detail, .card .card-history .history-title, .anomaly-badge, .util-bar-label, .np-label, .np-sub,
+    .quick-btn .qb-label, .order-status-card .legend-name {
+      font-size: calc(var(--font-xs) - 0.03125rem);
+    }
+    .card p, .card .desc-text, .repayment-card-desc, .info-bar-content, .card .text-muted {
+      font-size: calc(var(--font-sm) - 0.0625rem);
+    }
+    .profit-distribution-grid { display: block !important; }
   }
 
-  .page-header h1,
-  .page-header h2 {
-    font-size: var(--font-xl);
+  @media (max-width: 480px) {
+    .stats-grid { gap: 8px; }
+    .summary-grid { grid-template-columns: 1fr; }
+    .btn { width: 100%; }
+    .btn--sm { font-size: 10px; padding: 6px 10px; }
   }
 
-  .card h3 {
-    font-size: var(--font-md);
+  /* 打印样式 */
+  @media print {
+    @page { size: A4 landscape; margin: 5mm 8mm; }
+    body { background: var(--white) !important; color: #000 !important; font-size: 9pt !important; }
+    #app { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+    .no-print, .toolbar, .action-buttons, .action-row, .modal-overlay, .form-actions, .lang-toggle { display: none !important; }
+    .print-only { display: block !important; }
+    a { color: #000 !important; text-decoration: none !important; }
+    .card, .cashflow-summary, .kpi-card, .fund-flow-card, .income-card, .quick-card, .order-status-card, .message-center-card {
+      box-shadow: none !important; border: 1px solid #ccc !important; margin-bottom: 6px !important; padding: 6px 8px !important;
+      break-inside: avoid !important; page-break-inside: avoid !important;
+    }
+    .card h3 { font-size: 9pt !important; margin-bottom: 3px !important; border-bottom: none !important; text-align: left !important; }
+    .card p { text-align: left !important; }
+    .page-header h1, .page-header h2 { text-align: left !important; }
+    .table-container { border: none; overflow: visible; }
+    .data-table, .anomaly-table { font-size: 7.5pt !important; table-layout: fixed !important; width: 100% !important; }
+    .data-table thead th, .data-table tbody td, .anomaly-table th, .anomaly-table td {
+      padding: 4px 6px !important; font-size: 7pt !important; line-height: 1.2 !important; border: 1px solid #999 !important;
+      text-align: left !important; white-space: normal !important; word-break: break-word !important;
+    }
+    .badge { border: 1px solid #999 !important; background: none !important; }
+    .data-table .desc-cell, .cashflow-table .flow-desc, .capital-table .flow-desc, .expense-table .expense-desc {
+      max-width: none !important; overflow: visible !important; text-overflow: clip !important; white-space: normal !important; word-break: break-word !important;
+    }
+    .stats-grid { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; }
+    .card--stat { flex: 1 1 auto !important; min-width: 90px !important; border: 1px solid #ccc !important; padding: 3px 5px !important; text-align: left !important; box-shadow: none !important; }
+    .card--stat .stat-value { font-size: 9pt !important; font-weight: 600 !important; text-align: left !important; }
+    .card--stat .stat-label { font-size: 6.5pt !important; text-align: left !important; }
+    .kpi-row { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
+    .kpi-card { flex: 1 !important; min-width: 120px !important; }
+    .kpi-val { font-size: 11pt !important; }
+    .form-grid, .form-grid.form-grid--3, .form-grid.form-grid--4 { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+    .order-first-row { grid-template-columns: repeat(2, 1fr) !important; }
+    .fee-cards-row { grid-template-columns: repeat(2, 1fr) !important; }
+    .repayment-cards-row { grid-template-columns: repeat(3, 1fr) !important; }
+    .info-display { grid-template-columns: repeat(2, 1fr) !important; border: 1px solid #ccc !important; background: #fff !important; }
+    .repayment-card { border: 1px solid #ccc !important; box-shadow: none !important; page-break-inside: avoid !important; }
+    .repayment-card.selected { border-color: #999 !important; background: #fff !important; }
+    .form-group input, .form-group select, .form-group textarea { border: 1px solid #ccc !important; background: #fff !important; }
+    .fixed-repayment-form { border: 1px solid #ccc !important; background: #fff !important; page-break-inside: avoid !important; }
+    .fee-card { border: 1px solid #ccc !important; background: #fff !important; }
+    .payment-method-row { background: #fff !important; border: 1px solid #ccc !important; }
+    .anomaly-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+    .anomaly-card { break-inside: avoid !important; page-break-inside: avoid !important; box-shadow: none !important; border: 1px solid #ccc !important; }
+    .order-detail-grid { grid-template-columns: 1fr 1fr !important; }
+    .backup-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .backup-card { border: 1px solid #ccc !important; box-shadow: none !important; }
+    .backup-card-primary { background: #fff !important; border-left: 4px solid #999 !important; }
+    .fixed-repayment-card { background: #fff !important; border-left: 4px solid #999 !important; }
+    .btn-backup-primary, .btn-restore, .btn-blacklist, .capital-btn, .btn-capital-inject { display: none !important; }
   }
 
-  .card--stat .stat-value {
-    font-size: var(--font-lg);
-  }
-
-  .card--stat .stat-label {
-    font-size: var(--font-xs);
-  }
-
-  .data-table thead th,
-  .data-table tbody td {
-    font-size: var(--font-sm);
-  }
-
-  .btn {
-    font-size: var(--font-sm);
-  }
-
-  .toolbar .btn {
-    font-size: var(--font-sm);
-  }
-
-  .form-group label {
-    font-size: var(--font-sm);
-  }
-
-  .form-group input,
-  .form-group select,
-  .form-group textarea {
-    font-size: var(--font-md);
-  }
-
-  .profit-distribution-grid {
-    display: grid !important;
+  /* 收益处置网格 */
+  .profit-cards-grid {
+    display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-3);
-    align-items: stretch;
+    margin-bottom: var(--spacing-3);
   }
-}
+  .profit-cards-grid .card { margin-bottom: 0; height: 100%; display: flex; flex-direction: column; }
+  .profit-cards-grid .card .form-actions { margin-top: auto; }
 
-/* ============================================================
-   二、手机端响应式（≤768px）
-   ============================================================ */
-@media (max-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-
-  #app {
-    padding: var(--spacing-2);
-  }
-
-  .page-header h1,
-  .page-header h2 {
-    font-size: var(--font-lg);
-  }
-
-  /* === 统计卡片简化 === */
-  .stats-grid,
-  .stats-grid--2,
-  .stats-grid--3,
-  .stats-grid--auto {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: var(--spacing-2);
-  }
-
-  .card--stat {
-    min-height: 64px;
-    padding: var(--spacing-2) var(--spacing-3);
-  }
-
-  /* === 表单堆叠 === */
-  .form-grid,
-  .form-grid--3,
-  .form-grid--4 {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-2);
-  }
-
-  .form-grid-mobile-2 {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-
-  .order-first-row {
-    grid-template-columns: 1fr;
-  }
-
-  .fee-cards-row {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-3);
-  }
-
-  .fee-card .fee-card-body {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing-2);
-  }
-
-  /* === 按钮优化 === */
-  .btn {
-    font-size: var(--font-xs);
-    padding: 8px 14px;
-  }
-
-  .btn--sm {
-    padding: 6px 12px;
-    font-size: 11px;
-  }
-
-  .toolbar .btn {
-    font-size: var(--font-xs);
-    padding: var(--spacing-3) var(--spacing-1);
-  }
-
-  /* === 表格水平滚动 === */
-  .table-container {
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    margin: var(--spacing-2) 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .data-table {
-    font-size: var(--font-xs);
-    table-layout: fixed;
-    min-width: 700px;
-    width: max-content;
-  }
-
-  .data-table thead th,
-  .data-table tbody td {
-    padding: 6px 5px;
-    font-size: var(--font-xs);
-    line-height: var(--line-height-tight);
-    height: auto;
-    min-height: 32px;
-    white-space: nowrap;
-  }
-
-  .data-table .desc-cell {
-    white-space: normal;
-    word-break: break-word;
-    min-width: 120px;
-    max-width: 160px;
-  }
-
-  /* === 徽章缩小 === */
-  .badge {
-    font-size: 10px;
-    padding: 1px 6px;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .locked-badge,
-  .reconciled-badge {
-    font-size: 10px;
-    padding: 2px 8px;
-  }
-
-  /* === 工具栏 2 列 === */
-  .toolbar.admin-grid,
-  .toolbar.store-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  /* === 摘要网格 === */
-  .summary-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-1);
-  }
-
-  .summary-item {
-    padding: var(--spacing-1);
-    gap: var(--spacing-1);
-  }
-
-  /* === 信息展示 === */
-  .info-display {
-    grid-template-columns: 1fr;
-  }
-
-  /* === 支付方式 === */
-  .payment-method-selector {
-    flex-direction: column;
-    gap: var(--spacing-1);
-  }
-
-  .payment-method-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-2);
-  }
-
-  .address-option {
-    flex-direction: column;
-    gap: var(--spacing-1);
-  }
-
-  /* === 还款卡片 === */
-  .repayment-cards-row {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-2);
-  }
-
-  /* === 异常页面 === */
-  .anomaly-grid {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-4);
-  }
-
-  /* === 订单详情 === */
-  .order-detail-grid {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-
-  /* === 备份页面 === */
-  .backup-grid,
-  .backup-grid-store {
-    grid-template-columns: 1fr !important;
-    gap: var(--spacing-4);
-  }
-
-  /* === 收益处置 === */
-  .profit-distribution-grid {
-    display: block !important;
-  }
-
-  /* === 文字统一缩小 === */
-  .card h3,
-  .card-header .card-title,
-  .modal-content h3 {
-    font-size: calc(var(--font-md) - 0.0625rem);
-    margin-bottom: var(--spacing-1);
-  }
-
-  .stat-value,
-  .kpi-val,
-  .info-item-value,
-  .amount-highlight {
-    font-size: calc(var(--font-lg) - 0.0625rem);
-  }
-
-  .card p,
-  .desc-text,
-  .text-muted {
-    font-size: calc(var(--font-sm) - 0.0625rem);
-  }
-
-  /* === 隐藏非关键元素 === */
-  .mobile-hide {
-    display: none;
-  }
-
-  /* === 仪表盘隐藏元素 === */
-  .kpi-card--green {
-    display: none !important;
-  }
-
-  .order-status-card {
-    display: none !important;
-  }
-}
-
-/* ============================================================
-   三、小屏手机（≤480px）
-   ============================================================ */
-@media (max-width: 480px) {
-  .stats-grid {
-    gap: 8px;
-  }
-
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .btn {
-    width: 100%;
-  }
-
-  .btn--sm {
-    font-size: 10px;
-    padding: 6px 10px;
-  }
-}
-
-/* ============================================================
-   四、打印样式（统一简化）
-   ============================================================ */
-@media print {
-  @page {
-    size: A4 landscape;
-    margin: 5mm 8mm;
-  }
-
-  body {
-    background: var(--bg-card) !important;
-    color: var(--text-primary) !important;
-    font-size: 9pt !important;
-  }
-
-  #app {
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  /* === 隐藏交互元素 === */
-  .no-print,
-  .toolbar,
-  .action-buttons,
-  .action-row,
-  .modal-overlay,
-  .form-actions,
-  .lang-toggle {
-    display: none !important;
-  }
-
-  .print-only {
-    display: block !important;
-  }
-
-  a {
-    color: var(--text-primary) !important;
-    text-decoration: none !important;
-  }
-
-  /* === 卡片打印 === */
-  .card,
-  .kpi-card,
-  .fund-flow-card,
-  .income-card {
-    box-shadow: none !important;
-    border: 1px solid var(--border-light) !important;
-    margin-bottom: 6px !important;
-    padding: 6px 8px !important;
-    page-break-inside: avoid !important;
-  }
-
-  /* === 表格打印 === */
-  .data-table,
-  .anomaly-table {
-    font-size: 7.5pt !important;
-    table-layout: fixed !important;
-    width: 100% !important;
-  }
-
-  .data-table thead th,
-  .data-table tbody td,
-  .anomaly-table th,
-  .anomaly-table td {
-    padding: 4px 6px !important;
-    font-size: 7pt !important;
-    line-height: var(--line-height-tight) !important;
-    border: 1px solid var(--border-light) !important;
-    text-align: left !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-  }
-
-  /* === 徽章打印 === */
-  .badge {
-    border: 1px solid var(--border-light) !important;
-    background: none !important;
-  }
-
-  /* === 表单打印 === */
-  .form-grid,
-  .form-grid--3,
-  .form-grid--4 {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 8px !important;
-  }
-
-  .repayment-cards-row {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-
-  .info-display {
-    grid-template-columns: repeat(2, 1fr) !important;
-    border: 1px solid var(--border-light) !important;
-    background: var(--bg-card) !important;
+  @media (max-width: 768px) {
+    .profit-cards-grid { grid-template-columns: 1fr; gap: var(--spacing-2); }
   }
 }
