@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.3 订单详情打印优化（智能识别订单信息）
+// app-dashboard-print.js - v3.0 A4竖版打印优化（页码、列宽、行高、空行填充）
 
 'use strict';
 
@@ -56,6 +56,10 @@
             // ========== 订单详情页面特殊处理：将订单信息改为3列3行网格 ==========
             this._reformatOrderInfoForPrint(printContent);
 
+            // ========== 打印前后处理：空行填充 + 行高限制 ==========
+            this._fillEmptyRows(printContent);
+            this._limitCellLines(printContent);
+
             // ========== 获取打印页头信息 ==========
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
@@ -86,25 +90,41 @@
                     <meta charset="UTF-8">
                     <title>JF! by Gadai - ${lang === 'id' ? 'Cetak' : '打印'}</title>
                     <style>
+                        /* ===== 基础重置 ===== */
                         * { box-sizing: border-box; margin: 0; padding: 0; }
-                        body { 
-                            font-family: 'Segoe UI', Arial, sans-serif; 
-                            font-size: 9pt; 
-                            line-height: 1.3; 
-                            color: #1e293b; 
-                            padding: 0; 
-                            margin: 0; 
+
+                        /* ===== 页面设置：A4竖版 ===== */
+                        @page {
+                            size: A4 portrait;
+                            margin: 12mm 10mm 18mm 10mm; /* 上 右 下(留页脚) 左 */
+                            @bottom-center {
+                                content: counter(page) " / " counter(pages);
+                                font-size: 8pt;
+                                color: #94a3b8;
+                            }
                         }
-                        .print-container { padding: 5mm; }
-                        .print-header { 
-                            text-align: center; 
-                            margin-bottom: 8px; 
-                            padding-bottom: 6px; 
+
+                        /* ===== body 与容器 ===== */
+                        html, body {
+                            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+                            font-size: 9pt;
+                            line-height: 1.4;
+                            color: #1e293b;
+                            background: #fff;
+                            margin: 0;
+                            padding: 0;
+                        }
+
+                        /* ===== 页眉：固定在每页顶部（已有，不重复）===== */
+                        .print-header {
+                            text-align: center;
+                            margin-bottom: 8px;
+                            padding-bottom: 6px;
                             border-bottom: 2px solid #1e293b;
                         }
-                        .print-header .logo { 
-                            font-size: 14pt; 
-                            font-weight: bold; 
+                        .print-header .logo {
+                            font-size: 14pt;
+                            font-weight: bold;
                             color: #0e7490;
                             display: flex;
                             align-items: center;
@@ -113,72 +133,226 @@
                         }
                         .print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
                         .print-header-info {
-                            font-size: 9pt;
+                            font-size: 8.5pt;
                             color: #475569;
-                            margin: 4px 0 8px;
+                            margin: 4px 0 4px;
                             text-align: center;
                             white-space: nowrap;
                         }
-                        .print-footer { 
-                            text-align: center; 
-                            font-size: 7pt; 
-                            color: #94a3b8; 
-                            margin-top: 12px; 
-                            padding-top: 6px; 
-                            border-top: 1px solid #e2e8f0; 
+
+                        /* ===== 页脚：固定在底部，含页码 ===== */
+                        .print-footer {
+                            position: fixed;
+                            bottom: 0;
+                            left: 0;
+                            right: 0;
+                            height: 14mm;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 0 10mm;
+                            border-top: 1px solid #e2e8f0;
+                            background: #fff;
+                            font-size: 7.5pt;
+                            color: #94a3b8;
                         }
-                        table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-                        th { background: #f1f5f9; font-weight: 600; text-align: left; }
-                        th, td { 
-                            border: 1px solid #cbd5e1; 
-                            padding: 5px 8px; 
-                            text-align: left; 
-                            font-size: 8pt; 
-                            vertical-align: top; 
+                        .print-footer .footer-brand {
+                            flex: 1;
+                            text-align: left;
                         }
-                        .amount { text-align: right; }
-                        .text-center { text-align: center; }
-                        .card { 
-                            border: 1px solid #e2e8f0; 
-                            border-radius: 6px; 
-                            padding: 8px; 
-                            margin-bottom: 10px; 
+                        .print-footer .footer-page {
+                            flex: 1;
+                            text-align: center;
+                            font-size: 8pt;
+                            color: #64748b;
+                        }
+                        .print-footer .footer-date {
+                            flex: 1;
+                            text-align: right;
+                        }
+
+                        /* ===== 主内容区（避开固定页脚） ===== */
+                        .print-container {
+                            padding-bottom: 16mm; /* 为固定页脚留空间 */
+                        }
+
+                        /* ===== 卡片 ===== */
+                        .card {
+                            border: 1px solid #e2e8f0;
+                            border-radius: 4px;
+                            padding: 8px 10px;
+                            margin-bottom: 8px;
                             break-inside: avoid;
+                            page-break-inside: avoid;
                         }
-                        .card h3 { 
-                            font-size: 10pt; 
-                            margin-bottom: 6px; 
+                        .card h3 {
+                            font-size: 9.5pt;
+                            font-weight: 600;
+                            margin-bottom: 6px;
                             border-bottom: 1px solid #e2e8f0;
-                            padding-bottom: 4px;
+                            padding-bottom: 3px;
                         }
-                        /* 3列网格样式 */
+                        .page-header h1, .page-header h2 {
+                            font-size: 11pt;
+                            font-weight: 700;
+                            margin-bottom: 6px;
+                        }
+
+                        /* ===== 统一表格基础 ===== */
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            table-layout: fixed;  /* 固定列宽，均匀分布 */
+                            margin: 5px 0;
+                            font-size: 8pt;
+                        }
+                        /* 表头 */
+                        th {
+                            background: #f1f5f9;
+                            font-weight: 600;
+                            color: #334155;
+                            border: 1px solid #cbd5e1;
+                            padding: 5px 6px;
+                            text-align: left;
+                            vertical-align: middle;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            height: 22pt; /* 统一表头行高 */
+                            line-height: 1.3;
+                        }
+                        /* 数据行：统一行高，最多换行一次 */
+                        td {
+                            border: 1px solid #cbd5e1;
+                            padding: 4px 6px;
+                            text-align: left;
+                            vertical-align: middle;
+                            /* 行高统一：单行高度约为 22pt，最多两行 44pt */
+                            line-height: 1.35;
+                            min-height: 22pt;
+                            max-height: 44pt;        /* 限制最多两行高度 */
+                            overflow: hidden;
+                            /* 超过两行用省略号，但实际靠 display 控制 */
+                            white-space: normal;
+                            word-break: break-word;
+                            /* 限制为最多2行 */
+                            display: table-cell;
+                        }
+                        /* 利用 WebKit 限制最多2行（仅适用于内容单元格内的 span） */
+                        td .cell-text {
+                            display: -webkit-box;
+                            -webkit-line-clamp: 2;
+                            -webkit-box-orient: vertical;
+                            overflow: hidden;
+                        }
+
+                        /* ===== 列宽规则（A4竖版 190mm可用宽） ===== */
+                        /* 按用途分组，各页面表格列数不同，用百分比确保均衡 */
+
+                        /* 订单号/ID：较窄 */
+                        .col-id, .col-id-narrow   { width: 9%; }
+                        /* 日期 */
+                        .col-date                  { width: 10%; white-space: nowrap; }
+                        /* 状态/方向 */
+                        .col-status, .col-status-wide { width: 9%; }
+                        /* 月数 */
+                        .col-months                { width: 6%; text-align: center; }
+                        /* 金额 */
+                        .col-amount                { width: 11%; text-align: right; }
+                        /* 类型 */
+                        .col-type                  { width: 10%; }
+                        /* 支付方式/来源 */
+                        .col-method                { width: 9%; }
+                        /* 门店 */
+                        .col-store                 { width: 9%; }
+                        /* 姓名/账户 */
+                        .col-name                  { width: 13%; }
+                        /* 身份证号 */
+                        .col-ktp                   { width: 13%; }
+                        /* 电话 */
+                        .col-phone                 { width: 10%; }
+                        /* 职业 */
+                        .col-occupation            { width: 10%; }
+                        /* 描述（剩余空间，自动占满） */
+                        .col-desc                  { width: auto; }
+                        /* 操作列（打印时隐藏，但若有保留，不占宽） */
+                        .col-action                { width: 0; display: none; }
+                        /* 质押物 */
+                        .col-collateral            { width: 14%; }
+
+                        /* ===== 对齐辅助 ===== */
+                        .amount, .text-right { text-align: right; font-variant-numeric: tabular-nums; }
+                        .text-center         { text-align: center; }
+                        .text-left           { text-align: left; }
+
+                        /* ===== 徽章扁平化 ===== */
+                        .badge {
+                            border: 1px solid #999;
+                            background: none !important;
+                            color: #334155 !important;
+                            border-radius: 3px;
+                            padding: 1px 4px;
+                            font-size: 7pt;
+                            display: inline-block;
+                        }
+
+                        /* ===== 空行填充（内容不足时填满表格线框） ===== */
+                        .print-empty-rows td {
+                            height: 22pt;
+                            border: 1px solid #cbd5e1;
+                            background: #fff;
+                        }
+
+                        /* ===== 统计卡片（stats） ===== */
+                        .stats-grid {
+                            display: flex !important;
+                            flex-wrap: wrap !important;
+                            gap: 5px !important;
+                        }
+                        .card--stat {
+                            flex: 1 1 auto !important;
+                            min-width: 80px !important;
+                            border: 1px solid #cbd5e1 !important;
+                            padding: 4px 6px !important;
+                            box-shadow: none !important;
+                        }
+                        .card--stat .stat-value { font-size: 9pt !important; font-weight: 600; }
+                        .card--stat .stat-label { font-size: 6.5pt !important; color: #64748b; }
+
+                        /* ===== 订单详情信息网格（3列） ===== */
                         .order-info-grid {
                             display: grid;
                             grid-template-columns: repeat(3, 1fr);
-                            gap: 12px 24px;
-                            margin-bottom: 20px;
+                            gap: 10px 20px;
+                            margin-bottom: 12px;
                         }
                         .info-item {
-                            padding: 4px 0;
+                            padding: 3px 0;
                             border-bottom: 1px solid #e2e8f0;
-                            break-inside: avoid;
                         }
-                        .info-item .label {
-                            font-size: 7pt;
-                            color: #64748b;
-                            margin-bottom: 2px;
-                        }
-                        .info-item .value {
-                            font-size: 10pt;
-                            font-weight: 500;
-                            color: #1e293b;
-                        }
-                        @media print {
-                            @page { size: A4; margin: 8mm; }
-                            body { margin: 0; padding: 0; }
-                            .print-container { padding: 0; }
-                            .card { break-inside: avoid; }
-                        }
+                        .info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }
+                        .info-item .value { font-size: 9.5pt; font-weight: 500; color: #1e293b; }
+
+                        /* ===== 其他布局 ===== */
+                        .order-detail-grid    { grid-template-columns: 1fr 1fr !important; }
+                        .anomaly-grid         { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+                        .repayment-cards-row  { grid-template-columns: repeat(3, 1fr) !important; }
+                        .info-display         { grid-template-columns: repeat(2, 1fr) !important; border: 1px solid #ccc !important; }
+                        .form-grid, .form-grid.form-grid--3, .form-grid.form-grid--4 { grid-template-columns: repeat(2, 1fr) !important; gap: 6px !important; }
+
+                        /* ===== 隐藏屏幕专属元素 ===== */
+                        .no-print, .toolbar, .action-buttons, .action-row,
+                        .modal-overlay, .form-actions, .lang-toggle,
+                        .btn-backup-primary, .btn-restore, .btn-blacklist,
+                        .capital-btn, .btn-capital-inject { display: none !important; }
+
+                        /* ===== 统计汇总区 ===== */
+                        .summary-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 4px !important; }
+                        .summary-item { padding: 4px 6px; border: 1px solid #e2e8f0; border-radius: 3px; }
+                        .summary-item .label { font-size: 7pt; color: #64748b; }
+                        .summary-item .value { font-size: 9pt; font-weight: 600; }
+
+                        /* ===== 防止表格跨页断裂（数据行） ===== */
+                        tbody tr { break-inside: avoid; page-break-inside: avoid; }
                     </style>
                 </head>
                 <body>
@@ -197,8 +371,17 @@
                         </div>
                         ${printContent.innerHTML}
                         <div class="print-footer">
-                            JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+                            <div class="footer-brand">JF! by Gadai &mdash; ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
+                            <div class="footer-page" id="pageNum"><!-- 页码由JS填写 --></div>
+                            <div class="footer-date">${printDateTime}</div>
                         </div>
+                        <script>
+                            // 页码（浏览器打印页码，JS补充显示当前/总页）
+                            // CSS counter(page)/counter(pages) 在@page规则中处理
+                            // 这里在 footer 中做文字补充（兼容不支持 @page counter 的浏览器）
+                            document.getElementById('pageNum').textContent =
+                                (document.querySelector('@page') ? '' : '');
+                        <\/script>
                     </div>
                     <script>
                         window.onload = function() {
@@ -210,6 +393,56 @@
                 </html>`
             );
             printWindow.document.close();
+        },
+
+        // 空行填充：若表格行数较少，补充空行使表格填满，供手工填写
+        _fillEmptyRows(printContent) {
+            const MIN_ROWS = 15; // 低于此行数时补空行至此数量
+            const tables = printContent.querySelectorAll('table');
+            for (const table of tables) {
+                const tbody = table.querySelector('tbody');
+                if (!tbody) continue;
+                const rows = tbody.querySelectorAll('tr:not(.print-empty-rows)');
+                const count = rows.length;
+                if (count >= MIN_ROWS) continue;
+                // 获取列数
+                const firstRow = rows[0] || table.querySelector('thead tr');
+                if (!firstRow) continue;
+                const colCount = firstRow.querySelectorAll('th, td').length;
+                const needed = MIN_ROWS - count;
+                const fragment = document.createDocumentFragment
+                    ? document.createDocumentFragment() : null;
+                for (let i = 0; i < needed; i++) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'print-empty-rows';
+                    for (let j = 0; j < colCount; j++) {
+                        const td = document.createElement('td');
+                        td.innerHTML = '&nbsp;';
+                        tr.appendChild(td);
+                    }
+                    tbody.appendChild(tr);
+                }
+            }
+        },
+
+        // 行高限制：将单元格内容包裹在 .cell-text span 中，CSS限制最多2行
+        _limitCellLines(printContent) {
+            const tds = printContent.querySelectorAll('td');
+            for (const td of tds) {
+                // 跳过已经包装过的或空行填充
+                if (td.querySelector('.cell-text')) continue;
+                if (td.closest('.print-empty-rows')) continue;
+                const inner = td.innerHTML.trim();
+                if (!inner || inner === '&nbsp;') continue;
+                // 只包装纯文本内容的单元格，跳过含复杂子元素（如按钮、网格）的
+                if (td.children.length === 0 || (td.children.length === 1 && td.children[0].tagName === 'SPAN')) {
+                    const span = document.createElement('span');
+                    span.className = 'cell-text';
+                    span.innerHTML = inner;
+                    td.innerHTML = '';
+                    td.appendChild(span);
+                }
+            }
         },
 
         // 重新格式化订单信息为3列3行网格
@@ -361,5 +594,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.3 订单详情打印优化（智能识别订单信息，3列3行网格布局）');
+    console.log('✅ JF.PrintPage v3.0 A4竖版打印优化（页码固定页脚、列宽均衡、行高统一最多2行、空行填充框线）');
 })();
