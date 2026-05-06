@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.0
+// app-dashboard-print.js - v2.1（打印表头优化：一行显示）
 
 'use strict';
 
@@ -20,7 +20,7 @@
 
             // ========== 移除所有不需要打印的元素 ==========
             
-            // 1. 移除侧边栏（Dashboard 专用）- 使用多种选择器确保覆盖
+            // 1. 移除侧边栏（Dashboard 专用）
             const sidebarSelectors = [
                 '.dashboard-v2 .dash-sidebar',
                 '.dash-sidebar',
@@ -59,12 +59,11 @@
                 elements.forEach(el => el.remove());
             }
 
-            // 4. 移除页眉中的操作按钮（但不移除页眉本身）
+            // 4. 移除页眉中的操作按钮
             const pageHeader = printContent.querySelector('.page-header');
             if (pageHeader) {
                 const headerActions = pageHeader.querySelector('.header-actions');
                 if (headerActions) headerActions.remove();
-                // 移除页眉中的所有按钮
                 const buttons = pageHeader.querySelectorAll('button');
                 for (const btn of buttons) btn.remove();
             }
@@ -73,7 +72,7 @@
             const toolbars = printContent.querySelectorAll('.toolbar, .no-print');
             for (const tb of toolbars) tb.remove();
 
-            // 6. 移除所有操作行（表格中的按钮行）
+            // 6. 移除所有操作行
             const actionRows = printContent.querySelectorAll('.action-row');
             for (const ar of actionRows) ar.remove();
 
@@ -126,11 +125,11 @@
             const refreshBtns = printContent.querySelectorAll('[onclick*="invalidateDashboardCache"], [onclick*="forceRecovery"]');
             for (const btn of refreshBtns) btn.remove();
 
-            // 14. 移除模态框（如果意外包含）
+            // 14. 移除模态框
             const modals = printContent.querySelectorAll('.modal-overlay, .modal-content');
             for (const modal of modals) modal.remove();
 
-            // 15. 移除包含 "加载更多" 按钮的行
+            // 15. 移除包含"加载更多"按钮的行
             const loadMoreRows = printContent.querySelectorAll('[id*="loadMore"], [onclick*="loadMore"]');
             for (const row of loadMoreRows) {
                 const tr = row.closest('tr');
@@ -142,7 +141,7 @@
             const sidebarFooters = printContent.querySelectorAll('.sidebar-footer, [class*="sidebar-footer"]');
             for (const footer of sidebarFooters) footer.remove();
 
-            // 17. 移除导航徽章（小红点）
+            // 17. 移除导航徽章
             const navBadges = printContent.querySelectorAll('.nav-badge');
             for (const badge of navBadges) badge.remove();
 
@@ -202,17 +201,12 @@
                             gap: 8px;
                         }
                         .print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
-                        .print-store-info { 
-                            font-size: 9pt; 
-                            color: #475569; 
-                            margin: 4px 0; 
-                            text-align: center; 
-                        }
-                        .print-user-info { 
-                            font-size: 8pt; 
-                            color: #64748b; 
-                            margin-bottom: 4px; 
-                            text-align: center; 
+                        .print-header-info {
+                            font-size: 9pt;
+                            color: #475569;
+                            margin: 4px 0 8px;
+                            text-align: center;
+                            white-space: nowrap;
                         }
                         .print-footer { 
                             text-align: center; 
@@ -295,11 +289,11 @@
                                 <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
                                 JF! by Gadai
                             </div>
-                            <div class="print-store-info">
-                                🏪 ${Utils.escapeHtml(storeName)} ${isAdmin ? (lang === 'id' ? '(Kantor Pusat)' : '(总部)') : ''}
-                            </div>
-                            <div class="print-user-info">
-                                👤 ${Utils.escapeHtml(userName)} (${roleText}) | 📅 ${printDateTime}
+                            <div class="print-header-info">
+                                🏪 ${isAdmin
+                                    ? (lang === 'id' ? 'Kantor Pusat' : '总部')
+                                    : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
+                                } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
                             </div>
                         </div>
                         ${printContent.innerHTML}
@@ -330,5 +324,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.1 打印模块已修复（侧边栏/顶部栏已隐藏）');
+    console.log('✅ JF.PrintPage v2.1 打印表头优化（一行显示）');
 })();
