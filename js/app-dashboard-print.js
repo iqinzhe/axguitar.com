@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v3.4 彻底清除顶部无用行（字符串正则替换）
+// app-dashboard-print.js - v3.5 极速切除顶部顽固垃圾行
 
 'use strict';
 
@@ -35,14 +35,12 @@
                 elements.forEach(el => el.remove());
             }
 
-            // 处理页眉
             const pageHeader = printContent.querySelector('.page-header');
             if (pageHeader) {
                 const headerActions = pageHeader.querySelector('.header-actions');
                 if (headerActions) headerActions.remove();
             }
 
-            // 移除新增/编辑表单卡片
             const formCards = printContent.querySelectorAll('.card');
             const removeKeywords = ['Tambah', '新增', 'Edit', '编辑', 'Tambah Pengeluaran', '新增运营支出'];
             for (const card of formCards) {
@@ -53,6 +51,28 @@
                 }
             }
 
+            // ========== TreeWalker 清理文本节点 (v3.3逻辑保留) ==========
+            const walker = document.createTreeWalker(
+                printContent,
+                NodeFilter.SHOW_TEXT
+            );
+            const nodesToRemove = [];
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                const text = node.nodeValue.trim();
+                if (!text) continue;
+                if (text.includes('JF! by Gadai - 打印') || text.includes('JF! by Gadai - Cetak') ||
+                    /^\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(:\d{2})?\s*$/.test(text)) {
+                    const parent = node.parentNode;
+                    if (parent && parent.childNodes.length === 1) {
+                        nodesToRemove.push(parent);
+                    } else if (parent) {
+                        node.nodeValue = '';
+                    }
+                }
+            }
+            nodesToRemove.forEach(el => el.remove());
+
             // ========== 订单详情格式化 ==========
             this._reformatOrderInfoForPrint(printContent);
 
@@ -60,18 +80,27 @@
             this._fillEmptyRows(printContent);
             this._limitCellLines(printContent);
 
-            // ========== 获取内容HTML并强力清理无用字符串 ==========
-            let contentHtml = printContent.innerHTML;
+            // ========== 核心：切除 HTML 开头垃圾 ==========
+            let contentHtml = printContent.innerHTML.trim();
 
-            // 移除所有包含“JF! by Gadai - 打印/Cetak”的整行内容（带或不带日期）
+            // 多重正则替换：匹配各种可能的垃圾形式（带日期/无日期，任何标签）
+            // 如果整个页面开头就是垃圾，直接切到第一个有效标签（以<div或<table等开始）
+            if (contentHtml.indexOf('<') !== 0) {
+                // HTML 以文本开头，找到第一个 < 的位置，去掉之前所有的内容
+                const firstTag = contentHtml.indexOf('<');
+                if (firstTag > 0) {
+                    contentHtml = contentHtml.substring(firstTag);
+                }
+            }
+
+            // 再针对性地切除可能残留的包装垃圾（如 <span>2026/5/7 08:09 JF! by Gadai - 打印</span>）
             contentHtml = contentHtml
-                // 移除独立的 <div> 或 <span> 包含此文本
-                .replace(/<[^>]+>\s*(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*JF! by Gadai\s*-\s*(打印|Cetak))\s*<\/[^>]+>/gi, '')
-                // 移除可能作为文本节点藏在其他标签里的情况（如 <b>, <p>, <h> 等）
-                .replace(/(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*JF! by Gadai\s*-\s*(打印|Cetak))/gi, '')
-                // 移除没有日期，只有“JF! by Gadai - 打印/Cetak”的任何标签
-                .replace(/<[^>]+>\s*(JF! by Gadai\s*-\s*(打印|Cetak))\s*<\/[^>]+>/gi, '')
-                .replace(/(JF! by Gadai\s*-\s*(打印|Cetak))/gi, '');
+                .replace(/^<[^>]+>\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)\s*<\/[^>]+>/gi, '')
+                .replace(/^<[^>]+>\s*(?:JF! by Gadai\s*-\s*(?:打印|Cetak))\s*<\/[^>]+>/gi, '')
+                .replace(/^\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)/gi, '');
+
+            // 调试输出（可在控制台查看，确认开头是否干净）
+            console.log('🧹 Cleaned HTML start (first 200 chars):', contentHtml.substring(0, 200));
 
             // ========== 页头信息 ==========
             const lang = Utils.lang;
@@ -484,5 +513,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v3.4 正则清理顶部无用文本，页脚居中');
+    console.log('✅ JF.PrintPage v3.5 顽固垃圾切割清理，页脚居中');
 })();
