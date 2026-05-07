@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v3.3 彻底清除顶部“日期+JF! by Gadai - 打印”冗余行
+// app-dashboard-print.js - v3.4 彻底清除顶部无用行（字符串正则替换）
 
 'use strict';
 
@@ -15,10 +15,9 @@
             const originalApp = document.getElementById("app");
             if (!originalApp) return;
 
-            // 深度克隆需要打印的内容
             const printContent = originalApp.cloneNode(true);
 
-            // ========== 移除所有不需要打印的元素 ==========
+            // ========== 移除不需要的元素 ==========
             const removeSelectors = [
                 '.dashboard-v2 .dash-sidebar', '.dash-sidebar', '.sidebar', '#dashSidebar',
                 '.dashboard-v2 .dash-topbar', '.dash-topbar', '.topbar', '#dashTopbar',
@@ -31,13 +30,12 @@
                 '.print-footer', '.footer-date', '.print-header',
                 '.print-date-time', '.current-time'
             ];
-            
             for (const selector of removeSelectors) {
                 const elements = printContent.querySelectorAll(selector);
                 elements.forEach(el => el.remove());
             }
 
-            // 移除页眉中的操作按钮区域
+            // 处理页眉
             const pageHeader = printContent.querySelector('.page-header');
             if (pageHeader) {
                 const headerActions = pageHeader.querySelector('.header-actions');
@@ -55,67 +53,44 @@
                 }
             }
 
-            // ========== 强力移除顶部无用行：遍历所有文本节点 ==========
-            const walker = document.createTreeWalker(
-                printContent,
-                NodeFilter.SHOW_TEXT,
-                {
-                    acceptNode: function(node) {
-                        // 跳过空文本
-                        if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
-                        // 只关心包含目标关键词的文本节点
-                        if (node.nodeValue.includes('JF! by Gadai - 打印') ||
-                            node.nodeValue.includes('JF! by Gadai - Cetak')) {
-                            return NodeFilter.FILTER_ACCEPT;
-                        }
-                        return NodeFilter.FILTER_REJECT;
-                    }
-                }
-            );
-
-            const nodesToRemove = [];
-            while (walker.nextNode()) {
-                const textNode = walker.currentNode;
-                // 找到该文本节点的父元素，如果父元素只有它一个子节点，直接移除父元素；否则清空文本
-                const parent = textNode.parentNode;
-                if (parent && parent.childNodes.length === 1) {
-                    nodesToRemove.push(parent);
-                } else if (parent) {
-                    textNode.nodeValue = '';
-                }
-            }
-            nodesToRemove.forEach(el => el.remove());
-
-            // ========== 订单详情页面特殊处理：将订单信息改为3列3行网格 ==========
+            // ========== 订单详情格式化 ==========
             this._reformatOrderInfoForPrint(printContent);
 
-            // ========== 打印前后处理：空行填充 + 行高限制 ==========
+            // ========== 表格优化 ==========
             this._fillEmptyRows(printContent);
             this._limitCellLines(printContent);
 
-            // ========== 获取打印页头信息 ==========
+            // ========== 获取内容HTML并强力清理无用字符串 ==========
+            let contentHtml = printContent.innerHTML;
+
+            // 移除所有包含“JF! by Gadai - 打印/Cetak”的整行内容（带或不带日期）
+            contentHtml = contentHtml
+                // 移除独立的 <div> 或 <span> 包含此文本
+                .replace(/<[^>]+>\s*(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*JF! by Gadai\s*-\s*(打印|Cetak))\s*<\/[^>]+>/gi, '')
+                // 移除可能作为文本节点藏在其他标签里的情况（如 <b>, <p>, <h> 等）
+                .replace(/(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*JF! by Gadai\s*-\s*(打印|Cetak))/gi, '')
+                // 移除没有日期，只有“JF! by Gadai - 打印/Cetak”的任何标签
+                .replace(/<[^>]+>\s*(JF! by Gadai\s*-\s*(打印|Cetak))\s*<\/[^>]+>/gi, '')
+                .replace(/(JF! by Gadai\s*-\s*(打印|Cetak))/gi, '');
+
+            // ========== 页头信息 ==========
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
-            let storeName = '';
-            let roleText = '';
-            let userName = '';
-
+            let storeName = '', roleText = '';
             try {
                 storeName = AUTH.getCurrentStoreName();
                 roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
                            AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
                            (lang === 'id' ? 'Staf' : '员工');
-                userName = AUTH.user?.name || '-';
             } catch (e) {
                 storeName = '-';
                 roleText = '-';
-                userName = '-';
             }
 
             const printDateTime = new Date().toLocaleString();
             const footerBrandText = lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统';
 
-            // 构建打印页面
+            // ========== 构建打印窗口 ==========
             const printWindow = window.open('', '_blank');
             printWindow.document.write(
                 `<!DOCTYPE html>
@@ -324,7 +299,7 @@
                                 } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
                             </div>
                         </div>
-                        ${printContent.innerHTML}
+                        ${contentHtml}
                     </div>
                     <script>
                         window.onload = function() {
@@ -384,7 +359,6 @@
         _reformatOrderInfoForPrint(printContent) {
             const cards = printContent.querySelectorAll('.card');
             let orderInfoCard = null;
-            
             for (const card of cards) {
                 const text = card.textContent || '';
                 if ((text.includes('订单号') || text.includes('ID Pesanan')) &&
@@ -394,9 +368,8 @@
                     break;
                 }
             }
-            
             if (!orderInfoCard) return;
-            
+
             const lines = [];
             const paragraphs = orderInfoCard.querySelectorAll('p');
             if (paragraphs.length > 0) {
@@ -417,7 +390,7 @@
                     }
                 }
             }
-            
+
             const fieldMap = {
                 '订单号': 'order_id',
                 'ID Pesanan': 'order_id',
@@ -438,7 +411,7 @@
                 '剩余本金': 'remaining_principal',
                 'Sisa Pokok': 'remaining_principal'
             };
-            
+
             const fields = {};
             for (const line of lines) {
                 for (const [label, key] of Object.entries(fieldMap)) {
@@ -449,7 +422,7 @@
                     }
                 }
             }
-            
+
             const lang = Utils.lang;
             const labels = {
                 order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
@@ -462,7 +435,7 @@
                 monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
                 remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
             };
-            
+
             const infoItems = [
                 { label: labels.order_id, value: fields.order_id || '-' },
                 { label: labels.customer_name, value: fields.customer_name || '-' },
@@ -474,7 +447,7 @@
                 { label: labels.monthly_interest, value: fields.monthly_interest || '-' },
                 { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
             ];
-            
+
             const gridHtml = `
                 <div class="order-info-grid">
                     ${infoItems.map(item => `
@@ -485,7 +458,7 @@
                     `).join('')}
                 </div>
             `;
-            
+
             const otherContent = [];
             const children = orderInfoCard.children;
             for (const child of children) {
@@ -499,19 +472,17 @@
                     break;
                 }
             }
-            
+
             orderInfoCard.innerHTML = gridHtml + otherContent.join('');
         }
     };
 
-    // 挂载命名空间
     JF.PrintPage = PrintPage;
-
     if (window.APP) {
         window.APP.printCurrentPage = PrintPage.printCurrentPage.bind(PrintPage);
     } else {
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v3.3 清除顶部冗余行，页脚居中');
+    console.log('✅ JF.PrintPage v3.4 正则清理顶部无用文本，页脚居中');
 })();
