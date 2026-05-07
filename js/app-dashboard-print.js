@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.3 订单详情打印优化（智能识别订单信息）
+// app-dashboard-print.js - v2.4 订单列表打印优化（打印完整订单列表）
 
 'use strict';
 
@@ -23,7 +23,7 @@
                 '.dashboard-v2 .dash-sidebar', '.dash-sidebar', '.sidebar', '#dashSidebar',
                 '.dashboard-v2 .dash-topbar', '.dash-topbar', '.topbar', '#dashTopbar',
                 '.sidebar-overlay', '#sidebarOverlay', '.toolbar', '.no-print',
-                '.action-row', 'button', '.form-actions', '.form-grid', '.lang-toggle',
+                'button', '.form-actions', '.form-grid', '.lang-toggle',
                 '.lang-btn-side', '#hamburgerBtn', '[onclick*="toggleLanguage"]',
                 '[onclick*="invalidateDashboardCache"]', '[onclick*="forceRecovery"]',
                 '.modal-overlay', '.modal-content', '[id*="loadMore"]', '.sidebar-footer',
@@ -52,6 +52,9 @@
                     card.remove();
                 }
             }
+
+            // ========== 订单列表页面特殊处理：移除操作行，保留完整订单数据 ==========
+            this._cleanOrderTableForPrint(printContent);
 
             // ========== 订单详情页面特殊处理：将订单信息改为3列3行网格 ==========
             this._reformatOrderInfoForPrint(printContent);
@@ -173,9 +176,23 @@
                             font-weight: 500;
                             color: #1e293b;
                         }
+                        /* 订单列表打印专用：缩略表头 */
+                        .order-table th {
+                            font-size: 7.5pt;
+                            padding: 4px 6px;
+                            white-space: nowrap;
+                        }
+                        .order-table td {
+                            font-size: 7.5pt;
+                            padding: 4px 6px;
+                        }
+                        .info-bar {
+                            padding: 4px 8px;
+                            margin-bottom: 8px;
+                            font-size: 8pt;
+                        }
                         @media print {
-                            /* margin-top: 0 隐藏浏览器自动生成的顶部打印戳记（日期+标题行） */
-                            @page { size: A4; margin: 0mm 8mm 8mm 8mm; }
+                            @page { size: A4 landscape; margin: 0mm 8mm 8mm 8mm; }
                             body { margin: 0; padding: 0; }
                             .print-container { padding: 5mm 0 0 0; }
                             .card { break-inside: avoid; }
@@ -213,12 +230,44 @@
             printWindow.document.close();
         },
 
+        // ========== 新增：清理订单列表表格，移除操作行 ==========
+        _cleanOrderTableForPrint(printContent) {
+            // 查找订单表格
+            const orderTable = printContent.querySelector('.order-table');
+            if (!orderTable) return;
+
+            // 移除所有操作行 (action-row)
+            const actionRows = orderTable.querySelectorAll('.action-row');
+            actionRows.forEach(row => row.remove());
+
+            // 移除加载更多行
+            const loadMoreRow = orderTable.querySelector('#loadMoreRow');
+            if (loadMoreRow) loadMoreRow.remove();
+
+            // 确保表格结构完整（每行数据后面不再有操作行）
+            const tbody = orderTable.querySelector('tbody');
+            if (!tbody) return;
+
+            // 清理可能残留的空行或异常行
+            const allRows = tbody.querySelectorAll('tr');
+            allRows.forEach(row => {
+                // 移除任何包含按钮的行（双重保险）
+                const buttons = row.querySelectorAll('button, .btn, .action-buttons, .action-label');
+                if (buttons.length > 0) {
+                    row.remove();
+                }
+            });
+
+            // 移除表格中可能存在的操作按钮容器
+            const actionButtons = orderTable.querySelectorAll('.action-buttons');
+            actionButtons.forEach(el => el.remove());
+        },
+
         // 重新格式化订单信息为3列3行网格
         _reformatOrderInfoForPrint(printContent) {
             // 查找包含订单信息的卡片
             const cards = printContent.querySelectorAll('.card');
             let orderInfoCard = null;
-            let orderInfoHtml = '';
             
             for (const card of cards) {
                 const text = card.textContent || '';
@@ -327,6 +376,7 @@
                             <div class="label">${Utils.escapeHtml(item.label)}</div>
                             <div class="value">${Utils.escapeHtml(item.value)}</div>
                         </div>
+                    </div>
                     `).join('')}
                 </div>
             `;
@@ -362,5 +412,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.3 订单详情打印优化（智能识别订单信息，3列3行网格布局）');
+    console.log('✅ JF.PrintPage v2.4 订单列表打印优化（完整订单列表，移除操作行）');
 })();
