@@ -151,10 +151,10 @@
                             border-bottom: 1px solid #e2e8f0;
                             padding-bottom: 4px;
                         }
-                        /* 3列网格样式 */
+                        /* 2列网格样式 */
                         .order-info-grid {
                             display: grid;
-                            grid-template-columns: repeat(3, 1fr);
+                            grid-template-columns: repeat(2, 1fr);
                             gap: 12px 24px;
                             margin-bottom: 20px;
                         }
@@ -213,7 +213,7 @@
             printWindow.document.close();
         },
 
-       _reformatOrderInfoForPrint(printContent) {
+_reformatOrderInfoForPrint(printContent) {
     const cards = printContent.querySelectorAll('.card');
     let orderInfoCard = null;
 
@@ -251,14 +251,14 @@
         }
     }
 
-    // 字段映射，新增手机号码
+    // 字段映射，包含手机号码
     const fieldMap = {
         '订单号': 'order_id',
         'ID Pesanan': 'order_id',
         '客户姓名': 'customer_name',
         'Nama Nasabah': 'customer_name',
-        '手机号码': 'phone',              // 新增
-        'Nomor Telepon': 'phone',         // 新增印尼语
+        '手机号码': 'phone',
+        'Nomor Telepon': 'phone',
         '质押物名称': 'collateral_name',
         'Nama Jaminan': 'collateral_name',
         '贷款金额': 'loan_amount',
@@ -292,7 +292,7 @@
     const labels = {
         order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
         customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
-        phone: lang === 'id' ? 'Nomor Telepon' : '手机号码',   // 新增
+        phone: lang === 'id' ? 'Nomor Telepon' : '手机号码',
         collateral_name: lang === 'id' ? 'Nama Jaminan' : '质押物名称',
         loan_amount: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
         repayment_type: lang === 'id' ? 'Jenis Cicilan' : '还款方式',
@@ -302,11 +302,11 @@
         remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
     };
 
-    // 10 个项目，按 2 列 5 行排列（先左列后右列）
+    // 10个项目，两列5行
     const infoItems = [
         { label: labels.order_id, value: fields.order_id || '-' },
         { label: labels.customer_name, value: fields.customer_name || '-' },
-        { label: labels.phone, value: fields.phone || '-' },               // 新增
+        { label: labels.phone, value: fields.phone || '-' },
         { label: labels.collateral_name, value: fields.collateral_name || '-' },
         { label: labels.loan_amount, value: fields.loan_amount || '-' },
         { label: labels.repayment_type, value: fields.repayment_type || '-' },
@@ -316,8 +316,9 @@
         { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
     ];
 
+    // 使用已有的 order-detail-grid 类名
     const gridHtml = `
-        <div class="order-info-grid">
+        <div class="order-detail-grid">
             ${infoItems.map(item => `
                 <div class="info-item">
                     <div class="label">${Utils.escapeHtml(item.label)}</div>
@@ -327,7 +328,7 @@
         </div>
     `;
 
-    // 保留缴费记录等内容
+    // 保留缴费记录等其他内容
     const otherContent = [];
     const children = orderInfoCard.children;
     for (const child of children) {
