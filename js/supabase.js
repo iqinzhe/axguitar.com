@@ -923,18 +923,13 @@
         },
 
         // ---------- 订单核心 ----------
-        // ---------- 订单核心 ----------
-// 【v2.6 修复】排除练习门店（内联过滤，避免 await 中断查询链）
 async getOrders(filters={}, from, to) {
     const profile = await this.getCurrentProfile();
-    // 【v2.6】先获取练习门店 ID，避免 await 中断 Supabase 查询链
     const practiceIds = (profile?.role === 'admin') ? await this._getPracticeStoreIds() : [];
     let q = supabaseClient.from('orders').select('*', { count:'exact' });
-    // 管理员排除练习门店
     if (practiceIds.length > 0) {
         q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
     }
-    // 非管理员只看本店
     if(profile?.role !== 'admin' && profile?.store_id) {
         q = q.eq('store_id', profile.store_id);
     }
@@ -977,10 +972,10 @@ async getOrders(filters={}, from, to) {
             if(profile.role==='admin' && !orderData.store_id) throw new Error(Utils.t('store_operation'));
             if(!targetStoreId) throw new Error(Utils.lang==='id'?'Toko tidak ditemukan':'未找到门店');
 
-            // 【v2.5 新增】典当期限（仅灵活还款）
+            // 典当期限（仅灵活还款）
             const pawnTermMonths = (repaymentType === 'flexible' && orderData.pawn_term_months) 
                 ? parseInt(orderData.pawn_term_months) : null;
-            // 【v2.5 新增】典当到期日
+            // 典当到期日
             const pawnDueDate = (repaymentType === 'flexible' && pawnTermMonths)
                 ? Utils.calculatePawnDueDate(nowDate, pawnTermMonths) : null;
 
@@ -1017,7 +1012,7 @@ async getOrders(filters={}, from, to) {
                         agreed_service_fee_rate: serviceFeePercent / 100, fixed_paid_months: 0,
                         overdue_days: 0, liquidation_status: 'normal',
                         max_extension_months: orderData.max_extension_months || 10,
-                        // 【v2.5 新增】典当期限和到期日
+                        // 典当期限和到期日
                         pawn_term_months: pawnTermMonths,
                         pawn_due_date: pawnDueDate,
                         fund_status: 'deployed',
@@ -1420,18 +1415,14 @@ async getOrders(filters={}, from, to) {
             return true;
         },
 
-        // 【v2.6 修复】排除练习门店（内联过滤，避免 await 中断查询链）
 async getAllPayments() {
     if (!supabaseClient) return [];
     const profile = await this.getCurrentProfile();
-    // 【v2.6】先获取练习门店 ID，避免 await 中断 Supabase 查询链
     const practiceIds = (profile?.role === 'admin') ? await this._getPracticeStoreIds() : [];
     let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
-    // 管理员排除练习门店
     if (practiceIds.length > 0) {
         orderQuery = orderQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
     }
-    // 非管理员只看本店
     if(profile?.role !== 'admin' && profile?.store_id) {
         orderQuery = orderQuery.eq('store_id', profile.store_id);
     }
