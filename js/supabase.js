@@ -1,7 +1,7 @@
-// supabase.js - v2.4 管理员排除练习门店数据
+// supabase.js - v2.5 典当期限功能
 // 1. 管理员可查看所有门店数据（排除练习门店）
-// 2. 管理员可为总部创建支出
-// 3. 新增 excludePracticeStores 通用过滤函数
+// 2. 新增 pawn_term_months / pawn_due_date 字段支持
+// 3. excludePracticeStores 通用过滤函数
 
 'use strict';
 
@@ -129,34 +129,21 @@
     // 自动应用门店过滤（管理员不过滤，可查看所有门店）
     const applyStoreFilter = (query, profile, storeIdParam) => {
         if(!profile) return query;
-        // 管理员不应用店铺过滤，可查看所有数据
         if(profile.role === 'admin') {
-            // 如果指定了特定门店ID，则过滤
             if(storeIdParam && storeIdParam !== 'all') {
                 return query.eq('store_id', storeIdParam);
             }
             return query;
         }
-        // 非管理员：只能看自己门店
         if(profile.store_id) return query.eq('store_id', profile.store_id);
         return query;
     };
 
-    // ==================== 【v2.4 新增】排除练习门店的通用过滤函数 ====================
-    /**
-     * 自动排除练习门店数据（仅对管理员生效）
-     * 规则：管理员默认排除 is_practice=true 的门店，除非显式指定 includePractice=true
-     * @param {Object} query - Supabase 查询对象
-     * @param {Object} profile - 当前用户 profile
-     * @param {Object} [options] - 可选配置
-     * @param {boolean} [options.includePractice=false] - 是否包含练习门店
-     * @returns {Object} 修改后的查询对象
-     */
+    // ==================== 排除练习门店的通用过滤函数 ====================
     const excludePracticeStores = async (query, profile, options = {}) => {
         if (!profile) return query;
         const { includePractice = false } = options;
         
-        // 只有管理员才需要排除练习门店（非管理员只能看自己门店，不涉及此问题）
         if (profile.role === 'admin' && !includePractice) {
             const practiceIds = await SupabaseAPI._getPracticeStoreIds();
             if (practiceIds.length > 0) {
@@ -431,7 +418,6 @@
                 const { data: bl } = await supabaseClient.from('blacklist').select('customer_id');
                 const blackIds = (bl||[]).map(b=>b.customer_id);
                 let q = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-                // 管理员不过滤门店，可查看所有客户
                 if(profile?.role !== 'admin' && profile?.store_id) q = q.eq('store_id', profile.store_id);
                 if(blackIds.length) q = q.not('id','in',`(${blackIds.join(',')})`);
                 const { data } = await q;
@@ -495,7 +481,6 @@
                     stores:store_id (name, code)
                 ), blacklisted_by_profile:blacklisted_by (name)
             `).order('blacklisted_at', { ascending: false });
-            // 管理员不过滤门店
             if(profile?.role !== 'admin' && filterStoreId) q = q.eq('customers.store_id', filterStoreId);
             const { data, error } = await q;
             if(error) throw error;
@@ -633,22 +618,19 @@
             return true;
         },
 
-        // ========== 支出管理（修复版 - 支持管理员/总部） ==========
+        // ========== 支出管理 ==========
         async addExpense(expenseData) {
             if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             
-            // 确定门店ID
             let targetStoreId = expenseData.store_id || profile?.store_id;
             
-            // 如果是管理员且没有指定门店，获取总部门店ID
             if (profile?.role === 'admin' && !targetStoreId) {
                 const stores = await this.getAllStores();
                 const hqStore = stores.find(s => s.code === 'STORE_000');
                 if (hqStore) {
                     targetStoreId = hqStore.id;
                 } else {
-                    // 如果没有总部门店，返回友好错误
                     throw new Error(Utils.lang === 'id' 
                         ? 'Tidak dapat menentukan toko. Silakan pilih toko terlebih dahulu.'
                         : '无法确定门店，请先选择门店');
@@ -659,7 +641,6 @@
                 throw new Error(Utils.lang === 'id' ? 'ID toko tidak ditemukan' : '门店ID缺失');
             }
             
-            // 确保 amount 是数字
             const amountValue = typeof expenseData.amount === 'number' 
                 ? expenseData.amount 
                 : parseFloat(expenseData.amount);
@@ -668,7 +649,6 @@
                 throw new Error(Utils.t('invalid_amount'));
             }
             
-            // 只传必要字段，让数据库自动处理默认值
             const insertData = {
                 store_id: targetStoreId,
                 expense_date: expenseData.expense_date || Utils.getLocalToday(),
@@ -678,8 +658,6 @@
                 payment_method: expenseData.payment_method || 'cash',
                 created_by: profile?.id
             };
-            
-            console.log('[addExpense] 插入数据:', insertData);
             
             try {
                 const { data, error } = await supabaseClient
@@ -693,7 +671,6 @@
                     throw error;
                 }
                 
-                // 记录现金流
                 try {
                     await this.recordCashFlow({
                         store_id: targetStoreId,
@@ -751,7 +728,6 @@
         },
 
         // ===== 完整业务方法 =====
-        // 【v2.4 修改】排除练习门店
         async getFullCapitalAnalysis(storeIdParam = null) {
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
@@ -763,7 +739,6 @@
             let injectionQuery = supabaseClient.from('capital_injections')
                 .select('*').eq('is_voided', false);
             injectionQuery = applyStoreFilter(injectionQuery, profile, targetStoreId);
-            // 【v2.4】管理员排除练习门店
             injectionQuery = await excludePracticeStores(injectionQuery, profile);
             const { data: injections } = await injectionQuery;
 
@@ -777,7 +752,6 @@
             let orderQuery = supabaseClient.from('orders')
                 .select('loan_amount, status, store_id').eq('status', 'active');
             orderQuery = applyStoreFilter(orderQuery, profile, targetStoreId);
-            // 【v2.4】管理员排除练习门店
             orderQuery = await excludePracticeStores(orderQuery, profile);
             const { data: activeOrders } = await orderQuery;
             const deployedCapital = (activeOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
@@ -949,13 +923,10 @@
         },
 
         // ---------- 订单核心 ----------
-        // 【v2.4 修改】排除练习门店
         async getOrders(filters={}, from, to) {
             const profile = await this.getCurrentProfile();
             let q = supabaseClient.from('orders').select('*', { count:'exact' });
-            // 【v2.4】管理员排除练习门店
             q = await excludePracticeStores(q, profile);
-            // 非管理员只看本店
             if(profile?.role !== 'admin' && profile?.store_id) {
                 q = q.eq('store_id', profile.store_id);
             }
@@ -983,6 +954,7 @@
             return { order, payments: data };
         },
 
+        // 【v2.5 修改】新增 pawn_term_months / pawn_due_date 字段
         async createOrder(orderData) {
             if(!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
@@ -997,6 +969,13 @@
             if(profile.role==='admin' && !orderData.store_id) throw new Error(Utils.t('store_operation'));
             if(!targetStoreId) throw new Error(Utils.lang==='id'?'Toko tidak ditemukan':'未找到门店');
 
+            // 【v2.5 新增】典当期限（仅灵活还款）
+            const pawnTermMonths = (repaymentType === 'flexible' && orderData.pawn_term_months) 
+                ? parseInt(orderData.pawn_term_months) : null;
+            // 【v2.5 新增】典当到期日
+            const pawnDueDate = (repaymentType === 'flexible' && pawnTermMonths)
+                ? Utils.calculatePawnDueDate(nowDate, pawnTermMonths) : null;
+
             let retryCount=0, lastError=null, newOrder=null;
             while(retryCount<5){
                 try {
@@ -1007,7 +986,10 @@
                             Utils.roundMonthlyPayment(Utils.calculateFixedMonthlyPayment(orderData.loan_amount, agreedInterestRate, repaymentTerm));
                     }
                     const monthlyInterest = orderData.loan_amount * agreedInterestRate;
-                    const nextDueDate = this.calculateNextDueDate(nowDate, 0);
+                    // 首次到期日：灵活还款使用典当到期日，固定还款使用首次还款日
+                    const nextDueDate = (repaymentType === 'flexible' && pawnDueDate) 
+                        ? pawnDueDate 
+                        : this.calculateNextDueDate(nowDate, 0);
                     const newOrderData = {
                         order_id: orderId, customer_name: orderData.customer_name,
                         customer_ktp: orderData.customer_ktp, customer_phone: orderData.customer_phone,
@@ -1027,6 +1009,9 @@
                         agreed_service_fee_rate: serviceFeePercent / 100, fixed_paid_months: 0,
                         overdue_days: 0, liquidation_status: 'normal',
                         max_extension_months: orderData.max_extension_months || 10,
+                        // 【v2.5 新增】典当期限和到期日
+                        pawn_term_months: pawnTermMonths,
+                        pawn_due_date: pawnDueDate,
                         fund_status: 'deployed',
                         created_at: nowStr(), updated_at: nowStr()
                     };
@@ -1036,7 +1021,8 @@
                         throw error;
                     }
                     newOrder = data;
-                    console.log('✅ 订单创建成功: ' + orderId);
+                    console.log('✅ 订单创建成功: ' + orderId + 
+                        (pawnTermMonths ? ` | 典当期限: ${pawnTermMonths}个月 | 到期日: ${pawnDueDate}` : ''));
                     break;
                 } catch(err){
                     if(err.code==='23505' && retryCount<4){ retryCount++; await new Promise(r=>setTimeout(r,100*(retryCount+1))); continue; }
@@ -1426,14 +1412,11 @@
             return true;
         },
 
-        // 【v2.4 修改】排除练习门店
         async getAllPayments() {
             if (!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
             let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
-            // 【v2.4】管理员排除练习门店
             orderQuery = await excludePracticeStores(orderQuery, profile);
-            // 非管理员只看本店
             if(profile?.role !== 'admin' && profile?.store_id) {
                 orderQuery = orderQuery.eq('store_id', profile.store_id);
             }
@@ -1505,7 +1488,6 @@
             return true;
         },
 
-        // 【v2.4 修改】排除练习门店（三个子查询）
         async getCashFlowSummary(storeIdParam = null) {
             if (!supabaseClient) return { cash: { balance: 0 }, bank: { balance: 0 }, total: { balance: 0 }, netProfit: { operatingIncome: 0, operatingExpense: 0 }, total_injected_capital: 0, deployed_capital: 0, available_capital: 0 };
             
@@ -1521,7 +1503,6 @@
                 }
             }
             
-            // 子查询1：现金流记录
             let query = supabaseClient.from('cash_flow_records')
                 .select('direction, amount, source_target, flow_type, store_id')
                 .eq('is_voided', false);
@@ -1531,7 +1512,6 @@
             } else if (!isAdmin && profile?.store_id) {
                 query = query.eq('store_id', profile.store_id);
             }
-            // 【v2.4】管理员排除练习门店
             if (isAdmin && !targetStoreId) {
                 query = await excludePracticeStores(query, profile);
             }
@@ -1553,7 +1533,6 @@
                 else if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') operatingIncome += amt;
             }
 
-            // 子查询2：资本注入
             let injectionQuery = supabaseClient.from('capital_injections')
                 .select('amount, source')
                 .eq('is_voided', false)
@@ -1564,7 +1543,6 @@
             } else if (!isAdmin && profile?.store_id) {
                 injectionQuery = injectionQuery.eq('store_id', profile.store_id);
             }
-            // 【v2.4】管理员排除练习门店
             if (isAdmin && !targetStoreId) {
                 injectionQuery = await excludePracticeStores(injectionQuery, profile);
             }
@@ -1572,7 +1550,6 @@
             const { data: injections } = await injectionQuery;
             const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
 
-            // 子查询3：在押资金
             let deployedQuery = supabaseClient.from('orders')
                 .select('loan_amount')
                 .eq('status', 'active');
@@ -1582,7 +1559,6 @@
             } else if (!isAdmin && profile?.store_id) {
                 deployedQuery = deployedQuery.eq('store_id', profile.store_id);
             }
-            // 【v2.4】管理员排除练习门店
             if (isAdmin && !targetStoreId) {
                 deployedQuery = await excludePracticeStores(deployedQuery, profile);
             }
@@ -1806,5 +1782,5 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
-    console.log('✅ JF.Supabase v2.4 管理员排除练习门店数据（excludePracticeStores 通用函数）');
+    console.log('✅ JF.Supabase v2.5 典当期限功能（pawn_term_months / pawn_due_date）');
 })();
