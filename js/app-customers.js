@@ -1,4 +1,4 @@
-// app-customers.js - v2.5 费用卡片样式优化 + 双语详细分级说明
+// app-customers.js - v2.6 典当期限功能 + 卡片顺序调整
 
 'use strict';
 
@@ -561,7 +561,7 @@
             }
         },
 
-        // ==================== 为客户创建订单（费用卡片优化版） ====================
+        // ==================== 为客户创建订单（v2.6 典当期限 + 卡片顺序调整） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -589,7 +589,97 @@
                     ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
                     : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
 
-                document.getElementById("app").innerHTML = `<div class="page-header"><h2>📝 ${t('create_order')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card"><div class="form-section"><div class="form-section-title"><span class="section-icon">👤</span> ${t('customer_info')}</div><div class="info-display"><div class="info-display-item"><span class="info-label">${t('customer_id')}</span><span class="info-value">${Utils.escapeHtml(customer.customer_id || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('customer_name')}</span><span class="info-value">${Utils.escapeHtml(customer.name)}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_number')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_number || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('phone')}</span><span class="info-value">${Utils.escapeHtml(customer.phone)}</span></div><div class="info-display-item"><span class="info-label">${t('occupation')}</span><span class="info-value">${occupationDisplay}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_address')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('living_address')}</span><span class="info-value">${customer.living_same_as_ktp !== false ? t('same_as_ktp') : Utils.escapeHtml(customer.living_address || '-')}</span></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💎</span> ${t('collateral_info')}</div><div class="order-first-row"><div class="form-group"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div><div class="form-group"><label>${t('collateral_note')}</label><input id="collateralNote" placeholder="${lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年'}"></div><div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()"></div><div class="form-group"><label>${t('loan_source')}</label><div class="payment-method-selector compact"><label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label></div></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💰</span> ${t('fee_details')}</div><div class="fee-cards-row"><div class="fee-card"><div class="fee-card-label">📋 ${t('admin_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Biaya Tetap' : '固定收费'})</small></div><div class="fee-card-body"><input type="text" id="adminFeeInput" value="0" class="amount-input" readonly></div><div class="fee-card-hint">${adminFeeHintText}</div></div><div class="fee-card"><div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div><div class="fee-card-body"><select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">${Utils.getServiceFeePercentOptions(2)}</select><input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()"></div><div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div></div></div><div class="payment-method-row"><span class="payment-method-label">📥 ${t('fee_payment_method')}</span><div class="payment-method-selector compact" style="padding:0;"><label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ${t('bank')}</label></div><div class="payment-method-hint">💡 ${t('fee_payment_hint')}</div></div><div class="form-group interest-rate-group"><label>📈 ${t('interest_rate_select')}</label><select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">📅</span> ${t('repayment_method')}</div><div class="repayment-cards-row"><div class="repayment-card selected" id="flexibleCard" onclick="document.getElementById('flexibleRadio').checked=true;APP.toggleRepaymentForm('flexible')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="flexibleRadio" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">💰 ${t('flexible_repayment')}</span></div><div class="repayment-card-desc">${t('flexible_desc')}</div><div class="repayment-card-note">${t('max_tenor')}</div></div><div class="repayment-card" id="fixedCard" onclick="document.getElementById('fixedRadio').checked=true;APP.toggleRepaymentForm('fixed')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="fixedRadio" value="fixed" onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">📅 ${t('fixed_repayment')}</span></div><div class="repayment-card-desc">${t('fixed_desc')}</div><div class="repayment-card-note">${lang === 'id' ? 'Pilihan 1-10 bulan' : '可选1-10个月'}</div></div><div id="flexibleMaxMonthsCard" class="repayment-card extension-card"><div class="repayment-card-header"><span class="repayment-card-title">📅 ${t('max_extension')}</span></div><div class="extension-select"><select id="maxExtensionMonths"><option value="6">6 ${t('month')}</option><option value="10" selected>10 ${t('month')}</option><option value="12">12 ${t('month')}</option><option value="24">24 ${t('month')}</option></select></div><div class="repayment-card-note extension-note">${t('extension_limit')}</div></div></div><div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form"><div class="form-grid"><div class="form-group"><label>📅 ${t('term_months')}</label><select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">${Utils.getRepaymentTermOptions(5)}</select></div><div class="form-group"><label>💰 ${t('monthly_payment')}</label><input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()"><div class="form-hint">${t('monthly_payment_rounded')}</div></div></div></div></div><div class="form-section"><div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div><div class="form-actions"><button onclick="APP.saveOrderForCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success" id="saveOrderBtn">💾 ${t('save')}</button><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('cancel')}</button></div></div></div>`;
+                // 【v2.6 新增】典当期限提示
+                const pawnTermHintText = lang === 'id'
+                    ? 'Pilih jangka waktu gadai (1-10 bulan). Tanggal jatuh tempo akan dihitung otomatis.'
+                    : '选择典当期限（1-10个月）。到期日将自动计算。';
+
+                document.getElementById("app").innerHTML = `
+                    <div class="page-header"><h2>📝 ${t('create_order')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div>
+                    <div class="card">
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">👤</span> ${t('customer_info')}</div>
+                            <div class="info-display">
+                                <div class="info-display-item"><span class="info-label">${t('customer_id')}</span><span class="info-value">${Utils.escapeHtml(customer.customer_id || '-')}</span></div>
+                                <div class="info-display-item"><span class="info-label">${t('customer_name')}</span><span class="info-value">${Utils.escapeHtml(customer.name)}</span></div>
+                                <div class="info-display-item"><span class="info-label">${t('ktp_number')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_number || '-')}</span></div>
+                                <div class="info-display-item"><span class="info-label">${t('phone')}</span><span class="info-value">${Utils.escapeHtml(customer.phone)}</span></div>
+                                <div class="info-display-item"><span class="info-label">${t('occupation')}</span><span class="info-value">${occupationDisplay}</span></div>
+                                <div class="info-display-item"><span class="info-label">${t('ktp_address')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</span></div>
+                                <div class="info-display-item"><span class="info-label">${t('living_address')}</span><span class="info-value">${customer.living_same_as_ktp !== false ? t('same_as_ktp') : Utils.escapeHtml(customer.living_address || '-')}</span></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">💎</span> ${t('collateral_info')}</div>
+                            <div class="order-first-row">
+                                <div class="form-group"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div>
+                                <div class="form-group"><label>${t('collateral_note')}</label><input id="collateralNote" placeholder="${lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年'}"></div>
+                                <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()"></div>
+                                <div class="form-group"><label>${t('loan_source')}</label><div class="payment-method-selector compact"><label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label></div></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">💰</span> ${t('fee_details')}</div>
+                            <div class="fee-cards-row">
+                                <div class="fee-card">
+                                    <div class="fee-card-label">📋 ${t('admin_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Biaya Tetap' : '固定收费'})</small></div>
+                                    <div class="fee-card-body"><input type="text" id="adminFeeInput" value="0" class="amount-input" readonly></div>
+                                    <div class="fee-card-hint">${adminFeeHintText}</div>
+                                </div>
+                                <div class="fee-card">
+                                    <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
+                                    <div class="fee-card-body"><select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">${Utils.getServiceFeePercentOptions(2)}</select><input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()"></div>
+                                    <div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div>
+                                </div>
+                            </div>
+                            <div class="payment-method-row">
+                                <span class="payment-method-label">📥 ${t('fee_payment_method')}</span>
+                                <div class="payment-method-selector compact" style="padding:0;"><label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ${t('bank')}</label></div>
+                                <div class="payment-method-hint">💡 ${t('fee_payment_hint')}</div>
+                            </div>
+                            <div class="form-group interest-rate-group">
+                                <label>📈 ${t('interest_rate_select')}</label>
+                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">📅</span> ${t('repayment_method')}</div>
+                            <div class="repayment-cards-row">
+                                <!-- ========== 灵活还款卡片 ========== -->
+                                <div class="repayment-card selected" id="flexibleCard" onclick="document.getElementById('flexibleRadio').checked=true;APP.toggleRepaymentForm('flexible')">
+                                    <div class="repayment-card-header"><input type="radio" name="repaymentType" id="flexibleRadio" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">💰 ${t('flexible_repayment')}</span></div>
+                                    <div class="repayment-card-desc">${t('flexible_desc')}</div>
+                                </div>
+                                <!-- ========== 【v2.6 新增】典当期限卡片（紧跟灵活还款） ========== -->
+                                <div class="repayment-card extension-card" id="pawnTermCard">
+                                    <div class="repayment-card-header"><span class="repayment-card-title">📅 ${lang === 'id' ? 'Jangka Waktu Gadai' : '典当期限'}</span></div>
+                                    <div class="extension-select">
+                                        <select id="pawnTermSelect" onchange="Utils.updatePawnDueDateDisplay()">
+                                            ${Utils.getPawnTermOptions()}
+                                        </select>
+                                    </div>
+                                    <div class="repayment-card-note extension-note" id="pawnDueDateDisplay"></div>
+                                    <div class="repayment-card-note" style="font-size:11px;color:var(--text-muted);margin-top:4px;">${pawnTermHintText}</div>
+                                </div>
+                                <!-- ========== 固定还款卡片 ========== -->
+                                <div class="repayment-card" id="fixedCard" onclick="document.getElementById('fixedRadio').checked=true;APP.toggleRepaymentForm('fixed')">
+                                    <div class="repayment-card-header"><input type="radio" name="repaymentType" id="fixedRadio" value="fixed" onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">📅 ${t('fixed_repayment')}</span></div>
+                                    <div class="repayment-card-desc">${t('fixed_desc')}</div>
+                                    <div class="repayment-card-note">${lang === 'id' ? 'Pilihan 1-10 bulan' : '可选1-10个月'}</div>
+                                </div>
+                                <div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form">
+                                    <div class="form-grid">
+                                        <div class="form-group"><label>📅 ${t('term_months')}</label><select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">${Utils.getRepaymentTermOptions(5)}</select></div>
+                                        <div class="form-group"><label>💰 ${t('monthly_payment')}</label><input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()"><div class="form-hint">${t('monthly_payment_rounded')}</div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div>
+                            <div class="form-actions"><button onclick="APP.saveOrderForCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success" id="saveOrderBtn">💾 ${t('save')}</button><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('cancel')}</button></div>
+                        </div>
+                    </div>`;
                 const amountInput = document.getElementById("amount"); if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
                 const serviceFeeInput = document.getElementById("serviceFeeInput"); if (serviceFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(serviceFeeInput);
                 const monthlyPaymentInput = document.getElementById("monthlyPaymentInput"); if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
@@ -601,6 +691,7 @@
             }
         },
 
+        // 【v2.6 修改】新增典当期限校验
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -619,7 +710,20 @@
             const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 8;
             const repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked'); 
             const repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
-            let repaymentTerm = null, monthlyFixedPayment = null, maxExtensionMonths = 10;
+            let repaymentTerm = null, monthlyFixedPayment = null;
+            
+            // 【v2.6 新增】典当期限（仅灵活还款）
+            let pawnTermMonths = null;
+            if (repaymentType === 'flexible') {
+                const pawnTermSelect = document.getElementById('pawnTermSelect');
+                pawnTermMonths = pawnTermSelect ? parseInt(pawnTermSelect.value) : null;
+                if (!pawnTermMonths || pawnTermMonths <= 0) {
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
+                    Utils.toast.warning(lang === 'id' ? 'Silakan pilih Jangka Waktu Gadai terlebih dahulu' : '请先选择典当期限');
+                    return;
+                }
+            }
+            
             if (repaymentType === 'fixed') { 
                 repaymentTerm = parseInt(document.getElementById("repaymentTermSelect")?.value) || 5; 
                 const monthlyStr = document.getElementById("monthlyPaymentInput").value; 
@@ -628,8 +732,6 @@
                     const monthlyRate = agreedInterestRate / 100; 
                     monthlyFixedPayment = Utils.roundMonthlyPayment(Utils.calculateFixedMonthlyPayment(amount, monthlyRate, repaymentTerm)); 
                 } 
-            } else { 
-                maxExtensionMonths = parseInt(document.getElementById('maxExtensionMonths')?.value) || 10; 
             }
             const loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash'; 
             const fullCollateralName = collateralNote ? `${collateral} (${collateralNote})` : collateral;
@@ -641,12 +743,21 @@
                 const customer = await SUPABASE.getCustomer(customerId); 
                 const blacklistData = await SUPABASE.checkBlacklist(customer.id); 
                 if (blacklistData.isBlacklisted) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } Utils.toast.error(lang === 'id' ? 'Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '此客户已被拉黑，无法创建新订单。', 4000); return; }
-                const orderData = { customer: { name: customer.name, ktp: customer.ktp_number || '', phone: customer.phone, address: customer.ktp_address || customer.address || '' }, collateral_name: fullCollateralName, loan_amount: amount, notes, customer_id: customerId, store_id: storeId, admin_fee: adminFee, service_fee_percent: serviceFeePercent, service_fee_amount: serviceFee, agreed_interest_rate: agreedInterestRate, repayment_type: repaymentType, repayment_term: repaymentTerm, monthly_fixed_payment: monthlyFixedPayment, max_extension_months: maxExtensionMonths };
+                const orderData = { 
+                    customer: { name: customer.name, ktp: customer.ktp_number || '', phone: customer.phone, address: customer.ktp_address || customer.address || '' }, 
+                    collateral_name: fullCollateralName, loan_amount: amount, notes, customer_id: customerId, store_id: storeId, 
+                    admin_fee: adminFee, service_fee_percent: serviceFeePercent, service_fee_amount: serviceFee, 
+                    agreed_interest_rate: agreedInterestRate, repayment_type: repaymentType, repayment_term: repaymentTerm, 
+                    monthly_fixed_payment: monthlyFixedPayment, 
+                    // 【v2.5 新增】典当期限
+                    pawn_term_months: pawnTermMonths,
+                    max_extension_months: 10
+                };
                 const newOrder = await Order.create(orderData);
                 if (adminFee > 0) await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee).catch(e => console.error("管理费收取失败:", e));
                 if (serviceFee > 0) await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod).catch(e => console.error("服务费收取失败:", e));
                 if (amount > 0) { const desc = lang === 'id' ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'}` : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'}`; await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, desc).catch(e => console.error("当金发放记录失败:", e)); }
-                const successMsg = repaymentType === 'fixed' ? (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`) : (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nMaksimal perpanjangan: ${maxExtensionMonths} bulan` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n最长可延期: ${maxExtensionMonths}个月`);
+                const successMsg = repaymentType === 'fixed' ? (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`) : (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nJangka Waktu Gadai: ${pawnTermMonths} bulan` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n典当期限: ${pawnTermMonths}个月`);
                 Utils.toast.success(successMsg, 5000);
                 document.getElementById("collateral").value = ''; 
                 document.getElementById("collateralNote").value = ''; 
@@ -664,6 +775,10 @@
                 if (interestSelect) interestSelect.value = '8';
                 const flexibleRadio = document.getElementById("flexibleRadio"); 
                 if (flexibleRadio) { flexibleRadio.checked = true; APP.toggleRepaymentForm('flexible'); }
+                const pawnTermEl = document.getElementById('pawnTermSelect');
+                if (pawnTermEl) pawnTermEl.value = '';
+                const pawnDisplay = document.getElementById('pawnDueDateDisplay');
+                if (pawnDisplay) pawnDisplay.innerHTML = '';
                 APP.recalculateAllFees(); 
                 const monthlyInput = document.getElementById("monthlyPaymentInput"); 
                 if (monthlyInput) { monthlyInput.value = '0'; delete monthlyInput.dataset.manual; }
@@ -685,13 +800,11 @@
             const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
             if (serviceFeeInput && !serviceFeeInput.dataset.manual) { const result = Utils.calculateServiceFee(amount, percent); serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount); }
             if (serviceFeeSelect) { const group = serviceFeeSelect.closest('.form-group') || serviceFeeSelect.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; }
-            // 同步更新服务费提示
             this._updateServiceFeeHint(amount, percent);
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
             if (repaymentType === 'fixed') { const rateSelect = document.getElementById('agreedInterestRateSelect'); const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08; const termSelect = document.getElementById('repaymentTermSelect'); const months = termSelect ? parseInt(termSelect.value) : 5; if (amount > 0 && months > 0) { const monthly = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months); const rounded = Utils.roundMonthlyPayment(monthly); const monthlyInput = document.getElementById('monthlyPaymentInput'); if (monthlyInput && !monthlyInput.dataset.manual) { monthlyInput.value = Utils.formatNumberWithCommas(rounded); } } }
         },
 
-        // ========== 提取服务费提示更新逻辑为独立方法 ==========
         _updateServiceFeeHint(amount, percent) {
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
@@ -729,7 +842,6 @@
                 input.value = Utils.formatNumberWithCommas(result.amount);
                 input.dataset.manual = 'true';
             }
-            // 使用独立方法更新提示
             this._updateServiceFeeHint(amount, percent);
             if (select) {
                 const group = select.closest('.form-group') || select.parentElement;
@@ -741,7 +853,19 @@
 
         onMonthlyPaymentManualChange() { const input = document.getElementById('monthlyPaymentInput'); if (input) input.dataset.manual = 'true'; },
 
-        toggleRepaymentForm(value) { const fixedForm = document.getElementById('fixedRepaymentForm'); const flexibleCard = document.getElementById('flexibleMaxMonthsCard'); const flexibleDiv = document.getElementById('flexibleCard'); const fixedDiv = document.getElementById('fixedCard'); if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none'; if (flexibleCard) flexibleCard.style.display = value === 'flexible' ? 'block' : 'none'; if (flexibleDiv) flexibleDiv.classList.toggle('selected', value === 'flexible'); if (fixedDiv) fixedDiv.classList.toggle('selected', value === 'fixed'); if (value === 'fixed') APP.recalculateAllFees(); },
+        // 【v2.6 修改】切换还款方式时同步控制典当期限卡片显示
+        toggleRepaymentForm(value) { 
+            const fixedForm = document.getElementById('fixedRepaymentForm'); 
+            const pawnTermCard = document.getElementById('pawnTermCard'); 
+            const flexibleCard = document.getElementById('flexibleCard'); 
+            const fixedCard = document.getElementById('fixedCard'); 
+            if (fixedForm) fixedForm.style.display = value === 'fixed' ? 'block' : 'none'; 
+            // 典当期限卡片：仅灵活还款时显示
+            if (pawnTermCard) pawnTermCard.style.display = value === 'flexible' ? 'block' : 'none'; 
+            if (flexibleCard) flexibleCard.classList.toggle('selected', value === 'flexible'); 
+            if (fixedCard) fixedCard.classList.toggle('selected', value === 'fixed'); 
+            if (value === 'fixed') APP.recalculateAllFees(); 
+        },
 
         // ==================== 客户订单列表 ====================
         async showCustomerOrders(customerId) {
@@ -838,5 +962,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.5 费用卡片样式优化 + 双语详细分级说明');
+    console.log('✅ JF.CustomersPage v2.6 典当期限功能 + 卡片顺序调整');
 })();
