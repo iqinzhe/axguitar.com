@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.5 修复员工支出上限阈值
+// app-dashboard-expenses.js - v2.6 修复管理员总部支出
 
 'use strict';
 
@@ -68,7 +68,7 @@
                             <td class="text-center">${methodText}</td>
                             <td class="desc-cell">${Utils.escapeHtml(e.description || '-')}</td>
                             ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
-                            <td class="text-center" style="white-space:nowrap;">${actionHtml}</tr>
+                            <td class="text-center" style="white-space:nowrap;">${actionHtml}</td>
                         </tr>`;
                     }
                 }
@@ -90,7 +90,7 @@
                                 <span class="info-bar-icon">🎓</span>
                                 <div class="info-bar-content">
                                     <strong>${lang === 'id' ? 'Mode Latihan' : '练习模式'}</strong><br>
-                                    ${lang === 'id' 
+                                    ${lang === 'id'
                                         ? 'Anda sedang dalam mode latihan. Semua data pengeluaran akan dicatat dan dapat dihapus nanti.'
                                         : '您当前处于练习模式。所有支出数据将被记录，后续可删除。'}
                                 </div>
@@ -108,7 +108,7 @@
                             <span class="info-bar-icon">💡</span>
                             <div class="info-bar-content">
                                 <strong>${lang === 'id' ? 'Batas Pengeluaran Staf' : '员工支出限额'}</strong><br>
-                                ${lang === 'id' 
+                                ${lang === 'id'
                                     ? `Anda hanya dapat mencatat pengeluaran hingga ${Utils.formatCurrency(maxAmount)} per transaksi. Pengeluaran di atas batas ini memerlukan persetujuan manajer toko.`
                                     : `您每笔支出上限为 ${Utils.formatCurrency(maxAmount)}，超出部分需店长审批。`}
                             </div>
@@ -210,7 +210,7 @@
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         },
 
-        // ==================== 添加支出（v2.5 - 员工金额上限检查） ====================
+        // ==================== 添加支出（v2.6 - 管理员支持总部支出） ====================
         async addExpense() {
             const lang = Utils.lang;
             const expenseDate = document.getElementById("expenseDate").value || new Date().toISOString().split('T')[0];
@@ -220,13 +220,13 @@
             const description = document.getElementById("expenseDescription").value;
             const paymentMethod = document.getElementById("expenseMethod").value;
 
-            if (!category) { 
-                Utils.toast.warning(lang === 'id' ? 'Masukkan kategori' : '请输入类别'); 
-                return; 
+            if (!category) {
+                Utils.toast.warning(lang === 'id' ? 'Masukkan kategori' : '请输入类别');
+                return;
             }
-            if (isNaN(amount) || amount <= 0) { 
-                Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额'); 
-                return; 
+            if (isNaN(amount) || amount <= 0) {
+                Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
+                return;
             }
 
             // 【v2.5 新增】员工支出金额上限检查
@@ -247,46 +247,41 @@
 
             try {
                 const profile = await SUPABASE.getCurrentProfile();
-                
-                // 验证门店
-                if (!profile?.store_id) {
+                const isAdmin = profile?.role === 'admin';
+
+                // ✅ 仅非管理员且无关联门店时报错 —— 管理员允许无门店，由后端自动分配到总部（STORE_000）
+                if (!isAdmin && !profile?.store_id) {
                     throw new Error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
                 }
-                
-                // 获取门店信息（仅用于日志，不拦截）
-                const stores = await SUPABASE.getAllStores();
-                const myStore = stores.find(s => s.id === profile.store_id);
-                
+
                 console.log('[addExpense] 保存支出:', {
-                    store_id: profile.store_id,
-                    store_name: myStore?.name,
-                    is_practice: myStore?.is_practice,
+                    role: profile.role,
+                    store_id: profile.store_id || '(管理员无门店，将自动分配总部)',
                     category: category,
                     amount: amount,
                     payment_method: paymentMethod
                 });
-                
-                // 直接调用 SUPABASE.addExpense（RLS 策略已允许所有门店）
+
+                // 调用后端，管理员若 store_id 为空则传 undefined，让 backend 自动使用总部
                 const result = await SUPABASE.addExpense({
-                    store_id: profile.store_id,
+                    store_id: profile.store_id || undefined,
                     expense_date: expenseDate,
                     category: category,
                     amount: amount,
                     description: description || null,
                     payment_method: paymentMethod
                 });
-                
+
                 console.log('[addExpense] 保存成功:', result);
-                
+
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
-                
+
                 // 刷新页面
                 await ExpensesPage.showExpenses();
-                
+
             } catch (error) {
                 console.error("[addExpense] 保存失败:", error);
-                
-                // 输出完整错误信息
+
                 let errorMsg = error.message;
                 if (error.details) {
                     errorMsg += '\n' + (lang === 'id' ? 'Detail: ' : '详情: ') + error.details;
@@ -297,7 +292,7 @@
                 if (error.code) {
                     errorMsg += '\n' + (lang === 'id' ? 'Kode: ' : '代码: ') + error.code;
                 }
-                
+
                 Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + errorMsg : '保存失败：' + errorMsg);
             } finally {
                 if (addBtn) {
@@ -324,10 +319,10 @@
                     Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat diubah' : '支出已平账，不可修改');
                     return;
                 }
-                
+
                 const oldModal = document.getElementById('editExpenseModal');
                 if (oldModal) oldModal.remove();
-                
+
                 const modalHtml = `
                     <div id="editExpenseModal" class="modal-overlay">
                         <div class="modal-content" style="max-width: 450px;">
@@ -362,23 +357,23 @@
                         </div>
                     </div>
                 `;
-                
+
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
-                
+
                 const amountInput = document.getElementById('editExpenseAmount');
                 if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
-                
+
             } catch (error) {
                 console.error("editExpense error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal mengubah: ' + error.message : '修改失败：' + error.message);
             }
         },
-        
+
         closeEditExpenseModal: function() {
             const modal = document.getElementById('editExpenseModal');
             if (modal) modal.remove();
         },
-        
+
         // ==================== 保存编辑后的支出（带现金流验证） ====================
         async saveEditedExpense(expenseId) {
             const lang = Utils.lang;
@@ -387,14 +382,14 @@
                 Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengubah pengeluaran' : '仅管理员可修改支出记录');
                 return;
             }
-            
+
             const expenseDate = document.getElementById('editExpenseDate')?.value;
             const category = document.getElementById('editExpenseCategory')?.value.trim();
             const amountStr = document.getElementById('editExpenseAmount')?.value || '0';
             const amount = Utils.parseNumberFromCommas(amountStr);
             const description = document.getElementById('editExpenseDescription')?.value.trim();
             const paymentMethod = document.getElementById('editExpenseMethod')?.value;
-            
+
             if (!category) {
                 Utils.toast.warning(lang === 'id' ? 'Kategori harus diisi' : '类别必须填写');
                 return;
@@ -403,44 +398,40 @@
                 Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
                 return;
             }
-            
+
             const saveBtn = document.getElementById('saveEditExpenseBtn');
             if (saveBtn) {
                 saveBtn.disabled = true;
                 saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
             }
-            
+
             try {
                 const client = SUPABASE.getClient();
-                // 获取旧记录（包含 store_id, payment_method 等）
                 const { data: oldExpense, error: fetchError } = await client
                     .from('expenses').select('amount, payment_method, category, store_id').eq('id', expenseId).single();
                 if (fetchError) throw fetchError;
-                
-                // 查询关联的现金流记录（未作废）
+
                 const { data: relatedFlows, error: flowError } = await client
                     .from('cash_flow_records')
                     .select('id, amount')
                     .eq('reference_id', expenseId)
                     .eq('flow_type', 'expense')
                     .eq('is_voided', false);
-                    
+
                 if (flowError) {
                     console.warn('查询关联现金流失败:', flowError.message);
                 }
-                
+
                 let flowSum = 0;
                 if (relatedFlows && relatedFlows.length > 0) {
                     flowSum = relatedFlows.reduce((s, f) => s + (f.amount || 0), 0);
                 }
-                
+
                 const oldAmount = oldExpense.amount || 0;
-                const epsilon = 1; // 容忍1印尼盾误差
-                
-                // 如果现金流总和与旧支出金额不一致，则自动修复
+                const epsilon = 1;
+
                 if (Math.abs(flowSum - oldAmount) > epsilon) {
                     console.warn('⚠️ 现金流记录与支出记录不一致，将自动修复。旧金额:', oldAmount, '现金流总和:', flowSum);
-                    // 作废旧的现金流记录
                     if (relatedFlows && relatedFlows.length > 0) {
                         for (const flow of relatedFlows) {
                             await client.from('cash_flow_records')
@@ -448,7 +439,6 @@
                                 .eq('id', flow.id);
                         }
                     }
-                    // 更新支出记录
                     const updates = {
                         expense_date: expenseDate,
                         category: category,
@@ -459,8 +449,7 @@
                     };
                     const { error: updateError } = await client.from('expenses').update(updates).eq('id', expenseId);
                     if (updateError) throw updateError;
-                    
-                    // 插入新的现金流记录
+
                     await SUPABASE.recordCashFlow({
                         store_id: oldExpense.store_id,
                         flow_type: 'expense',
@@ -470,10 +459,9 @@
                         description: category,
                         reference_id: expenseId
                     });
-                    
+
                     Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah dan disinkronkan' : '支出已修改并同步现金流');
                 } else {
-                    // 现金流一致，调用原有更新方法（内部会处理差异）
                     const updates = {
                         expense_date: expenseDate,
                         category: category,
@@ -483,24 +471,24 @@
                         updated_at: Utils.getLocalDateTime()
                     };
                     await SUPABASE.updateExpenseWithCashFlow(expenseId, updates);
-                    
+
                     const amountChanged = oldAmount !== amount;
                     if (amountChanged) {
                         const diff = amount - oldAmount;
-                        const diffText = diff > 0 
+                        const diffText = diff > 0
                             ? `${lang === 'id' ? 'naik' : '增加'} ${Utils.formatCurrency(diff)}`
                             : `${lang === 'id' ? 'turun' : '减少'} ${Utils.formatCurrency(Math.abs(diff))}`;
-                        Utils.toast.success(lang === 'id' 
+                        Utils.toast.success(lang === 'id'
                             ? `Pengeluaran berhasil diubah (${diffText})`
                             : `支出已修改 (${diffText})`);
                     } else {
                         Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah' : '支出已修改');
                     }
                 }
-                
+
                 ExpensesPage.closeEditExpenseModal();
                 await ExpensesPage.showExpenses();
-                
+
             } catch (error) {
                 console.error("saveEditedExpense error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal menyimpan: ' + error.message : '保存失败：' + error.message);
@@ -520,31 +508,31 @@
                 Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat menghapus pengeluaran' : '仅管理员可删除支出记录');
                 return;
             }
-            
+
             const client = SUPABASE.getClient();
             const { data: expense, error: fetchError } = await client
                 .from('expenses').select('category, amount, is_reconciled').eq('id', expenseId).single();
-            
+
             if (fetchError) {
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data pengeluaran' : '加载支出数据失败');
                 return;
             }
-            
+
             if (expense.is_reconciled) {
                 Utils.toast.warning(lang === 'id' ? 'Pengeluaran sudah direkonsiliasi, tidak dapat dihapus' : '支出已平账，不可删除');
                 return;
             }
-            
+
             const confirmMsg = lang === 'id'
                 ? `⚠️ Hapus pengeluaran ini?\n\nKategori: ${expense.category}\nJumlah: ${Utils.formatCurrency(expense.amount)}\n\nData terkait di arus kas juga akan dihapus.`
                 : `⚠️ 删除此支出记录？\n\n类别: ${expense.category}\n金额: ${Utils.formatCurrency(expense.amount)}\n\n关联的现金流记录也将被删除。`;
-            
+
             const confirmed = await Utils.toast.confirm(confirmMsg);
             if (!confirmed) return;
-            
+
             try {
                 await SUPABASE.deleteExpenseWithCashFlow(expenseId);
-                
+
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran dan arus kas terkait telah dihapus' : '支出及关联现金流已删除');
                 await ExpensesPage.showExpenses();
             } catch (error) {
@@ -642,5 +630,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.5 修复完成（员工支出上限 IDR 5,000,000）');
+    console.log('✅ JF.ExpensesPage v2.6 完成（管理员总部支出打通）');
 })();
