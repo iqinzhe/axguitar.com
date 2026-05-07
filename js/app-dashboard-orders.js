@@ -71,8 +71,8 @@
                 if (o.status === 'active' && !isAdmin) {
                     actionButtons += `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
                 }
-                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`;
-                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print')}</button>`;
+                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
+                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
                 if (PERMISSION.canDeleteOrder()) {
                     actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
                 }
@@ -109,7 +109,7 @@
                     <h2>📋 ${t('order_list')}</h2>
                     <div class="header-actions">
                         <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
-                        <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button>
+                        <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print_order_list')}</button>
                     </div>
                 </div>
                 <div class="toolbar no-print">
@@ -189,8 +189,8 @@
                 if (o.status === 'active' && !isAdmin) {
                     actionButtons += `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
                 }
-                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`;
-                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print')}</button>`;
+                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
+                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
                 if (PERMISSION.canDeleteOrder()) {
                     actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
                 }
