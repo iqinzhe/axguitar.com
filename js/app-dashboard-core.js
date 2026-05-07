@@ -1,5 +1,4 @@
-// app-dashboard-core.js - v2.5 优化版
-// 验证 + 集成工作日历 + 仪表盘数据分批加载 + 登出时清理资源
+// app-dashboard-core.js - v2.6 修复仪表盘练习门店数据泄露
 
 'use strict';
 
@@ -453,12 +452,21 @@
             if (badgeSpan) badgeSpan.textContent = activeOrders || '';
         },
 
+        // 【v2.6 修复】排除练习门店
         async _getActiveOrdersCount() {
             try {
                 const profile = await SUPABASE.getCurrentProfile();
                 const client = SUPABASE.getClient();
                 let q = client.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'active');
-                if (profile?.role !== 'admin' && profile?.store_id) q = q.eq('store_id', profile.store_id);
+                if (profile?.role !== 'admin' && profile?.store_id) {
+                    q = q.eq('store_id', profile.store_id);
+                } else if (profile?.role === 'admin') {
+                    // 【v2.6】管理员排除练习门店
+                    const practiceIds = await SUPABASE._getPracticeStoreIds();
+                    if (practiceIds.length > 0) {
+                        q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                    }
+                }
                 const { count } = await q;
                 return count || 0;
             } catch (e) { return 0; }
@@ -623,7 +631,7 @@
             console.log('[Dashboard] 详细信息已更新');
         },
 
-        // ========== 仪表盘渲染（核心） ==========
+        // ========== 仪表盘渲染（核心）==========
         async originalRenderDashboard() {
             if (!AUTH.isLoggedIn()) {
                 await this.renderLogin();
@@ -646,10 +654,15 @@
                 const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
                 const kpiReport = await JF.Cache.get(kpiCacheKey, async () => {
                     const client = SUPABASE.getClient();
+                    // 【v2.6】提前获取练习门店 ID
                     const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
+                    
                     const applyFilter = function(q) {
-                        if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                        else if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                        if (isAdmin && practiceIds.length > 0) {
+                            q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                        } else if (!isAdmin && storeId) {
+                            q = q.eq('store_id', storeId);
+                        }
                         return q;
                     };
 
@@ -678,6 +691,7 @@
                                 const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
                                 let q = client.from('orders').select('*', { count: 'exact', head: true }).gte('created_at', monthStart);
                                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                                else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const r = await q;
                                 return r.count || 0;
                             } catch (e) { return 0; }
@@ -687,6 +701,7 @@
                                 const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
                                 let q = client.from('orders').select('loan_amount').gte('created_at', monthStart);
                                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                                else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const r = await q;
                                 return (r.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
                             } catch (e) { return 0; }
@@ -695,14 +710,17 @@
                             try {
                                 let injQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
                                 if (!isAdmin && storeId) injQuery = injQuery.eq('store_id', storeId);
+                                else if (isAdmin && practiceIds.length > 0) injQuery = injQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const injResult = await injQuery;
                                 return (injResult.data || []).reduce((s, i) => s + (i.amount || 0), 0);
                             } catch (e) { return 0; }
                         })(),
                         (async () => {
                             try {
+                                // 【v2.6 修复】排除练习门店
                                 let depQuery = client.from('orders').select('loan_amount').eq('status', 'active');
                                 if (!isAdmin && storeId) depQuery = depQuery.eq('store_id', storeId);
+                                else if (isAdmin && practiceIds.length > 0) depQuery = depQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const depResult = await depQuery;
                                 return (depResult.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
                             } catch (e) { return 0; }
@@ -1140,7 +1158,6 @@
             </div>
         </div>`;
     
-    // 绑定输入框聚焦样式
     const inputs = document.querySelectorAll('#username, #password');
     inputs.forEach(input => {
         input.addEventListener('focus', function() {
@@ -1313,5 +1330,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.5 优化版（登出时清理网络监控资源）');
+    console.log('✅ JF.DashboardCore v2.6 修复仪表盘练习门店数据泄露');
 })();
