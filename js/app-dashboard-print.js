@@ -121,7 +121,7 @@
 
                         @page {
                             size: A4 portrait;
-                            margin: 12mm 10mm 12mm 10mm;
+                            margin: 12mm 10mm 12mm 10mm;  /* 上 12mm，右 10mm，下 12mm，左 10mm */
                             /* 禁用浏览器默认页眉页脚 */
                             @top-left { content: none; }
                             @top-center { content: none; }
