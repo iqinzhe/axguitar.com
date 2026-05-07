@@ -923,20 +923,28 @@
         },
 
         // ---------- 订单核心 ----------
-        async getOrders(filters={}, from, to) {
-            const profile = await this.getCurrentProfile();
-            let q = supabaseClient.from('orders').select('*', { count:'exact' });
-            q = await excludePracticeStores(q, profile);
-            if(profile?.role !== 'admin' && profile?.store_id) {
-                q = q.eq('store_id', profile.store_id);
-            }
-            if(filters.status && filters.status!=='all') q = q.eq('status', filters.status);
-            if(from!==undefined && to!==undefined) q = q.range(from, to);
-            q = q.order('created_at', { ascending: false });
-            const { data, error, count } = await q;
-            if(error) throw error;
-            return { data: data||[], totalCount: count||0 };
-        },
+        // ---------- 订单核心 ----------
+// 【v2.6 修复】排除练习门店（内联过滤，避免 await 中断查询链）
+async getOrders(filters={}, from, to) {
+    const profile = await this.getCurrentProfile();
+    // 【v2.6】先获取练习门店 ID，避免 await 中断 Supabase 查询链
+    const practiceIds = (profile?.role === 'admin') ? await this._getPracticeStoreIds() : [];
+    let q = supabaseClient.from('orders').select('*', { count:'exact' });
+    // 管理员排除练习门店
+    if (practiceIds.length > 0) {
+        q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+    }
+    // 非管理员只看本店
+    if(profile?.role !== 'admin' && profile?.store_id) {
+        q = q.eq('store_id', profile.store_id);
+    }
+    if(filters.status && filters.status!=='all') q = q.eq('status', filters.status);
+    if(from!==undefined && to!==undefined) q = q.range(from, to);
+    q = q.order('created_at', { ascending: false });
+    const { data, error, count } = await q;
+    if(error) throw error;
+    return { data: data||[], totalCount: count||0 };
+},
 
         async getOrdersLegacy(filters) { const res = await this.getOrders(filters); return res.data; },
 
@@ -1412,14 +1420,21 @@
             return true;
         },
 
-        async getAllPayments() {
-            if (!supabaseClient) return [];
-            const profile = await this.getCurrentProfile();
-            let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
-            orderQuery = await excludePracticeStores(orderQuery, profile);
-            if(profile?.role !== 'admin' && profile?.store_id) {
-                orderQuery = orderQuery.eq('store_id', profile.store_id);
-            }
+        // 【v2.6 修复】排除练习门店（内联过滤，避免 await 中断查询链）
+async getAllPayments() {
+    if (!supabaseClient) return [];
+    const profile = await this.getCurrentProfile();
+    // 【v2.6】先获取练习门店 ID，避免 await 中断 Supabase 查询链
+    const practiceIds = (profile?.role === 'admin') ? await this._getPracticeStoreIds() : [];
+    let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
+    // 管理员排除练习门店
+    if (practiceIds.length > 0) {
+        orderQuery = orderQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+    }
+    // 非管理员只看本店
+    if(profile?.role !== 'admin' && profile?.store_id) {
+        orderQuery = orderQuery.eq('store_id', profile.store_id);
+    }
             const { data: accessibleOrders, error: orderError } = await orderQuery;
             if (orderError) return [];
             const accessibleOrderIds = accessibleOrders.map(o => o.id);
