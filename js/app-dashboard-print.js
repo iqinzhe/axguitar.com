@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v3.8 精简版，配合 responsive.css 打印样式，彻底清除页眉
+// app-dashboard-print.js - v3.9 精简版，配合 responsive.css 打印样式，彻底清除页眉和垃圾内容
 
 'use strict';
 
@@ -51,7 +51,7 @@
                 }
             }
 
-            // ========== TreeWalker 清理残留文本（安全网） ==========
+            // ========== TreeWalker 清理残留文本（增强版 - 彻底清除垃圾内容） ==========
             const walker = document.createTreeWalker(
                 printContent,
                 NodeFilter.SHOW_TEXT
@@ -62,8 +62,21 @@
                 const text = node.nodeValue;
                 if (!text) continue;
                 const trimmed = text.trim();
-                if (/^(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?\s+)?JF! by Gadai\s*-\s*(?:打印|Cetak)\s*$/i.test(trimmed) ||
-                    /^(?:JF! by Gadai\s*-\s*(?:打印|Cetak))/i.test(trimmed)) {
+                
+                // 增强的匹配规则，覆盖所有格式的垃圾内容
+                const isGarbage = (
+                    // 原有规则：时间戳 + JF! by Gadai - 打印/Cetak
+                    /^(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?\s+)?JF!\s+by\s+Gadai\s*-\s*(?:打印|Cetak)\s*$/i.test(trimmed) ||
+                    /^JF!\s+by\s+Gadai\s*-\s*(?:打印|Cetak)/i.test(trimmed) ||
+                    // 新增规则：日期 JF! by Gadai - 打印（各种日期格式）
+                    /^\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?\s+JF!\s*by\s+Gadai\s*-\s*(?:打印|Cetak)\s*$/i.test(trimmed) ||
+                    // 日期单独出现（格式：2026/5/7 08:09）
+                    /^\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?\s*$/.test(trimmed) ||
+                    // 仅 JF! by Gadai
+                    /^JF!\s+by\s+Gadai\s*$/.test(trimmed)
+                );
+
+                if (isGarbage) {
                     const parent = node.parentNode;
                     if (parent && parent.childNodes.length === 1) {
                         nodesToRemove.push(parent);
@@ -327,5 +340,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v3.8 精简版，配合 responsive.css 彻底清除页眉');
+    console.log('✅ JF.PrintPage v3.9 精简版，彻底清除页眉和垃圾内容');
 })();
