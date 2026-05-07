@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v3.2 页脚居中、清除顶部多余行及页脚时间残留
+// app-dashboard-print.js - v3.3 彻底清除顶部“日期+JF! by Gadai - 打印”冗余行
 
 'use strict';
 
@@ -28,7 +28,6 @@
                 '[onclick*="invalidateDashboardCache"]', '[onclick*="forceRecovery"]',
                 '.modal-overlay', '.modal-content', '[id*="loadMore"]', '.sidebar-footer',
                 '.nav-badge', '.header-actions', '.page-header button',
-                // 清除可能被克隆的页脚/页眉时间元素
                 '.print-footer', '.footer-date', '.print-header',
                 '.print-date-time', '.current-time'
             ];
@@ -56,23 +55,36 @@
                 }
             }
 
-            // ========== 强力清除顶部“JF! by Gadai - 打印”及类似文本 ==========
-            const allElements = printContent.querySelectorAll('*');
-            for (const el of allElements) {
-                // 移除仅包含该文本的元素（文本节点/父元素）
-                if (el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE) {
-                    if (el.textContent.includes('JF! by Gadai - 打印')) {
-                        el.remove();
-                        continue;
+            // ========== 强力移除顶部无用行：遍历所有文本节点 ==========
+            const walker = document.createTreeWalker(
+                printContent,
+                NodeFilter.SHOW_TEXT,
+                {
+                    acceptNode: function(node) {
+                        // 跳过空文本
+                        if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                        // 只关心包含目标关键词的文本节点
+                        if (node.nodeValue.includes('JF! by Gadai - 打印') ||
+                            node.nodeValue.includes('JF! by Gadai - Cetak')) {
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                        return NodeFilter.FILTER_REJECT;
                     }
                 }
-                // 移除纯时间格式文本（如 2026/5/7 08:09:04）的剩余元素
-                const text = el.innerText || '';
-                if (text.match(/^\d{4}\/\d{1,2}\/\d{1,2} \d{2}:\d{2}(:\d{2})?$/) &&
-                    el.children.length === 0) {
-                    el.remove();
+            );
+
+            const nodesToRemove = [];
+            while (walker.nextNode()) {
+                const textNode = walker.currentNode;
+                // 找到该文本节点的父元素，如果父元素只有它一个子节点，直接移除父元素；否则清空文本
+                const parent = textNode.parentNode;
+                if (parent && parent.childNodes.length === 1) {
+                    nodesToRemove.push(parent);
+                } else if (parent) {
+                    textNode.nodeValue = '';
                 }
             }
+            nodesToRemove.forEach(el => el.remove());
 
             // ========== 订单详情页面特殊处理：将订单信息改为3列3行网格 ==========
             this._reformatOrderInfoForPrint(printContent);
@@ -114,10 +126,9 @@
                     <style>
                         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-                        /* ===== 页面设置：A4竖版，页脚居中（品牌 + 页码） ===== */
                         @page {
                             size: A4 portrait;
-                            margin: 12mm 10mm 12mm 10mm; /* 上下边距一致 */
+                            margin: 12mm 10mm 12mm 10mm;
                             @bottom-center {
                                 content: "JF! by Gadai — ${footerBrandText} — " counter(page) " / " counter(pages);
                                 font-size: 7.5pt;
@@ -135,7 +146,6 @@
                             padding: 0;
                         }
 
-                        /* ===== 页眉 ===== */
                         .print-header {
                             text-align: center;
                             margin-bottom: 8px;
@@ -160,7 +170,6 @@
                             white-space: nowrap;
                         }
 
-                        /* ===== 卡片 ===== */
                         .card {
                             border: 1px solid #e2e8f0;
                             border-radius: 4px;
@@ -182,7 +191,6 @@
                             margin-bottom: 6px;
                         }
 
-                        /* ===== 表格 ===== */
                         table {
                             width: 100%;
                             border-collapse: collapse;
@@ -220,7 +228,6 @@
                             overflow: hidden;
                         }
 
-                        /* 列宽 */
                         .col-id, .col-id-narrow   { width: 9%; }
                         .col-date                  { width: 10%; white-space: nowrap; }
                         .col-status, .col-status-wide { width: 9%; }
@@ -290,7 +297,6 @@
                         .info-display         { grid-template-columns: repeat(2, 1fr) !important; border: 1px solid #ccc !important; }
                         .form-grid, .form-grid.form-grid--3, .form-grid.form-grid--4 { grid-template-columns: repeat(2, 1fr) !important; gap: 6px !important; }
 
-                        /* 隐藏杂项 */
                         .no-print, .toolbar, .action-buttons, .action-row,
                         .modal-overlay, .form-actions, .lang-toggle,
                         .btn-backup-primary, .btn-restore, .btn-blacklist,
@@ -332,18 +338,180 @@
             printWindow.document.close();
         },
 
-        _fillEmptyRows(printContent) { /* 同前，不变 */ },
-        _limitCellLines(printContent) { /* 同前，不变 */ },
-        _reformatOrderInfoForPrint(printContent) { /* 同前，不变 */ }
+        _fillEmptyRows(printContent) {
+            const MIN_ROWS = 15;
+            const tables = printContent.querySelectorAll('table');
+            for (const table of tables) {
+                const tbody = table.querySelector('tbody');
+                if (!tbody) continue;
+                const rows = tbody.querySelectorAll('tr:not(.print-empty-rows)');
+                const count = rows.length;
+                if (count >= MIN_ROWS) continue;
+                const firstRow = rows[0] || table.querySelector('thead tr');
+                if (!firstRow) continue;
+                const colCount = firstRow.querySelectorAll('th, td').length;
+                const needed = MIN_ROWS - count;
+                for (let i = 0; i < needed; i++) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'print-empty-rows';
+                    for (let j = 0; j < colCount; j++) {
+                        const td = document.createElement('td');
+                        td.innerHTML = '&nbsp;';
+                        tr.appendChild(td);
+                    }
+                    tbody.appendChild(tr);
+                }
+            }
+        },
+
+        _limitCellLines(printContent) {
+            const tds = printContent.querySelectorAll('td');
+            for (const td of tds) {
+                if (td.querySelector('.cell-text')) continue;
+                if (td.closest('.print-empty-rows')) continue;
+                const inner = td.innerHTML.trim();
+                if (!inner || inner === '&nbsp;') continue;
+                if (td.children.length === 0 || (td.children.length === 1 && td.children[0].tagName === 'SPAN')) {
+                    const span = document.createElement('span');
+                    span.className = 'cell-text';
+                    span.innerHTML = inner;
+                    td.innerHTML = '';
+                    td.appendChild(span);
+                }
+            }
+        },
+
+        _reformatOrderInfoForPrint(printContent) {
+            const cards = printContent.querySelectorAll('.card');
+            let orderInfoCard = null;
+            
+            for (const card of cards) {
+                const text = card.textContent || '';
+                if ((text.includes('订单号') || text.includes('ID Pesanan')) &&
+                    (text.includes('客户姓名') || text.includes('Nama Nasabah')) &&
+                    (text.includes('贷款金额') || text.includes('Jumlah Pinjaman'))) {
+                    orderInfoCard = card;
+                    break;
+                }
+            }
+            
+            if (!orderInfoCard) return;
+            
+            const lines = [];
+            const paragraphs = orderInfoCard.querySelectorAll('p');
+            if (paragraphs.length > 0) {
+                for (const p of paragraphs) {
+                    const text = p.innerText.trim();
+                    if (text && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
+                        lines.push(text);
+                    }
+                }
+            } else {
+                const text = orderInfoCard.innerText;
+                const textLines = text.split('\n');
+                for (const line of textLines) {
+                    const trimmed = line.trim();
+                    if (trimmed && !trimmed.includes('缴费记录') && !trimmed.includes('订单详情') &&
+                        !trimmed.includes('📄') && !trimmed.includes('💰') && !trimmed.includes('打印自')) {
+                        lines.push(trimmed);
+                    }
+                }
+            }
+            
+            const fieldMap = {
+                '订单号': 'order_id',
+                'ID Pesanan': 'order_id',
+                '客户姓名': 'customer_name',
+                'Nama Nasabah': 'customer_name',
+                '质押物名称': 'collateral_name',
+                'Nama Jaminan': 'collateral_name',
+                '贷款金额': 'loan_amount',
+                'Jumlah Pinjaman': 'loan_amount',
+                '还款方式': 'repayment_type',
+                'Jenis Cicilan': 'repayment_type',
+                '状态': 'status',
+                'Status': 'status',
+                '约定利率': 'interest_rate',
+                'Suku Bunga': 'interest_rate',
+                '月利息': 'monthly_interest',
+                'Bunga Bulanan': 'monthly_interest',
+                '剩余本金': 'remaining_principal',
+                'Sisa Pokok': 'remaining_principal'
+            };
+            
+            const fields = {};
+            for (const line of lines) {
+                for (const [label, key] of Object.entries(fieldMap)) {
+                    if (line.startsWith(label) || line.includes(label + ' ')) {
+                        let value = line.replace(label, '').replace(/^[:：\s]+/, '').trim();
+                        if (value) fields[key] = value;
+                        break;
+                    }
+                }
+            }
+            
+            const lang = Utils.lang;
+            const labels = {
+                order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
+                customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
+                collateral_name: lang === 'id' ? 'Nama Jaminan' : '质押物名称',
+                loan_amount: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
+                repayment_type: lang === 'id' ? 'Jenis Cicilan' : '还款方式',
+                status: lang === 'id' ? 'Status' : '状态',
+                interest_rate: lang === 'id' ? 'Suku Bunga' : '约定利率',
+                monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
+                remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
+            };
+            
+            const infoItems = [
+                { label: labels.order_id, value: fields.order_id || '-' },
+                { label: labels.customer_name, value: fields.customer_name || '-' },
+                { label: labels.collateral_name, value: fields.collateral_name || '-' },
+                { label: labels.loan_amount, value: fields.loan_amount || '-' },
+                { label: labels.repayment_type, value: fields.repayment_type || '-' },
+                { label: labels.status, value: fields.status || '-' },
+                { label: labels.interest_rate, value: fields.interest_rate || '-' },
+                { label: labels.monthly_interest, value: fields.monthly_interest || '-' },
+                { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
+            ];
+            
+            const gridHtml = `
+                <div class="order-info-grid">
+                    ${infoItems.map(item => `
+                        <div class="info-item">
+                            <div class="label">${Utils.escapeHtml(item.label)}</div>
+                            <div class="value">${Utils.escapeHtml(item.value)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            const otherContent = [];
+            const children = orderInfoCard.children;
+            for (const child of children) {
+                if (child.tagName === 'H3' && (child.innerText.includes('缴费记录') || child.innerText.includes('Riwayat Pembayaran'))) {
+                    otherContent.push(child.outerHTML);
+                    let next = child.nextElementSibling;
+                    while (next && (!next.tagName === 'H3' || !next.innerText.includes('订单'))) {
+                        otherContent.push(next.outerHTML);
+                        next = next.nextElementSibling;
+                    }
+                    break;
+                }
+            }
+            
+            orderInfoCard.innerHTML = gridHtml + otherContent.join('');
+        }
     };
 
-    // 挂载
+    // 挂载命名空间
     JF.PrintPage = PrintPage;
+
     if (window.APP) {
         window.APP.printCurrentPage = PrintPage.printCurrentPage.bind(PrintPage);
     } else {
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v3.2 页脚居中，清除顶部/页脚时间冗余');
+    console.log('✅ JF.PrintPage v3.3 清除顶部冗余行，页脚居中');
 })();
