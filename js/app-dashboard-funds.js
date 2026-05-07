@@ -1,5 +1,6 @@
-// app-dashboard-funds.js - v2.1 (JF 命名空间) 
+// app-dashboard-funds.js - v2.2 管理员排除练习门店数据
 // v2.1: 员工仅可查看本人操作的资金流水记录
+// v2.2: 管理员查看资金流水时排除练习门店
 
 'use strict';
 
@@ -35,6 +36,7 @@
         },
 
         // ==================== 构建资金流水页面 HTML（纯内容） ====================
+        // 【v2.2 修改】管理员排除练习门店
         async buildCashFlowPageHTML() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -46,9 +48,15 @@
                 const client = SUPABASE.getClient();
 
                 if (isAdmin) {
-                    const { data: allFlows } = await client
+                    // 【v2.2】管理员查询时排除练习门店
+                    let q = client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('recorded_at', { ascending: false });
+                    const practiceIds = await SUPABASE._getPracticeStoreIds();
+                    if (practiceIds.length > 0) {
+                        q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                    }
+                    const { data: allFlows } = await q;
                     transactions = allFlows || [];
                 } else if (isStaff) {
                     // 【v2.1】员工仅可查看本人操作的资金流水记录
@@ -191,6 +199,7 @@
         },
 
         // ==================== 原有弹窗、转账、导出等方法（完整保留） ====================
+        // 【v2.2 修改】管理员排除练习门店
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -200,9 +209,15 @@
                 let transactions = [];
                 const client = SUPABASE.getClient();
                 if (isAdmin) {
-                    const { data: allFlows } = await client
+                    // 【v2.2】管理员查询时排除练习门店
+                    let q = client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('recorded_at', { ascending: false });
+                    const practiceIds = await SUPABASE._getPracticeStoreIds();
+                    if (practiceIds.length > 0) {
+                        q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                    }
+                    const { data: allFlows } = await q;
                     transactions = allFlows || [];
                 } else if (isStaff) {
                     // 【v2.1】员工在弹窗中也仅查看本人记录
@@ -552,5 +567,5 @@
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
     }
 
-    console.log('✅ JF.FundsPage v2.1 更新完成（员工仅查看本人操作流水，禁止导出/打印，内部转账双重拦截）');
+    console.log('✅ JF.FundsPage v2.2 管理员排除练习门店数据');
 })();
