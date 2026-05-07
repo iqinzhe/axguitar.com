@@ -381,10 +381,6 @@
     .kpi-card--green {
         display: none !important;
     }
-    /* 2. 隐藏“订单状态分布”卡片 */
-    .order-status-card {
-        display: none !important;
-    }
 }
 
 /* ============================================================
