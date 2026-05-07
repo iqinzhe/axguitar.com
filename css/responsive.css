@@ -134,11 +134,19 @@
   }
 
   /* 打印样式 — A4竖版统一规范 */
-  @media print {
-    /* ===== 页面设置：A4竖版 ===== */
+@media print {
     @page {
-      size: A4 portrait;
-      margin: 12mm 10mm 18mm 10mm; /* 下边留给固定页脚 */
+        size: A4 portrait;
+        margin: 15mm 10mm 18mm 10mm;
+        /* 关键：禁用浏览器自动生成的页眉 */
+        @top-left { content: none; }
+        @top-center { content: none; }
+        @top-right { content: none; }
+    }
+    /* 确保 body 无额外边距 */
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     /* ===== 基础重置 ===== */
