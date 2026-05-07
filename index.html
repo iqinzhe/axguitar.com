@@ -1,26 +1,107 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="zh-Hans-ID">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#0e7490">
 <title>JF! by Gadai - Sistem Manajemen Gadai</title>
 
+<!-- ① 图标 -->
 <link rel="icon" href="icons/favicon-192x192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest?v=1">
 
-<link rel="stylesheet" href="css/variables.css">
-<link rel="stylesheet" href="css/critical.css">          <!-- 首屏动画 -->
+<!-- ② 提前连接关键外部域（浏览器握手提前） -->
+<link rel="preconnect" href="https://hiupsvsbcdsgoyiieqiv.supabase.co" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+<!-- ③ 首屏关键 CSS 内联（variables + critical）：消除首屏渲染阻塞 -->
+<style>
+/* === variables.css 内联 === */
+@layer base, utilities, components, pages;
+:root {
+  --primary: #0e7490; --primary-light: #22d3ee; --primary-soft: #cffafe; --primary-dark: #0c4a6e;
+  --success: #16a34a; --success-dark: #15803d; --success-light: #f0fdf4;
+  --warning: #d97706; --warning-dark: #b45309; --warning-light: #fffbeb;
+  --danger: #dc2626; --danger-dark: #b91c1c; --danger-light: #fff1f2;
+  --bg-page: #f4f6f9; --bg-card: #ffffff; --bg-highlight: #f0f9ff;
+  --bg-hover: #eef2f7; --bg-modal: rgba(7,22,48,0.55); --bg-input-readonly: #f8fafc;
+  --text-primary: #0c1929; --text-secondary: #3d5068; --text-muted: #6b7e95; --text-white: #ffffff;
+  --border-light: #dde3ec; --border-medium: #c4cedb;
+  --shadow-none: none;
+  --shadow-sm: 0 1px 3px 0 rgb(14 116 144 / 0.06);
+  --shadow-md: 0 2px 6px 0 rgb(14 116 144 / 0.09);
+  --shadow-lg: 0 4px 12px -1px rgb(14 116 144 / 0.12);
+  --shadow-xl: 0 8px 20px -2px rgb(14 116 144 / 0.15);
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-2xl: 20px;
+  --spacing-1: 3px; --spacing-1-5: 5px; --spacing-2: 6px; --spacing-3: 10px;
+  --spacing-4: 14px; --spacing-5: 18px; --spacing-6: 22px; --spacing-7: 26px; --spacing-8: 30px;
+  --transition-fast: 0.15s ease; --transition-slow: 0.3s ease;
+  --font-xs: 0.75rem; --font-sm: 0.875rem; --font-md: 1rem;
+  --font-lg: 1.125rem; --font-xl: 1.25rem; --font-2xl: 1.5rem;
+  --white: #ffffff;
+  --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb; --gray-300:#d1d5db;
+  --gray-400:#9ca3af; --gray-500:#6b7280; --gray-600:#4b5563; --gray-700:#374151;
+  --gray-800:#1f2937; --gray-900:#111827;
+  --red-500:#ef4444; --red-600:#dc2626; --red-700:#b91c1c;
+  --green-500:#22c55e; --green-600:#16a34a; --green-700:#15803d;
+  --blue-500:#3b82f6; --blue-600:#2563eb; --blue-700:#1d4ed8;
+  --purple-600:#7c3aed; --purple-700:#6d28d9; --amber-600:#d97706; --amber-700:#b45309;
+  --cyan-600:#0891b2; --teal-600:#0d9488; --sky-500:#0ea5e9; --sky-600:#0284c7;
+  --gradient-sidebar: linear-gradient(180deg,#eef3f9 0%,#e3edf7 50%,#d6e6f5 100%);
+  --gradient-primary: linear-gradient(135deg,var(--primary-dark),var(--primary));
+  --gradient-cta: linear-gradient(135deg,#0e7490,#06b6d4);
+  --gradient-kpi-blue: linear-gradient(90deg,#0e7490,#06b6d4);
+  --gradient-kpi-amber: linear-gradient(90deg,#d97706,#f59e0b);
+  --gradient-kpi-green: linear-gradient(90deg,#15803d,#16a34a);
+  --gradient-util-bar: linear-gradient(90deg,#f59e0b,#fbbf24);
+  --gradient-net-profit: linear-gradient(135deg,#e0f2fe,#f0f9ff);
+  --gradient-backup-card: linear-gradient(135deg,#e8f4e8 0%,#d4ecd4 100%);
+  --opacity-disabled: 0.6; --opacity-icon: 0.4; --opacity-overlay: 0.55;
+  --z-sidebar: 100; --z-sidebar-overlay: 99; --z-topbar: 50; --z-modal: 9999; --z-tooltip: 10000;
+}
+
+/* === critical.css 内联（防止 FOUC，首帧加载遮罩） === */
+@layer base {
+  .dashboard-content { opacity: 0; }
+  .dashboard-content.loaded { opacity: 1; transition: opacity 0.3s ease; }
+  .loading-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(245,246,250,0.96); backdrop-filter: blur(4px);
+    z-index: var(--z-modal); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px;
+  }
+  .loading-spinner {
+    width: 48px; height: 48px;
+    border: 3px solid var(--gray-200); border-top-color: var(--primary);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  .loading-text { font-size: 1rem; color: var(--gray-600); }
+  .loading-text::after {
+    content: "..."; animation: dots 1.5s steps(4,end) infinite;
+    display: inline-block; width: 28px; text-align: left;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes dots { 0%,20%{content:""}40%{content:"."}60%{content:".."}80%,100%{content:"..."} }
+}
+</style>
+
+<!-- ④ 非首屏 CSS 异步加载（reset / utilities / components / dashboard / responsive） -->
+<!-- 注：variables 和 critical 已内联，此处不再引用 -->
 <link rel="stylesheet" href="css/reset.css">
-<link rel="stylesheet" href="css/utilities.css">         <!-- 工具类 -->
+<link rel="stylesheet" href="css/utilities.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/dashboard.css">
 <link rel="stylesheet" href="css/responsive.css">
 
-<link rel="preconnect" href="https://hiupsvsbcdsgoyiieqiv.supabase.co">
-<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<!-- ⑤ 预加载首屏最重要的 JS（提示浏览器提前获取，不执行） -->
+<link rel="preload" href="js/utils.js" as="script">
+<link rel="preload" href="js/supabase.js" as="script">
+<link rel="preload" href="js/auth.js" as="script">
+<link rel="preload" href="js/app-dashboard-core.js" as="script">
+
 </head>
 <body>
 
@@ -33,7 +114,7 @@
 <!-- ========== 主内容区域 ========== -->
 <div class="dashboard-content" id="dashboardContent">
     <div id="app">
-        <div class="loading-container" style="display: none;">
+        <div class="loading-container" style="display:none;">
             <div class="loader"></div>
             <p class="loading-text" id="loadingStatus">Memuat sistem...</p>
         </div>
@@ -42,29 +123,28 @@
 
 <!--
   ==================== 脚本加载策略 ====================
-  
-  第 0 层：立即执行
-    - token 状态检查内联代码
-  
+
+  第 0 层：立即执行（内联）
+    - Token 状态检查，无需等待 DOM
+
   第 1 层：CDN + 核心基础（defer，按序执行）
-    - config.js → supabase-js → utils.js → toast.js → cache.js
+    - config.js → supabase-js → fee-config.js
+    - utils.js → toast.js → cache.js
     - supabase.js → auth.js → permission.js → audit.js
     - order.js → store.js → storage.js → migration.js
-  
+
   第 2 层：核心应用（defer）
     - app-dashboard-core.js（首屏仪表盘）
-  
-  第 3 层：非核心模块（defer，浏览器自动按序加载，不阻塞首屏）
-    - 所有 app-*.js 页面模块
-  
+
+  第 3 层：非核心页面模块（defer，不阻塞首屏）
+    - 所有 app-*.js
+
   第 4 层：内联启动逻辑（defer）
-    - 应用启动控制
+    - 应用初始化 + 全局快捷键
 -->
 
-<!-- ========== 第 0 层：Token 状态初始化（立即执行，不依赖 DOM） ========== -->
+<!-- ========== 第 0 层：Token 状态初始化（立即执行） ========== -->
 <script>
-// app-state-init.js - v2.3 内联版
-// 在页面加载时检查 token 有效性，无有效 token 则清除所有页面恢复状态
 (function () {
     'use strict';
     try {
@@ -75,8 +155,7 @@
                 try {
                     var tokenData = JSON.parse(localStorage.getItem(key));
                     if (tokenData && tokenData.expires_at) {
-                        var expiresAt = new Date(tokenData.expires_at * 1000);
-                        if (expiresAt > new Date()) {
+                        if (new Date(tokenData.expires_at * 1000) > new Date()) {
                             hasValidToken = true;
                         }
                     }
@@ -86,17 +165,13 @@
         }
         if (!hasValidToken) {
             try {
-                sessionStorage.removeItem('jf_current_state');
-                localStorage.removeItem('jf_last_state');
-                sessionStorage.removeItem('jf_current_page');
-                sessionStorage.removeItem('jf_current_filter');
-                sessionStorage.removeItem('jf_current_order_id');
-                sessionStorage.removeItem('jf_current_customer_id');
-                localStorage.removeItem('jf_last_page');
-                localStorage.removeItem('jf_last_filter');
-                localStorage.removeItem('jf_last_order_id');
-                localStorage.removeItem('jf_last_customer_id');
-                console.log('[StateInit] 无有效 token，已清除所有页面恢复状态');
+                var clearKeys = ['jf_current_state','jf_last_state','jf_current_page',
+                    'jf_current_filter','jf_current_order_id','jf_current_customer_id',
+                    'jf_last_page','jf_last_filter','jf_last_order_id','jf_last_customer_id'];
+                clearKeys.forEach(function(k) {
+                    sessionStorage.removeItem(k); localStorage.removeItem(k);
+                });
+                console.log('[StateInit] 无有效 token，已清除页面恢复状态');
             } catch (e) { /* ignore */ }
         } else {
             console.log('[StateInit] 检测到有效 token，保留页面恢复状态');
@@ -105,10 +180,10 @@
 })();
 </script>
 
-<!-- ========== 第 1 层：核心基础脚本（defer，按序执行） ========== -->
+<!-- ========== 第 1 层：核心基础脚本（defer） ========== -->
 <script defer src="config.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="fee-config.js"></script>   
+<script defer src="fee-config.js"></script>
 <script defer src="js/utils.js"></script>
 <script defer src="js/toast.js"></script>
 <script defer src="js/cache.js"></script>
@@ -124,7 +199,7 @@
 <!-- ========== 第 2 层：核心应用（首屏仪表盘） ========== -->
 <script defer src="js/app-dashboard-core.js"></script>
 
-<!-- ========== 第 3 层：非核心模块（defer，浏览器自动按序加载，不阻塞首屏） ========== -->
+<!-- ========== 第 3 层：非核心页面模块（defer） ========== -->
 <script defer src="js/app-capital.js"></script>
 <script defer src="js/app-profit.js"></script>
 <script defer src="js/app-dashboard-anomaly.js"></script>
@@ -139,16 +214,15 @@
 <script defer src="js/app-blacklist.js"></script>
 <script defer src="js/app-payments.js"></script>
 
-<!-- ========== 第 4 层：内联启动逻辑（合并原 app.js + 启动控制） ========== -->
+<!-- ========== 第 4 层：内联启动逻辑（合并 app.js + 启动控制） ========== -->
 <script>
-// 合并了原 app.js 和 index.html 中的启动逻辑
 (function () {
     'use strict';
 
-    // ==================== app.js 逻辑（门面层） ====================
     var JF = window.JF || {};
     window.JF = JF;
 
+    // ==================== APP 门面层 ====================
     var APP = {
         forceClearAndReload: function () {
             console.log('[APP] 强制清除所有存储并重新加载');
@@ -156,19 +230,17 @@
                 var keysToRemove = [];
                 for (var i = 0; i < localStorage.length; i++) {
                     var key = localStorage.key(i);
-                    if (key && (
-                        key.indexOf('supabase.') === 0 ||
-                        key.indexOf('sb-') === 0 ||
-                        key.indexOf('jf_') === 0
-                    )) {
+                    if (key && (key.indexOf('supabase.') === 0 ||
+                                key.indexOf('sb-') === 0 ||
+                                key.indexOf('jf_') === 0)) {
                         keysToRemove.push(key);
                     }
                 }
                 keysToRemove.forEach(function (k) { localStorage.removeItem(k); });
                 sessionStorage.clear();
-                document.cookie.split(";").forEach(function (c) {
-                    document.cookie = c.replace(/^ +/, "")
-                        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                document.cookie.split(';').forEach(function (c) {
+                    document.cookie = c.replace(/^ +/, '')
+                        .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
                 });
                 console.log('[APP] 已清除 ' + keysToRemove.length + ' 个存储项');
             } catch (e) {
@@ -181,7 +253,8 @@
             if (typeof BackupStorage !== 'undefined' && BackupStorage.backup) {
                 BackupStorage.backup();
             } else {
-                Utils.toast.error(Utils.t('backup_restore') + ' ' + (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
+                Utils.toast.error(Utils.t('backup_restore') + ' ' +
+                    (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
             }
         },
 
@@ -194,7 +267,8 @@
                     if (typeof BackupStorage !== 'undefined' && BackupStorage.restore) {
                         BackupStorage.restore(e.target.files[0]);
                     } else {
-                        Utils.toast.error(Utils.t('backup_restore') + ' ' + (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
+                        Utils.toast.error(Utils.t('backup_restore') + ' ' +
+                            (Utils.lang === 'id' ? 'tidak tersedia' : '不可用'));
                     }
                 }
             };
@@ -205,34 +279,28 @@
             try {
                 var result = await SUPABASE.getPaymentHistory(orderId);
                 var order = result.order;
-                if (!order) {
-                    Utils.toast.error(Utils.t('order_not_found'));
-                    return;
-                }
+                if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
                 var storeWA = await SUPABASE.getStoreWANumber(order.store_id);
                 if (!storeWA) {
-                    Utils.toast.warning(Utils.lang === 'id' ? 'Nomor WhatsApp toko belum diatur' : '门店 WhatsApp 号码未设置');
+                    Utils.toast.warning(Utils.lang === 'id'
+                        ? 'Nomor WhatsApp toko belum diatur' : '门店 WhatsApp 号码未设置');
                     return;
                 }
                 var customerPhone = order.customer_phone;
                 if (!customerPhone) {
-                    Utils.toast.warning(Utils.lang === 'id' ? 'Nomor telepon nasabah tidak tersedia' : '客户电话不存在');
+                    Utils.toast.warning(Utils.lang === 'id'
+                        ? 'Nomor telepon nasabah tidak tersedia' : '客户电话不存在');
                     return;
                 }
                 var cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-                if (cleanPhone.indexOf('62') !== 0 && cleanPhone.indexOf('0') !== 0) {
-                    cleanPhone = '62' + cleanPhone;
-                }
-                if (cleanPhone.indexOf('0') === 0) {
-                    cleanPhone = '62' + cleanPhone.substring(1);
-                }
+                if (cleanPhone.indexOf('0') === 0) cleanPhone = '62' + cleanPhone.substring(1);
+                else if (cleanPhone.indexOf('62') !== 0) cleanPhone = '62' + cleanPhone;
                 var waMessage = JF.WAPage ? JF.WAPage.generateWAText(order, storeWA) : '';
-                var encodedMessage = encodeURIComponent(waMessage);
-                window.open('https://wa.me/' + cleanPhone + '?text=' + encodedMessage, '_blank');
+                window.open('https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(waMessage), '_blank');
                 await SUPABASE.logReminder(order.id);
                 Utils.toast.success(Utils.lang === 'id' ? 'Membuka WhatsApp...' : '正在打开 WhatsApp...');
             } catch (error) {
-                console.error("sendWAReminder error:", error);
+                console.error('sendWAReminder error:', error);
                 Utils.toast.error(Utils.lang === 'id' ? 'Gagal mengirim pengingat' : '发送提醒失败');
             }
         },
@@ -251,19 +319,16 @@
 
     // ==================== 全局快捷键 ====================
     document.addEventListener('keydown', function (e) {
-        if (e.altKey && e.key === 'r') {
+        // Alt+R：恢复状态
+        if (e.altKey && !e.shiftKey && e.key === 'r') {
             e.preventDefault();
             if (JF.DashboardCore && typeof JF.DashboardCore.forceRecovery === 'function') {
                 JF.DashboardCore.forceRecovery();
-            } else if (window.APP && typeof window.APP.forceRecovery === 'function') {
-                window.APP.forceRecovery();
             } else {
                 location.reload();
             }
         }
-    });
-
-    document.addEventListener('keydown', function (e) {
+        // Alt+Shift+R：强制清除并重载
         if (e.altKey && e.shiftKey && e.key === 'R') {
             e.preventDefault();
             APP.forceClearAndReload();
@@ -273,37 +338,30 @@
     console.log('[Boot] 核心模块 + 门面层已就绪');
 
     // ==================== 应用启动 ====================
-    var loadingOverlay = document.getElementById('loadingOverlay');
+    var loadingOverlay  = document.getElementById('loadingOverlay');
     var dashboardContent = document.getElementById('dashboardContent');
 
-    function hideLoadingAndShowContent() {
+    function hideLoading() {
         if (loadingOverlay) {
             loadingOverlay.style.transition = 'opacity 0.3s ease';
             loadingOverlay.style.opacity = '0';
-            setTimeout(function () {
-                loadingOverlay.style.display = 'none';
-            }, 300);
+            setTimeout(function () { loadingOverlay.style.display = 'none'; }, 300);
         }
-        if (dashboardContent) {
-            dashboardContent.classList.add('loaded');
-        }
+        if (dashboardContent) dashboardContent.classList.add('loaded');
     }
 
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             console.log('[Boot] 启动应用');
             JF.DashboardCore.init();
-            setTimeout(hideLoadingAndShowContent, 100);
+            setTimeout(hideLoading, 100);
         } else {
-            console.warn('[Boot] DashboardCore 未就绪，等待中...');
             setTimeout(startApp, 200);
         }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
-            setTimeout(startApp, 100);
-        });
+        document.addEventListener('DOMContentLoaded', function () { setTimeout(startApp, 100); });
     } else {
         setTimeout(startApp, 100);
     }
