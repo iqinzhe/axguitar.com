@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v3.0 A4竖版打印优化（页码、列宽、行高、空行填充）
+// app-dashboard-print.js - v3.1 A4竖版打印优化（修复顶部多余行、页脚改为@page边距盒）
 
 'use strict';
 
@@ -53,6 +53,17 @@
                 }
             }
 
+            // ========== 移除顶部可能出现的 "JF! by Gadai - 打印" 文本 ==========
+            const allElements = printContent.querySelectorAll('*');
+            for (const el of allElements) {
+                // 针对只包含单个文本节点的元素
+                if (el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    if (el.textContent.includes('JF! by Gadai - 打印')) {
+                        el.remove();
+                    }
+                }
+            }
+
             // ========== 订单详情页面特殊处理：将订单信息改为3列3行网格 ==========
             this._reformatOrderInfoForPrint(printContent);
 
@@ -80,6 +91,8 @@
             }
 
             const printDateTime = new Date().toLocaleString();
+            // 页脚品牌文字（根据语言）
+            const footerBrandText = lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统';
 
             // 构建打印页面
             const printWindow = window.open('', '_blank');
@@ -92,14 +105,22 @@
                     <style>
                         /* ===== 基础重置 ===== */
                         * { box-sizing: border-box; margin: 0; padding: 0; }
+                        :root {
+                            --footer-brand-text: "${footerBrandText}";
+                        }
 
-                        /* ===== 页面设置：A4竖版 ===== */
+                        /* ===== 页面设置：A4竖版（上下边距一致，页脚由@page边距盒控制） ===== */
                         @page {
                             size: A4 portrait;
-                            margin: 12mm 10mm 18mm 10mm; /* 上 右 下(留页脚) 左 */
-                            @bottom-center {
+                            margin: 12mm 10mm 12mm 10mm; /* 上 右 下 左 */
+                            @bottom-left {
+                                content: "JF! by Gadai — " var(--footer-brand-text);
+                                font-size: 7.5pt;
+                                color: #94a3b8;
+                            }
+                            @bottom-right {
                                 content: counter(page) " / " counter(pages);
-                                font-size: 8pt;
+                                font-size: 7.5pt;
                                 color: #94a3b8;
                             }
                         }
@@ -115,7 +136,7 @@
                             padding: 0;
                         }
 
-                        /* ===== 页眉：固定在每页顶部（已有，不重复）===== */
+                        /* ===== 页眉：固定在每页顶部（不重复） ===== */
                         .print-header {
                             text-align: center;
                             margin-bottom: 8px;
@@ -140,40 +161,9 @@
                             white-space: nowrap;
                         }
 
-                        /* ===== 页脚：固定在底部，含页码 ===== */
-                        .print-footer {
-                            position: fixed;
-                            bottom: 0;
-                            left: 0;
-                            right: 0;
-                            height: 14mm;
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                            padding: 0 10mm;
-                            border-top: 1px solid #e2e8f0;
-                            background: #fff;
-                            font-size: 7.5pt;
-                            color: #94a3b8;
-                        }
-                        .print-footer .footer-brand {
-                            flex: 1;
-                            text-align: left;
-                        }
-                        .print-footer .footer-page {
-                            flex: 1;
-                            text-align: center;
-                            font-size: 8pt;
-                            color: #64748b;
-                        }
-                        .print-footer .footer-date {
-                            flex: 1;
-                            text-align: right;
-                        }
-
-                        /* ===== 主内容区（避开固定页脚） ===== */
+                        /* ===== 主内容区（不再需要为固定页脚留白） ===== */
                         .print-container {
-                            padding-bottom: 16mm; /* 为固定页脚留空间 */
+                            /* padding-bottom 不再需要，因为页脚由 @page 边距盒实现 */
                         }
 
                         /* ===== 卡片 ===== */
@@ -246,7 +236,6 @@
                         }
 
                         /* ===== 列宽规则（A4竖版 190mm可用宽） ===== */
-                        /* 按用途分组，各页面表格列数不同，用百分比确保均衡 */
 
                         /* 订单号/ID：较窄 */
                         .col-id, .col-id-narrow   { width: 9%; }
@@ -370,18 +359,6 @@
                             </div>
                         </div>
                         ${printContent.innerHTML}
-                        <div class="print-footer">
-                            <div class="footer-brand">JF! by Gadai &mdash; ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div>
-                            <div class="footer-page" id="pageNum"><!-- 页码由JS填写 --></div>
-                            <div class="footer-date">${printDateTime}</div>
-                        </div>
-                        <script>
-                            // 页码（浏览器打印页码，JS补充显示当前/总页）
-                            // CSS counter(page)/counter(pages) 在@page规则中处理
-                            // 这里在 footer 中做文字补充（兼容不支持 @page counter 的浏览器）
-                            document.getElementById('pageNum').textContent =
-                                (document.querySelector('@page') ? '' : '');
-                        <\/script>
                     </div>
                     <script>
                         window.onload = function() {
@@ -594,5 +571,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v3.0 A4竖版打印优化（页码固定页脚、列宽均衡、行高统一最多2行、空行填充框线）');
+    console.log('✅ JF.PrintPage v3.1 修复顶部多余行、页脚改写为左右分布品牌与页码');
 })();
