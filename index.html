@@ -63,28 +63,91 @@
   --z-sidebar: 100; --z-sidebar-overlay: 99; --z-topbar: 50; --z-modal: 9999; --z-tooltip: 10000;
 }
 
-/* === critical.css 内联（防止 FOUC，首帧加载遮罩） === */
+/* === critical.css 内联（防止 FOUC + 精美加载动画） === */
 @layer base {
   .dashboard-content { opacity: 0; }
-  .dashboard-content.loaded { opacity: 1; transition: opacity 0.3s ease; }
+  .dashboard-content.loaded { opacity: 1; transition: opacity 0.4s ease; }
+
+  /* 遮罩层：磨砂背景 + 点阵纹理 */
   .loading-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(245,246,250,0.96); backdrop-filter: blur(4px);
-    z-index: var(--z-modal); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 20px;
+    background: #eef3f8;
+    background-image: radial-gradient(circle, #c4d8e6 1px, transparent 1px);
+    background-size: 28px 28px;
+    z-index: var(--z-modal);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px;
+    transition: opacity 0.4s ease;
   }
-  .loading-spinner {
-    width: 48px; height: 48px;
-    border: 3px solid var(--gray-200); border-top-color: var(--primary);
-    border-radius: 50%; animation: spin 0.8s linear infinite;
+
+  /* 品牌标识区 */
+  .loading-brand {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
   }
-  .loading-text { font-size: 1rem; color: var(--gray-600); }
-  .loading-text::after {
-    content: "..."; animation: dots 1.5s steps(4,end) infinite;
-    display: inline-block; width: 28px; text-align: left;
+  .loading-brand-logo {
+    height: 36px; width: auto;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes dots { 0%,20%{content:""}40%{content:"."}60%{content:".."}80%,100%{content:"..."} }
+  .loading-brand-name {
+    font-size: 1.35rem; font-weight: 700;
+    color: #0e7490; letter-spacing: 0.5px;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  }
+
+  /* 音量柱动画（5根） */
+  .loading-bars {
+    display: flex; gap: 5px; align-items: flex-end; height: 22px;
+  }
+  .loading-bar {
+    width: 4px; border-radius: 2px; background: #0e7490;
+    animation: loBar 1.2s ease-in-out infinite;
+    transform-origin: bottom;
+  }
+  .loading-bar:nth-child(1) { animation-delay: 0s;    height: 8px; }
+  .loading-bar:nth-child(2) { animation-delay: 0.15s; height: 14px; }
+  .loading-bar:nth-child(3) { animation-delay: 0.3s;  height: 20px; }
+  .loading-bar:nth-child(4) { animation-delay: 0.45s; height: 14px; }
+  .loading-bar:nth-child(5) { animation-delay: 0.6s;  height: 8px; }
+
+  /* 文字区 */
+  .loading-text {
+    font-size: 0.875rem; color: #3d5068;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    letter-spacing: 0.4px;
+  }
+  .loading-dots span {
+    display: inline-block;
+    animation: loDot 1.5s ease-in-out infinite; opacity: 0;
+  }
+  .loading-dots span:nth-child(1) { animation-delay: 0s; }
+  .loading-dots span:nth-child(2) { animation-delay: 0.3s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.6s; }
+
+  /* 进度扫描条 */
+  .loading-progress {
+    width: 120px; height: 2px;
+    background: rgba(14,116,144,0.15);
+    border-radius: 1px; overflow: hidden;
+  }
+  .loading-progress-bar {
+    height: 100%; width: 40%;
+    background: linear-gradient(90deg, #0e7490, #06b6d4);
+    border-radius: 1px;
+    animation: loProgress 1.8s ease-in-out infinite;
+  }
+
+  /* 关键帧 */
+  @keyframes loBar {
+    0%,100% { opacity: 0.3; transform: scaleY(0.5); }
+    50%     { opacity: 1;   transform: scaleY(1); }
+  }
+  @keyframes loDot {
+    0%,80%,100% { opacity: 0; transform: translateY(0); }
+    40%         { opacity: 1; transform: translateY(-3px); }
+  }
+  @keyframes loProgress {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+  }
 }
 </style>
 
@@ -107,8 +170,37 @@
 
 <!-- ========== 加载动画层 ========== -->
 <div class="loading-overlay" id="loadingOverlay">
-    <div class="loading-spinner"></div>
-    <div class="loading-text">Memuat</div>
+
+    <!-- 音量柱节奏动画 -->
+    <div class="loading-bars">
+        <div class="loading-bar"></div>
+        <div class="loading-bar"></div>
+        <div class="loading-bar"></div>
+        <div class="loading-bar"></div>
+        <div class="loading-bar"></div>
+    </div>
+
+    <!-- 品牌标识 -->
+    <div class="loading-brand">
+        <img class="loading-brand-logo"
+             src="icons/pagehead-logo.png" alt="JF!"
+             onerror="this.style.display='none'">
+        <span class="loading-brand-name">JF! by Gadai</span>
+    </div>
+
+    <!-- 文字提示 -->
+    <div class="loading-text">
+        Memuat sistem
+        <span class="loading-dots">
+            <span>·</span><span>·</span><span>·</span>
+        </span>
+    </div>
+
+    <!-- 扫描进度条 -->
+    <div class="loading-progress">
+        <div class="loading-progress-bar"></div>
+    </div>
+
 </div>
 
 <!-- ========== 主内容区域 ========== -->
