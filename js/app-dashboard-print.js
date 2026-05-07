@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v3.5 极速切除顶部顽固垃圾行
+// app-dashboard-print.js - v3.6 彻底移除打印页眉垃圾行
 
 'use strict';
 
@@ -51,7 +51,7 @@
                 }
             }
 
-            // ========== TreeWalker 清理文本节点 (v3.3逻辑保留) ==========
+            // ========== TreeWalker 清理文本节点（增强移除“JF! by Gadai - 打印”等） ==========
             const walker = document.createTreeWalker(
                 printContent,
                 NodeFilter.SHOW_TEXT
@@ -59,14 +59,17 @@
             const nodesToRemove = [];
             while (walker.nextNode()) {
                 const node = walker.currentNode;
-                const text = node.nodeValue.trim();
+                const text = node.nodeValue;
                 if (!text) continue;
-                if (text.includes('JF! by Gadai - 打印') || text.includes('JF! by Gadai - Cetak') ||
-                    /^\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(:\d{2})?\s*$/.test(text)) {
+                const trimmed = text.trim();
+                // 匹配包含 "JF! by Gadai - 打印" 或 "JF! by Gadai - Cetak" 的行
+                if (trimmed.includes('JF! by Gadai - 打印') || trimmed.includes('JF! by Gadai - Cetak') ||
+                    /^\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(:\d{2})?\s*$/.test(trimmed) ||
+                    /JF! by Gadai\s*-\s*(打印|Cetak)/i.test(trimmed)) {
                     const parent = node.parentNode;
                     if (parent && parent.childNodes.length === 1) {
                         nodesToRemove.push(parent);
-                    } else if (parent) {
+                    } else {
                         node.nodeValue = '';
                     }
                 }
@@ -80,27 +83,13 @@
             this._fillEmptyRows(printContent);
             this._limitCellLines(printContent);
 
-            // ========== 核心：切除 HTML 开头垃圾 ==========
             let contentHtml = printContent.innerHTML.trim();
 
-            // 多重正则替换：匹配各种可能的垃圾形式（带日期/无日期，任何标签）
-            // 如果整个页面开头就是垃圾，直接切到第一个有效标签（以<div或<table等开始）
-            if (contentHtml.indexOf('<') !== 0) {
-                // HTML 以文本开头，找到第一个 < 的位置，去掉之前所有的内容
-                const firstTag = contentHtml.indexOf('<');
-                if (firstTag > 0) {
-                    contentHtml = contentHtml.substring(firstTag);
-                }
-            }
-
-            // 再针对性地切除可能残留的包装垃圾（如 <span>2026/5/7 08:09 JF! by Gadai - 打印</span>）
+            // 额外正则移除任何可能残留的垃圾文本（安全网）
             contentHtml = contentHtml
                 .replace(/^<[^>]+>\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)\s*<\/[^>]+>/gi, '')
                 .replace(/^<[^>]+>\s*(?:JF! by Gadai\s*-\s*(?:打印|Cetak))\s*<\/[^>]+>/gi, '')
                 .replace(/^\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)/gi, '');
-
-            // 调试输出（可在控制台查看，确认开头是否干净）
-            console.log('🧹 Cleaned HTML start (first 200 chars):', contentHtml.substring(0, 200));
 
             // ========== 页头信息 ==========
             const lang = Utils.lang;
@@ -133,6 +122,10 @@
                         @page {
                             size: A4 portrait;
                             margin: 12mm 10mm 12mm 10mm;
+                            /* 禁用浏览器默认页眉页脚 */
+                            @top-left { content: none; }
+                            @top-center { content: none; }
+                            @top-right { content: none; }
                             @bottom-center {
                                 content: "JF! by Gadai — ${footerBrandText} — " counter(page) " / " counter(pages);
                                 font-size: 7.5pt;
@@ -141,13 +134,13 @@
                         }
 
                         html, body {
+                            margin: 0;
+                            padding: 0;
                             font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
                             font-size: 9pt;
                             line-height: 1.4;
                             color: #1e293b;
                             background: #fff;
-                            margin: 0;
-                            padding: 0;
                         }
 
                         .print-header {
@@ -513,5 +506,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v3.5 顽固垃圾切割清理，页脚居中');
+    console.log('✅ JF.PrintPage v3.6 彻底移除打印页眉垃圾行，禁用浏览器默认页眉');
 })();
