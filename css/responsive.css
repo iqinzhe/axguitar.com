@@ -1,0 +1,154 @@
+/* ============================================================
+   responsive.css - 统一响应式与打印样式（打印部分已移除）
+   ============================================================ */
+@layer pages {
+  /* 桌面端 */
+  @media (min-width: 769px) {
+    html { font-size: 17px; }
+    #app { padding: var(--spacing-3) var(--spacing-4); }
+    .page-header h1, .page-header h2 { font-size: var(--font-xl); }
+    .card h3 { font-size: var(--font-md); }
+    .card--stat .stat-value { font-size: var(--font-lg); }
+    .card--stat .stat-label { font-size: var(--font-xs); }
+    .data-table thead th, .data-table tbody td { font-size: var(--font-sm); }
+    .btn { font-size: var(--font-sm); }
+    .btn--sm { font-size: var(--font-sm); }
+    .toolbar .btn { font-size: var(--font-sm); }
+    .form-group label { font-size: var(--font-sm); }
+    .form-group input, .form-group select, .form-group textarea { font-size: var(--font-md); }
+    .table-container { overflow-x: visible; }
+    .data-table { table-layout: auto !important; min-width: auto !important; width: 100%; }
+    .profit-distribution-grid { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-3); align-items: stretch; }
+  }
+
+  /* 手机端 */
+  @media (max-width: 768px) {
+    html { font-size: 16px; }
+    #app { padding: var(--spacing-2); }
+    .page-header h1, .page-header h2 { font-size: var(--font-lg); }
+    .card h3 { font-size: calc(var(--font-md) - 0.0625rem); }
+
+    .stats-grid,
+    .stats-grid.stats-grid--2,
+    .stats-grid.stats-grid--3,
+    .stats-grid.stats-grid--auto {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: var(--spacing-2);
+    }
+    .card--stat { min-height: 64px; padding: var(--spacing-2) var(--spacing-3); }
+    .card--stat .stat-value { font-size: calc(var(--font-xl) - 0.125rem); }
+    .card--stat .stat-label { font-size: calc(var(--font-xs) - 0.03125rem); }
+
+    .info-cards-row { flex-direction: column; }
+    .info-cards-row .info-item-card { min-width: auto; }
+
+    .fee-cards-row { grid-template-columns: 1fr; gap: var(--spacing-3); }
+    .fee-card .fee-card-body { flex-direction: column; align-items: stretch; gap: var(--spacing-2); }
+    .fee-card .fee-card-body select { width: 100%; min-width: auto; }
+    .fee-card .fee-card-body input { width: 100%; text-align: right; }
+
+    .btn { font-size: var(--font-xs); padding: 8px 14px; }
+    .btn--sm { padding: 6px 12px; font-size: 11px; }
+    .toolbar .btn { font-size: var(--font-xs); overflow: hidden; text-overflow: ellipsis; padding: var(--spacing-3) var(--spacing-1); }
+
+    .btn--primary, .btn--success, .btn--warning, .btn--danger, .btn--outline { width: 100%; text-align: center; }
+
+    .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .data-table { font-size: var(--font-xs); table-layout: fixed; min-width: 700px; width: max-content; }
+    .data-table thead th, .data-table tbody td { padding: 6px 5px; font-size: var(--font-xs); line-height: 1.3; height: auto; min-height: 32px; white-space: nowrap; }
+    .data-table .desc-cell { white-space: normal; word-break: break-word; min-width: 120px; max-width: 160px; }
+
+    .action-row td { padding: 6px 5px !important; }
+    .action-row .action-label { font-size: var(--font-xs); width: 40px; min-width: 40px; padding-right: var(--spacing-1); }
+    .action-row .action-buttons { flex-direction: row; flex-wrap: nowrap; gap: 12px; overflow-x: auto; padding: 2px 0; }
+    .action-row .action-buttons .btn--sm { flex-shrink: 0; padding: 8px 14px; font-size: 11px; border-radius: var(--radius-sm); max-width: 120px; }
+
+    .badge { font-size: 10px; padding: 1px 6px; white-space: nowrap; flex-shrink: 0; }
+    .locked-badge, .reconciled-badge { font-size: 10px; padding: 2px 8px; }
+
+    .toolbar.admin-grid, .toolbar.store-grid { grid-template-columns: repeat(2, 1fr); }
+
+    .summary-grid { grid-template-columns: repeat(2, 1fr); gap: var(--spacing-1); }
+    .summary-item { padding: var(--spacing-1); gap: var(--spacing-1); }
+    .summary-item .label, .summary-item .value { font-size: var(--font-xs); }
+
+    .payment-double-column { flex-direction: column; gap: var(--spacing-2); }
+    .payment-double-column .card { flex: none; width: 100%; max-width: 100%; min-width: 0; margin-bottom: 0; overflow-x: hidden; }
+
+    .form-grid, .form-grid.form-grid--3, .form-grid.form-grid--4 { grid-template-columns: 1fr; gap: var(--spacing-2); }
+    .form-grid-mobile-2 { grid-template-columns: repeat(2, 1fr) !important; }
+    .order-first-row { grid-template-columns: 1fr; }
+    .repayment-cards-row { grid-template-columns: 1fr; gap: var(--spacing-2); }
+    .info-display { grid-template-columns: 1fr; }
+    .info-display-item .info-label { min-width: 70px; }
+
+    .payment-method-selector { flex-direction: column; gap: var(--spacing-1); }
+    .payment-method-row { flex-direction: column; align-items: flex-start; gap: var(--spacing-2); }
+    .address-option { flex-direction: column; gap: var(--spacing-1); }
+
+    .form-group label { font-size: var(--font-xs); }
+    .form-group input, .form-group select, .form-group textarea { font-size: var(--font-sm); }
+
+    .order-detail-grid { grid-template-columns: 1fr; gap: 0; }
+    .anomaly-grid { grid-template-columns: 1fr; gap: var(--spacing-4); }
+    .anomaly-card { min-height: auto; }
+    .backup-grid, .backup-grid-store { grid-template-columns: 1fr !important; gap: var(--spacing-4); }
+    .cashflow-stats { flex-direction: column; }
+    .cashflow-item-card { min-width: auto; }
+    .cashflow-table .flow-desc, .capital-table .flow-desc { max-width: 150px; }
+    .expense-table .expense-desc { max-width: 100px; }
+    .mobile-hide { display: none; }
+
+    /* 移动端隐藏指定卡片 */
+    .kpi-card--green,
+    .order-status-card {
+      display: none !important;
+    }
+
+    /* 通用字体缩小 */
+    .card h3, .card-header .card-title, .modal-content h3, .repayment-card-title, .anomaly-card-header h3, .backup-card h3 {
+      font-size: calc(var(--font-md) - 0.0625rem);
+      margin-bottom: var(--spacing-1);
+    }
+    .stat-value, .kpi-val, .fund-block-val, .info-item-value, .cashflow-item-card .value, .repayment-card .repayment-amount,
+    .fee-card .fee-card-body input, .amount-highlight, .card .card-value-main, .summary-item .value, .legend-count {
+      font-size: calc(var(--font-lg) - 0.0625rem);
+    }
+    .stat-label, .card-action, .info-label, .repayment-card-desc, .repayment-card-note, .card .info-bar, .card .form-hint,
+    .cashflow-item-card .label, .legend-name, .legend-pct, .kpi-label, .fund-block-label, .cb-label, .income-name, .income-sub,
+    .info-item-card .info-item-detail, .card .card-history .history-title, .anomaly-badge, .util-bar-label, .np-label, .np-sub,
+    .quick-btn .qb-label, .order-status-card .legend-name {
+      font-size: calc(var(--font-xs) - 0.03125rem);
+    }
+    .card p, .card .desc-text, .repayment-card-desc, .info-bar-content, .card .text-muted {
+      font-size: calc(var(--font-sm) - 0.0625rem);
+    }
+    .profit-distribution-grid { display: block !important; }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid { gap: 8px; }
+    .summary-grid { grid-template-columns: 1fr; }
+    .btn { width: 100%; }
+    .btn--sm { font-size: 10px; padding: 6px 10px; }
+  }
+
+  /* 收益处置网格 */
+  .profit-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-3);
+    margin-bottom: var(--spacing-3);
+  }
+  .profit-cards-grid .card { margin-bottom: 0; height: 100%; display: flex; flex-direction: column; }
+  .profit-cards-grid .card .form-actions { margin-top: auto; }
+
+  @media (max-width: 768px) {
+    .profit-cards-grid { grid-template-columns: 1fr; gap: var(--spacing-2); }
+  }
+}
+
+/* 手机端隐藏“活跃在押订单”卡片 */
+.kpi-card--amber {
+  display: none !important;
+}
