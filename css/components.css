@@ -1037,6 +1037,28 @@
     gap: var(--spacing-5);
     margin-bottom: var(--spacing-4);
   }
+   /* 信息条目（用于订单详情网格内部） */
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px dashed #ccc;
+    padding: 6px 0;
+}
+
+.info-item .label {
+    font-weight: 500;
+    color: #555;
+    white-space: nowrap;
+    margin-right: 8px;
+}
+
+.info-item .value {
+    font-weight: 600;
+    color: #111;
+    text-align: right;
+    word-break: break-word;
+}
 }
 /* ============================================================
    移动端适配 - 修复创建订单等页面的布局
