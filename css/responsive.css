@@ -634,7 +634,7 @@
     }
 
     /* 订单详情打印 */
-    .order-detail-grid { grid-template-columns: 1fr 1fr !important; }
+    .order-detail-grid { grid-template-columns: repeat(4, 1fr) !important; }
 
     /* 备份页面打印 */
     .backup-grid { grid-template-columns: repeat(2, 1fr) !important; }
