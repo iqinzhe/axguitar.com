@@ -171,15 +171,12 @@
   }
 
   .data-table tbody td {
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border-light);
     text-align: left;
     font-size: var(--font-sm);
     line-height: 1.4;
-    /* 统一行高：最多换行一次（约2行），超出截断 */
-    height: 36px;          /* 单行标准高度 */
-    max-height: 52px;      /* 最多2行高度上限 */
-    overflow: hidden;
+    min-height: 36px;
     vertical-align: middle;
     word-break: break-word;
   }
@@ -222,26 +219,26 @@
     padding-right: var(--spacing-2);
   }
 
-  /* 列宽辅助 — 百分比均衡，适配A4竖版 190mm 可用宽度 */
-  .col-id           { width: 9%; }        /* 订单号/ID */
-  .col-id-narrow    { width: 7%; }        /* 短ID */
-  .col-name         { width: 13%; }       /* 姓名/账户 */
-  .col-order-id     { width: 10%; }       /* 订单编号（带前缀） */
-  .col-ktp          { width: 13%; }       /* 身份证号 */
-  .col-phone        { width: 10%; }       /* 电话 */
-  .col-address      { width: 16%; }       /* 地址 */
-  .col-date         { width: 10%; }       /* 日期（固定不换行） */
-  .col-status       { width: 9%; }        /* 状态 */
-  .col-status-wide  { width: 10%; }       /* 宽状态 */
-  .col-store        { width: 9%; }        /* 门店 */
-  .col-amount       { width: 11%; }       /* 金额 */
-  .col-type         { width: 10%; }       /* 类型 */
-  .col-months       { width: 6%; }        /* 月数（数字窄列） */
-  .col-method       { width: 9%; }        /* 支付方式 */
-  .col-collateral   { width: 14%; }       /* 质押物 */
-  .col-occupation   { width: 10%; }       /* 职业 */
-  .col-desc         { width: auto; }      /* 描述（占满剩余空间） */
-  .col-action       { width: 100px; }
+  /* 列宽辅助 */
+  .col-id       { width: 8%; }
+  .col-name     { width: 14%; }
+  .col-order-id { width: 10%; }
+  .col-ktp      { width: 12%; }
+  .col-phone    { width: 11%; }
+  .col-address  { width: 18%; }
+  .col-date     { width: 10%; }
+  .col-status   { width: 8%; }
+  .col-store    { width: 9%; }
+  .col-amount   { width: 12%; }
+  .col-type     { width: 12%; }
+  .col-months   { width: 7%; }
+  .col-method   { width: 9%; }
+  .col-desc     { width: auto; }
+  .col-action   { width: 100px; }
+  .col-id-narrow    { width: 6%; }
+  .col-status-wide  { width: 10%; }
+  .col-collateral   { width: 15%; }
+  .col-occupation   { width: 12%; }
 
   /* ---------- 徽章系统 ---------- */
   .badge {
@@ -1037,28 +1034,6 @@
     gap: var(--spacing-5);
     margin-bottom: var(--spacing-4);
   }
-   /* 信息条目（用于订单详情网格内部） */
-.info-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    border-bottom: 1px dashed #ccc;
-    padding: 6px 0;
-}
-
-.info-item .label {
-    font-weight: 500;
-    color: #555;
-    white-space: nowrap;
-    margin-right: 8px;
-}
-
-.info-item .value {
-    font-weight: 600;
-    color: #111;
-    text-align: right;
-    word-break: break-word;
-}
 }
 /* ============================================================
    移动端适配 - 修复创建订单等页面的布局
