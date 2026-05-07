@@ -408,7 +408,8 @@
 @media print {
     @page {
         size: A4 landscape;
-        margin: 5mm 8mm;
+        /* margin-top: 0 可消除浏览器在页面顶部自动插入的打印戳记（日期+标题行）所占的空间 */
+        margin: 0mm 8mm 5mm 8mm;
     }
 
     body {
