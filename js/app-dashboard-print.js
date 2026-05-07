@@ -151,10 +151,10 @@
                             border-bottom: 1px solid #e2e8f0;
                             padding-bottom: 4px;
                         }
-                        /* 2列网格样式 */
+                        /* 3列网格样式 */
                         .order-info-grid {
                             display: grid;
-                            grid-template-columns: repeat(2, 1fr);
+                            grid-template-columns: repeat(3, 1fr);
                             gap: 12px 24px;
                             margin-bottom: 20px;
                         }
@@ -213,138 +213,144 @@
             printWindow.document.close();
         },
 
-_reformatOrderInfoForPrint(printContent) {
-    const cards = printContent.querySelectorAll('.card');
-    let orderInfoCard = null;
-
-    for (const card of cards) {
-        const text = card.textContent || '';
-        if ((text.includes('订单号') || text.includes('ID Pesanan')) &&
-            (text.includes('客户姓名') || text.includes('Nama Nasabah')) &&
-            (text.includes('贷款金额') || text.includes('Jumlah Pinjaman'))) {
-            orderInfoCard = card;
-            break;
-        }
-    }
-
-    if (!orderInfoCard) return;
-
-    const lines = [];
-    const paragraphs = orderInfoCard.querySelectorAll('p');
-
-    if (paragraphs.length > 0) {
-        for (const p of paragraphs) {
-            const text = p.innerText.trim();
-            if (text && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
-                lines.push(text);
-            }
-        }
-    } else {
-        const text = orderInfoCard.innerText;
-        const textLines = text.split('\n');
-        for (const line of textLines) {
-            const trimmed = line.trim();
-            if (trimmed && !trimmed.includes('缴费记录') && !trimmed.includes('订单详情') &&
-                !trimmed.includes('📄') && !trimmed.includes('💰') && !trimmed.includes('打印自')) {
-                lines.push(trimmed);
-            }
-        }
-    }
-
-    // 字段映射，包含手机号码
-    const fieldMap = {
-        '订单号': 'order_id',
-        'ID Pesanan': 'order_id',
-        '客户姓名': 'customer_name',
-        'Nama Nasabah': 'customer_name',
-        '手机号码': 'phone',
-        'Nomor Telepon': 'phone',
-        '质押物名称': 'collateral_name',
-        'Nama Jaminan': 'collateral_name',
-        '贷款金额': 'loan_amount',
-        'Jumlah Pinjaman': 'loan_amount',
-        '还款方式': 'repayment_type',
-        'Jenis Cicilan': 'repayment_type',
-        '状态': 'status',
-        'Status': 'status',
-        '约定利率': 'interest_rate',
-        'Suku Bunga': 'interest_rate',
-        '月利息': 'monthly_interest',
-        'Bunga Bulanan': 'monthly_interest',
-        '剩余本金': 'remaining_principal',
-        'Sisa Pokok': 'remaining_principal'
-    };
-
-    const fields = {};
-    for (const line of lines) {
-        for (const [label, key] of Object.entries(fieldMap)) {
-            if (line.startsWith(label) || line.includes(label + ' ')) {
-                let value = line.replace(label, '').replace(/^[:：\s]+/, '').trim();
-                if (value) {
-                    fields[key] = value;
+        // 重新格式化订单信息为3列3行网格
+        _reformatOrderInfoForPrint(printContent) {
+            // 查找包含订单信息的卡片
+            const cards = printContent.querySelectorAll('.card');
+            let orderInfoCard = null;
+            let orderInfoHtml = '';
+            
+            for (const card of cards) {
+                const text = card.textContent || '';
+                // 检查是否包含订单关键信息
+                if ((text.includes('订单号') || text.includes('ID Pesanan')) &&
+                    (text.includes('客户姓名') || text.includes('Nama Nasabah')) &&
+                    (text.includes('贷款金额') || text.includes('Jumlah Pinjaman'))) {
+                    orderInfoCard = card;
+                    break;
                 }
-                break;
             }
-        }
-    }
-
-    const lang = Utils.lang;
-    const labels = {
-        order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
-        customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
-        phone: lang === 'id' ? 'Nomor Telepon' : '手机号码',
-        collateral_name: lang === 'id' ? 'Nama Jaminan' : '质押物名称',
-        loan_amount: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
-        repayment_type: lang === 'id' ? 'Jenis Cicilan' : '还款方式',
-        status: lang === 'id' ? 'Status' : '状态',
-        interest_rate: lang === 'id' ? 'Suku Bunga' : '约定利率',
-        monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
-        remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
-    };
-
-    // 10个项目，两列5行
-    const infoItems = [
-        { label: labels.order_id, value: fields.order_id || '-' },
-        { label: labels.customer_name, value: fields.customer_name || '-' },
-        { label: labels.phone, value: fields.phone || '-' },
-        { label: labels.collateral_name, value: fields.collateral_name || '-' },
-        { label: labels.loan_amount, value: fields.loan_amount || '-' },
-        { label: labels.repayment_type, value: fields.repayment_type || '-' },
-        { label: labels.status, value: fields.status || '-' },
-        { label: labels.interest_rate, value: fields.interest_rate || '-' },
-        { label: labels.monthly_interest, value: fields.monthly_interest || '-' },
-        { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
-    ];
-
-    // 使用已有的 order-detail-grid 类名
-    const gridHtml = `
-        <div class="order-detail-grid">
-            ${infoItems.map(item => `
-                <div class="info-item">
-                    <div class="label">${Utils.escapeHtml(item.label)}</div>
-                    <div class="value">${Utils.escapeHtml(item.value)}</div>
+            
+            if (!orderInfoCard) return;
+            
+            // 提取订单信息（从 p 标签或直接文本中）
+            const lines = [];
+            const paragraphs = orderInfoCard.querySelectorAll('p');
+            
+            if (paragraphs.length > 0) {
+                for (const p of paragraphs) {
+                    const text = p.innerText.trim();
+                    if (text && !text.includes('缴费记录') && !text.includes('Riwayat Pembayaran')) {
+                        lines.push(text);
+                    }
+                }
+            } else {
+                // 如果没有 p 标签，从纯文本中提取
+                const text = orderInfoCard.innerText;
+                const textLines = text.split('\n');
+                for (const line of textLines) {
+                    const trimmed = line.trim();
+                    if (trimmed && !trimmed.includes('缴费记录') && !trimmed.includes('订单详情') &&
+                        !trimmed.includes('📄') && !trimmed.includes('💰') && !trimmed.includes('打印自')) {
+                        lines.push(trimmed);
+                    }
+                }
+            }
+            
+            // 定义需要提取的字段映射
+            const fieldMap = {
+                '订单号': 'order_id',
+                'ID Pesanan': 'order_id',
+                '客户姓名': 'customer_name',
+                'Nama Nasabah': 'customer_name',
+                '质押物名称': 'collateral_name',
+                'Nama Jaminan': 'collateral_name',
+                '贷款金额': 'loan_amount',
+                'Jumlah Pinjaman': 'loan_amount',
+                '还款方式': 'repayment_type',
+                'Jenis Cicilan': 'repayment_type',
+                '状态': 'status',
+                'Status': 'status',
+                '约定利率': 'interest_rate',
+                'Suku Bunga': 'interest_rate',
+                '月利息': 'monthly_interest',
+                'Bunga Bulanan': 'monthly_interest',
+                '剩余本金': 'remaining_principal',
+                'Sisa Pokok': 'remaining_principal'
+            };
+            
+            // 解析字段值
+            const fields = {};
+            for (const line of lines) {
+                for (const [label, key] of Object.entries(fieldMap)) {
+                    if (line.startsWith(label) || line.includes(label + ' ')) {
+                        let value = line.replace(label, '').replace(/^[:：\s]+/, '').trim();
+                        if (value) {
+                            fields[key] = value;
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // 语言判断
+            const lang = Utils.lang;
+            const labels = {
+                order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
+                customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
+                collateral_name: lang === 'id' ? 'Nama Jaminan' : '质押物名称',
+                loan_amount: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
+                repayment_type: lang === 'id' ? 'Jenis Cicilan' : '还款方式',
+                status: lang === 'id' ? 'Status' : '状态',
+                interest_rate: lang === 'id' ? 'Suku Bunga' : '约定利率',
+                monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
+                remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
+            };
+            
+            // 构建3列网格
+            const infoItems = [
+                { label: labels.order_id, value: fields.order_id || '-' },
+                { label: labels.customer_name, value: fields.customer_name || '-' },
+                { label: labels.collateral_name, value: fields.collateral_name || '-' },
+                { label: labels.loan_amount, value: fields.loan_amount || '-' },
+                { label: labels.repayment_type, value: fields.repayment_type || '-' },
+                { label: labels.status, value: fields.status || '-' },
+                { label: labels.interest_rate, value: fields.interest_rate || '-' },
+                { label: labels.monthly_interest, value: fields.monthly_interest || '-' },
+                { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
+            ];
+            
+            const gridHtml = `
+                <div class="order-info-grid">
+                    ${infoItems.map(item => `
+                        <div class="info-item">
+                            <div class="label">${Utils.escapeHtml(item.label)}</div>
+                            <div class="value">${Utils.escapeHtml(item.value)}</div>
+                        </div>
+                    `).join('')}
                 </div>
-            `).join('')}
-        </div>
-    `;
-
-    // 保留缴费记录等其他内容
-    const otherContent = [];
-    const children = orderInfoCard.children;
-    for (const child of children) {
-        if (child.tagName === 'H3' && (child.innerText.includes('缴费记录') || child.innerText.includes('Riwayat Pembayaran'))) {
-            otherContent.push(child.outerHTML);
-            let next = child.nextElementSibling;
-            while (next && (!next.tagName === 'H3' || !next.innerText.includes('订单'))) {
-                otherContent.push(next.outerHTML);
-                next = next.nextElementSibling;
+            `;
+            
+            // 保存原始卡片中的其他内容（如缴费记录表格）
+            const otherContent = [];
+            const children = orderInfoCard.children;
+            for (const child of children) {
+                if (child.tagName === 'H3' && (child.innerText.includes('缴费记录') || child.innerText.includes('Riwayat Pembayaran'))) {
+                    // 保留缴费记录标题和后续内容
+                    otherContent.push(child.outerHTML);
+                    let next = child.nextElementSibling;
+                    while (next && (!next.tagName === 'H3' || !next.innerText.includes('订单'))) {
+                        otherContent.push(next.outerHTML);
+                        next = next.nextElementSibling;
+                    }
+                    break;
+                }
             }
-            break;
+            
+            // 替换卡片内容
+            orderInfoCard.innerHTML = gridHtml + otherContent.join('');
         }
-    }
-
-    orderInfoCard.innerHTML = gridHtml + otherContent.join('');
-}
+    };
 
     // 挂载命名空间
     JF.PrintPage = PrintPage;
