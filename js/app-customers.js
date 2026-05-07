@@ -1,4 +1,4 @@
-// app-customers.js - v2.4 完整版（包含删除客户功能 + 统一金额提取）
+// app-customers.js - v2.5 费用卡片样式优化 + 双语详细分级说明
 
 'use strict';
 
@@ -265,7 +265,7 @@
                 const canEdit = isAdmin;
                 const canBlacklist = !isBlacklisted;
                 const canUnblacklist = isAdmin && isBlacklisted;
-                const canDelete = isAdmin;  // 管理员可删除客户
+                const canDelete = isAdmin;
 
                 const modalHtml =
                     `<div id="customerDetailCard" class="modal-overlay customer-detail-card">
@@ -349,7 +349,7 @@
             }
         },
 
-        // ==================== 从卡片删除客户（新增功能） ====================
+        // ==================== 从卡片删除客户 ====================
         deleteCustomerFromCard: async function (customerId, customerName) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -360,7 +360,6 @@
                 return;
             }
             
-            // 先检查客户是否有进行中的订单
             try {
                 const client = SUPABASE.getClient();
                 const { data: activeOrders, error } = await client
@@ -379,7 +378,6 @@
                     return;
                 }
                 
-                // 二次确认
                 const confirmMsg = lang === 'id'
                     ? `⚠️ HAPUS NASABAH "${customerName}"?\n\nSemua data berikut akan dihapus:\n• Data nasabah\n• Semua pesanan (riwayat lengkap)\n• Riwayat pembayaran\n• Catatan blacklist (jika ada)\n\n⚠️ TINDAKAN INI TIDAK DAPAT DIBATALKAN!`
                     : `⚠️ 删除客户 "${customerName}"？\n\n以下数据将被删除：\n• 客户基本信息\n• 所有订单记录\n• 缴费历史记录\n• 黑名单记录（如有）\n\n⚠️ 此操作不可撤销！`;
@@ -387,14 +385,11 @@
                 const confirmed = await Utils.toast.confirm(confirmMsg);
                 if (!confirmed) return;
                 
-                // 执行删除
                 await CustomersPage.deleteCustomer(customerId);
                 
-                // 关闭详情弹窗
                 const modal = document.getElementById('customerDetailCard');
                 if (modal) modal.remove();
                 
-                // 刷新客户列表
                 await CustomersPage.showCustomers();
                 
             } catch (error) {
@@ -482,12 +477,10 @@
             const t = Utils.t.bind(Utils);
             const client = SUPABASE.getClient();
             
-            // 获取客户信息用于日志
             const { data: customer } = await client.from('customers').select('name, customer_id').eq('id', customerId).single();
             const customerName = customer?.name || 'Unknown';
             
             try {
-                // 1. 获取该客户的所有订单ID
                 const { data: orders, error: ordersError } = await client
                     .from('orders')
                     .select('id')
@@ -497,7 +490,6 @@
                 
                 const orderIds = (orders || []).map(o => o.id);
                 
-                // 2. 删除 payment_history 中的记录
                 if (orderIds.length > 0) {
                     const { error: payError } = await client
                         .from('payment_history')
@@ -506,7 +498,6 @@
                     if (payError) console.warn('删除缴费记录失败:', payError.message);
                 }
                 
-                // 3. 删除 cash_flow_records 中的记录
                 if (orderIds.length > 0) {
                     const { error: flowError } = await client
                         .from('cash_flow_records')
@@ -514,7 +505,6 @@
                         .in('order_id', orderIds);
                     if (flowError) console.warn('删除现金流记录失败:', flowError.message);
                     
-                    // 也删除 reference_id 关联的记录
                     const { error: refError } = await client
                         .from('cash_flow_records')
                         .delete()
@@ -522,7 +512,6 @@
                     if (refError) console.warn('删除关联现金流失败:', refError.message);
                 }
                 
-                // 4. 删除 reminder_logs 中的记录
                 if (orderIds.length > 0) {
                     const { error: remindError } = await client
                         .from('reminder_logs')
@@ -531,28 +520,24 @@
                     if (remindError) console.warn('删除提醒记录失败:', remindError.message);
                 }
                 
-                // 5. 删除 orders 中的记录
                 const { error: orderDeleteError } = await client
                     .from('orders')
                     .delete()
                     .eq('customer_id', customerId);
                 if (orderDeleteError) throw orderDeleteError;
                 
-                // 6. 删除 blacklist 中的记录
                 const { error: blacklistError } = await client
                     .from('blacklist')
                     .delete()
                     .eq('customer_id', customerId);
                 if (blacklistError) console.warn('删除黑名单记录失败:', blacklistError.message);
                 
-                // 7. 删除 customer 本身
                 const { error: customerError } = await client
                     .from('customers')
                     .delete()
                     .eq('id', customerId);
                 if (customerError) throw customerError;
                 
-                // 8. 审计日志
                 if (window.Audit) {
                     await window.Audit.log('customer_delete', JSON.stringify({
                         customer_id: customerId,
@@ -566,7 +551,6 @@
                     ? `Nasabah "${customerName}" berhasil dihapus` 
                     : `客户 "${customerName}" 已删除`);
                 
-                // 清除缓存
                 if (window.APP.clearAnomalyCache) window.APP.clearAnomalyCache();
                 SUPABASE.clearCache();
                 
@@ -577,7 +561,7 @@
             }
         },
 
-        // ==================== 为客户创建订单 ====================
+        // ==================== 为客户创建订单（费用卡片优化版） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -595,7 +579,17 @@
                 APP.currentPage = 'createOrder'; 
                 APP.currentCustomerId = customerId; 
                 const occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
-                document.getElementById("app").innerHTML = `<div class="page-header"><h2>📝 ${t('create_order')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card"><div class="form-section"><div class="form-section-title"><span class="section-icon">👤</span> ${t('customer_info')}</div><div class="info-display"><div class="info-display-item"><span class="info-label">${t('customer_id')}</span><span class="info-value">${Utils.escapeHtml(customer.customer_id || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('customer_name')}</span><span class="info-value">${Utils.escapeHtml(customer.name)}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_number')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_number || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('phone')}</span><span class="info-value">${Utils.escapeHtml(customer.phone)}</span></div><div class="info-display-item"><span class="info-label">${t('occupation')}</span><span class="info-value">${occupationDisplay}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_address')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('living_address')}</span><span class="info-value">${customer.living_same_as_ktp !== false ? t('same_as_ktp') : Utils.escapeHtml(customer.living_address || '-')}</span></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💎</span> ${t('collateral_info')}</div><div class="order-first-row"><div class="form-group"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div><div class="form-group"><label>${t('collateral_note')}</label><input id="collateralNote" placeholder="${lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年'}"></div><div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()"></div><div class="form-group"><label>${t('loan_source')}</label><div class="payment-method-selector compact"><label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label></div></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💰</span> ${t('fee_details')}</div><div class="fee-cards-row"><div class="fee-card"><div class="fee-card-label">📋 ${t('admin_fee')}</div><div class="fee-card-body"><input type="text" id="adminFeeInput" value="0" class="amount-input" readonly style="background:#f8fafc;"></div><div class="fee-card-hint">💡 ≤Rp500rb→Rp20rb | Rp500rb~3jt→Rp30rb | >3jt→1%</div></div><div class="fee-card"><div class="fee-card-label">✨ ${t('service_fee')}</div><div class="fee-card-body"><select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">${Utils.getServiceFeePercentOptions(2)}</select><input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()"></div><div class="fee-card-hint" id="serviceFeeHint">💡 ${lang === 'id' ? '≤3jt: 0% | 3jt~5jt: 1% | >5jt: dapat dipilih' : '≤300万: 0% | 301万~500万: 1% | >500万: 可选'}</div></div></div><div class="payment-method-row"><span class="payment-method-label">📥 ${t('fee_payment_method')}</span><div class="payment-method-selector compact" style="padding:0;"><label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ${t('bank')}</label></div><div class="payment-method-hint">💡 ${t('fee_payment_hint')}</div></div><div class="form-group interest-rate-group"><label>📈 ${t('interest_rate_select')}</label><select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">📅</span> ${t('repayment_method')}</div><div class="repayment-cards-row"><div class="repayment-card selected" id="flexibleCard" onclick="document.getElementById('flexibleRadio').checked=true;APP.toggleRepaymentForm('flexible')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="flexibleRadio" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">💰 ${t('flexible_repayment')}</span></div><div class="repayment-card-desc">${t('flexible_desc')}</div><div class="repayment-card-note">${t('max_tenor')}</div></div><div class="repayment-card" id="fixedCard" onclick="document.getElementById('fixedRadio').checked=true;APP.toggleRepaymentForm('fixed')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="fixedRadio" value="fixed" onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">📅 ${t('fixed_repayment')}</span></div><div class="repayment-card-desc">${t('fixed_desc')}</div><div class="repayment-card-note">${lang === 'id' ? 'Pilihan 1-10 bulan' : '可选1-10个月'}</div></div><div id="flexibleMaxMonthsCard" class="repayment-card extension-card"><div class="repayment-card-header"><span class="repayment-card-title">📅 ${t('max_extension')}</span></div><div class="extension-select"><select id="maxExtensionMonths"><option value="6">6 ${t('month')}</option><option value="10" selected>10 ${t('month')}</option><option value="12">12 ${t('month')}</option><option value="24">24 ${t('month')}</option></select></div><div class="repayment-card-note extension-note">${t('extension_limit')}</div></div></div><div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form"><div class="form-grid"><div class="form-group"><label>📅 ${t('term_months')}</label><select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">${Utils.getRepaymentTermOptions(5)}</select></div><div class="form-group"><label>💰 ${t('monthly_payment')}</label><input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()"><div class="form-hint">${t('monthly_payment_rounded')}</div></div></div></div></div><div class="form-section"><div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div><div class="form-actions"><button onclick="APP.saveOrderForCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success" id="saveOrderBtn">💾 ${t('save')}</button><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('cancel')}</button></div></div></div>`;
+
+                // ========== 费用明细卡片 HTML（双语详细分级说明） ==========
+                const adminFeeHintText = lang === 'id'
+                    ? `• Nilai gadai ≤ Rp500.000 : biaya administrasi Rp20.000\n• Nilai gadai Rp500.000 – Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai`
+                    : `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
+
+                const serviceFeeHintText = lang === 'id'
+                    ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
+                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+
+                document.getElementById("app").innerHTML = `<div class="page-header"><h2>📝 ${t('create_order')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card"><div class="form-section"><div class="form-section-title"><span class="section-icon">👤</span> ${t('customer_info')}</div><div class="info-display"><div class="info-display-item"><span class="info-label">${t('customer_id')}</span><span class="info-value">${Utils.escapeHtml(customer.customer_id || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('customer_name')}</span><span class="info-value">${Utils.escapeHtml(customer.name)}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_number')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_number || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('phone')}</span><span class="info-value">${Utils.escapeHtml(customer.phone)}</span></div><div class="info-display-item"><span class="info-label">${t('occupation')}</span><span class="info-value">${occupationDisplay}</span></div><div class="info-display-item"><span class="info-label">${t('ktp_address')}</span><span class="info-value">${Utils.escapeHtml(customer.ktp_address || customer.address || '-')}</span></div><div class="info-display-item"><span class="info-label">${t('living_address')}</span><span class="info-value">${customer.living_same_as_ktp !== false ? t('same_as_ktp') : Utils.escapeHtml(customer.living_address || '-')}</span></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💎</span> ${t('collateral_info')}</div><div class="order-first-row"><div class="form-group"><label>${t('collateral_name')} *</label><input id="collateral" placeholder="${t('collateral_name')}"></div><div class="form-group"><label>${t('collateral_note')}</label><input id="collateralNote" placeholder="${lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年'}"></div><div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()"></div><div class="form-group"><label>${t('loan_source')}</label><div class="payment-method-selector compact"><label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label></div></div></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">💰</span> ${t('fee_details')}</div><div class="fee-cards-row"><div class="fee-card"><div class="fee-card-label">📋 ${t('admin_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Biaya Tetap' : '固定收费'})</small></div><div class="fee-card-body"><input type="text" id="adminFeeInput" value="0" class="amount-input" readonly></div><div class="fee-card-hint">${adminFeeHintText}</div></div><div class="fee-card"><div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div><div class="fee-card-body"><select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">${Utils.getServiceFeePercentOptions(2)}</select><input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()"></div><div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div></div></div><div class="payment-method-row"><span class="payment-method-label">📥 ${t('fee_payment_method')}</span><div class="payment-method-selector compact" style="padding:0;"><label><input type="radio" name="feePaymentMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="feePaymentMethod" value="bank"> 🏧 ${t('bank')}</label></div><div class="payment-method-hint">💡 ${t('fee_payment_hint')}</div></div><div class="form-group interest-rate-group"><label>📈 ${t('interest_rate_select')}</label><select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select></div></div><div class="form-section"><div class="form-section-title"><span class="section-icon">📅</span> ${t('repayment_method')}</div><div class="repayment-cards-row"><div class="repayment-card selected" id="flexibleCard" onclick="document.getElementById('flexibleRadio').checked=true;APP.toggleRepaymentForm('flexible')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="flexibleRadio" value="flexible" checked onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">💰 ${t('flexible_repayment')}</span></div><div class="repayment-card-desc">${t('flexible_desc')}</div><div class="repayment-card-note">${t('max_tenor')}</div></div><div class="repayment-card" id="fixedCard" onclick="document.getElementById('fixedRadio').checked=true;APP.toggleRepaymentForm('fixed')"><div class="repayment-card-header"><input type="radio" name="repaymentType" id="fixedRadio" value="fixed" onchange="APP.toggleRepaymentForm(this.value)"><span class="repayment-card-title">📅 ${t('fixed_repayment')}</span></div><div class="repayment-card-desc">${t('fixed_desc')}</div><div class="repayment-card-note">${lang === 'id' ? 'Pilihan 1-10 bulan' : '可选1-10个月'}</div></div><div id="flexibleMaxMonthsCard" class="repayment-card extension-card"><div class="repayment-card-header"><span class="repayment-card-title">📅 ${t('max_extension')}</span></div><div class="extension-select"><select id="maxExtensionMonths"><option value="6">6 ${t('month')}</option><option value="10" selected>10 ${t('month')}</option><option value="12">12 ${t('month')}</option><option value="24">24 ${t('month')}</option></select></div><div class="repayment-card-note extension-note">${t('extension_limit')}</div></div></div><div id="fixedRepaymentForm" style="display:none;" class="fixed-repayment-form"><div class="form-grid"><div class="form-group"><label>📅 ${t('term_months')}</label><select id="repaymentTermSelect" onchange="APP.recalculateAllFees()">${Utils.getRepaymentTermOptions(5)}</select></div><div class="form-group"><label>💰 ${t('monthly_payment')}</label><input type="text" id="monthlyPaymentInput" value="0" class="amount-input" oninput="APP.onMonthlyPaymentManualChange()"><div class="form-hint">${t('monthly_payment_rounded')}</div></div></div></div></div><div class="form-section"><div class="form-group full-width"><label>${t('notes')}</label><textarea id="notes" rows="2" placeholder="${t('notes')}"></textarea></div><div class="form-actions"><button onclick="APP.saveOrderForCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success" id="saveOrderBtn">💾 ${t('save')}</button><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('cancel')}</button></div></div></div>`;
                 const amountInput = document.getElementById("amount"); if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
                 const serviceFeeInput = document.getElementById("serviceFeeInput"); if (serviceFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(serviceFeeInput);
                 const monthlyPaymentInput = document.getElementById("monthlyPaymentInput"); if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
@@ -691,11 +685,57 @@
             const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
             if (serviceFeeInput && !serviceFeeInput.dataset.manual) { const result = Utils.calculateServiceFee(amount, percent); serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount); }
             if (serviceFeeSelect) { const group = serviceFeeSelect.closest('.form-group') || serviceFeeSelect.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; }
+            // 同步更新服务费提示
+            this._updateServiceFeeHint(amount, percent);
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
             if (repaymentType === 'fixed') { const rateSelect = document.getElementById('agreedInterestRateSelect'); const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08; const termSelect = document.getElementById('repaymentTermSelect'); const months = termSelect ? parseInt(termSelect.value) : 5; if (amount > 0 && months > 0) { const monthly = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months); const rounded = Utils.roundMonthlyPayment(monthly); const monthlyInput = document.getElementById('monthlyPaymentInput'); if (monthlyInput && !monthlyInput.dataset.manual) { monthlyInput.value = Utils.formatNumberWithCommas(rounded); } } }
         },
 
-        recalculateServiceFee() { const select = document.getElementById('serviceFeePercentSelect'); if (select) select.dataset.manual = 'true'; const amount = Utils.getAmountFromInput('amount'); const percent = select ? parseFloat(select.value) : 2; const result = Utils.calculateServiceFee(amount, percent); const input = document.getElementById('serviceFeeInput'); if (input) { input.value = Utils.formatNumberWithCommas(result.amount); input.dataset.manual = 'true'; } const hint = document.getElementById('serviceFeeHint'); if (hint) { hint.innerHTML = amount <= 3000000 ? `💡 ${Utils.lang === 'id' ? '≤3jt: Gratis (0%)' : '≤300万: 免费 (0%)'}` : amount <= 5000000 ? `💡 ${Utils.lang === 'id' ? '3jt~5jt: 1% (otomatis)' : '301万~500万: 1% (自动)'}` : `💡 ${Utils.lang === 'id' ? '>5jt: Pilih 2%-6%' : '>500万: 可选 2%-6%'}`; } if (select) { const group = select.closest('.form-group') || select.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; } },
+        // ========== 提取服务费提示更新逻辑为独立方法 ==========
+        _updateServiceFeeHint(amount, percent) {
+            const hint = document.getElementById('serviceFeeHint');
+            if (!hint) return;
+            const lang = Utils.lang;
+            if (amount <= 0) {
+                hint.innerHTML = lang === 'id'
+                    ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
+                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+            } else {
+                const feeResult = Utils.calculateServiceFee(amount, percent);
+                if (feeResult.percent === 0) {
+                    hint.innerHTML = lang === 'id'
+                        ? `✅ Nilai gadai ≤ Rp3.000.000 : <strong>gratis biaya layanan (0%)</strong>\n\n• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal 12%`
+                        : `✅ 当金 ≤ Rp3,000,000 ：<strong>免服务费（0%）</strong>\n\n• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                } else if (feeResult.percent === 1) {
+                    hint.innerHTML = lang === 'id'
+                        ? `📌 Nilai gadai Rp3.000.001–Rp5.000.000 : <strong>dikenakan 1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal 12%`
+                        : `📌 当金 Rp3,000,001～Rp5,000,000 ：<strong>收取 1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                } else {
+                    hint.innerHTML = lang === 'id'
+                        ? `🔢 Nilai gadai > Rp5.000.000 : <strong>dipilih ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal 12%`
+                        : `🔢 当金 > Rp5,000,000 ：<strong>已选 ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                }
+            }
+        },
+
+        recalculateServiceFee() {
+            const select = document.getElementById('serviceFeePercentSelect');
+            if (select) select.dataset.manual = 'true';
+            const amount = Utils.getAmountFromInput('amount');
+            const percent = select ? parseFloat(select.value) : 2;
+            const result = Utils.calculateServiceFee(amount, percent);
+            const input = document.getElementById('serviceFeeInput');
+            if (input) {
+                input.value = Utils.formatNumberWithCommas(result.amount);
+                input.dataset.manual = 'true';
+            }
+            // 使用独立方法更新提示
+            this._updateServiceFeeHint(amount, percent);
+            if (select) {
+                const group = select.closest('.form-group') || select.parentElement;
+                if (group) group.style.display = (amount > 5000000) ? '' : 'none';
+            }
+        },
 
         onServiceFeeManualChange() { const input = document.getElementById('serviceFeeInput'); if (input) input.dataset.manual = 'true'; },
 
@@ -798,5 +838,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.4 完整版（包含删除客户功能 + 统一金额提取）');
+    console.log('✅ JF.CustomersPage v2.5 费用卡片样式优化 + 双语详细分级说明');
 })();
