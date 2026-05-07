@@ -174,9 +174,10 @@
                             color: #1e293b;
                         }
                         @media print {
-                            @page { size: A4; margin: 8mm; }
+                            /* margin-top: 0 隐藏浏览器自动生成的顶部打印戳记（日期+标题行） */
+                            @page { size: A4; margin: 0mm 8mm 8mm 8mm; }
                             body { margin: 0; padding: 0; }
-                            .print-container { padding: 0; }
+                            .print-container { padding: 5mm 0 0 0; }
                             .card { break-inside: avoid; }
                         }
                     </style>
