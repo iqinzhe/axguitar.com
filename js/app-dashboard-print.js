@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v3.6 彻底移除打印页眉垃圾行
+// app-dashboard-print.js - v3.7 根治浏览器打印页眉垃圾行（Chrome 强制隐藏）
 
 'use strict';
 
@@ -51,7 +51,7 @@
                 }
             }
 
-            // ========== TreeWalker 清理文本节点（增强移除“JF! by Gadai - 打印”等） ==========
+            // ========== 强力清除文本中的垃圾行 ==========
             const walker = document.createTreeWalker(
                 printContent,
                 NodeFilter.SHOW_TEXT
@@ -62,10 +62,9 @@
                 const text = node.nodeValue;
                 if (!text) continue;
                 const trimmed = text.trim();
-                // 匹配包含 "JF! by Gadai - 打印" 或 "JF! by Gadai - Cetak" 的行
-                if (trimmed.includes('JF! by Gadai - 打印') || trimmed.includes('JF! by Gadai - Cetak') ||
-                    /^\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(:\d{2})?\s*$/.test(trimmed) ||
-                    /JF! by Gadai\s*-\s*(打印|Cetak)/i.test(trimmed)) {
+                // 匹配包含日期时间 + JF! by Gadai - 打印 的整行
+                if (/^(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?\s+)?JF! by Gadai\s*-\s*(?:打印|Cetak)\s*$/i.test(trimmed) ||
+                    /^(?:JF! by Gadai\s*-\s*(?:打印|Cetak))/i.test(trimmed)) {
                     const parent = node.parentNode;
                     if (parent && parent.childNodes.length === 1) {
                         nodesToRemove.push(parent);
@@ -76,6 +75,12 @@
             }
             nodesToRemove.forEach(el => el.remove());
 
+            // 额外用正则清理 HTML 字符串中的垃圾（安全网）
+            let contentHtml = printContent.innerHTML.trim();
+            contentHtml = contentHtml
+                .replace(/<[^>]*>\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)\s*<\/[^>]*>/gi, '')
+                .replace(/^\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)\s*$/gim, '');
+
             // ========== 订单详情格式化 ==========
             this._reformatOrderInfoForPrint(printContent);
 
@@ -83,13 +88,8 @@
             this._fillEmptyRows(printContent);
             this._limitCellLines(printContent);
 
-            let contentHtml = printContent.innerHTML.trim();
-
-            // 额外正则移除任何可能残留的垃圾文本（安全网）
-            contentHtml = contentHtml
-                .replace(/^<[^>]+>\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)\s*<\/[^>]+>/gi, '')
-                .replace(/^<[^>]+>\s*(?:JF! by Gadai\s*-\s*(?:打印|Cetak))\s*<\/[^>]+>/gi, '')
-                .replace(/^\s*(?:\d{4}\/\d{1,2}\/\d{1,2}\s+\d{2}:\d{2}(:\d{2})?\s*)?JF! by Gadai\s*-\s*(?:打印|Cetak)/gi, '');
+            // 重新获取清理后的 HTML
+            contentHtml = printContent.innerHTML;
 
             // ========== 页头信息 ==========
             const lang = Utils.lang;
@@ -115,34 +115,34 @@
                 <html>
                 <head>
                     <meta charset="UTF-8">
-                    <title>JF! by Gadai - ${lang === 'id' ? 'Cetak' : '打印'}</title>
+                    <!-- 标题设置为不可见字符，防止浏览器页眉显示文字 -->
+                    <title>&#8203;</title>
                     <style>
-                        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-                        @page {
-                            size: A4 portrait;
-                            margin: 12mm 10mm 12mm 10mm;  /* 上 12mm，右 10mm，下 12mm，左 10mm */
-                            /* 禁用浏览器默认页眉页脚 */
-                            @top-left { content: none; }
-                            @top-center { content: none; }
-                            @top-right { content: none; }
-                            @bottom-center {
-                                content: "JF! by Gadai — ${footerBrandText} — " counter(page) " / " counter(pages);
-                                font-size: 7.5pt;
-                                color: #94a3b8;
-                            }
-                        }
-
-                        html, body {
+                        * {
+                            box-sizing: border-box;
                             margin: 0;
                             padding: 0;
+                        }
+                        /* 强制重置所有外边距和内边距 */
+                        html, body {
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            background: white;
                             font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
                             font-size: 9pt;
                             line-height: 1.4;
                             color: #1e293b;
-                            background: #fff;
                         }
-
+                        /* @page 设置：上边距为 0，然后通过 body 上边距控制实际内容位置，以此覆盖浏览器页眉区 */
+                        @page {
+                            size: A4 portrait;
+                            margin: 0mm;  /* 完全清除页边距，再用 body 的 padding 模拟 */
+                        }
+                        /* 恢复实际需要的边距（原设计为上下 12mm 左右 10mm） */
+                        .print-container {
+                            margin: 12mm 10mm;
+                            padding: 0;
+                        }
                         .print-header {
                             text-align: center;
                             margin-bottom: 8px;
@@ -506,5 +506,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v3.6 彻底移除打印页眉垃圾行，禁用浏览器默认页眉');
+    console.log('✅ JF.PrintPage v3.7 根治浏览器打印页眉（@page margin:0 + 空标题 + 内容清理）');
 })();
