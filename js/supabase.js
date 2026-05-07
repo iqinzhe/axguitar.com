@@ -110,8 +110,8 @@
     let _profileCache = null;
     const _storePrefixCache = new Map();
     let _storesCache = null, _storesCacheTime = 0;
-    const STORES_TTL = 43200000; // 12小时
-    const USERS_TTL = 43200000;   // 12小时
+    const STORES_TTL = 3600000; // 1小时
+    const USERS_TTL = 3600000;   // 1小时
 
     // 安全查询包装器
     const safeQuery = async (fn, fallback = null, silent = false) => {
