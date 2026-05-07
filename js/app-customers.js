@@ -1,4 +1,4 @@
-// app-customers.js - v2.7 客户列表活跃订单状态 + 费用Rp符号补充
+// app-customers.js - v2.8 服务费卡片补充 Rp 符号
 
 'use strict';
 
@@ -20,12 +20,11 @@
                 const storeMap = {};
                 for (const s of stores) storeMap[s.id] = s.name;
 
-                // 【v2.7 新增】批量查询所有客户的活跃订单状态
+                // 批量查询所有客户的活跃订单状态
                 const client = SUPABASE.getClient();
                 const customerIds = (customers || []).map(c => c.id);
                 const activeOrderMap = {};
                 if (customerIds.length > 0) {
-                    // 分批查询（PostgREST IN 有限制）
                     const BATCH_SIZE = 50;
                     for (let i = 0; i < customerIds.length; i += BATCH_SIZE) {
                         const batch = customerIds.slice(i, i + BATCH_SIZE);
@@ -55,18 +54,15 @@
                         const ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
                         const occupation = Utils.escapeHtml(c.occupation || '-');
 
-                        // 【v2.7 新增】检查是否有活跃订单
                         const hasActiveOrders = activeOrderMap[c.id] && activeOrderMap[c.id].length > 0;
                         let createBtnHtml;
                         if (hasActiveOrders) {
-                            // 有活跃订单：按钮变灰，显示提示
                             const orderList = activeOrderMap[c.id].join(', ');
                             createBtnHtml = `<button class="btn btn--sm" style="background:#94a3b8;color:#fff;opacity:0.7;cursor:not-allowed;" disabled
                                 title="${lang === 'id' ? 'Memiliki pesanan aktif: ' + orderList : '有活跃订单: ' + orderList}">
                                 🔒 ${lang === 'id' ? 'Pesanan Aktif' : '活跃订单中'}
                             </button>`;
                         } else {
-                            // 无活跃订单：绿色按钮，可创建
                             createBtnHtml = `<button onclick="APP.createOrderForCustomer('${Utils.escapeAttr(c.id)}')" class="btn btn--success btn--sm">➕ ${t('create_order_for')}</button>`;
                         }
 
@@ -593,7 +589,7 @@
             }
         },
 
-        // ==================== 为客户创建订单（v2.7 费用Rp符号补充） ====================
+        // ==================== 为客户创建订单（v2.8 服务费卡片补充 Rp） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -653,13 +649,12 @@
                             <div class="fee-cards-row">
                                 <div class="fee-card">
                                     <div class="fee-card-label">📋 ${t('admin_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Biaya Tetap' : '固定收费'})</small></div>
-                                    <!-- 【v2.7 修复】管理费金额前补 Rp -->
                                     <div class="fee-card-body"><span style="font-weight:700;color:var(--text-primary);margin-right:4px;">Rp</span><input type="text" id="adminFeeInput" value="0" class="amount-input" readonly></div>
                                     <div class="fee-card-hint">${adminFeeHintText}</div>
                                 </div>
                                 <div class="fee-card">
                                     <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
-                                    <!-- 【v2.7 修复】服务费金额前补 Rp -->
+                                    <!-- 【v2.8 修复】百分比下拉框和金额输入框之间补 Rp -->
                                     <div class="fee-card-body"><select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">${Utils.getServiceFeePercentOptions(2)}</select><span style="font-weight:700;color:var(--text-primary);margin:0 4px;">Rp</span><input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()"></div>
                                     <div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div>
                                 </div>
@@ -741,7 +736,6 @@
             const repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
             let repaymentTerm = null, monthlyFixedPayment = null;
             
-            // 典当期限（仅灵活还款）
             let pawnTermMonths = null;
             if (repaymentType === 'flexible') {
                 const pawnTermSelect = document.getElementById('pawnTermSelect');
@@ -988,5 +982,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.7 客户列表活跃订单状态区分 + 费用Rp符号补充');
+    console.log('✅ JF.CustomersPage v2.8 服务费卡片补充 Rp 符号');
 })();
