@@ -1,6 +1,6 @@
-// utils.js - v2.4 统一重构版
+// utils.js - v2.5 典当期限功能
 // 基础工具模块，挂载到 JF.Utils
-// 修复：增加网络监控 + 错误恢复工具 + 金额提取统一函数 + 移除货币缓存 + NetworkMonitor.destroy
+// 新增：getPawnTermOptions / calculatePawnDueDate / updatePawnDueDateDisplay
 // v2.4: 费用配置集中管理，引用 FeeConfig
 
 'use strict';
@@ -870,6 +870,65 @@
         return Utils.parseNumberFromCommas(el.value);
     };
 
+    /* ==================== 典当期限 ==================== */
+    /**
+     * 生成典当期限下拉选项（1-10个月，无默认选中，必选）
+     */
+    Utils.getPawnTermOptions = function () {
+        const label = _lang === 'id' ? 'bulan' : '个月';
+        const defaultOption = _lang === 'id' 
+            ? '<option value="">-- Pilih Jangka Waktu --</option>'
+            : '<option value="">-- 请选择期限 --</option>';
+        return defaultOption + Array.from({ length: 10 }, (_, i) => i + 1)
+            .map(m => `<option value="${m}">${m} ${label}</option>`)
+            .join('');
+    };
+
+    /**
+     * 计算典当到期日
+     * @param {string} startDate - 起始日期 (YYYY-MM-DD)
+     * @param {number} termMonths - 期限月数
+     * @returns {string} 到期日 (YYYY-MM-DD)
+     */
+    Utils.calculatePawnDueDate = function (startDate, termMonths) {
+        if (!startDate || !termMonths || termMonths <= 0) return '';
+        const [year, month, day] = startDate.split('-').map(Number);
+        const totalMonths = month - 1 + termMonths;
+        const newYear = year + Math.floor(totalMonths / 12);
+        const newMonth = (totalMonths % 12) + 1;
+        const daysInNewMonth = new Date(Date.UTC(newYear, newMonth, 0)).getUTCDate();
+        const newDay = Math.min(day, daysInNewMonth);
+        return (
+            newYear +
+            '-' +
+            String(newMonth).padStart(2, '0') +
+            '-' +
+            String(newDay).padStart(2, '0')
+        );
+    };
+
+    /**
+     * 动态更新典当到期日显示
+     * 调用方：createOrderForCustomer 页面
+     */
+    Utils.updatePawnDueDateDisplay = function () {
+        const termSelect = document.getElementById('pawnTermSelect');
+        const displayEl = document.getElementById('pawnDueDateDisplay');
+        if (!termSelect || !displayEl) return;
+        
+        const selectedMonths = parseInt(termSelect.value);
+        if (!selectedMonths || selectedMonths <= 0) {
+            displayEl.innerHTML = '';
+            return;
+        }
+        
+        const today = Utils.getLocalToday();
+        const dueDate = Utils.calculatePawnDueDate(today, selectedMonths);
+        displayEl.innerHTML = '📅 ' + (_lang === 'id' ? 'Tanggal Jatuh Tempo: ' : '到期日: ') + Utils.formatDate(dueDate);
+        // 存储到期日供保存时使用
+        displayEl.dataset.dueDate = dueDate;
+    };
+
     /* ==================== 网络监控（增强版，支持 destroy） ==================== */
     Utils.NetworkMonitor = {
         _initialized: false,
@@ -1004,5 +1063,5 @@
         Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = window.JF.FeeConfig.DEFAULT_INTEREST_RATE_PERCENT;
     }
 
-    console.log('✅ Utils v2.4 初始化完成 (费用配置集中管理，默认利率8.5%)');
+    console.log('✅ Utils v2.5 初始化完成 (典当期限功能)');
 })();
