@@ -1,7 +1,7 @@
-// supabase.js - v2.3 完整修复版
-// 1. 管理员可查看所有门店数据（包括练习门店）
+// supabase.js - v2.4 管理员排除练习门店数据
+// 1. 管理员可查看所有门店数据（排除练习门店）
 // 2. 管理员可为总部创建支出
-// 3. 移除练习门店数据排除逻辑
+// 3. 新增 excludePracticeStores 通用过滤函数
 
 'use strict';
 
@@ -139,6 +139,30 @@
         }
         // 非管理员：只能看自己门店
         if(profile.store_id) return query.eq('store_id', profile.store_id);
+        return query;
+    };
+
+    // ==================== 【v2.4 新增】排除练习门店的通用过滤函数 ====================
+    /**
+     * 自动排除练习门店数据（仅对管理员生效）
+     * 规则：管理员默认排除 is_practice=true 的门店，除非显式指定 includePractice=true
+     * @param {Object} query - Supabase 查询对象
+     * @param {Object} profile - 当前用户 profile
+     * @param {Object} [options] - 可选配置
+     * @param {boolean} [options.includePractice=false] - 是否包含练习门店
+     * @returns {Object} 修改后的查询对象
+     */
+    const excludePracticeStores = async (query, profile, options = {}) => {
+        if (!profile) return query;
+        const { includePractice = false } = options;
+        
+        // 只有管理员才需要排除练习门店（非管理员只能看自己门店，不涉及此问题）
+        if (profile.role === 'admin' && !includePractice) {
+            const practiceIds = await SupabaseAPI._getPracticeStoreIds();
+            if (practiceIds.length > 0) {
+                query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+            }
+        }
         return query;
     };
 
@@ -727,6 +751,7 @@
         },
 
         // ===== 完整业务方法 =====
+        // 【v2.4 修改】排除练习门店
         async getFullCapitalAnalysis(storeIdParam = null) {
             const profile = await this.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
@@ -738,6 +763,8 @@
             let injectionQuery = supabaseClient.from('capital_injections')
                 .select('*').eq('is_voided', false);
             injectionQuery = applyStoreFilter(injectionQuery, profile, targetStoreId);
+            // 【v2.4】管理员排除练习门店
+            injectionQuery = await excludePracticeStores(injectionQuery, profile);
             const { data: injections } = await injectionQuery;
 
             const externalInjections = (injections || []).filter(i => i.source !== 'profit');
@@ -750,6 +777,8 @@
             let orderQuery = supabaseClient.from('orders')
                 .select('loan_amount, status, store_id').eq('status', 'active');
             orderQuery = applyStoreFilter(orderQuery, profile, targetStoreId);
+            // 【v2.4】管理员排除练习门店
+            orderQuery = await excludePracticeStores(orderQuery, profile);
             const { data: activeOrders } = await orderQuery;
             const deployedCapital = (activeOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
             const availableCapital = totalCapital - deployedCapital;
@@ -920,14 +949,16 @@
         },
 
         // ---------- 订单核心 ----------
+        // 【v2.4 修改】排除练习门店
         async getOrders(filters={}, from, to) {
             const profile = await this.getCurrentProfile();
             let q = supabaseClient.from('orders').select('*', { count:'exact' });
-            // 管理员不过滤门店（包括练习门店），可查看所有数据
+            // 【v2.4】管理员排除练习门店
+            q = await excludePracticeStores(q, profile);
+            // 非管理员只看本店
             if(profile?.role !== 'admin' && profile?.store_id) {
                 q = q.eq('store_id', profile.store_id);
             }
-            // 注意：管理员不再排除练习门店，可以看到所有数据
             if(filters.status && filters.status!=='all') q = q.eq('status', filters.status);
             if(from!==undefined && to!==undefined) q = q.range(from, to);
             q = q.order('created_at', { ascending: false });
@@ -1395,11 +1426,14 @@
             return true;
         },
 
+        // 【v2.4 修改】排除练习门店
         async getAllPayments() {
             if (!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
             let orderQuery = supabaseClient.from('orders').select('id, order_id, customer_name');
-            // 管理员不过滤门店
+            // 【v2.4】管理员排除练习门店
+            orderQuery = await excludePracticeStores(orderQuery, profile);
+            // 非管理员只看本店
             if(profile?.role !== 'admin' && profile?.store_id) {
                 orderQuery = orderQuery.eq('store_id', profile.store_id);
             }
@@ -1471,6 +1505,7 @@
             return true;
         },
 
+        // 【v2.4 修改】排除练习门店（三个子查询）
         async getCashFlowSummary(storeIdParam = null) {
             if (!supabaseClient) return { cash: { balance: 0 }, bank: { balance: 0 }, total: { balance: 0 }, netProfit: { operatingIncome: 0, operatingExpense: 0 }, total_injected_capital: 0, deployed_capital: 0, available_capital: 0 };
             
@@ -1486,6 +1521,7 @@
                 }
             }
             
+            // 子查询1：现金流记录
             let query = supabaseClient.from('cash_flow_records')
                 .select('direction, amount, source_target, flow_type, store_id')
                 .eq('is_voided', false);
@@ -1495,7 +1531,10 @@
             } else if (!isAdmin && profile?.store_id) {
                 query = query.eq('store_id', profile.store_id);
             }
-            // 管理员不排除任何数据（包括练习门店）- 移除了 practice 排除逻辑
+            // 【v2.4】管理员排除练习门店
+            if (isAdmin && !targetStoreId) {
+                query = await excludePracticeStores(query, profile);
+            }
             
             const { data: flows, error } = await query;
             if (error) throw error;
@@ -1514,6 +1553,7 @@
                 else if (flow.flow_type === 'admin_fee' || flow.flow_type === 'service_fee' || flow.flow_type === 'interest') operatingIncome += amt;
             }
 
+            // 子查询2：资本注入
             let injectionQuery = supabaseClient.from('capital_injections')
                 .select('amount, source')
                 .eq('is_voided', false)
@@ -1524,11 +1564,15 @@
             } else if (!isAdmin && profile?.store_id) {
                 injectionQuery = injectionQuery.eq('store_id', profile.store_id);
             }
-            // 管理员不排除练习门店
+            // 【v2.4】管理员排除练习门店
+            if (isAdmin && !targetStoreId) {
+                injectionQuery = await excludePracticeStores(injectionQuery, profile);
+            }
             
             const { data: injections } = await injectionQuery;
             const totalInjectedCapital = (injections || []).reduce((sum, i) => sum + (i.amount || 0), 0);
 
+            // 子查询3：在押资金
             let deployedQuery = supabaseClient.from('orders')
                 .select('loan_amount')
                 .eq('status', 'active');
@@ -1538,7 +1582,10 @@
             } else if (!isAdmin && profile?.store_id) {
                 deployedQuery = deployedQuery.eq('store_id', profile.store_id);
             }
-            // 管理员不排除练习门店
+            // 【v2.4】管理员排除练习门店
+            if (isAdmin && !targetStoreId) {
+                deployedQuery = await excludePracticeStores(deployedQuery, profile);
+            }
             
             const { data: deployedOrders } = await deployedQuery;
             const deployedCapital = (deployedOrders || []).reduce((sum, o) => sum + (o.loan_amount || 0), 0);
@@ -1759,5 +1806,5 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
-    console.log('✅ JF.Supabase v2.3 完整修复版（管理员可查看所有门店数据，支持总部支出）');
+    console.log('✅ JF.Supabase v2.4 管理员排除练习门店数据（excludePracticeStores 通用函数）');
 })();
