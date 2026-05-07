@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.2 修复黑名单加载重复问题
+// app-dashboard-anomaly.js - v2.3 管理员排除练习门店数据
 
 'use strict';
 
@@ -9,6 +9,7 @@
     const AnomalyPage = {
 
         // ---------- 辅助数据获取 ----------
+        // 【v2.3 修改】管理员排除练习门店
         async _getOverdueOrdersRange(profile, minDays, maxDays) {
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
@@ -21,7 +22,15 @@
                 .lte('overdue_days', maxDays)
                 .order('overdue_days', { ascending: false });
 
-            if (!isAdmin && storeId) query = query.eq('store_id', storeId);
+            if (!isAdmin && storeId) {
+                query = query.eq('store_id', storeId);
+            } else if (isAdmin) {
+                // 【v2.3 新增】管理员排除练习门店
+                const practiceIds = await SUPABASE._getPracticeStoreIds();
+                if (practiceIds.length > 0) {
+                    query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                }
+            }
             const { data, error } = await query;
             if (error) { console.warn('获取逾期订单失败:', error); return []; }
             return data || [];
@@ -410,5 +419,5 @@
     window.APP.loadMoreBlacklist = AnomalyPage.loadMoreBlacklist.bind(AnomalyPage);
     window.APP.clearAnomalyCache = AnomalyPage.clearAnomalyCache.bind(AnomalyPage);
 
-    console.log('✅ JF.AnomalyPage v2.2 已修复（黑名单加载锁、防重复）');
+    console.log('✅ JF.AnomalyPage v2.3 管理员排除练习门店数据');
 })();
