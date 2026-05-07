@@ -410,104 +410,277 @@
             }
         },
 
-        // ==================== 补全：打印单个订单 ====================
-        async printOrder(orderId) {
-            const lang = Utils.lang;
-            try {
-                const result = await SUPABASE.getPaymentHistory(orderId);
-                const order = result.order;
-                if (!order) {
-                    Utils.toast.error(Utils.t('order_not_found'));
-                    return;
-                }
+        // ==================== 补全：打印单个订单（统一样式） ====================
+async printOrder(orderId) {
+    const lang = Utils.lang;
+    const t = Utils.t.bind(Utils);
+    try {
+        const result = await SUPABASE.getPaymentHistory(orderId);
+        const order = result.order;
+        if (!order) {
+            Utils.toast.error(Utils.t('order_not_found'));
+            return;
+        }
 
-                const profile = await SUPABASE.getCurrentProfile();
-                const isAdmin = PERMISSION.isAdmin();
-                const storeName = isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (profile?.stores?.name || '-');
-                const userName = profile?.name || '-';
-                const printDateTime = new Date().toLocaleString();
+        const profile = await SUPABASE.getCurrentProfile();
+        const isAdmin = PERMISSION.isAdmin();
 
-                const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-                const monthlyRate = order.agreed_interest_rate || 0.08;
-                const currentMonthlyInterest = remainingPrincipal * monthlyRate;
-                const statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
-                                   order.status === 'completed' ? (lang === 'id' ? 'Lunas' : '已结清') :
-                                   (lang === 'id' ? 'Likuidasi' : '已变卖');
-                const repaymentText = order.repayment_type === 'fixed' ? (lang === 'id' ? 'Cicilan Tetap' : '固定还款') :
-                                     (lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款');
+        // ========== 获取页头信息（与 PrintPage._doPrint 保持一致） ==========
+        let storeName = '';
+        let roleText = '';
+        let userName = '';
 
-                let paymentRows = '';
-                if (result.payments && result.payments.length > 0) {
-                    for (const p of result.payments) {
-                        paymentRows += `<tr>
-                            <td>${Utils.formatDate(p.date)}</td>
-                            <td>${Utils.escapeHtml(p.type)}</td>
-                            <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
-                            <td>${Utils.escapeHtml(p.payment_method || '-')}</td>
-                            <td>${Utils.escapeHtml(p.description || '')}</td>
-                        </tr>`;
+        try {
+            storeName = AUTH.getCurrentStoreName();
+            roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                       AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                       (lang === 'id' ? 'Staf' : '员工');
+            userName = AUTH.user?.name || '-';
+        } catch (e) {
+            storeName = '-';
+            roleText = '-';
+            userName = '-';
+        }
+
+        const printDateTime = new Date().toLocaleString();
+
+        // ========== 订单数据计算 ==========
+        const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+        const monthlyRate = order.agreed_interest_rate || 0.08;
+        const currentMonthlyInterest = remainingPrincipal * monthlyRate;
+        const statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
+                           order.status === 'completed' ? (lang === 'id' ? 'Lunas' : '已结清') :
+                           (lang === 'id' ? 'Likuidasi' : '已变卖');
+        const repaymentText = order.repayment_type === 'fixed' ? (lang === 'id' ? 'Cicilan Tetap' : '固定还款') :
+                             (lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款');
+
+        // ========== 构建订单信息3列网格 ==========
+        const labels = {
+            order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
+            customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
+            collateral_name: lang === 'id' ? 'Nama Jaminan' : '质押物名称',
+            loan_amount: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
+            repayment_type: lang === 'id' ? 'Jenis Cicilan' : '还款方式',
+            status: lang === 'id' ? 'Status' : '状态',
+            interest_rate: lang === 'id' ? 'Suku Bunga' : '约定利率',
+            monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
+            remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
+        };
+
+        const infoItems = [
+            { label: labels.order_id, value: order.order_id },
+            { label: labels.customer_name, value: order.customer_name },
+            { label: labels.collateral_name, value: order.collateral_name },
+            { label: labels.loan_amount, value: Utils.formatCurrency(order.loan_amount) },
+            { label: labels.repayment_type, value: repaymentText },
+            { label: labels.status, value: statusText },
+            { label: labels.interest_rate, value: (monthlyRate * 100).toFixed(0) + '%' },
+            { label: labels.monthly_interest, value: Utils.formatCurrency(currentMonthlyInterest) },
+            { label: labels.remaining_principal, value: Utils.formatCurrency(remainingPrincipal) }
+        ];
+
+        const orderInfoGrid = `
+            <div class="order-info-grid">
+                ${infoItems.map(item => `
+                    <div class="info-item">
+                        <div class="label">${Utils.escapeHtml(item.label)}</div>
+                        <div class="value">${Utils.escapeHtml(item.value)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // ========== 缴费记录表格 ==========
+        let paymentRows = '';
+        if (result.payments && result.payments.length > 0) {
+            for (const p of result.payments) {
+                const typeText = p.type === 'admin_fee' ? t('admin_fee') : 
+                                 p.type === 'service_fee' ? t('service_fee') : 
+                                 p.type === 'interest' ? t('interest') : t('principal');
+                paymentRows += `<tr>
+                    <td>${Utils.formatDate(p.date)}</td>
+                    <td>${Utils.escapeHtml(typeText)}</td>
+                    <td class="text-right">${Utils.formatCurrency(p.amount)}</td>
+                    <td>${Utils.escapeHtml(p.payment_method || '-')}</td>
+                    <td>${Utils.escapeHtml(p.description || '')}</td>
+                </tr>`;
+            }
+        } else {
+            paymentRows = `<tr><td colspan="5" class="text-center">${lang === 'id' ? 'Tidak ada' : '无'}</td></tr>`;
+        }
+
+        // ========== 构建完整打印页面（与 PrintPage._doPrint 样式完全一致） ==========
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>JF! by Gadai - ${lang === 'id' ? 'Cetak Pesanan' : '打印订单'} - ${Utils.escapeHtml(order.order_id)}</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { 
+                        font-family: 'Segoe UI', Arial, sans-serif; 
+                        font-size: 9pt; 
+                        line-height: 1.3; 
+                        color: #1e293b; 
+                        padding: 0; 
+                        margin: 0; 
                     }
-                } else {
-                    paymentRows = `<tr><td colspan="5" class="text-center">${lang === 'id' ? 'Tidak ada' : '无'}</td></tr>`;
-                }
+                    .print-container { padding: 5mm; }
+                    
+                    .print-header { 
+                        text-align: center; 
+                        margin-bottom: 8px; 
+                        padding-bottom: 6px; 
+                        border-bottom: 2px solid #1e293b;
+                    }
+                    .print-header .logo { 
+                        font-size: 14pt; 
+                        font-weight: bold; 
+                        color: #0e7490;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 8px;
+                    }
+                    .print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
+                    .print-header-info {
+                        font-size: 9pt;
+                        color: #475569;
+                        margin: 4px 0 8px;
+                        text-align: center;
+                        white-space: nowrap;
+                    }
+                    
+                    .print-footer { 
+                        text-align: center; 
+                        font-size: 7pt; 
+                        color: #94a3b8; 
+                        margin-top: 12px; 
+                        padding-top: 6px; 
+                        border-top: 1px solid #e2e8f0; 
+                    }
+                    
+                    .page-title {
+                        font-size: 14pt;
+                        font-weight: bold;
+                        margin: 12px 0;
+                        color: #1e293b;
+                    }
+                    
+                    .order-info-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 12px 24px;
+                        margin-bottom: 20px;
+                    }
+                    .info-item {
+                        padding: 4px 0;
+                        border-bottom: 1px solid #e2e8f0;
+                        break-inside: avoid;
+                    }
+                    .info-item .label {
+                        font-size: 7pt;
+                        color: #64748b;
+                        margin-bottom: 2px;
+                    }
+                    .info-item .value {
+                        font-size: 10pt;
+                        font-weight: 500;
+                        color: #1e293b;
+                    }
+                    
+                    .card { 
+                        border: 1px solid #e2e8f0; 
+                        border-radius: 6px; 
+                        padding: 8px; 
+                        margin-bottom: 10px; 
+                        break-inside: avoid;
+                    }
+                    .card h3 { 
+                        font-size: 10pt; 
+                        margin-bottom: 6px; 
+                        border-bottom: 1px solid #e2e8f0;
+                        padding-bottom: 4px;
+                    }
+                    
+                    table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+                    th { background: #f1f5f9; font-weight: 600; text-align: left; }
+                    th, td { 
+                        border: 1px solid #cbd5e1; 
+                        padding: 5px 8px; 
+                        text-align: left; 
+                        font-size: 8pt; 
+                        vertical-align: top; 
+                    }
+                    .text-right { text-align: right; }
+                    .text-center { text-align: center; }
+                    
+                    @media print {
+                        @page { size: A4; margin: 0mm 8mm 8mm 8mm; }
+                        body { margin: 0; padding: 0; }
+                        .print-container { padding: 5mm 0 0 0; }
+                        .card { break-inside: avoid; }
+                        .info-item { break-inside: avoid; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-container">
+                    <div class="print-header">
+                        <div class="logo">
+                            <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
+                            JF! by Gadai
+                        </div>
+                        <div class="print-header-info">
+                            🏪 ${isAdmin
+                                ? (lang === 'id' ? 'Kantor Pusat' : '总部')
+                                : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
+                            } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
+                        </div>
+                    </div>
 
-                const printWindow = window.open('', '_blank');
-                printWindow.document.write(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="UTF-8">
-                        <title>Print Order - ${Utils.escapeHtml(order.order_id)}</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; font-size: 11pt; padding: 2cm; }
-                            h1 { font-size: 16pt; margin-bottom: 0.5cm; }
-                            table { width: 100%; border-collapse: collapse; margin: 1cm 0; }
-                            th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
-                            th { background: #eee; font-weight: bold; }
-                            .text-right { text-align: right; }
-                            .text-center { text-align: center; }
-                            @media print { body { padding: 0; } }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>${lang === 'id' ? 'Detail Pesanan' : '订单详情'}</h1>
-                        <table>
-                            <tr><td><strong>${Utils.t('order_id')}</strong></td><td>${Utils.escapeHtml(order.order_id)}</td></tr>
-                            <tr><td><strong>${Utils.t('customer_name')}</strong></td><td>${Utils.escapeHtml(order.customer_name)}</td></tr>
-                            <tr><td><strong>${Utils.t('collateral_name')}</strong></td><td>${Utils.escapeHtml(order.collateral_name)}</td></tr>
-                            <tr><td><strong>${Utils.t('loan_amount')}</strong></td><td>${Utils.formatCurrency(order.loan_amount)}</td></tr>
-                            <tr><td><strong>${Utils.t('repayment_type')}</strong></td><td>${repaymentText}</td></tr>
-                            <tr><td><strong>${Utils.t('status')}</strong></td><td>${statusText}</td></tr>
-                            <tr><td><strong>${Utils.t('agreed_rate')}</strong></td><td>${(monthlyRate * 100).toFixed(0)}%</td></tr>
-                            <tr><td><strong>${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</strong></td><td>${Utils.formatCurrency(currentMonthlyInterest)}</td></tr>
-                            <tr><td><strong>${Utils.t('remaining_principal')}</strong></td><td>${Utils.formatCurrency(remainingPrincipal)}</td></tr>
-                        </table>
-                        <h2>${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h2>
+                    <h1 class="page-title">📄 ${lang === 'id' ? 'Detail Pesanan' : '订单详情'}</h1>
+                    
+                    <div class="card">
+                        <h3>📋 ${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
+                        ${orderInfoGrid}
+                        
+                        <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>${Utils.t('date')}</th>
-                                    <th>${Utils.t('type')}</th>
-                                    <th>${Utils.t('amount')}</th>
-                                    <th>${Utils.t('payment_method')}</th>
-                                    <th>${Utils.t('description')}</th>
+                                    <th>${t('date')}</th>
+                                    <th>${t('type')}</th>
+                                    <th class="text-right">${t('amount')}</th>
+                                    <th>${t('payment_method')}</th>
+                                    <th>${t('description')}</th>
                                 </tr>
                             </thead>
                             <tbody>${paymentRows}</tbody>
                         </table>
-                        <p style="text-align:center; font-size:9pt; margin-top:1cm;">
-                            ${lang === 'id' ? 'Dicetak dari' : '打印自'} JF! by Gadai - ${printDateTime}
-                        </p>
-                        <script>window.print(); setTimeout(function(){ window.close(); }, 500);</script>
-                    </body>
-                    </html>
-                `);
-                printWindow.document.close();
-            } catch (error) {
-                console.error("printOrder error:", error);
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
-            }
-        },
+                    </div>
+
+                    <div class="print-footer">
+                        JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+                    </div>
+                </div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(function() { window.close(); }, 800);
+                    };
+                <\/script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    } catch (error) {
+        console.error("printOrder error:", error);
+        Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
+    }
+},
 
         // ==================== 显示缴费历史汇总 ====================
         async showPaymentHistory() {
