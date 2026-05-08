@@ -15,33 +15,34 @@
 }
 
 body{
+
     background:#e9ecef;
+
     font-family:Arial,"Microsoft YaHei",sans-serif;
+
     color:#222;
 
-    /* 页面预览边距 */
-    padding:35px;
+    /* 页面预览留白 */
+    padding:20px 0;
 }
 
 /* =========================
    A4 打印设置
 ========================= */
 @page{
+
     size:A4;
 
-    /* 增大打印边距，防止溢出 */
-    margin:20mm;
+    /* 上下 12mm 左右 20mm */
+    margin:12mm 20mm;
 }
 
 /* =========================
-   A5 内容区域
+   内容区域
 ========================= */
 .receipt{
 
-    /* 缩小宽度，避免打印边缘溢出 */
     width:138mm;
-
-    min-height:auto;
 
     margin:0 auto;
 
@@ -49,8 +50,8 @@ body{
 
     border:1.2px solid #222;
 
-    /* 增大内部留白 */
-    padding:16mm 14mm;
+    /* 缩小上下 padding 防止分页 */
+    padding:10mm 12mm;
 
     position:relative;
 }
@@ -62,8 +63,8 @@ body{
 
     position:absolute;
 
-    top:12mm;
-    right:14mm;
+    top:10mm;
+    right:12mm;
 
     font-size:11px;
 
@@ -81,10 +82,10 @@ body{
 
     padding-bottom:12px;
 
-    margin-bottom:20px;
+    margin-bottom:18px;
 }
 
-/* logo */
+/* LOGO */
 .logo-box{
 
     width:68px;
@@ -132,7 +133,7 @@ body{
 
     text-align:center;
 
-    margin-bottom:20px;
+    margin-bottom:18px;
 }
 
 .title .id-title{
@@ -260,7 +261,7 @@ table{
 
     align-items:flex-end;
 
-    margin-top:42px;
+    margin-top:38px;
 }
 
 .sign-box{
@@ -308,7 +309,7 @@ table{
 ========================= */
 .footer{
 
-    margin-top:26px;
+    margin-top:24px;
 
     text-align:center;
 
