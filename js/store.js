@@ -1,4 +1,4 @@
-// store.js - v2.2 门店财务汇总重构（2行×7列）+ 练习按钮仅STORE_004
+// store.js - v2.3 门店财务汇总重构（2行×7列）+ 打印修复 + STORE_000保护 + 练习按钮仅STORE_004
 
 'use strict';
 
@@ -360,7 +360,7 @@
             }
         },
 
-        // 增强版清理练习门店数据（原有方法完整保留）
+        // 增强版清理练习门店数据
         async _cleanPracticeDataEnhanced(storeId) {
             const lang = Utils.lang;
             const client = SUPABASE.getClient();
@@ -470,7 +470,7 @@
             }
         },
 
-        // ==================== 构建门店管理 HTML（v2.2 重构） ====================
+        // ==================== 构建门店管理 HTML（v2.3 打印修复 + STORE_000保护） ====================
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -525,25 +525,12 @@
                 const storeStats = {};
                 for (const s of StoreManager.stores) {
                     storeStats[s.id] = {
-                        // 本月数据
-                        monthNewOrders: 0,
-                        monthLoanAmount: 0,
-                        monthAdminFee: 0,
-                        monthServiceFee: 0,
-                        monthInterest: 0,
-                        monthExpense: 0,
-                        // 累计数据
-                        totalOrders: 0,
-                        activeOrders: 0,
-                        completedOrders: 0,
-                        totalLoanAmount: 0,
-                        totalAdminFee: 0,
-                        totalServiceFee: 0,
-                        totalInterest: 0,
-                        totalPrincipal: 0,
-                        totalExpense: 0,
-                        returnCapital: 0,
-                        deployedCapital: 0
+                        monthNewOrders: 0, monthLoanAmount: 0, monthAdminFee: 0,
+                        monthServiceFee: 0, monthInterest: 0, monthExpense: 0,
+                        totalOrders: 0, activeOrders: 0, completedOrders: 0,
+                        totalLoanAmount: 0, totalAdminFee: 0, totalServiceFee: 0,
+                        totalInterest: 0, totalPrincipal: 0, totalExpense: 0,
+                        returnCapital: 0, deployedCapital: 0
                     };
                 }
 
@@ -568,25 +555,19 @@
                         stats.completedOrders++;
                     }
                     
-                    // 本月数据
                     if (o.created_at && o.created_at >= monthStart && o.created_at <= monthEnd + 'T23:59:59') {
                         stats.monthNewOrders++;
                         stats.monthLoanAmount += (o.loan_amount || 0);
                     }
                 }
 
-                // 统计本月管理费/服务费/利息（从 payment_history 按日期筛选）
-                // 获取所有订单ID
+                // 统计本月管理费/服务费/利息
                 const allOrderIds = (allOrders || []).map(o => o.id);
                 
                 if (allOrderIds.length > 0) {
-                    // 本月管理费
                     const { data: monthAdminFees } = await client
-                        .from('payment_history')
-                        .select('order_id, amount')
-                        .eq('type', 'admin_fee')
-                        .gte('date', monthStart)
-                        .lte('date', monthEnd)
+                        .from('payment_history').select('order_id, amount')
+                        .eq('type', 'admin_fee').gte('date', monthStart).lte('date', monthEnd)
                         .in('order_id', allOrderIds);
                     
                     if (monthAdminFees) {
@@ -598,13 +579,9 @@
                         }
                     }
                     
-                    // 本月服务费
                     const { data: monthServiceFees } = await client
-                        .from('payment_history')
-                        .select('order_id, amount')
-                        .eq('type', 'service_fee')
-                        .gte('date', monthStart)
-                        .lte('date', monthEnd)
+                        .from('payment_history').select('order_id, amount')
+                        .eq('type', 'service_fee').gte('date', monthStart).lte('date', monthEnd)
                         .in('order_id', allOrderIds);
                     
                     if (monthServiceFees) {
@@ -616,13 +593,9 @@
                         }
                     }
                     
-                    // 本月利息
                     const { data: monthInterests } = await client
-                        .from('payment_history')
-                        .select('order_id, amount')
-                        .eq('type', 'interest')
-                        .gte('date', monthStart)
-                        .lte('date', monthEnd)
+                        .from('payment_history').select('order_id, amount')
+                        .eq('type', 'interest').gte('date', monthStart).lte('date', monthEnd)
                         .in('order_id', allOrderIds);
                     
                     if (monthInterests) {
@@ -763,6 +736,7 @@
                     for (const store of StoreManager.stores) {
                         const isActive = store.is_active !== false;
                         const isStorePractice = store.is_practice === true;
+                        const isStore000 = (store.code === 'STORE_000');
 
                         let statusBadgeHtml = isActive
                             ? `<span class="badge badge--active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
@@ -782,32 +756,36 @@
                             <td class="text-center">${statusBadgeHtml}</td>
                         </tr>`;
 
-                        // 操作行 - 练习按钮仅 STORE_004 显示
                         const isPractice = store.is_practice === true;
                         const isStore004 = (store.code === 'STORE_004');
                         
-                        let actionButtons =
-                            `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>` +
-                            (isActive
-                                ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn btn--sm btn--warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
-                                : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn btn--sm btn--success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`);
+                        let actionButtons = '';
                         
-                        // 仅 STORE_004 显示练习模式按钮
-                        if (isStore004) {
-                            const practiceLabel = isPractice
-                                ? (lang === 'id' ? 'Mode Latihan (Aktif)' : '练习模式 (已开启)')
-                                : (lang === 'id' ? 'Jadikan Toko Latihan' : '设为练习门店');
-                            const practiceBtnStyle = isPractice
-                                ? 'background:#a78bfa;color:#fff;'
-                                : 'background:#ede9fe;color:#6d28d9;';
-                            const practiceBtnTitle = isPractice
-                                ? (lang === 'id' ? 'Kembalikan ke mode normal' : '恢复为正常门店')
-                                : (lang === 'id' ? 'Jadikan toko latihan (data tidak dihitung)' : '设为练习门店（数据不计入统计）');
+                        if (isStore000) {
+                            actionButtons = `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>`;
+                            actionButtons += `<span style="color:var(--text-muted);font-size:10px;margin-left:4px;">🔒 ${lang === 'id' ? 'Toko Pusat' : '总部门店'}</span>`;
+                        } else {
+                            actionButtons = `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>` +
+                                (isActive
+                                    ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn btn--sm btn--warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
+                                    : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn btn--sm btn--success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`);
                             
-                            actionButtons += `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}" title="${practiceBtnTitle}">${practiceLabel}</button>`;
+                            if (isStore004) {
+                                const practiceLabel = isPractice
+                                    ? (lang === 'id' ? 'Mode Latihan (Aktif)' : '练习模式 (已开启)')
+                                    : (lang === 'id' ? 'Jadikan Toko Latihan' : '设为练习门店');
+                                const practiceBtnStyle = isPractice
+                                    ? 'background:#a78bfa;color:#fff;'
+                                    : 'background:#ede9fe;color:#6d28d9;';
+                                const practiceBtnTitle = isPractice
+                                    ? (lang === 'id' ? 'Kembalikan ke mode normal' : '恢复为正常门店')
+                                    : (lang === 'id' ? 'Jadikan toko latihan (data tidak dihitung)' : '设为练习门店（数据不计入统计）');
+                                
+                                actionButtons += `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}" title="${practiceBtnTitle}">${practiceLabel}</button>`;
+                            }
+                            
+                            actionButtons += `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
                         }
-                        
-                        actionButtons += `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
 
                         storeRows += `<tr class="action-row"${practiceRowStyle2}>
                             <td class="action-label">${t('action')}</td>
@@ -822,10 +800,10 @@
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                         <div class="header-actions">
                             <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            <button onclick="StoreManager.printStoreFinanceSummary()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak Ringkasan' : '打印财务汇总'}</button>
                         </div>
                     </div>
-                    <div class="card cashflow-card">
+                    <div class="card cashflow-card no-print">
                         <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
                         <div class="cashflow-stats">
                             <div class="cashflow-item-card">
@@ -843,7 +821,7 @@
                         </div>
                         <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Tidak termasuk Toko Latihan' : '不含练习门店'}</p>
                     </div>
-                    <div class="card">
+                    <div class="card" id="storeFinanceSummaryCard">
                         <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                         <div class="table-container" style="overflow-x:auto;">
                             <table class="data-table store-stats-table" style="min-width:1200px;font-size:11px;">
@@ -871,7 +849,7 @@
                         </div>
                         <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Baris ungu = Toko Latihan (tidak dihitung dalam total) | Format: Bulan Ini / Total' : '紫色行 = 练习门店（不计入合计）| 格式: 本月 / 累计'}</p>
                     </div>
-                    <div class="card">
+                    <div class="card no-print">
                         <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                         <div class="table-container">
                             <table class="data-table store-table">
@@ -889,7 +867,7 @@
                             </table>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card no-print">
                         <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                         <div class="form-grid">
                             <div class="form-group">
@@ -911,7 +889,6 @@
                     </div>
                     
                     <style>
-                        /* 门店财务汇总表打印样式 */
                         .store-stats-table th {
                             font-size: 10px;
                             padding: 4px 6px;
@@ -928,6 +905,9 @@
                             font-size: 9px;
                         }
                         @media print {
+                            .no-print {
+                                display: none !important;
+                            }
                             .store-stats-table {
                                 font-size: 9px !important;
                             }
@@ -949,16 +929,24 @@
                         }
                     </style>`;
 
+                // 存储打印数据到全局变量供打印函数使用
+                window._storeFinanceData = {
+                    storeStatsRows,
+                    summaryRow,
+                    grandTotal,
+                    lang
+                };
+
                 console.log('[StoreManager] 门店管理页面内容构建完成');
                 return content;
 
             } catch (error) {
                 console.error('[StoreManager] 构建页面失败:', error);
+                const lang = Utils.lang;
                 return `<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                         <div class="header-actions">
                             <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
                         </div>
                     </div>
                     <div class="card" style="text-align:center;padding:40px;">
@@ -971,6 +959,174 @@
                         <button onclick="APP.goBack()" class="btn btn--sm" style="margin-top:16px;margin-left:8px;">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
                     </div>`;
             }
+        },
+
+        // ==================== 打印门店财务汇总 ====================
+        printStoreFinanceSummary() {
+            const lang = Utils.lang;
+            const data = window._storeFinanceData;
+            
+            if (!data) {
+                Utils.toast.warning(lang === 'id' ? 'Data tidak tersedia' : '暂无数据可打印');
+                return;
+            }
+            
+            const isAdmin = PERMISSION.isAdmin();
+            let storeName = '';
+            let roleText = '';
+            let userName = '';
+            
+            try {
+                storeName = AUTH.getCurrentStoreName();
+                roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                           AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                           (lang === 'id' ? 'Staf' : '员工');
+                userName = AUTH.user?.name || '-';
+            } catch (e) {
+                storeName = '-';
+                roleText = '-';
+                userName = '-';
+            }
+            
+            const printDateTime = new Date().toLocaleString();
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>JF! by Gadai - ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</title>
+                    <style>
+                        * { box-sizing: border-box; margin: 0; padding: 0; }
+                        body { 
+                            font-family: 'Segoe UI', Arial, sans-serif; 
+                            font-size: 9pt; 
+                            line-height: 1.3; 
+                            color: #1e293b; 
+                            padding: 0; 
+                            margin: 0; 
+                        }
+                        .print-container { padding: 5mm; }
+                        .print-header { 
+                            text-align: center; 
+                            margin-bottom: 8px; 
+                            padding-bottom: 6px; 
+                            border-bottom: 2px solid #1e293b;
+                        }
+                        .print-header .logo { 
+                            font-size: 14pt; 
+                            font-weight: bold; 
+                            color: #0e7490;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                        }
+                        .print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
+                        .print-header-info {
+                            font-size: 9pt;
+                            color: #475569;
+                            margin: 4px 0 8px;
+                            text-align: center;
+                            white-space: nowrap;
+                        }
+                        .print-footer { 
+                            text-align: center; 
+                            font-size: 7pt; 
+                            color: #94a3b8; 
+                            margin-top: 12px; 
+                            padding-top: 6px; 
+                            border-top: 1px solid #e2e8f0; 
+                        }
+                        .page-title {
+                            font-size: 14pt;
+                            font-weight: bold;
+                            margin: 12px 0;
+                            color: #1e293b;
+                        }
+                        table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+                        th { background: #f1f5f9; font-weight: 600; text-align: left; }
+                        th, td { 
+                            border: 1px solid #cbd5e1; 
+                            padding: 4px 6px; 
+                            font-size: 8pt; 
+                            vertical-align: middle; 
+                        }
+                        .text-center { text-align: center; }
+                        .amount { text-align: right; }
+                        .income { color: #10b981; }
+                        .expense { color: #ef4444; }
+                        td small { font-size: 7pt; color: #64748b; }
+                        @media print {
+                            @page { size: A4 landscape; margin: 5mm; }
+                            body { margin: 0; padding: 0; }
+                            .print-container { padding: 5mm 0 0 0; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-container">
+                        <div class="print-header">
+                            <div class="logo">
+                                <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
+                                JF! by Gadai
+                            </div>
+                            <div class="print-header-info">
+                                🏪 ${isAdmin
+                                    ? (lang === 'id' ? 'Kantor Pusat' : '总部')
+                                    : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
+                                } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
+                            </div>
+                            <div class="print-header-info" style="font-size:8pt;">
+                                ${lang === 'id' ? 'Periode: ' : '统计期间: '} ${Utils.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())} - ${Utils.formatDate(new Date().toISOString())}
+                            </div>
+                        </div>
+                        
+                        <h1 class="page-title">📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h1>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" style="vertical-align:middle;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Bulan Ini' : '本月新增'}<br>${lang === 'id' ? 'Pesanan' : '订单'}</th>
+                                    <th class="text-center">${lang === 'id' ? 'Aktif' : '进行中'} / ${lang === 'id' ? 'Lunas' : '已结清'}</th>
+                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月放出'}<br>${lang === 'id' ? 'Total Pinjaman' : '总当金'}</th>
+                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月管理费'}<br>${lang === 'id' ? 'Total Admin' : '总管理费'}</th>
+                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月服务费'}<br>${lang === 'id' ? 'Total Layanan' : '总服务费'}</th>
+                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利息'}<br>${lang === 'id' ? 'Total Bunga' : '总利息'}</th>
+                                </tr>
+                                <tr>
+                                    <th class="amount">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}<br>${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</th>
+                                    <th class="amount">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
+                                    <th class="amount">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
+                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月支出'}<br>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</th>
+                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利润'}<br>${lang === 'id' ? 'Total Laba' : '总利润'}</th>
+                                    <th class="amount">${lang === 'id' ? 'Pengembalian' : '偿还'}<br>${lang === 'id' ? 'Modal' : '本金'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.storeStatsRows}
+                                ${data.summaryRow}
+                            </tbody>
+                        </table>
+                        
+                        <p style="font-size:7pt;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total (累计)' : '格式: 本月 / 累计'}</p>
+                        
+                        <div class="print-footer">
+                            JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+                        </div>
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                            setTimeout(function() { window.close(); }, 800);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
         },
 
         // 供外壳调用的渲染函数
@@ -1019,5 +1175,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.2 门店财务汇总重构（2行×7列）+ 练习按钮仅STORE_004');
+    console.log('✅ JF.StoreManager v2.3 打印修复 + STORE_000保护 + 练习按钮仅STORE_004');
 })();
