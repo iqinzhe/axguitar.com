@@ -14,44 +14,47 @@
     box-sizing:border-box;
 }
 
+html,
 body{
-
+    width:100%;
     background:#e9ecef;
-
     font-family:Arial,"Microsoft YaHei",sans-serif;
-
     color:#222;
+}
 
-    /* 页面预览留白 */
-    padding:20px;
+/* 页面预览留白 */
+body{
+    padding:20px 0;
 }
 
 /* =========================
    A4 打印设置
 ========================= */
 @page{
-
     size:A4;
 
-    /* 上下 12mm 左右 20mm */
-    margin:20mm 30mm;
+    /* 打印边距 */
+    margin:10mm;
 }
 
 /* =========================
-   内容区域
+   主体
 ========================= */
 .receipt{
 
-    width:138mm;
+    width:100%;
+
+    /* 视觉接近 A5 */
+    max-width:128mm;
 
     margin:0 auto;
 
     background:#fff;
 
-    border:1.2px solid #222;
+    border:1px solid #222;
 
-    /* 缩小上下 padding 防止分页 */
-    padding:10mm 12mm;
+    /* 缩小内边距避免分页 */
+    padding:8mm 10mm;
 
     position:relative;
 }
@@ -63,8 +66,8 @@ body{
 
     position:absolute;
 
-    top:10mm;
-    right:12mm;
+    top:8mm;
+    right:10mm;
 
     font-size:11px;
 
@@ -78,20 +81,20 @@ body{
 
     text-align:center;
 
-    border-bottom:1.8px solid #222;
+    border-bottom:1.5px solid #222;
 
-    padding-bottom:12px;
+    padding-bottom:10px;
 
-    margin-bottom:18px;
+    margin-bottom:16px;
 }
 
 /* LOGO */
 .logo-box{
 
-    width:68px;
-    height:68px;
+    width:64px;
+    height:64px;
 
-    margin:0 auto 10px;
+    margin:0 auto 8px;
 
     border:1px dashed #999;
 
@@ -107,13 +110,13 @@ body{
 /* 公司名称 */
 .company-name{
 
-    font-size:22px;
+    font-size:21px;
 
     font-weight:bold;
 
     letter-spacing:1px;
 
-    margin-bottom:6px;
+    margin-bottom:5px;
 }
 
 /* 公司信息 */
@@ -121,7 +124,7 @@ body{
 
     font-size:11px;
 
-    line-height:1.7;
+    line-height:1.6;
 
     color:#444;
 }
@@ -133,23 +136,23 @@ body{
 
     text-align:center;
 
-    margin-bottom:18px;
+    margin-bottom:16px;
 }
 
-.title .id-title{
+.id-title{
 
-    font-size:18px;
+    font-size:17px;
 
     font-weight:bold;
 
     letter-spacing:1px;
 }
 
-.title .cn-title{
+.cn-title{
 
-    margin-top:4px;
+    margin-top:3px;
 
-    font-size:14px;
+    font-size:13px;
 
     color:#444;
 }
@@ -159,7 +162,7 @@ body{
 ========================= */
 .section-title{
 
-    font-size:14px;
+    font-size:13px;
 
     font-weight:bold;
 
@@ -167,7 +170,7 @@ body{
 
     padding-bottom:4px;
 
-    margin:16px 0 8px;
+    margin:14px 0 7px;
 }
 
 /* =========================
@@ -184,9 +187,9 @@ table{
 
     border:1px solid #444;
 
-    padding:7px 9px;
+    padding:6px 8px;
 
-    font-size:12px;
+    font-size:11px;
 }
 
 .label{
@@ -206,11 +209,11 @@ table{
 
     border:1px solid #444;
 
-    padding:7px;
+    padding:6px;
 
     text-align:center;
 
-    font-size:12px;
+    font-size:11px;
 }
 
 .item-table th{
@@ -221,15 +224,13 @@ table{
 }
 
 /* =========================
-   金额重点
+   金额
 ========================= */
 .amount{
 
-    font-size:16px;
+    font-size:15px;
 
     font-weight:bold;
-
-    color:#000;
 }
 
 /* =========================
@@ -237,15 +238,15 @@ table{
 ========================= */
 .notice{
 
-    margin-top:15px;
+    margin-top:12px;
 
     border:1px dashed #666;
 
-    padding:10px;
+    padding:9px;
 
-    font-size:11px;
+    font-size:10px;
 
-    line-height:1.8;
+    line-height:1.7;
 
     background:#fafafa;
 }
@@ -261,7 +262,7 @@ table{
 
     align-items:flex-end;
 
-    margin-top:38px;
+    margin-top:32px;
 }
 
 .sign-box{
@@ -274,10 +275,10 @@ table{
 /* 印章 */
 .stamp-placeholder{
 
-    width:85px;
-    height:85px;
+    width:80px;
+    height:80px;
 
-    margin:0 auto 8px;
+    margin:0 auto 6px;
 
     border:2px dashed #999;
 
@@ -289,7 +290,7 @@ table{
 
     justify-content:center;
 
-    font-size:11px;
+    font-size:10px;
 
     color:#777;
 }
@@ -299,9 +300,9 @@ table{
 
     border-top:1px solid #222;
 
-    padding-top:6px;
+    padding-top:5px;
 
-    font-size:11px;
+    font-size:10px;
 }
 
 /* =========================
@@ -309,17 +310,17 @@ table{
 ========================= */
 .footer{
 
-    margin-top:24px;
+    margin-top:18px;
 
     text-align:center;
 
-    font-size:10px;
+    font-size:9px;
 
     color:#666;
 
     border-top:1px solid #ccc;
 
-    padding-top:8px;
+    padding-top:6px;
 }
 
 /* =========================
@@ -327,20 +328,29 @@ table{
 ========================= */
 @media print{
 
+    html,
     body{
+
+        width:100%;
+        height:auto;
 
         background:#fff;
 
+        margin:0;
         padding:0;
     }
 
     .receipt{
 
+        width:100%;
+
+        max-width:none;
+
         border:1px solid #222;
 
-        box-shadow:none;
+        page-break-inside:avoid;
 
-        margin:0 auto;
+        break-inside:avoid;
     }
 }
 
@@ -475,19 +485,27 @@ table{
     <table class="info-table">
 
         <tr>
-            <td class="label">典当本金</td>
+
+            <td class="label">
+                典当本金
+            </td>
 
             <td class="amount">
                 Rp 10,000,000
             </td>
+
         </tr>
 
         <tr>
-            <td class="label">起止时间</td>
+
+            <td class="label">
+                起止时间
+            </td>
 
             <td>
                 2026-04-08 至 2026-05-08
             </td>
+
         </tr>
 
     </table>
