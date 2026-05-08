@@ -1,4 +1,4 @@
-// app-message-center.js - v1.2 修复印尼文显示 + 返回按钮
+// app-message-center.js - v2.0
 
 'use strict';
 
