@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.4 修复版
+// app-dashboard-anomaly.js - v2.0
 // 修复内容：loadMoreBlacklist 增加更完善的防重复请求机制 + 移除按钮禁用时的状态残留
 
 'use strict';
