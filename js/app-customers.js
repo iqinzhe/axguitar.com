@@ -1,4 +1,4 @@
-// app-customers.js - v3.0 骨架屏优化：服务费卡片固定区域切换 + 之前所有修改
+// app-customers.js - v2.0 服务费固定容器  + 金额0只读
 
 'use strict';
 
@@ -8,7 +8,7 @@
 
     const CustomersPage = {
 
-        // ==================== 构建客户列表 HTML（v2.7 活跃订单状态区分） ====================
+        // ==================== 构建客户列表 HTML（活跃订单状态区分） ====================
         async buildCustomersHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -589,7 +589,7 @@
             }
         },
 
-        // ==================== 为客户创建订单（v3.0 骨架屏优化） ====================
+        // ==================== 为客户创建订单（服务费固定容器 + 只读状态） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -657,12 +657,13 @@
                                 </div>
                                 <div class="fee-card">
                                     <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
-                                    <!-- 固定容器，内容动态替换 -->
-                                    <div class="fee-card-body" id="serviceFeeDisplay">
-                                        <div class="fee-skeleton">
-                                            <div class="skeleton-line skeleton-line--lg"></div>
-                                            <div class="skeleton-line skeleton-line--sm" style="margin-top:8px;"></div>
-                                        </div>
+                                    <!-- 固定容器，始终显示，金额为0时只读 -->
+                                    <div class="fee-card-body" id="serviceFeeDisplay" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                        <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">
+                                            ${Array.from({ length: 13 }, (_, i) => `<option value="${i}">${i}%</option>`).join('')}
+                                        </select>
+                                        <span style="font-weight:700;color:var(--text-primary);">Rp</span>
+                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()" style="flex:1;min-width:100px;" readonly>
                                     </div>
                                     <div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div>
                                 </div>
@@ -713,15 +714,15 @@
                         </div>
                     </div>`;
                 
-                // 绑定金额格式化
                 const amountInput = document.getElementById("amount"); 
                 if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
                 const adminFeeInput = document.getElementById("adminFeeInput"); 
                 if (adminFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(adminFeeInput);
+                const serviceFeeInput = document.getElementById("serviceFeeInput"); 
+                if (serviceFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(serviceFeeInput);
                 const monthlyPaymentInput = document.getElementById("monthlyPaymentInput"); 
                 if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
                 
-                // 初始化费用（此时金额为0，会显示骨架屏）
                 APP.recalculateAllFees();
             } catch (error) { 
                 console.error("createOrderForCustomer error:", error); 
@@ -730,7 +731,7 @@
             }
         },
 
-        // ==================== 保存订单（v3.0 服务费固定容器） ====================
+        // ==================== 保存订单（服务费重置时只读） ====================
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -814,11 +815,14 @@
                 document.getElementById("notes").value = '';
                 const adminFeeEl = document.getElementById("adminFeeInput"); 
                 if (adminFeeEl) { adminFeeEl.value = '0'; delete adminFeeEl.dataset.manual; }
-                // 重置服务费容器为骨架屏
-                const displayContainer = document.getElementById('serviceFeeDisplay');
-                if (displayContainer) {
-                    displayContainer.innerHTML = `<div class="fee-skeleton"><div class="skeleton-line skeleton-line--lg"></div><div class="skeleton-line skeleton-line--sm" style="margin-top:8px;"></div></div>`;
+                const svcInput = document.getElementById("serviceFeeInput");
+                if (svcInput) {
+                    svcInput.value = '0';
+                    svcInput.readOnly = true;
+                    delete svcInput.dataset.manual;
                 }
+                const svcSelect = document.getElementById("serviceFeePercentSelect");
+                if (svcSelect) { svcSelect.value = '0'; delete svcSelect.dataset.manual; }
                 const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
                 if (cashRadio) cashRadio.checked = true;
                 const loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]'); 
@@ -844,7 +848,7 @@
             }
         },
 
-        // ==================== 费用重算（v3.0 动态更新服务费容器） ====================
+        // ==================== 费用重算（只读状态切换） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
@@ -856,41 +860,37 @@
             }
             this._updateAdminFeeHint(amount);
 
-            // 服务费：根据金额动态更新固定容器
-            const displayContainer = document.getElementById('serviceFeeDisplay');
-            if (!displayContainer) return;
+            // 服务费：根据金额动态更新固定容器，金额为0时只读
+            const serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
+            const serviceFeeInput = document.getElementById('serviceFeeInput');
 
             if (amount <= 0) {
-                // 显示骨架屏
-                displayContainer.innerHTML = `
-                    <div class="fee-skeleton">
-                        <div class="skeleton-line skeleton-line--lg"></div>
-                        <div class="skeleton-line skeleton-line--sm" style="margin-top:8px;"></div>
-                    </div>`;
+                if (serviceFeeSelect) { serviceFeeSelect.value = '0'; delete serviceFeeSelect.dataset.manual; }
+                if (serviceFeeInput) { serviceFeeInput.value = '0'; serviceFeeInput.readOnly = true; }
                 this._updateServiceFeeHint(amount, 0);
             } else {
+                if (serviceFeeInput) serviceFeeInput.readOnly = false;
+
                 let defaultPercent = 0;
                 if (amount > 5000000) defaultPercent = 2;
                 else if (amount > 3000000) defaultPercent = 1;
 
-                const percentOptions = amount > 5000000 
-                    ? Array.from({ length: 11 }, (_, i) => `<option value="${i+2}"${(i+2)===defaultPercent?' selected':''}>${i+2}%</option>`).join('')
-                    : `<option value="${defaultPercent}" selected>${defaultPercent}%</option>`;
+                if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
+                    serviceFeeSelect.value = defaultPercent;
+                }
 
-                const selectDisplay = amount > 5000000 ? '' : ' style="display:none;"';
+                const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : defaultPercent;
+                if (serviceFeeInput && !serviceFeeInput.dataset.manual) {
+                    const result = Utils.calculateServiceFee(amount, percent);
+                    serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
+                }
 
-                displayContainer.innerHTML = `
-                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                        <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;"${selectDisplay}>
-                            ${percentOptions}
-                        </select>
-                        <span style="font-weight:700;color:var(--text-primary);">Rp</span>
-                        <input type="text" id="serviceFeeInput" value="${Utils.formatNumberWithCommas(Utils.calculateServiceFee(amount, defaultPercent).amount)}" class="amount-input" oninput="APP.onServiceFeeManualChange()" style="flex:1;min-width:100px;">
-                    </div>`;
-
-                const svcInput = document.getElementById('serviceFeeInput');
-                if (svcInput && Utils.bindAmountFormat) Utils.bindAmountFormat(svcInput);
-                this._updateServiceFeeHint(amount, defaultPercent);
+                // 控制下拉显示（仅当金 > 5,000,000 时显示下拉，否则隐藏）
+                const selectContainer = serviceFeeSelect?.closest('.form-group') || serviceFeeSelect?.parentElement;
+                if (selectContainer) {
+                    selectContainer.style.display = (amount > 5000000) ? '' : 'none';
+                }
+                this._updateServiceFeeHint(amount, percent);
             }
 
             // 固定还款计算
@@ -946,7 +946,7 @@
             }
         },
 
-        // ==================== 服务费提示更新（v2.9 支持0%-12%） ====================
+        // ==================== 服务费提示更新（支持0%-12%） ====================
         _updateServiceFeeHint(amount, percent) {
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
@@ -1113,5 +1113,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v3.0 骨架屏优化完成（服务费固定容器 + 动态内容切换）');
+    console.log('✅ JF.CustomersPage v2.0 服务费固定容器 + 金额0只读');
 })();
