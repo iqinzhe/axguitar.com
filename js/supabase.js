@@ -1,12 +1,7 @@
-// supabase.js - v2.6 完整修复版
-// 修复内容：
+// supabase.js - v2.0
 // 1. deleteOrder 完整清理现金流（order_id + reference_id）
 // 2. 统一利息少付逻辑，确保前后端一致
 // 3. 缓存 practiceIds，避免重复查询
-// 4. RPC 调用前检查函数是否存在
-// 5. 员工支出金额后端验证
-// 6. updateOverdueDays 失败时写入审计日志
-// 7. safeQuery 401 处理增加初始化检查
 
 'use strict';
 
