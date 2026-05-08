@@ -1,4 +1,4 @@
-// app-payments.js - v2.2 统一金额提取 + 幂等性检查和审计日志
+// app-payments.js - v2.0 统一金额提取 + 幂等性检查和审计日志
 
 'use strict';
 
