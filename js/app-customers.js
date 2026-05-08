@@ -1,4 +1,4 @@
-// app-customers.js - v2.8 服务费卡片补充 Rp 符号
+// app-customers.js - v2.9 费用明细卡片优化（管理费/服务费支持手动修改，服务费下拉0%-12%）
 
 'use strict';
 
@@ -589,7 +589,7 @@
             }
         },
 
-        // ==================== 为客户创建订单（v2.8 服务费卡片补充 Rp） ====================
+        // ==================== 为客户创建订单（v2.9 费用明细卡片优化） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -649,13 +649,21 @@
                             <div class="fee-cards-row">
                                 <div class="fee-card">
                                     <div class="fee-card-label">📋 ${t('admin_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Biaya Tetap' : '固定收费'})</small></div>
-                                    <div class="fee-card-body"><span style="font-weight:700;color:var(--text-primary);margin-right:4px;">Rp</span><input type="text" id="adminFeeInput" value="0" class="amount-input" readonly></div>
-                                    <div class="fee-card-hint">${adminFeeHintText}</div>
+                                    <div class="fee-card-body">
+                                        <span style="font-weight:700;color:var(--text-primary);margin-right:4px;">Rp</span>
+                                        <input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">
+                                    </div>
+                                    <div class="fee-card-hint" id="adminFeeHint">${adminFeeHintText}</div>
                                 </div>
                                 <div class="fee-card">
                                     <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
-                                    <!-- 【v2.8 修复】百分比下拉框和金额输入框之间补 Rp -->
-                                    <div class="fee-card-body"><select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">${Utils.getServiceFeePercentOptions(2)}</select><span style="font-weight:700;color:var(--text-primary);margin:0 4px;">Rp</span><input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()"></div>
+                                    <div class="fee-card-body" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                        <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">
+                                            ${Array.from({ length: 13 }, (_, i) => `<option value="${i}">${i}%</option>`).join('')}
+                                        </select>
+                                        <span style="font-weight:700;color:var(--text-primary);">Rp</span>
+                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()" style="flex:1;min-width:100px;">
+                                    </div>
                                     <div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div>
                                 </div>
                             </div>
@@ -705,6 +713,7 @@
                         </div>
                     </div>`;
                 const amountInput = document.getElementById("amount"); if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
+                const adminFeeInput = document.getElementById("adminFeeInput"); if (adminFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(adminFeeInput);
                 const serviceFeeInput = document.getElementById("serviceFeeInput"); if (serviceFeeInput && Utils.bindAmountFormat) Utils.bindAmountFormat(serviceFeeInput);
                 const monthlyPaymentInput = document.getElementById("monthlyPaymentInput"); if (monthlyPaymentInput && Utils.bindAmountFormat) Utils.bindAmountFormat(monthlyPaymentInput);
                 APP.recalculateAllFees();
@@ -715,7 +724,7 @@
             }
         },
 
-        // ==================== 保存订单 ====================
+        // ==================== 保存订单（v2.9 支持手动修改管理费/服务费） ====================
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -725,11 +734,23 @@
             const collateralNote = document.getElementById("collateralNote").value.trim();
             const amount = Utils.getAmountFromInput("amount");
             const notes = document.getElementById("notes").value;
-            const adminFee = Utils.calculateAdminFee(amount); 
-            let serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 2;
+            
+            // 管理费：支持手动修改
+            const adminFeeInput = document.getElementById("adminFeeInput");
+            let adminFee = adminFeeInput ? Utils.parseNumberFromCommas(adminFeeInput.value) || 0 : 0;
+            if (adminFee === 0 && amount > 0) {
+                adminFee = Utils.calculateAdminFee(amount);
+            }
+            
+            // 服务费：支持手动修改
+            let serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 0;
             const serviceFeeStr = document.getElementById("serviceFeeInput").value; 
             let serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
-            if (serviceFee === 0 && amount > 0) { const result = Utils.calculateServiceFee(amount, serviceFeePercent); serviceFee = result.amount; serviceFeePercent = result.percent; }
+            if (serviceFee === 0 && amount > 0 && serviceFeePercent > 0) {
+                const result = Utils.calculateServiceFee(amount, serviceFeePercent); 
+                serviceFee = result.amount;
+            }
+            
             const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
             const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 8;
             const repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked'); 
@@ -785,8 +806,10 @@
                 document.getElementById("collateralNote").value = ''; 
                 document.getElementById("amount").value = ''; 
                 document.getElementById("notes").value = '';
+                const adminFeeEl = document.getElementById("adminFeeInput"); 
+                if (adminFeeEl) { adminFeeEl.value = '0'; delete adminFeeEl.dataset.manual; }
                 const svcSelect = document.getElementById("serviceFeePercentSelect"); 
-                if (svcSelect) { svcSelect.value = '2'; delete svcSelect.dataset.manual; }
+                if (svcSelect) { svcSelect.value = '0'; delete svcSelect.dataset.manual; delete svcSelect.dataset.optionsUpdated; }
                 const svcInput = document.getElementById("serviceFeeInput"); 
                 if (svcInput) { svcInput.value = '0'; delete svcInput.dataset.manual; }
                 const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
@@ -814,42 +837,163 @@
             }
         },
 
+        // ==================== 费用重算（v2.9 支持手动修改管理费/服务费） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
+            
+            // 管理费：自动计算，但允许手动修改
             const adminFee = Utils.calculateAdminFee(amount);
-            const adminFeeInput = document.getElementById('adminFeeInput'); if (adminFeeInput) adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
-            const serviceFeeSelect = document.getElementById('serviceFeePercentSelect'); const serviceFeeInput = document.getElementById('serviceFeeInput');
-            const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
-            if (serviceFeeInput && !serviceFeeInput.dataset.manual) { const result = Utils.calculateServiceFee(amount, percent); serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount); }
-            if (serviceFeeSelect) { const group = serviceFeeSelect.closest('.form-group') || serviceFeeSelect.parentElement; if (group) group.style.display = (amount > 5000000) ? '' : 'none'; }
+            const adminFeeInput = document.getElementById('adminFeeInput');
+            if (adminFeeInput && !adminFeeInput.dataset.manual) {
+                adminFeeInput.value = Utils.formatNumberWithCommas(adminFee);
+            }
+            this._updateAdminFeeHint(amount);
+            
+            // 服务费：根据金额自动选择百分比
+            let defaultPercent = 0;
+            if (amount > 5000000) defaultPercent = 2;
+            else if (amount > 3000000) defaultPercent = 1;
+            
+            const serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
+            const serviceFeeInput = document.getElementById('serviceFeeInput');
+            
+            if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
+                serviceFeeSelect.value = defaultPercent;
+            }
+            
+            const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : defaultPercent;
+            if (serviceFeeInput && !serviceFeeInput.dataset.manual) {
+                const result = Utils.calculateServiceFee(amount, percent);
+                serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
+            }
+            
+            if (serviceFeeSelect) {
+                const selectContainer = serviceFeeSelect.closest('.form-group') || serviceFeeSelect.parentElement;
+                if (selectContainer) {
+                    if (amount > 5000000) {
+                        selectContainer.style.display = '';
+                        if (!serviceFeeSelect.dataset.optionsUpdated || serviceFeeSelect.dataset.optionsUpdated !== 'full') {
+                            serviceFeeSelect.innerHTML = Array.from({ length: 11 }, (_, i) => {
+                                const pct = i + 2;
+                                return `<option value="${pct}"${pct === percent ? ' selected' : ''}>${pct}%</option>`;
+                            }).join('');
+                            serviceFeeSelect.dataset.optionsUpdated = 'full';
+                        }
+                    } else if (amount > 3000000) {
+                        selectContainer.style.display = 'none';
+                        serviceFeeSelect.value = '1';
+                        serviceFeeSelect.dataset.optionsUpdated = 'simple';
+                    } else {
+                        selectContainer.style.display = 'none';
+                        serviceFeeSelect.value = '0';
+                        serviceFeeSelect.dataset.optionsUpdated = 'simple';
+                    }
+                }
+            }
+            
             this._updateServiceFeeHint(amount, percent);
+            
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
-            if (repaymentType === 'fixed') { const rateSelect = document.getElementById('agreedInterestRateSelect'); const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08; const termSelect = document.getElementById('repaymentTermSelect'); const months = termSelect ? parseInt(termSelect.value) : 5; if (amount > 0 && months > 0) { const monthly = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months); const rounded = Utils.roundMonthlyPayment(monthly); const monthlyInput = document.getElementById('monthlyPaymentInput'); if (monthlyInput && !monthlyInput.dataset.manual) { monthlyInput.value = Utils.formatNumberWithCommas(rounded); } } }
+            if (repaymentType === 'fixed') { 
+                const rateSelect = document.getElementById('agreedInterestRateSelect'); 
+                const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08; 
+                const termSelect = document.getElementById('repaymentTermSelect'); 
+                const months = termSelect ? parseInt(termSelect.value) : 5; 
+                if (amount > 0 && months > 0) { 
+                    const monthly = Utils.calculateFixedMonthlyPayment(amount, monthlyRate, months); 
+                    const rounded = Utils.roundMonthlyPayment(monthly); 
+                    const monthlyInput = document.getElementById('monthlyPaymentInput'); 
+                    if (monthlyInput && !monthlyInput.dataset.manual) { 
+                        monthlyInput.value = Utils.formatNumberWithCommas(rounded); 
+                    } 
+                } 
+            }
         },
 
+        // ==================== 管理费手动修改标记 ====================
+        onAdminFeeManualChange() {
+            const input = document.getElementById('adminFeeInput');
+            if (input) input.dataset.manual = 'true';
+            
+            const amount = Utils.getAmountFromInput('amount');
+            this._updateAdminFeeHint(amount);
+        },
+
+        _updateAdminFeeHint(amount) {
+            const hint = document.getElementById('adminFeeHint');
+            if (!hint) return;
+            
+            const lang = Utils.lang;
+            const adminFee = Utils.calculateAdminFee(amount);
+            
+            if (amount <= 0) {
+                hint.innerHTML = lang === 'id'
+                    ? `• Nilai gadai ≤ Rp500.000 : biaya administrasi Rp20.000\n• Nilai gadai Rp500.000 – Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai`
+                    : `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
+            } else {
+                let highlightedHint = '';
+                let allHints = '';
+                
+                if (lang === 'id') {
+                    allHints = `• Nilai gadai ≤ Rp500.000 : biaya administrasi Rp20.000\n• Nilai gadai Rp500.000 – Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai`;
+                    
+                    if (amount <= 500000) {
+                        highlightedHint = `📌 Nilai gadai ≤ Rp500.000 : <strong>biaya administrasi Rp20.000</strong>\n\n${allHints}`;
+                    } else if (amount <= 3000000) {
+                        highlightedHint = `📌 Nilai gadai Rp500.000–Rp3.000.000 : <strong>biaya administrasi Rp30.000</strong>\n\n${allHints}`;
+                    } else {
+                        highlightedHint = `🔢 Nilai gadai > Rp3.000.000 : <strong>dikenakan 1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}`;
+                    }
+                } else {
+                    allHints = `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
+                    
+                    if (amount <= 500000) {
+                        highlightedHint = `📌 当金 ≤ Rp500,000 ：<strong>管理费 Rp20,000</strong>\n\n${allHints}`;
+                    } else if (amount <= 3000000) {
+                        highlightedHint = `📌 当金 Rp500,000～Rp3,000,000 ：<strong>管理费 Rp30,000</strong>\n\n${allHints}`;
+                    } else {
+                        highlightedHint = `🔢 当金 > Rp3,000,000 ：<strong>管理费 1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}`;
+                    }
+                }
+                
+                hint.innerHTML = highlightedHint;
+            }
+        },
+
+        // ==================== 服务费提示更新（v2.9 支持0%-12%） ====================
         _updateServiceFeeHint(amount, percent) {
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
+            
             const lang = Utils.lang;
+            
             if (amount <= 0) {
                 hint.innerHTML = lang === 'id'
                     ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
                     : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
             } else {
                 const feeResult = Utils.calculateServiceFee(amount, percent);
+                let allHints = lang === 'id'
+                    ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
+                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                
+                let highlightedHint = '';
+                
                 if (feeResult.percent === 0) {
-                    hint.innerHTML = lang === 'id'
-                        ? `✅ Nilai gadai ≤ Rp3.000.000 : <strong>gratis biaya layanan (0%)</strong>\n\n• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal 12%`
-                        : `✅ 当金 ≤ Rp3,000,000 ：<strong>免服务费（0%）</strong>\n\n• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                    highlightedHint = lang === 'id'
+                        ? `✅ Nilai gadai ≤ Rp3.000.000 : <strong>gratis biaya layanan (0%)</strong>\n\n${allHints}`
+                        : `✅ 当金 ≤ Rp3,000,000 ：<strong>免服务费（0%）</strong>\n\n${allHints}`;
                 } else if (feeResult.percent === 1) {
-                    hint.innerHTML = lang === 'id'
-                        ? `📌 Nilai gadai Rp3.000.001–Rp5.000.000 : <strong>dikenakan 1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal 12%`
-                        : `📌 当金 Rp3,000,001～Rp5,000,000 ：<strong>收取 1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                    highlightedHint = lang === 'id'
+                        ? `📌 Nilai gadai Rp3.000.001–Rp5.000.000 : <strong>dikenakan 1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`
+                        : `📌 当金 Rp3,000,001～Rp5,000,000 ：<strong>收取 1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`;
                 } else {
-                    hint.innerHTML = lang === 'id'
-                        ? `🔢 Nilai gadai > Rp5.000.000 : <strong>dipilih ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal 12%`
-                        : `🔢 当金 > Rp5,000,000 ：<strong>已选 ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                    highlightedHint = lang === 'id'
+                        ? `🔢 Nilai gadai > Rp5.000.000 : <strong>dipilih ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`
+                        : `🔢 当金 > Rp5,000,000 ：<strong>已选 ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`;
                 }
+                
+                hint.innerHTML = highlightedHint;
             }
         },
 
@@ -972,6 +1116,7 @@
         window.APP.createOrderForCustomer = CustomersPage.createOrderForCustomer.bind(CustomersPage);
         window.APP.saveOrderForCustomer = CustomersPage.saveOrderForCustomer.bind(CustomersPage);
         window.APP.recalculateAllFees = CustomersPage.recalculateAllFees.bind(CustomersPage);
+        window.APP.onAdminFeeManualChange = CustomersPage.onAdminFeeManualChange.bind(CustomersPage);
         window.APP.recalculateServiceFee = CustomersPage.recalculateServiceFee.bind(CustomersPage);
         window.APP.onServiceFeeManualChange = CustomersPage.onServiceFeeManualChange.bind(CustomersPage);
         window.APP.onMonthlyPaymentManualChange = CustomersPage.onMonthlyPaymentManualChange.bind(CustomersPage);
@@ -982,5 +1127,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.8 服务费卡片补充 Rp 符号');
+    console.log('✅ JF.CustomersPage v2.9 费用明细卡片优化（管理费/服务费支持手动修改，服务费下拉0%-12%）');
 })();
