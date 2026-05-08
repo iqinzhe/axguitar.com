@@ -1,4 +1,5 @@
-// app-capital.js -  v2.0 (JF 命名空间) 
+// app-capital.js - v2.3 修复版
+// 修复内容：门店选择状态持久化（使用 sessionStorage 替代全局变量）
 // 包含：资本注入、利润再投入、资金占用报告、资金健康度评估
 
 'use strict';
@@ -16,7 +17,6 @@
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
-            // 非管理员直接拒绝
             if (!isAdmin) {
                 Utils.toast.warning(lang === 'id' 
                     ? 'Hanya administrator yang dapat mencatat injeksi modal' 
@@ -33,7 +33,6 @@
             }
             storeOptions += '</select>';
             
-            // 获取当前各门店的资本情况
             let storeBalancesHtml = '';
             try {
                 const client = SUPABASE.getClient();
@@ -150,7 +149,6 @@
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = profile?.role === 'admin';
             
-            // 权限二次确认
             if (!isAdmin) {
                 Utils.toast.error(lang === 'id' ? 'Hanya admin yang dapat mencatat injeksi modal' : '仅管理员可记录资本注入');
                 return;
@@ -174,7 +172,6 @@
                 return;
             }
             
-            // 获取门店名称用于确认
             const storeName = document.getElementById('injectionStoreId')?.selectedOptions?.[0]?.text || '';
             
             const confirmMsg = lang === 'id'
@@ -199,7 +196,6 @@
                 
                 APP.closeCapitalInjectionModal();
                 
-                // 清除缓存，刷新仪表盘
                 if (JF.Cache) JF.Cache.clear();
                 if (typeof window.DashboardCore !== 'undefined' && DashboardCore.refreshCurrentPage) {
                     await DashboardCore.refreshCurrentPage();
@@ -227,19 +223,22 @@
             const isAdmin = profile?.role === 'admin';
             
             try {
-                // 获取门店列表用于门店选择器
                 let stores = [];
                 if (isAdmin) {
                     stores = await SUPABASE.getAllStores();
                 }
                 
-                // 默认选择当前门店或第一个门店
                 let currentStoreId = profile?.store_id;
                 if (isAdmin && stores.length > 0 && !currentStoreId) {
-                    currentStoreId = stores[0]?.id;
+                    // 【修复 #12】从 sessionStorage 恢复门店选择状态
+                    const savedStoreId = sessionStorage.getItem('jf_profit_reinvest_store_id');
+                    if (savedStoreId && stores.some(s => s.id === savedStoreId)) {
+                        currentStoreId = savedStoreId;
+                    } else {
+                        currentStoreId = stores[0]?.id;
+                    }
                 }
                 
-                // 【修复】使用正确的 API 获取资本分析数据
                 let analysis = null;
                 if (currentStoreId) {
                     analysis = await SUPABASE.getFullCapitalAnalysis(currentStoreId);
@@ -249,7 +248,10 @@
                     analysis = await SUPABASE.getFullCapitalAnalysis();
                 }
                 
-                // 保存当前选中的门店 ID 用于后续刷新
+                // 【修复 #12】保存到 sessionStorage 持久化
+                if (currentStoreId) {
+                    sessionStorage.setItem('jf_profit_reinvest_store_id', currentStoreId);
+                }
                 window._currentProfitStoreId = currentStoreId;
                 
                 document.getElementById("app").innerHTML = `
@@ -402,7 +404,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="reinvestHistoryBody">
-                                    <tr><td colspan="7" class="text-center">${lang === 'id' ? 'Memuat...' : '加载中...'}<\/td></table>
+                                    <tr><td colspan="7" class="text-center">${lang === 'id' ? 'Memuat...' : '加载中...'}<\/td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -414,7 +416,6 @@
             } catch (error) {
                 console.error('showProfitReinvestPage error:', error);
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data' : '加载数据失败');
-                // 显示错误页面
                 document.getElementById("app").innerHTML = `
                     <div class="page-header">
                         <h2>🔄 ${lang === 'id' ? 'Reinvestasi Keuntungan' : '利润再投入'}</h2>
@@ -430,7 +431,7 @@
             }
         },
         
-        // ==================== 【新增】加载利润再投入数据（门店切换时调用） ====================
+        // 【修复 #12】加载利润再投入数据 - 使用 sessionStorage 持久化
         loadProfitReinvestData: async function() {
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
@@ -439,16 +440,20 @@
             if (isAdmin) {
                 const storeSelect = document.getElementById('reinvestStoreSelect');
                 storeId = storeSelect ? storeSelect.value : null;
+                // 【修复 #12】保存到 sessionStorage
+                if (storeId) {
+                    sessionStorage.setItem('jf_profit_reinvest_store_id', storeId);
+                }
             } else {
                 const profile = await SUPABASE.getCurrentProfile();
                 storeId = profile?.store_id;
             }
             
             if (!storeId && isAdmin) {
-                // 管理员选择"全部门店"时，可能需要汇总数据
                 const stores = await SUPABASE.getAllStores();
                 if (stores.length > 0) {
                     storeId = stores[0]?.id;
+                    sessionStorage.setItem('jf_profit_reinvest_store_id', storeId);
                 }
             }
             
@@ -462,7 +467,6 @@
             try {
                 const analysis = await SUPABASE.getFullCapitalAnalysis(storeId);
                 
-                // 更新页面数据
                 const elements = {
                     externalCapitalValue: analysis?.capital_breakdown?.external_injections || 0,
                     profitReinvestedValue: analysis?.capital_breakdown?.profit_reinvestments || 0,
@@ -501,14 +505,12 @@
                     }
                 }
                 
-                // 更新可用资金样式
                 const availableEl = document.getElementById('availableCapitalValue');
                 if (availableEl) {
                     const available = analysis?.available_capital || 0;
                     availableEl.className = `usage-value ${available > 0 ? 'success' : 'danger'}`;
                 }
                 
-                // 更新健康度评估
                 const healthCard = document.getElementById('healthCard');
                 const healthSummary = document.getElementById('healthSummary');
                 const strengthsList = document.getElementById('strengthsList');
@@ -531,7 +533,6 @@
                     }
                 }
                 
-                // 更新再投入按钮区域
                 const reinvestActionArea = document.getElementById('reinvestActionArea');
                 const pendingProfit = analysis?.pending_reinvest_profit || 0;
                 if (reinvestActionArea) {
@@ -560,7 +561,6 @@
                     }
                 }
                 
-                // 刷新历史记录
                 await CapitalModule._loadReinvestHistory();
                 
             } catch (error) {
@@ -569,7 +569,7 @@
             }
         },
         
-        // ====================  执行利润再投入（全额） ====================
+        // ==================== 执行利润再投入（全额） ====================
         executeProfitReinvestment: async function() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -603,7 +603,6 @@
                     return;
                 }
                 
-                // 取门店名称（优先从下拉框，否则查接口）
                 let storeName = storeId;
                 const storeSelectEl = document.getElementById('reinvestStoreSelect');
                 if (storeSelectEl && storeSelectEl.selectedOptions?.[0]?.text) {
@@ -613,7 +612,7 @@
                         const allStores = await SUPABASE.getAllStores();
                         const found = allStores.find(s => s.id === storeId);
                         if (found) storeName = found.name;
-                    } catch(e) { /* 取不到名称时降级显示 ID */ }
+                    } catch(e) { }
                 }
                 const confirmMsg = lang === 'id'
                     ? `⚠️ Konfirmasi Reinvestasi Keuntungan\n\nToko: ${storeName}\nJumlah: ${Utils.formatCurrency(pendingProfit)}\n\nKeuntungan akan ditambahkan ke modal toko. Lanjutkan?`
@@ -635,10 +634,8 @@
                     ? `✅ Berhasil mereinvestasi ${Utils.formatCurrency(pendingProfit)} ke modal`
                     : `✅ 成功再投入 ${Utils.formatCurrency(pendingProfit)} 到资本`);
                 
-                // 刷新页面数据
                 await CapitalModule.loadProfitReinvestData();
                 
-                // 清除缓存，刷新仪表盘
                 if (JF.Cache) JF.Cache.clear();
                 
             } catch (error) {
@@ -687,7 +684,6 @@
                     return;
                 }
                 
-                // 创建弹窗
                 const oldModal = document.getElementById('partialReinvestModal');
                 if (oldModal) oldModal.remove();
                 
@@ -785,10 +781,8 @@
                 
                 CapitalModule.closePartialReinvestModal();
                 
-                // 刷新页面数据
                 await CapitalModule.loadProfitReinvestData();
                 
-                // 清除缓存，刷新仪表盘
                 if (JF.Cache) JF.Cache.clear();
                 
             } catch (error) {
@@ -810,7 +804,6 @@
             const storeSelect = document.getElementById('reinvestStoreSelect');
             let storeId = storeSelect ? storeSelect.value : null;
             
-            // 如果没有 storeId 且不是管理员，使用当前用户的门店
             if (!storeId) {
                 const profile = await SUPABASE.getCurrentProfile();
                 if (profile?.role !== 'admin') {
@@ -884,5 +877,5 @@
         };
     }
 
-    console.log('✅ JF.CapitalModule v2.2 修复完成（利润再投入页面完整）');
+    console.log('✅ JF.CapitalModule v2.3 修复版（门店选择状态持久化）');
 })();
