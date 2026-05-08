@@ -1,7 +1,6 @@
 // permission.js - v2.0 统一权限模块 (JF 命名空间)
 // 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
 
-
 'use strict';
 
 (function () {
