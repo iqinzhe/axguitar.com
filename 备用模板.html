@@ -1,384 +1,281 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-<title>典当结清凭证</title>
-
-<style>
-
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
-
-/* =========================
-   页面整体
-========================= */
-html,
-body{
-    width:100%;
-    height:100%;
-
-    background:#e9ecef;
-
-    font-family:Arial,"Microsoft YaHei",sans-serif;
-
-    color:#222;
-}
-
-/* =========================
-   页面预览 + 居中
-========================= */
-body{
-
-    margin:0;
-
-    display:flex;
-
-    justify-content:center;
-
-    align-items:center;
-
-    min-height:100vh;
-
-    padding:20px;
-}
-
-/* =========================
-   A4 打印设置
-========================= */
-@page{
-
-    size:A4;
-
-    margin:10mm;
-}
-
-/* =========================
-   主体
-========================= */
-.receipt{
-
-    width:128mm;
-
-    background:#fff;
-
-    border:1px solid #222;
-
-    padding:8mm 10mm;
-
-    position:relative;
-}
-
-/* =========================
-   单号
-========================= */
-.voucher-number{
-
-    position:absolute;
-
-    top:8mm;
-    right:10mm;
-
-    font-size:11px;
-
-    color:#333;
-}
-
-/* =========================
-   页头
-========================= */
-.header{
-
-    text-align:center;
-
-    border-bottom:1.5px solid #222;
-
-    padding-bottom:10px;
-
-    margin-bottom:16px;
-}
-
-/* LOGO */
-.logo-box{
-
-    width:64px;
-    height:64px;
-
-    margin:0 auto 8px;
-
-    border:1px dashed #999;
-
-    display:flex;
-    align-items:center;
-    justify-content:center;
-
-    font-size:11px;
-
-    color:#666;
-}
-
-/* 公司名称 */
-.company-name{
-
-    font-size:21px;
-
-    font-weight:bold;
-
-    letter-spacing:1px;
-
-    margin-bottom:5px;
-}
-
-/* 公司信息 */
-.company-meta{
-
-    font-size:11px;
-
-    line-height:1.6;
-
-    color:#444;
-}
-
-/* =========================
-   标题
-========================= */
-.title{
-
-    text-align:center;
-
-    margin-bottom:16px;
-}
-
-.id-title{
-
-    font-size:17px;
-
-    font-weight:bold;
-
-    letter-spacing:1px;
-}
-
-.cn-title{
-
-    margin-top:3px;
-
-    font-size:13px;
-
-    color:#444;
-}
-
-/* =========================
-   区块标题
-========================= */
-.section-title{
-
-    font-size:13px;
-
-    font-weight:bold;
-
-    border-bottom:1px solid #222;
-
-    padding-bottom:4px;
-
-    margin:14px 0 7px;
-}
-
-/* =========================
-   表格
-========================= */
-table{
-
-    width:100%;
-
-    border-collapse:collapse;
-}
-
-.info-table td{
-
-    border:1px solid #444;
-
-    padding:6px 8px;
-
-    font-size:11px;
-}
-
-.label{
-
-    width:24%;
-
-    background:#f5f5f5;
-
-    font-weight:bold;
-}
-
-/* =========================
-   物品表
-========================= */
-.item-table th,
-.item-table td{
-
-    border:1px solid #444;
-
-    padding:6px;
-
-    text-align:center;
-
-    font-size:11px;
-}
-
-.item-table th{
-
-    background:#f2f2f2;
-
-    font-weight:bold;
-}
-
-/* =========================
-   金额
-========================= */
-.amount{
-
-    font-size:15px;
-
-    font-weight:bold;
-}
-
-/* =========================
-   声明
-========================= */
-.notice{
-
-    margin-top:12px;
-
-    border:1px dashed #666;
-
-    padding:9px;
-
-    font-size:10px;
-
-    line-height:1.7;
-
-    background:#fafafa;
-}
-
-/* =========================
-   签字区域
-========================= */
-.signature-area{
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:flex-end;
-
-    margin-top:32px;
-}
-
-.sign-box{
-
-    width:30%;
-
-    text-align:center;
-}
-
-/* 印章 */
-.stamp-placeholder{
-
-    width:80px;
-    height:80px;
-
-    margin:0 auto 6px;
-
-    border:2px dashed #999;
-
-    border-radius:50%;
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:center;
-
-    font-size:10px;
-
-    color:#777;
-}
-
-/* 签字线 */
-.sign-line{
-
-    border-top:1px solid #222;
-
-    padding-top:5px;
-
-    font-size:10px;
-}
-
-/* =========================
-   页脚
-========================= */
-.footer{
-
-    margin-top:18px;
-
-    text-align:center;
-
-    font-size:9px;
-
-    color:#666;
-
-    border-top:1px solid #ccc;
-
-    padding-top:6px;
-}
-
-/* =========================
-   打印优化
-========================= */
-@media print{
-
-    html,
-    body{
-
-        width:100%;
-        height:100%;
-
-        background:#fff;
-
-        margin:0;
-        padding:0;
-
-        display:flex;
-
-        justify-content:center;
-
-        align-items:center;
-    }
-
-    .receipt{
-
-        width:128mm;
-
-        border:1px solid #222;
-
-        page-break-inside:avoid;
-
-        break-inside:avoid;
-    }
-}
-
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>典当结清凭证 | 打印优化版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* =========================
+           屏幕预览样式 (优雅居中，模拟纸张)
+        ========================= */
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            background: #e9ecef;      /* 屏幕预览背景色，打印时会被覆盖 */
+            font-family: Arial, "Microsoft YaHei", sans-serif;
+            color: #222;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px 20px;       /* 屏幕预览留白，打印时移除 */
+        }
+
+        /* 凭证卡片样式 (屏幕预览时自带柔和阴影，打印无影响) */
+        .receipt {
+            width: 128mm;
+            background: #fff;
+            border: 1px solid #222;
+            padding: 8mm 10mm;
+            position: relative;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1); /* 仅屏幕预览增强立体感 */
+            transition: box-shadow 0.2s;
+        }
+
+        /* =========================
+           打印核心优化 (A4 垂直水平居中 + 彻底隐藏浏览器打印戳记)
+        ========================= */
+        @media print {
+            /* 1. 完全重置页面边距，消除浏览器默认页眉/页脚区域 */
+            @page {
+                size: A4;
+                margin: 0;            /* 关键：移除所有页边距，避免URL/页码占用空间 */
+            }
+
+            /* 2. html / body 占满整张纸，用于 flex 居中，同时背景强制白色 */
+            html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                background: white;      /* 打印时纯白背景，无任何灰色 */
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100%;       /* 保证完全撑满纸张高度 */
+            }
+
+            /* 3. 凭证卡片居中且无外部干扰边距 */
+            .receipt {
+                width: 128mm;
+                margin: 0 auto;         /* 水平辅助安全 */
+                border: 1px solid #222; /* 保留边框实体感 */
+                box-shadow: none;       /* 去除屏幕阴影 */
+                page-break-inside: avoid;   /* 防分页 */
+                break-inside: avoid;
+                position: relative;
+                background: #fff;
+            }
+
+            /* 4. 完全隐藏所有可能产生打印戳记的元素（如浏览器自动添加的页码、日期、URL等）
+                 使用内容重置 + 覆盖伪元素，并结合 @page margin 彻底消除物理空间 */
+            body::before,
+            body::after,
+            html::before,
+            html::after {
+                display: none !important;
+                content: none !important;
+            }
+
+            /* 5. 确保所有背景色/边框打印时完整保留（无颜色丢失） */
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            /* 6. 确保表格及文字保持锐利，避免缩放导致的错位 */
+            table, tr, td, th, div, span {
+                break-inside: avoid;
+            }
+
+            /* 7. 凭证内部任何内容都不触发额外的页眉/页脚区域 */
+            .voucher-number,
+            .header,
+            .title,
+            .section-title,
+            .notice,
+            .signature-area,
+            .footer {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* =========================
+           常规视觉样式 (保持不变，但打印时完美继承)
+        ========================= */
+        .voucher-number {
+            position: absolute;
+            top: 8mm;
+            right: 10mm;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 1.5px solid #222;
+            padding-bottom: 10px;
+            margin-bottom: 16px;
+        }
+
+        .logo-box {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 8px;
+            border: 1px dashed #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #666;
+            background: #fefefe;
+        }
+
+        .company-name {
+            font-size: 21px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .company-meta {
+            font-size: 11px;
+            line-height: 1.6;
+            color: #444;
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .id-title {
+            font-size: 17px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .cn-title {
+            margin-top: 3px;
+            font-size: 13px;
+            color: #444;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: bold;
+            border-bottom: 1px solid #222;
+            padding-bottom: 4px;
+            margin: 14px 0 7px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .info-table td {
+            border: 1px solid #444;
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+
+        .label {
+            width: 24%;
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+
+        .item-table th,
+        .item-table td {
+            border: 1px solid #444;
+            padding: 6px;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        .item-table th {
+            background: #f2f2f2;
+            font-weight: bold;
+        }
+
+        .amount {
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .notice {
+            margin-top: 12px;
+            border: 1px dashed #666;
+            padding: 9px;
+            font-size: 10px;
+            line-height: 1.7;
+            background: #fafafa;
+        }
+
+        .signature-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 32px;
+        }
+
+        .sign-box {
+            width: 30%;
+            text-align: center;
+        }
+
+        .stamp-placeholder {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 6px;
+            border: 2px dashed #999;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #777;
+            background: #fff;
+        }
+
+        .sign-line {
+            border-top: 1px solid #222;
+            padding-top: 5px;
+            font-size: 10px;
+        }
+
+        .footer {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 9px;
+            color: #666;
+            border-top: 1px solid #ccc;
+            padding-top: 6px;
+        }
+
+        /* 屏幕预览时保持响应式友好 */
+        @media (max-width: 140mm) {
+            body {
+                padding: 12px;
+            }
+            .receipt {
+                width: 100%;
+                max-width: 128mm;
+            }
+        }
+    </style>
 </head>
-
 <body>
-
 <div class="receipt">
-
     <!-- 单号 -->
     <div class="voucher-number">
         No : BL-20260508-001
@@ -386,196 +283,109 @@ table{
 
     <!-- 页头 -->
     <div class="header">
-
-        <!-- LOGO -->
         <div class="logo-box">
             LOGO
         </div>
-
-        <!-- 公司名称 -->
         <div class="company-name">
             JF! by Gadai
         </div>
-
-        <!-- 公司信息 -->
         <div class="company-meta">
-
-            <div>
-                Alamat : Cakra Residence Bloc E1-12, Pasuruan
-            </div>
-
-            <div>
-                Tel : +62 895 1569 2586
-            </div>
-
-            <div>
-                NIB : XXXXXXXXXXXX
-            </div>
-
+            <div>Alamat : Cakra Residence Bloc E1-12, Pasuruan</div>
+            <div>Tel : +62 895 1569 2586</div>
+            <div>NIB : XXXXXXXXXXXX</div>
         </div>
-
     </div>
 
     <!-- 标题 -->
     <div class="title">
-
-        <div class="id-title">
-            SURAT PELUNASAN GADAI
-        </div>
-
-        <div class="cn-title">
-            典当结清凭证
-        </div>
-
+        <div class="id-title">SURAT PELUNASAN GADAI</div>
+        <div class="cn-title">典当结清凭证</div>
     </div>
 
     <!-- 客户信息 -->
-    <div class="section-title">
-        客户信息
-    </div>
-
+    <div class="section-title">客户信息</div>
     <table class="info-table">
-
         <tr>
             <td class="label">客户姓名</td>
             <td>张三</td>
-
             <td class="label">KTP</td>
             <td>3514151011778002</td>
         </tr>
-
         <tr>
             <td class="label">联系电话</td>
             <td>+62 812 XXXX XXXX</td>
-
             <td class="label">结清日期</td>
             <td>2026-05-08</td>
         </tr>
-
         <tr>
             <td class="label">典当单号</td>
             <td>PAWN-2026-0001</td>
-
             <td class="label">赎回方式</td>
             <td>现金 / 转账</td>
         </tr>
-
     </table>
 
     <!-- 物品信息 -->
-    <div class="section-title">
-        典当物品信息
-    </div>
-
+    <div class="section-title">典当物品信息</div>
     <table class="item-table">
-
         <thead>
-
-        <tr>
-            <th>序号</th>
-            <th>物品名称</th>
-            <th>规格 / 描述</th>
-            <th>数量</th>
-            <th>备注</th>
-        </tr>
-
+            <tr>
+                <th>序号</th>
+                <th>物品名称</th>
+                <th>规格 / 描述</th>
+                <th>数量</th>
+                <th>备注</th>
+            </tr>
         </thead>
-
         <tbody>
-
-        <tr>
-            <td>1</td>
-            <td>黄金项链</td>
-            <td>24K / 20克</td>
-            <td>1</td>
-            <td>外观完好</td>
-        </tr>
-
+            <tr>
+                <td>1</td>
+                <td>黄金项链</td>
+                <td>24K / 20克</td>
+                <td>1</td>
+                <td>外观完好</td>
+            </tr>
         </tbody>
-
     </table>
 
     <!-- 费用信息 -->
-    <div class="section-title">
-        费用结算信息
-    </div>
-
+    <div class="section-title">费用结算信息</div>
     <table class="info-table">
-
         <tr>
-
-            <td class="label">
-                典当本金
-            </td>
-
-            <td class="amount">
-                Rp 10,000,000
-            </td>
-
+            <td class="label">典当本金</td>
+            <td class="amount">Rp 10,000,000</td>
         </tr>
-
         <tr>
-
-            <td class="label">
-                起止时间
-            </td>
-
-            <td>
-                2026-04-08 至 2026-05-08
-            </td>
-
+            <td class="label">起止时间</td>
+            <td>2026-04-08 至 2026-05-08</td>
         </tr>
-
     </table>
 
     <!-- 声明 -->
     <div class="notice">
-
         1. 本凭证证明客户已完成本次典当业务全部款项结清。<br>
-
         2. 典当物品已由客户本人确认领取。<br>
-
         3. 请妥善保管本凭证，遗失不补。<br>
-
         4. 如有争议，以本公司系统记录为准。
-
     </div>
 
     <!-- 签字 -->
     <div class="signature-area">
-
         <div class="sign-box">
-
-            <div class="sign-line">
-                客户签字
-            </div>
-
+            <div class="sign-line">客户签字</div>
         </div>
-
         <div class="sign-box">
-
-            <div class="stamp-placeholder">
-                公司盖章
-            </div>
-
+            <div class="stamp-placeholder">公司盖章</div>
         </div>
-
         <div class="sign-box">
-
-            <div class="sign-line">
-                经办人签字
-            </div>
-
+            <div class="sign-line">经办人签字</div>
         </div>
-
     </div>
 
     <!-- 页脚 -->
     <div class="footer">
         本凭证由系统自动生成 ｜ JF! by Gadai
     </div>
-
 </div>
-
 </body>
 </html>
