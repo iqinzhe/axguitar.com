@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.7 修复版
+// app-dashboard-core.js - v2.0
 // 修复内容：Enter 键防重复触发 + 统一登录页 Enter 处理
 
 'use strict';
