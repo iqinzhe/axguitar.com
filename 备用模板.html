@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>典当结清凭证 | 打印优化版</title>
+    <title>典当结清凭证 | 无戳记完美打印版</title>
     <style>
         * {
             margin: 0;
@@ -12,12 +12,13 @@
         }
 
         /* =========================
-           屏幕预览样式 (优雅居中，模拟纸张)
+           屏幕预览样式 (优雅居中，模拟纸质质感)
         ========================= */
-        html, body {
+        html,
+        body {
             width: 100%;
             min-height: 100vh;
-            background: #e9ecef;      /* 屏幕预览背景色，打印时会被覆盖 */
+            background: #e9ecef;
             font-family: Arial, "Microsoft YaHei", sans-serif;
             color: #222;
         }
@@ -26,90 +27,122 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 24px 20px;       /* 屏幕预览留白，打印时移除 */
+            padding: 24px 20px;
         }
 
-        /* 凭证卡片样式 (屏幕预览时自带柔和阴影，打印无影响) */
+        /* 凭证卡片（屏幕预览带柔和阴影，打印时自动消失） */
         .receipt {
             width: 128mm;
             background: #fff;
             border: 1px solid #222;
             padding: 8mm 10mm;
             position: relative;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1); /* 仅屏幕预览增强立体感 */
-            transition: box-shadow 0.2s;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s;
         }
 
         /* =========================
-           打印核心优化 (A4 垂直水平居中 + 彻底隐藏浏览器打印戳记)
+           打印核心优化 —— 彻底清除浏览器自动添加的页眉/页脚/URL/页码/日期等戳记
+           实现 A4 纸张内 水平和垂直 完美居中，四角无任何多余字符或水印
         ========================= */
         @media print {
-            /* 1. 完全重置页面边距，消除浏览器默认页眉/页脚区域 */
+            /* 1. 最关键步骤: 将页面物理边距完全归零，杜绝所有默认页眉/页脚区域 */
             @page {
                 size: A4;
-                margin: 0;            /* 关键：移除所有页边距，避免URL/页码占用空间 */
+                margin: 0mm;          /* 无任何外边距，清除URL、页码、日期等占位空间 */
+                padding: 0mm;
+                /* 兼容性：显式禁止所有 margin box 内容 (现代浏览器支持) */
+                @top-center {
+                    content: none;
+                }
+                @bottom-center {
+                    content: none;
+                }
+                @top-left {
+                    content: none;
+                }
+                @top-right {
+                    content: none;
+                }
+                @bottom-left {
+                    content: none;
+                }
+                @bottom-right {
+                    content: none;
+                }
+                @left-middle {
+                    content: none;
+                }
+                @right-middle {
+                    content: none;
+                }
             }
 
-            /* 2. html / body 占满整张纸，用于 flex 居中，同时背景强制白色 */
-            html, body {
+            /* 2. html, body 占满整张纸，并使用 Flex 实现完全居中 (垂直水平完美对齐) */
+            html,
+            body {
                 width: 100%;
                 height: 100%;
                 margin: 0;
                 padding: 0;
-                background: white;      /* 打印时纯白背景，无任何灰色 */
+                background: white;
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                min-height: 100%;       /* 保证完全撑满纸张高度 */
             }
 
-            /* 3. 凭证卡片居中且无外部干扰边距 */
+            /* 3. 凭证主体: 固定宽度 + 居中强化；移除屏幕阴影，确保边框清晰 */
             .receipt {
                 width: 128mm;
-                margin: 0 auto;         /* 水平辅助安全 */
-                border: 1px solid #222; /* 保留边框实体感 */
-                box-shadow: none;       /* 去除屏幕阴影 */
-                page-break-inside: avoid;   /* 防分页 */
+                margin: 0 auto;
+                border: 1px solid #222;
+                box-shadow: none;
+                page-break-inside: avoid;
                 break-inside: avoid;
-                position: relative;
                 background: #fff;
+                position: relative;
             }
 
-            /* 4. 完全隐藏所有可能产生打印戳记的元素（如浏览器自动添加的页码、日期、URL等）
-                 使用内容重置 + 覆盖伪元素，并结合 @page margin 彻底消除物理空间 */
+            /* 4. 全面清除任何可能由伪元素、额外元素生成的戳记/水印 */
             body::before,
             body::after,
             html::before,
-            html::after {
+            html::after,
+            .receipt::before,
+            .receipt::after {
                 display: none !important;
                 content: none !important;
             }
 
-            /* 5. 确保所有背景色/边框打印时完整保留（无颜色丢失） */
+            /* 5. 强制保留所有背景及边框颜色（确保可视化信息完整） */
             * {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
 
-            /* 6. 确保表格及文字保持锐利，避免缩放导致的错位 */
-            table, tr, td, th, div, span {
-                break-inside: avoid;
-            }
-
-            /* 7. 凭证内部任何内容都不触发额外的页眉/页脚区域 */
-            .voucher-number,
+            /* 6. 避免内容分页断裂，提升打印体验 */
+            .receipt,
             .header,
-            .title,
             .section-title,
+            .info-table,
+            .item-table,
             .notice,
             .signature-area,
             .footer {
                 page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            /* 7. 安全后备：确保没有任何元素能突破边界显示戳记 */
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
             }
         }
 
         /* =========================
-           常规视觉样式 (保持不变，但打印时完美继承)
+           常规视觉样式 (工整清晰，适合存档)
         ========================= */
         .voucher-number {
             position: absolute;
@@ -262,11 +295,12 @@
             padding-top: 6px;
         }
 
-        /* 屏幕预览时保持响应式友好 */
+        /* 屏幕自适应小幅度压缩 (仅用于屏幕预览不损失比例) */
         @media (max-width: 140mm) {
             body {
                 padding: 12px;
             }
+
             .receipt {
                 width: 100%;
                 max-width: 128mm;
@@ -359,7 +393,7 @@
             <td class="label">起止时间</td>
             <td>2026-04-08 至 2026-05-08</td>
         </tr>
-    </table>
+     </table>
 
     <!-- 声明 -->
     <div class="notice">
