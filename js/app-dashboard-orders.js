@@ -1,5 +1,5 @@
-// app-dashboard-orders.js - v2.3 修复版
-// 修复内容：printAllOrders 增加数据量限制和分页提示
+// app-dashboard-orders.js - v2.0
+// printAllOrders 增加数据量限制和分页提示
 
 'use strict';
 
