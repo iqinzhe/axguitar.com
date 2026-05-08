@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.4 订单列表打印优化（打印完整订单列表）
+// app-dashboard-print.js - v2.0
 
 'use strict';
 
