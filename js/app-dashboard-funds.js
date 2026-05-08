@@ -1,6 +1,4 @@
-// app-dashboard-funds.js - v2.2 管理员排除练习门店数据
-// v2.1: 员工仅可查看本人操作的资金流水记录
-// v2.2: 管理员查看资金流水时排除练习门店
+// app-dashboard-funds.js - v2.0 管理员排除练习门店数据
 
 'use strict';
 
