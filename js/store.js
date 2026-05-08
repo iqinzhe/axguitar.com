@@ -1,4 +1,4 @@
-// store.js - v2.4 门店财务卡片打印（每页2张卡片，1+4行×3列）
+// store.js - v2.5 卡片式财务汇总（屏幕 + 打印，每页4张卡片）
 
 'use strict';
 
@@ -470,7 +470,7 @@
             }
         },
 
-        // ==================== 构建门店管理 HTML（v2.4 收集卡片数据） ====================
+        // ==================== 构建门店管理 HTML（卡片式财务汇总） ====================
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -626,7 +626,7 @@
                     storeStats[sid].returnCapital += (rc.amount || 0);
                 }
 
-                // 计算利润
+                // 计算利润和可动用资金
                 for (const sid of Object.keys(storeStats)) {
                     const s = storeStats[sid];
                     s.monthProfit = s.monthAdminFee + s.monthServiceFee + s.monthInterest - s.monthExpense;
@@ -634,7 +634,7 @@
                     s.availableCapital = (storeBalances[sid]?.cashBalance || 0) + (storeBalances[sid]?.bankBalance || 0);
                 }
 
-                // 构建总计
+                // 合计数据（仅正常门店）
                 const grandTotal = {
                     monthNewOrders: 0, activeOrders: 0, completedOrders: 0,
                     monthLoanAmount: 0, totalLoanAmount: 0,
@@ -648,12 +648,8 @@
                     returnCapital: 0
                 };
 
-                // 准备卡片数据（排除练习门店）
-                window._storeCardsData = [];
-                
-                // 生成门店统计行（2行×7列布局）
-                let storeStatsRows = '';
-
+                // 收集门店卡片数据（仅正常门店，排除练习门店）
+                const storeCards = [];
                 for (const store of StoreManager.stores) {
                     const isPractice = store.is_practice === true;
                     const stats = storeStats[store.id] || {};
@@ -680,11 +676,8 @@
                         grandTotal.monthProfit += (stats.monthProfit || 0);
                         grandTotal.totalProfit += (stats.totalProfit || 0);
                         grandTotal.returnCapital += (stats.returnCapital || 0);
-                    }
-
-                    // ----- 收集卡片数据（仅非练习门店）-----
-                    if (!isPractice) {
-                        window._storeCardsData.push({
+                        
+                        storeCards.push({
                             name: store.name,
                             code: store.code,
                             monthNewOrders: stats.monthNewOrders || 0,
@@ -709,57 +702,62 @@
                             returnCapital: stats.returnCapital || 0
                         });
                     }
-
-                    let storeStatusBadge = '';
-                    if (store.is_active === false) {
-                        storeStatusBadge = ` <span class="badge badge--liquidated">${lang === 'id' ? 'DITUTUP' : '已暂停'}</span>`;
-                    }
-                    if (isPractice) {
-                        storeStatusBadge += ` <span class="badge" style="background:#a78bfa;color:#fff;">${lang === 'id' ? 'LATIHAN' : '练习'}</span>`;
-                    }
-
-                    const practiceRowStyle = isPractice ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
-                    const storeDisplay = `<strong>${Utils.escapeHtml(store.name)}${storeStatusBadge}</strong><br><small>${Utils.escapeHtml(store.code)}</small>`;
-
-                    storeStatsRows += `<tr${practiceRowStyle}>
-                        <td class="store-name-cell" rowspan="2">${storeDisplay}</td>
-                        <td class="text-center">${stats.monthNewOrders || 0}</td>
-                        <td class="text-center">${stats.activeOrders || 0} / ${stats.completedOrders || 0}</td>
-                        <td class="amount">${Utils.formatCurrency(stats.monthLoanAmount || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalLoanAmount || 0)}</small></td>
-                        <td class="amount income">${Utils.formatCurrency(stats.monthAdminFee || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalAdminFee || 0)}</small></td>
-                        <td class="amount income">${Utils.formatCurrency(stats.monthServiceFee || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalServiceFee || 0)}</small></td>
-                        <td class="amount income">${Utils.formatCurrency(stats.monthInterest || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalInterest || 0)}</small></td>
-                    </tr>
-                    <tr${practiceRowStyle}>
-                        <td class="amount">${Utils.formatCurrency(stats.deployedCapital || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.availableCapital || 0)}</small></td>
-                        <td class="amount">${Utils.formatCurrency(balance.cashBalance)}</td>
-                        <td class="amount">${Utils.formatCurrency(balance.bankBalance)}</td>
-                        <td class="amount expense">${Utils.formatCurrency(stats.monthExpense || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalExpense || 0)}</small></td>
-                        <td class="amount ${(stats.monthProfit || 0) >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(stats.monthProfit || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalProfit || 0)}</small></td>
-                        <td class="amount">${Utils.formatCurrency(stats.returnCapital || 0)}</td>
-                    </tr>`;
                 }
+                // 保存到全局供打印使用
+                window._storeCardsData = storeCards;
 
-                // 合计行
-                const summaryRow = `<tr style="background:#f1f5f9;font-weight:bold;">
-                    <td class="store-name-cell" rowspan="2"><strong>${lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计'}</strong></td>
-                    <td class="text-center"><strong>${grandTotal.monthNewOrders}</strong></td>
-                    <td class="text-center"><strong>${grandTotal.activeOrders} / ${grandTotal.completedOrders}</strong></td>
-                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.monthLoanAmount)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalLoanAmount)}</small></td>
-                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.monthAdminFee)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalAdminFee)}</small></td>
-                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.monthServiceFee)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalServiceFee)}</small></td>
-                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.monthInterest)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalInterest)}</small></td>
-                </tr>
-                <tr style="background:#f1f5f9;font-weight:bold;">
-                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.deployedCapital)}</strong><br><small>${Utils.formatCurrency(grandTotal.availableCapital)}</small></td>
-                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.cashBalance)}</strong></td>
-                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.bankBalance)}</strong></td>
-                    <td class="amount expense"><strong>${Utils.formatCurrency(grandTotal.monthExpense)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalExpense)}</small></td>
-                    <td class="amount ${grandTotal.monthProfit >= 0 ? 'income' : 'expense'}"><strong>${Utils.formatCurrency(grandTotal.monthProfit)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalProfit)}</small></td>
-                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.returnCapital)}</strong></td>
-                </tr>`;
+                // ========== 生成卡片式财务汇总（屏幕显示） ==========
+                const fmt = (val) => Utils.formatCurrency(val);
+                let cardsHtml = '<div class="store-cards-grid">';
+                for (const s of storeCards) {
+                    cardsHtml += `
+<div class="store-finance-card">
+    <div class="card-header">${Utils.escapeHtml(s.name)} <span style="font-size:0.8rem;">(${Utils.escapeHtml(s.code)})</span></div>
+    <div class="card-grid">
+        <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
+        <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
+        <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
 
-                // ==================== 门店列表行 ====================
+        <div><strong>🧾 管理费</strong><br>${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}</div>
+        <div><strong>🛠️ 服务费</strong><br>${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}</div>
+        <div><strong>💸 利息</strong><br>${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}</div>
+
+        <div><strong>📦 在押资金</strong><br>${fmt(s.deployedCapital)}</div>
+        <div><strong>💵 可动用资金</strong><br>${fmt(s.availableCapital)}</div>
+        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
+
+        <div><strong>📉 本月支出</strong><br>${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}</div>
+        <div><strong>📈 本月利润</strong><br>${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}</div>
+        <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
+    </div>
+</div>`;
+                }
+                cardsHtml += '</div>';
+
+                // 汇总卡片（合计）
+                const summaryHtml = `
+<div class="store-summary-card">
+    <div class="card-header">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</div>
+    <div class="card-grid summary">
+        <div><strong>📋 本月新增</strong><br>${grandTotal.monthNewOrders}</div>
+        <div><strong>🔄 进行中/已结清</strong><br>${grandTotal.activeOrders} / ${grandTotal.completedOrders}</div>
+        <div><strong>💰 本月当金</strong><br>${fmt(grandTotal.monthLoanAmount)}</div>
+
+        <div><strong>🧾 管理费</strong><br>${fmt(grandTotal.monthAdminFee)} / ${fmt(grandTotal.totalAdminFee)}</div>
+        <div><strong>🛠️ 服务费</strong><br>${fmt(grandTotal.monthServiceFee)} / ${fmt(grandTotal.totalServiceFee)}</div>
+        <div><strong>💸 利息</strong><br>${fmt(grandTotal.monthInterest)} / ${fmt(grandTotal.totalInterest)}</div>
+
+        <div><strong>📦 在押资金</strong><br>${fmt(grandTotal.deployedCapital)}</div>
+        <div><strong>💵 可动用资金</strong><br>${fmt(grandTotal.availableCapital)}</div>
+        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(grandTotal.cashBalance)} / ${fmt(grandTotal.bankBalance)}</div>
+
+        <div><strong>📉 本月支出</strong><br>${fmt(grandTotal.monthExpense)} / ${fmt(grandTotal.totalExpense)}</div>
+        <div><strong>📈 本月利润</strong><br>${fmt(grandTotal.monthProfit)} / ${fmt(grandTotal.totalProfit)}</div>
+        <div><strong>💳 偿还本金</strong><br>${fmt(grandTotal.returnCapital)}</div>
+    </div>
+</div>`;
+
+                // ==================== 门店列表行（保持不变） ====================
                 let storeRows = '';
                 if (StoreManager.stores.length === 0) {
                     storeRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td>`;
@@ -852,33 +850,11 @@
                         </div>
                         <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Tidak termasuk Toko Latihan' : '不含练习门店'}</p>
                     </div>
-                    <div class="card" id="storeFinanceSummaryCard">
+                    <div class="card">
                         <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
-                        <div class="table-container" style="overflow-x:auto;">
-                            <table class="data-table store-stats-table" style="min-width:1200px;font-size:11px;">
-                                <thead>
-                                    <tr>
-                                        <th rowspan="2" style="vertical-align:middle;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                        <th class="text-center">${lang === 'id' ? 'Bulan Ini' : '本月新增'}<br>${lang === 'id' ? 'Pesanan' : '订单'}</th>
-                                        <th class="text-center">${lang === 'id' ? 'Aktif' : '进行中'} / ${lang === 'id' ? 'Lunas' : '已结清'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月放出'}<br>${lang === 'id' ? 'Total Pinjaman' : '总当金'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月管理费'}<br>${lang === 'id' ? 'Total Admin' : '总管理费'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月服务费'}<br>${lang === 'id' ? 'Total Layanan' : '总服务费'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利息'}<br>${lang === 'id' ? 'Total Bunga' : '总利息'}</th>
-                                    </tr>
-                                    <tr>
-                                        <th class="amount">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}<br>${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</th>
-                                        <th class="amount">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
-                                        <th class="amount">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月支出'}<br>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利润'}<br>${lang === 'id' ? 'Total Laba' : '总利润'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Pengembalian' : '偿还'}<br>${lang === 'id' ? 'Modal' : '本金'}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>${storeStatsRows}${summaryRow}</tbody>
-                            </table>
-                        </div>
-                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Baris ungu = Toko Latihan (tidak dihitung dalam total) | Format: Bulan Ini / Total' : '紫色行 = 练习门店（不计入合计）| 格式: 本月 / 累计'}</p>
+                        ${cardsHtml}
+                        ${summaryHtml}
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total' : '格式: 本月 / 累计'}</p>
                     </div>
                     <div class="card no-print">
                         <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
@@ -920,42 +896,76 @@
                     </div>
                     
                     <style>
-                        .store-stats-table th {
-                            font-size: 10px;
-                            padding: 4px 6px;
-                            white-space: nowrap;
+                        .store-cards-grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+                            gap: 16px;
+                            margin-bottom: 24px;
+                        }
+                        .store-finance-card, .store-summary-card {
+                            border: 1px solid #cbd5e1;
+                            border-radius: 12px;
+                            padding: 12px;
+                            background: #fff;
+                            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                            transition: box-shadow 0.2s;
+                            break-inside: avoid;
+                        }
+                        .store-finance-card:hover {
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                        }
+                        .store-summary-card {
+                            background: #f8fafc;
+                            border-width: 2px;
+                        }
+                        .store-finance-card .card-header, .store-summary-card .card-header {
+                            font-weight: bold;
+                            font-size: 1.1rem;
+                            padding-bottom: 6px;
+                            margin-bottom: 8px;
+                            border-bottom: 1px solid #e2e8f0;
                             text-align: center;
-                            vertical-align: middle;
                         }
-                        .store-stats-table td {
-                            font-size: 10px;
-                            padding: 4px 6px;
-                            vertical-align: middle;
+                        .card-grid {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 8px 12px;
+                            font-size: 0.85rem;
                         }
-                        .store-stats-table td small {
-                            font-size: 9px;
+                        .card-grid.summary {
+                            font-weight: 500;
+                        }
+                        .card-grid div {
+                            line-height: 1.3;
+                        }
+                        @media (max-width: 768px) {
+                            .store-cards-grid {
+                                grid-template-columns: 1fr;
+                            }
+                            .card-grid {
+                                font-size: 0.8rem;
+                                gap: 6px 10px;
+                            }
                         }
                         @media print {
                             .no-print {
                                 display: none !important;
                             }
-                            .store-stats-table {
-                                font-size: 9px !important;
+                            .store-cards-grid {
+                                display: block;
                             }
-                            .store-stats-table th {
-                                font-size: 8px !important;
-                                padding: 2px 4px !important;
+                            .store-finance-card, .store-summary-card {
+                                border: 1px solid #000;
+                                margin-bottom: 12px;
+                                page-break-inside: avoid;
+                                padding: 8px;
                             }
-                            .store-stats-table td {
-                                font-size: 8px !important;
-                                padding: 2px 4px !important;
-                            }
-                            .store-stats-table td small {
-                                font-size: 7px !important;
+                            .card-grid {
+                                font-size: 8pt;
                             }
                             @page {
-                                size: A4 landscape;
-                                margin: 5mm;
+                                size: A4 portrait;
+                                margin: 8mm;
                             }
                         }
                     </style>`;
@@ -984,7 +994,7 @@
             }
         },
 
-        // ==================== 打印门店财务汇总（卡片式，每页2张） ====================
+        // ==================== 打印门店财务汇总（卡片式，每页4张） ====================
         printStoreFinanceSummary() {
             const lang = Utils.lang;
             const cards = window._storeCardsData || [];
@@ -1007,18 +1017,17 @@
             const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
             const periodEnd = new Date().toISOString().split('T')[0];
 
-            // 格式化金额（完整 Rp 格式）
             const fmt = (val) => Utils.formatCurrency(val);
 
             let cardsHtml = '';
             for (let i = 0; i < cards.length; i++) {
                 const s = cards[i];
                 cardsHtml += `
-<div style="border: 1px solid #000; border-radius: 8px; padding: 10px; margin-bottom: 20px; page-break-inside: avoid; background: #fff; width: 95%; margin-left: auto; margin-right: auto;">
-    <div style="font-weight: bold; font-size: 12pt; padding-bottom: 6px; margin-bottom: 8px; border-bottom: 1px solid #ccc; text-align: center;">
+<div style="border: 1px solid #000; border-radius: 6px; padding: 6px 8px; margin-bottom: 12px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 8pt;">
+    <div style="font-weight: bold; font-size: 10pt; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px solid #ccc; text-align: center;">
         ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
     </div>
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px;">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 8px;">
         <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
         <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
         <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
@@ -1036,8 +1045,8 @@
         <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
     </div>
 </div>`;
-                // 每两个卡片之间分页（A4每页2张）
-                if ((i + 1) % 2 === 0 && i !== cards.length - 1) {
+                // 每4张卡片分页
+                if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
                     cardsHtml += '<div style="page-break-after: always;"></div>';
                 }
             }
@@ -1056,20 +1065,19 @@
             font-size: 9pt;
             background: #fff;
             margin: 0;
-            padding: 10mm;
+            padding: 8mm;
         }
         @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 8mm;
         }
         @media print {
             body { margin: 0; padding: 0; }
-            .page-break { page-break-after: always; }
         }
         .print-header {
             text-align: center;
-            margin-bottom: 15px;
-            padding-bottom: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
             border-bottom: 2px solid #1e293b;
         }
         .print-header .logo {
@@ -1078,7 +1086,7 @@
             color: #0e7490;
         }
         .print-header-info {
-            font-size: 9pt;
+            font-size: 8pt;
             color: #475569;
             margin-top: 4px;
         }
@@ -1086,7 +1094,7 @@
             text-align: center;
             font-size: 7pt;
             color: #94a3b8;
-            margin-top: 20px;
+            margin-top: 16px;
             padding-top: 6px;
             border-top: 1px solid #e2e8f0;
         }
@@ -1100,7 +1108,7 @@
             &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
             &nbsp;|&nbsp; 📅 ${printDateTime}
         </div>
-        <div class="print-header-info" style="font-size:8pt;">
+        <div class="print-header-info" style="font-size:7pt;">
             📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
         </div>
     </div>
@@ -1166,5 +1174,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.4 卡片打印（每页2张，1+4行×3列）');
+    console.log('✅ JF.StoreManager v2.5 卡片式财务汇总（屏幕 + 打印每页4张）');
 })();
