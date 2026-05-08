@@ -1,5 +1,5 @@
-// auth.js - v2.3 修复版
-// 修复内容：移除 Enter 键监听（由 DashboardCore 统一处理），避免重复触发
+// auth.js - v2.4 修复版
+// 修复内容：移除 Enter 键监听 + 修复 logout 重复调用 signOut
 
 'use strict';
 
@@ -10,7 +10,7 @@
     const AUTH = {
         user: null,
 
-        // ==================== 登录锁定机制（使用 localStorage） ====================
+        // ==================== 登录锁定机制 ====================
         _getLoginAttempts() {
             const stored = localStorage.getItem('jf_login_attempts');
             return stored ? JSON.parse(stored) : {};
@@ -220,9 +220,6 @@
                 }
             });
 
-            // 【修复 #18】移除 auth.js 中的 Enter 键监听，统一由 DashboardCore 处理
-            // 避免重复触发登录
-
             console.log('[Auth] 认证模块初始化完成');
         },
 
@@ -372,19 +369,20 @@
             }
         },
 
+        // 【修复 #2】logout 简化，只调用一次 forceClearAuth，避免重复 signOut
         async logout() {
             console.log('[Auth] 执行登出');
+            
             if (this.user && window.Audit) {
-                await window.Audit.logLogout(this.user.id, this.user.name).catch(() => {});
+                try {
+                    await window.Audit.logLogout(this.user.id, this.user.name);
+                } catch (e) {
+                    console.warn('[Auth] 审计日志记录失败:', e.message);
+                }
             }
+            
             this._clearAllLoginFailures();
             this.user = null;
-            
-            try {
-                await SUPABASE.logout();
-            } catch (e) {
-                console.warn('[Auth] Supabase logout 失败:', e.message);
-            }
             
             await this.forceClearAuth();
         },
@@ -570,5 +568,5 @@
     JF.Auth = AUTH;
     window.AUTH = AUTH;
 
-    console.log('✅ JF.Auth v2.3 修复版（移除 Enter 键监听，避免重复触发）');
+    console.log('✅ JF.Auth v2.4 修复版（logout 只调用一次 signOut）');
 })();
