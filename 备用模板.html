@@ -2,176 +2,332 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
 <title>典当结清凭证</title>
 
 <style>
-    *{
-        margin:0;
-        padding:0;
-        box-sizing:border-box;
-    }
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:#e9ecef;
+    font-family:Arial,"Microsoft YaHei",sans-serif;
+    color:#222;
+    padding:20px;
+}
+
+/* =========================
+   A4 打印
+========================= */
+@page{
+    size:A4;
+    margin:12mm;
+}
+
+/* =========================
+   A5 内容区域
+========================= */
+.receipt{
+
+    width:148mm;
+    min-height:210mm;
+
+    margin:0 auto;
+
+    background:#fff;
+
+    border:1.5px solid #222;
+
+    padding:14mm 12mm;
+
+    position:relative;
+}
+
+/* =========================
+   单号
+========================= */
+.voucher-number{
+    position:absolute;
+    top:12mm;
+    right:12mm;
+
+    font-size:12px;
+    color:#333;
+}
+
+/* =========================
+   页头
+========================= */
+.header{
+
+    text-align:center;
+
+    border-bottom:2px solid #222;
+
+    padding-bottom:12px;
+
+    margin-bottom:20px;
+}
+
+/* logo */
+.logo-box{
+
+    width:70px;
+    height:70px;
+
+    margin:0 auto 10px;
+
+    border:1px dashed #999;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    font-size:12px;
+    color:#666;
+}
+
+/* 公司名称 */
+.company-name{
+
+    font-size:24px;
+
+    font-weight:bold;
+
+    letter-spacing:1px;
+
+    margin-bottom:6px;
+}
+
+/* 公司信息 */
+.company-meta{
+
+    font-size:12px;
+
+    line-height:1.7;
+
+    color:#444;
+}
+
+/* =========================
+   标题
+========================= */
+.title{
+
+    text-align:center;
+
+    margin-bottom:22px;
+}
+
+.title .id-title{
+
+    font-size:20px;
+
+    font-weight:bold;
+
+    letter-spacing:1px;
+}
+
+.title .cn-title{
+
+    margin-top:4px;
+
+    font-size:15px;
+
+    color:#444;
+}
+
+/* =========================
+   区块标题
+========================= */
+.section-title{
+
+    font-size:15px;
+
+    font-weight:bold;
+
+    border-bottom:1px solid #222;
+
+    padding-bottom:4px;
+
+    margin:18px 0 8px;
+}
+
+/* =========================
+   表格
+========================= */
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.info-table td{
+
+    border:1px solid #444;
+
+    padding:8px 10px;
+
+    font-size:13px;
+}
+
+.label{
+
+    width:24%;
+
+    background:#f5f5f5;
+
+    font-weight:bold;
+}
+
+/* =========================
+   物品表
+========================= */
+.item-table th,
+.item-table td{
+
+    border:1px solid #444;
+
+    padding:8px;
+
+    text-align:center;
+
+    font-size:13px;
+}
+
+.item-table th{
+
+    background:#f2f2f2;
+
+    font-weight:bold;
+}
+
+/* =========================
+   金额重点
+========================= */
+.amount{
+
+    font-size:18px;
+
+    font-weight:bold;
+
+    color:#000;
+}
+
+/* =========================
+   声明
+========================= */
+.notice{
+
+    margin-top:16px;
+
+    border:1px dashed #666;
+
+    padding:12px;
+
+    font-size:12px;
+
+    line-height:1.8;
+
+    background:#fafafa;
+}
+
+/* =========================
+   签字区域
+========================= */
+.signature-area{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-end;
+
+    margin-top:45px;
+}
+
+.sign-box{
+
+    width:30%;
+
+    text-align:center;
+}
+
+/* 印章 */
+.stamp-placeholder{
+
+    width:90px;
+    height:90px;
+
+    margin:0 auto 8px;
+
+    border:2px dashed #999;
+
+    border-radius:50%;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    font-size:12px;
+
+    color:#777;
+}
+
+/* 签字线 */
+.sign-line{
+
+    border-top:1px solid #222;
+
+    padding-top:6px;
+
+    font-size:12px;
+}
+
+/* =========================
+   页脚
+========================= */
+.footer{
+
+    margin-top:28px;
+
+    text-align:center;
+
+    font-size:11px;
+
+    color:#666;
+
+    border-top:1px solid #ccc;
+
+    padding-top:10px;
+}
+
+/* =========================
+   打印优化
+========================= */
+@media print{
 
     body{
-        background:#f3f4f6;
-        font-family:Arial, Helvetica, sans-serif;
-        padding:30px;
-        color:#222;
+        background:#fff;
+        padding:0;
     }
 
     .receipt{
-        width:900px;
-        margin:auto;
-        background:#fff;
-        border:2px solid #222;
-        padding:35px;
-        position:relative;
-    }
 
-    .top-bar{
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        border-bottom:2px solid #222;
-        padding-bottom:20px;
-        margin-bottom:25px;
-    }
+        border:1px solid #222;
 
-    .logo-box{
-        width:120px;
-        height:80px;
-        border:1px dashed #999;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-size:14px;
-        color:#666;
-    }
+        margin:0 auto;
 
-    .company-info{
-        text-align:right;
-        line-height:1.8;
+        box-shadow:none;
     }
+}
 
-    .title{
-        text-align:center;
-        font-size:32px;
-        font-weight:bold;
-        letter-spacing:4px;
-        margin-bottom:30px;
-    }
-
-    .voucher-number{
-        position:absolute;
-        top:20px;
-        right:35px;
-        font-size:14px;
-    }
-
-    .info-table{
-        width:100%;
-        border-collapse:collapse;
-        margin-bottom:25px;
-    }
-
-    .info-table td{
-        border:1px solid #444;
-        padding:12px;
-        font-size:15px;
-    }
-
-    .label{
-        width:160px;
-        background:#f8f8f8;
-        font-weight:bold;
-    }
-
-    .section-title{
-        margin:25px 0 10px;
-        font-size:18px;
-        font-weight:bold;
-        border-left:5px solid #111;
-        padding-left:10px;
-    }
-
-    .item-table{
-        width:100%;
-        border-collapse:collapse;
-        margin-bottom:25px;
-    }
-
-    .item-table th,
-    .item-table td{
-        border:1px solid #444;
-        padding:12px;
-        text-align:center;
-        font-size:15px;
-    }
-
-    .item-table th{
-        background:#f0f0f0;
-    }
-
-    .notice{
-        border:1px dashed #666;
-        padding:15px;
-        line-height:1.8;
-        font-size:14px;
-        margin-top:20px;
-        background:#fafafa;
-    }
-
-    .signature-area{
-        display:flex;
-        justify-content:space-between;
-        margin-top:50px;
-    }
-
-    .sign-box{
-        width:240px;
-        text-align:center;
-    }
-
-    .sign-line{
-        border-top:1px solid #222;
-        margin-top:70px;
-        padding-top:8px;
-        font-size:14px;
-    }
-
-    .stamp-placeholder{
-        width:120px;
-        height:120px;
-        border:2px dashed #999;
-        border-radius:50%;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        color:#777;
-        font-size:14px;
-        margin:auto;
-    }
-
-    .footer{
-        margin-top:40px;
-        text-align:center;
-        font-size:13px;
-        color:#666;
-        border-top:1px solid #ccc;
-        padding-top:15px;
-    }
-
-    @media print{
-        body{
-            background:#fff;
-            padding:0;
-        }
-
-        .receipt{
-            border:none;
-            width:100%;
-        }
-    }
 </style>
 </head>
 
@@ -179,26 +335,57 @@
 
 <div class="receipt">
 
+    <!-- 单号 -->
     <div class="voucher-number">
-        凭证编号：BL001
+        No : BL-20260508-001
     </div>
 
-    <div class="top-bar">
+    <!-- 页头 -->
+    <div class="header">
+
+        <!-- LOGO -->
         <div class="logo-box">
-            <link rel="icon" href="icons/favicon-192x192.png">
+            LOGO
         </div>
 
-        <div class="company-info">
-            <h2> JF! by Gadai </h2>
-            <div>Alamat：Cakra residence Bloc E1-12, Krajan Panas I, Oro-Oro Ombowetan, Kec. Rembang, Pasuruan</div>
-            <div>Tel：+62 895 1569 2586</div>
-            <div>营业执照号：XXXXXXXXXXXX</div>
+        <!-- 公司名称 -->
+        <div class="company-name">
+            JF! by Gadai
+        </div>
+
+        <!-- 公司信息 -->
+        <div class="company-meta">
+            <div>
+                Alamat : Cakra Residence Bloc E1-12, Pasuruan
+            </div>
+
+            <div>
+                Tel : +62 895 1569 2586
+            </div>
+
+            <div>
+                NIB : XXXXXXXXXXXX
+            </div>
         </div>
 
     </div>
 
+    <!-- 标题 -->
     <div class="title">
-        典当结清凭证
+
+        <div class="id-title">
+            SURAT PELUNASAN GADAI
+        </div>
+
+        <div class="cn-title">
+            典当结清凭证
+        </div>
+
+    </div>
+
+    <!-- 客户信息 -->
+    <div class="section-title">
+        客户信息
     </div>
 
     <table class="info-table">
@@ -208,12 +395,12 @@
             <td>张三</td>
 
             <td class="label">KTP</td>
-            <td> 3514151011778002 </td>
+            <td>3514151011778002</td>
         </tr>
 
         <tr>
             <td class="label">联系电话</td>
-            <td>+62 XXX XXXX XXXX</td>
+            <td>+62 812 XXXX XXXX</td>
 
             <td class="label">结清日期</td>
             <td>2026-05-08</td>
@@ -223,65 +410,116 @@
             <td class="label">典当单号</td>
             <td>PAWN-2026-0001</td>
 
+            <td class="label">赎回方式</td>
+            <td>现金 / 转账</td>
+        </tr>
+
     </table>
+
+    <!-- 物品信息 -->
     <div class="section-title">
         典当物品信息
     </div>
+
     <table class="item-table">
+
         <thead>
-            <tr>
-                <th>序号</th>
-                <th>物品名称</th>
-                <th>规格 / 描述</th>
-                <th>数量</th>
-                <th>备注</th>
-            </tr>
+
+        <tr>
+            <th>序号</th>
+            <th>物品名称</th>
+            <th>规格 / 描述</th>
+            <th>数量</th>
+            <th>备注</th>
+        </tr>
+
         </thead>
 
         <tbody>
-            <tr>
-                <td>1</td>
-                <td>黄金项链</td>
-                <td>24K / 20克</td>
-                <td>1</td>
-                <td>外观完好</td>
-            </tr>
+
+        <tr>
+            <td>1</td>
+            <td>黄金项链</td>
+            <td>24K / 20克</td>
+            <td>1</td>
+            <td>外观完好</td>
+        </tr>
+
         </tbody>
+
     </table>
 
+    <!-- 费用信息 -->
+    <div class="section-title">
+        费用结算信息
+    </div>
+
     <table class="info-table">
+
         <tr>
             <td class="label">典当本金</td>
             <td>Rp 10,000,000</td>
 
+            <td class="label">综合费用</td>
+            <td>Rp 1,500,000</td>
+        </tr>
+
+        <tr>
+            <td class="label">逾期费用</td>
+            <td>Rp 0</td>
+
+            <td class="label">结清总金额</td>
+
+            <td class="amount">
+                Rp 11,500,000
+            </td>
+        </tr>
+
     </table>
+
+    <!-- 声明 -->
     <div class="notice">
+
         1. 本凭证证明客户已完成本次典当业务全部款项结清。<br>
+
         2. 典当物品已由客户本人确认领取。<br>
+
         3. 请妥善保管本凭证，遗失不补。<br>
+
         4. 如有争议，以本公司系统记录为准。
+
     </div>
 
+    <!-- 签字 -->
     <div class="signature-area">
+
         <div class="sign-box">
+
             <div class="sign-line">
                 客户签字
             </div>
+
         </div>
 
         <div class="sign-box">
+
             <div class="stamp-placeholder">
                 公司盖章
             </div>
+
         </div>
+
         <div class="sign-box">
+
             <div class="sign-line">
                 经办人签字
             </div>
+
         </div>
 
     </div>
 
+    <!-- 页脚 -->
     <div class="footer">
         本凭证由系统自动生成 ｜ JF! by Gadai
     </div>
