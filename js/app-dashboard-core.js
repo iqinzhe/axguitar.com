@@ -1,4 +1,4 @@
-// app-dashboard-core.js - v2.6 修复仪表盘练习门店数据泄露
+// app-dashboard-core.js - v2.0
 
 'use strict';
 
