@@ -1,5 +1,4 @@
-// app-customers.js - v2.1 修复版
-// 修复内容：
+// app-customers.js - v2.0
 // 1. deleteCustomer 增加 internal_transfers 删除
 // 2. 服务费金额为 0 时同时清除 dataset.manual 标记
 
