@@ -1,4 +1,4 @@
-// app-payments.js - v2.0 统一金额提取 + 幂等性检查和审计日志
+// app-payments.js - v2.1 紧急修复 (移除 loan_amount 篡改、少付告警、统一锁 key、幂等窗口缩小至2分钟)
 
 'use strict';
 
@@ -17,24 +17,31 @@
     window.APP._releasePaymentLock = function (lockKey) {
         delete window.APP._paymentLock[lockKey];
     };
+    // 改进幂等性检查：缩小窗口至 2 分钟
     window.APP._checkIdempotency = async function (orderId, type, amount, paymentMethod) {
         try {
             const client = SUPABASE.getClient();
             const { data: order, error: orderError } = await client
                 .from('orders').select('id').eq('order_id', orderId).single();
             if (orderError || !order) return false;
-            const today = Utils.getLocalToday();
+
+            // 获取当前时间，计算 2 分钟前的 ISO 字符串
+            const now = new Date();
+            const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000).toISOString();
+
             const { data, error } = await client
                 .from('payment_history').select('id')
                 .eq('order_id', order.id).eq('type', type)
                 .eq('amount', amount).eq('payment_method', paymentMethod)
-                .gte('date', today).maybeSingle();
+                .gte('created_at', twoMinutesAgo)   // 仅检查最近2分钟内的记录
+                .maybeSingle();
             if (error) return false;
             return !!data;
         } catch (e) { return false; }
     };
 
     const PaymentPage = {
+
         // ==================== 辅助：设置按钮加载状态 ====================
         _setButtonLoading(btn, loading) {
             if (!btn) return;
@@ -104,7 +111,7 @@
             return null;
         },
 
-        // ==================== 显示缴费页面 ====================
+        // ==================== 显示缴费页面 (无变化) ====================
         async showPayment(orderId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -299,15 +306,18 @@
             }
         },
 
-        // ==================== 利息收款（统一使用 Utils.getAmountFromInput） ====================
+        // ==================== 利息收款（去除 loan_amount 篡改，增加少付告警） ====================
         async payInterestWithMethod(orderId) {
-            const actualPaid = Utils.getAmountFromInput('interestAmount');   // 统一提取
+            const actualPaid = Utils.getAmountFromInput('interestAmount');
             const method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
             const methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
 
             if (isNaN(actualPaid) || actualPaid <= 0) { Utils.toast.warning(Utils.t('invalid_amount')); return; }
-            if (!window.APP._acquirePaymentLock(orderId + '_interest')) {
+
+            // 统一锁 key
+            const lockKey = orderId + '_interest';
+            if (!window.APP._acquirePaymentLock(lockKey)) {
                 Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...'); return;
             }
             const confirmBtn = this._findConfirmButton('interest');
@@ -318,10 +328,10 @@
                 const order = await SUPABASE.getOrder(orderId);
                 const calcResult = Utils.calculateInterestPartialPayment(order, actualPaid);
 
-                // 增强的幂等性检查：使用实际支付金额
+                // 幂等性检查（2分钟窗口）
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', actualPaid, method);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '此笔付款已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔付款在2分钟内已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
 
@@ -330,40 +340,46 @@
                 const theoreticalInterest = remainingPrincipal * monthlyRate;
                 const nextInterestNumber = (order.interest_paid_months || 0) + 1;
 
+                // 构建确认消息，如果少付则高亮警告
+                let shortfallWarning = '';
+                if (calcResult.principalDeducted < 0) {
+                    const shortfall = Math.abs(calcResult.principalDeducted);
+                    shortfallWarning = lang === 'id'
+                        ? `\n\n⚠️ PERHATIAN: Jumlah yang dibayar KURANG ${Utils.formatCurrency(shortfall)} dari bunga bulan ini.\nKekurangan ini akan dicatat sebagai HUTANG BUNGA dan harus dilunasi pada pembayaran berikutnya.`
+                        : `\n\n⚠️ 注意：支付金额不足，比本月利息少 ${Utils.formatCurrency(shortfall)}。\n差额将记录为利息欠款，需在下次还款时补足。`;
+                }
+
                 const previewMsg = lang === 'id'
-                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(0)}%\nBunga 1 bln (teoritis): ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}\n\n${calcResult.description}\n\nLanjutkan?`
-                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(0)}%\n1个月利息(理论): ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}\n\n${calcResult.description}\n\n确认收款？`;
+                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(0)}%\nBunga 1 bln (teoritis): ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\nLanjutkan?`
+                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(0)}%\n1个月利息(理论): ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\n确认收款？`;
 
                 const confirmed = await Utils.toast.confirm(previewMsg);
                 if (!confirmed) return;
 
                 try {
-                    if (calcResult.interestPaid > 0) {
-                        // 传入实际支付金额
-                        await SUPABASE.recordInterestPayment(orderId, 1, method, actualPaid);
+                    // 调用后端记录，不再修改 loan_amount
+                    const result = await SUPABASE.recordInterestPayment(orderId, 1, method, actualPaid);
+                    // 如果返回了少付信息，显示醒目提示
+                    if (result && result.shortfall > 0) {
+                        const shortfallMsg = lang === 'id'
+                            ? `⚠️ Pembayaran kurang ${Utils.formatCurrency(result.shortfall)}. Hutang bunga total sekarang: ${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`
+                            : `⚠️ 本次少付 ${Utils.formatCurrency(result.shortfall)}，累计利息欠款：${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`;
+                        Utils.toast.warning(shortfallMsg, 8000);
+                    } else {
+                        Utils.toast.success(lang === 'id' ? 'Pembayaran bunga berhasil!' : '利息收款成功！');
                     }
-                    if (calcResult.principalDeducted > 0) {
-                        await SUPABASE.recordPrincipalPayment(orderId, calcResult.principalDeducted, method);
-                    } else if (calcResult.principalDeducted < 0) {
-                        const client = SUPABASE.getClient();
-                        const newPrincipalRemaining = (order.loan_amount || 0) - (order.principal_paid || 0) + Math.abs(calcResult.principalDeducted);
-                        const newLoanAmount = (order.loan_amount || 0) + Math.abs(calcResult.principalDeducted);
-                        await client.from('orders').update({ loan_amount: newLoanAmount, principal_remaining: newPrincipalRemaining, updated_at: Utils.getLocalDateTime() }).eq('order_id', orderId);
-                    }
+
                     if (window.Audit) {
                         await window.Audit.logPayment(order.order_id, 'interest', actualPaid, method);
-                        // 额外记录计算详情用于审计
-                        await window.Audit.log('interest_payment_calc', JSON.stringify({
-                            order_id: order.order_id,
-                            actualPaid,
-                            calcResult,
-                            timestamp: new Date().toISOString()
-                        }));
-                        if (calcResult.principalDeducted !== 0) {
-                            await window.Audit.log('interest_adjustment', JSON.stringify({ order_id: order.order_id, actual_paid: actualPaid, interest_recorded: calcResult.interestPaid, principal_adjustment: calcResult.principalDeducted, description: calcResult.description }));
+                        if (result && result.shortfall > 0) {
+                            await window.Audit.log('interest_shortfall', JSON.stringify({
+                                order_id: order.order_id,
+                                paid: actualPaid,
+                                shortfall: result.shortfall,
+                                total_shortfall: (order.interest_shortfall || 0) + result.shortfall
+                            }));
                         }
                     }
-                    Utils.toast.success(lang === 'id' ? 'Pembayaran bunga berhasil!' : '利息收款成功！');
                     await PaymentPage.showPayment(orderId);
                 } catch (error) {
                     console.error('payInterestWithMethod 事务失败:', error);
@@ -373,21 +389,23 @@
                 console.error('payInterestWithMethod error:', error);
                 Utils.toast.error(error.message);
             } finally {
-                window.APP._releasePaymentLock(orderId + '_interest');
+                window.APP._releasePaymentLock(lockKey);
                 this._setButtonLoading(confirmBtn, false);
                 this._restoreDisabledButtons(disabledButtons);
             }
         },
 
-        // ==================== 本金收款（统一使用 Utils.getAmountFromInput） ====================
+        // ==================== 本金收款（幂等性窗口缩小） ====================
         async payPrincipalWithMethod(orderId) {
-            const amount = Utils.getAmountFromInput('principalAmount');   // 统一提取
+            const amount = Utils.getAmountFromInput('principalAmount');
             const target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
             const targetName = target === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
 
             if (isNaN(amount) || amount <= 0) { Utils.toast.warning(Utils.t('invalid_amount')); return; }
-            if (!window.APP._acquirePaymentLock(orderId + '_principal')) {
+
+            const lockKey = orderId + '_principal';
+            if (!window.APP._acquirePaymentLock(lockKey)) {
                 Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...'); return;
             }
             const confirmBtn = this._findConfirmButton('principal');
@@ -405,7 +423,7 @@
 
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'principal', actualAmount, target);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '此笔付款已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔付款在2分钟内已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
 
@@ -435,17 +453,18 @@
                 console.error('payPrincipalWithMethod error:', error);
                 Utils.toast.error(error.message);
             } finally {
-                window.APP._releasePaymentLock(orderId + '_principal');
+                window.APP._releasePaymentLock(lockKey);
                 this._setButtonLoading(confirmBtn, false);
                 this._restoreDisabledButtons(disabledButtons);
             }
         },
 
-        // ==================== 固定还款 ====================
+        // ==================== 固定还款 (锁 key 统一) ====================
         async payFixedInstallment(orderId) {
             const method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
             const lang = Utils.lang;
-            if (!window.APP._acquirePaymentLock(orderId + '_fixed')) {
+            const lockKey = orderId + '_fixed';
+            if (!window.APP._acquirePaymentLock(lockKey)) {
                 Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...'); return;
             }
             const confirmBtn = this._findConfirmButton('fixed');
@@ -456,7 +475,7 @@
                 const fixedPaymentBefore = orderBefore.monthly_fixed_payment || 0;
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'fixed_installment', fixedPaymentBefore, method);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat, tidak perlu diproses ulang.' : '此笔付款已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔付款在2分钟内已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
                 await SUPABASE.recordFixedPayment(orderId, method);
@@ -466,17 +485,18 @@
                 console.error('payFixedInstallment error:', error);
                 Utils.toast.error(error.message);
             } finally {
-                window.APP._releasePaymentLock(orderId + '_fixed');
+                window.APP._releasePaymentLock(lockKey);
                 this._setButtonLoading(confirmBtn, false);
                 this._restoreDisabledButtons(disabledButtons);
             }
         },
 
-        // ==================== 提前结清 ====================
+        // ==================== 提前结清 (锁 key 统一) ====================
         async earlySettleFixedOrder(orderId) {
             const method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
             const lang = Utils.lang;
-            if (!window.APP._acquirePaymentLock(orderId + '_early_settle')) {
+            const lockKey = orderId + '_early_settle';
+            if (!window.APP._acquirePaymentLock(lockKey)) {
                 Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses, harap tunggu...' : '⏳ 支付正在处理中，请稍候...'); return;
             }
             const confirmBtn = this._findConfirmButton('early_settle');
@@ -487,7 +507,7 @@
                 const remainingPrincipal = orderBefore.principal_remaining || orderBefore.loan_amount || 0;
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'early_settlement', remainingPrincipal, method);
                 if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? 'Pelunasan ini sudah tercatat, tidak perlu diproses ulang.' : '此笔结清已记录，无需重复处理。');
+                    Utils.toast.warning(lang === 'id' ? 'Pelunasan ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔结清在2分钟内已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
                 await SUPABASE.earlySettleFixedOrder(orderId, method);
@@ -497,7 +517,7 @@
                 console.error('earlySettleFixedOrder error:', error);
                 Utils.toast.error(error.message);
             } finally {
-                window.APP._releasePaymentLock(orderId + '_early_settle');
+                window.APP._releasePaymentLock(lockKey);
                 this._setButtonLoading(confirmBtn, false);
                 this._restoreDisabledButtons(disabledButtons);
             }
@@ -517,7 +537,7 @@
                 const printWindow = window.open('', '_blank');
                 const printDateTime = new Date().toLocaleString();
                 const userName = AUTH.user?.name || '-';
-                const storeAddress = ''; // 可扩展
+                const storeAddress = '';
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
@@ -596,5 +616,5 @@
         };
     }
 
-    console.log('✅ JF.PaymentPage v2.2 修复完成（统一金额提取，幂等性检查，审计日志）');
+    console.log('✅ JF.PaymentPage v2.1 修复完成 (移除 loan_amount 篡改、少付告警、统一锁 key、幂等窗口2分钟)');
 })();
