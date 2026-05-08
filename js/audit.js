@@ -1,5 +1,5 @@
-// audit.js - v2.1 修复版
-// 修复内容：所有日志写入增加 try-catch 保护，不阻塞主流程
+// audit.js - v2.0
+// 所有日志写入增加 try-catch 保护，不阻塞主流程
 
 'use strict';
 
