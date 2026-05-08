@@ -1,4 +1,5 @@
-// auth.js - v2.0 统一认证模块 (JF 命名空间)
+// auth.js - v2.3 修复版
+// 修复内容：移除 Enter 键监听（由 DashboardCore 统一处理），避免重复触发
 
 'use strict';
 
@@ -112,15 +113,13 @@
             }
         },
 
-        // ==================== 【修复】强制清除认证状态 ====================
+        // ==================== 强制清除认证状态 ====================
         async forceClearAuth() {
             console.log('[Auth] 强制清除认证状态');
             this.user = null;
             SUPABASE.clearCache();
             
-            // 清除所有 Supabase 存储的 token
             try {
-                // 尝试清除 localStorage
                 const keysToRemove = [];
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
@@ -134,7 +133,6 @@
                 }
                 keysToRemove.forEach(key => localStorage.removeItem(key));
                 
-                // 尝试清除 sessionStorage
                 for (let i = 0; i < sessionStorage.length; i++) {
                     const key = sessionStorage.key(i);
                     if (key && (
@@ -148,7 +146,6 @@
                 console.warn('[Auth] 清除存储失败:', e.message);
             }
             
-            // 尝试登出 Supabase（忽略错误）
             try {
                 await SUPABASE.getClient().auth.signOut();
             } catch (e) {
@@ -156,11 +153,10 @@
             }
         },
 
-        // ==================== 【修复】初始化 ====================
+        // ==================== 初始化 ====================
         async init() {
             console.log('[Auth] 初始化认证模块...');
             
-            // 初始化网络监控（如果存在）
             if (Utils.NetworkMonitor && !Utils.NetworkMonitor._initialized) {
                 Utils.NetworkMonitor.init();
                 console.log('📡 增强版网络监控已启动');
@@ -179,29 +175,21 @@
                 }
             } catch (e) {
                 console.warn('[Auth] 加载用户失败，清除认证状态:', e.message);
-                // 【修复】加载失败时强制清除
                 await this.forceClearAuth();
             }
 
-            // 【修复 v2.2】监听认证状态变化
-            // 注意：INITIAL_SESSION 在页面加载时触发，此时 DashboardCore.init() 正在进行中，
-            // 不能在此处触发任何渲染，否则会造成二次渲染和界面闪烁。
-            // 只处理运行时的 SIGNED_OUT / USER_DELETED / TOKEN_REFRESHED 事件。
             const client = SUPABASE.getClient();
             client.auth.onAuthStateChange(async (event, session) => {
                 console.log('[Auth] 认证状态变化:', event);
 
-                // INITIAL_SESSION：仅在页面首次加载时触发，由 DashboardCore.init() 负责处理，此处只同步 user 状态
                 if (event === 'INITIAL_SESSION') {
                     if (!session) {
                         console.log('[Auth] 初始会话为空，用户未登录');
                         this.user = null;
                     }
-                    // 不做任何渲染，让 DashboardCore.init() 统一处理
                     return;
                 }
 
-                // 以下事件只在运行时（登录后）触发，可以安全地操作 UI
                 if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
                     console.log('[Auth] 用户已登出或被删除');
                     this.user = null;
@@ -232,7 +220,9 @@
                 }
             });
 
-            this._bindEnterKeyLogin();
+            // 【修复 #18】移除 auth.js 中的 Enter 键监听，统一由 DashboardCore 处理
+            // 避免重复触发登录
+
             console.log('[Auth] 认证模块初始化完成');
         },
 
@@ -271,17 +261,6 @@
             }
         },
 
-        _bindEnterKeyLogin() {
-            document.addEventListener('keypress', async (e) => {
-                if (e.key === 'Enter' && document.getElementById('app')?.querySelector('.login-box')) {
-                    const loginBtn = document.getElementById('loginBtn');
-                    // 如果登录按钮已被禁用，说明正在登录中，忽略 Enter
-                    if (loginBtn && loginBtn.disabled) return;
-                    if (typeof window.APP?.login === 'function') await window.APP.login();
-                }
-            });
-        },
-
         // ==================== 用户状态查询 ====================
         isLoggedIn()      { return !!this.user; },
         isAdmin()         { return this.user?.role === 'admin'; },
@@ -308,10 +287,8 @@
             try {
                 console.log('[Auth] 开始登录:', usernameOrEmail);
                 
-                // 1. 检查锁定状态
                 if (this._isLocked(usernameOrEmail)) return null;
 
-                // 2. 检查网络
                 const isNetworkAvailable = Utils.NetworkMonitor
                     ? await Utils.NetworkMonitor._checkRealConnectivity()
                     : navigator.onLine;
@@ -323,10 +300,8 @@
                     return null;
                 }
 
-                // 3. 登录前先清除旧的认证状态，避免 token 冲突
                 await this.forceClearAuth();
 
-                // 4. 登录
                 const result = await SUPABASE.login(usernameOrEmail, password);
 
                 if (!result || result.error) {
@@ -341,10 +316,8 @@
                     return null;
                 }
 
-                // 5. 重置失败计数
                 this._resetLoginFailure(usernameOrEmail);
 
-                // 6. 加载资料
                 await this.loadCurrentUser();
 
                 if (!this.user) {
@@ -355,7 +328,6 @@
 
                 console.log('[Auth] 登录成功:', this.user.name);
 
-                // 7. 检查门店状态
                 if (this.user.store_id) {
                     try {
                         const storeStatus = await SUPABASE.checkStoreStatus(this.user.store_id);
@@ -371,7 +343,6 @@
                     }
                 }
 
-                // 8. 审计
                 if (window.Audit) {
                     await window.Audit.logLoginSuccess(this.user.id, this.user.name);
                 }
@@ -385,7 +356,6 @@
             }
         },
 
-        // ==================== 【修复】加载当前用户 ====================
         async loadCurrentUser() {
             try {
                 const profile = await SUPABASE.getCurrentProfile();
@@ -399,8 +369,6 @@
             } catch (e) {
                 console.warn('[Auth] loadCurrentUser 失败:', e.message);
                 this.user = null;
-                // 【修复】加载失败时不清除 token，因为可能是网络问题
-                // 只有在确认是 token 无效时才清除
             }
         },
 
@@ -418,7 +386,6 @@
                 console.warn('[Auth] Supabase logout 失败:', e.message);
             }
             
-            // 清除本地存储
             await this.forceClearAuth();
         },
 
@@ -494,7 +461,6 @@
 
             let authCleaned = false;
 
-            // 尝试 Edge Function 删除
             try {
                 const { error: fnError } = await client.functions.invoke('delete-user', {
                     body: { userId: userProfile.id }
@@ -509,7 +475,6 @@
                 console.warn('Edge Function 未部署或调用失败:', e.message);
             }
 
-            // 降级：禁用用户
             if (!authCleaned) {
                 try {
                     const randomPassword = Math.random().toString(36).slice(-12) + '!@#';
@@ -561,7 +526,6 @@
                 throw new Error(msg);
             }
 
-            // 优先使用 Edge Function
             let edgeSuccess = false;
             try {
                 const { error } = await client.functions.invoke('reset-user-password', {
@@ -604,7 +568,7 @@
 
     // 挂载到命名空间
     JF.Auth = AUTH;
-    window.AUTH = AUTH; // 向下兼容
+    window.AUTH = AUTH;
 
-    console.log('✅ JF.Auth v2.2 初始化完成（修复 INITIAL_SESSION 二次渲染闪烁）');
+    console.log('✅ JF.Auth v2.3 修复版（移除 Enter 键监听，避免重复触发）');
 })();
