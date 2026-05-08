@@ -220,7 +220,7 @@
             }
         },
         
-        // ==================== 【修复 Bug 2】利润再投入页面 ====================
+        // ==================== 利润再投入页面 ====================
         showProfitReinvestPage: async function() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -446,7 +446,6 @@
             
             if (!storeId && isAdmin) {
                 // 管理员选择"全部门店"时，可能需要汇总数据
-                // 这里简化处理：选择第一个有效门店
                 const stores = await SUPABASE.getAllStores();
                 if (stores.length > 0) {
                     storeId = stores[0]?.id;
@@ -570,7 +569,7 @@
             }
         },
         
-        // ==================== 【新增】执行利润再投入（全额） ====================
+        // ====================  执行利润再投入（全额） ====================
         executeProfitReinvestment: async function() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -654,7 +653,7 @@
             }
         },
         
-        // ==================== 【新增】显示部分再投入弹窗 ====================
+        // ==================== 显示部分再投入弹窗 ====================
         showPartialReinvestModal: async function() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
