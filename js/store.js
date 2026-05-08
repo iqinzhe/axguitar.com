@@ -1,4 +1,4 @@
-// store.js - v2.3 门店财务汇总重构（2行×7列）+ 打印修复 + STORE_000保护 + 练习按钮仅STORE_004
+// store.js - v2.4 门店财务卡片打印（每页2张卡片，1+4行×3列）
 
 'use strict';
 
@@ -470,7 +470,7 @@
             }
         },
 
-        // ==================== 构建门店管理 HTML（v2.3 打印修复 + STORE_000保护） ====================
+        // ==================== 构建门店管理 HTML（v2.4 收集卡片数据） ====================
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -648,6 +648,9 @@
                     returnCapital: 0
                 };
 
+                // 准备卡片数据（排除练习门店）
+                window._storeCardsData = [];
+                
                 // 生成门店统计行（2行×7列布局）
                 let storeStatsRows = '';
 
@@ -677,6 +680,34 @@
                         grandTotal.monthProfit += (stats.monthProfit || 0);
                         grandTotal.totalProfit += (stats.totalProfit || 0);
                         grandTotal.returnCapital += (stats.returnCapital || 0);
+                    }
+
+                    // ----- 收集卡片数据（仅非练习门店）-----
+                    if (!isPractice) {
+                        window._storeCardsData.push({
+                            name: store.name,
+                            code: store.code,
+                            monthNewOrders: stats.monthNewOrders || 0,
+                            activeOrders: stats.activeOrders || 0,
+                            completedOrders: stats.completedOrders || 0,
+                            monthLoanAmount: stats.monthLoanAmount || 0,
+                            totalLoanAmount: stats.totalLoanAmount || 0,
+                            monthAdminFee: stats.monthAdminFee || 0,
+                            totalAdminFee: stats.totalAdminFee || 0,
+                            monthServiceFee: stats.monthServiceFee || 0,
+                            totalServiceFee: stats.totalServiceFee || 0,
+                            monthInterest: stats.monthInterest || 0,
+                            totalInterest: stats.totalInterest || 0,
+                            deployedCapital: stats.deployedCapital || 0,
+                            availableCapital: stats.availableCapital || 0,
+                            cashBalance: balance.cashBalance,
+                            bankBalance: balance.bankBalance,
+                            monthExpense: stats.monthExpense || 0,
+                            totalExpense: stats.totalExpense || 0,
+                            monthProfit: stats.monthProfit || 0,
+                            totalProfit: stats.totalProfit || 0,
+                            returnCapital: stats.returnCapital || 0
+                        });
                     }
 
                     let storeStatusBadge = '';
@@ -929,14 +960,6 @@
                         }
                     </style>`;
 
-                // 存储打印数据到全局变量供打印函数使用
-                window._storeFinanceData = {
-                    storeStatsRows,
-                    summaryRow,
-                    grandTotal,
-                    lang
-                };
-
                 console.log('[StoreManager] 门店管理页面内容构建完成');
                 return content;
 
@@ -961,170 +984,138 @@
             }
         },
 
-        // ==================== 打印门店财务汇总 ====================
+        // ==================== 打印门店财务汇总（卡片式，每页2张） ====================
         printStoreFinanceSummary() {
             const lang = Utils.lang;
-            const data = window._storeFinanceData;
-            
-            if (!data) {
-                Utils.toast.warning(lang === 'id' ? 'Data tidak tersedia' : '暂无数据可打印');
+            const cards = window._storeCardsData || [];
+            if (cards.length === 0) {
+                Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
                 return;
             }
-            
+
             const isAdmin = PERMISSION.isAdmin();
-            let storeName = '';
-            let roleText = '';
-            let userName = '';
-            
+            let storeName = '', roleText = '', userName = '';
             try {
                 storeName = AUTH.getCurrentStoreName();
                 roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
                            AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
                            (lang === 'id' ? 'Staf' : '员工');
                 userName = AUTH.user?.name || '-';
-            } catch (e) {
-                storeName = '-';
-                roleText = '-';
-                userName = '-';
-            }
-            
+            } catch (e) { /* ignore */ }
+
             const printDateTime = new Date().toLocaleString();
-            
+            const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            const periodEnd = new Date().toISOString().split('T')[0];
+
+            // 格式化金额（完整 Rp 格式）
+            const fmt = (val) => Utils.formatCurrency(val);
+
+            let cardsHtml = '';
+            for (let i = 0; i < cards.length; i++) {
+                const s = cards[i];
+                cardsHtml += `
+<div style="border: 1px solid #000; border-radius: 8px; padding: 10px; margin-bottom: 20px; page-break-inside: avoid; background: #fff; width: 95%; margin-left: auto; margin-right: auto;">
+    <div style="font-weight: bold; font-size: 12pt; padding-bottom: 6px; margin-bottom: 8px; border-bottom: 1px solid #ccc; text-align: center;">
+        ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px;">
+        <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
+        <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
+        <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
+
+        <div><strong>🧾 管理费</strong><br>${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}</div>
+        <div><strong>🛠️ 服务费</strong><br>${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}</div>
+        <div><strong>💸 利息</strong><br>${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}</div>
+
+        <div><strong>📦 在押资金</strong><br>${fmt(s.deployedCapital)}</div>
+        <div><strong>💵 可动用资金</strong><br>${fmt(s.availableCapital)}</div>
+        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
+
+        <div><strong>📉 本月支出</strong><br>${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}</div>
+        <div><strong>📈 本月利润</strong><br>${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}</div>
+        <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
+    </div>
+</div>`;
+                // 每两个卡片之间分页（A4每页2张）
+                if ((i + 1) % 2 === 0 && i !== cards.length - 1) {
+                    cardsHtml += '<div style="page-break-after: always;"></div>';
+                }
+            }
+
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <title>JF! by Gadai - ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</title>
-                    <style>
-                        * { box-sizing: border-box; margin: 0; padding: 0; }
-                        body { 
-                            font-family: 'Segoe UI', Arial, sans-serif; 
-                            font-size: 9pt; 
-                            line-height: 1.3; 
-                            color: #1e293b; 
-                            padding: 0; 
-                            margin: 0; 
-                        }
-                        .print-container { padding: 5mm; }
-                        .print-header { 
-                            text-align: center; 
-                            margin-bottom: 8px; 
-                            padding-bottom: 6px; 
-                            border-bottom: 2px solid #1e293b;
-                        }
-                        .print-header .logo { 
-                            font-size: 14pt; 
-                            font-weight: bold; 
-                            color: #0e7490;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            gap: 8px;
-                        }
-                        .print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
-                        .print-header-info {
-                            font-size: 9pt;
-                            color: #475569;
-                            margin: 4px 0 8px;
-                            text-align: center;
-                            white-space: nowrap;
-                        }
-                        .print-footer { 
-                            text-align: center; 
-                            font-size: 7pt; 
-                            color: #94a3b8; 
-                            margin-top: 12px; 
-                            padding-top: 6px; 
-                            border-top: 1px solid #e2e8f0; 
-                        }
-                        .page-title {
-                            font-size: 14pt;
-                            font-weight: bold;
-                            margin: 12px 0;
-                            color: #1e293b;
-                        }
-                        table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-                        th { background: #f1f5f9; font-weight: 600; text-align: left; }
-                        th, td { 
-                            border: 1px solid #cbd5e1; 
-                            padding: 4px 6px; 
-                            font-size: 8pt; 
-                            vertical-align: middle; 
-                        }
-                        .text-center { text-align: center; }
-                        .amount { text-align: right; }
-                        .income { color: #10b981; }
-                        .expense { color: #ef4444; }
-                        td small { font-size: 7pt; color: #64748b; }
-                        @media print {
-                            @page { size: A4 landscape; margin: 5mm; }
-                            body { margin: 0; padding: 0; }
-                            .print-container { padding: 5mm 0 0 0; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="print-container">
-                        <div class="print-header">
-                            <div class="logo">
-                                <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
-                                JF! by Gadai
-                            </div>
-                            <div class="print-header-info">
-                                🏪 ${isAdmin
-                                    ? (lang === 'id' ? 'Kantor Pusat' : '总部')
-                                    : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
-                                } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
-                            </div>
-                            <div class="print-header-info" style="font-size:8pt;">
-                                ${lang === 'id' ? 'Periode: ' : '统计期间: '} ${Utils.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())} - ${Utils.formatDate(new Date().toISOString())}
-                            </div>
-                        </div>
-                        
-                        <h1 class="page-title">📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h1>
-                        
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th rowspan="2" style="vertical-align:middle;">${lang === 'id' ? 'Toko' : '门店'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Bulan Ini' : '本月新增'}<br>${lang === 'id' ? 'Pesanan' : '订单'}</th>
-                                    <th class="text-center">${lang === 'id' ? 'Aktif' : '进行中'} / ${lang === 'id' ? 'Lunas' : '已结清'}</th>
-                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月放出'}<br>${lang === 'id' ? 'Total Pinjaman' : '总当金'}</th>
-                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月管理费'}<br>${lang === 'id' ? 'Total Admin' : '总管理费'}</th>
-                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月服务费'}<br>${lang === 'id' ? 'Total Layanan' : '总服务费'}</th>
-                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利息'}<br>${lang === 'id' ? 'Total Bunga' : '总利息'}</th>
-                                </tr>
-                                <tr>
-                                    <th class="amount">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}<br>${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</th>
-                                    <th class="amount">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
-                                    <th class="amount">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
-                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月支出'}<br>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</th>
-                                    <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利润'}<br>${lang === 'id' ? 'Total Laba' : '总利润'}</th>
-                                    <th class="amount">${lang === 'id' ? 'Pengembalian' : '偿还'}<br>${lang === 'id' ? 'Modal' : '本金'}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.storeStatsRows}
-                                ${data.summaryRow}
-                            </tbody>
-                        </table>
-                        
-                        <p style="font-size:7pt;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total (累计)' : '格式: 本月 / 累计'}</p>
-                        
-                        <div class="print-footer">
-                            JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
-                        </div>
-                    </div>
-                    <script>
-                        window.onload = function() {
-                            window.print();
-                            setTimeout(function() { window.close(); }, 800);
-                        };
-                    <\/script>
-                </body>
-                </html>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JF! by Gadai - ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            font-size: 9pt;
+            background: #fff;
+            margin: 0;
+            padding: 10mm;
+        }
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+        @media print {
+            body { margin: 0; padding: 0; }
+            .page-break { page-break-after: always; }
+        }
+        .print-header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #1e293b;
+        }
+        .print-header .logo {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #0e7490;
+        }
+        .print-header-info {
+            font-size: 9pt;
+            color: #475569;
+            margin-top: 4px;
+        }
+        .print-footer {
+            text-align: center;
+            font-size: 7pt;
+            color: #94a3b8;
+            margin-top: 20px;
+            padding-top: 6px;
+            border-top: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-header">
+        <div class="logo">JF! by Gadai</div>
+        <div class="print-header-info">
+            🏪 ${isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)}
+            &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
+            &nbsp;|&nbsp; 📅 ${printDateTime}
+        </div>
+        <div class="print-header-info" style="font-size:8pt;">
+            📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
+        </div>
+    </div>
+    ${cardsHtml}
+    <div class="print-footer">
+        JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+    </div>
+    <script>
+        window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+        };
+    <\/script>
+</body>
+</html>
             `);
             printWindow.document.close();
         },
@@ -1175,5 +1166,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.3 打印修复 + STORE_000保护 + 练习按钮仅STORE_004');
+    console.log('✅ JF.StoreManager v2.4 卡片打印（每页2张，1+4行×3列）');
 })();
