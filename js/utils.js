@@ -1,7 +1,4 @@
-// utils.js - v2.5 典当期限功能
-// 基础工具模块，挂载到 JF.Utils
-// 新增：getPawnTermOptions / calculatePawnDueDate / updatePawnDueDateDisplay
-// v2.4: 费用配置集中管理，引用 FeeConfig
+// utils.js - v2.0 典当期限功能
 
 'use strict';
 
