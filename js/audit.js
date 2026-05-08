@@ -1,4 +1,5 @@
-// audit.js - v2.0 统一审计日志模块 (JF 命名空间)
+// audit.js - v2.1 修复版
+// 修复内容：所有日志写入增加 try-catch 保护，不阻塞主流程
 
 'use strict';
 
@@ -24,8 +25,8 @@
                     created_at: new Date().toISOString()
                 });
             } catch (error) {
-                // 审计日志写入失败不阻塞主流程
-                console.error('审计日志写入失败:', action, error.message);
+                // 审计日志写入失败不阻塞主流程，仅控制台输出
+                console.error('[Audit] 写入失败:', action, error.message);
             }
         },
 
@@ -213,34 +214,39 @@
          * @returns {Array} 日志记录数组
          */
         async getLogs(filters = {}) {
-            const client = SUPABASE.getClient();
-            let query = client.from('audit_logs').select('*').order('created_at', { ascending: false });
+            try {
+                const client = SUPABASE.getClient();
+                let query = client.from('audit_logs').select('*').order('created_at', { ascending: false });
 
-            if (filters.action) {
-                query = query.eq('action', filters.action);
-            }
-            if (filters.userId) {
-                query = query.eq('user_id', filters.userId);
-            }
-            if (filters.startDate) {
-                query = query.gte('created_at', filters.startDate);
-            }
-            if (filters.endDate) {
-                query = query.lte('created_at', filters.endDate + 'T23:59:59');
-            }
+                if (filters.action) {
+                    query = query.eq('action', filters.action);
+                }
+                if (filters.userId) {
+                    query = query.eq('user_id', filters.userId);
+                }
+                if (filters.startDate) {
+                    query = query.gte('created_at', filters.startDate);
+                }
+                if (filters.endDate) {
+                    query = query.lte('created_at', filters.endDate + 'T23:59:59');
+                }
 
-            const limit = filters.limit || 500;
-            query = query.limit(limit);
+                const limit = filters.limit || 500;
+                query = query.limit(limit);
 
-            const { data, error } = await query;
-            if (error) throw error;
-            return data || [];
+                const { data, error } = await query;
+                if (error) throw error;
+                return data || [];
+            } catch (error) {
+                console.error('[Audit] getLogs 失败:', error.message);
+                return [];
+            }
         }
     };
 
     // 挂载到命名空间
     JF.Audit = Audit;
-    window.Audit = Audit; // 向下兼容
+    window.Audit = Audit;
 
-    console.log('✅ JF.Audit v2.0 初始化完成');
+    console.log('✅ JF.Audit v2.1 修复版（所有日志写入增加 try-catch 保护）');
 })();
