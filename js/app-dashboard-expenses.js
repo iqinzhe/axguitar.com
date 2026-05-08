@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.6 修复管理员总部支出
+// app-dashboard-expenses.js - v2.0
 
 'use strict';
 
