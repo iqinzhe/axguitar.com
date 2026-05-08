@@ -9,7 +9,7 @@
     /* ==================== 配置常量 ==================== */
     const DEFAULT_TTL = 5 * 60 * 1000;       // 默认 5 分钟
     const MAX_SIZE = 200;                  // 最大缓存条目数
-    const CLEANUP_INTERVAL = 2 * 60 * 1000;;      // 清理间隔 2 分钟
+    const CLEANUP_INTERVAL = 2 * 60 * 1000;     // 清理间隔 2 分钟
 
     /* ==================== 私有状态 ==================== */
     let _data        = new Map();            // key → { value, time, ttl }
