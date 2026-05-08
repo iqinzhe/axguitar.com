@@ -1,4 +1,4 @@
-// store.js - v2.0 (JF 命名空间) 
+// store.js - v2.2 门店财务汇总重构（2行×7列）+ 练习按钮仅STORE_004
 
 'use strict';
 
@@ -470,7 +470,7 @@
             }
         },
 
-        // ==================== 构建门店管理 HTML（纯内容） ====================
+        // ==================== 构建门店管理 HTML（v2.2 重构） ====================
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -480,82 +480,230 @@
                 console.log('[StoreManager] 门店列表加载完成:', StoreManager.stores.length, '个门店');
 
                 const client = SUPABASE.getClient();
-                const [allOrdersResult, allExpensesResult, allPaymentsResult] = await Promise.all([
-                    client.from('orders').select('id, store_id, status, loan_amount, admin_fee_paid, admin_fee, interest_paid_total, principal_paid, service_fee_paid'),
-                    client.from('expenses').select('id, store_id, amount, payment_method'),
-                    client.from('payment_history').select('id, order_id, type, amount, payment_method')
-                ]);
+                
+                // 获取本月起止日期
+                const today = new Date();
+                const currentYear = today.getFullYear();
+                const currentMonth = today.getMonth();
+                const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+                const monthEnd = today.toISOString().split('T')[0];
+                
+                console.log('[StoreManager] 本月统计范围:', monthStart, '~', monthEnd);
 
-                const allOrders = allOrdersResult.data || [];
-                const allExpenses = allExpensesResult.data || [];
-                const allPayments = allPaymentsResult.data || [];
-
-                const orderStoreMap = {};
-                for (const o of allOrders) orderStoreMap[o.id] = o.store_id;
-
-                const storeStats = {};
-                for (const s of StoreManager.stores) storeStats[s.id] = { orders: [], expenses: [], payments: [] };
-
-                for (const o of allOrders) {
-                    if (storeStats[o.store_id]) storeStats[o.store_id].orders.push(o);
-                }
-                for (const e of allExpenses) {
-                    if (storeStats[e.store_id]) storeStats[e.store_id].expenses.push(e);
-                }
-                for (const p of allPayments) {
-                    const storeId = orderStoreMap[p.order_id];
-                    if (storeId && storeStats[storeId]) storeStats[storeId].payments.push(p);
+                // 查询所有订单
+                const { data: allOrders, error: orderError } = await client
+                    .from('orders')
+                    .select('id, store_id, status, loan_amount, created_at, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid');
+                
+                if (orderError) {
+                    console.error('[StoreManager] 查询订单失败:', orderError);
                 }
 
+                // 查询所有支出
+                const { data: allExpenses, error: expenseError } = await client
+                    .from('expenses')
+                    .select('id, store_id, amount, expense_date');
+                
+                if (expenseError) {
+                    console.error('[StoreManager] 查询支出失败:', expenseError);
+                }
+
+                // 查询偿还本金（profit_distributions 中 type='return_capital'）
+                const { data: returnCapitalData, error: returnError } = await client
+                    .from('profit_distributions')
+                    .select('store_id, amount')
+                    .eq('type', 'return_capital');
+                
+                if (returnError) {
+                    console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
+                }
+
+                // 获取现金流余额
                 const storeBalances = await StoreManager._getAllStoreCashFlowBalances();
 
+                // 构建统计数据
+                const storeStats = {};
+                for (const s of StoreManager.stores) {
+                    storeStats[s.id] = {
+                        // 本月数据
+                        monthNewOrders: 0,
+                        monthLoanAmount: 0,
+                        monthAdminFee: 0,
+                        monthServiceFee: 0,
+                        monthInterest: 0,
+                        monthExpense: 0,
+                        // 累计数据
+                        totalOrders: 0,
+                        activeOrders: 0,
+                        completedOrders: 0,
+                        totalLoanAmount: 0,
+                        totalAdminFee: 0,
+                        totalServiceFee: 0,
+                        totalInterest: 0,
+                        totalPrincipal: 0,
+                        totalExpense: 0,
+                        returnCapital: 0,
+                        deployedCapital: 0
+                    };
+                }
+
+                // 统计订单数据
+                for (const o of (allOrders || [])) {
+                    const sid = o.store_id;
+                    if (!storeStats[sid]) continue;
+                    
+                    const stats = storeStats[sid];
+                    stats.totalOrders++;
+                    stats.totalLoanAmount += (o.loan_amount || 0);
+                    
+                    if (o.admin_fee_paid) stats.totalAdminFee += (o.admin_fee || 0);
+                    stats.totalServiceFee += (o.service_fee_paid || 0);
+                    stats.totalInterest += (o.interest_paid_total || 0);
+                    stats.totalPrincipal += (o.principal_paid || 0);
+                    
+                    if (o.status === 'active') {
+                        stats.activeOrders++;
+                        stats.deployedCapital += (o.loan_amount || 0) - (o.principal_paid || 0);
+                    } else if (o.status === 'completed') {
+                        stats.completedOrders++;
+                    }
+                    
+                    // 本月数据
+                    if (o.created_at && o.created_at >= monthStart && o.created_at <= monthEnd + 'T23:59:59') {
+                        stats.monthNewOrders++;
+                        stats.monthLoanAmount += (o.loan_amount || 0);
+                    }
+                }
+
+                // 统计本月管理费/服务费/利息（从 payment_history 按日期筛选）
+                // 获取所有订单ID
+                const allOrderIds = (allOrders || []).map(o => o.id);
+                
+                if (allOrderIds.length > 0) {
+                    // 本月管理费
+                    const { data: monthAdminFees } = await client
+                        .from('payment_history')
+                        .select('order_id, amount')
+                        .eq('type', 'admin_fee')
+                        .gte('date', monthStart)
+                        .lte('date', monthEnd)
+                        .in('order_id', allOrderIds);
+                    
+                    if (monthAdminFees) {
+                        const orderStoreMap = {};
+                        for (const o of (allOrders || [])) orderStoreMap[o.id] = o.store_id;
+                        for (const p of monthAdminFees) {
+                            const sid = orderStoreMap[p.order_id];
+                            if (sid && storeStats[sid]) storeStats[sid].monthAdminFee += (p.amount || 0);
+                        }
+                    }
+                    
+                    // 本月服务费
+                    const { data: monthServiceFees } = await client
+                        .from('payment_history')
+                        .select('order_id, amount')
+                        .eq('type', 'service_fee')
+                        .gte('date', monthStart)
+                        .lte('date', monthEnd)
+                        .in('order_id', allOrderIds);
+                    
+                    if (monthServiceFees) {
+                        const orderStoreMap = {};
+                        for (const o of (allOrders || [])) orderStoreMap[o.id] = o.store_id;
+                        for (const p of monthServiceFees) {
+                            const sid = orderStoreMap[p.order_id];
+                            if (sid && storeStats[sid]) storeStats[sid].monthServiceFee += (p.amount || 0);
+                        }
+                    }
+                    
+                    // 本月利息
+                    const { data: monthInterests } = await client
+                        .from('payment_history')
+                        .select('order_id, amount')
+                        .eq('type', 'interest')
+                        .gte('date', monthStart)
+                        .lte('date', monthEnd)
+                        .in('order_id', allOrderIds);
+                    
+                    if (monthInterests) {
+                        const orderStoreMap = {};
+                        for (const o of (allOrders || [])) orderStoreMap[o.id] = o.store_id;
+                        for (const p of monthInterests) {
+                            const sid = orderStoreMap[p.order_id];
+                            if (sid && storeStats[sid]) storeStats[sid].monthInterest += (p.amount || 0);
+                        }
+                    }
+                }
+
+                // 统计支出数据
+                for (const e of (allExpenses || [])) {
+                    const sid = e.store_id;
+                    if (!storeStats[sid]) continue;
+                    storeStats[sid].totalExpense += (e.amount || 0);
+                    
+                    if (e.expense_date >= monthStart && e.expense_date <= monthEnd) {
+                        storeStats[sid].monthExpense += (e.amount || 0);
+                    }
+                }
+
+                // 统计偿还本金
+                for (const rc of (returnCapitalData || [])) {
+                    const sid = rc.store_id;
+                    if (!storeStats[sid]) continue;
+                    storeStats[sid].returnCapital += (rc.amount || 0);
+                }
+
+                // 计算利润
+                for (const sid of Object.keys(storeStats)) {
+                    const s = storeStats[sid];
+                    s.monthProfit = s.monthAdminFee + s.monthServiceFee + s.monthInterest - s.monthExpense;
+                    s.totalProfit = s.totalAdminFee + s.totalServiceFee + s.totalInterest - s.totalExpense;
+                    s.availableCapital = (storeBalances[sid]?.cashBalance || 0) + (storeBalances[sid]?.bankBalance || 0);
+                }
+
+                // 构建总计
                 const grandTotal = {
-                    orders: 0, active: 0, loan: 0, adminFee: 0, serviceFee: 0,
-                    interest: 0, principal: 0, expenses: 0, income: 0,
-                    cashBalance: 0, bankBalance: 0
+                    monthNewOrders: 0, activeOrders: 0, completedOrders: 0,
+                    monthLoanAmount: 0, totalLoanAmount: 0,
+                    monthAdminFee: 0, totalAdminFee: 0,
+                    monthServiceFee: 0, totalServiceFee: 0,
+                    monthInterest: 0, totalInterest: 0,
+                    deployedCapital: 0, availableCapital: 0,
+                    cashBalance: 0, bankBalance: 0,
+                    monthExpense: 0, totalExpense: 0,
+                    monthProfit: 0, totalProfit: 0,
+                    returnCapital: 0
                 };
 
+                // 生成门店统计行（2行×7列布局）
                 let storeStatsRows = '';
 
                 for (const store of StoreManager.stores) {
                     const isPractice = store.is_practice === true;
-                    const stats = storeStats[store.id] || { orders: [], expenses: [] };
-                    const orders = stats.orders;
-                    const expenses = stats.expenses;
-
-                    let ordsCount = orders.length;
-                    let activeCount = 0, totalLoan = 0, totalAdminFee = 0, totalServiceFee = 0;
-                    let totalInterest = 0, totalPrincipal = 0;
-
-                    for (const o of orders) {
-                        totalLoan += (o.loan_amount || 0);
-                        if (o.admin_fee_paid) totalAdminFee += (o.admin_fee || 0);
-                        totalServiceFee += (o.service_fee_paid || 0);
-                        totalInterest += (o.interest_paid_total || 0);
-                        totalPrincipal += (o.principal_paid || 0);
-                        if (o.status === 'active') activeCount++;
-                    }
-
-                    const totalIncome = totalAdminFee + totalServiceFee + totalInterest;
-                    let totalExpenses = 0;
-                    for (const e of expenses) totalExpenses += (e.amount || 0);
-
+                    const stats = storeStats[store.id] || {};
                     const balance = storeBalances[store.id] || { cashBalance: 0, bankBalance: 0 };
-                    const cashBalance = balance.cashBalance;
-                    const bankBalance = balance.bankBalance;
 
                     if (!isPractice) {
-                        grandTotal.orders += ordsCount;
-                        grandTotal.active += activeCount;
-                        grandTotal.loan += totalLoan;
-                        grandTotal.adminFee += totalAdminFee;
-                        grandTotal.serviceFee += totalServiceFee;
-                        grandTotal.interest += totalInterest;
-                        grandTotal.principal += totalPrincipal;
-                        grandTotal.expenses += totalExpenses;
-                        grandTotal.income += totalIncome;
-                        grandTotal.cashBalance += cashBalance;
-                        grandTotal.bankBalance += bankBalance;
+                        grandTotal.monthNewOrders += (stats.monthNewOrders || 0);
+                        grandTotal.activeOrders += (stats.activeOrders || 0);
+                        grandTotal.completedOrders += (stats.completedOrders || 0);
+                        grandTotal.monthLoanAmount += (stats.monthLoanAmount || 0);
+                        grandTotal.totalLoanAmount += (stats.totalLoanAmount || 0);
+                        grandTotal.monthAdminFee += (stats.monthAdminFee || 0);
+                        grandTotal.totalAdminFee += (stats.totalAdminFee || 0);
+                        grandTotal.monthServiceFee += (stats.monthServiceFee || 0);
+                        grandTotal.totalServiceFee += (stats.totalServiceFee || 0);
+                        grandTotal.monthInterest += (stats.monthInterest || 0);
+                        grandTotal.totalInterest += (stats.totalInterest || 0);
+                        grandTotal.deployedCapital += (stats.deployedCapital || 0);
+                        grandTotal.availableCapital += (stats.availableCapital || 0);
+                        grandTotal.cashBalance += balance.cashBalance;
+                        grandTotal.bankBalance += balance.bankBalance;
+                        grandTotal.monthExpense += (stats.monthExpense || 0);
+                        grandTotal.totalExpense += (stats.totalExpense || 0);
+                        grandTotal.monthProfit += (stats.monthProfit || 0);
+                        grandTotal.totalProfit += (stats.totalProfit || 0);
+                        grandTotal.returnCapital += (stats.returnCapital || 0);
                     }
 
                     let storeStatusBadge = '';
@@ -567,39 +715,47 @@
                     }
 
                     const practiceRowStyle = isPractice ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
+                    const storeDisplay = `<strong>${Utils.escapeHtml(store.name)}${storeStatusBadge}</strong><br><small>${Utils.escapeHtml(store.code)}</small>`;
 
                     storeStatsRows += `<tr${practiceRowStyle}>
-                        <td class="store-name-cell"><strong>${Utils.escapeHtml(store.name)}${storeStatusBadge}</strong><br><small>${Utils.escapeHtml(store.code)}</small></td>
-                        <td class="text-center">${ordsCount}</td>
-                        <td class="text-center">${activeCount}</td>
-                        <td class="amount">${Utils.formatCurrency(totalLoan)}</td>
-                        <td class="amount income">${Utils.formatCurrency(totalAdminFee)}</td>
-                        <td class="amount income">${Utils.formatCurrency(totalServiceFee)}</td>
-                        <td class="amount income">${Utils.formatCurrency(totalInterest)}</td>
-                        <td class="amount">${Utils.formatCurrency(totalPrincipal)}</td>
-                        <td class="amount income">${Utils.formatCurrency(totalIncome)}</td>
-                        <td class="amount expense">${Utils.formatCurrency(totalExpenses)}</td>
-                        <td class="amount">${Utils.formatCurrency(cashBalance)}</td>
-                        <td class="amount">${Utils.formatCurrency(bankBalance)}</td>
+                        <td class="store-name-cell" rowspan="2">${storeDisplay}</td>
+                        <td class="text-center">${stats.monthNewOrders || 0}</td>
+                        <td class="text-center">${stats.activeOrders || 0} / ${stats.completedOrders || 0}</td>
+                        <td class="amount">${Utils.formatCurrency(stats.monthLoanAmount || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalLoanAmount || 0)}</small></td>
+                        <td class="amount income">${Utils.formatCurrency(stats.monthAdminFee || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalAdminFee || 0)}</small></td>
+                        <td class="amount income">${Utils.formatCurrency(stats.monthServiceFee || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalServiceFee || 0)}</small></td>
+                        <td class="amount income">${Utils.formatCurrency(stats.monthInterest || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalInterest || 0)}</small></td>
+                    </tr>
+                    <tr${practiceRowStyle}>
+                        <td class="amount">${Utils.formatCurrency(stats.deployedCapital || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.availableCapital || 0)}</small></td>
+                        <td class="amount">${Utils.formatCurrency(balance.cashBalance)}</td>
+                        <td class="amount">${Utils.formatCurrency(balance.bankBalance)}</td>
+                        <td class="amount expense">${Utils.formatCurrency(stats.monthExpense || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalExpense || 0)}</small></td>
+                        <td class="amount ${(stats.monthProfit || 0) >= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(stats.monthProfit || 0)}<br><small style="color:var(--text-muted);">${Utils.formatCurrency(stats.totalProfit || 0)}</small></td>
+                        <td class="amount">${Utils.formatCurrency(stats.returnCapital || 0)}</td>
                     </tr>`;
                 }
 
+                // 合计行
                 const summaryRow = `<tr style="background:#f1f5f9;font-weight:bold;">
-                    <td class="store-name-cell"><strong>${lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计'}</strong></td>
-                    <td class="text-center"><strong>${grandTotal.orders}</strong></td>
-                    <td class="text-center"><strong>${grandTotal.active}</strong></td>
-                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.loan)}</strong></td>
-                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.adminFee)}</strong></td>
-                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.serviceFee)}</strong></td>
-                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.interest)}</strong></td>
-                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.principal)}</strong></td>
-                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.income)}</strong></td>
-                    <td class="amount expense"><strong>${Utils.formatCurrency(grandTotal.expenses)}</strong></td>
+                    <td class="store-name-cell" rowspan="2"><strong>${lang === 'id' ? '📊 TOTAL SEMUA TOKO' : '📊 全部门店合计'}</strong></td>
+                    <td class="text-center"><strong>${grandTotal.monthNewOrders}</strong></td>
+                    <td class="text-center"><strong>${grandTotal.activeOrders} / ${grandTotal.completedOrders}</strong></td>
+                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.monthLoanAmount)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalLoanAmount)}</small></td>
+                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.monthAdminFee)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalAdminFee)}</small></td>
+                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.monthServiceFee)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalServiceFee)}</small></td>
+                    <td class="amount income"><strong>${Utils.formatCurrency(grandTotal.monthInterest)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalInterest)}</small></td>
+                </tr>
+                <tr style="background:#f1f5f9;font-weight:bold;">
+                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.deployedCapital)}</strong><br><small>${Utils.formatCurrency(grandTotal.availableCapital)}</small></td>
                     <td class="amount"><strong>${Utils.formatCurrency(grandTotal.cashBalance)}</strong></td>
                     <td class="amount"><strong>${Utils.formatCurrency(grandTotal.bankBalance)}</strong></td>
+                    <td class="amount expense"><strong>${Utils.formatCurrency(grandTotal.monthExpense)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalExpense)}</small></td>
+                    <td class="amount ${grandTotal.monthProfit >= 0 ? 'income' : 'expense'}"><strong>${Utils.formatCurrency(grandTotal.monthProfit)}</strong><br><small>${Utils.formatCurrency(grandTotal.totalProfit)}</small></td>
+                    <td class="amount"><strong>${Utils.formatCurrency(grandTotal.returnCapital)}</strong></td>
                 </tr>`;
 
-                // 门店列表行
+                // ==================== 门店列表行 ====================
                 let storeRows = '';
                 if (StoreManager.stores.length === 0) {
                     storeRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td>`;
@@ -626,24 +782,32 @@
                             <td class="text-center">${statusBadgeHtml}</td>
                         </tr>`;
 
+                        // 操作行 - 练习按钮仅 STORE_004 显示
                         const isPractice = store.is_practice === true;
-                        const practiceLabel = isPractice
-                            ? (lang === 'id' ? 'Mode Latihan (Aktif)' : '练习模式 (已开启)')
-                            : (lang === 'id' ? 'Jadikan Toko Latihan' : '设为练习门店');
-                        const practiceBtnStyle = isPractice
-                            ? 'background:#a78bfa;color:#fff;'
-                            : 'background:#ede9fe;color:#6d28d9;';
-                        const practiceBtnTitle = isPractice
-                            ? (lang === 'id' ? 'Kembalikan ke mode normal' : '恢复为正常门店')
-                            : (lang === 'id' ? 'Jadikan toko latihan (data tidak dihitung)' : '设为练习门店（数据不计入统计）');
-
-                        const actionButtons =
+                        const isStore004 = (store.code === 'STORE_004');
+                        
+                        let actionButtons =
                             `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>` +
                             (isActive
                                 ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn btn--sm btn--warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
-                                : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn btn--sm btn--success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`) +
-                            `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}" title="${practiceBtnTitle}">${practiceLabel}</button>` +
-                            `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
+                                : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn btn--sm btn--success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`);
+                        
+                        // 仅 STORE_004 显示练习模式按钮
+                        if (isStore004) {
+                            const practiceLabel = isPractice
+                                ? (lang === 'id' ? 'Mode Latihan (Aktif)' : '练习模式 (已开启)')
+                                : (lang === 'id' ? 'Jadikan Toko Latihan' : '设为练习门店');
+                            const practiceBtnStyle = isPractice
+                                ? 'background:#a78bfa;color:#fff;'
+                                : 'background:#ede9fe;color:#6d28d9;';
+                            const practiceBtnTitle = isPractice
+                                ? (lang === 'id' ? 'Kembalikan ke mode normal' : '恢复为正常门店')
+                                : (lang === 'id' ? 'Jadikan toko latihan (data tidak dihitung)' : '设为练习门店（数据不计入统计）');
+                            
+                            actionButtons += `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}" title="${practiceBtnTitle}">${practiceLabel}</button>`;
+                        }
+                        
+                        actionButtons += `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
 
                         storeRows += `<tr class="action-row"${practiceRowStyle2}>
                             <td class="action-label">${t('action')}</td>
@@ -652,6 +816,7 @@
                     }
                 }
 
+                // ==================== 构建完整页面 ====================
                 const content = `
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
@@ -681,27 +846,30 @@
                     <div class="card">
                         <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                         <div class="table-container" style="overflow-x:auto;">
-                            <table class="data-table store-stats-table" style="min-width:800px;">
+                            <table class="data-table store-stats-table" style="min-width:1200px;font-size:11px;">
                                 <thead>
                                     <tr>
-                                        <th>${lang === 'id' ? 'Toko' : '门店'}</th>
-                                        <th class="text-center">${t('total_orders')}</th>
-                                        <th class="text-center">${t('active')}</th>
-                                        <th class="amount">${t('total_loan')}</th>
-                                        <th class="amount">${lang === 'id' ? 'Admin Fee' : '管理费'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Service Fee' : '服务费'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Bunga' : '利息'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Pokok' : '本金'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Pendapatan' : '收入'}</th>
-                                        <th class="amount">${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
+                                        <th rowspan="2" style="vertical-align:middle;">${lang === 'id' ? 'Toko' : '门店'}</th>
+                                        <th class="text-center">${lang === 'id' ? 'Bulan Ini' : '本月新增'}<br>${lang === 'id' ? 'Pesanan' : '订单'}</th>
+                                        <th class="text-center">${lang === 'id' ? 'Aktif' : '进行中'} / ${lang === 'id' ? 'Lunas' : '已结清'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月放出'}<br>${lang === 'id' ? 'Total Pinjaman' : '总当金'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月管理费'}<br>${lang === 'id' ? 'Total Admin' : '总管理费'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月服务费'}<br>${lang === 'id' ? 'Total Layanan' : '总服务费'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利息'}<br>${lang === 'id' ? 'Total Bunga' : '总利息'}</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="amount">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}<br>${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</th>
                                         <th class="amount">🏦 ${lang === 'id' ? 'Brankas' : '保险柜'}</th>
                                         <th class="amount">🏧 ${lang === 'id' ? 'Bank BNI' : '银行BNI'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月支出'}<br>${lang === 'id' ? 'Total Pengeluaran' : '总支出'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Bulan Ini' : '本月利润'}<br>${lang === 'id' ? 'Total Laba' : '总利润'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Pengembalian' : '偿还'}<br>${lang === 'id' ? 'Modal' : '本金'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>${storeStatsRows}${summaryRow}</tbody>
                             </table>
                         </div>
-                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Baris ungu = Toko Latihan (tidak dihitung dalam total)' : '紫色行 = 练习门店（不计入合计）'}</p>
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Baris ungu = Toko Latihan (tidak dihitung dalam total) | Format: Bulan Ini / Total' : '紫色行 = 练习门店（不计入合计）| 格式: 本月 / 累计'}</p>
                     </div>
                     <div class="card">
                         <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
@@ -740,7 +908,46 @@
                                 <button onclick="APP.addStore()" class="btn btn--success">➕ ${lang === 'id' ? 'Tambah Toko' : '添加门店'}</button>
                             </div>
                         </div>
-                    </div>`;
+                    </div>
+                    
+                    <style>
+                        /* 门店财务汇总表打印样式 */
+                        .store-stats-table th {
+                            font-size: 10px;
+                            padding: 4px 6px;
+                            white-space: nowrap;
+                            text-align: center;
+                            vertical-align: middle;
+                        }
+                        .store-stats-table td {
+                            font-size: 10px;
+                            padding: 4px 6px;
+                            vertical-align: middle;
+                        }
+                        .store-stats-table td small {
+                            font-size: 9px;
+                        }
+                        @media print {
+                            .store-stats-table {
+                                font-size: 9px !important;
+                            }
+                            .store-stats-table th {
+                                font-size: 8px !important;
+                                padding: 2px 4px !important;
+                            }
+                            .store-stats-table td {
+                                font-size: 8px !important;
+                                padding: 2px 4px !important;
+                            }
+                            .store-stats-table td small {
+                                font-size: 7px !important;
+                            }
+                            @page {
+                                size: A4 landscape;
+                                margin: 5mm;
+                            }
+                        }
+                    </style>`;
 
                 console.log('[StoreManager] 门店管理页面内容构建完成');
                 return content;
@@ -812,5 +1019,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.1 重构完成（类名统一，Toast图标清理）');
+    console.log('✅ JF.StoreManager v2.2 门店财务汇总重构（2行×7列）+ 练习按钮仅STORE_004');
 })();
