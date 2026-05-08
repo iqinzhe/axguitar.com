@@ -1,5 +1,5 @@
-// permission.js - v2.6 修复版
-// 修复内容：canAddExpenseAmount 增加异步版本，同步方法增加角色刷新提示
+// permission.js - v2.0
+// canAddExpenseAmount 增加异步版本，同步方法增加角色刷新提示
 
 'use strict';
 
