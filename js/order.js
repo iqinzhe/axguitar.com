@@ -1,4 +1,5 @@
-// order.js - v2.0 (利息支付记录增加 actualPaid 参数)
+// order.js - v2.2 修复版
+// 修复内容：getOrderCashFlow 返回订单专属流水（而非整个门店流水）
 
 'use strict';
 
@@ -59,10 +60,9 @@
             }
         },
 
-        // ==================== 利息记录（灵活还款）【修复：增加 actualPaid 参数】 ====================
+        // ==================== 利息记录（灵活还款） ====================
         async recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid = null) {
             try {
-                // 将 actualPaid 参数传递给底层 SUPABASE 方法
                 return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid);
             } catch (error) {
                 console.error("recordInterestPayment error:", error);
@@ -252,12 +252,55 @@
             }
         },
 
-        // ==================== 获取订单资金流水 ====================
+        // 【修复 #3】获取订单专属的资金流水（而非整个门店流水）
         async getOrderCashFlow(orderId) {
             try {
                 const order = await SUPABASE.getOrder(orderId);
                 if (!order) return [];
-                return await SUPABASE.getCashFlowRecords(order.store_id);
+                
+                const client = SUPABASE.getClient();
+                
+                // 通过 order_id 查询（最精确）
+                let query = client.from('cash_flow_records')
+                    .select('*')
+                    .eq('order_id', order.id)
+                    .eq('is_voided', false)
+                    .order('recorded_at', { ascending: false });
+                
+                const { data: orderIdFlows, error: orderIdError } = await query;
+                
+                if (orderIdError) {
+                    console.warn('通过 order_id 查询现金流失败:', orderIdError.message);
+                }
+                
+                // 同时通过 reference_id = order.order_id 查询（备用）
+                const { data: refIdFlows, error: refIdError } = await client
+                    .from('cash_flow_records')
+                    .select('*')
+                    .eq('reference_id', order.order_id)
+                    .eq('is_voided', false)
+                    .order('recorded_at', { ascending: false });
+                
+                if (refIdError) {
+                    console.warn('通过 reference_id 查询现金流失败:', refIdError.message);
+                }
+                
+                // 合并去重
+                const allFlows = [...(orderIdFlows || []), ...(refIdFlows || [])];
+                const uniqueFlows = [];
+                const seenIds = new Set();
+                
+                for (const flow of allFlows) {
+                    if (!seenIds.has(flow.id)) {
+                        seenIds.add(flow.id);
+                        uniqueFlows.push(flow);
+                    }
+                }
+                
+                // 按时间倒序排序
+                uniqueFlows.sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
+                
+                return uniqueFlows;
             } catch (error) {
                 console.error("getOrderCashFlow error:", error);
                 return [];
@@ -311,7 +354,7 @@
 
     // 挂载到命名空间
     JF.Order = Order;
-    window.Order = Order; // 向下兼容
+    window.Order = Order;
 
-    console.log('✅ JF.Order v2.1 初始化完成（recordInterestPayment 支持 actualPaid 参数）');
+    console.log('✅ JF.Order v2.2 修复版（getOrderCashFlow 返回订单专属流水）');
 })();
