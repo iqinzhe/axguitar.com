@@ -1,5 +1,5 @@
-// order.js - v2.2 修复版
-// 修复内容：getOrderCashFlow 返回订单专属流水（而非整个门店流水）
+// order.js - v2.0
+// getOrderCashFlow 返回订单专属流水（而非整个门店流水）
 
 'use strict';
 
