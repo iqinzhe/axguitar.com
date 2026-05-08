@@ -1,9 +1,6 @@
-// permission.js - v2.5 统一权限模块 (JF 命名空间)
-// v2.1 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
-// v2.2 新增：store_manager 与 staff 权限规则拆分；store_manager 可处置本店收益
-// v2.3 修复：禁止员工发起内部转账（internal_transfer 仅限 store_manager 及以上）
-// v2.4 修复：店长可查看本店报表（report_view 对 store_manager 开放）；新增 cross_store_report_view 权限
-// v2.5 新增：审计日志查看权限项（audit_view 仅 admin）；员工支出金额上限阈值常量
+// permission.js - v2.0 统一权限模块 (JF 命名空间)
+// 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
+
 
 'use strict';
 
