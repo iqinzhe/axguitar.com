@@ -1,5 +1,5 @@
-// app-message-center.js - v2.1 修复版
-// 修复内容：返回按钮使用更可靠的全局方法 + 增加降级方案
+// app-message-center.js - v2.0
+// 返回按钮使用更可靠的全局方法 + 增加降级方案
 
 'use strict';
 
