@@ -1,4 +1,4 @@
-// utils.js - v2.0 典当期限功能
+// utils.js - v2.5.1 修复版（利息少付计算修正、累计少付显示助手）
 
 'use strict';
 
@@ -252,6 +252,7 @@
             'force_recovery': 'Pulihkan Paksa',
             'error_recovery_failed': 'Pemulihan otomatis gagal, silakan segarkan halaman',
             'login_failed': 'Login gagal',
+            'interest_shortfall': 'Kekurangan Bunga',
         };
 
         _translations.zh = {
@@ -465,6 +466,7 @@
             'force_recovery': '强制恢复',
             'error_recovery_failed': '自动恢复失败，请刷新页面',
             'login_failed': '登录失败',
+            'interest_shortfall': '累计利息欠款',
         };
     }
 
@@ -617,7 +619,6 @@
             if (window.Toast && window.Toast.confirmPromise) {
                 return window.Toast.confirmPromise(msg, title);
             }
-            // 备用：使用原生 confirm
             console.warn('Toast.confirmPromise 不可用，使用原生 confirm');
             return Promise.resolve(confirm(msg));
         },
@@ -664,7 +665,6 @@
             inputEl.setSelectionRange(newCursor, newCursor);
         };
         inputEl.addEventListener('input', handler);
-        // 初始格式化
         const initialRaw = inputEl.value.replace(/[^\d]/g, '');
         if (initialRaw) inputEl.value = Utils.formatNumberWithCommas(initialRaw);
     };
@@ -697,7 +697,6 @@
         if (window.JF?.FeeConfig?.calculateAdminFee) {
             return window.JF.FeeConfig.calculateAdminFee(loanAmount);
         }
-        // 降级逻辑（保持原行为）
         if (!loanAmount || loanAmount <= 0) return 0;
         if (loanAmount <= 500000) return 20000;
         if (loanAmount <= 3000000) return 30000;
@@ -708,7 +707,6 @@
         if (window.JF?.FeeConfig?.calculateServiceFee) {
             return window.JF.FeeConfig.calculateServiceFee(loanAmount, percent);
         }
-        // 降级逻辑
         if (!loanAmount || loanAmount <= 0) return { percent: 0, amount: 0 };
         if (loanAmount <= 3000000) return { percent: 0, amount: 0 };
         if (loanAmount <= 5000000) {
@@ -731,7 +729,10 @@
     };
 
     /**
-     * 利息部分缴费计算
+     * 利息部分缴费计算（修复版：不暗示修改 loan_amount，少付通过 shortfall 记录）
+     * @param {Object} order - 订单对象
+     * @param {number} actualPaid - 实际支付金额
+     * @returns {Object} { interestPaid, principalDeducted, shortfall, isShortfall, isExcess, description }
      */
     Utils.calculateInterestPartialPayment = function (order, actualPaid) {
         const lang = _lang;
@@ -741,7 +742,15 @@
         const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
         const theoreticalInterest = remainingPrincipal * monthlyRate;
 
-        const result = { interestPaid: 0, principalDeducted: 0, isPartial: false, isExcess: false, description: '' };
+        const result = {
+            interestPaid: 0,
+            principalDeducted: 0,
+            shortfall: 0,
+            isPartial: false,
+            isShortfall: false,
+            isExcess: false,
+            description: ''
+        };
 
         if (actualPaid >= theoreticalInterest) {
             result.interestPaid = theoreticalInterest;
@@ -759,14 +768,32 @@
             }
         } else {
             result.interestPaid = actualPaid;
-            const shortfall = theoreticalInterest - actualPaid;
-            result.principalDeducted = -shortfall;
+            result.shortfall = theoreticalInterest - actualPaid;
+            result.isShortfall = true;
             result.isPartial = true;
+            result.principalDeducted = 0; // 不再为负，差额由 interest_shortfall 字段记录
             result.description = lang === 'id'
-                ? `Bunga dibayar: ${Utils.formatCurrency(actualPaid)} (Kekurangan ${Utils.formatCurrency(shortfall)} ditambahkan ke pokok)`
-                : `实缴利息: ${Utils.formatCurrency(actualPaid)} (差额 ${Utils.formatCurrency(shortfall)} 加入本金)`;
+                ? `Bunga dibayar: ${Utils.formatCurrency(actualPaid)} (Kekurangan ${Utils.formatCurrency(result.shortfall)} akan dicatat sebagai hutang bunga)`
+                : `实缴利息: ${Utils.formatCurrency(actualPaid)} (差额 ${Utils.formatCurrency(result.shortfall)} 将记为利息欠款)`;
         }
         return result;
+    };
+
+    /**
+     * 获取累计利息少付的显示文案
+     * @param {Object} order - 订单对象（需包含 interest_shortfall 字段）
+     * @returns {Object|null} { value, text, isWarning } 或 null
+     */
+    Utils.getInterestShortfallDisplay = function (order) {
+        const shortfall = order?.interest_shortfall || 0;
+        if (shortfall <= 0) return null;
+        return {
+            value: shortfall,
+            text: _lang === 'id'
+                ? `⚠️ Kekurangan bunga: ${Utils.formatCurrency(shortfall)}`
+                : `⚠️ 累计利息欠款: ${Utils.formatCurrency(shortfall)}`,
+            isWarning: true
+        };
     };
 
     /* ==================== 下拉选项生成（优先使用 FeeConfig） ==================== */
@@ -774,7 +801,6 @@
         if (window.JF?.FeeConfig?.getInterestRateOptionsHtml) {
             return window.JF.FeeConfig.getInterestRateOptionsHtml();
         }
-        // 降级
         const rates = [10, 9.5, 9, 8.5, 8, 7.5];
         const defaultVal = (defaultRate !== null) ? defaultRate : Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT;
         return rates.map(r => `<option value="${r}"${r === defaultVal ? ' selected' : ''}>${r}%</option>`).join('');
@@ -784,7 +810,6 @@
         if (window.JF?.FeeConfig?.getServiceFeePercentOptionsHtml) {
             return window.JF.FeeConfig.getServiceFeePercentOptionsHtml();
         }
-        // 降级
         const options = [2, 3, 4, 5, 6];
         return options.map(o => `<option value="${o}"${o === defaultPercent ? ' selected' : ''}>${o}%</option>`).join('');
     };
@@ -855,7 +880,6 @@
         }
     };
 
-    /* ==================== 金额输入统一提取 ==================== */
     /**
      * 从指定 ID 的输入框获取并解析为数字金额
      * @param {string} elementId - 输入框元素的 ID
@@ -941,7 +965,6 @@
             this._checkUrl = checkUrl || window.APP_CONFIG?.SUPABASE?.URL;
             this._isOnline = navigator.onLine;
             
-            // 保存事件处理函数以便后续移除
             this._onlineHandler = () => {
                 console.log('[NetworkMonitor] 网络已恢复');
                 this._isOnline = true;
@@ -960,7 +983,6 @@
         },
         
         _startPeriodicCheck() {
-            // 保存 interval ID
             this._intervalId = setInterval(async () => {
                 const online = await this._checkRealConnectivity();
                 if (online !== this._isOnline) {
@@ -994,7 +1016,6 @@
             return this._isOnline;
         },
         
-        // 销毁方法，清理所有资源
         destroy() {
             if (this._intervalId) {
                 clearInterval(this._intervalId);
@@ -1036,7 +1057,6 @@
             this._errors.unshift(entry);
             if (this._errors.length > this._maxErrors) this._errors.pop();
             
-            // 只对关键错误输出到控制台
             if (context === 'uncaught' || context === 'unhandled_promise') {
                 console.error('[ErrorHandler]', context + ':', entry.message);
             }
@@ -1054,11 +1074,11 @@
     // 初始化错误收集器
     Utils.ErrorHandler.init();
 
-    // 如果有 FeeConfig，同步更新默认利率常量（确保一致）
+    // 如果有 FeeConfig，同步更新默认利率常量
     if (window.JF?.FeeConfig) {
         Utils.DEFAULT_AGREED_INTEREST_RATE = window.JF.FeeConfig.DEFAULT_INTEREST_RATE;
         Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = window.JF.FeeConfig.DEFAULT_INTEREST_RATE_PERCENT;
     }
 
-    console.log('✅ Utils v2.5 初始化完成 (典当期限功能)');
+    console.log('✅ Utils v2.5.1 修复完成 (利息少付计算修正、累计少付显示助手)');
 })();
