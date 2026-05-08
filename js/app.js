@@ -1,4 +1,4 @@
-// app.js - v2.2 轻量门面层（委托给 DashboardCore）
+// app.js - v2.0 轻量门面层（委托给 DashboardCore）
 // JF 命名空间下的主入口，提供快捷键、强制恢复、导出/导入等辅助功能
 
 'use strict';
