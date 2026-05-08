@@ -1,4 +1,5 @@
-// storage.js - v2.0 统一备份恢复模块 (JF 命名空间)
+// storage.js - v2.2 修复版
+// 修复内容：备份恢复时 cash_flow 增加去重保护
 
 'use strict';
 
@@ -285,16 +286,63 @@
                 }
             }
 
+            // 【修复 #1】cash_flow 恢复时增加去重保护
             if (backupData.cash_flows?.length > 0) {
                 for (const flow of backupData.cash_flows) {
-                    const { error } = await client.from('cash_flow_records').insert({
-                        store_id: flow.store_id, flow_type: flow.flow_type, direction: flow.direction,
-                        amount: flow.amount, source_target: flow.source_target, order_id: flow.order_id,
-                        customer_id: flow.customer_id, description: flow.description,
-                        recorded_by: profile?.id, recorded_at: flow.recorded_at,
-                        reference_id: flow.reference_id, is_voided: flow.is_voided || false
-                    });
-                    if (!error) results.cashFlows++;
+                    let isDuplicate = false;
+                    
+                    try {
+                        let dupQuery = client.from('cash_flow_records').select('id');
+                        
+                        if (flow.reference_id) {
+                            dupQuery = dupQuery.eq('reference_id', flow.reference_id);
+                        } 
+                        else if (flow.store_id && flow.recorded_at && flow.amount && flow.flow_type) {
+                            const recordedDate = new Date(flow.recorded_at);
+                            const startTime = new Date(recordedDate.getTime() - 10000).toISOString();
+                            const endTime = new Date(recordedDate.getTime() + 10000).toISOString();
+                            
+                            dupQuery = dupQuery
+                                .eq('store_id', flow.store_id)
+                                .eq('flow_type', flow.flow_type)
+                                .eq('amount', flow.amount)
+                                .gte('recorded_at', startTime)
+                                .lte('recorded_at', endTime);
+                        }
+                        else if (flow.store_id && flow.description && flow.amount) {
+                            dupQuery = dupQuery
+                                .eq('store_id', flow.store_id)
+                                .eq('amount', flow.amount)
+                                .ilike('description', flow.description);
+                        }
+                        
+                        const { data: existing, error: dupError } = await dupQuery.limit(1);
+                        if (!dupError && existing && existing.length > 0) {
+                            isDuplicate = true;
+                            console.log(`[Restore] 现金流记录已存在，跳过: ${flow.flow_type} - ${Utils.formatCurrency(flow.amount)}`);
+                        }
+                    } catch (dupCheckError) {
+                        console.warn('[Restore] 去重检查失败，继续插入:', dupCheckError.message);
+                        isDuplicate = false;
+                    }
+                    
+                    if (!isDuplicate) {
+                        const { error } = await client.from('cash_flow_records').insert({
+                            store_id: flow.store_id,
+                            flow_type: flow.flow_type,
+                            direction: flow.direction,
+                            amount: flow.amount,
+                            source_target: flow.source_target,
+                            order_id: flow.order_id,
+                            customer_id: flow.customer_id,
+                            description: flow.description,
+                            recorded_by: profile?.id,
+                            recorded_at: flow.recorded_at,
+                            reference_id: flow.reference_id,
+                            is_voided: flow.is_voided || false
+                        });
+                        if (!error) results.cashFlows++;
+                    }
                 }
             }
 
@@ -459,7 +507,7 @@
                     `<div class="page-header"><h2>💾 ${pageTitle}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn-back">↩️ ${backText}</button></div></div>
                     <div class="backup-grid backup-grid-store">
                         <div class="backup-card backup-card-store-primary">
-                            <h3>${lang === 'id' ? '📤 Cadangkan Data Toko' : '📤 备份本门店数据'}</h3>
+                            <h3>📤 ${lang === 'id' ? 'Cadangkan Data Toko' : '备份本门店数据'}</h3>
                             <p>${lang === 'id' ? 'Cadangkan data toko Anda (pesanan, nasabah, pengeluaran, pembayaran) ke file JSON.' : '备份本门店数据（订单、客户、支出、缴费记录）为 JSON 文件。'}</p>
                             <button onclick="BackupStorage.backup()" class="btn-backup-store-primary">${lang === 'id' ? '💾 Cadangkan Sekarang' : '💾 立即备份'}</button>
                         </div>
@@ -468,15 +516,15 @@
                             <p>${lang === 'id' ? 'Ekspor data ke format CSV' : '导出数据为 CSV 格式'}</p>
                             <div style="margin-bottom:12px;"><div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-secondary);">${lang === 'id' ? '📁 Data Bisnis' : '📁 业务数据'}</div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <button onclick="BackupStorage.exportOrdersToCSV()" class="btn-small">${lang === 'id' ? '📋 Ekspor Pesanan' : '📋 导出订单'}</button>
-                                    <button onclick="BackupStorage.exportPaymentsToCSV()" class="btn-small">${lang === 'id' ? '💰 Ekspor Pembayaran' : '💰 导出缴费'}</button>
-                                    <button onclick="BackupStorage.exportCustomersToCSV()" class="btn-small">${lang === 'id' ? '👥 Ekspor Nasabah' : '👥 导出客户'}</button>
+                                    <button onclick="BackupStorage.exportOrdersToCSV()" class="btn-small">📋 ${lang === 'id' ? 'Ekspor Pesanan' : '导出订单'}</button>
+                                    <button onclick="BackupStorage.exportPaymentsToCSV()" class="btn-small">💰 ${lang === 'id' ? 'Ekspor Pembayaran' : '导出缴费'}</button>
+                                    <button onclick="BackupStorage.exportCustomersToCSV()" class="btn-small">👥 ${lang === 'id' ? 'Ekspor Nasabah' : '导出客户'}</button>
                                 </div>
                             </div>
-                            <div><div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-secondary);">${lang === 'id' ? '💰 Data Keuangan' : '💰 财务数据'}</div>
+                            <div><div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-secondary);">💰 ${lang === 'id' ? 'Data Keuangan' : '财务数据'}</div>
                                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                                    <button onclick="BackupStorage.exportCashFlowToCSV()" class="btn-small">${lang === 'id' ? '💸 Ekspor Arus Kas' : '💸 导出资金流水'}</button>
-                                    <button onclick="BackupStorage.exportExpensesToCSV()" class="btn-small">${lang === 'id' ? '📝 Ekspor Pengeluaran' : '📝 导出运营支出'}</button>
+                                    <button onclick="BackupStorage.exportCashFlowToCSV()" class="btn-small">💸 ${lang === 'id' ? 'Ekspor Arus Kas' : '导出资金流水'}</button>
+                                    <button onclick="BackupStorage.exportExpensesToCSV()" class="btn-small">📝 ${lang === 'id' ? 'Ekspor Pengeluaran' : '导出运营支出'}</button>
                                 </div>
                             </div>
                         </div>
@@ -537,11 +585,10 @@
             this.restore(fileInput.files[0]);
         },
 
-        // ==================== 审计日志（v2.1 增加权限检查） ====================
+        // ==================== 审计日志 ====================
         async showAuditLog() {
             const lang = Utils.lang;
 
-            // 【v2.1】权限检查：仅管理员可查看审计日志
             if (!PERMISSION.canViewAuditLog()) {
                 Utils.toast.warning(lang === 'id'
                     ? 'Hanya administrator yang dapat melihat log audit.'
@@ -600,7 +647,7 @@
                                 else detailsText = Utils.escapeHtml(log.details || '').substring(0, 80);
                             }
                         } catch (e) { detailsText = Utils.escapeHtml(String(log.details || '')).substring(0, 80); }
-                        rows += `<tr><td class="date-cell">${Utils.formatDate(log.created_at)}</td><td>${actionText}</td><td>${Utils.escapeHtml(log.user_name || '-')}</td><td class="desc-cell">${detailsText}</td></tr>`;
+                        rows += `<td><td class="date-cell">${Utils.formatDate(log.created_at)}</td><td>${actionText}</td><td>${Utils.escapeHtml(log.user_name || '-')}</td><td class="desc-cell">${detailsText}</td></tr>`;
                     }
                 }
 
@@ -755,7 +802,7 @@
 
     // 挂载到命名空间
     JF.BackupStorage = BackupStorage;
-    window.BackupStorage = BackupStorage; // 向下兼容
+    window.BackupStorage = BackupStorage;
 
-    console.log('✅ JF.BackupStorage v2.1 更新完成（审计日志增加权限检查及新增操作类型映射）');
+    console.log('✅ JF.BackupStorage v2.2 修复版（备份恢复 cash_flow 增加去重保护）');
 })();
