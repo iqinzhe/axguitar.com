@@ -1,4 +1,4 @@
-// store.js - v2.0 卡片式财务汇总（屏幕 + 打印，每页4张卡片）
+// store.js - v2.6 卡片式财务汇总（屏幕 + 打印每页4张，行高饱满）
 
 'use strict';
 
@@ -508,7 +508,7 @@
                     console.error('[StoreManager] 查询支出失败:', expenseError);
                 }
 
-                // 查询偿还本金（profit_distributions 中 type='return_capital'）
+                // 查询偿还本金
                 const { data: returnCapitalData, error: returnError } = await client
                     .from('profit_distributions')
                     .select('store_id, amount')
@@ -994,7 +994,7 @@
             }
         },
 
-        // ==================== 打印门店财务汇总（卡片式，每页4张） ====================
+        // ==================== 打印门店财务汇总（卡片式，每页4张，行高饱满） ====================
         printStoreFinanceSummary() {
             const lang = Utils.lang;
             const cards = window._storeCardsData || [];
@@ -1023,11 +1023,11 @@
             for (let i = 0; i < cards.length; i++) {
                 const s = cards[i];
                 cardsHtml += `
-<div style="border: 1px solid #000; border-radius: 6px; padding: 6px 8px; margin-bottom: 12px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 8pt;">
-    <div style="font-weight: bold; font-size: 10pt; padding-bottom: 4px; margin-bottom: 6px; border-bottom: 1px solid #ccc; text-align: center;">
+<div style="border: 1px solid #000; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 9pt;">
+    <div style="font-weight: bold; font-size: 11pt; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #ccc; text-align: center;">
         ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
     </div>
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 8px;">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; line-height: 1.5;">
         <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
         <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
         <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
@@ -1045,9 +1045,9 @@
         <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
     </div>
 </div>`;
-                // 每4张卡片分页
+                // 每4张卡片分页（最后一张后不加分页）
                 if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
-                    cardsHtml += '<div style="page-break-after: always;"></div>';
+                    cardsHtml += '<div style="page-break-after: always; height: 0;"></div>';
                 }
             }
 
@@ -1062,22 +1062,21 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', 'Courier New', monospace;
-            font-size: 9pt;
             background: #fff;
             margin: 0;
-            padding: 8mm;
+            padding: 10mm 8mm 8mm 8mm;
         }
         @page {
             size: A4 portrait;
-            margin: 8mm;
+            margin: 12mm 10mm 10mm 10mm;
         }
         @media print {
             body { margin: 0; padding: 0; }
         }
         .print-header {
             text-align: center;
-            margin-bottom: 12px;
-            padding-bottom: 6px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
             border-bottom: 2px solid #1e293b;
         }
         .print-header .logo {
@@ -1086,7 +1085,7 @@
             color: #0e7490;
         }
         .print-header-info {
-            font-size: 8pt;
+            font-size: 9pt;
             color: #475569;
             margin-top: 4px;
         }
@@ -1094,27 +1093,33 @@
             text-align: center;
             font-size: 7pt;
             color: #94a3b8;
-            margin-top: 16px;
+            margin-top: 20px;
             padding-top: 6px;
             border-top: 1px solid #e2e8f0;
+        }
+        /* 确保每个卡片内部不跨页 */
+        .print-container > div {
+            break-inside: avoid;
         }
     </style>
 </head>
 <body>
-    <div class="print-header">
-        <div class="logo">JF! by Gadai</div>
-        <div class="print-header-info">
-            🏪 ${isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)}
-            &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
-            &nbsp;|&nbsp; 📅 ${printDateTime}
+    <div class="print-container">
+        <div class="print-header">
+            <div class="logo">JF! by Gadai</div>
+            <div class="print-header-info">
+                🏪 ${isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)}
+                &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
+                &nbsp;|&nbsp; 📅 ${printDateTime}
+            </div>
+            <div class="print-header-info" style="font-size:8pt;">
+                📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
+            </div>
         </div>
-        <div class="print-header-info" style="font-size:7pt;">
-            📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
+        ${cardsHtml}
+        <div class="print-footer">
+            JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
         </div>
-    </div>
-    ${cardsHtml}
-    <div class="print-footer">
-        JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
     </div>
     <script>
         window.onload = function() {
@@ -1174,5 +1179,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.5 卡片式财务汇总（屏幕 + 打印每页4张）');
+    console.log('✅ JF.StoreManager v2.6 卡片式财务汇总（屏幕 + 打印每页4张，行高饱满）');
 })();
