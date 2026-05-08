@@ -1,4 +1,5 @@
-// app-dashboard-orders.js - v2.0 补全 printOrder 方法
+// app-dashboard-orders.js - v2.3 修复版
+// 修复内容：printAllOrders 增加数据量限制和分页提示
 
 'use strict';
 
@@ -25,12 +26,10 @@
             let from = currentFrom || 0;
             let to = from + PAGE_SIZE - 1;
 
-            // 获取数据
             const { orders, totalCount } = await this._fetchOrderData(filters, from, to);
             const allOrders = orders;
             let currentFromVal = from + allOrders.length;
 
-            // 获取门店映射
             const stores = await SUPABASE.getAllStores();
             const storeMap = {};
             for (const s of stores) storeMap[s.id] = s.name;
@@ -42,7 +41,6 @@
                 liquidated: t('status_liquidated')
             };
 
-            // 构建表格行
             let rows = '';
             for (const o of allOrders) {
                 const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
@@ -66,7 +64,6 @@
                     ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
                 </tr>`;
 
-                // 操作行
                 let actionButtons = '';
                 if (o.status === 'active' && !isAdmin) {
                     actionButtons += `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
@@ -83,7 +80,6 @@
                 </tr>`;
             }
 
-            // 加载更多区域
             let loadMoreHtml = '';
             if (currentFromVal < totalCount) {
                 const remaining = totalCount - currentFromVal;
@@ -92,7 +88,6 @@
                 loadMoreHtml = `<tr id="loadMoreRow"><td colspan="${totalCols}" style="text-align:center;padding:14px;color:var(--text-muted);">✅ ${lang === 'id' ? `Semua ${totalCount} pesanan telah dimuat` : `已加载全部 ${totalCount} 条订单`}</td></tr>`;
             }
 
-            // 设置全局分页状态
             window._orderTableState = {
                 currentFrom: currentFromVal,
                 totalCount,
@@ -210,13 +205,11 @@
             }
         },
 
-        // ==================== 供外壳调用的渲染函数 ====================
         async renderOrderTableHTML(filters) {
             const mergedFilters = Object.assign({ status: 'all' }, filters || {});
             return await this.buildOrderTableHTML(mergedFilters, 0, 50);
         },
 
-        // ==================== 订单详情 HTML ====================
         async renderViewOrderHTML(orderId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -236,7 +229,6 @@
             const currentMonthlyInterest = remainingPrincipal * monthlyRate;
             const nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
 
-            // 还款方式信息
             let repaymentInfoHtml = '';
             if (order.repayment_type === 'fixed') {
                 const paidMonths = order.fixed_paid_months || 0;
@@ -249,7 +241,6 @@
                 repaymentInfoHtml = `<p><strong>${t('repayment_type')}:</strong> 💰 ${t('flexible_repayment')} (${lang === 'id' ? 'Maksimal perpanjangan 10 bulan' : '最长延期10个月'})</p>`;
             }
 
-            // 缴费记录
             let payRows = '';
             if (payments && payments.length > 0) {
                 for (const p of payments) {
@@ -258,7 +249,7 @@
                     payRows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td>${typeText}</td><td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td>`;
+                payRows = `<td><td colspan="6" class="text-center">${t('no_data')}</td>`;
             }
 
             const content = `
@@ -303,14 +294,13 @@
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">
                         <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
                         ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(order.order_id)}'})" class="btn btn--success">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>` : ''}
-                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success">🧾 ${lang === 'id' ? '结清凭证' : '结清凭证'}</button>` : ''}
+                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success">🧾 ${lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证'}</button>` : ''}
                         <button onclick="APP.sendWAReminder('${Utils.escapeAttr(order.order_id)}')" class="btn btn--warning">📱 ${lang === 'id' ? 'WA提醒' : 'WA提醒'}</button>
                     </div>
                 </div>`;
             return content;
         },
 
-        // ==================== 原有的 showOrderTable（兼容直接调用） ====================
         async showOrderTable() {
             APP.currentPage = 'orderTable';
             APP.saveCurrentPageState();
@@ -319,7 +309,6 @@
             document.getElementById("app").innerHTML = contentHTML;
         },
 
-        // ==================== 加载更多订单 ====================
         async loadMoreOrders() {
             const state = window._orderTableState;
             if (!state) return;
@@ -366,18 +355,15 @@
             }
         },
 
-        // 快捷跳转到缴费页
         payOrder(orderId) {
             APP.navigateTo('payment', { orderId });
         },
 
-        // 切换筛选状态
         filterOrders(status) {
             APP.currentFilter = status;
             this.showOrderTable();
         },
 
-        // ==================== 查看订单详情 ====================
         async viewOrder(orderId) {
             APP.currentPage = 'viewOrder';
             APP.currentOrderId = orderId;
@@ -393,7 +379,6 @@
             }
         },
 
-        // ==================== 删除订单 ====================
         async deleteOrder(orderId) {
             const confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
             if (!confirmed) return;
@@ -410,7 +395,6 @@
             }
         },
 
-        // ==================== 打印单个订单（保持原有实现） ====================
         async printOrder(orderId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -583,7 +567,7 @@
                                 window.print();
                                 setTimeout(function() { window.close(); }, 800);
                             };
-                        </script>
+                        <\/script>
                     </body>
                     </html>
                 `);
@@ -594,7 +578,6 @@
             }
         },
 
-        // ==================== 显示缴费历史汇总 ====================
         async showPaymentHistory() {
             APP.currentPage = 'paymentHistory';
             APP.saveCurrentPageState();
@@ -614,7 +597,7 @@
 
                 let rows = '';
                 if (allPayments.length === 0) {
-                    rows = `<tr><td colspan="8" class="text-center">${t('no_data')}</td>`;
+                    rows = `<table><td colspan="8" class="text-center">${t('no_data')}</td>`;
                 } else {
                     for (const p of allPayments) {
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
@@ -645,23 +628,40 @@
             }
         },
 
-        // ==================== 新增：打印所有订单（完整列表） ====================
+        // 【修复 #21】printAllOrders - 增加数据量限制和分页提示
         async printAllOrders() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
             const isAdmin = PERMISSION.isAdmin();
 
-            // 当前筛选状态
             const filters = { status: APP.currentFilter || 'all' };
 
             try {
-                // 拉取所有订单（不分页，最多1000条）
-                const { orders } = await this._fetchOrderData(filters, 0, 99999);
+                // 【修复 #21】限制最大打印数量为 500 条，避免浏览器卡死
+                const MAX_PRINT_ORDERS = 500;
+                
+                Utils.toast.info(lang === 'id' 
+                    ? '⏳ Sedang menyiapkan data untuk dicetak...' 
+                    : '⏳ 正在准备打印数据...', 2000);
+                
+                const { orders: allOrdersResult, totalCount } = await this._fetchOrderData(filters, 0, MAX_PRINT_ORDERS);
+                const orders = allOrdersResult;
+                
+                if (totalCount > MAX_PRINT_ORDERS) {
+                    Utils.toast.warning(lang === 'id' 
+                        ? `⚠️ Hanya ${MAX_PRINT_ORDERS} dari ${totalCount} pesanan yang akan dicetak. Gunakan filter untuk mencetak sebagian.`
+                        : `⚠️ 仅打印前 ${MAX_PRINT_ORDERS} 条订单（共 ${totalCount} 条）。请使用筛选条件分批打印。`, 5000);
+                }
+                
+                if (orders.length === 0) {
+                    Utils.toast.warning(lang === 'id' ? 'Tidak ada data untuk dicetak' : '没有可打印的数据');
+                    return;
+                }
+                
                 const stores = await SUPABASE.getAllStores();
                 const storeMap = {};
                 for (const s of stores) storeMap[s.id] = s.name;
 
-                // 构建表格行
                 let rows = '';
                 for (const o of orders) {
                     const nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
@@ -684,7 +684,6 @@
                     </tr>`;
                 }
 
-                // 表头
                 const headerHtml = `
                     <tr>
                         <th>${t('order_id')}</th>
@@ -699,7 +698,6 @@
                         ${isAdmin ? `<th class="text-center">${t('store')}</th>` : ''}
                     </tr>`;
 
-                // 获取打印页头信息
                 let storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
@@ -710,7 +708,6 @@
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
                 const printDateTime = new Date().toLocaleString();
 
-                // 构建打印页面
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
                     <!DOCTYPE html>
@@ -733,7 +730,6 @@
                             td { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
                             .amount { text-align: right; }
                             .text-center { text-align: center; }
-                            /* 竖向 A4 各列宽度 — 总可用约 190mm */
                             col.col-id       { width: 22mm; }
                             col.col-customer { width: 32mm; }
                             col.col-collat   { width: 30mm; }
@@ -748,6 +744,15 @@
                                 @page { size: A4 portrait; margin: 8mm; }
                                 body { margin: 0; padding: 0; }
                                 .print-container { padding: 0; }
+                            }
+                            .print-warning {
+                                background: #fef3c7;
+                                color: #d97706;
+                                padding: 8px;
+                                margin-bottom: 12px;
+                                border-radius: 4px;
+                                font-size: 8pt;
+                                text-align: center;
                             }
                         </style>
                     </head>
@@ -765,7 +770,14 @@
                                     } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
                                 </div>
                             </div>
-                            <div class="page-title">📋 ${t('order_list')} &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">${lang === 'id' ? 'Total' : '共'} ${orders.length} ${lang === 'id' ? 'pesanan' : '条订单'}</small></div>
+                            ${totalCount > MAX_PRINT_ORDERS ? `
+                            <div class="print-warning">
+                                ⚠️ ${lang === 'id' 
+                                    ? `Hanya ${orders.length} dari ${totalCount} pesanan yang dicetak. Gunakan filter untuk mencetak sebagian.`
+                                    : `仅打印 ${orders.length} 条订单（共 ${totalCount} 条）。请使用筛选条件分批打印。`}
+                            </div>
+                            ` : ''}
+                            <div class="page-title">📋 ${t('order_list')} &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">${lang === 'id' ? 'Total' : '共'} ${orders.length} ${lang === 'id' ? 'pesanan' : '条订单'} ${totalCount > orders.length ? `(dari ${totalCount})` : ''}</small></div>
                             <table>
                                 <colgroup>
                                     <col class="col-id">
@@ -818,5 +830,5 @@
         window.APP.showPaymentHistory = OrdersPage.showPaymentHistory.bind(OrdersPage);
     }
 
-    console.log('✅ JF.OrdersPage v2.2 打印订单列表修复 + printAllOrders 新增');
+    console.log('✅ JF.OrdersPage v2.3 修复版（printAllOrders 增加 500 条限制 + 分页提示）');
 })();
