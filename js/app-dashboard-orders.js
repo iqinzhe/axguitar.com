@@ -699,6 +699,17 @@
                         ${isAdmin ? `<th class="text-center">${t('store')}</th>` : ''}
                     </tr>`;
 
+                // 获取打印页头信息
+                let storeName = '', roleText = '', userName = '';
+                try {
+                    storeName = AUTH.getCurrentStoreName();
+                    roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                               AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') :
+                               (lang === 'id' ? 'Staf' : '员工');
+                    userName = AUTH.user?.name || '-';
+                } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
+                const printDateTime = new Date().toLocaleString();
+
                 // 构建打印页面
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
@@ -709,31 +720,78 @@
                         <title>JF! by Gadai - ${t('print_order_list')}</title>
                         <style>
                             * { box-sizing: border-box; margin: 0; padding: 0; }
-                            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8pt; padding: 10px; color: #1e293b; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                            th { background: #f1f5f9; font-weight: bold; text-align: left; padding: 6px 8px; border: 1px solid #cbd5e1; white-space: nowrap; }
-                            td { padding: 5px 8px; border: 1px solid #cbd5e1; }
+                            body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }
+                            .print-container { padding: 5mm; }
+                            .print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }
+                            .print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }
+                            .print-header .logo img { height: 26px; width: auto; vertical-align: middle; }
+                            .print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }
+                            .page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }
+                            .print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
+                            th { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }
+                            td { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
                             .amount { text-align: right; }
                             .text-center { text-align: center; }
+                            /* 竖向 A4 各列宽度 — 总可用约 190mm */
+                            col.col-id       { width: 22mm; }
+                            col.col-customer { width: 32mm; }
+                            col.col-collat   { width: 30mm; }
+                            col.col-loan     { width: 22mm; }
+                            col.col-interest { width: 20mm; }
+                            col.col-paid     { width: 14mm; }
+                            col.col-due      { width: 18mm; }
+                            col.col-type     { width: 13mm; }
+                            col.col-status   { width: 14mm; }
+                            col.col-store    { width: 19mm; }
                             @media print {
-                                @page { size: A4 landscape; margin: 8mm; }
-                                body { padding: 0; }
+                                @page { size: A4 portrait; margin: 8mm; }
+                                body { margin: 0; padding: 0; }
+                                .print-container { padding: 0; }
                             }
                         </style>
                     </head>
                     <body>
-                        <h2 style="text-align:center; margin-bottom:10px;">📋 ${t('order_list')}</h2>
-                        <table>
-                            <thead>${headerHtml}</thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                        <p style="text-align:center; margin-top:10px;">${lang === 'id' ? 'Total' : '共'} ${orders.length} ${lang === 'id' ? 'pesanan' : '条订单'}</p>
+                        <div class="print-container">
+                            <div class="print-header">
+                                <div class="logo">
+                                    <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
+                                    JF! by Gadai
+                                </div>
+                                <div class="print-header-info">
+                                    🏪 ${isAdmin
+                                        ? (lang === 'id' ? 'Kantor Pusat' : '总部')
+                                        : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
+                                    } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
+                                </div>
+                            </div>
+                            <div class="page-title">📋 ${t('order_list')} &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">${lang === 'id' ? 'Total' : '共'} ${orders.length} ${lang === 'id' ? 'pesanan' : '条订单'}</small></div>
+                            <table>
+                                <colgroup>
+                                    <col class="col-id">
+                                    <col class="col-customer">
+                                    <col class="col-collat">
+                                    <col class="col-loan">
+                                    <col class="col-interest">
+                                    <col class="col-paid">
+                                    <col class="col-due">
+                                    <col class="col-type">
+                                    <col class="col-status">
+                                    ${isAdmin ? '<col class="col-store">' : ''}
+                                </colgroup>
+                                <thead>${headerHtml}</thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                            <div class="print-footer">
+                                JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+                            </div>
+                        </div>
                         <script>
                             window.onload = function() {
                                 window.print();
                                 setTimeout(function() { window.close(); }, 800);
                             };
-                        </script>
+                        <\/script>
                     </body>
                     </html>
                 `);

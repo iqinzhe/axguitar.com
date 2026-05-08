@@ -191,11 +191,55 @@
                             margin-bottom: 8px;
                             font-size: 8pt;
                         }
+                        /* 异常状况页面打印优化 */
+                        .anomaly-grid { display: block !important; }
+                        .anomaly-card {
+                            border: 1px solid #e2e8f0;
+                            border-radius: 6px;
+                            margin-bottom: 10px;
+                            break-inside: avoid;
+                            page-break-inside: avoid;
+                        }
+                        .anomaly-card-header {
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 5px 10px;
+                            background: #f8fafc;
+                            border-bottom: 1px solid #e2e8f0;
+                            border-radius: 6px 6px 0 0;
+                        }
+                        .anomaly-card-header h3 { font-size: 9pt; font-weight: 600; margin: 0; flex: 1; }
+                        .anomaly-badge {
+                            background: #0e7490; color: #fff;
+                            font-size: 7pt; padding: 1px 7px;
+                            border-radius: 10px; font-weight: 600;
+                        }
+                        .anomaly-card-body { padding: 6px 10px; }
+                        .anomaly-card-footer { padding: 3px 10px; font-size: 7pt; color: #64748b; border-top: 1px solid #f1f5f9; }
+                        .anomaly-icon { font-size: 11pt; flex-shrink: 0; }
+                        .anomaly-table th { font-size: 7pt !important; padding: 3px 5px !important; white-space: nowrap; }
+                        .anomaly-table td { font-size: 7pt !important; padding: 3px 5px !important; }
+                        /* 排名列表 */
+                        .ranking-list { display: flex; flex-direction: column; gap: 5px; padding: 4px 0; }
+                        .ranking-item { display: flex; align-items: flex-start; gap: 8px; padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 4px; }
+                        .ranking-number { font-size: 14pt; line-height: 1.2; flex-shrink: 0; }
+                        .ranking-info { flex: 1; }
+                        .ranking-name { display: block; font-weight: 600; font-size: 8.5pt; }
+                        .ranking-code { display: block; font-size: 7pt; color: #64748b; }
+                        .ranking-count { font-size: 7pt; color: #475569; text-align: right; line-height: 1.6; }
+                        .empty-state { text-align: center; padding: 10px; color: #94a3b8; font-size: 8pt; }
+                        /* 用户/角色管理：操作行隐藏 */
+                        .user-table .action-row,
+                        .data-table .action-row { display: none !important; }
                         @media print {
-                            @page { size: A4 landscape; margin: 0mm 8mm 8mm 8mm; }
+                            @page { size: A4 portrait; margin: 8mm; }
                             body { margin: 0; padding: 0; }
-                            .print-container { padding: 5mm 0 0 0; }
+                            .print-container { padding: 0; }
                             .card { break-inside: avoid; }
+                            .anomaly-card { break-inside: avoid; page-break-inside: avoid; }
+                            .user-table .action-row,
+                            .data-table .action-row { display: none !important; }
                         }
                     </style>
                 </head>
@@ -230,37 +274,36 @@
             printWindow.document.close();
         },
 
-        // ========== 新增：清理订单列表表格，移除操作行 ==========
+        // ========== 清理所有表格中的操作行（订单列表、角色管理等通用） ==========
         _cleanOrderTableForPrint(printContent) {
-            // 查找订单表格
-            const orderTable = printContent.querySelector('.order-table');
-            if (!orderTable) return;
+            // 1. 移除所有表格中的 action-row（通用，覆盖角色管理/订单管理等所有页面）
+            printContent.querySelectorAll('.action-row').forEach(row => row.remove());
 
-            // 移除所有操作行 (action-row)
-            const actionRows = orderTable.querySelectorAll('.action-row');
-            actionRows.forEach(row => row.remove());
+            // 2. 移除所有操作按钮容器（双重保险）
+            printContent.querySelectorAll('.action-buttons').forEach(el => el.remove());
 
-            // 移除加载更多行
-            const loadMoreRow = orderTable.querySelector('#loadMoreRow');
-            if (loadMoreRow) loadMoreRow.remove();
-
-            // 确保表格结构完整（每行数据后面不再有操作行）
-            const tbody = orderTable.querySelector('tbody');
-            if (!tbody) return;
-
-            // 清理可能残留的空行或异常行
-            const allRows = tbody.querySelectorAll('tr');
-            allRows.forEach(row => {
-                // 移除任何包含按钮的行（双重保险）
-                const buttons = row.querySelectorAll('button, .btn, .action-buttons, .action-label');
-                if (buttons.length > 0) {
-                    row.remove();
-                }
+            // 3. 移除加载更多行
+            ['#loadMoreRow', '#blacklistLoadMoreRow'].forEach(sel => {
+                const el = printContent.querySelector(sel);
+                if (el) el.remove();
             });
 
-            // 移除表格中可能存在的操作按钮容器
-            const actionButtons = orderTable.querySelectorAll('.action-buttons');
-            actionButtons.forEach(el => el.remove());
+            // 4. 针对订单表格：再次检查包含 button 的 tr（冗余保护）
+            const orderTable = printContent.querySelector('.order-table');
+            if (orderTable) {
+                const tbody = orderTable.querySelector('tbody');
+                if (tbody) {
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        if (row.querySelectorAll('button, .btn').length > 0) row.remove();
+                    });
+                }
+            }
+
+            // 5. 角色管理 select.role-select 所在行也需移除
+            printContent.querySelectorAll('select.role-select').forEach(el => {
+                const row = el.closest('tr');
+                if (row) row.remove();
+            });
         },
 
         // 重新格式化订单信息为3列3行网格
