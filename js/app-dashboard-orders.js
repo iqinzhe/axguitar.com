@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.2 订单列表打印修复 + 补全 printOrder 方法
+// app-dashboard-orders.js - v2.0 补全 printOrder 方法
 
 'use strict';
 
