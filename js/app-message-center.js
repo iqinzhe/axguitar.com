@@ -1,4 +1,5 @@
-// app-message-center.js - v2.0
+// app-message-center.js - v2.1 修复版
+// 修复内容：返回按钮使用更可靠的全局方法 + 增加降级方案
 
 'use strict';
 
@@ -119,10 +120,8 @@
                 }
             }
             
-            // 按逾期天数排序（逾期多的在前）
             messages.sort((a, b) => (b.overdueDays || 0) - (a.overdueDays || 0));
             
-            // 去重：同一订单只保留第一条（逾期提醒优先）
             const seen = new Set();
             const uniqueMessages = [];
             for (const msg of messages) {
@@ -145,7 +144,7 @@
             }
         },
 
-        // 显示消息中心页面
+        // 【修复 #10】显示消息中心页面 - 返回按钮使用更可靠的全局方法
         async showMessageCenter() {
             APP.currentPage = 'messageCenter';
             APP.saveCurrentPageState();
@@ -173,11 +172,10 @@
                                 <button onclick="MessageCenter.markAsSentAndRemove('${Utils.escapeAttr(m.orderId)}', '${m.type}')" class="btn btn--sm btn--success">✅ ${lang === 'id' ? 'Tandai Terkirim' : '标记已发送'}</button>
                                 <button onclick="MessageCenter.openWhatsApp('${Utils.escapeAttr(m.customerPhone)}', '${Utils.escapeAttr(m.waMessage)}')" class="btn btn--sm btn--warning">📱 ${lang === 'id' ? 'Buka WA' : '打开WA'}</button>
                             </td>
-                        </tr>`;
+                        ｜｜DSML｜｜`;
                     }
                 }
                 
-                // 生成汇总文本（批量复制用）
                 let bulkText = '';
                 for (const m of messages) {
                     bulkText += m.waMessage + '\n\n---\n\n';
@@ -234,18 +232,29 @@
                 
                 document.getElementById("app").innerHTML = content;
                 
-                // 修复返回按钮：手动绑定事件
+                // 【修复 #10】返回按钮 - 使用更可靠的全局方法
                 const backBtn = document.getElementById('messageCenterBackBtn');
                 if (backBtn) {
                     backBtn.onclick = function(e) {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (typeof APP !== 'undefined' && APP.goBack) {
+                        
+                        // 优先使用全局 APP.goBack
+                        if (typeof APP !== 'undefined' && APP.goBack && typeof APP.goBack === 'function') {
                             APP.goBack();
-                        } else if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.goBack) {
+                        } 
+                        // 降级到 JF.DashboardCore.goBack
+                        else if (typeof JF !== 'undefined' && JF.DashboardCore && typeof JF.DashboardCore.goBack === 'function') {
                             JF.DashboardCore.goBack();
-                        } else {
-                            window.history.back();
+                        } 
+                        // 最终降级：浏览器后退 + 手动渲染仪表盘
+                        else {
+                            console.warn('[MessageCenter] goBack 不可用，使用降级方案');
+                            if (typeof JF !== 'undefined' && JF.DashboardCore && typeof JF.DashboardCore.renderDashboard === 'function') {
+                                JF.DashboardCore.renderDashboard();
+                            } else {
+                                window.history.back();
+                            }
                         }
                     };
                 }
@@ -313,5 +322,5 @@
         window.APP = { showMessageCenter: MessageCenter.showMessageCenter.bind(MessageCenter) };
     }
 
-    console.log('✅ JF.MessageCenter v1.2 修复完成（印尼文显示 + 返回按钮）');
+    console.log('✅ JF.MessageCenter v2.1 修复版（返回按钮多重降级）');
 })();
