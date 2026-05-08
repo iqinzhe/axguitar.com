@@ -1,8 +1,5 @@
-// app-profit.js - v2.3 (JF 命名空间)
+// app-profit.js - v2.0 (JF 命名空间)
 // 收益处置页面（利润再投入 / 偿还本金）
-// v2.1：store_manager 可处置本店收益（admin 可处置所有门店）
-// v2.2：电脑端3列布局，手机端单列布局
-// v2.3：店长收益处置增加复核机制（单笔超过 IDR 10,000,000 需管理员确认）
 
 'use strict';
 
@@ -14,7 +11,7 @@
 
         // ==================== 业务常量 ====================
         /** 店长单笔收益处置上限（超过此金额需管理员复核确认） */
-        STORE_MANAGER_DISTRIBUTION_MAX: 10000000,
+        STORE_MANAGER_DISTRIBUTION_MAX: 8000000,
 
         async showDistributionPage() {
             const lang = Utils.lang;
