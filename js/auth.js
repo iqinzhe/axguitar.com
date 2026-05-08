@@ -1,5 +1,5 @@
-// auth.js - v2.4 修复版
-// 修复内容：移除 Enter 键监听 + 修复 logout 重复调用 signOut
+// auth.js - v2.0
+// 移除 Enter 键监听 + 修复 logout 重复调用 signOut
 
 'use strict';
 
