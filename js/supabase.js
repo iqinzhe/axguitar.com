@@ -1,7 +1,6 @@
-// supabase.js - v2.5 典当期限功能
-// 1. 管理员可查看所有门店数据（排除练习门店）
-// 2. 新增 pawn_term_months / pawn_due_date 字段支持
-// 3. excludePracticeStores 通用过滤函数
+// supabase.js - v2.0 典当期限功能
+//  管理员可查看所有门店数据（排除练习门店）
+
 
 'use strict';
 
