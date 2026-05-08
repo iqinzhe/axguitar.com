@@ -1,4 +1,4 @@
-// app-state-init.js - v2.3 修复版
+// app-state-init.js - v2.0
 // 在页面加载时检查 token 有效性，无有效 token 则清除所有页面恢复状态，防止未登录时错误恢复页面
 
 'use strict';
