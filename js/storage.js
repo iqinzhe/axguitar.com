@@ -1,5 +1,4 @@
-// storage.js - v2.1 统一备份恢复模块 (JF 命名空间)
-// v2.1: 审计日志查看增加权限检查
+// storage.js - v2.0 统一备份恢复模块 (JF 命名空间)
 
 'use strict';
 
