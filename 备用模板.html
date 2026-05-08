@@ -18,15 +18,19 @@ body{
     background:#e9ecef;
     font-family:Arial,"Microsoft YaHei",sans-serif;
     color:#222;
-    padding:20px;
+
+    /* 页面预览边距 */
+    padding:35px;
 }
 
 /* =========================
-   A4 打印
+   A4 打印设置
 ========================= */
 @page{
     size:A4;
-    margin:12mm;
+
+    /* 增大打印边距，防止溢出 */
+    margin:20mm;
 }
 
 /* =========================
@@ -34,16 +38,19 @@ body{
 ========================= */
 .receipt{
 
-    width:148mm;
-    min-height:210mm;
+    /* 缩小宽度，避免打印边缘溢出 */
+    width:138mm;
+
+    min-height:auto;
 
     margin:0 auto;
 
     background:#fff;
 
-    border:1.5px solid #222;
+    border:1.2px solid #222;
 
-    padding:14mm 12mm;
+    /* 增大内部留白 */
+    padding:16mm 14mm;
 
     position:relative;
 }
@@ -52,11 +59,14 @@ body{
    单号
 ========================= */
 .voucher-number{
-    position:absolute;
-    top:12mm;
-    right:12mm;
 
-    font-size:12px;
+    position:absolute;
+
+    top:12mm;
+    right:14mm;
+
+    font-size:11px;
+
     color:#333;
 }
 
@@ -67,7 +77,7 @@ body{
 
     text-align:center;
 
-    border-bottom:2px solid #222;
+    border-bottom:1.8px solid #222;
 
     padding-bottom:12px;
 
@@ -77,8 +87,8 @@ body{
 /* logo */
 .logo-box{
 
-    width:70px;
-    height:70px;
+    width:68px;
+    height:68px;
 
     margin:0 auto 10px;
 
@@ -88,14 +98,15 @@ body{
     align-items:center;
     justify-content:center;
 
-    font-size:12px;
+    font-size:11px;
+
     color:#666;
 }
 
 /* 公司名称 */
 .company-name{
 
-    font-size:24px;
+    font-size:22px;
 
     font-weight:bold;
 
@@ -107,7 +118,7 @@ body{
 /* 公司信息 */
 .company-meta{
 
-    font-size:12px;
+    font-size:11px;
 
     line-height:1.7;
 
@@ -121,12 +132,12 @@ body{
 
     text-align:center;
 
-    margin-bottom:22px;
+    margin-bottom:20px;
 }
 
 .title .id-title{
 
-    font-size:20px;
+    font-size:18px;
 
     font-weight:bold;
 
@@ -137,7 +148,7 @@ body{
 
     margin-top:4px;
 
-    font-size:15px;
+    font-size:14px;
 
     color:#444;
 }
@@ -147,7 +158,7 @@ body{
 ========================= */
 .section-title{
 
-    font-size:15px;
+    font-size:14px;
 
     font-weight:bold;
 
@@ -155,14 +166,16 @@ body{
 
     padding-bottom:4px;
 
-    margin:18px 0 8px;
+    margin:16px 0 8px;
 }
 
 /* =========================
    表格
 ========================= */
 table{
+
     width:100%;
+
     border-collapse:collapse;
 }
 
@@ -170,9 +183,9 @@ table{
 
     border:1px solid #444;
 
-    padding:8px 10px;
+    padding:7px 9px;
 
-    font-size:13px;
+    font-size:12px;
 }
 
 .label{
@@ -192,11 +205,11 @@ table{
 
     border:1px solid #444;
 
-    padding:8px;
+    padding:7px;
 
     text-align:center;
 
-    font-size:13px;
+    font-size:12px;
 }
 
 .item-table th{
@@ -211,7 +224,7 @@ table{
 ========================= */
 .amount{
 
-    font-size:18px;
+    font-size:16px;
 
     font-weight:bold;
 
@@ -223,13 +236,13 @@ table{
 ========================= */
 .notice{
 
-    margin-top:16px;
+    margin-top:15px;
 
     border:1px dashed #666;
 
-    padding:12px;
+    padding:10px;
 
-    font-size:12px;
+    font-size:11px;
 
     line-height:1.8;
 
@@ -247,7 +260,7 @@ table{
 
     align-items:flex-end;
 
-    margin-top:45px;
+    margin-top:42px;
 }
 
 .sign-box{
@@ -260,8 +273,8 @@ table{
 /* 印章 */
 .stamp-placeholder{
 
-    width:90px;
-    height:90px;
+    width:85px;
+    height:85px;
 
     margin:0 auto 8px;
 
@@ -275,7 +288,7 @@ table{
 
     justify-content:center;
 
-    font-size:12px;
+    font-size:11px;
 
     color:#777;
 }
@@ -287,7 +300,7 @@ table{
 
     padding-top:6px;
 
-    font-size:12px;
+    font-size:11px;
 }
 
 /* =========================
@@ -295,17 +308,17 @@ table{
 ========================= */
 .footer{
 
-    margin-top:28px;
+    margin-top:26px;
 
     text-align:center;
 
-    font-size:11px;
+    font-size:10px;
 
     color:#666;
 
     border-top:1px solid #ccc;
 
-    padding-top:10px;
+    padding-top:8px;
 }
 
 /* =========================
@@ -314,7 +327,9 @@ table{
 @media print{
 
     body{
+
         background:#fff;
+
         padding:0;
     }
 
@@ -322,9 +337,9 @@ table{
 
         border:1px solid #222;
 
-        margin:0 auto;
-
         box-shadow:none;
+
+        margin:0 auto;
     }
 }
 
@@ -355,6 +370,7 @@ table{
 
         <!-- 公司信息 -->
         <div class="company-meta">
+
             <div>
                 Alamat : Cakra Residence Bloc E1-12, Pasuruan
             </div>
@@ -366,6 +382,7 @@ table{
             <div>
                 NIB : XXXXXXXXXXXX
             </div>
+
         </div>
 
     </div>
@@ -458,10 +475,18 @@ table{
 
         <tr>
             <td class="label">典当本金</td>
-            <td>Rp 10,000,000</td>
 
-            <td class="label">典当周期</td>
-            <td>2026-01-01 - 2026-05-08</td>
+            <td class="amount">
+                Rp 10,000,000
+            </td>
+        </tr>
+
+        <tr>
+            <td class="label">起止时间</td>
+
+            <td>
+                2026-04-08 至 2026-05-08
+            </td>
         </tr>
 
     </table>
