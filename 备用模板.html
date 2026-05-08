@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>典当结清凭证 | 无戳记完美打印版</title>
+    <title>典当结清凭证 | 精致小版</title>
     <style>
         * {
             margin: 0;
@@ -12,7 +12,7 @@
         }
 
         /* =========================
-           屏幕预览样式 (优雅居中，模拟纸质质感)
+           屏幕预览样式 (模拟纸张，精致小巧)
         ========================= */
         html,
         body {
@@ -27,31 +27,30 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 24px 20px;
+            padding: 30px 20px;
         }
 
-        /* 凭证卡片（屏幕预览带柔和阴影，打印时自动消失） */
+        /* 凭证卡片 —— 宽度缩小为 90mm (原128mm)，更像一张精致小凭证 */
         .receipt {
-            width: 128mm;
+            width: 90mm;           /* 核心缩小宽度，A4纸留白更从容 */
             background: #fff;
             border: 1px solid #222;
-            padding: 8mm 10mm;
+            padding: 6mm 7mm;      /* 内边距相应微调，保持舒适 */
             position: relative;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
             transition: all 0.2s;
         }
 
         /* =========================
-           打印核心优化 —— 彻底清除浏览器自动添加的页眉/页脚/URL/页码/日期等戳记
-           实现 A4 纸张内 水平和垂直 完美居中，四角无任何多余字符或水印
+           打印核心 —— 彻底消除戳记 + 完美居中 + 保留小尺寸凭证
         ========================= */
         @media print {
-            /* 1. 最关键步骤: 将页面物理边距完全归零，杜绝所有默认页眉/页脚区域 */
+            /* 1. 完全清除页边距，杜绝任何默认 URL/页码/日期 */
             @page {
                 size: A4;
-                margin: 0mm;          /* 无任何外边距，清除URL、页码、日期等占位空间 */
+                margin: 0mm;
                 padding: 0mm;
-                /* 兼容性：显式禁止所有 margin box 内容 (现代浏览器支持) */
+                /* 强制所有 margin box 无内容 */
                 @top-center {
                     content: none;
                 }
@@ -78,7 +77,7 @@
                 }
             }
 
-            /* 2. html, body 占满整张纸，并使用 Flex 实现完全居中 (垂直水平完美对齐) */
+            /* 2. html, body 铺满整张纸，flex 实现绝对居中 */
             html,
             body {
                 width: 100%;
@@ -91,9 +90,9 @@
                 align-items: center;
             }
 
-            /* 3. 凭证主体: 固定宽度 + 居中强化；移除屏幕阴影，确保边框清晰 */
+            /* 3. 凭证主体保持 90mm 宽，居中 + 无额外边距 */
             .receipt {
-                width: 128mm;
+                width: 90mm;           /* 打印时也保持小巧宽度 */
                 margin: 0 auto;
                 border: 1px solid #222;
                 box-shadow: none;
@@ -103,7 +102,7 @@
                 position: relative;
             }
 
-            /* 4. 全面清除任何可能由伪元素、额外元素生成的戳记/水印 */
+            /* 4. 彻底摧毁所有可能产生戳记的伪元素 */
             body::before,
             body::after,
             html::before,
@@ -114,13 +113,13 @@
                 content: none !important;
             }
 
-            /* 5. 强制保留所有背景及边框颜色（确保可视化信息完整） */
+            /* 5. 强制保留边框背景色 */
             * {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
 
-            /* 6. 避免内容分页断裂，提升打印体验 */
+            /* 6. 防止内容跨页断裂 */
             .receipt,
             .header,
             .section-title,
@@ -132,82 +131,75 @@
                 page-break-inside: avoid;
                 break-inside: avoid;
             }
-
-            /* 7. 安全后备：确保没有任何元素能突破边界显示戳记 */
-            body {
-                background: white;
-                padding: 0;
-                margin: 0;
-            }
         }
 
         /* =========================
-           常规视觉样式 (工整清晰，适合存档)
+           内容样式微调 (适应更窄的版面，字体舒适)
         ========================= */
         .voucher-number {
             position: absolute;
-            top: 8mm;
-            right: 10mm;
-            font-size: 11px;
+            top: 6mm;
+            right: 7mm;
+            font-size: 9px;
             color: #333;
         }
 
         .header {
             text-align: center;
-            border-bottom: 1.5px solid #222;
-            padding-bottom: 10px;
-            margin-bottom: 16px;
+            border-bottom: 1.2px solid #222;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .logo-box {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 8px;
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 6px;
             border: 1px dashed #999;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 11px;
+            font-size: 10px;
             color: #666;
             background: #fefefe;
         }
 
         .company-name {
-            font-size: 21px;
+            font-size: 18px;
             font-weight: bold;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
         }
 
         .company-meta {
-            font-size: 11px;
-            line-height: 1.6;
+            font-size: 9px;
+            line-height: 1.5;
             color: #444;
         }
 
         .title {
             text-align: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .id-title {
-            font-size: 17px;
+            font-size: 15px;
             font-weight: bold;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         .cn-title {
-            margin-top: 3px;
-            font-size: 13px;
+            margin-top: 2px;
+            font-size: 11px;
             color: #444;
         }
 
         .section-title {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: bold;
             border-bottom: 1px solid #222;
-            padding-bottom: 4px;
-            margin: 14px 0 7px;
+            padding-bottom: 3px;
+            margin: 10px 0 6px;
         }
 
         table {
@@ -217,12 +209,12 @@
 
         .info-table td {
             border: 1px solid #444;
-            padding: 6px 8px;
-            font-size: 11px;
+            padding: 5px 6px;
+            font-size: 9.5px;
         }
 
         .label {
-            width: 24%;
+            width: 26%;
             background: #f5f5f5;
             font-weight: bold;
         }
@@ -230,9 +222,9 @@
         .item-table th,
         .item-table td {
             border: 1px solid #444;
-            padding: 6px;
+            padding: 5px 4px;
             text-align: center;
-            font-size: 11px;
+            font-size: 9.5px;
         }
 
         .item-table th {
@@ -241,16 +233,16 @@
         }
 
         .amount {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: bold;
         }
 
         .notice {
-            margin-top: 12px;
+            margin-top: 10px;
             border: 1px dashed #666;
-            padding: 9px;
-            font-size: 10px;
-            line-height: 1.7;
+            padding: 7px;
+            font-size: 8.5px;
+            line-height: 1.6;
             background: #fafafa;
         }
 
@@ -258,7 +250,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            margin-top: 32px;
+            margin-top: 20px;
         }
 
         .sign-box {
@@ -267,43 +259,42 @@
         }
 
         .stamp-placeholder {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 6px;
-            border: 2px dashed #999;
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 5px;
+            border: 1.5px dashed #999;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 9px;
             color: #777;
             background: #fff;
         }
 
         .sign-line {
             border-top: 1px solid #222;
-            padding-top: 5px;
-            font-size: 10px;
+            padding-top: 4px;
+            font-size: 9px;
         }
 
         .footer {
-            margin-top: 18px;
+            margin-top: 12px;
             text-align: center;
-            font-size: 9px;
+            font-size: 8px;
             color: #666;
             border-top: 1px solid #ccc;
-            padding-top: 6px;
+            padding-top: 5px;
         }
 
-        /* 屏幕自适应小幅度压缩 (仅用于屏幕预览不损失比例) */
-        @media (max-width: 140mm) {
+        /* 屏幕预览时确保卡片不超出小屏幕 */
+        @media (max-width: 100mm) {
             body {
                 padding: 12px;
             }
-
             .receipt {
                 width: 100%;
-                max-width: 128mm;
+                max-width: 90mm;
             }
         }
     </style>
@@ -393,7 +384,7 @@
             <td class="label">起止时间</td>
             <td>2026-04-08 至 2026-05-08</td>
         </tr>
-     </table>
+    </table>
 
     <!-- 声明 -->
     <div class="notice">
