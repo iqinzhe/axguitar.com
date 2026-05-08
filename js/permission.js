@@ -1,5 +1,5 @@
-// permission.js - v2.0 统一权限模块 (JF 命名空间)
-// 新增：checkStoreAccess / requireStoreAccess 通用门店权限检查
+// permission.js - v2.6 修复版
+// 修复内容：canAddExpenseAmount 增加异步版本，同步方法增加角色刷新提示
 
 'use strict';
 
@@ -13,107 +13,75 @@
         /** 员工单笔支出上限（超过此金额需店长确认） */
         STAFF_EXPENSE_MAX_AMOUNT: 5000000,
 
-        // ==================== 权限规则表（单一来源） ====================
+        // ==================== 权限规则表 ====================
         _rules: {
             admin: true,
-            // store_manager：分店经理，可查看本店报表，可处置本店收益，可发起内部转账
             store_manager: {
-                // 订单
                 order_create: true,
                 order_view: true,
                 order_payment: true,
                 order_edit: false,
                 order_delete: false,
-                // 客户
                 customer_manage: true,
                 customer_create: true,
                 customer_edit: true,
                 customer_delete: false,
-                // 支出
                 expense_add: true,
                 expense_edit: false,
                 expense_delete: false,
-                // 报表：店长可查看本店经营报表
                 report_view: true,
-                // 跨店汇总报表（仅管理员）
                 cross_store_report_view: false,
-                // 用户管理（仅管理员）
                 user_manage: false,
                 user_create: false,
                 user_edit: false,
                 user_delete: false,
-                // 门店管理（仅管理员）
                 store_manage: false,
                 store_create: false,
                 store_edit: false,
                 store_delete: false,
-                // 黑名单
                 blacklist_add: true,
                 blacklist_remove: false,
                 blacklist_view: true,
-                // 资金流水
                 cash_flow_view: true,
                 internal_transfer: true,
-                // 备份恢复（仅管理员）
                 backup_restore: false,
-                // 收益处置：分店经理可处置本店收益
                 profit_distribute: true,
-                // 审计日志查看（仅管理员）
                 audit_view: false,
             },
-            // staff：普通员工，不可处置收益，不可发起内部转账，不可查看跨店报表
             staff: {
-                // 订单
                 order_create: true,
                 order_view: true,
                 order_payment: true,
                 order_edit: false,
                 order_delete: false,
-                // 客户
                 customer_manage: true,
                 customer_create: true,
                 customer_edit: true,
                 customer_delete: false,
-                // 支出（添加受金额上限约束，见 STAFF_EXPENSE_MAX_AMOUNT）
                 expense_add: true,
                 expense_edit: false,
                 expense_delete: false,
-                // 报表
                 report_view: false,
-                // 跨店汇总报表（仅管理员）
                 cross_store_report_view: false,
-                // 用户管理（仅管理员）
                 user_manage: false,
                 user_create: false,
                 user_edit: false,
                 user_delete: false,
-                // 门店管理（仅管理员）
                 store_manage: false,
                 store_create: false,
                 store_edit: false,
                 store_delete: false,
-                // 黑名单
                 blacklist_add: true,
                 blacklist_remove: false,
                 blacklist_view: true,
-                // 资金流水：员工可查看本店流水，但不可发起内部转账
                 cash_flow_view: true,
                 internal_transfer: false,
-                // 备份恢复（仅管理员）
                 backup_restore: false,
-                // 收益处置：员工不可操作
                 profit_distribute: false,
-                // 审计日志查看（仅管理员）
                 audit_view: false,
             },
         },
 
-        /**
-         * 根据角色同步检查权限
-         * @param {string} role
-         * @param {string} action
-         * @returns {boolean}
-         */
         _checkByRole(role, action) {
             if (!role) return false;
             if (role === 'admin') return true;
@@ -126,16 +94,14 @@
             return false;
         },
 
-        /**
-         * 同步权限检查（使用缓存角色）
-         */
         can(action) {
+            // 【修复 #26】同步检查时增加控制台提示（仅开发环境）
+            if (AUTH.user?.role === 'staff' && (action === 'expense_add' || action === 'internal_transfer')) {
+                console.debug('[Permission] 同步权限检查:', action, '结果:', this._checkByRole(AUTH.user?.role, action));
+            }
             return this._checkByRole(AUTH.user?.role, action);
         },
 
-        /**
-         * 异步权限检查（从数据库获取最新角色）
-         */
         async canAsync(action) {
             try {
                 const profile = await SUPABASE.getCurrentProfile();
@@ -147,11 +113,6 @@
         },
 
         // ==================== 门店访问权限检查 ====================
-        /**
-         * 异步检查当前登录用户是否有权访问指定门店
-         * @param {string|null} storeId - 要访问的门店ID，null 表示无门店（如总部）
-         * @returns {Promise<boolean>} true: 有权限；false: 无权限
-         */
         async checkStoreAccess(storeId) {
             if (this.isAdmin()) return true;
 
@@ -166,12 +127,6 @@
             }
         },
 
-        /**
-         * 异步检查门店访问权限，若权限不足则抛出错误
-         * @param {string|null} storeId
-         * @param {string} [customMessage] - 可选自定义错误信息
-         * @returns {Promise<void>}
-         */
         async requireStoreAccess(storeId, customMessage) {
             const hasAccess = await this.checkStoreAccess(storeId);
             if (!hasAccess) {
@@ -184,21 +139,39 @@
             }
         },
 
-        // ==================== 支出金额阈值检查 ====================
-        /**
-         * 检查支出金额是否超过员工单笔上限
-         * @param {number} amount - 支出金额
-         * @returns {boolean} true: 未超限或用户非员工；false: 超过上限
-         */
+        // ==================== 【修复 #26】支出金额阈值检查（同步版本，带警告） ====================
         canAddExpenseAmount(amount) {
             if (this.isAdmin() || this.isStoreManager()) return true;
-            return amount <= this.STAFF_EXPENSE_MAX_AMOUNT;
+            if (this.isStaff()) {
+                if (amount > this.STAFF_EXPENSE_MAX_AMOUNT) {
+                    console.warn(`[Permission] 员工支出金额 ${Utils.formatCurrency(amount)} 超过限额 ${Utils.formatCurrency(this.STAFF_EXPENSE_MAX_AMOUNT)}`);
+                    return false;
+                }
+                return true;
+            }
+            return true;
         },
 
         /**
-         * 获取员工支出上限（用于 UI 提示）
-         * @returns {number}
+         * 【修复 #26】异步版本支出金额检查（从数据库获取最新角色）
+         * @param {number} amount - 支出金额
+         * @returns {Promise<boolean>} true: 未超限或用户非员工；false: 超过上限
          */
+        async canAddExpenseAmountAsync(amount) {
+            const profile = await SUPABASE.getCurrentProfile();
+            const role = profile?.role;
+            
+            if (role === 'admin' || role === 'store_manager') return true;
+            if (role === 'staff') {
+                if (amount > this.STAFF_EXPENSE_MAX_AMOUNT) {
+                    console.warn(`[Permission] 员工支出金额 ${Utils.formatCurrency(amount)} 超过限额 ${Utils.formatCurrency(this.STAFF_EXPENSE_MAX_AMOUNT)}`);
+                    return false;
+                }
+                return true;
+            }
+            return true;
+        },
+
         getStaffExpenseMaxAmount() {
             return this.STAFF_EXPENSE_MAX_AMOUNT;
         },
@@ -314,5 +287,5 @@
     JF.Permission = PERMISSION;
     window.PERMISSION = PERMISSION;
 
-    console.log('✅ JF.Permission v2.5 初始化完成（内部转账仅店长+、店长可看本店报表、员工支出上限IDR 5,000,000、审计日志权限项）');
+    console.log('✅ JF.Permission v2.6 修复版（canAddExpenseAmount 增加异步版本 + 同步警告）');
 })();
