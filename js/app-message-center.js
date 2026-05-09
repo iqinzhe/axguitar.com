@@ -139,7 +139,7 @@
                 return order.monthly_fixed_payment || 0;
             } else {
                 const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-                const monthlyRate = order.agreed_interest_rate || 0.08;
+                const monthlyRate = order.agreed_interest_rate || 0.10;
                 return remainingPrincipal * monthlyRate;
             }
         },
