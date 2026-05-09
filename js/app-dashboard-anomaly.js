@@ -433,5 +433,5 @@
     window.APP.loadMoreBlacklist = AnomalyPage.loadMoreBlacklist.bind(AnomalyPage);
     window.APP.clearAnomalyCache = AnomalyPage.clearAnomalyCache.bind(AnomalyPage);
 
-    console.log('✅ JF.AnomalyPage v2.4 修复版（loadMoreBlacklist 增强防重复）');
+    console.log('✅ JF.AnomalyPage v2.0（loadMoreBlacklist 增强防重复）');
 })();
