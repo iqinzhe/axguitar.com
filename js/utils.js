@@ -12,9 +12,9 @@
     window.Utils = Utils;
 
     /* ==================== 常量 ==================== */
-    // 从 FeeConfig 读取配置，如果未加载则使用默认值（8.5%）
-    Utils.DEFAULT_AGREED_INTEREST_RATE = (window.JF?.FeeConfig?.DEFAULT_INTEREST_RATE) || 0.085;
-    Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = (window.JF?.FeeConfig?.DEFAULT_INTEREST_RATE_PERCENT) || 8.5;
+    // 从 FeeConfig 读取配置，如果未加载则使用默认值（10%）
+    Utils.DEFAULT_AGREED_INTEREST_RATE = (window.JF?.FeeConfig?.DEFAULT_INTEREST_RATE) || 0.10;
+    Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = (window.JF?.FeeConfig?.DEFAULT_INTEREST_RATE_PERCENT) || 10;
     Utils.DEFAULT_MAX_EXTENSION_MONTHS = 10;
     Utils.CURRENCY_SYMBOL = 'Rp';
     const JAKARTA_UTC_OFFSET = 7 * 60; // 分钟
