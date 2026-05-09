@@ -1127,5 +1127,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.0 卡片式财务汇总（屏幕双列 + 打印每页3张 + 无打印戳记 + 页码）');
+    console.log('✅ JF.StoreManager v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 无打印戳记 + 页码）');
 })();
