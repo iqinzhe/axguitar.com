@@ -1,4 +1,4 @@
-// store.js - v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 无打印戳记 + 页码）
+// store.js - v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 4列指标 + 无打印戳记）
 
 'use strict';
 
@@ -470,7 +470,7 @@
             }
         },
 
-        // ==================== 构建门店管理 HTML（卡片式财务汇总） ====================
+        // ==================== 构建门店管理 HTML（屏幕显示，保持不变） ====================
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -481,7 +481,6 @@
 
                 const client = SUPABASE.getClient();
                 
-                // 获取本月起止日期
                 const today = new Date();
                 const currentYear = today.getFullYear();
                 const currentMonth = today.getMonth();
@@ -490,38 +489,27 @@
                 
                 console.log('[StoreManager] 本月统计范围:', monthStart, '~', monthEnd);
 
-                // 查询所有订单
                 const { data: allOrders, error: orderError } = await client
                     .from('orders')
                     .select('id, store_id, status, loan_amount, created_at, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid');
                 
-                if (orderError) {
-                    console.error('[StoreManager] 查询订单失败:', orderError);
-                }
+                if (orderError) console.error('[StoreManager] 查询订单失败:', orderError);
 
-                // 查询所有支出
                 const { data: allExpenses, error: expenseError } = await client
                     .from('expenses')
                     .select('id, store_id, amount, expense_date');
                 
-                if (expenseError) {
-                    console.error('[StoreManager] 查询支出失败:', expenseError);
-                }
+                if (expenseError) console.error('[StoreManager] 查询支出失败:', expenseError);
 
-                // 查询偿还本金
                 const { data: returnCapitalData, error: returnError } = await client
                     .from('profit_distributions')
                     .select('store_id, amount')
                     .eq('type', 'return_capital');
                 
-                if (returnError) {
-                    console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
-                }
+                if (returnError) console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
 
-                // 获取现金流余额
                 const storeBalances = await StoreManager._getAllStoreCashFlowBalances();
 
-                // 构建统计数据
                 const storeStats = {};
                 for (const s of StoreManager.stores) {
                     storeStats[s.id] = {
@@ -534,7 +522,6 @@
                     };
                 }
 
-                // 统计订单数据
                 for (const o of (allOrders || [])) {
                     const sid = o.store_id;
                     if (!storeStats[sid]) continue;
@@ -561,7 +548,6 @@
                     }
                 }
 
-                // 统计本月管理费/服务费/利息
                 const allOrderIds = (allOrders || []).map(o => o.id);
                 
                 if (allOrderIds.length > 0) {
@@ -608,7 +594,6 @@
                     }
                 }
 
-                // 统计支出数据
                 for (const e of (allExpenses || [])) {
                     const sid = e.store_id;
                     if (!storeStats[sid]) continue;
@@ -619,14 +604,12 @@
                     }
                 }
 
-                // 统计偿还本金
                 for (const rc of (returnCapitalData || [])) {
                     const sid = rc.store_id;
                     if (!storeStats[sid]) continue;
                     storeStats[sid].returnCapital += (rc.amount || 0);
                 }
 
-                // 计算利润和可动用资金
                 for (const sid of Object.keys(storeStats)) {
                     const s = storeStats[sid];
                     s.monthProfit = s.monthAdminFee + s.monthServiceFee + s.monthInterest - s.monthExpense;
@@ -634,7 +617,6 @@
                     s.availableCapital = (storeBalances[sid]?.cashBalance || 0) + (storeBalances[sid]?.bankBalance || 0);
                 }
 
-                // 合计数据（仅正常门店）
                 const grandTotal = {
                     monthNewOrders: 0, activeOrders: 0, completedOrders: 0,
                     monthLoanAmount: 0, totalLoanAmount: 0,
@@ -648,7 +630,6 @@
                     returnCapital: 0
                 };
 
-                // 收集门店卡片数据（仅正常门店，排除练习门店）
                 const storeCards = [];
                 for (const store of StoreManager.stores) {
                     const isPractice = store.is_practice === true;
@@ -703,39 +684,57 @@
                         });
                     }
                 }
-                // 保存到全局供打印使用
                 window._storeCardsData = storeCards;
 
-                // ========== 生成卡片式财务汇总（屏幕显示） ==========
                 const fmt = (val) => Utils.formatCurrency(val);
-               let cardsHtml = '';
-    for (let i = 0; i < cards.length; i++) {
-        const s = cards[i];
-        cardsHtml += `
-<div style="border: 1px solid #000; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 9pt;">
-    <div style="font-weight: bold; font-size: 11pt; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #ccc; text-align: center;">
-        ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px; line-height: 1.5;">
-        <!-- 第一行：4个指标 -->
+                let cardsHtml = '<div class="store-cards-grid">';
+                for (const s of storeCards) {
+                    cardsHtml += `
+<div class="store-finance-card">
+    <div class="card-header">${Utils.escapeHtml(s.name)} <span style="font-size:0.8rem;">(${Utils.escapeHtml(s.code)})</span></div>
+    <div class="card-grid">
         <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
         <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
         <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
+
         <div><strong>🧾 管理费</strong><br>${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}</div>
-        <!-- 第二行：4个指标 -->
         <div><strong>🛠️ 服务费</strong><br>${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}</div>
         <div><strong>💸 利息</strong><br>${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}</div>
+
         <div><strong>📦 在押资金</strong><br>${fmt(s.deployedCapital)}</div>
         <div><strong>💵 可动用资金</strong><br>${fmt(s.availableCapital)}</div>
-        <!-- 第三行：4个指标 -->
         <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
+
         <div><strong>📉 本月支出</strong><br>${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}</div>
         <div><strong>📈 本月利润</strong><br>${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}</div>
         <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
     </div>
 </div>`;
+                }
+                cardsHtml += '</div>';
 
-                // ==================== 门店列表行（保持不变） ====================
+                const summaryHtml = `
+<div class="store-summary-card">
+    <div class="card-header">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</div>
+    <div class="card-grid summary">
+        <div><strong>📋 本月新增</strong><br>${grandTotal.monthNewOrders}</div>
+        <div><strong>🔄 进行中/已结清</strong><br>${grandTotal.activeOrders} / ${grandTotal.completedOrders}</div>
+        <div><strong>💰 本月当金</strong><br>${fmt(grandTotal.monthLoanAmount)}</div>
+
+        <div><strong>🧾 管理费</strong><br>${fmt(grandTotal.monthAdminFee)} / ${fmt(grandTotal.totalAdminFee)}</div>
+        <div><strong>🛠️ 服务费</strong><br>${fmt(grandTotal.monthServiceFee)} / ${fmt(grandTotal.totalServiceFee)}</div>
+        <div><strong>💸 利息</strong><br>${fmt(grandTotal.monthInterest)} / ${fmt(grandTotal.totalInterest)}</div>
+
+        <div><strong>📦 在押资金</strong><br>${fmt(grandTotal.deployedCapital)}</div>
+        <div><strong>💵 可动用资金</strong><br>${fmt(grandTotal.availableCapital)}</div>
+        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(grandTotal.cashBalance)} / ${fmt(grandTotal.bankBalance)}</div>
+
+        <div><strong>📉 本月支出</strong><br>${fmt(grandTotal.monthExpense)} / ${fmt(grandTotal.totalExpense)}</div>
+        <div><strong>📈 本月利润</strong><br>${fmt(grandTotal.monthProfit)} / ${fmt(grandTotal.totalProfit)}</div>
+        <div><strong>💳 偿还本金</strong><br>${fmt(grandTotal.returnCapital)}</div>
+    </div>
+</div>`;
+
                 let storeRows = '';
                 if (StoreManager.stores.length === 0) {
                     storeRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td>`;
@@ -801,7 +800,6 @@
                     }
                 }
 
-                // ==================== 构建完整页面 ====================
                 const content = `
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
@@ -897,65 +895,63 @@
             }
         },
 
-        // ==================== 打印门店财务汇总（卡片式，每页4张，无打印戳记，带页码） ====================
+        // ==================== 打印门店财务汇总（4列×3行，无打印戳记） ====================
         printStoreFinanceSummary() {
-    const lang = Utils.lang;
-    const cards = window._storeCardsData || [];
-    if (cards.length === 0) {
-        Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
-        return;
-    }
+            const lang = Utils.lang;
+            const cards = window._storeCardsData || [];
+            if (cards.length === 0) {
+                Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
+                return;
+            }
 
-    const isAdmin = PERMISSION.isAdmin();
-    let storeName = '', roleText = '', userName = '';
-    try {
-        storeName = AUTH.getCurrentStoreName();
-        roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
-                   AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
-                   (lang === 'id' ? 'Staf' : '员工');
-        userName = AUTH.user?.name || '-';
-    } catch (e) { /* ignore */ }
+            const isAdmin = PERMISSION.isAdmin();
+            let storeName = '', roleText = '', userName = '';
+            try {
+                storeName = AUTH.getCurrentStoreName();
+                roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                           AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                           (lang === 'id' ? 'Staf' : '员工');
+                userName = AUTH.user?.name || '-';
+            } catch (e) { /* ignore */ }
 
-    const printDateTime = new Date().toLocaleString();
-    const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-    const periodEnd = new Date().toISOString().split('T')[0];
+            const printDateTime = new Date().toLocaleString();
+            const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            const periodEnd = new Date().toISOString().split('T')[0];
 
-    const fmt = (val) => Utils.formatCurrency(val);
+            const fmt = (val) => Utils.formatCurrency(val);
 
-    let cardsHtml = '';
-    for (let i = 0; i < cards.length; i++) {
-        const s = cards[i];
-        cardsHtml += `
+            let cardsHtml = '';
+            for (let i = 0; i < cards.length; i++) {
+                const s = cards[i];
+                cardsHtml += `
 <div style="border: 1px solid #000; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 9pt;">
     <div style="font-weight: bold; font-size: 11pt; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #ccc; text-align: center;">
         ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
     </div>
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; line-height: 1.5;">
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px; line-height: 1.5;">
         <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
         <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
         <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
-
         <div><strong>🧾 管理费</strong><br>${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}</div>
+
         <div><strong>🛠️ 服务费</strong><br>${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}</div>
         <div><strong>💸 利息</strong><br>${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}</div>
-
         <div><strong>📦 在押资金</strong><br>${fmt(s.deployedCapital)}</div>
         <div><strong>💵 可动用资金</strong><br>${fmt(s.availableCapital)}</div>
-        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
 
+        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
         <div><strong>📉 本月支出</strong><br>${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}</div>
         <div><strong>📈 本月利润</strong><br>${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}</div>
         <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
     </div>
 </div>`;
-        // 每4张卡片分页（最后一张后不加分页）
-        if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
-            cardsHtml += '<div style="page-break-after: always; break-after: page;"></div>';
-        }
-    }
+                if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
+                    cardsHtml += '<div style="page-break-after: always; break-after: page;"></div>';
+                }
+            }
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -969,7 +965,6 @@
             margin: 0;
             padding: 0;
         }
-        /* 彻底移除所有浏览器默认打印戳记，不留任何页眉页脚 */
         @page {
             size: A4 portrait;
             margin: 12mm 10mm 12mm 10mm;
@@ -1000,7 +995,6 @@
             color: #475569;
             margin-top: 4px;
         }
-        /* 确保卡片内部不跨页 */
         .print-container > div {
             break-inside: avoid;
             page-break-inside: avoid;
@@ -1042,7 +1036,7 @@
             return await this.buildStoreManagementHTML();
         },
 
-        // 原有的 renderStoreManagement（兼容直接调用）
+        // 兼容直接调用
         async renderStoreManagement() {
             const contentHTML = await this.buildStoreManagementHTML();
             document.getElementById("app").innerHTML = contentHTML;
@@ -1053,7 +1047,6 @@
     JF.StoreManager = StoreManager;
     window.StoreManager = StoreManager;
 
-    // 向下兼容 APP 方法
     window.APP = window.APP || {};
     window.APP.addStore = async function () {
         const name = document.getElementById('newStoreName')?.value.trim();
@@ -1083,5 +1076,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 无打印戳记 + 页码）');
+    console.log('✅ JF.StoreManager v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 4列指标 + 无打印戳记）');
 })();
