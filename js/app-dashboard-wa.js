@@ -16,7 +16,7 @@
          */
         generateWAText(order, senderNumber) {
             const lang = Utils.lang;
-            const monthlyRate = order.agreed_interest_rate || 0.08;
+            const monthlyRate = order.agreed_interest_rate || 0.10;
             const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
             const currentMonthlyInterest = remainingPrincipal * monthlyRate;
             const dueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
