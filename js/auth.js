@@ -267,10 +267,20 @@
 
         async isAdminAsync()        { return (await SUPABASE.getCurrentProfile())?.role === 'admin'; },
         async isStoreManagerAsync() { return (await SUPABASE.getCurrentProfile())?.role === 'store_manager'; },
-        async isStaffAsync()        { return (await SUPABASE.getCurrentProfile())?.role === 'staff'; },
+        // 【修复 #6】补全 try/catch，防止网络异常时产生未捕获的 rejection
+        async isStaffAsync() {
+            try { return (await SUPABASE.getCurrentProfile())?.role === 'staff'; }
+            catch (e) { console.warn('[AUTH] isStaffAsync 失败:', e.message); return false; }
+        },
 
-        async getFreshRole()    { return (await SUPABASE.getCurrentProfile())?.role || null; },
-        async getFreshStoreId() { return (await SUPABASE.getCurrentProfile())?.store_id || null; },
+        async getFreshRole() {
+            try { return (await SUPABASE.getCurrentProfile())?.role || null; }
+            catch (e) { console.warn('[AUTH] getFreshRole 失败:', e.message); return null; }
+        },
+        async getFreshStoreId() {
+            try { return (await SUPABASE.getCurrentProfile())?.store_id || null; }
+            catch (e) { console.warn('[AUTH] getFreshStoreId 失败:', e.message); return null; }
+        },
 
         getCurrentStoreName() {
             if (this.user?.role === 'admin' && !this.user?.stores?.name && !this.user?.store_name) {
@@ -387,7 +397,10 @@
             await this.forceClearAuth();
         },
 
-        async getAllUsers() { return await SUPABASE.getAllUsers(); },
+        async getAllUsers() {
+            try { return await SUPABASE.getAllUsers(); }
+            catch (e) { console.warn('[AUTH] getAllUsers 失败:', e.message); return []; }
+        },
 
         // ==================== 用户管理 ====================
         async addUser(username, password, name, role, storeId) {

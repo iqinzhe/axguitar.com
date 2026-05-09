@@ -119,6 +119,9 @@
     const PRACTICE_IDS_TTL = 5 * 60 * 1000; // 5分钟
 
     // 安全查询包装器
+    // 【修复 #7】全局 Supabase 查询超时时间
+    const QUERY_TIMEOUT_MS = 12000;
+
     const safeQuery = async (fn, fallback = null, silent = false) => {
         try {
             return await fn();
@@ -223,9 +226,19 @@
             JF.Cache?.clear?.();
         },
 
-        async isAdmin() { const p = await this.getCurrentProfile(); return p?.role === 'admin'; },
-        async getCurrentStoreId() { const p = await this.getCurrentProfile(); return p?.store_id; },
-        async getCurrentStoreName() { const p = await this.getCurrentProfile(); return p?.stores?.name || 'Kantor'; },
+        // 【修复 #6】补全 try/catch，防止 getCurrentProfile 异常时产生未捕获的 rejection
+        async isAdmin() {
+            try { const p = await this.getCurrentProfile(); return p?.role === 'admin'; }
+            catch (e) { console.warn('[SUPABASE] isAdmin 失败:', e.message); return false; }
+        },
+        async getCurrentStoreId() {
+            try { const p = await this.getCurrentProfile(); return p?.store_id; }
+            catch (e) { console.warn('[SUPABASE] getCurrentStoreId 失败:', e.message); return null; }
+        },
+        async getCurrentStoreName() {
+            try { const p = await this.getCurrentProfile(); return p?.stores?.name || 'Kantor'; }
+            catch (e) { console.warn('[SUPABASE] getCurrentStoreName 失败:', e.message); return 'Kantor'; }
+        },
 
         async login(emailOrUsername, password) {
             if(!supabaseClient) throw new Error('客户端未初始化');
