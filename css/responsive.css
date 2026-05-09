@@ -693,6 +693,6 @@
         gap: var(--spacing-2);
     }
     .profit-cards-grid .card {
-        padding: 8px 6px;
+        padding: 3px 6px;
     }
 }
