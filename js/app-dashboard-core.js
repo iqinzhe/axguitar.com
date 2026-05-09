@@ -333,7 +333,7 @@
         },
 
         // ========== 逾期更新定时器 ==========
-_clearOverdueInterval() { if (_overdueInterval) { clearInterval(_overdueInterval); _overdueInterval = null; } },
+       _clearOverdueInterval() { if (_overdueInterval) { clearInterval(_overdueInterval); _overdueInterval = null; } },
 _startOverdueInterval() {
     this._clearOverdueInterval();
     if (!AUTH.isLoggedIn()) return;
