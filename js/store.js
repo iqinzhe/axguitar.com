@@ -966,15 +966,13 @@
             padding: 0;
         }
         @page {
-            size: A4 portrait;
-            margin: 12mm 10mm 12mm 10mm;
-            @top-center { content: none; }
-            @top-left { content: none; }
-            @top-right { content: none; }
-            @bottom-left { content: none; }
-            @bottom-right { content: none; }
-            @bottom-center { content: none; }
+           size: A4 portrait;
+           margin: 0;
         }
+        body {
+              padding: 12mm 10mm 12mm 10mm;
+        }
+        
         .print-container {
             margin: 0;
             padding: 0;
