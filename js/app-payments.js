@@ -616,5 +616,5 @@
         };
     }
 
-    console.log('✅ JF.PaymentPage v2.1 修复完成 (移除 loan_amount 篡改、少付告警、统一锁 key、幂等窗口2分钟)');
+    console.log('✅ JF.PaymentPage v2.0(移除 loan_amount 篡改、少付告警、统一锁 key、幂等窗口2分钟)');
 })();
