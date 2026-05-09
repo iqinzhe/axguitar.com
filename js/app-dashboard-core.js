@@ -1,5 +1,5 @@
 // app-dashboard-core.js - v2.0
-// 修复内容：Enter 键防重复触发 + 统一登录页 Enter 处理
+// Enter 键防重复触发 + 统一登录页 Enter 处理
 
 'use strict';
 
@@ -137,7 +137,7 @@
         currentCustomerId: null,
         _isInitialized: false,
         _popStateNavigation: false,
-        // 【修复 #18】添加防重复标志
+        // 添加防重复标志
         _enterProcessing: false,
 
         // ========== 清理残留遮罩层 ==========
@@ -160,13 +160,13 @@
 
         // ========== 全局键盘管理器 ==========
         _initGlobalKeyboard() {
-            // 【修复 #5】防止 init() 重复调用时监听器叠加注册
+            // 防止 init() 重复调用时监听器叠加注册
             if (this._keyboardInitialized) {
                 console.log('[Keyboard] 已初始化，跳过重复注册');
                 return;
             }
             this._keyboardInitialized = true;
-            // 【修复 #18】添加防重复标志
+            // 添加防重复标志
             this._enterProcessing = false;
             
             document.addEventListener('keydown', (e) => {
@@ -219,7 +219,7 @@
             }
         },
 
-        // 【修复 #18】增加防重复触发标志
+        // 增加防重复触发标志
         _handleGlobalEnter(e) {
             if (this._enterProcessing) return;
             
@@ -676,7 +676,7 @@ _startOverdueInterval() {
                 const storeId = profile?.store_id;
 
                 const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
-                // 【修复 #7】仪表盘数据加载整体超时保护（15秒）
+                // 仪表盘数据加载整体超时保护（15秒）
                 const _kpiFetchWithTimeout = (fetchFn, ms) => Promise.race([
                     fetchFn(),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('数据加载超时，请检查网络连接')), ms))
@@ -1285,7 +1285,7 @@ _startOverdueInterval() {
         },
 
         async init() {
-            // 【修复 #5】防止重复调用 init()
+            // 防止重复调用 init()
             if (this._isInitialized) {
                 console.warn('[DashboardCore] 已初始化，忽略重复调用');
                 return;
