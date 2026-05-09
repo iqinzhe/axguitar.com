@@ -828,7 +828,7 @@
                 const loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]'); 
                 if (loanCashRadio) loanCashRadio.checked = true;
                 const interestSelect = document.getElementById("agreedInterestRateSelect"); 
-                if (interestSelect) interestSelect.value = '8';
+                if (interestSelect) interestSelect.value = '10';
                 const flexibleRadio = document.getElementById("flexibleRadio"); 
                 if (flexibleRadio) { flexibleRadio.checked = true; APP.toggleRepaymentForm('flexible'); }
                 const pawnTermEl = document.getElementById('pawnTermSelect');
