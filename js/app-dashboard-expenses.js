@@ -157,7 +157,9 @@
                         <div class="form-grid form-grid--4">
                             <div class="form-group">
                                 <label>${lang === 'id' ? 'Tanggal' : '日期'} *</label>
-                                <input type="date" id="expenseDate" value="${todayDate}">
+                                <input type="date" id="expenseDate" value="${todayDate}"
+                                    ${!isAdmin ? `min="${new Date(Date.now() - 3*24*60*60*1000).toISOString().split('T')[0]}" max="${todayDate}"` : ''}>
+                                ${!isAdmin ? `<small style="color:var(--text-muted);font-size:11px;">⏰ ${lang === 'id' ? 'Maks. 3 hari ke belakang' : '最多可填3天前'}</small>` : ''}
                             </div>
                             <div class="form-group">
                                 <label>${lang === 'id' ? 'Jumlah' : '金额'} *</label>
@@ -178,8 +180,8 @@
                                 </select>
                             </div>
                             <div class="form-group full-width">
-                                <label>${lang === 'id' ? 'Deskripsi' : '描述'}</label>
-                                <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Catatan tambahan' : '备注'}"></textarea>
+                                <label>${lang === 'id' ? 'Deskripsi' : '描述'} * <small style="color:var(--text-muted);font-weight:normal;">${lang === 'id' ? '(wajib diisi)' : '(必填)'}</small></label>
+                                <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Wajib: jelaskan tujuan pengeluaran ini' : '必填：请说明本次支出的具体用途'}"></textarea>
                             </div>
                             <div class="form-actions">
                                 <button onclick="APP.addExpense()" id="addExpenseBtn" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
@@ -228,6 +230,33 @@
             if (isNaN(amount) || amount <= 0) {
                 Utils.toast.warning(lang === 'id' ? 'Masukkan jumlah yang valid' : '请输入有效金额');
                 return;
+            }
+
+            // 【v2.7 新增】描述必填校验（所有角色）
+            if (!description || !description.trim()) {
+                Utils.toast.warning(lang === 'id' ? '⚠️ Deskripsi wajib diisi! Jelaskan tujuan pengeluaran ini.' : '⚠️ 描述为必填项！请说明本次支出的具体用途。', 4000);
+                document.getElementById('expenseDescription')?.focus();
+                return;
+            }
+            if (description.trim().length < 4) {
+                Utils.toast.warning(lang === 'id' ? '⚠️ Deskripsi terlalu singkat, minimal 4 karakter.' : '⚠️ 描述内容太短，请至少填写4个字。', 4000);
+                document.getElementById('expenseDescription')?.focus();
+                return;
+            }
+
+            // 【v2.7 新增】时间锁校验（仅非管理员，最多允许填3天前）
+            const profileForDateCheck = await SUPABASE.getCurrentProfile();
+            if (profileForDateCheck?.role !== 'admin') {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const minAllowed = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                if (expenseDate > todayStr) {
+                    Utils.toast.warning(lang === 'id' ? '⚠️ Tanggal tidak boleh lebih dari hari ini.' : '⚠️ 日期不能超过今天。', 4000);
+                    return;
+                }
+                if (expenseDate < minAllowed) {
+                    Utils.toast.warning(lang === 'id' ? '⚠️ Tanggal terlalu lama! Hanya boleh 3 hari ke belakang. Hubungi admin untuk koreksi.' : '⚠️ 日期超出范围！门店只能填写3天内的支出，如需更早日期请联系管理员。', 5000);
+                    return;
+                }
             }
 
             // 【v2.5 新增】员工支出金额上限检查
