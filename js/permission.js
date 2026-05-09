@@ -95,7 +95,7 @@
         },
 
         can(action) {
-            // 【修复 #26】同步检查时增加控制台提示（仅开发环境）
+            // 同步检查时增加控制台提示（仅开发环境）
             if (AUTH.user?.role === 'staff' && (action === 'expense_add' || action === 'internal_transfer')) {
                 console.debug('[Permission] 同步权限检查:', action, '结果:', this._checkByRole(AUTH.user?.role, action));
             }
@@ -139,7 +139,7 @@
             }
         },
 
-        // ==================== 【修复 #26】支出金额阈值检查（同步版本，带警告） ====================
+        // ====================  支出金额阈值检查（同步版本，带警告） ====================
         canAddExpenseAmount(amount) {
             if (this.isAdmin() || this.isStoreManager()) return true;
             if (this.isStaff()) {
@@ -153,7 +153,7 @@
         },
 
         /**
-         * 【修复 #26】异步版本支出金额检查（从数据库获取最新角色）
+         * 异步版本支出金额检查（从数据库获取最新角色）
          * @param {number} amount - 支出金额
          * @returns {Promise<boolean>} true: 未超限或用户非员工；false: 超过上限
          */
