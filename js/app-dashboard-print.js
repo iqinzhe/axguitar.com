@@ -455,5 +455,5 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.4 订单列表打印优化（完整订单列表，移除操作行）');
+    console.log('✅ JF.PrintPage v2.0 订单列表打印优化（完整订单列表，移除操作行）');
 })();
