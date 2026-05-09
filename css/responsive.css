@@ -754,26 +754,97 @@
 }
 
 /* ============================================================
-   七、门店财务汇总屏幕显示样式 - 强制双列
+   七、门店财务汇总屏幕显示样式（从 store.js 内联样式迁移，无冲突）
    ============================================================ */
-/* 屏幕显示时，卡片容器强制双列（因为 store.js 中使用 inline-grid 双列） */
-@media screen and (min-width: 769px) {
+
+/* ---------- 基础卡片容器 ---------- */
+.store-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);   /* 桌面端默认双列，移动端由下方媒体查询覆盖 */
+    gap: 16px;
+    margin-bottom: 24px;                      /* 原内联样式间距 */
+}
+
+/* ---------- 财务卡片 & 汇总卡片 ---------- */
+.store-finance-card,
+.store-summary-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s;
+    break-inside: avoid;                      /* 打印时避免卡片内部分页 */
+}
+
+.store-finance-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.store-summary-card {
+    background: #f8fafc;
+    border-width: 2px;
+}
+
+/* ---------- 卡片标题 ---------- */
+.store-finance-card .card-header,
+.store-summary-card .card-header {
+    font-weight: bold;
+    font-size: 1.1rem;
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: center;
+}
+
+/* ---------- 卡片内部指标网格 ---------- */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 12px;
+    font-size: 0.85rem;
+}
+
+.card-grid.summary {
+    font-weight: 500;
+}
+
+.card-grid div {
+    line-height: 1.3;
+}
+
+/* 汇总卡片与前面卡片的间距（保持原有规则） */
+.card > .store-cards-grid + .store-summary-card {
+    margin-top: 16px;
+}
+
+/* ---------- 移动端适配（≤768px） ---------- */
+@media (max-width: 768px) {
+    /* 单列卡片 */
     .store-cards-grid {
-        display: grid !important;
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 16px !important;
+        grid-template-columns: 1fr;
     }
     
-    /* 汇总卡片也参与双列布局 */
-    .card > .store-cards-grid + .store-summary-card {
-        margin-top: 16px;
+    /* 内部网格微调 */
+    .card-grid {
+        font-size: 0.8rem;
+        gap: 6px 10px;
     }
 }
 
-/* 移动端屏幕显示时单列 */
-@media screen and (max-width: 768px) {
+/* ---------- 浏览器直接打印时的简化样式 ---------- */
+@media print {
     .store-cards-grid {
-        grid-template-columns: 1fr !important;
-        gap: 12px !important;
+        display: block;
+    }
+    .store-finance-card,
+    .store-summary-card {
+        border: 1px solid #000;
+        margin-bottom: 12px;
+        page-break-inside: avoid;
+        padding: 8px;
+    }
+    .card-grid {
+        font-size: 8pt;
     }
 }
