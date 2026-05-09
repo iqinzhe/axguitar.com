@@ -286,7 +286,7 @@
                 }
             }
 
-            // 【修复 #1】cash_flow 恢复时增加去重保护
+            // cash_flow 恢复时增加去重保护
             if (backupData.cash_flows?.length > 0) {
                 for (const flow of backupData.cash_flows) {
                     let isDuplicate = false;
@@ -804,5 +804,5 @@
     JF.BackupStorage = BackupStorage;
     window.BackupStorage = BackupStorage;
 
-    console.log('✅ JF.BackupStorage v2.2 修复版（备份恢复 cash_flow 增加去重保护）');
+    console.log('✅ JF.BackupStorage v2.0（备份恢复 cash_flow 增加去重保护）');
 })();
