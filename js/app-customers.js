@@ -946,7 +946,7 @@
             }
         },
 
-        // ==================== 服务费提示更新（支持0%-12%） ====================
+        // ==================== 服务费提示更新（支持0%-10%） ====================
         _updateServiceFeeHint(amount, percent) {
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
@@ -955,7 +955,7 @@
             if (amount <= 0) {
                 hint.innerHTML = lang === 'id'
                     ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
-                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高10%封顶`;
             } else {
                 const feeResult = Utils.calculateServiceFee(amount, percent);
                 let allHints = lang === 'id'
