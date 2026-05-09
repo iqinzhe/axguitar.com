@@ -639,3 +639,15 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes dots { 0%,20%{content:""}40%{content:"."}60%{content:".."}80%,100%{content:"..."} }
 }
+
+/* ============================================================
+   门店管理卡片样式（屏幕显示强制双列）
+   ============================================================ */
+/* 覆盖 store.js 中的 auto-fill 为固定双列 */
+@media (min-width: 769px) {
+    .store-cards-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 16px !important;
+    }
+}
