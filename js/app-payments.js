@@ -156,7 +156,7 @@
                 const loanAmount = order.loan_amount || 0;
                 const principalPaid = order.principal_paid || 0;
                 const remainingPrincipal = loanAmount - principalPaid;
-                const monthlyRate = order.agreed_interest_rate || 0.08;
+                const monthlyRate = order.agreed_interest_rate || 0.10;
                 const currentMonthlyInterest = remainingPrincipal * monthlyRate;
 
                 const interestPayments = payments.filter(p => p.type === 'interest' && !p.is_voided).sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -285,7 +285,7 @@
                             <div class="summary-item"><span class="label">💎 ${t('collateral_name')}:</span><span class="value">${Utils.escapeHtml(order.collateral_name || '-')}</span></div>
                             <div class="summary-item"><span class="label">💰 ${t('service_fee')}:</span><span class="value">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)</span></div>
                             <div class="summary-item"><span class="label">📋 ${t('admin_fee')}:</span><span class="value">${Utils.formatCurrency(order.admin_fee)}</span></div>
-                            <div class="summary-item"><span class="label">📈 ${t('agreed_rate')}:</span><span class="value">${((order.agreed_interest_rate || 0.08)*100).toFixed(0)}%</span></div>
+                            <div class="summary-item"><span class="label">📈 ${t('agreed_rate')}:</span><span class="value">${((order.agreed_interest_rate || 0.10)*100).toFixed(0)}%</span></div>
                             <div class="summary-item"><span class="label">✅ ${t('admin_fee')}:</span><span class="value income">${adminFeePaidInfo}</span></div>
                             <div class="summary-item"><span class="label">✅ ${t('service_fee')}:</span><span class="value income">${serviceFeePaidInfo}</span></div>
                         </div>
