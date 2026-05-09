@@ -1,4 +1,4 @@
-// store.js - v2.0 卡片式财务汇总（屏幕 + 打印每页4张，行高饱满）
+// store.js - v2.7 卡片式财务汇总（屏幕双列 + 打印每页4张 + 无打印戳记 + 页码）
 
 'use strict';
 
@@ -783,7 +783,7 @@
                             <td>${Utils.escapeHtml(store.phone || '-')}</td>
                             <td><input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" onchange="StoreManager.updateStoreWANumber('${store.id}', this.value)"></td>
                             <td class="text-center">${statusBadgeHtml}</td>
-                        </tr>`;
+                         </tr>`;
 
                         const isPractice = store.is_practice === true;
                         const isStore004 = (store.code === 'STORE_004');
@@ -819,7 +819,7 @@
                         storeRows += `<tr class="action-row"${practiceRowStyle2}>
                             <td class="action-label">${t('action')}</td>
                             <td colspan="5"><div class="action-buttons">${actionButtons}</div></td>
-                        </tr>`;
+                         </tr>`;
                     }
                 }
 
@@ -898,7 +898,7 @@
                     <style>
                         .store-cards-grid {
                             display: grid;
-                            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+                            grid-template-columns: repeat(2, 1fr);
                             gap: 16px;
                             margin-bottom: 24px;
                         }
@@ -965,7 +965,19 @@
                             }
                             @page {
                                 size: A4 portrait;
-                                margin: 8mm;
+                                margin: 12mm 10mm 12mm 10mm;
+                                @top-center { content: none; }
+                                @top-left { content: none; }
+                                @top-right { content: none; }
+                                @bottom-left { content: none; }
+                                @bottom-right { content: none; }
+                                @bottom-center {
+                                    content: "JF! by Gadai --- 典当管理系统 --- " counter(page) "/" counter(pages);
+                                    font-size: 8pt;
+                                    font-family: 'Segoe UI', Arial, sans-serif;
+                                    font-weight: normal;
+                                    color: #666;
+                                }
                             }
                         }
                     </style>`;
@@ -994,7 +1006,7 @@
             }
         },
 
-        // ==================== 打印门店财务汇总（卡片式，每页4张，行高饱满） ====================
+        // ==================== 打印门店财务汇总（卡片式，每页4张，无打印戳记，带页码） ====================
         printStoreFinanceSummary() {
             const lang = Utils.lang;
             const cards = window._storeCardsData || [];
@@ -1018,6 +1030,8 @@
             const periodEnd = new Date().toISOString().split('T')[0];
 
             const fmt = (val) => Utils.formatCurrency(val);
+            const totalCards = cards.length;
+            const totalPages = Math.ceil(totalCards / 4);
 
             let cardsHtml = '';
             for (let i = 0; i < cards.length; i++) {
@@ -1047,7 +1061,7 @@
 </div>`;
                 // 每4张卡片分页（最后一张后不加分页）
                 if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
-                    cardsHtml += '<div style="page-break-after: always; height: 0;"></div>';
+                    cardsHtml += '<div style="page-break-after: always; break-after: page;"></div>';
                 }
             }
 
@@ -1064,14 +1078,40 @@
             font-family: 'Segoe UI', 'Courier New', monospace;
             background: #fff;
             margin: 0;
-            padding: 10mm 8mm 8mm 8mm;
+            padding: 0;
         }
+        /* 关键：移除浏览器默认打印戳记，添加自定义页码 */
         @page {
             size: A4 portrait;
-            margin: 12mm 10mm 10mm 10mm;
+            margin: 12mm 10mm 12mm 10mm;
+            /* 移除所有默认页眉页脚 - 这是移除打印戳记的关键 */
+            @top-center {
+                content: none;
+            }
+            @top-left {
+                content: none;
+            }
+            @top-right {
+                content: none;
+            }
+            @bottom-left {
+                content: none;
+            }
+            @bottom-right {
+                content: none;
+            }
+            /* 添加自定义页码 - 一行显示 */
+            @bottom-center {
+                content: "JF! by Gadai --- 典当管理系统 --- " counter(page) "/" counter(pages);
+                font-size: 8pt;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-weight: normal;
+                color: #666;
+            }
         }
-        @media print {
-            body { margin: 0; padding: 0; }
+        .print-container {
+            margin: 0;
+            padding: 0;
         }
         .print-header {
             text-align: center;
@@ -1089,17 +1129,15 @@
             color: #475569;
             margin-top: 4px;
         }
-        .print-footer {
-            text-align: center;
-            font-size: 7pt;
-            color: #94a3b8;
-            margin-top: 20px;
-            padding-top: 6px;
-            border-top: 1px solid #e2e8f0;
-        }
         /* 确保每个卡片内部不跨页 */
         .print-container > div {
             break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        /* 分页标记 */
+        .page-break {
+            page-break-after: always;
+            break-after: page;
         }
     </style>
 </head>
@@ -1114,17 +1152,14 @@
             </div>
             <div class="print-header-info" style="font-size:8pt;">
                 📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
+                &nbsp;|&nbsp; 📄 ${lang === 'id' ? 'Halaman' : '第'} 1 / ${totalPages} ${lang === 'id' ? 'halaman' : '页'}
             </div>
         </div>
         ${cardsHtml}
-        <div class="print-footer">
-            JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
-        </div>
     </div>
     <script>
         window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
+            setTimeout(function() { window.print(); }, 100);
         };
     <\/script>
 </body>
@@ -1179,5 +1214,5 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.6 卡片式财务汇总（屏幕 + 打印每页4张，行高饱满）');
+    console.log('✅ JF.StoreManager v2.7 卡片式财务汇总（屏幕双列 + 打印每页4张 + 无打印戳记 + 页码）');
 })();
