@@ -1080,5 +1080,5 @@
         Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = window.JF.FeeConfig.DEFAULT_INTEREST_RATE_PERCENT;
     }
 
-    console.log('✅ Utils v2.5.1 修复完成 (利息少付计算修正、累计少付显示助手)');
+    console.log('✅ Utils v2.0 (利息少付计算修正、累计少付显示助手)');
 })();
