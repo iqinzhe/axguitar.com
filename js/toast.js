@@ -332,5 +332,5 @@
     addAnimations();
     initContainer();
 
-    console.log('✅ Toast v2.2 精简完成');
+    console.log('✅ Toast v2.0完成');
 })();
