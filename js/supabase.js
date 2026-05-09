@@ -113,19 +113,19 @@
     const STORES_TTL = 3600000; // 1小时
     const USERS_TTL = 3600000;   // 1小时
     
-    // 【修复 #4】缓存 practiceIds
+    // 缓存 practiceIds
     let _practiceStoreIdsCache = null;
     let _practiceStoreIdsCacheTime = 0;
     const PRACTICE_IDS_TTL = 5 * 60 * 1000; // 5分钟
 
-    // 安全查询包装器【修复 #20】
+    // 安全查询包装器
     const safeQuery = async (fn, fallback = null, silent = false) => {
         try {
             return await fn();
         } catch(error) {
             if(!silent) console.warn('[Supabase]', error.message || error);
             if(error.status===401 || (error.message && (error.message.includes('JWT')||error.message.includes('session')))){
-                // 【修复 #20】增加 DashboardCore 存在性检查
+                // 增加 DashboardCore 存在性检查
                 if (JF.DashboardCore && typeof JF.DashboardCore.logout === 'function') {
                     setTimeout(() => JF.DashboardCore.logout(), 1000);
                 } else {
@@ -369,7 +369,7 @@
             return prefix + Date.now().toString().slice(-6) + String(Math.floor(Math.random()*100)).padStart(2,'0');
         },
 
-        /* 【修复 #4】缓存 practiceIds */
+        /* 缓存 practiceIds */
         async _getPracticeStoreIds(forceRefresh = false) {
             const now = Date.now();
             if (!forceRefresh && _practiceStoreIdsCache && (now - _practiceStoreIdsCacheTime) < PRACTICE_IDS_TTL) {
@@ -641,12 +641,12 @@
             return true;
         },
 
-        /* 【修复 #13 + #3】员工支出金额后端验证 + 管理员门店逻辑优化 */
+        /* 员工支出金额后端验证 + 管理员门店逻辑优化 */
         async addExpense(expenseData) {
             if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             
-            // 【修复 #13】员工支出金额后端验证
+            // 员工支出金额后端验证
             if (profile?.role === 'staff') {
                 const maxAmount = window.PERMISSION?.STAFF_EXPENSE_MAX_AMOUNT || 5000000;
                 if (expenseData.amount > maxAmount) {
@@ -658,7 +658,7 @@
             
             let targetStoreId = expenseData.store_id || profile?.store_id;
             
-            // 【修复 #3】管理员无门店时查找 STORE_000，若不存在则提示创建
+            // 管理员无门店时查找 STORE_000，若不存在则提示创建
             if (profile?.role === 'admin' && !targetStoreId) {
                 const stores = await this.getAllStores();
                 const hqStore = stores.find(s => s.code === 'STORE_000');
@@ -1119,7 +1119,7 @@
             return true;
         },
 
-        /* 【修复 #2】统一利息少付逻辑 - 确保前后端一致 */
+        /* 统一利息少付逻辑 - 确保前后端一致 */
         async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
@@ -1133,7 +1133,7 @@
                 let paidAmount = (actualPaid!==null && !isNaN(actualPaid) && actualPaid>0) ? actualPaid : theoreticalInterest;
                 let interestToRecord = paidAmount, principalAdjustment=0, shortfallToTrack=0;
                 
-                /* 【修复 #2】统一少付/超额处理逻辑 */
+                /* 统一少付/超额处理逻辑 */
                 if(paidAmount >= theoreticalInterest){
                     interestToRecord = theoreticalInterest;
                     principalAdjustment = paidAmount - theoreticalInterest;
@@ -1360,7 +1360,7 @@
             return true;
         },
 
-        /* 【修复 #11】updateOverdueDays 失败时写入审计日志 */
+        /* updateOverdueDays 失败时写入审计日志 */
         async updateOverdueDays() {
             if(!supabaseClient) return false;
             const { data: activeOrders, error } = await supabaseClient
@@ -1412,7 +1412,7 @@
             const failed = results.filter(r => r.status === 'rejected');
             if (failed.length > 0) {
                 console.error(`[updateOverdueDays] ${failed.length} 个更新失败:`, failed.map(f => f.reason?.message || 'unknown'));
-                /* 【修复 #11】写入审计日志 */
+                /* 写入审计日志 */
                 if (window.Audit) {
                     await window.Audit.log('overdue_update_failed', JSON.stringify({
                         failed_count: failed.length,
@@ -1458,13 +1458,13 @@
             return true;
         },
 
-        /* 【修复 #1】deleteOrder 完整清理现金流 */
+        /* deleteOrder 完整清理现金流 */
         async deleteOrder(orderId) {
             const profile = await this.getCurrentProfile();
             if(profile?.role!=='admin') throw new Error(Utils.lang==='id'?'Hanya admin yang dapat menghapus pesanan':'需管理员权限');
             const order = await this.getOrder(orderId);
             
-            // 【修复 #1】清理 order_id 关联的现金流
+            // 清理 order_id 关联的现金流
             const { error: voidErr1 } = await supabaseClient.from('cash_flow_records')
                 .update({ is_voided:true, voided_at:nowStr(), voided_by:profile.id })
                 .eq('order_id', order.id);
@@ -1472,7 +1472,7 @@
                 await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
             }
             
-            // 【修复 #1】清理 reference_id 关联的现金流（重要补充）
+            // 清理 reference_id 关联的现金流（重要补充）
             const { error: voidErr2 } = await supabaseClient.from('cash_flow_records')
                 .update({ is_voided:true, voided_at:nowStr(), voided_by:profile.id })
                 .eq('reference_id', order.order_id);
@@ -1822,7 +1822,7 @@
             });
         },
 
-        /* 【修复 #5】RPC 调用前检查函数是否存在 */
+        /* RPC 调用前检查函数是否存在 */
         async ensureInterestShortfallColumn() {
             try {
                 const session = await this.getSession();
@@ -1840,7 +1840,7 @@
                     if (error.message && error.message.includes('column "interest_shortfall" does not exist')) {
                         console.log('[Supabase] interest_shortfall 列不存在，尝试添加...');
                         try {
-                            /* 【修复 #5】先检查 RPC 函数是否存在 */
+                            /* 先检查 RPC 函数是否存在 */
                             let rpcExists = false;
                             try {
                                 const { data: funcCheck } = await supabaseClient.rpc('check_function_exists', { 
@@ -1889,5 +1889,5 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
-    console.log('✅ JF.Supabase v2.6 完整修复版 (7个问题全部修复)');
+    console.log('✅ JF.Supabase v2.0');
 })();
