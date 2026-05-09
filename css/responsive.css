@@ -870,7 +870,7 @@
     }
     .card-grid {
         font-size: 8pt;
-        gap: 8px 6px;  /* 行间距 列间距 */
+        gap: 12px 6px;  /* 行间距 列间距 */
     }
     .store-finance-card .card-grid div,
     .store-summary-card .card-grid div {
