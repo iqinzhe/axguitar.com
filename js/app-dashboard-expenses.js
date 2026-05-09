@@ -54,9 +54,10 @@
                             } else {
                                 actionHtml += `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span> `;
                             }
-                            if (!e.is_reconciled) {
-                                actionHtml += `<button onclick="APP.balanceExpenses()" class="btn btn--warning btn--sm">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
-                            }
+                            // 平账按钮已隐藏（保留功能，暂不对外显示）
+                            // if (!e.is_reconciled) {
+                            //     actionHtml += `<button onclick="APP.balanceExpenses()" class="btn btn--warning btn--sm">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
+                            // }
                         } else {
                             actionHtml += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
                         }
