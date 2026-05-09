@@ -921,35 +921,33 @@
 
         // ==================== 打印门店财务汇总（卡片式，每页4张，无打印戳记，带页码） ====================
         printStoreFinanceSummary() {
-            const lang = Utils.lang;
-            const cards = window._storeCardsData || [];
-            if (cards.length === 0) {
-                Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
-                return;
-            }
+    const lang = Utils.lang;
+    const cards = window._storeCardsData || [];
+    if (cards.length === 0) {
+        Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
+        return;
+    }
 
-            const isAdmin = PERMISSION.isAdmin();
-            let storeName = '', roleText = '', userName = '';
-            try {
-                storeName = AUTH.getCurrentStoreName();
-                roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
-                           AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
-                           (lang === 'id' ? 'Staf' : '员工');
-                userName = AUTH.user?.name || '-';
-            } catch (e) { /* ignore */ }
+    const isAdmin = PERMISSION.isAdmin();
+    let storeName = '', roleText = '', userName = '';
+    try {
+        storeName = AUTH.getCurrentStoreName();
+        roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                   AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                   (lang === 'id' ? 'Staf' : '员工');
+        userName = AUTH.user?.name || '-';
+    } catch (e) { /* ignore */ }
 
-            const printDateTime = new Date().toLocaleString();
-            const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const periodEnd = new Date().toISOString().split('T')[0];
+    const printDateTime = new Date().toLocaleString();
+    const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const periodEnd = new Date().toISOString().split('T')[0];
 
-            const fmt = (val) => Utils.formatCurrency(val);
-            const totalCards = cards.length;
-            const totalPages = Math.ceil(totalCards / 4);
+    const fmt = (val) => Utils.formatCurrency(val);
 
-            let cardsHtml = '';
-            for (let i = 0; i < cards.length; i++) {
-                const s = cards[i];
-                cardsHtml += `
+    let cardsHtml = '';
+    for (let i = 0; i < cards.length; i++) {
+        const s = cards[i];
+        cardsHtml += `
 <div style="border: 1px solid #000; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 9pt;">
     <div style="font-weight: bold; font-size: 11pt; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #ccc; text-align: center;">
         ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
@@ -972,14 +970,14 @@
         <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
     </div>
 </div>`;
-                // 每4张卡片分页（最后一张后不加分页）
-                if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
-                    cardsHtml += '<div style="page-break-after: always; break-after: page;"></div>';
-                }
-            }
+        // 每4张卡片分页（最后一张后不加分页）
+        if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
+            cardsHtml += '<div style="page-break-after: always; break-after: page;"></div>';
+        }
+    }
 
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -993,34 +991,16 @@
             margin: 0;
             padding: 0;
         }
-        /* 关键：移除浏览器默认打印戳记，添加自定义页码 */
+        /* 彻底移除所有浏览器默认打印戳记，不留任何页眉页脚 */
         @page {
             size: A4 portrait;
             margin: 12mm 10mm 12mm 10mm;
-            /* 移除所有默认页眉页脚 - 这是移除打印戳记的关键 */
-            @top-center {
-                content: none;
-            }
-            @top-left {
-                content: none;
-            }
-            @top-right {
-                content: none;
-            }
-            @bottom-left {
-                content: none;
-            }
-            @bottom-right {
-                content: none;
-            }
-            /* 添加自定义页码 - 一行显示 */
-            @bottom-center {
-                content: "JF! by Gadai --- 典当管理系统 --- " counter(page) "/" counter(pages);
-                font-size: 8pt;
-                font-family: 'Segoe UI', Arial, sans-serif;
-                font-weight: normal;
-                color: #666;
-            }
+            @top-center { content: none; }
+            @top-left { content: none; }
+            @top-right { content: none; }
+            @bottom-left { content: none; }
+            @bottom-right { content: none; }
+            @bottom-center { content: none; }
         }
         .print-container {
             margin: 0;
@@ -1042,12 +1022,11 @@
             color: #475569;
             margin-top: 4px;
         }
-        /* 确保每个卡片内部不跨页 */
+        /* 确保卡片内部不跨页 */
         .print-container > div {
             break-inside: avoid;
             page-break-inside: avoid;
         }
-        /* 分页标记 */
         .page-break {
             page-break-after: always;
             break-after: page;
@@ -1065,7 +1044,6 @@
             </div>
             <div class="print-header-info" style="font-size:8pt;">
                 📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
-                &nbsp;|&nbsp; 📄 ${lang === 'id' ? 'Halaman' : '第'} 1 / ${totalPages} ${lang === 'id' ? 'halaman' : '页'}
             </div>
         </div>
         ${cardsHtml}
@@ -1077,9 +1055,9 @@
     <\/script>
 </body>
 </html>
-            `);
-            printWindow.document.close();
-        },
+    `);
+    printWindow.document.close();
+},
 
         // 供外壳调用的渲染函数
         async renderStoreManagementHTML() {
