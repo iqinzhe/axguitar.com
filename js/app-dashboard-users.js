@@ -348,5 +348,5 @@
         };
     }
 
-    console.log('✅ JF.UsersPage v2.1 重构完成（类名统一）');
+    console.log('✅ JF.UsersPage v2.0（类名统一）');
 })();
