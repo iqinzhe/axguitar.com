@@ -877,5 +877,5 @@
         };
     }
 
-    console.log('✅ JF.CapitalModule v2.3 修复版（门店选择状态持久化）');
+    console.log('✅ JF.CapitalModule v2.0（门店选择状态持久化）');
 })();
