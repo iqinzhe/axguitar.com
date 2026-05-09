@@ -1,4 +1,4 @@
-// store.js - v2.7 卡片式财务汇总（屏幕双列 + 打印每页4张 + 无打印戳记 + 页码）
+// store.js - v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 无打印戳记 + 页码）
 
 'use strict';
 
@@ -1006,42 +1006,41 @@
             }
         },
 
-        // ==================== 打印门店财务汇总（卡片式，每页4张，无打印戳记，带页码） ====================
-        printStoreFinanceSummary() {
-            const lang = Utils.lang;
-            const cards = window._storeCardsData || [];
-            if (cards.length === 0) {
-                Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
-                return;
-            }
+// ==================== 打印门店财务汇总（每页3个卡片，每页都有页眉，底部紧凑） ====================
+printStoreFinanceSummary() {
+    const lang = Utils.lang;
+    const cards = window._storeCardsData || [];
+    if (cards.length === 0) {
+        Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
+        return;
+    }
 
-            const isAdmin = PERMISSION.isAdmin();
-            let storeName = '', roleText = '', userName = '';
-            try {
-                storeName = AUTH.getCurrentStoreName();
-                roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
-                           AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
-                           (lang === 'id' ? 'Staf' : '员工');
-                userName = AUTH.user?.name || '-';
-            } catch (e) { /* ignore */ }
+    const isAdmin = PERMISSION.isAdmin();
+    let storeName = '', roleText = '', userName = '';
+    try {
+        storeName = AUTH.getCurrentStoreName();
+        roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                   AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                   (lang === 'id' ? 'Staf' : '员工');
+        userName = AUTH.user?.name || '-';
+    } catch (e) { /* ignore */ }
 
-            const printDateTime = new Date().toLocaleString();
-            const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const periodEnd = new Date().toISOString().split('T')[0];
+    const printDateTime = new Date().toLocaleString();
+    const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const periodEnd = new Date().toISOString().split('T')[0];
 
-            const fmt = (val) => Utils.formatCurrency(val);
-            const totalCards = cards.length;
-            const totalPages = Math.ceil(totalCards / 4);
+    const fmt = (val) => Utils.formatCurrency(val);
+    const totalCards = cards.length;
+    const cardsPerPage = 3;  // 每页3个卡片，确保A4纸能容纳
+    const totalPages = Math.ceil(totalCards / cardsPerPage);
 
-            let cardsHtml = '';
-            for (let i = 0; i < cards.length; i++) {
-                const s = cards[i];
-                cardsHtml += `
-<div style="border: 1px solid #000; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 9pt;">
-    <div style="font-weight: bold; font-size: 11pt; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #ccc; text-align: center;">
-        ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; line-height: 1.5;">
+    let cardsHtml = '';
+    for (let i = 0; i < cards.length; i++) {
+        const s = cards[i];
+        cardsHtml += `
+<div class="print-card">
+    <div class="print-card-title">${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})</div>
+    <div class="print-card-grid">
         <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
         <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
         <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
@@ -1059,32 +1058,53 @@
         <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
     </div>
 </div>`;
-                // 每4张卡片分页（最后一张后不加分页）
-                if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
-                    cardsHtml += '<div style="page-break-after: always; break-after: page;"></div>';
-                }
-            }
+        // 每3个卡片后分页（最后一张后不加分页）
+        if ((i + 1) % cardsPerPage === 0 && i !== cards.length - 1) {
+            cardsHtml += '<div class="page-break"></div>';
+        }
+    }
 
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>JF! by Gadai - ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: 'Segoe UI', 'Courier New', monospace;
             background: #fff;
             margin: 0;
             padding: 0;
         }
-        /* 关键：移除浏览器默认打印戳记，添加自定义页码 */
+        /* 固定页眉 - 每页重复 */
+        .print-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            text-align: center;
+            padding: 6px 0 8px 0;
+            border-bottom: 2px solid #1e293b;
+            z-index: 1000;
+        }
+        /* 为固定页眉预留空间 */
+        .print-container {
+            margin-top: 72px;
+            padding: 0 8px;
+        }
+        /* 打印页面设置 */
         @page {
             size: A4 portrait;
-            margin: 12mm 10mm 12mm 10mm;
-            /* 移除所有默认页眉页脚 - 这是移除打印戳记的关键 */
+            margin: 15mm 12mm 10mm 12mm;
+            /* 移除所有默认页眉页脚（打印戳记） */
             @top-center {
                 content: none;
             }
@@ -1100,73 +1120,91 @@
             @bottom-right {
                 content: none;
             }
-            /* 添加自定义页码 - 一行显示 */
+            /* 自定义页脚页码 */
             @bottom-center {
                 content: "JF! by Gadai --- 典当管理系统 --- " counter(page) "/" counter(pages);
                 font-size: 8pt;
                 font-family: 'Segoe UI', Arial, sans-serif;
                 font-weight: normal;
-                color: #666;
+                color: #555;
             }
         }
-        .print-container {
-            margin: 0;
-            padding: 0;
-        }
-        .print-header {
-            text-align: center;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #1e293b;
-        }
+        /* 页眉内部样式 */
         .print-header .logo {
-            font-size: 14pt;
+            font-size: 13pt;
             font-weight: bold;
             color: #0e7490;
         }
         .print-header-info {
-            font-size: 9pt;
+            font-size: 8pt;
             color: #475569;
-            margin-top: 4px;
+            margin-top: 3px;
         }
-        /* 确保每个卡片内部不跨页 */
-        .print-container > div {
+        /* 卡片样式 - 紧凑且不跨页 */
+        .print-card {
+            border: 1px solid #000;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 10px;
+            background: #fff;
             break-inside: avoid;
             page-break-inside: avoid;
         }
-        /* 分页标记 */
+        .print-card-title {
+            font-weight: bold;
+            font-size: 10pt;
+            text-align: center;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #ccc;
+        }
+        .print-card-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px 8px;
+            font-size: 7.5pt;
+            line-height: 1.35;
+        }
+        .print-card-grid div {
+            line-height: 1.35;
+        }
+        /* 分页符 */
         .page-break {
             page-break-after: always;
             break-after: page;
         }
+        /* 最后一页底部不留多余空白 */
+        .print-container:last-child {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
-    <div class="print-container">
-        <div class="print-header">
-            <div class="logo">JF! by Gadai</div>
-            <div class="print-header-info">
-                🏪 ${isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)}
-                &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
-                &nbsp;|&nbsp; 📅 ${printDateTime}
-            </div>
-            <div class="print-header-info" style="font-size:8pt;">
-                📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
-                &nbsp;|&nbsp; 📄 ${lang === 'id' ? 'Halaman' : '第'} 1 / ${totalPages} ${lang === 'id' ? 'halaman' : '页'}
-            </div>
+    <div class="print-header">
+        <div class="logo">JF! by Gadai</div>
+        <div class="print-header-info">
+            🏪 ${isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)}
+            &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
+            &nbsp;|&nbsp; 📅 ${printDateTime}
         </div>
+        <div class="print-header-info" style="font-size:7.5pt;">
+            📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
+        </div>
+    </div>
+    <div class="print-container">
         ${cardsHtml}
     </div>
     <script>
         window.onload = function() {
-            setTimeout(function() { window.print(); }, 100);
+            // 确保所有卡片完整显示后调用打印
+            setTimeout(function() { window.print(); }, 200);
         };
     <\/script>
 </body>
 </html>
-            `);
-            printWindow.document.close();
-        },
+    `);
+    printWindow.document.close();
+}
 
         // 供外壳调用的渲染函数
         async renderStoreManagementHTML() {
