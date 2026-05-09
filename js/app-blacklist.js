@@ -207,5 +207,4 @@
         };
     }
 
-    console.log('✅ JF.BlacklistPage v2.0 重构完成（类名统一）');
 })();

@@ -248,5 +248,4 @@
     JF.Audit = Audit;
     window.Audit = Audit;
 
-    console.log('✅ JF.Audit v2.0（所有日志写入增加 try-catch 保护）');
 })();

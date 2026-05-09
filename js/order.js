@@ -356,5 +356,4 @@
     JF.Order = Order;
     window.Order = Order;
 
-    console.log('✅ JF.Order v2.0（getOrderCashFlow 返回订单专属流水）');
 })();

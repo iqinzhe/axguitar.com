@@ -1113,5 +1113,4 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.0 服务费固定容器 + 金额0只读');
 })();

@@ -12,15 +12,12 @@
 
         // ==================== 加载门店列表 ====================
         async loadStores(force = false) {
-            console.log('[StoreManager] loadStores, force:', force);
             if (!force && StoreManager._loaded && StoreManager.stores.length > 0) {
-                console.log('[StoreManager] 使用缓存的门店数据:', StoreManager.stores.length);
                 return StoreManager.stores;
             }
             try {
                 StoreManager.stores = await SUPABASE.getAllStores();
                 StoreManager._loaded = true;
-                console.log('[StoreManager] 门店数据加载完成:', StoreManager.stores.length);
                 return StoreManager.stores;
             } catch (err) {
                 console.error('[StoreManager] loadStores 失败:', err);
@@ -227,7 +224,6 @@
                 const idx = StoreManager.stores.findIndex(s => s.id === storeId);
                 if (idx !== -1) StoreManager.stores[idx].wa_number = waNumber || null;
 
-                console.log(`[StoreManager] WA号码已更新: ${storeId} -> ${waNumber}`);
                 if (window._debugStoreWA) {
                     Utils.toast.success(lang === 'id' ? 'Nomor WA berhasil diperbarui' : 'WA号码已更新');
                 }
@@ -366,7 +362,6 @@
             const client = SUPABASE.getClient();
             const errors = [];
 
-            console.log('[StoreManager] 开始增强版清理门店 ' + storeId + ' 的练习数据...');
 
             try {
                 const { data: orders, error: orderError } = await client
@@ -377,7 +372,6 @@
                 }
 
                 const orderIds = (orders || []).map(o => o.id);
-                console.log('[StoreManager] 找到 ' + orderIds.length + ' 个订单需要清理');
 
                 const cleanSteps = [];
 
@@ -445,7 +439,6 @@
                 for (const step of cleanSteps) {
                     try {
                         await step.exec();
-                        console.log(`[StoreManager] ✅ ${step.name} 已清理`);
                     } catch (err) {
                         errors.push(`${step.name} 清理失败: ${err.message}`);
                         console.warn(`[StoreManager] ⚠️ ${step.name} 清理失败:`, err.message);
@@ -463,7 +456,6 @@
                         : `清理完成但有 ${errors.length} 个错误: ${errorSummary}`);
                 }
 
-                console.log('[StoreManager] ✅ 门店 ' + storeId + ' 练习数据完整清理完成');
             } catch (error) {
                 console.error('[StoreManager] 增强版清理练习数据异常:', error);
                 throw error;
@@ -477,7 +469,6 @@
 
             try {
                 await StoreManager.loadStores(true);
-                console.log('[StoreManager] 门店列表加载完成:', StoreManager.stores.length, '个门店');
 
                 const client = SUPABASE.getClient();
                 
@@ -487,7 +478,6 @@
                 const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
                 const monthEnd = today.toISOString().split('T')[0];
                 
-                console.log('[StoreManager] 本月统计范围:', monthStart, '~', monthEnd);
 
                 const { data: allOrders, error: orderError } = await client
                     .from('orders')
@@ -871,7 +861,6 @@
                         </div>
                     </div>`;
 
-                console.log('[StoreManager] 门店管理页面内容构建完成');
                 return content;
 
             } catch (error) {
@@ -1078,5 +1067,4 @@
         }
     };
 
-    console.log('✅ JF.StoreManager v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 4列指标 + 无打印戳记）');
 })();

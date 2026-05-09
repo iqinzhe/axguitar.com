@@ -966,11 +966,9 @@
             this._isOnline = navigator.onLine;
             
             this._onlineHandler = () => {
-                console.log('[NetworkMonitor] 网络已恢复');
                 this._isOnline = true;
             };
             this._offlineHandler = () => {
-                console.log('[NetworkMonitor] 网络已断开');
                 this._isOnline = false;
             };
             
@@ -979,7 +977,6 @@
             
             this._startPeriodicCheck();
             
-            console.log('[NetworkMonitor] 网络监控已启动');
         },
         
         _startPeriodicCheck() {
@@ -988,7 +985,6 @@
                 if (online !== this._isOnline) {
                     this._isOnline = online;
                     if (online) {
-                        console.log('[NetworkMonitor] 实际连通性: 在线');
                     } else {
                         console.warn('[NetworkMonitor] 实际连通性: 离线');
                     }
@@ -1030,7 +1026,6 @@
                 this._offlineHandler = null;
             }
             this._initialized = false;
-            console.log('[NetworkMonitor] 网络监控已销毁');
         },
     };
 
@@ -1043,7 +1038,6 @@
             const handler = (error, context) => this.capture(error, context);
             window.addEventListener('error', (e) => handler(e.error || e.message, 'uncaught'));
             window.addEventListener('unhandledrejection', (e) => handler(e.reason, 'unhandled_promise'));
-            console.log('[ErrorHandler] 全局错误收集已启动');
         },
         
         capture(error, context) {
@@ -1080,5 +1074,4 @@
         Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT = window.JF.FeeConfig.DEFAULT_INTEREST_RATE_PERCENT;
     }
 
-    console.log('✅ Utils v2.0 (利息少付计算修正、累计少付显示助手)');
 })();

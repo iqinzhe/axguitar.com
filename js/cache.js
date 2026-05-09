@@ -22,7 +22,6 @@
 
     const debugLog = (...args) => {
         if (window.__debugCache !== false) {
-            console.log('[JF.Cache]', ...args);
         }
     };
 
@@ -233,5 +232,4 @@
         getStats() { return Cache.getStats(); },
     };
 
-    console.log('✅ JF.Cache v2.0 初始化完成');
 })();

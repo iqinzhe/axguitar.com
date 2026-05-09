@@ -115,7 +115,6 @@
 
         // ==================== 强制清除认证状态 ====================
         async forceClearAuth() {
-            console.log('[Auth] 强制清除认证状态');
             this.user = null;
             SUPABASE.clearCache();
             
@@ -155,13 +154,10 @@
 
         // ==================== 初始化 ====================
         async init() {
-            console.log('[Auth] 初始化认证模块...');
             
             if (Utils.NetworkMonitor && !Utils.NetworkMonitor._initialized) {
                 Utils.NetworkMonitor.init();
-                console.log('📡 增强版网络监控已启动');
             } else if (Utils.NetworkMonitor && Utils.NetworkMonitor._initialized) {
-                console.log('📡 网络监控已运行');
             } else {
                 this._initLegacyNetworkListener();
             }
@@ -169,9 +165,7 @@
             try {
                 await this.loadCurrentUser();
                 if (this.user) {
-                    console.log('[Auth] 用户已登录:', this.user.name);
                 } else {
-                    console.log('[Auth] 用户未登录');
                 }
             } catch (e) {
                 console.warn('[Auth] 加载用户失败，清除认证状态:', e.message);
@@ -180,18 +174,15 @@
 
             const client = SUPABASE.getClient();
             client.auth.onAuthStateChange(async (event, session) => {
-                console.log('[Auth] 认证状态变化:', event);
 
                 if (event === 'INITIAL_SESSION') {
                     if (!session) {
-                        console.log('[Auth] 初始会话为空，用户未登录');
                         this.user = null;
                     }
                     return;
                 }
 
                 if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-                    console.log('[Auth] 用户已登出或被删除');
                     this.user = null;
                     SUPABASE.clearCache();
                     if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
@@ -199,7 +190,6 @@
                     }
                 } else if (event === 'TOKEN_REFRESHED') {
                     if (session) {
-                        console.log('[Auth] Token 已刷新');
                         SUPABASE.clearCache();
                         try {
                             await this.loadCurrentUser();
@@ -220,7 +210,6 @@
                 }
             });
 
-            console.log('[Auth] 认证模块初始化完成');
         },
 
         // 降级方案：原有简单网络监听
@@ -292,7 +281,6 @@
         // ==================== 登录逻辑 ====================
         async login(usernameOrEmail, password) {
             try {
-                console.log('[Auth] 开始登录:', usernameOrEmail);
                 
                 if (this._isLocked(usernameOrEmail)) return null;
 
@@ -333,7 +321,6 @@
                     return null;
                 }
 
-                console.log('[Auth] 登录成功:', this.user.name);
 
                 if (this.user.store_id) {
                     try {
@@ -368,10 +355,8 @@
                 const profile = await SUPABASE.getCurrentProfile();
                 if (profile) {
                     this.user = profile;
-                    console.log('[Auth] 用户资料已加载:', profile.name);
                 } else {
                     this.user = null;
-                    console.log('[Auth] 无用户资料');
                 }
             } catch (e) {
                 console.warn('[Auth] loadCurrentUser 失败:', e.message);
@@ -381,7 +366,6 @@
 
         // 【修复 #2】logout 简化，只调用一次 forceClearAuth，避免重复 signOut
         async logout() {
-            console.log('[Auth] 执行登出');
             
             if (this.user && window.Audit) {
                 try {
@@ -478,7 +462,6 @@
                 });
                 if (!fnError) {
                     authCleaned = true;
-                    console.log('✅ Edge Function 已删除 Auth 账户');
                 } else {
                     console.warn('Edge Function 调用失败:', fnError);
                 }
@@ -496,7 +479,6 @@
                     });
                     if (!updateError) {
                         authCleaned = true;
-                        console.log('✅ 已禁用 Auth 账户（密码和邮箱已更改）');
                     } else {
                         console.warn('Auth 账户清理失败:', updateError?.message);
                     }
@@ -548,7 +530,6 @@
                 });
                 if (!error) {
                     edgeSuccess = true;
-                    console.log('✅ Edge Function 已重置密码');
                 } else {
                     console.warn('Edge Function 调用失败:', error.message);
                 }
@@ -581,5 +562,4 @@
     JF.Auth = AUTH;
     window.AUTH = AUTH;
 
-    console.log('✅ JF.Auth v2.0（logout 只调用一次 signOut）');
 })();

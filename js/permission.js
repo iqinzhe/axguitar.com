@@ -287,5 +287,4 @@
     JF.Permission = PERMISSION;
     window.PERMISSION = PERMISSION;
 
-    console.log('✅ JF.Permission v2.0（canAddExpenseAmount 增加异步版本 + 同步警告）');
 })();

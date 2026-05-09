@@ -87,5 +87,4 @@
         window.APP = { generateWAText: WAPage.generateWAText.bind(WAPage) };
     }
 
-    console.log('✅ JF.WAPage v2.0 初始化完成');
 })();

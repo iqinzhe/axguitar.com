@@ -143,7 +143,6 @@
                 if (localStorage.getItem(key)) {
                     localStorage.removeItem(key);
                     cleared++;
-                    console.log(`✅ 已清理旧数据: ${key}`);
                 }
             }
             return cleared;
@@ -192,7 +191,7 @@
 
             if (this.progress.success > 0) {
                 const cleared = this.clearOldLocalStorage();
-                if (cleared > 0) console.log(`✅ 迁移完成，已清理 ${cleared} 个旧存储键`);
+                if (cleared > 0) { /* migration complete */ }
                 location.reload();
             }
         },
@@ -237,5 +236,4 @@
     JF.Migration = Migration;
     window.Migration = Migration; // 向下兼容
 
-    console.log('✅ JF.Migration v2.0 初始化完成');
 })();

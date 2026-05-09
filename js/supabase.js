@@ -100,7 +100,6 @@
             auth: { storage: SafeStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
             global: { headers: { 'X-Client-Info': 'jf-gadai-v3' } }
         });
-        console.log('✅ Supabase 客户端初始化成功');
     } catch(e) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         console.warn('⚠️ Supabase 初始化降级');
@@ -283,7 +282,6 @@
                             return parsed.data;
                         } else if(parsed && parsed.data) {
                             SafeStorage.removeItem('jf_cache_stores');
-                            console.log('[Supabase] 门店缓存已过期，已删除');
                         }
                     }
                 } catch(e) { /* ignore */ }
@@ -421,7 +419,6 @@
                         if(error.code==='23505'){ lastError=error; await new Promise(r=>setTimeout(r,50*(attempt+1))); continue; }
                         throw error;
                     }
-                    console.log(`✅ 客户创建: ${customerId}`);
                     return data;
                 } catch(e){
                     if(e.code==='23505' && attempt<7){ lastError=e; await new Promise(r=>setTimeout(r,50*(attempt+1))); continue; }
@@ -1066,8 +1063,6 @@
                         throw error;
                     }
                     newOrder = data;
-                    console.log('✅ 订单创建成功: ' + orderId + 
-                        (pawnTermMonths ? ` | 典当期限: ${pawnTermMonths}个月 | 到期日: ${pawnDueDate}` : ''));
                     break;
                 } catch(err){
                     if(err.code==='23505' && retryCount<4){ retryCount++; await new Promise(r=>setTimeout(r,100*(retryCount+1))); continue; }
@@ -1543,7 +1538,6 @@
                             return parsed.data;
                         } else if(parsed && parsed.data) {
                             SafeStorage.removeItem('jf_cache_users');
-                            console.log('[Supabase] 用户缓存已过期，已删除');
                         }
                     }
                 } catch(e) { /* ignore */ }
@@ -1840,7 +1834,6 @@
             try {
                 const session = await this.getSession();
                 if (!session) {
-                    console.log('[Supabase] 无有效会话，跳过列检查');
                     return;
                 }
                 
@@ -1851,7 +1844,6 @@
                     
                 if (error) {
                     if (error.message && error.message.includes('column "interest_shortfall" does not exist')) {
-                        console.log('[Supabase] interest_shortfall 列不存在，尝试添加...');
                         try {
                             /* 先检查 RPC 函数是否存在 */
                             let rpcExists = false;
@@ -1873,7 +1865,6 @@
                                     console.warn('[Supabase] 请在 Supabase SQL Editor 中执行:');
                                     console.warn('ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
                                 } else {
-                                    console.log('[Supabase] ✅ interest_shortfall 列已添加');
                                 }
                             } else {
                                 console.warn('[Supabase] RPC 函数 add_interest_shortfall_column 不存在');
@@ -1886,7 +1877,6 @@
                             console.warn('ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
                         }
                     } else if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
-                        console.log('[Supabase] 认证已过期，跳过列检查');
                     } else {
                         console.warn('[Supabase] 列检查查询失败:', error.message);
                     }
@@ -1902,5 +1892,4 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
-    console.log('✅ JF.Supabase v2.0');
 })();

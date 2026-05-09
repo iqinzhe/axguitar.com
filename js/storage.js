@@ -319,7 +319,6 @@
                         const { data: existing, error: dupError } = await dupQuery.limit(1);
                         if (!dupError && existing && existing.length > 0) {
                             isDuplicate = true;
-                            console.log(`[Restore] 现金流记录已存在，跳过: ${flow.flow_type} - ${Utils.formatCurrency(flow.amount)}`);
                         }
                     } catch (dupCheckError) {
                         console.warn('[Restore] 去重检查失败，继续插入:', dupCheckError.message);
@@ -804,5 +803,4 @@
     JF.BackupStorage = BackupStorage;
     window.BackupStorage = BackupStorage;
 
-    console.log('✅ JF.BackupStorage v2.0（备份恢复 cash_flow 增加去重保护）');
 })();

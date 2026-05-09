@@ -565,5 +565,4 @@
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
     }
 
-    console.log('✅ JF.FundsPage v2.0 管理员排除练习门店数据');
 })();

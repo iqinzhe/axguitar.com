@@ -162,7 +162,6 @@
         _initGlobalKeyboard() {
             // 【修复 #5】防止 init() 重复调用时监听器叠加注册
             if (this._keyboardInitialized) {
-                console.log('[Keyboard] 已初始化，跳过重复注册');
                 return;
             }
             this._keyboardInitialized = true;
@@ -186,7 +185,6 @@
                 this.goBack();
             });
 
-            console.log('[Keyboard] 全局快捷键已就绪: Esc=关闭弹窗 | Enter=确认/搜索 | 浏览器返回=app内返回');
         },
 
         _handleGlobalEsc() {
@@ -346,7 +344,6 @@
                 document.addEventListener(evt, reset, { passive: true });
             });
             this._resetIdleTimer();
-            console.log('[IdleTimer] 闲置登出已启动，超时：18分钟');
         },
         _resetIdleTimer() {
             if (this._idleTimer) clearTimeout(this._idleTimer);
@@ -406,7 +403,6 @@
         // ========== 刷新当前页面 ==========
         async refreshCurrentPage() {
             if (!AUTH.isLoggedIn()) {
-                console.log('[DashboardCore] 用户未登录，显示登录页');
                 await this.renderLogin();
                 return;
             }
@@ -690,7 +686,6 @@
                 }
             }
             
-            console.log('[Dashboard] 详细信息已更新');
         },
 
         // ========== 仪表盘渲染（核心）==========
@@ -1302,7 +1297,6 @@
         },
 
         forceRecovery() {
-            console.log('[Recovery] 手动强制恢复');
             const appDiv = document.getElementById('app');
             if (!appDiv) return;
             const loadingText = Utils.lang === 'id' ? 'Sedang memulihkan...' : '恢复中...';
@@ -1329,33 +1323,28 @@
                 console.warn('[DashboardCore] 已初始化，忽略重复调用');
                 return;
             }
-            console.log('[DashboardCore] 开始初始化...');
             ModuleFallback.clearAll();
             
             try {
                 await AUTH.init();
                 
                 if (!AUTH.isLoggedIn()) {
-                    console.log('[DashboardCore] 用户未登录，显示登录页面');
                     await this.renderLogin();
                     return;
                 }
                 
-                console.log('[DashboardCore] 用户已登录:', AUTH.user?.name);
 
                 this._initGlobalKeyboard();
                 this._initIdleTimer();
 
                 const saved = this.restorePageState();
                 if (saved.page && saved.page !== 'login') {
-                    console.log('[DashboardCore] 恢复页面状态:', saved.page);
                     this.currentPage = saved.page;
                     this.currentOrderId = saved.orderId || null;
                     this.currentCustomerId = saved.customerId || null;
                     this.currentFilter = saved.filter || "all";
                     await this.refreshCurrentPage();
                 } else {
-                    console.log('[DashboardCore] 无保存状态，显示仪表盘');
                     await this.renderDashboard();
                 }
                 
@@ -1402,5 +1391,4 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.0（Enter 键防重复触发 + 统一登录页处理）');
 })();

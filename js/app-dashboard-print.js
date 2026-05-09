@@ -425,6 +425,7 @@
                             <div class="label">${Utils.escapeHtml(item.label)}</div>
                             <div class="value">${Utils.escapeHtml(item.value)}</div>
                         </div>
+                    </div>
                     `).join('')}
                 </div>
             `;
@@ -460,5 +461,4 @@
         window.APP = { printCurrentPage: PrintPage.printCurrentPage.bind(PrintPage) };
     }
 
-    console.log('✅ JF.PrintPage v2.0 订单列表打印优化（完整订单列表，移除操作行）');
 })();

@@ -100,7 +100,7 @@
                     }
                 }
 
-                // 员工支出上限提示
+                // 【v2.5 新增】员工支出上限提示
                 let staffExpenseInfoHtml = '';
                 if (PERMISSION.isStaff()) {
                     const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
@@ -259,8 +259,8 @@
                 }
             }
 
-            // 员工支出金额上限检查
-            if (!(await PERMISSION.canAddExpenseAmountAsync(amount))) {
+            // 【v2.5 新增】员工支出金额上限检查
+            if (!PERMISSION.canAddExpenseAmount(amount)) {
                 const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
                 const warningMsg = lang === 'id'
                     ? `⚠️ Jumlah pengeluaran melebihi batas staf!\n\nBatas maksimal: ${Utils.formatCurrency(maxAmount)}\nJumlah Anda: ${Utils.formatCurrency(amount)}\n\nPengeluaran di atas ${Utils.formatCurrency(maxAmount)} memerlukan persetujuan manajer toko. Silakan hubungi manajer toko Anda.`
@@ -284,13 +284,6 @@
                     throw new Error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店');
                 }
 
-                console.log('[addExpense] 保存支出:', {
-                    role: profile.role,
-                    store_id: profile.store_id || '(管理员无门店，将自动分配总部)',
-                    category: category,
-                    amount: amount,
-                    payment_method: paymentMethod
-                });
 
                 // 调用后端，管理员若 store_id 为空则传 undefined，让 backend 自动使用总部
                 const result = await SUPABASE.addExpense({
@@ -302,7 +295,6 @@
                     payment_method: paymentMethod
                 });
 
-                console.log('[addExpense] 保存成功:', result);
 
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
 
@@ -681,5 +673,4 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.0（管理员总部支出打通）');
 })();

@@ -351,11 +351,9 @@
             // 防止重复点击（锁机制 + 时间戳双重保护）
             const now = Date.now();
             if (state.isLoadingMore) {
-                console.log('[AnomalyPage] 已有加载任务进行中，跳过');
                 return;
             }
             if (state.lastLoadTime && (now - state.lastLoadTime) < 1000) {
-                console.log('[AnomalyPage] 请求过于频繁，跳过');
                 Utils.toast.warning(Utils.lang === 'id' ? 'Mohon tunggu sebentar' : '请稍后再试', 1000);
                 return;
             }
@@ -433,5 +431,4 @@
     window.APP.loadMoreBlacklist = AnomalyPage.loadMoreBlacklist.bind(AnomalyPage);
     window.APP.clearAnomalyCache = AnomalyPage.clearAnomalyCache.bind(AnomalyPage);
 
-    console.log('✅ JF.AnomalyPage v2.0（loadMoreBlacklist 增强防重复）');
 })();

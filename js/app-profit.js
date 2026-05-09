@@ -278,5 +278,4 @@
     window.APP = window.APP || {};
     window.APP.showDistributionPage = ProfitPage.showDistributionPage.bind(ProfitPage);
 
-    console.log('✅ JF.ProfitPage v2.0店长收益处置增加复核机制：单笔>IDR 5,000,000 需管理员确认，含审计日志）');
 })();
