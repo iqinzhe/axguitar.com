@@ -1123,5 +1123,5 @@
         window.APP = {};
     }
 
-    console.log('✅ JF.CustomersPage v2.1 修复版（删除客户增加 internal_transfers + 服务费金额0清除手动标记）');
+    console.log('✅ JF.CustomersPage v2.0（删除客户增加 internal_transfers + 服务费金额0清除手动标记）');
 })();
