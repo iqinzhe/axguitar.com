@@ -419,7 +419,6 @@
                             <div class="label">${Utils.escapeHtml(item.label)}</div>
                             <div class="value">${Utils.escapeHtml(item.value)}</div>
                         </div>
-                    </div>
                     `).join('')}
                 </div>
             `;
