@@ -21,14 +21,14 @@
             FREE_THRESHOLD: 3000000,      // 3,000,000 以下免服务费
             PERCENT_THRESHOLD: 5000000,   // 5,000,000 以上启用百分比
             MIN_PERCENT: 2,               // 最低百分比 2%
-            MAX_PERCENT: 12,              // 最高百分比 12%
+            MAX_PERCENT: 10,              // 最高百分比 10%
             DEFAULT_PERCENT: 2            // 默认百分比 2%
         },
         
         // 利率配置
         DEFAULT_INTEREST_RATE: 0.10,            // 10%
         DEFAULT_INTEREST_RATE_PERCENT: 10,      // 10%
-        AVAILABLE_INTEREST_RATES: [10, 9.5, 9, 8.5, 8, 7.5],
+        AVAILABLE_INTEREST_RATES: [10, 9.5, 9, 8.5, 8],
         
         // 还款期限配置
         MIN_REPAYMENT_TERM: 1,
@@ -57,7 +57,7 @@
          * 根据当金金额和服务费百分比计算服务费
          * 【修复 #4】百分比越上限时截断到最大值，而非重置为默认值
          * @param {number} loanAmount - 当金金额
-         * @param {number} percent - 服务费百分比（0-12）
+         * @param {number} percent - 服务费百分比（0-10）
          * @returns {Object} { percent: number, amount: number }
          */
         calculateServiceFee(loanAmount, percent) {
