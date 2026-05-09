@@ -59,7 +59,7 @@
                         let createBtnHtml;
                         if (hasActiveOrders) {
                             const orderList = activeOrderMap[c.id].join(', ');
-                            createBtnHtml = `<button class="btn btn--sm" style="background:#94a3b8;color:#fff;opacity:0.7;cursor:not-allowed;" disabled
+                            createBtnHtml = `<button class="btn btn--sm" style="background:#94a3b;color:#fff;opacity:0.7;cursor:not-allowed;" disabled
                                 title="${lang === 'id' ? 'Memiliki pesanan aktif: ' + orderList : '有活跃订单: ' + orderList}">
                                 🔒 ${lang === 'id' ? 'Pesanan Aktif' : '活跃订单中'}
                             </button>`;
@@ -96,7 +96,7 @@
                                         <label><input type="radio" name="livingAddrOpt" value="same" checked onchange="APP.toggleLivingAddress(this.value)"> ${t('same_as_ktp')}</label>
                                         <label><input type="radio" name="livingAddrOpt" value="different" onchange="APP.toggleLivingAddress(this.value)"> ${t('different_from_ktp')}</label>
                                     </div>
-                                    <textarea id="customerLivingAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址'}" style="display:none;margin-top:8px;"></textarea>
+                                    <textarea id="customerLivingAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat tinggal sebenarnya' : '实际居住地址'}" style="display:none;margin-top:px;"></textarea>
                                 </div>
                                 <div class="form-actions"><button onclick="APP.addCustomer()" class="btn btn--success" id="addCustomerBtn">💾 ${t('save_customer')}</button></div>
                             </div>
@@ -201,7 +201,7 @@
                     } catch (blErr) { console.warn('黑名单重复检查失败:', blErr.message); }
                 }
 
-                let maxRetries = 8, lastError = null, newCustomer = null;
+                let maxRetries = , lastError = null, newCustomer = null;
                 for (let attempt = 0; attempt < maxRetries; attempt++) {
                     try {
                         const prefix = await SUPABASE._getStorePrefix(storeId);
@@ -304,7 +304,7 @@
 
                 const modalHtml =
                     `<div id="customerDetailCard" class="modal-overlay customer-detail-card">
-                        <div class="modal-content" style="max-width:780px;">
+                        <div class="modal-content" style="max-width:70px;">
                             <h3 style="display:flex; justify-content:space-between; align-items:center;">
                                 <span>📋 ${t('customer_detail')} - ${Utils.escapeHtml(customer.name)}</span>
                                 <button onclick="document.getElementById('customerDetailCard').remove()" style="background:none; border:none; font-size:20px; cursor:pointer;">✖</button>
@@ -458,7 +458,7 @@
                 const modal = document.createElement('div'); 
                 modal.id = 'editCustomerModal'; 
                 modal.className = 'modal-overlay';
-                modal.innerHTML = `<div class="modal-content" style="max-width:600px;"><h3>✏️ ${t('edit_customer')}</h3><div class="form-grid order-first-row"><div class="form-group"><label>${t('customer_name')} *</label><input id="ec_name" value="${Utils.escapeHtml(c.name)}"></div><div class="form-group"><label>${t('phone')} *</label><input id="ec_phone" value="${Utils.escapeHtml(c.phone || '')}"></div><div class="form-group"><label>${t('ktp_number')}</label><input id="ec_ktp" value="${Utils.escapeHtml(c.ktp_number || '')}"></div><div class="form-group"><label>${t('occupation')}</label><input id="ec_occupation" value="${Utils.escapeHtml(c.occupation || '')}"></div><div class="form-group full-width"><label>${t('ktp_address')}</label><textarea id="ec_ktpAddr" rows="2">${Utils.escapeHtml(c.ktp_address || c.address || '')}</textarea></div><div class="form-group full-width"><label>${t('living_address')}</label><div class="address-option"><label><input type="radio" name="ec_livingOpt" value="same" ${livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('same_as_ktp')}</label><label><input type="radio" name="ec_livingOpt" value="different" ${!livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('different_from_ktp')}</label></div><textarea id="ec_livingAddr" rows="2" style="margin-top:8px;${livingSame ? 'display:none;' : ''}">${Utils.escapeHtml(c.living_address || '')}</textarea></div><div class="form-actions"><button onclick="APP._saveEditCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success">💾 ${t('save')}</button><button onclick="document.getElementById('editCustomerModal').remove()" class="btn btn--outline">✖ ${t('cancel')}</button></div></div></div>`;
+                modal.innerHTML = `<div class="modal-content" style="max-width:600px;"><h3>✏️ ${t('edit_customer')}</h3><div class="form-grid order-first-row"><div class="form-group"><label>${t('customer_name')} *</label><input id="ec_name" value="${Utils.escapeHtml(c.name)}"></div><div class="form-group"><label>${t('phone')} *</label><input id="ec_phone" value="${Utils.escapeHtml(c.phone || '')}"></div><div class="form-group"><label>${t('ktp_number')}</label><input id="ec_ktp" value="${Utils.escapeHtml(c.ktp_number || '')}"></div><div class="form-group"><label>${t('occupation')}</label><input id="ec_occupation" value="${Utils.escapeHtml(c.occupation || '')}"></div><div class="form-group full-width"><label>${t('ktp_address')}</label><textarea id="ec_ktpAddr" rows="2">${Utils.escapeHtml(c.ktp_address || c.address || '')}</textarea></div><div class="form-group full-width"><label>${t('living_address')}</label><div class="address-option"><label><input type="radio" name="ec_livingOpt" value="same" ${livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('same_as_ktp')}</label><label><input type="radio" name="ec_livingOpt" value="different" ${!livingSame ? 'checked' : ''} onchange="APP._toggleEditLiving(this.value)"> ${t('different_from_ktp')}</label></div><textarea id="ec_livingAddr" rows="2" style="margin-top:px;${livingSame ? 'display:none;' : ''}">${Utils.escapeHtml(c.living_address || '')}</textarea></div><div class="form-actions"><button onclick="APP._saveEditCustomer('${Utils.escapeAttr(customerId)}')" class="btn btn--success">💾 ${t('save')}</button><button onclick="document.getElementById('editCustomerModal').remove()" class="btn btn--outline">✖ ${t('cancel')}</button></div></div></div>`;
                 document.body.appendChild(modal);
             } catch (e) { 
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data: ' + e.message : '加载失败：' + e.message); 
@@ -673,7 +673,7 @@
                                 <div class="fee-card">
                                     <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
                                     <div class="fee-card-body" id="serviceFeeDisplay" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                                        <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">
+                                        <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:0px;">
                                             ${Array.from({ length: 13 }, (_, i) => `<option value="${i}">${i}%</option>`).join('')}
                                         </select>
                                         <span style="font-weight:700;color:var(--text-primary);">Rp</span>
@@ -689,7 +689,7 @@
                             </div>
                             <div class="form-group interest-rate-group">
                                 <label>📈 ${t('interest_rate_select')}</label>
-                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select>
+                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions()}</select>
                             </div>
                         </div>
                         <div class="form-section">
@@ -831,7 +831,7 @@
                 if (svcInput) {
                     svcInput.value = '0';
                     svcInput.readOnly = true;
-                    delete svcInput.dataset.manual;  // 【修复 #22】清除手动修改标记
+                    delete svcInput.dataset.manual;  // 清除手动修改标记
                 }
                 const svcSelect = document.getElementById("serviceFeePercentSelect");
                 if (svcSelect) { svcSelect.value = '0'; delete svcSelect.dataset.manual; }
@@ -840,7 +840,7 @@
                 const loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]'); 
                 if (loanCashRadio) loanCashRadio.checked = true;
                 const interestSelect = document.getElementById("agreedInterestRateSelect"); 
-                if (interestSelect) interestSelect.value = '8';
+                if (interestSelect) interestSelect.value = '10';
                 const flexibleRadio = document.getElementById("flexibleRadio"); 
                 if (flexibleRadio) { flexibleRadio.checked = true; APP.toggleRepaymentForm('flexible'); }
                 const pawnTermEl = document.getElementById('pawnTermSelect');
