@@ -322,5 +322,5 @@
         window.APP = { showMessageCenter: MessageCenter.showMessageCenter.bind(MessageCenter) };
     }
 
-    console.log('✅ JF.MessageCenter v2.1 修复版（返回按钮多重降级）');
+    console.log('✅ JF.MessageCenter v2.0（返回按钮多重降级）');
 })();
