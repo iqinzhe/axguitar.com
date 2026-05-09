@@ -47,7 +47,7 @@
                 const storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
                 const nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                 const remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                const currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.08);
+                const currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                 const repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
 
@@ -163,7 +163,7 @@
                 const storeName = isAdmin ? storeMap[o.store_id] || '-' : '';
                 const nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                 const remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                const currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.08);
+                const currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                 const repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
 
@@ -225,7 +225,7 @@
             const methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
 
             const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-            const monthlyRate = order.agreed_interest_rate || 0.08;
+            const monthlyRate = order.agreed_interest_rate || 0.10;
             const currentMonthlyInterest = remainingPrincipal * monthlyRate;
             const nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
 
@@ -428,7 +428,7 @@
                 const printDateTime = new Date().toLocaleString();
 
                 const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-                const monthlyRate = order.agreed_interest_rate || 0.08;
+                const monthlyRate = order.agreed_interest_rate || 0.10;
                 const currentMonthlyInterest = remainingPrincipal * monthlyRate;
                 const statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
                                    order.status === 'completed' ? (lang === 'id' ? 'Lunas' : '已结清') :
@@ -666,7 +666,7 @@
                 for (const o of orders) {
                     const nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                     const remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                    const currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.08);
+                    const currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                     const repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                     const statusText = o.status === 'active' ? t('status_active') : (o.status === 'completed' ? t('status_completed') : t('status_liquidated'));
 
