@@ -1,5 +1,5 @@
 // app-dashboard-core.js - v2.0
-// Enter 键防重复触发 + 统一登录页 Enter 处理
+// 修复内容：Enter 键防重复触发 + 统一登录页 Enter 处理
 
 'use strict';
 
@@ -137,7 +137,7 @@
         currentCustomerId: null,
         _isInitialized: false,
         _popStateNavigation: false,
-        // 添加防重复标志
+        // 【修复 #18】添加防重复标志
         _enterProcessing: false,
 
         // ========== 清理残留遮罩层 ==========
@@ -160,13 +160,13 @@
 
         // ========== 全局键盘管理器 ==========
         _initGlobalKeyboard() {
-            // 防止 init() 重复调用时监听器叠加注册
+            // 【修复 #5】防止 init() 重复调用时监听器叠加注册
             if (this._keyboardInitialized) {
                 console.log('[Keyboard] 已初始化，跳过重复注册');
                 return;
             }
             this._keyboardInitialized = true;
-            // 添加防重复标志
+            // 【修复 #18】添加防重复标志
             this._enterProcessing = false;
             
             document.addEventListener('keydown', (e) => {
@@ -219,7 +219,7 @@
             }
         },
 
-        // 增加防重复触发标志
+        // 【修复 #18】增加防重复触发标志
         _handleGlobalEnter(e) {
             if (this._enterProcessing) return;
             
@@ -333,14 +333,52 @@
         },
 
         // ========== 逾期更新定时器 ==========
-       _clearOverdueInterval() { if (_overdueInterval) { clearInterval(_overdueInterval); _overdueInterval = null; } },
-_startOverdueInterval() {
-    this._clearOverdueInterval();
-    if (!AUTH.isLoggedIn()) return;
-    _overdueInterval = setInterval(async () => {
-        try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { console.warn('[逾期更新] 失败:', err.message); }
-    }, 30 * 60 * 1000);
-},
+        _clearOverdueInterval() { if (_overdueInterval) { clearInterval(_overdueInterval); _overdueInterval = null; } },
+
+        // ========== 闲置自动登出（30分钟无操作） ==========
+        _idleTimer: null,
+        _IDLE_TIMEOUT: 18 * 60 * 1000,
+        _initIdleTimer() {
+            if (this._idleListenerAttached) return;
+            this._idleListenerAttached = true;
+            const reset = () => this._resetIdleTimer();
+            ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'].forEach(evt => {
+                document.addEventListener(evt, reset, { passive: true });
+            });
+            this._resetIdleTimer();
+            console.log('[IdleTimer] 闲置登出已启动，超时：18分钟');
+        },
+        _resetIdleTimer() {
+            if (this._idleTimer) clearTimeout(this._idleTimer);
+            if (!AUTH.isLoggedIn()) return;
+            this._idleTimer = setTimeout(async () => {
+                console.warn('[IdleTimer] 闲置超时，自动登出');
+                Utils.toast.warning(
+                    Utils.lang === 'id'
+                        ? '⏰ Sesi berakhir karena tidak ada aktivitas selama 18 menit.'
+                        : '⏰ 已闲置18分钟，系统自动登出。',
+                    4000
+                );
+                await new Promise(r => setTimeout(r, 3000));
+                this.clearPageState();
+                sessionStorage.clear();
+                this._isInitialized = false;
+                this._idleListenerAttached = false;
+                await AUTH.forceClearAuth();
+                await this.renderLogin();
+            }, this._IDLE_TIMEOUT);
+        },
+        _clearIdleTimer() {
+            if (this._idleTimer) { clearTimeout(this._idleTimer); this._idleTimer = null; }
+        },
+        _startOverdueInterval() {
+            this._clearOverdueInterval();
+            if (!AUTH.isLoggedIn()) return;
+            _overdueInterval = setInterval(async () => {
+                try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { console.warn('[逾期更新] 失败:', err.message); }
+            }, 18 * 60 * 1000);
+            setTimeout(async () => { try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { /* ignore */ } }, 5000);
+        },
 
         // ========== 统一外壳与内容切换 ==========
         async _ensureShell() {
@@ -676,7 +714,7 @@ _startOverdueInterval() {
                 const storeId = profile?.store_id;
 
                 const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
-                // 仪表盘数据加载整体超时保护（15秒）
+                // 【修复 #7】仪表盘数据加载整体超时保护（15秒）
                 const _kpiFetchWithTimeout = (fetchFn, ms) => Promise.race([
                     fetchFn(),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('数据加载超时，请检查网络连接')), ms))
@@ -1241,6 +1279,7 @@ _startOverdueInterval() {
 
         async logout() {
             this._clearOverdueInterval();
+            this._clearIdleTimer();
             
             if (Utils.NetworkMonitor && typeof Utils.NetworkMonitor.destroy === 'function') {
                 Utils.NetworkMonitor.destroy();
@@ -1285,7 +1324,7 @@ _startOverdueInterval() {
         },
 
         async init() {
-            // 防止重复调用 init()
+            // 【修复 #5】防止重复调用 init()
             if (this._isInitialized) {
                 console.warn('[DashboardCore] 已初始化，忽略重复调用');
                 return;
@@ -1305,6 +1344,7 @@ _startOverdueInterval() {
                 console.log('[DashboardCore] 用户已登录:', AUTH.user?.name);
 
                 this._initGlobalKeyboard();
+                this._initIdleTimer();
 
                 const saved = this.restorePageState();
                 if (saved.page && saved.page !== 'login') {
