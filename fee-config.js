@@ -26,8 +26,8 @@
         },
         
         // 利率配置
-        DEFAULT_INTEREST_RATE: 0.085,           // 8.5%
-        DEFAULT_INTEREST_RATE_PERCENT: 8.5,     // 8.5%
+        DEFAULT_INTEREST_RATE: 0.10,            // 10%
+        DEFAULT_INTEREST_RATE_PERCENT: 10,      // 10%
         AVAILABLE_INTEREST_RATES: [10, 9.5, 9, 8.5, 8, 7.5],
         
         // 还款期限配置
