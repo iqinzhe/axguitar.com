@@ -216,8 +216,11 @@
 <!--
   ==================== 脚本加载策略 ====================
 
-  第 0 层：立即执行（内联）
-    - Token 状态检查，无需等待 DOM
+  第 0 层：立即执行（内联同步脚本）
+    - Token 状态检查：在 DOM 解析阶段立即运行，无需等待其他脚本。
+    - 仅操作 localStorage / sessionStorage，不依赖任何外部模块。
+    - [修复] token key 匹配改用 endsWith('-auth-token')，精确匹配，
+      避免 indexOf 误匹配含有该子串但位置不固定的 key。
 
   第 1 层：CDN + 核心基础（defer，按序执行）
     - config.js → supabase-js → fee-config.js
@@ -231,11 +234,24 @@
   第 3 层：非核心页面模块（defer，不阻塞首屏）
     - 所有 app-*.js
 
-  第 4 层：内联启动逻辑（defer）
-    - 应用初始化 + 全局快捷键
+  第 4 层：启动逻辑（type="module"）
+    - [修复] 原为普通内联 <script>（同步执行），在所有 defer 脚本加载
+      前运行，导致 JF.DashboardCore 等全局对象尚未就绪。
+    - 改用 <script type="module">：module 脚本天然具有 defer 语义，
+      且规范保证其在所有同文档的 defer 脚本执行完毕后才运行，
+      彻底消除时序竞争，无需 setTimeout 轮询补救。
+
+  [说明] js/app.js 与 js/app-state-init.js 为存档备份文件，
+    其功能已分别内联于第 4 层和第 0 层。这两个文件不参与实际加载，
+    请勿直接引用，保留仅供版本对照。
 -->
 
 <!-- ========== 第 0 层：Token 状态初始化（立即执行） ========== -->
+<!--
+  [修复] token key 匹配从 indexOf('-auth-token') !== -1
+         改为 endsWith('-auth-token')，精确匹配 Supabase v2 规范 key 格式，
+         与 js/app-state-init.js 存档版本保持一致。
+-->
 <script>
 (function () {
     'use strict';
@@ -243,7 +259,8 @@
         var hasValidToken = false;
         for (var i = 0; i < localStorage.length; i++) {
             var key = localStorage.key(i);
-            if (key && key.startsWith('sb-') && key.indexOf('-auth-token') !== -1) {
+            /* [修复] 使用 endsWith 精确匹配 Supabase v2 auth-token key */
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
                 try {
                     var tokenData = JSON.parse(localStorage.getItem(key));
                     if (tokenData && tokenData.expires_at) {
@@ -257,11 +274,14 @@
         }
         if (!hasValidToken) {
             try {
-                var clearKeys = ['jf_current_state','jf_last_state','jf_current_page',
-                    'jf_current_filter','jf_current_order_id','jf_current_customer_id',
-                    'jf_last_page','jf_last_filter','jf_last_order_id','jf_last_customer_id'];
-                clearKeys.forEach(function(k) {
-                    sessionStorage.removeItem(k); localStorage.removeItem(k);
+                var clearKeys = [
+                    'jf_current_state', 'jf_last_state', 'jf_current_page',
+                    'jf_current_filter', 'jf_current_order_id', 'jf_current_customer_id',
+                    'jf_last_page', 'jf_last_filter', 'jf_last_order_id', 'jf_last_customer_id'
+                ];
+                clearKeys.forEach(function (k) {
+                    sessionStorage.removeItem(k);
+                    localStorage.removeItem(k);
                 });
                 console.log('[StateInit] 无有效 token，已清除页面恢复状态');
             } catch (e) { /* ignore */ }
@@ -306,15 +326,21 @@
 <script defer src="js/app-blacklist.js"></script>
 <script defer src="js/app-payments.js"></script>
 
-<!-- ========== 第 4 层：内联启动逻辑（合并 app.js + 启动控制） ========== -->
-<script>
+<!-- ========== 第 4 层：启动逻辑（type="module"） ========== -->
+<!--
+  [修复] 原为普通内联 <script>，同步执行，所有 defer 脚本尚未加载时即已运行。
+         改用 type="module"：规范保证 module 脚本在所有 defer 脚本执行完毕后运行，
+         彻底消除时序竞争，startApp() 无需再依赖 setTimeout 轮询补救
+         （轮询逻辑保留作为容错兜底，但正常情况下 JF.DashboardCore 已就绪）。
+-->
+<script type="module">
 (function () {
     'use strict';
 
     var JF = window.JF || {};
     window.JF = JF;
 
-    // ==================== APP 门面层 ====================
+    // ==================== APP 门面层（合并自 js/app.js 存档） ====================
     var APP = {
         forceClearAndReload: function () {
             console.log('[APP] 强制清除所有存储并重新加载');
@@ -322,9 +348,11 @@
                 var keysToRemove = [];
                 for (var i = 0; i < localStorage.length; i++) {
                     var key = localStorage.key(i);
-                    if (key && (key.indexOf('supabase.') === 0 ||
-                                key.indexOf('sb-') === 0 ||
-                                key.indexOf('jf_') === 0)) {
+                    if (key && (
+                        key.indexOf('supabase.') === 0 ||
+                        key.indexOf('sb-') === 0 ||
+                        key.indexOf('jf_') === 0
+                    )) {
                         keysToRemove.push(key);
                     }
                 }
@@ -371,7 +399,10 @@
             try {
                 var result = await SUPABASE.getPaymentHistory(orderId);
                 var order = result.order;
-                if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
+                if (!order) {
+                    Utils.toast.error(Utils.t('order_not_found'));
+                    return;
+                }
                 var storeWA = await SUPABASE.getStoreWANumber(order.store_id);
                 if (!storeWA) {
                     Utils.toast.warning(Utils.lang === 'id'
@@ -385,8 +416,11 @@
                     return;
                 }
                 var cleanPhone = customerPhone.replace(/[^0-9]/g, '');
-                if (cleanPhone.indexOf('0') === 0) cleanPhone = '62' + cleanPhone.substring(1);
-                else if (cleanPhone.indexOf('62') !== 0) cleanPhone = '62' + cleanPhone;
+                if (cleanPhone.indexOf('0') === 0) {
+                    cleanPhone = '62' + cleanPhone.substring(1);
+                } else if (cleanPhone.indexOf('62') !== 0) {
+                    cleanPhone = '62' + cleanPhone;
+                }
                 var waMessage = JF.WAPage ? JF.WAPage.generateWAText(order, storeWA) : '';
                 window.open('https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(waMessage), '_blank');
                 await SUPABASE.logReminder(order.id);
@@ -416,6 +450,8 @@
             e.preventDefault();
             if (JF.DashboardCore && typeof JF.DashboardCore.forceRecovery === 'function') {
                 JF.DashboardCore.forceRecovery();
+            } else if (window.APP && typeof window.APP.forceRecovery === 'function') {
+                window.APP.forceRecovery();
             } else {
                 location.reload();
             }
@@ -427,10 +463,10 @@
         }
     });
 
-    console.log('[Boot] 核心模块 + 门面层已就绪');
+    console.log('[Boot] 核心模块 + 门面层已就绪（type=module，defer 时序保证）');
 
     // ==================== 应用启动 ====================
-    var loadingOverlay  = document.getElementById('loadingOverlay');
+    var loadingOverlay   = document.getElementById('loadingOverlay');
     var dashboardContent = document.getElementById('dashboardContent');
 
     function hideLoading() {
@@ -442,21 +478,23 @@
         if (dashboardContent) dashboardContent.classList.add('loaded');
     }
 
+    /*
+     * startApp：因 type="module" 保证本脚本在所有 defer 脚本之后执行，
+     * 正常情况下 JF.DashboardCore 已就绪，setTimeout 轮询仅作容错兜底。
+     */
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             console.log('[Boot] 启动应用');
             JF.DashboardCore.init();
             setTimeout(hideLoading, 100);
         } else {
-            setTimeout(startApp, 200);
+            console.warn('[Boot] JF.DashboardCore 未就绪，100ms 后重试...');
+            setTimeout(startApp, 100);
         }
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { setTimeout(startApp, 100); });
-    } else {
-        setTimeout(startApp, 100);
-    }
+    // module 脚本天然在 DOMContentLoaded 之后执行，可直接调用
+    startApp();
 })();
 </script>
 
