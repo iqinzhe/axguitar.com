@@ -338,8 +338,7 @@
             this._clearOverdueInterval();
             if (!AUTH.isLoggedIn()) return;
             _overdueInterval = setInterval(async () => {
-                try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { console.warn('[逾期更新] 失败:', err.message); }
-            }, 30 * 60 * 1000);
+                try { await SUPABASE.updateOverdueDays(); 
             setTimeout(async () => { try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { /* ignore */ } }, 5000);
         },
 
