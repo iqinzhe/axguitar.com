@@ -46,7 +46,7 @@
                 const client = SUPABASE.getClient();
 
                 if (isAdmin) {
-                    // 【v2.2】管理员查询时排除练习门店
+                    // 管理员查询时排除练习门店
                     let q = client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('recorded_at', { ascending: false });
@@ -57,7 +57,7 @@
                     const { data: allFlows } = await q;
                     transactions = allFlows || [];
                 } else if (isStaff) {
-                    // 【v2.1】员工仅可查看本人操作的资金流水记录
+                    // 员工仅可查看本人操作的资金流水记录
                     const { data: staffFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id)
@@ -95,7 +95,7 @@
                     }
                 }
 
-                // 【v2.1 新增】员工受限提示
+                // 员工受限提示
                 let staffRestrictionHtml = '';
                 if (isStaff) {
                     staffRestrictionHtml = `
@@ -197,7 +197,7 @@
         },
 
         // ==================== 原有弹窗、转账、导出等方法（完整保留） ====================
-        // 【v2.2 修改】管理员排除练习门店
+        // 管理员排除练习门店
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -207,7 +207,7 @@
                 let transactions = [];
                 const client = SUPABASE.getClient();
                 if (isAdmin) {
-                    // 【v2.2】管理员查询时排除练习门店
+                    // 管理员查询时排除练习门店
                     let q = client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('recorded_at', { ascending: false });
@@ -218,7 +218,7 @@
                     const { data: allFlows } = await q;
                     transactions = allFlows || [];
                 } else if (isStaff) {
-                    // 【v2.1】员工在弹窗中也仅查看本人记录
+                    // 员工在弹窗中也仅查看本人记录
                     const { data: staffFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id)
@@ -395,7 +395,7 @@
         async showTransferModal(transferType) {
             const lang = Utils.lang;
             
-            // 【v2.1】员工禁止发起内部转账（双重保险：UI层也拦截）
+            // 员工禁止发起内部转账（双重保险：UI层也拦截）
             if (PERMISSION.isStaff()) {
                 Utils.toast.warning(lang === 'id'
                     ? 'Hanya manajer toko dan administrator yang dapat melakukan transfer internal.'
@@ -442,7 +442,7 @@
         async executeTransfer(transferType, amount) {
             const lang = Utils.lang;
             
-            // 【v2.1】员工禁止执行内部转账（双重保险）
+            // 员工禁止执行内部转账（双重保险）
             if (PERMISSION.isStaff()) {
                 Utils.toast.warning(lang === 'id'
                     ? 'Hanya manajer toko dan administrator yang dapat melakukan transfer internal.'
