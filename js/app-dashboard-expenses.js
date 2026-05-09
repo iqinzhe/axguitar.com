@@ -490,6 +490,13 @@
                         reference_id: expenseId
                     });
 
+                    if (window.Audit) await window.Audit.log('expense_edit', JSON.stringify({
+                        expense_id: expenseId,
+                        before: { amount: oldAmount, category: oldExpense.category, payment_method: oldExpense.payment_method },
+                        after: { amount, category, payment_method: paymentMethod, description },
+                        note: 'cash_flow_resynced',
+                        edited_by: AUTH.user?.name || '-'
+                    }));
                     Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil diubah dan disinkronkan' : '支出已修改并同步现金流');
                 } else {
                     const updates = {
@@ -501,6 +508,13 @@
                         updated_at: Utils.getLocalDateTime()
                     };
                     await SUPABASE.updateExpenseWithCashFlow(expenseId, updates);
+
+                    if (window.Audit) await window.Audit.log('expense_edit', JSON.stringify({
+                        expense_id: expenseId,
+                        before: { amount: oldAmount, category: oldExpense.category, payment_method: oldExpense.payment_method },
+                        after: { amount, category, payment_method: paymentMethod, description },
+                        edited_by: AUTH.user?.name || '-'
+                    }));
 
                     const amountChanged = oldAmount !== amount;
                     if (amountChanged) {
@@ -562,6 +576,13 @@
 
             try {
                 await SUPABASE.deleteExpenseWithCashFlow(expenseId);
+
+                if (window.Audit) await window.Audit.log('expense_delete', JSON.stringify({
+                    expense_id: expenseId,
+                    category: expense.category,
+                    amount: expense.amount,
+                    deleted_by: AUTH.user?.name || '-'
+                }));
 
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran dan arus kas terkait telah dihapus' : '支出及关联现金流已删除');
                 await ExpensesPage.showExpenses();
