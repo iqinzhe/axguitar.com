@@ -1347,5 +1347,5 @@
         if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState();
     });
 
-    console.log('✅ JF.DashboardCore v2.7 修复版（Enter 键防重复触发 + 统一登录页处理）');
+    console.log('✅ JF.DashboardCore v2.0（Enter 键防重复触发 + 统一登录页处理）');
 })();
