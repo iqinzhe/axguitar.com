@@ -568,5 +568,5 @@
     JF.Auth = AUTH;
     window.AUTH = AUTH;
 
-    console.log('✅ JF.Auth v2.4 修复版（logout 只调用一次 signOut）');
+    console.log('✅ JF.Auth v2.0（logout 只调用一次 signOut）');
 })();
