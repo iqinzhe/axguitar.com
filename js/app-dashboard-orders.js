@@ -830,5 +830,5 @@
         window.APP.showPaymentHistory = OrdersPage.showPaymentHistory.bind(OrdersPage);
     }
 
-    console.log('✅ JF.OrdersPage v2.3 修复版（printAllOrders 增加 500 条限制 + 分页提示）');
+    console.log('✅ JF.OrdersPage v2.0（printAllOrders 增加 500 条限制 + 分页提示）');
 })();
