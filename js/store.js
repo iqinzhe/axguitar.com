@@ -708,52 +708,30 @@
 
                 // ========== 生成卡片式财务汇总（屏幕显示） ==========
                 const fmt = (val) => Utils.formatCurrency(val);
-                let cardsHtml = '<div class="store-cards-grid">';
-                for (const s of storeCards) {
-                    cardsHtml += `
-<div class="store-finance-card">
-    <div class="card-header">${Utils.escapeHtml(s.name)} <span style="font-size:0.8rem;">(${Utils.escapeHtml(s.code)})</span></div>
-    <div class="card-grid">
+               let cardsHtml = '';
+    for (let i = 0; i < cards.length; i++) {
+        const s = cards[i];
+        cardsHtml += `
+<div style="border: 1px solid #000; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 9pt;">
+    <div style="font-weight: bold; font-size: 11pt; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #ccc; text-align: center;">
+        ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px; line-height: 1.5;">
+        <!-- 第一行：4个指标 -->
         <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
         <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
         <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
-
         <div><strong>🧾 管理费</strong><br>${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}</div>
+        <!-- 第二行：4个指标 -->
         <div><strong>🛠️ 服务费</strong><br>${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}</div>
         <div><strong>💸 利息</strong><br>${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}</div>
-
         <div><strong>📦 在押资金</strong><br>${fmt(s.deployedCapital)}</div>
         <div><strong>💵 可动用资金</strong><br>${fmt(s.availableCapital)}</div>
+        <!-- 第三行：4个指标 -->
         <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
-
         <div><strong>📉 本月支出</strong><br>${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}</div>
         <div><strong>📈 本月利润</strong><br>${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}</div>
         <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
-    </div>
-</div>`;
-                }
-                cardsHtml += '</div>';
-
-                // 汇总卡片（合计）
-                const summaryHtml = `
-<div class="store-summary-card">
-    <div class="card-header">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</div>
-    <div class="card-grid summary">
-        <div><strong>📋 本月新增</strong><br>${grandTotal.monthNewOrders}</div>
-        <div><strong>🔄 进行中/已结清</strong><br>${grandTotal.activeOrders} / ${grandTotal.completedOrders}</div>
-        <div><strong>💰 本月当金</strong><br>${fmt(grandTotal.monthLoanAmount)}</div>
-
-        <div><strong>🧾 管理费</strong><br>${fmt(grandTotal.monthAdminFee)} / ${fmt(grandTotal.totalAdminFee)}</div>
-        <div><strong>🛠️ 服务费</strong><br>${fmt(grandTotal.monthServiceFee)} / ${fmt(grandTotal.totalServiceFee)}</div>
-        <div><strong>💸 利息</strong><br>${fmt(grandTotal.monthInterest)} / ${fmt(grandTotal.totalInterest)}</div>
-
-        <div><strong>📦 在押资金</strong><br>${fmt(grandTotal.deployedCapital)}</div>
-        <div><strong>💵 可动用资金</strong><br>${fmt(grandTotal.availableCapital)}</div>
-        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(grandTotal.cashBalance)} / ${fmt(grandTotal.bankBalance)}</div>
-
-        <div><strong>📉 本月支出</strong><br>${fmt(grandTotal.monthExpense)} / ${fmt(grandTotal.totalExpense)}</div>
-        <div><strong>📈 本月利润</strong><br>${fmt(grandTotal.monthProfit)} / ${fmt(grandTotal.totalProfit)}</div>
-        <div><strong>💳 偿还本金</strong><br>${fmt(grandTotal.returnCapital)}</div>
     </div>
 </div>`;
 
