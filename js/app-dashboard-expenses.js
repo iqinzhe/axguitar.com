@@ -100,7 +100,7 @@
                     }
                 }
 
-                // 【v2.5 新增】员工支出上限提示
+                // 员工支出上限提示
                 let staffExpenseInfoHtml = '';
                 if (PERMISSION.isStaff()) {
                     const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
@@ -259,8 +259,8 @@
                 }
             }
 
-            // 【v2.5 新增】员工支出金额上限检查
-            if (!PERMISSION.canAddExpenseAmount(amount)) {
+            // 员工支出金额上限检查
+            if (!(await PERMISSION.canAddExpenseAmountAsync(amount))) {
                 const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
                 const warningMsg = lang === 'id'
                     ? `⚠️ Jumlah pengeluaran melebihi batas staf!\n\nBatas maksimal: ${Utils.formatCurrency(maxAmount)}\nJumlah Anda: ${Utils.formatCurrency(amount)}\n\nPengeluaran di atas ${Utils.formatCurrency(maxAmount)} memerlukan persetujuan manajer toko. Silakan hubungi manajer toko Anda.`
