@@ -951,6 +951,12 @@
             }
 
             const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                Utils.toast.warning(lang === 'id'
+                    ? 'Popup diblokir. Izinkan popup untuk halaman ini lalu coba lagi.'
+                    : '弹出窗口被拦截，请允许本页弹出窗口后重试。', 5000);
+                return;
+            }
             printWindow.document.write(`
 <!DOCTYPE html>
 <html>
@@ -967,10 +973,7 @@
         }
         @page {
            size: A4 portrait;
-           margin: 0;
-        }
-        body {
-              padding: 12mm 10mm 12mm 10mm;
+           margin: 12mm 10mm;
         }
         
         .print-container {
@@ -1020,7 +1023,8 @@
     </div>
     <script>
         window.onload = function() {
-            setTimeout(function() { window.print(); }, 100);
+            window.addEventListener('afterprint', function() { window.close(); });
+            window.print();
         };
     <\/script>
 </body>

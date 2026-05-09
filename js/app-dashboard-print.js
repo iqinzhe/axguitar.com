@@ -82,6 +82,12 @@
 
             // 构建打印页面
             const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                Utils.toast.warning(lang === 'id'
+                    ? 'Popup diblokir. Izinkan popup untuk halaman ini lalu coba lagi.'
+                    : '弹出窗口被拦截，请允许本页弹出窗口后重试。', 5000);
+                return;
+            }
             printWindow.document.write(
                 `<!DOCTYPE html>
                 <html>
@@ -264,8 +270,8 @@
                     </div>
                     <script>
                         window.onload = function() {
+                            window.addEventListener('afterprint', function() { window.close(); });
                             window.print();
-                            setTimeout(function() { window.close(); }, 800);
                         };
                     <\/script>
                 </body>
@@ -419,6 +425,7 @@
                             <div class="label">${Utils.escapeHtml(item.label)}</div>
                             <div class="value">${Utils.escapeHtml(item.value)}</div>
                         </div>
+                    </div>
                     `).join('')}
                 </div>
             `;
