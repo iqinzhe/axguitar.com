@@ -630,5 +630,5 @@
         };
     }
 
-    console.log('✅ JF.ExpensesPage v2.6 完成（管理员总部支出打通）');
+    console.log('✅ JF.ExpensesPage v2.0（管理员总部支出打通）');
 })();
