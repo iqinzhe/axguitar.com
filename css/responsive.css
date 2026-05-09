@@ -686,10 +686,13 @@
     margin-top: auto;
 }
 
-/* 移动端适配（复用 responsive.css 已有的断点） */
+/* 移动端适配 */
 @media (max-width: 768px) {
     .profit-cards-grid {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
+    }
+    .profit-cards-grid .card {
+        padding: 8px 6px;
     }
 }
