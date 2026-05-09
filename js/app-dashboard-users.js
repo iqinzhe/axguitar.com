@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v2.0 (JF 命名空间)
+// app-dashboard-users.js - v2.1 (密码重置改为模态框，移除 prompt())
 
 'use strict';
 
@@ -275,30 +275,122 @@
 
         async resetUserPassword(userId, userName) {
             const lang = Utils.lang;
-            const confirmMsg = lang === 'id'
-                ? `⚠️ Reset password untuk "${userName}"?\n\nHarus login ulang dengan password baru.`
-                : `⚠️ 重置 "${userName}" 的密码？\n\n需要使用新密码重新登录。`;
-            const confirmed = await Utils.toast.confirm(confirmMsg);
-            if (!confirmed) return;
 
-            const newPassword = prompt(lang === 'id'
-                ? `Masukkan password baru untuk "${userName}":\n\n(Minimal 6 karakter)`
-                : `请输入 "${userName}" 的新密码：\n\n(至少6个字符)`);
-            if (!newPassword || newPassword.length < 6) {
-                Utils.toast.warning(lang === 'id' ? 'Password minimal 6 karakter' : '密码至少6个字符');
-                return;
-            }
-            const confirmPassword = prompt(lang === 'id' ? 'Konfirmasi password baru:' : '确认新密码：');
-            if (newPassword !== confirmPassword) {
-                Utils.toast.warning(lang === 'id' ? 'Password tidak cocok' : '密码不匹配');
-                return;
-            }
-            try {
-                await AUTH.resetUserPassword(userId, newPassword);
-                Utils.toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
-            } catch (error) {
-                Utils.toast.error(lang === 'id' ? 'Gagal reset password: ' + error.message : '重置密码失败：' + error.message);
-            }
+            // 移除可能残留的旧弹窗
+            document.getElementById('resetPasswordModal')?.remove();
+
+            return new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.id = 'resetPasswordModal';
+                modal.className = 'modal-overlay';
+                modal.innerHTML = `
+                    <div class="modal-content" style="max-width:420px;">
+                        <h3>🔑 ${lang === 'id' ? 'Reset Password' : '重置密码'}</h3>
+                        <p style="color:var(--text-secondary);margin-bottom:16px;">
+                            ${lang === 'id'
+                                ? `Reset password untuk <strong>${Utils.escapeHtml(userName)}</strong>. Pengguna harus login ulang dengan password baru.`
+                                : `重置 <strong>${Utils.escapeHtml(userName)}</strong> 的密码，该用户需使用新密码重新登录。`}
+                        </p>
+                        <div class="form-group" style="margin-bottom:12px;">
+                            <label style="display:block;margin-bottom:4px;">
+                                ${lang === 'id' ? 'Password Baru' : '新密码'} *
+                                <small style="color:var(--text-muted);font-weight:400;">
+                                    (${lang === 'id' ? 'min. 6 karakter' : '至少6个字符'})
+                                </small>
+                            </label>
+                            <div style="position:relative;">
+                                <input id="rp_newPassword" type="password"
+                                    placeholder="${lang === 'id' ? 'Masukkan password baru' : '请输入新密码'}"
+                                    style="width:100%;padding-right:40px;box-sizing:border-box;">
+                                <span id="rp_toggleNew" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.55;font-size:16px;" title="${lang === 'id' ? 'Tampilkan/sembunyikan' : '显示/隐藏'}">👁️</span>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:20px;">
+                            <label style="display:block;margin-bottom:4px;">
+                                ${lang === 'id' ? 'Konfirmasi Password' : '确认新密码'} *
+                            </label>
+                            <div style="position:relative;">
+                                <input id="rp_confirmPassword" type="password"
+                                    placeholder="${lang === 'id' ? 'Ulangi password baru' : '再次输入新密码'}"
+                                    style="width:100%;padding-right:40px;box-sizing:border-box;">
+                                <span id="rp_toggleConfirm" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.55;font-size:16px;" title="${lang === 'id' ? 'Tampilkan/sembunyikan' : '显示/隐藏'}">👁️</span>
+                            </div>
+                        </div>
+                        <div id="rp_error" style="display:none;color:var(--danger);font-size:13px;margin-bottom:12px;"></div>
+                        <div class="modal-actions">
+                            <button id="rp_submitBtn" class="btn btn--warning">🔑 ${lang === 'id' ? 'Reset Password' : '确认重置'}</button>
+                            <button id="rp_cancelBtn" class="btn btn--outline">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                        </div>
+                    </div>`;
+
+                document.body.appendChild(modal);
+
+                const newPwdEl     = document.getElementById('rp_newPassword');
+                const confirmPwdEl = document.getElementById('rp_confirmPassword');
+                const errorEl      = document.getElementById('rp_error');
+                const submitBtn    = document.getElementById('rp_submitBtn');
+                const cancelBtn    = document.getElementById('rp_cancelBtn');
+
+                // 显示/隐藏密码切换
+                document.getElementById('rp_toggleNew').addEventListener('click', () => {
+                    newPwdEl.type = newPwdEl.type === 'password' ? 'text' : 'password';
+                });
+                document.getElementById('rp_toggleConfirm').addEventListener('click', () => {
+                    confirmPwdEl.type = confirmPwdEl.type === 'password' ? 'text' : 'password';
+                });
+
+                const showError = (msg) => {
+                    errorEl.textContent = msg;
+                    errorEl.style.display = 'block';
+                };
+
+                const closeModal = () => {
+                    modal.remove();
+                    resolve();
+                };
+
+                submitBtn.addEventListener('click', async () => {
+                    errorEl.style.display = 'none';
+                    const newPassword     = newPwdEl.value;
+                    const confirmPassword = confirmPwdEl.value;
+
+                    if (!newPassword || newPassword.length < 6) {
+                        showError(lang === 'id' ? 'Password minimal 6 karakter.' : '密码至少需要6个字符。');
+                        newPwdEl.focus();
+                        return;
+                    }
+                    if (newPassword !== confirmPassword) {
+                        showError(lang === 'id' ? 'Password tidak cocok.' : '两次输入的密码不一致。');
+                        confirmPwdEl.focus();
+                        return;
+                    }
+
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = lang === 'id' ? '⏳ Memproses...' : '⏳ 处理中...';
+                    try {
+                        await AUTH.resetUserPassword(userId, newPassword);
+                        closeModal();
+                        Utils.toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
+                    } catch (error) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = `🔑 ${lang === 'id' ? 'Reset Password' : '确认重置'}`;
+                        showError(lang === 'id' ? 'Gagal: ' + error.message : '重置失败：' + error.message);
+                    }
+                });
+
+                cancelBtn.addEventListener('click', closeModal);
+
+                // 点击遮罩关闭
+                modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+                // Enter 键提交
+                [newPwdEl, confirmPwdEl].forEach(el => {
+                    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitBtn.click(); });
+                });
+
+                // 自动聚焦
+                setTimeout(() => newPwdEl.focus(), 50);
+            });
         },
 
         async deleteUser(userId) {
@@ -348,5 +440,5 @@
         };
     }
 
-    console.log('✅ JF.UsersPage v2.0（类名统一）');
+    console.log('✅ JF.UsersPage v2.1（密码重置改为模态框）');
 })();
