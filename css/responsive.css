@@ -407,18 +407,22 @@
 }
 
 /* ============================================================
-   四、打印样式（全系统统一，仅用 no-print 控制）
+   四、打印样式（全系统统一 — 已合并三处 @media print，@page 唯一）
    ============================================================ */
 @media print {
+    /* ------ 页面设置（唯一 @page，竖向 A4，统一边距） ------ */
     @page {
-        size: A4 landscape;
-        margin: 5mm 8mm;
+        size: A4 portrait;
+        margin: 10mm 8mm;
     }
 
+    /* ------ 全局 ------ */
     body {
         background: #fff !important;
         color: #000 !important;
         font-size: 9pt !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     #app {
@@ -427,14 +431,16 @@
         margin: 0 !important;
     }
 
-    /* 隐藏所有含 no-print 类的元素，以及一些已知不需要打印的交互项 */
+    /* ------ 隐藏非打印元素 ------ */
     .no-print,
     .toolbar,
     .action-buttons,
     .action-row,
     .modal-overlay,
     .form-actions,
-    .lang-toggle {
+    .lang-toggle,
+    .print-stamp,
+    .watermark {
         display: none !important;
     }
 
@@ -445,7 +451,13 @@
         text-decoration: none !important;
     }
 
-    /* 卡片 */
+    /* ------ 打印容器（无额外内边距） ------ */
+    .print-container {
+        margin: 0;
+        padding: 0;
+    }
+
+    /* ------ 卡片 ------ */
     .card,
     .cashflow-summary,
     .kpi-card,
@@ -474,7 +486,7 @@
     .page-header h1,
     .page-header h2 { text-align: left !important; }
 
-    /* 表格 */
+    /* ------ 表格 ------ */
     .table-container {
         border: none;
         overflow: visible;
@@ -502,13 +514,13 @@
         word-break: break-word !important;
     }
 
-    /* 徽章 */
+    /* ------ 徽章 ------ */
     .badge {
         border: 1px solid #999 !important;
         background: none !important;
     }
 
-    /* 描述列 */
+    /* ------ 描述列 ------ */
     .data-table .desc-cell,
     .cashflow-table .flow-desc,
     .capital-table .flow-desc,
@@ -520,7 +532,7 @@
         word-break: break-word !important;
     }
 
-    /* 统计卡片 */
+    /* ------ 统计卡片 ------ */
     .stats-grid {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -549,7 +561,7 @@
 
     .card--stat:hover { transform: none !important; }
 
-    /* KPI 卡片打印 */
+    /* ------ KPI 卡片 ------ */
     .kpi-row {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -563,7 +575,7 @@
         font-size: 11pt !important;
     }
 
-    /* 表单打印 */
+    /* ------ 表单 ------ */
     .form-grid,
     .form-grid.form-grid--3,
     .form-grid.form-grid--4 {
@@ -620,7 +632,7 @@
         border: 1px solid #ccc !important;
     }
 
-    /* 异常页面打印 */
+    /* ------ 异常页面 ------ */
     .anomaly-grid {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 8px !important;
@@ -633,10 +645,10 @@
         border: 1px solid #ccc !important;
     }
 
-    /* 订单详情打印 */
+    /* ------ 订单详情 ------ */
     .order-detail-grid { grid-template-columns: repeat(4, 1fr) !important; }
 
-    /* 备份页面打印 */
+    /* ------ 备份页面 ------ */
     .backup-grid { grid-template-columns: repeat(2, 1fr) !important; }
 
     .backup-card {
@@ -654,7 +666,33 @@
         border-left: 4px solid #999 !important;
     }
 
-    /* 隐藏打印时不需要的按钮 */
+    /* ------ 门店财务汇总 ------ */
+    .store-cards-grid {
+        display: block;
+    }
+
+    .store-finance-card,
+    .store-summary-card {
+        border: 1px solid #000;
+        margin-bottom: 12px;
+        page-break-inside: avoid;
+        padding: 8px;
+        box-shadow: none !important;
+    }
+
+    .card-grid {
+        font-size: 8pt;
+        gap: 12px 6px;
+    }
+
+    .store-finance-card .card-grid div,
+    .store-summary-card .card-grid div {
+        background: none;
+        border: none;
+        padding: 2px 0;
+    }
+
+    /* ------ 隐藏打印时不需要的按钮 ------ */
     .btn-backup-primary,
     .btn-restore,
     .btn-blacklist,
@@ -699,62 +737,7 @@
 }
 
 /* ============================================================
-   六、门店财务汇总打印专用样式（移除打印戳记 + 页码）
-   ============================================================ */
-
-@media print {
-    /* 移除浏览器默认的打印页眉页脚（URL、日期等） - 这是移除打印戳记的关键 */
-    @page {
-        size: A4 portrait;
-        margin: 12mm 10mm 12mm 10mm;
-        /* 移除默认的页眉和页脚内容 */
-        @top-center {
-            content: none;
-        }
-        @bottom-center {
-            content: "JF! by Gadai --- 典当管理系统 --- " counter(page) "/" counter(pages);
-            font-size: 8pt;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            font-weight: normal;
-            color: #666;
-        }
-        @top-left {
-            content: none;
-        }
-        @top-right {
-            content: none;
-        }
-        @bottom-left {
-            content: none;
-        }
-        @bottom-right {
-            content: none;
-        }
-    }
-
-    /* 隐藏打印窗口中的额外元素 */
-    .print-container {
-        margin: 0;
-        padding: 0;
-    }
-
-    /* 确保没有额外的打印戳记元素 */
-    .print-stamp,
-    .watermark,
-    .no-print {
-        display: none !important;
-    }
-
-    /* 移除 body 上的任何默认边距 */
-    body {
-        margin: 0;
-        padding: 0;
-        background: white;
-    }
-}
-
-/* ============================================================
-   七、门店财务汇总屏幕显示样式（优化分隔）
+   六、门店财务汇总屏幕显示样式（优化分隔）
    ============================================================ */
 
 /* ---------- 基础卡片容器 ---------- */
@@ -856,26 +839,4 @@
     }
 }
 
-/* ---------- 浏览器直接打印时的简化样式 ---------- */
-@media print {
-    .store-cards-grid {
-        display: block;
-    }
-    .store-finance-card,
-    .store-summary-card {
-        border: 1px solid #000;
-        margin-bottom: 12px;
-        page-break-inside: avoid;
-        padding: 8px;
-    }
-    .card-grid {
-        font-size: 8pt;
-        gap: 12px 6px;  /* 行间距 列间距 */
-    }
-    .store-finance-card .card-grid div,
-    .store-summary-card .card-grid div {
-        background: none;
-        border: none;
-        padding: 2px 0;
-    }
-}
+
