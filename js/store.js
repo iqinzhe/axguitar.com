@@ -1030,13 +1030,13 @@
         /* 卡片标题 */
         .st {
             font-weight: bold;
-            font-size: 10pt;
+            font-size: 12pt;
             text-align: center;
-            padding: 4px 8px;
+            padding: 5px 8px;
             background: #f1f5f9;
             border-bottom: 1.5px solid #334155;
         }
-        .sc2 { font-size: 8pt; color: #64748b; font-weight: normal; }
+        .sc2 { font-size: 10pt; color: #64748b; font-weight: normal; }
 
         /* 指标网格 4列×3行，带线框 */
         .mg {
@@ -1046,16 +1046,12 @@
         .mc {
             border-right: 1px solid #cbd5e1;
             border-bottom: 1px solid #cbd5e1;
-            padding: 5px 7px;
-            min-height: 14mm;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            padding: 6px 8px;
         }
         .mc:nth-child(4n)   { border-right: none; }
         .mc:nth-child(n+9)  { border-bottom: none; }
-        .ml { font-size: 6.5pt; color: #475569; font-weight: 600; margin-bottom: 2px; }
-        .mv { font-size: 8.5pt; font-weight: 700; color: #0f172a; line-height: 1.3; word-break: break-all; }
+        .ml { font-size: 9pt; color: #475569; font-weight: 600; margin-bottom: 3px; }
+        .mv { font-size: 11pt; font-weight: 700; color: #0f172a; line-height: 1.4; word-break: break-all; }
     </style>
 </head>
 <body>
