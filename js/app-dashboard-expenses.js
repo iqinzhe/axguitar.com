@@ -74,11 +74,7 @@
                     }
                 }
 
-                // 类别选项
-                const expenseCategories = lang === 'id'
-                    ? ['Listrik', 'Air', 'Internet', 'Gaji Karyawan', 'Sewa Tempat', 'ATK', 'Perbaikan', 'Transportasi', 'Lainnya']
-                    : ['电费', '水费', '网络费', '员工工资', '场地租金', '办公用品', '维修', '交通费', '其他'];
-                const categoryOptions = expenseCategories.map(c => `<option value="${c}">${c}</option>`).join('');
+                // 类别选项已移除，改为自由文本输入
 
                 // 获取门店练习状态提示
                 let practiceWarningHtml = '';
@@ -167,10 +163,8 @@
                             </div>
                             <div class="form-group">
                                 <label>${lang === 'id' ? 'Kategori / Penyebab' : '类别/原因'} *</label>
-                                <select id="expenseCategory">
-                                    <option value="">${lang === 'id' ? 'Pilih kategori' : '选择类别'}</option>
-                                    ${categoryOptions}
-                                </select>
+                                <input type="text" id="expenseCategory"
+                                    placeholder="${lang === 'id' ? 'Contoh: Listrik, Gaji, Sewa...' : '如：电费、工资、房租…'}">
                             </div>
                             <div class="form-group">
                                 <label>${lang === 'id' ? 'Metode Pembayaran' : '支付方式'} *</label>
