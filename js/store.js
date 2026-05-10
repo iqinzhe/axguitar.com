@@ -1,5 +1,5 @@
 // store.js - v2.0 卡片式财务汇总（屏幕双列 + 打印每页4张 + 4列指标 + 无打印戳记）
-// 修复：12项财务指标完整中文/印尼语双语标签，增加 totalOrders 字段
+// 修复：手机端卡片内项目改为单列显示；12项指标完整中文/印尼语双语标签；增加 totalOrders 字段
 
 'use strict';
 
@@ -463,7 +463,7 @@
             }
         },
 
-        // ==================== 构建门店管理 HTML（屏幕显示，完整双语标签） ====================
+        // ==================== 构建门店管理 HTML（屏幕显示，完整双语标签，手机端单列） ====================
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -794,6 +794,15 @@
                 }
 
                 const content = `
+                    <!-- 手机端强制单列显示 -->
+                    <style>
+                        @media (max-width: 768px) {
+                            .store-finance-card .card-grid,
+                            .store-summary-card .card-grid {
+                                grid-template-columns: 1fr !important;
+                            }
+                        }
+                    </style>
                     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
                         <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
                         <div class="header-actions">
@@ -1018,10 +1027,7 @@
             color: #94a3b8;
         }
 
-        /* 门店卡片
-           A4可用高 = 297-16 = 281mm; 页眉≈12mm, 页脚≈8mm, 4卡间距≈12mm
-           单卡可用 ≈ (281-12-8-12)/4 ≈ 62mm
-        */
+        /* 门店卡片 */
         .sc {
             border: 1.5px solid #334155;
             border-radius: 5px;
@@ -1030,7 +1036,6 @@
             page-break-inside: avoid;
             overflow: hidden;
         }
-        /* 卡片标题 */
         .st {
             font-weight: bold;
             font-size: 12pt;
@@ -1041,7 +1046,6 @@
         }
         .sc2 { font-size: 10pt; color: #64748b; font-weight: normal; }
 
-        /* 指标网格 4列×3行，带线框 */
         .mg {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
