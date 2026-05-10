@@ -884,7 +884,7 @@
             }
         },
 
-        // ==================== 打印门店财务汇总（4列×3行，无打印戳记） ====================
+        // ==================== 打印门店财务汇总（统一页眉页脚 + A4满版 + 线框 + 分页继承） ====================
         printStoreFinanceSummary() {
             const lang = Utils.lang;
             const cards = window._storeCardsData || [];
@@ -909,33 +909,40 @@
 
             const fmt = (val) => Utils.formatCurrency(val);
 
+            // 页眉信息行
+            const headerStoreInfo = isAdmin
+                ? (lang === 'id' ? 'Kantor Pusat' : '总部')
+                : (lang === 'id' ? 'Toko: ' : '门店: ') + Utils.escapeHtml(storeName);
+
+            // 每个指标单元格：带线框、加大行高
+            const cell = (icon, label, value) =>
+                `<div class="metric-cell"><div class="metric-label">${icon} ${label}</div><div class="metric-value">${value}</div></div>`;
+
             let cardsHtml = '';
             for (let i = 0; i < cards.length; i++) {
                 const s = cards[i];
+                const isZh = lang !== 'id';
                 cardsHtml += `
-<div style="border: 1px solid #000; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; page-break-inside: avoid; background: #fff; width: 98%; margin-left: auto; margin-right: auto; font-size: 9pt;">
-    <div style="font-weight: bold; font-size: 11pt; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #ccc; text-align: center;">
-        ${Utils.escapeHtml(s.name)} (${Utils.escapeHtml(s.code)})
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px; line-height: 1.5;">
-        <div><strong>📋 本月新增</strong><br>${s.monthNewOrders}</div>
-        <div><strong>🔄 进行中/已结清</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
-        <div><strong>💰 本月当金</strong><br>${fmt(s.monthLoanAmount)}</div>
-        <div><strong>🧾 管理费</strong><br>${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}</div>
-
-        <div><strong>🛠️ 服务费</strong><br>${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}</div>
-        <div><strong>💸 利息</strong><br>${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}</div>
-        <div><strong>📦 在押资金</strong><br>${fmt(s.deployedCapital)}</div>
-        <div><strong>💵 可动用资金</strong><br>${fmt(s.availableCapital)}</div>
-
-        <div><strong>🏦 保险柜 / 🏧 BNI</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
-        <div><strong>📉 本月支出</strong><br>${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}</div>
-        <div><strong>📈 本月利润</strong><br>${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}</div>
-        <div><strong>💳 偿还本金</strong><br>${fmt(s.returnCapital)}</div>
+<div class="store-card">
+    <div class="store-card-title">${Utils.escapeHtml(s.name)} <span class="store-code">(${Utils.escapeHtml(s.code)})</span></div>
+    <div class="metrics-grid">
+        ${cell('📋', isZh ? '本月新增' : 'Order Baru', s.monthNewOrders)}
+        ${cell('🔄', isZh ? '进行中 / 结清' : 'Aktif / Lunas', `${s.activeOrders} / ${s.completedOrders}`)}
+        ${cell('💰', isZh ? '本月当金' : 'Pinjaman Bln', fmt(s.monthLoanAmount))}
+        ${cell('🧾', isZh ? '管理费 (月/累)' : 'Adm (Bln/Total)', `${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}`)}
+        ${cell('🛠️', isZh ? '服务费 (月/累)' : 'Jasa (Bln/Total)', `${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}`)}
+        ${cell('💸', isZh ? '利息 (月/累)' : 'Bunga (Bln/Total)', `${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}`)}
+        ${cell('📦', isZh ? '在押资金' : 'Dana Terjamin', fmt(s.deployedCapital))}
+        ${cell('💵', isZh ? '可动用资金' : 'Dana Tersedia', fmt(s.availableCapital))}
+        ${cell('🏦', isZh ? '保险柜 / 银行' : 'Brankas / BNI', `${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}`)}
+        ${cell('📉', isZh ? '本月支出 (月/累)' : 'Pengeluaran', `${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}`)}
+        ${cell('📈', isZh ? '本月利润 (月/累)' : 'Laba (Bln/Total)', `${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}`)}
+        ${cell('💳', isZh ? '偿还本金' : 'Cicilan Pokok', fmt(s.returnCapital))}
     </div>
 </div>`;
+                // 每4张卡片后分页（最后一组不加）
                 if ((i + 1) % 4 === 0 && i !== cards.length - 1) {
-                    cardsHtml += '<div style="page-break-after: always; break-after: page;"></div>';
+                    cardsHtml += '<div class="page-break"></div>';
                 }
             }
 
@@ -953,63 +960,208 @@
     <meta charset="UTF-8">
     <title>JF! by Gadai - ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</title>
     <style>
+        /* ===== 全局重置 ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', 'Courier New', monospace;
-            background: #fff;
-            margin: 0;
-            padding: 0;
-        }
+
+        /* ===== 隐藏浏览器默认打印戳记（URL / 标题栏）===== */
         @page {
-           size: A4 portrait;
-           margin: 12mm 10mm;
+            size: A4 portrait;
+            /* 将页边距留给我们自己的 running header/footer */
+            margin-top: 28mm;
+            margin-bottom: 18mm;
+            margin-left: 10mm;
+            margin-right: 10mm;
         }
-        
-        .print-container {
-            margin: 0;
-            padding: 0;
+
+        /* ===== 统一页眉（每页固定顶部）===== */
+        .page-header-fixed {
+            position: running(pageHeader);
         }
+        @page { @top-center { content: element(pageHeader); } }
+
+        /* ===== 统一页脚（每页固定底部）===== */
+        .page-footer-fixed {
+            position: running(pageFooter);
+        }
+        @page { @bottom-center { content: element(pageFooter); } }
+
+        /* ===== 兼容方案：用 fixed 定位模拟多页页眉页脚 ===== */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 9pt;
+            color: #1e293b;
+            background: #fff;
+        }
+
+        /* 页眉 */
         .print-header {
-            text-align: center;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            padding: 4mm 10mm 3mm;
+            background: #fff;
             border-bottom: 2px solid #1e293b;
+            z-index: 999;
         }
-        .print-header .logo {
-            font-size: 14pt;
+        .print-header .logo-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 13pt;
             font-weight: bold;
             color: #0e7490;
+            margin-bottom: 2px;
         }
-        .print-header-info {
-            font-size: 9pt;
+        .print-header .logo-line img {
+            height: 24px;
+            width: auto;
+            vertical-align: middle;
+        }
+        .print-header .info-line {
+            text-align: center;
+            font-size: 8pt;
             color: #475569;
-            margin-top: 4px;
+            white-space: nowrap;
         }
-        .print-container > div {
-            break-inside: avoid;
+        .print-header .period-line {
+            text-align: center;
+            font-size: 7.5pt;
+            color: #64748b;
+            margin-top: 1px;
+        }
+
+        /* 页脚 */
+        .print-footer {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            padding: 2mm 10mm;
+            background: #fff;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 7pt;
+            color: #94a3b8;
+            z-index: 999;
+        }
+        .print-footer .footer-left { text-align: left; }
+        .print-footer .footer-right { text-align: right; }
+
+        /* 内容区留出页眉页脚空间 */
+        .print-body {
+            /* top / bottom 由 @page margin 控制，这里额外补偿 fixed 元素高度 */
+            padding-top: 2mm;
+            padding-bottom: 2mm;
+        }
+
+        /* ===== 门店卡片 ===== */
+        /* A4可用高度约 257mm - 28mm(顶) - 18mm(底) = ~211mm
+           4张卡片均分: ~51mm 每张, 留 4mm gap => 卡片内容高约 47mm */
+        .store-card {
+            border: 2px solid #334155;
+            border-radius: 6px;
+            margin-bottom: 5mm;
             page-break-inside: avoid;
+            break-inside: avoid;
+            overflow: hidden;
         }
+        .store-card-title {
+            font-weight: bold;
+            font-size: 10.5pt;
+            text-align: center;
+            padding: 4px 10px;
+            background: #f1f5f9;
+            border-bottom: 1.5px solid #334155;
+            letter-spacing: 0.3px;
+        }
+        .store-code {
+            font-size: 8.5pt;
+            color: #64748b;
+            font-weight: normal;
+        }
+
+        /* 指标网格：4列 × 3行 */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            /* 行高撑满卡片剩余空间 */
+        }
+        .metric-cell {
+            border-right: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 5px 8px;
+            /* 约 11mm 行高，3行共33mm，加标题 8mm ≈ 41mm，4张 ≈ 164mm，加间距约 200mm */
+            min-height: 11mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        /* 最后一列去掉右边框 */
+        .metric-cell:nth-child(4n) { border-right: none; }
+        /* 最后一行去掉下边框 */
+        .metric-cell:nth-child(n+9) { border-bottom: none; }
+
+        .metric-label {
+            font-size: 7pt;
+            color: #475569;
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 3px;
+        }
+        .metric-value {
+            font-size: 9pt;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.3;
+            word-break: break-all;
+        }
+
+        /* 分页 */
         .page-break {
             page-break-after: always;
             break-after: page;
         }
+
+        /* 打印时确保 fixed 元素在每页显示（主流浏览器支持）*/
+        @media print {
+            /* 隐藏浏览器自动生成的 URL / 日期戳 */
+            html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+            .print-header { position: fixed; top: 0; }
+            .print-footer { position: fixed; bottom: 0; }
+
+            /* 页码由 JS 计数器驱动，写在页脚右侧 */
+            .store-card { break-inside: avoid; }
+        }
     </style>
 </head>
 <body>
-    <div class="print-container">
-        <div class="print-header">
-            <div class="logo">JF! by Gadai</div>
-            <div class="print-header-info">
-                🏪 ${isAdmin ? (lang === 'id' ? 'Kantor Pusat' : '总部') : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)}
-                &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
-                &nbsp;|&nbsp; 📅 ${printDateTime}
-            </div>
-            <div class="print-header-info" style="font-size:8pt;">
-                📆 ${lang === 'id' ? 'Periode' : '统计期间'} : ${periodStart} ~ ${periodEnd}
-            </div>
+
+    <!-- ===== 统一页眉（每页继承）===== -->
+    <div class="print-header">
+        <div class="logo-line">
+            <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
+            JF! by Gadai
         </div>
+        <div class="info-line">
+            🏪 ${headerStoreInfo} &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
+        </div>
+        <div class="period-line">
+            📆 ${lang === 'id' ? 'Periode' : '统计期间'}: ${periodStart} ~ ${periodEnd} &nbsp;|&nbsp; ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}
+        </div>
+    </div>
+
+    <!-- ===== 统一页脚（每页继承）===== -->
+    <div class="print-footer">
+        <div class="footer-left">JF! by Gadai &nbsp;·&nbsp; ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'} &nbsp;·&nbsp; ${Utils.escapeHtml(roleText)}: ${Utils.escapeHtml(userName)}</div>
+        <div class="footer-right" id="pageInfo">${lang === 'id' ? 'Halaman' : '第'} <span id="pageNum">1</span> ${lang === 'id' ? '' : '页'}</div>
+    </div>
+
+    <!-- ===== 内容区 ===== -->
+    <div class="print-body">
         ${cardsHtml}
     </div>
+
     <script>
         window.onload = function() {
             window.addEventListener('afterprint', function() { window.close(); });
@@ -1019,8 +1171,8 @@
 </body>
 </html>
     `);
-    printWindow.document.close();
-},
+            printWindow.document.close();
+        },
 
         // 供外壳调用的渲染函数
         async renderStoreManagementHTML() {

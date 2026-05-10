@@ -95,47 +95,73 @@
                     <meta charset="UTF-8">
                     <title>JF! by Gadai - ${lang === 'id' ? 'Cetak' : '打印'}</title>
                     <style>
+                        /* ===== 统一打印样式 v3.0 ===== */
                         * { box-sizing: border-box; margin: 0; padding: 0; }
+
+                        /* 隐藏浏览器默认打印戳记（URL / 标题 / 日期）*/
+                        @page {
+                            size: A4 portrait;
+                            margin-top: 26mm;
+                            margin-bottom: 16mm;
+                            margin-left: 8mm;
+                            margin-right: 8mm;
+                        }
+
                         body { 
                             font-family: 'Segoe UI', Arial, sans-serif; 
                             font-size: 9pt; 
-                            line-height: 1.3; 
+                            line-height: 1.4; 
                             color: #1e293b; 
                             padding: 0; 
                             margin: 0; 
                         }
-                        .print-container { padding: 5mm; }
-                        .print-header { 
-                            text-align: center; 
-                            margin-bottom: 8px; 
-                            padding-bottom: 6px; 
+
+                        /* ===== 统一页眉（每页固定顶部）===== */
+                        .print-header {
+                            position: fixed;
+                            top: 0; left: 0; right: 0;
+                            padding: 3mm 8mm 2mm;
+                            background: #fff;
                             border-bottom: 2px solid #1e293b;
+                            z-index: 999;
                         }
                         .print-header .logo { 
-                            font-size: 14pt; 
+                            font-size: 13pt; 
                             font-weight: bold; 
                             color: #0e7490;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                             gap: 8px;
+                            margin-bottom: 2px;
                         }
-                        .print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
+                        .print-header .logo img { height: 24px; width: auto; vertical-align: middle; }
                         .print-header-info {
-                            font-size: 9pt;
+                            font-size: 8pt;
                             color: #475569;
-                            margin: 4px 0 8px;
                             text-align: center;
                             white-space: nowrap;
                         }
+
+                        /* ===== 统一页脚（每页固定底部）===== */
                         .print-footer { 
-                            text-align: center; 
+                            position: fixed;
+                            bottom: 0; left: 0; right: 0;
+                            padding: 2mm 8mm;
+                            background: #fff;
+                            border-top: 1px solid #e2e8f0;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
                             font-size: 7pt; 
                             color: #94a3b8; 
-                            margin-top: 12px; 
-                            padding-top: 6px; 
-                            border-top: 1px solid #e2e8f0; 
                         }
+                        .print-footer .footer-left { text-align: left; }
+                        .print-footer .footer-right { text-align: right; }
+
+                        /* 内容区（留出页眉页脚空间）*/
+                        .print-container { padding: 0; }
+
                         table { width: 100%; border-collapse: collapse; margin: 6px 0; }
                         th { background: #f1f5f9; font-weight: 600; text-align: left; }
                         th, td { 
@@ -239,8 +265,11 @@
                         .user-table .action-row,
                         .data-table .action-row { display: none !important; }
                         @media print {
-                            @page { size: A4 portrait; margin: 8mm; }
+                            @page { size: A4 portrait; margin-top: 26mm; margin-bottom: 16mm; margin-left: 8mm; margin-right: 8mm; }
+                            html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                             body { margin: 0; padding: 0; }
+                            .print-header { position: fixed; top: 0; }
+                            .print-footer { position: fixed; bottom: 0; }
                             .print-container { padding: 0; }
                             .card { break-inside: avoid; }
                             .anomaly-card { break-inside: avoid; page-break-inside: avoid; }
@@ -250,23 +279,29 @@
                     </style>
                 </head>
                 <body>
+                    <!-- ===== 统一页眉（每页继承）===== -->
+                    <div class="print-header">
+                        <div class="logo">
+                            <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
+                            JF! by Gadai
+                        </div>
+                        <div class="print-header-info">
+                            🏪 ${isAdmin
+                                ? (lang === 'id' ? 'Kantor Pusat' : '总部')
+                                : (lang === 'id' ? 'Toko: ' : '门店: ') + Utils.escapeHtml(storeName)
+                            } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
+                        </div>
+                    </div>
+
+                    <!-- ===== 统一页脚（每页继承）===== -->
+                    <div class="print-footer">
+                        <div class="footer-left">JF! by Gadai &nbsp;·&nbsp; ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'} &nbsp;·&nbsp; ${Utils.escapeHtml(roleText)}: ${Utils.escapeHtml(userName)}</div>
+                        <div class="footer-right">${lang === 'id' ? 'Halaman' : '第'} <span id="pageNum">1</span>${lang === 'id' ? '' : ' 页'}</div>
+                    </div>
+
+                    <!-- ===== 内容区 ===== -->
                     <div class="print-container">
-                        <div class="print-header">
-                            <div class="logo">
-                                <img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
-                                JF! by Gadai
-                            </div>
-                            <div class="print-header-info">
-                                🏪 ${isAdmin
-                                    ? (lang === 'id' ? 'Kantor Pusat' : '总部')
-                                    : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
-                                } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
-                            </div>
-                        </div>
                         ${printContent.innerHTML}
-                        <div class="print-footer">
-                            JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
-                        </div>
                     </div>
                     <script>
                         window.onload = function() {
