@@ -1,5 +1,6 @@
 // app-profit.js - v2.0 (JF 命名空间)
 // 收益处置页面（利润再投入 / 偿还本金）
+// 修复：移动端滚动截断问题，增加外层滚动容器
 
 'use strict';
 
@@ -155,7 +156,9 @@
                     </div>
                 `;
 
-                document.getElementById('app').innerHTML = content;
+                // 修复移动端滚动截断：在内容外层包裹可滚动容器
+                const mobileScrollStyle = 'overflow-y:auto; height:100vh; -webkit-overflow-scrolling:touch; padding-bottom:16px; box-sizing:border-box;';
+                document.getElementById('app').innerHTML = `<div style="${mobileScrollStyle}">${content}</div>`;
 
                 // 绑定金额输入格式化
                 const reinvestInput = document.getElementById('reinvestAmount');
