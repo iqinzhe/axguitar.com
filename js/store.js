@@ -1,5 +1,6 @@
 // store.js - v2.0 卡片式财务汇总
-// 修复：桌面端固定 4 列 3 行（与打印一致）；手机端自动单列；12 项双语标签；增加 totalOrders
+// 打印：卡片单列垂直排列，占满宽度；屏幕：卡片间单列，内部4×3；手机：全单列
+// 12项双语标签；增加 totalOrders
 
 'use strict';
 
@@ -560,7 +561,7 @@
     </div>
 </div>`;
 
-                // 门店列表行（保持不变，省略部分代码以减少长度，实际与之前相同）
+                // 门店列表行保持不变
                 let storeRows = '';
                 if (StoreManager.stores.length === 0) {
                     storeRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td>`;
@@ -609,15 +610,21 @@
                 }
 
                 const content = `
-                    <!-- 桌面端固定4列3行，手机端自动单列 -->
                     <style>
+                        /* 卡片之间单列排列 */
+                        .store-cards-grid {
+                            display: flex !important;
+                            flex-direction: column !important;
+                            gap: 16px !important;
+                        }
+                        /* 卡片内部：桌面端4列，手机端单列 */
                         .store-finance-card .card-grid,
                         .store-summary-card .card-grid {
                             display: grid;
-                            grid-template-columns: repeat(4, 1fr) !important;
+                            grid-template-columns: repeat(4, 1fr);
                             gap: 10px;
                         }
-                        @media (max-width: 768px) {
+                        @media screen and (max-width: 768px) {
                             .store-finance-card .card-grid,
                             .store-summary-card .card-grid {
                                 grid-template-columns: 1fr !important;
@@ -711,7 +718,7 @@
             }
         },
 
-        // ==================== 打印门店财务汇总（与之前相同，省略以节省篇幅） ====================
+        // ==================== 打印门店财务汇总（卡片单列垂直排列，占满宽度） ====================
         printStoreFinanceSummary() {
             const lang = Utils.lang;
             const cards = window._storeCardsData || [];
@@ -719,37 +726,145 @@
                 Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
                 return;
             }
+
             const isAdmin = PERMISSION.isAdmin();
             let storeName = '', roleText = '', userName = '';
             try {
                 storeName = AUTH.getCurrentStoreName();
                 roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工');
                 userName = AUTH.user?.name || '-';
-            } catch (e) { }
+            } catch (e) { /* ignore */ }
+
             const printDateTime = new Date().toLocaleString();
             const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
             const periodEnd = new Date().toISOString().split('T')[0];
+
             const fmt = (val) => Utils.formatCurrency(val);
             const isZh = lang !== 'id';
-            const cell = (icon, label, value) => `<div class="mc"><div class="ml">${icon} ${label}</div><div class="mv">${value}</div></div>`;
-            const headerBlock = `<div class="ph"><div class="ph-logo"><img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'" style="height:22px;vertical-align:middle;margin-right:6px;">JF! by Gadai</div><div class="ph-info">🏪 ${isAdmin ? (isZh ? '总部' : 'Kantor Pusat') : (isZh ? '门店：' : 'Toko: ') + Utils.escapeHtml(storeName)} &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime} &nbsp;|&nbsp; 📆 ${isZh ? '统计期间' : 'Periode'}: ${periodStart} ~ ${periodEnd}</div></div>`;
-            const totalPages = Math.ceil(cards.length / 4);
-            const makeFooter = (pageNum) => `<div class="pf"><span>JF! by Gadai &nbsp;·&nbsp; ${isZh ? '典当管理系统' : 'Sistem Manajemen Gadai'} &nbsp;·&nbsp; ${pageNum}/${totalPages}</span></div>`;
-            let pagesHtml = '';
-            let pageNum = 0;
-            for (let i = 0; i < cards.length; i++) {
-                const s = cards[i];
-                if (i % 4 === 0) {
-                    if (i > 0) pagesHtml += '<div class="pb"></div>';
-                    pageNum++;
-                    pagesHtml += headerBlock;
-                }
-                pagesHtml += `<div class="sc"><div class="st">${Utils.escapeHtml(s.name)} <span class="sc2">(${Utils.escapeHtml(s.code)})</span></div><div class="mg">${cell('📋', isZh ? '本月新增订单 / 单数总计' : 'Pesanan Baru / Total', `${s.monthNewOrders} / ${s.totalOrders}`)}${cell('🔄', isZh ? '进行中订单/已结清订单' : 'Aktif / Lunas', `${s.activeOrders} / ${s.completedOrders}`)}${cell('💰', isZh ? '本月当金' : 'Pinjaman Bulan Ini', fmt(s.monthLoanAmount))}${cell('🧾', isZh ? '本月管理费 / 累管理费' : 'Admin Bulan Ini / Total Admin', `${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}`)}${cell('🛠️', isZh ? '本月服务费 / 累计服务费' : 'Layanan Bulan Ini / Total Layanan', `${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}`)}${cell('💸', isZh ? '本月利息 / 累计利息' : 'Bunga Bulan Ini / Total Bunga', `${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}`)}${cell('📦', isZh ? '在押资金' : 'Dana Terjamin', fmt(s.deployedCapital))}${cell('💵', isZh ? '可动用资金' : 'Dana Tersedia', fmt(s.availableCapital))}${cell('🏦', isZh ? '保险柜现金 / 银行BNI存款' : 'Brankas / Bank BNI', `${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}`)}${cell('📉', isZh ? '本月支出 / 累支出' : 'Pengeluaran Bulan Ini / Total', `${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}`)}${cell('📈', isZh ? '本月利润 / 累计利润' : 'Laba Bulan Ini / Total Laba', `${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}`)}${cell('💳', isZh ? '偿还本金' : 'Cicilan Pokok', fmt(s.returnCapital))}</div></div>`;
-                if ((i + 1) % 4 === 0 || i === cards.length - 1) pagesHtml += makeFooter(pageNum);
+
+            const cell = (icon, label, value) =>
+                `<div class="mc"><div class="ml">${icon} ${label}</div><div class="mv">${value}</div></div>`;
+
+            const headerBlock = `
+                <div class="ph">
+                    <div class="ph-logo"><img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'" style="height:22px;vertical-align:middle;margin-right:6px;"> JF! by Gadai</div>
+                    <div class="ph-info">
+                        🏪 ${isAdmin ? (isZh ? '总部' : 'Kantor Pusat') : (isZh ? '门店：' : 'Toko: ') + Utils.escapeHtml(storeName)}
+                        &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
+                        &nbsp;|&nbsp; 📅 ${printDateTime}
+                        &nbsp;|&nbsp; 📆 ${isZh ? '统计期间' : 'Periode'}: ${periodStart} ~ ${periodEnd}
+                    </div>
+                </div>`;
+
+            // 构建卡片 HTML，单列垂直排列
+            let cardsHtml = headerBlock;
+            for (const s of cards) {
+                cardsHtml += `
+<div class="sc">
+    <div class="st">${Utils.escapeHtml(s.name)} <span class="sc2">(${Utils.escapeHtml(s.code)})</span></div>
+    <div class="mg">
+        ${cell('📋', isZh ? '本月新增订单 / 单数总计' : 'Pesanan Baru / Total', `${s.monthNewOrders} / ${s.totalOrders}`)}
+        ${cell('🔄', isZh ? '进行中订单/已结清订单' : 'Aktif / Lunas', `${s.activeOrders} / ${s.completedOrders}`)}
+        ${cell('💰', isZh ? '本月当金' : 'Pinjaman Bulan Ini', fmt(s.monthLoanAmount))}
+        ${cell('🧾', isZh ? '本月管理费 / 累管理费' : 'Admin Bulan Ini / Total Admin', `${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}`)}
+        ${cell('🛠️', isZh ? '本月服务费 / 累计服务费' : 'Layanan Bulan Ini / Total Layanan', `${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}`)}
+        ${cell('💸', isZh ? '本月利息 / 累计利息' : 'Bunga Bulan Ini / Total Bunga', `${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}`)}
+        ${cell('📦', isZh ? '在押资金' : 'Dana Terjamin', fmt(s.deployedCapital))}
+        ${cell('💵', isZh ? '可动用资金' : 'Dana Tersedia', fmt(s.availableCapital))}
+        ${cell('🏦', isZh ? '保险柜现金 / 银行BNI存款' : 'Brankas / Bank BNI', `${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}`)}
+        ${cell('📉', isZh ? '本月支出 / 累支出' : 'Pengeluaran Bulan Ini / Total', `${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}`)}
+        ${cell('📈', isZh ? '本月利润 / 累计利润' : 'Laba Bulan Ini / Total Laba', `${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}`)}
+        ${cell('💳', isZh ? '偿还本金' : 'Cicilan Pokok', fmt(s.returnCapital))}
+    </div>
+</div>`;
             }
+
             const printWindow = window.open('', '_blank');
-            if (!printWindow) return;
-            printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>JF! by Gadai - ${isZh ? '门店财务汇总' : 'Ringkasan Keuangan Toko'}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#1e293b;background:#fff}@page{size:A4 portrait;margin:8mm 10mm}@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact}}.pb{page-break-after:always;break-after:page}.ph{text-align:center;border-bottom:2px solid #1e293b;padding-bottom:5px;margin-bottom:5px}.ph-logo{font-size:13pt;font-weight:bold;color:#0e7490;margin-bottom:2px}.ph-info{font-size:7.5pt;color:#475569;white-space:nowrap}.pf{border-top:1px solid #e2e8f0;padding-top:4px;margin-top:5px;text-align:center;font-size:7pt;color:#94a3b8}.sc{border:1.5px solid #334155;border-radius:5px;margin-bottom:4mm;break-inside:avoid;page-break-inside:avoid;overflow:hidden}.st{font-weight:bold;font-size:12pt;text-align:center;padding:5px 8px;background:#f1f5f9;border-bottom:1.5px solid #334155}.sc2{font-size:10pt;color:#64748b;font-weight:normal}.mg{display:grid;grid-template-columns:repeat(4,1fr)}.mc{border-right:1px solid #cbd5e1;border-bottom:1px solid #cbd5e1;padding:6px 8px}.mc:nth-child(4n){border-right:none}.mc:nth-child(n+9){border-bottom:none}.ml{font-size:9pt;color:#475569;font-weight:600;margin-bottom:3px}.mv{font-size:11pt;font-weight:700;color:#0f172a;line-height:1.4;word-break:break-all}</style></head><body>${pagesHtml}<script>window.onload=function(){window.addEventListener('afterprint',function(){window.close()});window.print()};<\/script></body></html>`);
+            if (!printWindow) {
+                Utils.toast.warning(lang === 'id' ? 'Popup diblokir. Izinkan popup untuk halaman ini lalu coba lagi.' : '弹出窗口被拦截，请允许本页弹出窗口后重试。', 5000);
+                return;
+            }
+            printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JF! by Gadai - ${isZh ? '门店财务汇总' : 'Ringkasan Keuangan Toko'}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #1e293b; background: #fff; }
+
+        @page { size: A4 portrait; margin: 8mm 10mm; }
+        @media print { html { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+        /* 页眉 */
+        .ph {
+            text-align: center;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+        .ph-logo { font-size: 13pt; font-weight: bold; color: #0e7490; margin-bottom: 2px; }
+        .ph-info { font-size: 7.5pt; color: #475569; white-space: nowrap; }
+
+        /* 页脚 */
+        .pf {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 4px;
+            margin-top: 5px;
+            text-align: center;
+            font-size: 7pt;
+            color: #94a3b8;
+        }
+
+        /* 卡片：单列，占满宽度 */
+        .sc {
+            border: 1.5px solid #334155;
+            border-radius: 5px;
+            margin-bottom: 5mm;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            width: 100%;
+        }
+        .st {
+            font-weight: bold;
+            font-size: 12pt;
+            text-align: center;
+            padding: 5px 8px;
+            background: #f1f5f9;
+            border-bottom: 1.5px solid #334155;
+        }
+        .sc2 { font-size: 10pt; color: #64748b; font-weight: normal; }
+
+        /* 指标网格：4列 */
+        .mg {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+        }
+        .mc {
+            border-right: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 6px 8px;
+        }
+        .mc:nth-child(4n)   { border-right: none; }
+        .mc:nth-child(n+9)  { border-bottom: none; }
+        .ml { font-size: 9pt; color: #475569; font-weight: 600; margin-bottom: 3px; }
+        .mv { font-size: 11pt; font-weight: 700; color: #0f172a; line-height: 1.4; word-break: break-all; }
+    </style>
+</head>
+<body>
+    ${cardsHtml}
+    <div class="pf">
+        JF! by Gadai &nbsp;·&nbsp; ${isZh ? '典当管理系统' : 'Sistem Manajemen Gadai'}
+    </div>
+    <script>
+        window.onload = function() {
+            window.addEventListener('afterprint', function() { window.close(); });
+            window.print();
+        };
+    </script>
+</body>
+</html>`);
             printWindow.document.close();
         },
 
@@ -757,15 +872,18 @@
         async renderStoreManagement() { document.getElementById("app").innerHTML = await this.buildStoreManagementHTML(); }
     };
 
+    // 挂载到命名空间
     JF.StoreManager = StoreManager;
     window.StoreManager = StoreManager;
 
     window.APP = window.APP || {};
     window.APP.addStore = async function () {
         const name = document.getElementById('newStoreName')?.value.trim();
+        const address = document.getElementById('newStoreAddress')?.value.trim();
+        const phone = document.getElementById('newStorePhone')?.value.trim();
         if (!name) { Utils.toast.warning(Utils.lang === 'id' ? 'Nama toko harus diisi' : '门店名称必须填写'); return; }
         try {
-            await StoreManager.createStore(name, document.getElementById('newStoreAddress')?.value.trim(), document.getElementById('newStorePhone')?.value.trim());
+            await StoreManager.createStore(name, address, phone);
             Utils.toast.success(Utils.lang === 'id' ? 'Toko berhasil ditambahkan' : '门店添加成功');
             await StoreManager.renderStoreManagement();
         } catch (error) { Utils.toast.error(error.message); }
@@ -775,4 +893,5 @@
         try { await StoreManager.deleteStore(storeId); Utils.toast.success(Utils.lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除'); await StoreManager.renderStoreManagement(); }
         catch (error) { Utils.toast.error(error.message); }
     };
+
 })();
