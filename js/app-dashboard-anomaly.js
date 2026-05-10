@@ -132,9 +132,9 @@
 
                 const cacheKeyBase = `overdue_range_${isAdmin ? 'admin' : profile?.store_id}`;
                 const [collectionOrders, preAuctionOrders, auctionOrders] = await Promise.all([
-                    JF.Cache.get(`${cacheKeyBase}_10_19`, () => this._getOverdueOrdersRange(profile, 10, 19), { ttl: 3 * 60 * 1000 }),
-                    JF.Cache.get(`${cacheKeyBase}_20_29`, () => this._getOverdueOrdersRange(profile, 20, 29), { ttl: 3 * 60 * 1000 }),
-                    JF.Cache.get(`${cacheKeyBase}_30_999`, () => this._getOverdueOrdersRange(profile, 30, 999), { ttl: 3 * 60 * 1000 })
+                    JF.Cache.get(`${cacheKeyBase}_1_7`, () => this._getOverdueOrdersRange(profile, 1, 7), { ttl: 3 * 60 * 1000 }),
+                    JF.Cache.get(`${cacheKeyBase}_8_20`, () => this._getOverdueOrdersRange(profile, 8, 20), { ttl: 3 * 60 * 1000 }),
+                    JF.Cache.get(`${cacheKeyBase}_21_999`, () => this._getOverdueOrdersRange(profile, 21, 999), { ttl: 3 * 60 * 1000 })
                 ]);
 
                 const blacklistResult = await JF.Cache.get('blacklist_customers_0',
@@ -180,7 +180,7 @@
                     }
                     const table = `<table class="data-table anomaly-table"><thead><tr><th class="col-id">${lang==='id'?'ID Pesanan':'订单号'}</th><th class="col-name">${lang==='id'?'Nama Nasabah':'客户姓名'}</th><th class="col-months text-center">${lang==='id'?'Hari Terlambat':'逾期天数'}</th><th class="col-amount amount">${lang==='id'?'Jumlah Pinjaman':'贷款金额'}</th><th class="text-center">${lang==='id'?'Aksi':'操作'}</th></tr></thead><tbody>${rows}</tbody></table>`;
                     let footer = '';
-                    if (stageKey==='pre_auction') footer = `<div class="anomaly-card-footer"><span class="warning-text">💡 ${lang==='id'?'10 hari lagi memasuki proses likuidasi':'10天后将进入变卖程序'}</span></div>`;
+                    if (stageKey==='pre_auction') footer = `<div class="anomaly-card-footer"><span class="warning-text">💡 ${lang==='id'?'Segera akan memasuki proses likuidasi':'即将进入变卖程序'}</span></div>`;
                     else if (stageKey==='auction') footer = `<div class="anomaly-card-footer"><span class="danger-text">⚖️ ${lang==='id'?'Pesanan dalam proses likuidasi':'订单已进入变卖程序'}</span></div>`;
                     return `<div class="anomaly-card" style="border-left:4px solid ${color}">
                         <div class="anomaly-card-header"><span class="anomaly-icon">${icon}</span><h3>${lang==='id'?titleId:titleZh}</h3><span class="anomaly-badge">${orders.length}</span></div>
@@ -190,9 +190,9 @@
                 };
 
                 const stageCardsHtml = [
-                    { stageKey:'collection', titleId:'Pengumpulan (10-19 Hari)', titleZh:'催收提醒期 (10-19天)', icon:'📞', color:'#f59e0b', orders:collectionOrders, showAuctionBtn:false },
-                    { stageKey:'pre_auction', titleId:'Pemberitahuan (20-29 Hari)', titleZh:'公告预告期 (20-29天)', icon:'📣', color:'#f97316', orders:preAuctionOrders, showAuctionBtn:false },
-                    { stageKey:'auction', titleId:'Likuidasi (30+ Hari)', titleZh:'正式变卖期 (≥30天)', icon:'⚖️', color:'#ef4444', orders:auctionOrders, showAuctionBtn:true }
+                    { stageKey:'collection', titleId:'Pengumpulan (1-7 Hari)', titleZh:'催收提醒期 (1-7天)', icon:'📞', color:'#f59e0b', orders:collectionOrders, showAuctionBtn:false },
+                    { stageKey:'pre_auction', titleId:'Pemberitahuan (8-20 Hari)', titleZh:'公告预告期 (8-20天)', icon:'📣', color:'#f97316', orders:preAuctionOrders, showAuctionBtn:false },
+                    { stageKey:'auction', titleId:'Likuidasi (21+ Hari)', titleZh:'正式变卖期 (≥21天)', icon:'⚖️', color:'#ef4444', orders:auctionOrders, showAuctionBtn:true }
                 ].map(buildStageCard).join('');
 
                 const buildBlacklistTable = () => {
