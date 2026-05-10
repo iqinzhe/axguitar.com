@@ -929,19 +929,21 @@
 </div>`;
 
             // 页脚块（每组4张卡片末尾插入）
-            const footerBlock = `
+            const totalPages = Math.ceil(cards.length / 4);
+            const makeFooter = (pageNum) => `
 <div class="pf">
-    <span>JF! by Gadai &nbsp;·&nbsp; ${isZh ? '典当管理系统' : 'Sistem Manajemen Gadai'} &nbsp;·&nbsp; ${Utils.escapeHtml(roleText)}: ${Utils.escapeHtml(userName)}</span>
-    <span>${isZh ? '门店财务汇总' : 'Ringkasan Keuangan Toko'} &nbsp;·&nbsp; ${periodStart} ~ ${periodEnd}</span>
+    <span>JF! by Gadai &nbsp;·&nbsp; ${isZh ? '典当管理系统' : 'Sistem Manajemen Gadai'} &nbsp;·&nbsp; ${pageNum}/${totalPages}</span>
 </div>`;
 
             // 构建卡片组（每4张一页，含页眉页脚）
             let pagesHtml = '';
+            let pageNum = 0;
             for (let i = 0; i < cards.length; i++) {
                 const s = cards[i];
                 // 每页开头插入页眉
                 if (i % 4 === 0) {
                     if (i > 0) pagesHtml += '<div class="pb"></div>'; // 分页符
+                    pageNum++;
                     pagesHtml += headerBlock;
                 }
 
@@ -966,7 +968,7 @@
 
                 // 每页末尾（第4张或最后一张）插入页脚
                 if ((i + 1) % 4 === 0 || i === cards.length - 1) {
-                    pagesHtml += footerBlock;
+                    pagesHtml += makeFooter(pageNum);
                 }
             }
 
@@ -1008,8 +1010,7 @@
             border-top: 1px solid #e2e8f0;
             padding-top: 4px;
             margin-top: 5px;
-            display: flex;
-            justify-content: space-between;
+            text-align: center;
             font-size: 7pt;
             color: #94a3b8;
         }
