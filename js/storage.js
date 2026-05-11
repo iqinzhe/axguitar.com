@@ -443,7 +443,7 @@
                 };
                 const headers = lang === 'id' ? ['Tanggal', 'Tipe', 'Arah', 'Sumber', 'Jumlah', 'Deskripsi', 'Toko'] : ['日期', '类型', '方向', '来源/去向', '金额', '描述', '门店'];
                 const rows = (flows || []).map(flow => [
-                    Utils.formatDate(flow.recorded_at), typeMap[flow.flow_type] || flow.flow_type,
+                    Utils.formatDate(flow.flow_date || flow.recorded_at), typeMap[flow.flow_type] || flow.flow_type,
                     flow.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'),
                     flow.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'),
                     flow.amount, flow.description || '-', isAdmin ? (flow.stores?.name || '-') : ''

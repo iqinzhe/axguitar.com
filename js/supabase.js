@@ -596,12 +596,14 @@
             const profile = await this.getCurrentProfile();
             const storeId = flowData.store_id || profile?.store_id;
             if(!storeId) throw new Error(Utils.lang==='id'?'ID toko tidak ditemukan':'门店ID缺失');
+            // flow_date = 业务发生日期（支持补录历史），recorded_at = 实际操作时间（审计用）
             const record = {
                 store_id: storeId, flow_type: flowData.flow_type,
                 direction: flowData.direction, amount: flowData.amount,
                 source_target: flowData.source_target, order_id: flowData.order_id || null,
                 customer_id: flowData.customer_id || null, description: flowData.description || '',
                 recorded_by: profile?.id, recorded_at: nowStr(),
+                flow_date: flowData.flow_date || todayStr(),
                 reference_id: flowData.reference_id || null, is_voided: false
             };
             const { data, error } = await supabaseClient.from('cash_flow_records').insert(record).select().single();
@@ -725,7 +727,8 @@
                         amount: amountValue,
                         source_target: expenseData.payment_method || 'cash',
                         description: expenseData.category,
-                        reference_id: data.id
+                        reference_id: data.id,
+                        flow_date: expenseData.expense_date || todayStr()  // 使用支出业务日期
                     });
                 } catch (flowError) {
                     console.warn('[addExpense] 现金流记录失败:', flowError.message);

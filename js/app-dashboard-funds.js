@@ -84,7 +84,7 @@
                 } else {
                     for (const t of transactions) {
                         rows += `<tr>
-                            <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
+                            <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                             <td>${typeMap[t.flow_type] || t.flow_type}</td>
                             <td class="text-center">${directionMap[t.direction] || t.direction}</td>
                             <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
@@ -164,8 +164,9 @@
             const startDate = document.getElementById('cashFlowFilterStart')?.value;
             const endDate = document.getElementById('cashFlowFilterEnd')?.value;
             const filtered = transactions.filter(t => {
-                if (startDate && t.recorded_at < startDate) return false;
-                if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+                const tDate = (t.flow_date || t.recorded_at || '').substring(0, 10);
+                if (startDate && tDate < startDate) return false;
+                if (endDate && tDate > endDate) return false;
                 return true;
             });
             FundsPage._renderCashFlowPageTable(filtered);
@@ -190,7 +191,7 @@
                 rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
             } else {
                 for (const t of transactions) {
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                 }
             }
             tbody.innerHTML = rows;
@@ -244,7 +245,7 @@
                 } else {
                     for (const t of transactions) {
                         rows += `<tr>
-                            <td class="date-cell">${Utils.formatDate(t.recorded_at)}</td>
+                            <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                             <td>${typeMap[t.flow_type] || t.flow_type}</td>
                             <td class="text-center">${directionMap[t.direction] || t.direction}</td>
                             <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
@@ -331,8 +332,9 @@
             const filtered = transactions.filter(t => {
                 if (filterType && t.flow_type !== filterType) return false;
                 if (searchDesc && !(t.description || '').toLowerCase().includes(searchDesc)) return false;
-                if (startDate && t.recorded_at < startDate) return false;
-                if (endDate && t.recorded_at > endDate + 'T23:59:59') return false;
+                const tDate = (t.flow_date || t.recorded_at || '').substring(0, 10);
+                if (startDate && tDate < startDate) return false;
+                if (endDate && tDate > endDate) return false;
                 return true;
             });
             FundsPage._renderCapitalTransactionsTable(filtered);
@@ -359,7 +361,7 @@
                 rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
             } else {
                 for (const t of transactions) {
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                 }
             }
             tbody.innerHTML = rows;
@@ -382,7 +384,7 @@
             const lang = Utils.lang;
             const headers = lang === 'id' ? ['Tanggal', 'Tipe', 'Arah', 'Sumber', 'Jumlah', 'Deskripsi'] : ['日期', '类型', '方向', '来源/去向', '金额', '描述'];
             const typeMap = FundsPage._getFlowTypeMap(lang);
-            const rows = transactions.map(t => [t.recorded_at.split('T')[0], typeMap[t.flow_type] || t.flow_type, t.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'), t.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'), t.amount, t.description || '-']);
+            const rows = transactions.map(t => [(t.flow_date || t.recorded_at || '').split('T')[0], typeMap[t.flow_type] || t.flow_type, t.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'), t.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'), t.amount, t.description || '-']);
             const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
