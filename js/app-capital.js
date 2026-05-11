@@ -80,7 +80,7 @@
             
             const modalHtml = `
                 <div id="capitalInjectionModal" class="modal-overlay">
-                    <div class="modal-content" style="max-width: 480px;">
+                    <div class="modal-content" style="max-width: 600px; width: 90%;">
                         <h3>💰 ${lang === 'id' ? 'Injeksi Modal Baru' : '新增资本注入'}</h3>
                         
                         <div class="form-group">
