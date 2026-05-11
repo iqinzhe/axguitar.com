@@ -373,8 +373,7 @@
             if (!AUTH.isLoggedIn()) return;
             _overdueInterval = setInterval(async () => {
                 try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { console.warn('[逾期更新] 失败:', err.message); }
-            }, 18 * 60 * 1000);
-            setTimeout(async () => { try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { /* ignore */ } }, 5000);
+            }, 18 * 60 * 1000);     
         },
 
         // ========== 统一外壳与内容切换 ==========
