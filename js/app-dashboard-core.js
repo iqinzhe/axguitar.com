@@ -685,8 +685,8 @@
                     messagePreview.innerHTML = previewHtml;
                 }
             }
-            
-        },
+        if (window._hideLoadingFn) { window._hideLoadingFn(); window._hideLoadingFn = null; }
+       },
 
         // ========== 仪表盘渲染（核心）==========
         async originalRenderDashboard() {
