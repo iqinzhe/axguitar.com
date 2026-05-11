@@ -26,11 +26,13 @@
             let from = currentFrom || 0;
             let to = from + PAGE_SIZE - 1;
 
-            const { orders, totalCount } = await this._fetchOrderData(filters, from, to);
+            // [优化] 订单数据与门店列表并行加载
+            const [{ orders, totalCount }, stores] = await Promise.all([
+                this._fetchOrderData(filters, from, to),
+                SUPABASE.getAllStores()
+            ]);
             const allOrders = orders;
             let currentFromVal = from + allOrders.length;
-
-            const stores = await SUPABASE.getAllStores();
             const storeMap = {};
             for (const s of stores) storeMap[s.id] = s.name;
 
@@ -213,10 +215,14 @@
         async renderViewOrderHTML(orderId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
-            const profile = await SUPABASE.getCurrentProfile();
+
+            // [优化] profile 与订单数据并行加载
+            const [profile, result] = await Promise.all([
+                SUPABASE.getCurrentProfile(),
+                SUPABASE.getPaymentHistory(orderId)
+            ]);
             const isAdmin = PERMISSION.isAdmin();
 
-            const result = await SUPABASE.getPaymentHistory(orderId);
             const order = result.order;
             const payments = result.payments;
             if (!order) throw new Error('order_not_found');

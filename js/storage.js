@@ -21,28 +21,41 @@
                 const isAdmin = profile?.role === 'admin';
                 const currentStoreId = profile?.store_id;
 
-                const orders = await SUPABASE.getOrdersLegacy();
-                const customers = await SUPABASE.getCustomers();
-
                 const client = SUPABASE.getClient();
+
+                // [优化] 所有备份数据并行加载（原为 7 次串行请求）
                 let expensesQuery = client.from('expenses').select('*');
                 if (!isAdmin && currentStoreId) {
                     expensesQuery = expensesQuery.eq('store_id', currentStoreId);
                 }
-                const expensesResult = await expensesQuery;
 
-                let storesResult = [];
+                let storesPromise;
                 if (isAdmin) {
-                    storesResult = await SUPABASE.getAllStores();
+                    storesPromise = SUPABASE.getAllStores();
                 } else if (currentStoreId) {
-                    const { data: storeData } = await client
-                        .from('stores').select('*').eq('id', currentStoreId);
-                    storesResult = storeData || [];
+                    storesPromise = client.from('stores').select('*').eq('id', currentStoreId)
+                        .then(r => r.data || []);
+                } else {
+                    storesPromise = Promise.resolve([]);
                 }
 
-                const paymentsResult = await SUPABASE.getAllPayments();
-                const cashFlowsResult = await SUPABASE.getCashFlowRecords();
-                const blacklistResult = await client.from('blacklist').select('*');
+                const [
+                    orders,
+                    customers,
+                    expensesResult,
+                    storesResult,
+                    paymentsResult,
+                    cashFlowsResult,
+                    blacklistResult
+                ] = await Promise.all([
+                    SUPABASE.getOrdersLegacy(),
+                    SUPABASE.getCustomers(),
+                    expensesQuery,
+                    storesPromise,
+                    SUPABASE.getAllPayments(),
+                    SUPABASE.getCashFlowRecords(),
+                    client.from('blacklist').select('*')
+                ]);
 
                 const backupData = {
                     version: '3.2',

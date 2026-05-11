@@ -11,13 +11,16 @@
         async buildExpensesHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
-            const profile = await SUPABASE.getCurrentProfile();
+            // [优化] profile 与门店数据并行加载
+            const [profile, storesData] = await Promise.all([
+                SUPABASE.getCurrentProfile(),
+                SUPABASE.getAllStores()
+            ]);
             const isAdmin = PERMISSION.isAdmin();
             const storeId = profile?.store_id;
 
             try {
-                // 获取门店列表用于显示门店名
-                const storesData = await SUPABASE.getAllStores();
+                // storesData 已在上方并行加载完毕
                 const storeMap = {};
                 for (const s of storesData) storeMap[s.id] = s.name;
 

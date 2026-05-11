@@ -15,8 +15,11 @@
             const isAdmin = PERMISSION.isAdmin();
 
             try {
-                const customers = await SUPABASE.getCustomers();
-                const stores = await SUPABASE.getAllStores();
+                // [优化] customers + stores 并行加载，减少一次串行等待
+                const [customers, stores] = await Promise.all([
+                    SUPABASE.getCustomers(),
+                    SUPABASE.getAllStores()
+                ]);
                 const storeMap = {};
                 for (const s of stores) storeMap[s.id] = s.name;
 
