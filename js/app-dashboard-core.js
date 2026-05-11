@@ -1,5 +1,5 @@
 // app-dashboard-core.js - v2.0
-// Enter 键防重复触发 + 统一登录页 Enter 处理
+// 修复内容：Enter 键防重复触发 + 统一登录页 Enter 处理
 
 'use strict';
 
@@ -685,7 +685,9 @@
                     messagePreview.innerHTML = previewHtml;
                 }
             }
-    
+            
+        },
+
         // ========== 仪表盘渲染（核心）==========
         async originalRenderDashboard() {
             if (!AUTH.isLoggedIn()) {
@@ -716,7 +718,8 @@
                 const kpiReport = await JF.Cache.get(kpiCacheKey, async () => {
                     const client = SUPABASE.getClient();
                     const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
-                    
+                    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
                     const applyFilter = function(q) {
                         if (isAdmin && practiceIds.length > 0) {
                             q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
@@ -726,87 +729,75 @@
                         return q;
                     };
 
+                    // 【优化】11个查询合并为4个，本地计算各项统计
                     const [
-                        totalRes,
-                        activeRes,
-                        completedRes,
-                        overdueRes,
-                        activeOrdersData,
                         allOrdersData,
-                        dueOrdersRes,
-                        newThisMonthRes,
-                        newLoanThisMonthRes,
+                        newThisMonthData,
                         injectedCapitalRes,
-                        deployedCapitalRes
+                        dueOrdersRes
                     ] = await Promise.all([
-                        applyFilter(client.from('orders').select('*', { count: 'exact', head: true })),
-                        applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active'),
-                        applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'completed'),
-                        applyFilter(client.from('orders').select('*', { count: 'exact', head: true })).eq('status', 'active').gte('overdue_days', 1),
-                        applyFilter(client.from('orders').select('loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid')).eq('status', 'active'),
-                        applyFilter(client.from('orders').select('loan_amount')),
-                        applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active')),
+                        applyFilter(client.from('orders').select(
+                            'status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at'
+                        )),
                         (async () => {
                             try {
-                                const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-                                let q = client.from('orders').select('*', { count: 'exact', head: true }).gte('created_at', monthStart);
-                                if (!isAdmin && storeId) q = q.eq('store_id', storeId);
-                                else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                                const r = await q;
-                                return r.count || 0;
-                            } catch (e) { return 0; }
-                        })(),
-                        (async () => {
-                            try {
-                                const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
                                 let q = client.from('orders').select('loan_amount').gte('created_at', monthStart);
                                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                                 else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const r = await q;
-                                return (r.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
+                                return r.data || [];
+                            } catch (e) { return []; }
+                        })(),
+                        (async () => {
+                            try {
+                                let q = client.from('capital_injections').select('amount').eq('is_voided', false);
+                                if (!isAdmin && storeId) q = q.eq('store_id', storeId);
+                                else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                                const r = await q;
+                                return (r.data || []).reduce((s, i) => s + (i.amount || 0), 0);
                             } catch (e) { return 0; }
                         })(),
                         (async () => {
                             try {
-                                let injQuery = client.from('capital_injections').select('amount').eq('is_voided', false);
-                                if (!isAdmin && storeId) injQuery = injQuery.eq('store_id', storeId);
-                                else if (isAdmin && practiceIds.length > 0) injQuery = injQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                                const injResult = await injQuery;
-                                return (injResult.data || []).reduce((s, i) => s + (i.amount || 0), 0);
-                            } catch (e) { return 0; }
-                        })(),
-                        (async () => {
-                            try {
-                                let depQuery = client.from('orders').select('loan_amount').eq('status', 'active');
-                                if (!isAdmin && storeId) depQuery = depQuery.eq('store_id', storeId);
-                                else if (isAdmin && practiceIds.length > 0) depQuery = depQuery.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                                const depResult = await depQuery;
-                                return (depResult.data || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
-                            } catch (e) { return 0; }
+                                const r = await applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active'));
+                                return r.data || [];
+                            } catch (e) { return []; }
                         })()
                     ]);
 
-                    let totalLoanActive = 0, adminFeesCollected = 0, serviceFeesCollected = 0, interestCollected = 0, principalCollected = 0;
-                    for (const o of (activeOrdersData.data || [])) {
-                        totalLoanActive += (o.loan_amount || 0);
-                        if (o.admin_fee_paid) adminFeesCollected += (o.admin_fee || 0);
-                        serviceFeesCollected += (o.service_fee_paid || 0);
-                        interestCollected += (o.interest_paid_total || 0);
-                        principalCollected += (o.principal_paid || 0);
-                    }
-                    let totalLoanAll = 0;
-                    for (const o of (allOrdersData.data || [])) totalLoanAll += (o.loan_amount || 0);
+                    // 本地计算各项统计（从 allOrdersData 一次遍历得出）
+                    let totalOrders = 0, activeOrders = 0, completedOrders = 0, overdueOrders = 0;
+                    let totalLoanActive = 0, totalLoanAll = 0;
+                    let adminFeesCollected = 0, serviceFeesCollected = 0, interestCollected = 0, principalCollected = 0;
 
+                    for (const o of (allOrdersData.data || [])) {
+                        totalOrders++;
+                        totalLoanAll += (o.loan_amount || 0);
+                        if (o.status === 'active') {
+                            activeOrders++;
+                            totalLoanActive += (o.loan_amount || 0);
+                            if ((o.overdue_days || 0) >= 1) overdueOrders++;
+                            if (o.admin_fee_paid) adminFeesCollected += (o.admin_fee || 0);
+                            serviceFeesCollected += (o.service_fee_paid || 0);
+                            interestCollected += (o.interest_paid_total || 0);
+                            principalCollected += (o.principal_paid || 0);
+                        } else if (o.status === 'completed') {
+                            completedOrders++;
+                        }
+                    }
+
+                    const newThisMonth = newThisMonthData.length;
+                    const newLoanThisMonth = newThisMonthData.reduce((s, o) => s + (o.loan_amount || 0), 0);
                     const injected = injectedCapitalRes || 0;
-                    const deployed = deployedCapitalRes || 0;
+                    const deployed = totalLoanActive;
 
                     return {
-                        total_orders: totalRes.count || 0,
-                        active_orders: activeRes.count || 0,
-                        completed_orders: completedRes.count || 0,
-                        overdue_orders: overdueRes.count || 0,
-                        new_this_month: newThisMonthRes,
-                        new_loan_this_month: newLoanThisMonthRes,
+                        total_orders: totalOrders,
+                        active_orders: activeOrders,
+                        completed_orders: completedOrders,
+                        overdue_orders: overdueOrders,
+                        new_this_month: newThisMonth,
+                        new_loan_this_month: newLoanThisMonth,
                         total_loan_amount: totalLoanAll,
                         admin_fees_collected: adminFeesCollected,
                         service_fees_collected: serviceFeesCollected,
@@ -815,9 +806,9 @@
                         total_injected_capital: injected,
                         deployed_capital: deployed,
                         available_capital: injected - deployed,
-                        due_orders: dueOrdersRes.data || []
+                        due_orders: dueOrdersRes
                     };
-                }, { ttl: 3 * 60 * 1000 });
+                }, { ttl: 10 * 60 * 1000 });
 
                 const totalOrders = kpiReport.total_orders;
                 const activeOrders = kpiReport.active_orders;
@@ -1124,7 +1115,8 @@
                         SUPABASE.getCashFlowSummary(),
                         (async () => {
                             const client = SUPABASE.getClient();
-                            let q = client.from('expenses').select('amount, store_id');
+                            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+                            let q = client.from('expenses').select('amount').gte('date', monthStart);
                             if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                             else if (isAdmin) {
                                 const practiceIds = await SUPABASE._getPracticeStoreIds();
@@ -1147,7 +1139,7 @@
                         totalExpenses: totalExpensesResult,
                         messages: messageDataResult
                     };
-                }, { ttl: 3 * 60 * 1000 }).then(details => {
+                }, { ttl: 10 * 60 * 1000 }).then(details => {
                     this._updateDashboardDetails(details, lang, isAdmin, kpiReport);
                 }).catch(err => {
                     console.warn('[Dashboard] 详细信息加载失败:', err);
