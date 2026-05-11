@@ -1015,6 +1015,7 @@
         </div>`;
                 
                 document.getElementById("app").innerHTML = finalHtml;
+                if (window.__hideLoadingOverlay) window.__hideLoadingOverlay();
                 this._initSidebarCloseOnMain();
                 
                 if (!document.getElementById('messageCenterStyle')) {
