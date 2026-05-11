@@ -646,26 +646,22 @@
             const bankExpense = (cashFlow.bank && cashFlow.bank.expense) ? cashFlow.bank.expense : 0;
             
             const cashValEl = document.querySelector('.cash-bank-item:nth-child(1) .cb-val');
-            if (cashValEl) cashValEl.textContent = Utils.formatCurrency(cashBalance);
+            if (cashValEl) { cashValEl.style.transition = 'opacity 0.4s'; cashValEl.style.opacity = '0'; setTimeout(function(){ cashValEl.textContent = Utils.formatCurrency(cashBalance); cashValEl.style.opacity = '1'; }, 400); }
             const cashFlowEl = document.querySelector('.cash-bank-item:nth-child(1) .cb-flow');
-            if (cashFlowEl) {
-                cashFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(cashIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(cashExpense) + '</span>';
-            }
+            if (cashFlowEl) { cashFlowEl.style.transition = 'opacity 0.4s'; cashFlowEl.style.opacity = '0'; setTimeout(function(){ cashFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(cashIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(cashExpense) + '</span>'; cashFlowEl.style.opacity = '1'; }, 400); }
             
             const bankValEl = document.querySelector('.cash-bank-item:nth-child(2) .cb-val');
-            if (bankValEl) bankValEl.textContent = Utils.formatCurrency(bankBalance);
+            if (bankValEl) { bankValEl.style.transition = 'opacity 0.4s'; bankValEl.style.opacity = '0'; setTimeout(function(){ bankValEl.textContent = Utils.formatCurrency(bankBalance); bankValEl.style.opacity = '1'; }, 400); }
             const bankFlowEl = document.querySelector('.cash-bank-item:nth-child(2) .cb-flow');
-            if (bankFlowEl) {
-                bankFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(bankIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(bankExpense) + '</span>';
-            }
+            if (bankFlowEl) { bankFlowEl.style.transition = 'opacity 0.4s'; bankFlowEl.style.opacity = '0'; setTimeout(function(){ bankFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(bankIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(bankExpense) + '</span>'; bankFlowEl.style.opacity = '1'; }, 400); }
             
             const totalIncome = (kpiReport.admin_fees_collected || 0) + (kpiReport.service_fees_collected || 0) + (kpiReport.interest_collected || 0);
             const netProfit = totalIncome - totalExpenses;
             const npValEl = document.querySelector('.np-val');
-            if (npValEl) npValEl.textContent = Utils.formatCurrency(netProfit);
+            if (npValEl) { npValEl.style.transition = 'opacity 0.4s'; npValEl.style.opacity = '0'; setTimeout(function(){ npValEl.textContent = Utils.formatCurrency(netProfit); npValEl.style.opacity = '1'; }, 400); }
             
             const expenseAmtEl = document.querySelector('.income-item .income-amt.expense');
-            if (expenseAmtEl) expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses);
+            if (expenseAmtEl) { expenseAmtEl.style.transition = 'opacity 0.4s'; expenseAmtEl.style.opacity = '0'; setTimeout(function(){ expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses); expenseAmtEl.style.opacity = '1'; }, 400); }
             
             const messagePreview = document.querySelector('.message-preview');
             if (messagePreview) {
