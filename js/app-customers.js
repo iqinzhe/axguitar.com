@@ -90,7 +90,7 @@
                                 <div class="form-group"><label>${t('customer_name')} *</label><input type="text" id="customerName" placeholder="${t('customer_name')}"></div>
                                 <div class="form-group"><label>${t('phone')} *</label><input type="text" id="customerPhone" placeholder="${t('phone')}"></div>
                                 <div class="form-group"><label>${t('ktp_number')}</label><input type="text" id="customerKtp" placeholder="${t('ktp_number')}"></div>
-                                <div class="form-group"><label>${t('occupation')}</label><input type="text" id="customerOccupation" placeholder="${lang === 'id' ? 'Contoh: PNS, Karyawan Swasta' : '例如: 公务员, 企业员工'}"></div>
+                                <div class="form-group"><label>${t('occupation')} <small style="font-weight:400;color:var(--text-muted);">${lang === 'id' ? '(opsional)' : '(选填)'}</small></label><input type="text" id="customerOccupation" placeholder="${lang === 'id' ? 'Contoh: PNS, Karyawan Swasta' : '例如: 公务员, 企业员工'}"></div>
                                 <div class="form-group"><label>📅 ${lang === 'id' ? 'Tanggal Daftar' : '注册日期'} <small style="font-weight:400;color:var(--text-muted);">(${lang === 'id' ? 'bisa diubah untuk data lama' : '可修改为历史日期'})</small></label><input type="date" id="customerRegDate" value="${Utils.getLocalToday()}"></div>
                                 <div class="form-group full-width"><label>${t('ktp_address')}</label><textarea id="customerKtpAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址'}"></textarea></div>
                                 <div class="form-group full-width">
