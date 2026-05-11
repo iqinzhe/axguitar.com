@@ -440,5 +440,4 @@
         };
     }
 
-    console.log('✅ JF.UsersPage v2.1（密码重置改为模态框）');
 })();
