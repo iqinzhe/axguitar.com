@@ -91,6 +91,7 @@
                                 <div class="form-group"><label>${t('phone')} *</label><input type="text" id="customerPhone" placeholder="${t('phone')}"></div>
                                 <div class="form-group"><label>${t('ktp_number')}</label><input type="text" id="customerKtp" placeholder="${t('ktp_number')}"></div>
                                 <div class="form-group"><label>${t('occupation')}</label><input type="text" id="customerOccupation" placeholder="${lang === 'id' ? 'Contoh: PNS, Karyawan Swasta' : '例如: 公务员, 企业员工'}"></div>
+                                <div class="form-group"><label>📅 ${lang === 'id' ? 'Tanggal Daftar' : '注册日期'} <small style="font-weight:400;color:var(--text-muted);">(${lang === 'id' ? 'bisa diubah untuk data lama' : '可修改为历史日期'})</small></label><input type="date" id="customerRegDate" value="${Utils.getLocalToday()}"></div>
                                 <div class="form-group full-width"><label>${t('ktp_address')}</label><textarea id="customerKtpAddress" rows="2" placeholder="${lang === 'id' ? 'Alamat sesuai KTP' : 'KTP证上的地址'}"></textarea></div>
                                 <div class="form-group full-width">
                                     <label>${t('living_address')}</label>
@@ -170,6 +171,8 @@
             const phone = document.getElementById("customerPhone").value.trim();
             const occupation = document.getElementById("customerOccupation").value.trim();
             const ktpAddress = document.getElementById("customerKtpAddress").value.trim();
+            const regDateInput = document.getElementById("customerRegDate");
+            const registeredDate = (regDateInput && regDateInput.value) ? regDateInput.value : Utils.getLocalToday();
             const livingOpt = document.querySelector('input[name="livingAddrOpt"]:checked')?.value || 'same';
             const livingSameAsKtp = livingOpt === 'same';
             const livingAddress = livingSameAsKtp ? null : document.getElementById("customerLivingAddress").value.trim();
@@ -227,7 +230,7 @@
                             ktp_number: ktp || null, phone, occupation: occupation || null,
                             ktp_address: ktpAddress || null, address: ktpAddress || null,
                             living_same_as_ktp: livingSameAsKtp, living_address: livingAddress || null,
-                            registered_date: Utils.getLocalToday(), created_by: profile.id
+                            registered_date: registeredDate, created_by: profile.id
                         };
                         const { data, error } = await client.from('customers').insert(customerData).select().single();
                         if (error) {
@@ -645,6 +648,7 @@
                                 <div class="form-group"><label>${t('collateral_note')}</label><input id="collateralNote" placeholder="${lang === 'id' ? 'Contoh: emas 24k, kondisi baik, tahun 2020' : '例如: 24k金, 状况良好, 2020年'}"></div>
                                 <div class="form-group"><label>${t('loan_amount')} *</label><input type="text" id="amount" placeholder="0" class="amount-input" oninput="APP.recalculateAllFees()"></div>
                                 <div class="form-group"><label>${t('loan_source')}</label><div class="payment-method-selector compact"><label><input type="radio" name="loanSource" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="loanSource" value="bank"> 🏧 ${t('bank')}</label></div></div>
+                                <div class="form-group"><label>📅 ${lang === 'id' ? 'Tanggal Order' : '订单日期'} <small style="font-weight:400;color:var(--text-muted);">(${lang === 'id' ? 'bisa diubah untuk data lama' : '可修改为历史日期'})</small></label><input type="date" id="orderDate" value="${Utils.getLocalToday()}"><div class="form-hint" style="font-size:11px;color:var(--warning,#f59e0b);margin-top:4px;">⚠️ ${lang === 'id' ? 'Tanggal jatuh tempo dihitung dari tanggal ini' : '到期日将从此日期起算'}</div></div>
                             </div>
                         </div>
                         <div class="form-section">
@@ -789,6 +793,9 @@
             }
             const loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash'; 
             const fullCollateralName = collateralNote ? `${collateral} (${collateralNote})` : collateral;
+            // 读取自定义订单日期（补录历史数据时使用）
+            const orderDateInput = document.getElementById('orderDate');
+            const customOrderDate = (orderDateInput && orderDateInput.value) ? orderDateInput.value : Utils.getLocalToday();
             if (!collateral || !amount || amount <= 0) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } Utils.toast.warning(t('fill_all_fields')); return; }
             try {
                 const profile = await SUPABASE.getCurrentProfile(); 
@@ -804,7 +811,8 @@
                     agreed_interest_rate: agreedInterestRate, repayment_type: repaymentType, repayment_term: repaymentTerm, 
                     monthly_fixed_payment: monthlyFixedPayment, 
                     pawn_term_months: pawnTermMonths,
-                    max_extension_months: 10
+                    max_extension_months: 10,
+                    custom_order_date: customOrderDate  // 补录历史日期支持
                 };
                 const newOrder = await Order.create(orderData);
                 if (adminFee > 0) {

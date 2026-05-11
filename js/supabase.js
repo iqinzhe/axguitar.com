@@ -1006,7 +1006,11 @@
         async createOrder(orderData) {
             if(!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
-            const nowDate = todayStr();
+            // 支持补录历史订单：custom_order_date 由前端传入，否则使用今天
+            const nowDate = orderData.custom_order_date || todayStr();
+            const nowDateTime = orderData.custom_order_date
+                ? orderData.custom_order_date + 'T00:00:00.000Z'
+                : nowStr();
             const adminFee = orderData.admin_fee || Utils.calculateAdminFee(orderData.loan_amount);
             const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
             const serviceFeeAmount = orderData.service_fee_amount || 0;
@@ -1057,7 +1061,7 @@
                         pawn_term_months: pawnTermMonths,
                         pawn_due_date: pawnDueDate,
                         fund_status: 'deployed',
-                        created_at: nowStr(), updated_at: nowStr()
+                        created_at: nowDateTime, updated_at: nowDateTime
                     };
                     const { data, error } = await supabaseClient.from('orders').insert(newOrderData).select().single();
                     if(error){
