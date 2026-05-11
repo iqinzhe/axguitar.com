@@ -454,7 +454,7 @@
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             console.log('[Boot] 启动应用');
             JF.DashboardCore.init();
-            setTimeout(hideLoading, 800);
+            setTimeout(hideLoading, 1200);
         } else {
             console.warn('[Boot] JF.DashboardCore 未就绪，100ms 后重试...');
             setTimeout(startApp, 100);
