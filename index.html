@@ -437,7 +437,6 @@
     var loadingOverlay   = document.getElementById('loadingOverlay');
     var dashboardContent = document.getElementById('dashboardContent');
 
-   window._hideLoadingFn = hideLoading;
    function hideLoading() {
         if (loadingOverlay) {
             loadingOverlay.style.transition = 'opacity 0.5s ease';
@@ -446,6 +445,7 @@
         }
         if (dashboardContent) dashboardContent.classList.add('loaded');
     }
+    window._hideLoadingFn = hideLoading;
 
     /*
      * startApp：因 type="module" 保证本脚本在所有 defer 脚本之后执行，
