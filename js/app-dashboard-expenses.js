@@ -177,8 +177,8 @@
                                 </select>
                             </div>
                             <div class="form-group full-width">
-                                <label>${lang === 'id' ? 'Deskripsi' : '描述'} * <small style="color:var(--text-muted);font-weight:normal;">${lang === 'id' ? '(wajib diisi)' : '(必填)'}</small></label>
-                                <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Wajib: jelaskan tujuan pengeluaran ini' : '必填：请说明本次支出的具体用途'}"></textarea>
+                                <label>${lang === 'id' ? 'Deskripsi' : '描述'} <small style="color:var(--text-muted);font-weight:normal;">${lang === 'id' ? '(opsional)' : '(选填)'}</small></label>
+                                <textarea id="expenseDescription" rows="2" placeholder="${lang === 'id' ? 'Opsional: jelaskan tujuan pengeluaran ini' : '选填：可说明本次支出的具体用途'}"></textarea>
                             </div>
                             <div class="form-actions">
                                 <button onclick="APP.addExpense()" id="addExpenseBtn" class="btn btn--success">💾 ${lang === 'id' ? 'Simpan Pengeluaran' : '保存支出'}</button>
@@ -229,13 +229,8 @@
                 return;
             }
 
-            // 【v2.7 新增】描述必填校验（所有角色）
-            if (!description || !description.trim()) {
-                Utils.toast.warning(lang === 'id' ? '⚠️ Deskripsi wajib diisi! Jelaskan tujuan pengeluaran ini.' : '⚠️ 描述为必填项！请说明本次支出的具体用途。', 4000);
-                document.getElementById('expenseDescription')?.focus();
-                return;
-            }
-            if (description.trim().length < 4) {
+            // 描述为选填，有内容时才做最短字数检查
+            if (description && description.trim().length > 0 && description.trim().length < 4) {
                 Utils.toast.warning(lang === 'id' ? '⚠️ Deskripsi terlalu singkat, minimal 4 karakter.' : '⚠️ 描述内容太短，请至少填写4个字。', 4000);
                 document.getElementById('expenseDescription')?.focus();
                 return;
