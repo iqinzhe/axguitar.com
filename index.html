@@ -215,42 +215,11 @@
 
 <!--
   ==================== 脚本加载策略 ====================
-
-  第 0 层：立即执行（内联同步脚本）
-    - Token 状态检查：在 DOM 解析阶段立即运行，无需等待其他脚本。
-    - 仅操作 localStorage / sessionStorage，不依赖任何外部模块。
-    - [修复] token key 匹配改用 endsWith('-auth-token')，精确匹配，
-      避免 indexOf 误匹配含有该子串但位置不固定的 key。
-
-  第 1 层：CDN + 核心基础（defer，按序执行）
-    - config.js → supabase-js → fee-config.js
-    - utils.js → toast.js → cache.js
-    - supabase.js → auth.js → permission.js → audit.js
-    - order.js → store.js → storage.js → migration.js
-
-  第 2 层：核心应用（defer）
-    - app-dashboard-core.js（首屏仪表盘）
-
-  第 3 层：非核心页面模块（defer，不阻塞首屏）
-    - 所有 app-*.js
-
-  第 4 层：启动逻辑（type="module"）
-    - [修复] 原为普通内联 <script>（同步执行），在所有 defer 脚本加载
-      前运行，导致 JF.DashboardCore 等全局对象尚未就绪。
-    - 改用 <script type="module">：module 脚本天然具有 defer 语义，
-      且规范保证其在所有同文档的 defer 脚本执行完毕后才运行，
-      彻底消除时序竞争，无需 setTimeout 轮询补救。
-
-  [说明] js/app.js 与 js/app-state-init.js 为存档备份文件，
-    其功能已分别内联于第 4 层和第 0 层。这两个文件不参与实际加载，
-    请勿直接引用，保留仅供版本对照。
--->
-
 <!-- ========== 第 0 层：Token 状态初始化（立即执行） ========== -->
 <!--
-  [修复] token key 匹配从 indexOf('-auth-token') !== -1
-         改为 endsWith('-auth-token')，精确匹配 Supabase v2 规范 key 格式，
-         与 js/app-state-init.js 存档版本保持一致。
+  token key 匹配从 indexOf('-auth-token') !== -1
+  改为endsWith('-auth-token')，精确匹配 Supabase v2 规范 key 格式，
+  与 js/app-state-init.js 存档版本保持一致。
 -->
 <script>
 (function () {
@@ -328,10 +297,9 @@
 
 <!-- ========== 第 4 层：启动逻辑（type="module"） ========== -->
 <!--
-  [修复] 原为普通内联 <script>，同步执行，所有 defer 脚本尚未加载时即已运行。
-         改用 type="module"：规范保证 module 脚本在所有 defer 脚本执行完毕后运行，
-         彻底消除时序竞争，startApp() 无需再依赖 setTimeout 轮询补救
-         （轮询逻辑保留作为容错兜底，但正常情况下 JF.DashboardCore 已就绪）。
+  普通内联用 type="module"：规范保证 module 脚本在所有 defer 脚本执行完毕后运行，
+  彻底消除时序竞争，startApp() 无需再依赖 setTimeout 轮询补救
+ （轮询逻辑保留作为容错兜底，但正常情况下 JF.DashboardCore 已就绪）。
 -->
 <script type="module">
 (function () {
@@ -471,9 +439,9 @@
 
     function hideLoading() {
         if (loadingOverlay) {
-            loadingOverlay.style.transition = 'opacity 0.8s ease';
+            loadingOverlay.style.transition = 'opacity 0.5s ease';
             loadingOverlay.style.opacity = '0';
-            setTimeout(function () { loadingOverlay.style.display = 'none'; }, 800);
+            setTimeout(function () { loadingOverlay.style.display = 'none'; }, 500);
         }
         if (dashboardContent) dashboardContent.classList.add('loaded');
     }
