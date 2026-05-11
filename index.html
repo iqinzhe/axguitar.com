@@ -447,10 +447,7 @@
     }
     window._hideLoadingFn = hideLoading;
 
-    /*
-     * startApp：因 type="module" 保证本脚本在所有 defer 脚本之后执行，
-     * 正常情况下 JF.DashboardCore 已就绪，setTimeout 轮询仅作容错兜底。
-     */
+    /* startApp：因 type="module" 保证本脚本在所有 defer 脚本之后执行 */
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             console.log('[Boot] 启动应用');
