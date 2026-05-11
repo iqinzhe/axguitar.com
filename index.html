@@ -205,22 +205,33 @@
 
 <!-- ========== 主内容区域 ========== -->
 <div class="dashboard-content" id="dashboardContent">
-    <div id="app">
-        <div class="loading-container" style="display:none;">
-            <div class="loader"></div>
-            <p class="loading-text" id="loadingStatus">Memuat sistem...</p>
-        </div>
-    </div>
+    <div id="app"></div>
 </div>
 
 <!--
   ==================== 脚本加载策略 ====================
-<!-- ========== 第 0 层：Token 状态初始化（立即执行） ========== -->
-<!--
-  token key 匹配从 indexOf('-auth-token') !== -1
-  改为endsWith('-auth-token')，精确匹配 Supabase v2 规范 key 格式，
-  与 js/app-state-init.js 存档版本保持一致。
+
+  第 0 层：立即执行（内联同步脚本）
+    - Token 状态检查：在 DOM 解析阶段立即运行，无需等待其他脚本。
+    - 仅操作 localStorage / sessionStorage，不依赖任何外部模块。
+
+  第 1 层：CDN + 核心基础（defer，按序执行）
+    - config.js → supabase-js（锁定版本 2.105.4）
+    - js/utils.js → fee-config.js（顺序已修正）
+    - toast.js → cache.js → supabase.js → auth.js → permission.js → audit.js
+    - order.js → store.js → storage.js → migration.js
+
+  第 2 层：核心应用（defer）
+    - app-dashboard-core.js（首屏仪表盘）
+
+  第 3 层：非核心页面模块（defer，不阻塞首屏）
+
+  第 4 层：启动逻辑（type="module"）
+    - module 脚本天然在所有 defer 脚本执行完毕后运行，
+      彻底消除时序竞争。
 -->
+
+<!-- ========== 第 0 层：Token 状态初始化（立即执行） ========== -->
 <script>
 (function () {
     'use strict';
@@ -228,7 +239,7 @@
         var hasValidToken = false;
         for (var i = 0; i < localStorage.length; i++) {
             var key = localStorage.key(i);
-            /* [修复] 使用 endsWith 精确匹配 Supabase v2 auth-token key */
+            /* 使用 endsWith 精确匹配 Supabase v2 auth-token key */
             if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
                 try {
                     var tokenData = JSON.parse(localStorage.getItem(key));
@@ -252,10 +263,7 @@
                     sessionStorage.removeItem(k);
                     localStorage.removeItem(k);
                 });
-                console.log('[StateInit] 无有效 token，已清除页面恢复状态');
             } catch (e) { /* ignore */ }
-        } else {
-            console.log('[StateInit] 检测到有效 token，保留页面恢复状态');
         }
     } catch (e) { /* 静默处理 */ }
 })();
@@ -263,7 +271,9 @@
 
 <!-- ========== 第 1 层：核心基础脚本（defer） ========== -->
 <script defer src="config.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- [优化②] 锁定 supabase-js 版本为 2.105.4，避免自动升级引入 breaking change -->
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4"></script>
+<!-- [优化③] utils.js 移到 fee-config.js 之前，修正加载顺序 -->
 <script defer src="js/utils.js"></script>
 <script defer src="fee-config.js"></script>
 <script defer src="js/toast.js"></script>
@@ -296,11 +306,6 @@
 <script defer src="js/app-payments.js"></script>
 
 <!-- ========== 第 4 层：启动逻辑（type="module"） ========== -->
-<!--
-  普通内联用 type="module"：规范保证 module 脚本在所有 defer 脚本执行完毕后运行，
-  彻底消除时序竞争，startApp() 无需再依赖 setTimeout 轮询补救
- （轮询逻辑保留作为容错兜底，但正常情况下 JF.DashboardCore 已就绪）。
--->
 <script type="module">
 (function () {
     'use strict';
@@ -308,10 +313,9 @@
     var JF = window.JF || {};
     window.JF = JF;
 
-    // ==================== APP 门面层（合并自 js/app.js 存档） ====================
+    // ==================== APP 门面层 ====================
     var APP = {
         forceClearAndReload: function () {
-            console.log('[APP] 强制清除所有存储并重新加载');
             try {
                 var keysToRemove = [];
                 for (var i = 0; i < localStorage.length; i++) {
@@ -330,10 +334,7 @@
                     document.cookie = c.replace(/^ +/, '')
                         .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
                 });
-                console.log('[APP] 已清除 ' + keysToRemove.length + ' 个存储项');
-            } catch (e) {
-                console.warn('[APP] 清除存储失败:', e.message);
-            }
+            } catch (e) { /* ignore */ }
             setTimeout(function () { location.reload(); }, 500);
         },
 
@@ -394,7 +395,6 @@
                 await SUPABASE.logReminder(order.id);
                 Utils.toast.success(Utils.lang === 'id' ? 'Membuka WhatsApp...' : '正在打开 WhatsApp...');
             } catch (error) {
-                console.error('sendWAReminder error:', error);
                 Utils.toast.error(Utils.lang === 'id' ? 'Gagal mengirim pengingat' : '发送提醒失败');
             }
         },
@@ -431,12 +431,11 @@
         }
     });
 
-    console.log('[Boot] 核心模块 + 门面层已就绪（type=module，defer 时序保证）');
-
     // ==================== 应用启动 ====================
     var loadingOverlay   = document.getElementById('loadingOverlay');
     var dashboardContent = document.getElementById('dashboardContent');
 
+    // [优化①] 等待 800ms 再撤遮罩，确保 Supabase 数据已回来再显示界面
     function hideLoading() {
         if (loadingOverlay) {
             loadingOverlay.style.transition = 'opacity 0.5s ease';
