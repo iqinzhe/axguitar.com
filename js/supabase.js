@@ -190,22 +190,24 @@
         },
 
         async getCurrentProfile() {
-            const session = await this.getSession();
-            if(!session){ _profileCache = null; return null; }
+            // [优化] 合并 getSession + getCurrentUser 为单次 getUser() 调用
+            // supabase-js v2 的 getUser() 内部包含 session 验证，减少一次往返
             if(_profileCache) return _profileCache;
 
-            const user = await this.getCurrentUser();
-            if(!user) return null;
+            let userId;
+            try {
+                const { data: { user }, error } = await supabaseClient.auth.getUser();
+                if(error || !user) { _profileCache = null; return null; }
+                userId = user.id;
+            } catch(e) { _profileCache = null; return null; }
+
+            // [优化] 将 user_profiles + stores 合并为单次 JOIN 查询，减少一次 SQL 往返
             const { data, error } = await supabaseClient
-                .from('user_profiles').select('*').eq('id', user.id).single();
+                .from('user_profiles')
+                .select('*, stores(*)')
+                .eq('id', userId)
+                .single();
             if(error) { _profileCache = null; return null; }
-            if(data?.store_id){
-                try {
-                    const { data: store } = await supabaseClient
-                        .from('stores').select('*').eq('id', data.store_id).single();
-                    if(store) data.stores = store;
-                } catch(e){}
-            }
             _profileCache = data;
             if(window.AUTH) window.AUTH.user = data;
             return data;

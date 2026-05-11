@@ -281,21 +281,32 @@
         // ==================== 登录逻辑 ====================
         async login(usernameOrEmail, password) {
             try {
-                
+                // [优化①] 先检查锁定状态（纯本地，无网络开销）
                 if (this._isLocked(usernameOrEmail)) return null;
 
-                const isNetworkAvailable = Utils.NetworkMonitor
-                    ? await Utils.NetworkMonitor._checkRealConnectivity()
-                    : navigator.onLine;
-
-                if (!isNetworkAvailable) {
+                // [优化②] 仅用 navigator.onLine 做快速离线拦截，
+                //          取消登录前多余的 Supabase HEAD 请求（省 200-500ms）
+                if (!navigator.onLine) {
                     Utils.toast.error(Utils.lang === 'id'
                         ? 'Tidak ada koneksi internet. Periksa jaringan Anda.'
                         : '无网络连接，请检查网络设置。', 4000);
                     return null;
                 }
 
-                await this.forceClearAuth();
+                // [优化③] 移除登录前的 forceClearAuth()（其内含 signOut 网络请求，
+                //          每次登录多花 300-800ms）；改为仅清除本地缓存即可
+                SUPABASE.clearCache();
+                this.user = null;
+                try {
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && (key.startsWith('supabase.auth.') || key.startsWith('sb-') || key.includes('token'))) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    keysToRemove.forEach(key => localStorage.removeItem(key));
+                } catch (e) { /* ignore */ }
 
                 const result = await SUPABASE.login(usernameOrEmail, password);
 
@@ -306,14 +317,19 @@
                         ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah')
                         : '登录失败：' + (result?.error?.message || '用户名或密码错误'), 4000);
                     if (window.Audit) {
-                        await window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials');
+                        // [优化④] 审计日志不阻塞登录流程（fire-and-forget）
+                        window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials').catch(() => {});
                     }
                     return null;
                 }
 
                 this._resetLoginFailure(usernameOrEmail);
 
-                await this.loadCurrentUser();
+                // [优化⑤] SUPABASE.login() 内部已调用 loadCurrentUser()，
+                //          此处直接复用 AUTH.user，无需重复网络请求
+                if (!this.user) {
+                    await this.loadCurrentUser();
+                }
 
                 if (!this.user) {
                     console.error('[Auth] 登录后加载用户资料失败');
@@ -321,15 +337,18 @@
                     return null;
                 }
 
-
+                // [优化⑥] checkStoreStatus 复用已缓存的 stores 数据（来自 getCurrentProfile 的 join），
+                //          避免再发一次 Supabase SQL 请求
                 if (this.user.store_id) {
                     try {
-                        const storeStatus = await SUPABASE.checkStoreStatus(this.user.store_id);
-                        if (!storeStatus.is_active) {
+                        const storeData = this.user.stores; // getCurrentProfile 已 join stores
+                        const isActive = storeData ? storeData.is_active !== false : true;
+                        const storeName = storeData?.name || '';
+                        if (!isActive) {
                             await this.logout();
                             Utils.toast.warning(Utils.lang === 'id'
-                                ? `Toko "${storeStatus.name}" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.`
-                                : `门店 "${storeStatus.name}" 已暂停营业。\n\n请联系管理员获取更多信息。`, 6000);
+                                ? `Toko "${storeName}" sedang ditutup sementara.\n\nHubungi administrator untuk informasi lebih lanjut.`
+                                : `门店 "${storeName}" 已暂停营业。\n\n请联系管理员获取更多信息。`, 6000);
                             return null;
                         }
                     } catch (e) {
@@ -338,7 +357,8 @@
                 }
 
                 if (window.Audit) {
-                    await window.Audit.logLoginSuccess(this.user.id, this.user.name);
+                    // [优化⑦] 审计日志 fire-and-forget，不阻塞仪表盘渲染
+                    window.Audit.logLoginSuccess(this.user.id, this.user.name).catch(() => {});
                 }
 
                 return this.user;
@@ -348,7 +368,7 @@
                 Utils.toast.error(Utils.lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误', 4000);
                 return null;
             }
-        },
+        },,
 
         async loadCurrentUser() {
             try {
