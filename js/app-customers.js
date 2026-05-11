@@ -675,7 +675,7 @@
                             </div>
                             <div class="form-group interest-rate-group">
                                 <label>📈 ${t('interest_rate_select')}</label>
-                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select>
+                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(10)}</select>
                             </div>
                         </div>
                         <div class="form-section">
