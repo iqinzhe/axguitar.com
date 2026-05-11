@@ -439,9 +439,9 @@
 
     function hideLoading() {
         if (loadingOverlay) {
-            loadingOverlay.style.transition = 'opacity 0.5s ease';
+            loadingOverlay.style.transition = 'opacity 0.8s ease';
             loadingOverlay.style.opacity = '0';
-            setTimeout(function () { loadingOverlay.style.display = 'none'; }, 500);
+            setTimeout(function () { loadingOverlay.style.display = 'none'; }, 800);
         }
         if (dashboardContent) dashboardContent.classList.add('loaded');
     }
