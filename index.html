@@ -437,7 +437,8 @@
     var loadingOverlay   = document.getElementById('loadingOverlay');
     var dashboardContent = document.getElementById('dashboardContent');
 
-    function hideLoading() {
+   window._hideLoadingFn = hideLoading;
+   function hideLoading() {
         if (loadingOverlay) {
             loadingOverlay.style.transition = 'opacity 0.5s ease';
             loadingOverlay.style.opacity = '0';
@@ -454,6 +455,9 @@
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             console.log('[Boot] 启动应用');
             JF.DashboardCore.init();
+            setTimeout(function() {
+        if (window._hideLoadingFn) { window._hideLoadingFn(); window._hideLoadingFn = null; }
+ }, 12000);  // 最多等12秒，超时强制撤遮罩; 
         } else {
             console.warn('[Boot] JF.DashboardCore 未就绪，100ms 后重试...');
             setTimeout(startApp, 100);
