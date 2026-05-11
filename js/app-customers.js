@@ -1,4 +1,4 @@
-// app-customers.js - v2.0 服务费固定容器 + 金额0只读
+// app-customers.js - v2.0 服务费固定容器  + 金额0只读
 
 'use strict';
 
@@ -675,7 +675,7 @@
                             </div>
                             <div class="form-group interest-rate-group">
                                 <label>📈 ${t('interest_rate_select')}</label>
-                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(10)}</select>
+                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select>
                             </div>
                         </div>
                         <div class="form-section">
@@ -804,9 +804,30 @@
                     max_extension_months: 10
                 };
                 const newOrder = await Order.create(orderData);
-                if (adminFee > 0) await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee).catch(e => console.error("管理费收取失败:", e));
-                if (serviceFee > 0) await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod).catch(e => console.error("服务费收取失败:", e));
-                if (amount > 0) { const desc = lang === 'id' ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'}` : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'}`; await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, desc).catch(e => console.error("当金发放记录失败:", e)); }
+                if (adminFee > 0) {
+                    await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee).catch(() => {
+                        Utils.toast.warning(lang === 'id'
+                            ? `⚠️ Pesanan ${newOrder.order_id} tersimpan, tapi biaya admin GAGAL dicatat. Harap catat manual!`
+                            : `⚠️ 订单 ${newOrder.order_id} 已保存，但管理费流水记录失败，请手动补录！`, 8000);
+                    });
+                }
+                if (serviceFee > 0) {
+                    await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod).catch(() => {
+                        Utils.toast.warning(lang === 'id'
+                            ? `⚠️ Pesanan ${newOrder.order_id} tersimpan, tapi biaya layanan GAGAL dicatat. Harap catat manual!`
+                            : `⚠️ 订单 ${newOrder.order_id} 已保存，但服务费流水记录失败，请手动补录！`, 8000);
+                    });
+                }
+                if (amount > 0) {
+                    const desc = lang === 'id'
+                        ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'}`
+                        : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'}`;
+                    await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, desc).catch(() => {
+                        Utils.toast.warning(lang === 'id'
+                            ? `⚠️ Pesanan ${newOrder.order_id} tersimpan, tapi pencairan dana GAGAL dicatat. Harap catat manual!`
+                            : `⚠️ 订单 ${newOrder.order_id} 已保存，但当金发放流水记录失败，请手动补录！`, 8000);
+                    });
+                }
                 const successMsg = repaymentType === 'fixed' ? (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`) : (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nJangka Waktu Gadai: ${pawnTermMonths} bulan` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n典当期限: ${pawnTermMonths}个月`);
                 Utils.toast.success(successMsg, 5000);
                 document.getElementById("collateral").value = ''; 
