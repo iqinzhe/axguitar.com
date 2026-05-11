@@ -435,7 +435,7 @@
     var loadingOverlay   = document.getElementById('loadingOverlay');
     var dashboardContent = document.getElementById('dashboardContent');
 
-    // [优化①] 等待 800ms 再撤遮罩，确保 Supabase 数据已回来再显示界面
+    // 优化：隐藏加载遮罩的函数，可从外部调用
     function hideLoading() {
         if (loadingOverlay) {
             loadingOverlay.style.transition = 'opacity 0.5s ease';
@@ -445,10 +445,40 @@
         if (dashboardContent) dashboardContent.classList.add('loaded');
     }
 
+    // 暴露为全局方法，供仪表盘渲染完成后直接调用
+    window.__hideLoadingOverlay = hideLoading;
+    // 同样保留旧的 hideLoading 引用（若有其他地方使用）
+    window.__showLoadingOverlay = function () {
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.opacity = '1';
+        }
+    };
+
+    // 备用监听：如果仪表盘渲染后未主动调用，则由 MutationObserver 在 5 秒内兜底
+    var fallbackObserver = new MutationObserver(function (mutations) {
+        var appEl = document.getElementById('app');
+        if (appEl && appEl.querySelector('.dashboard-v2')) {
+            hideLoading();
+            fallbackObserver.disconnect();
+        }
+    });
+
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             JF.DashboardCore.init();
-            setTimeout(hideLoading, 800);
+            // 启动 DOM 观察者，检测仪表盘渲染
+            var appEl = document.getElementById('app');
+            if (appEl) {
+                fallbackObserver.observe(appEl, { childList: true, subtree: true });
+                // 超时保护：如果 10 秒内仪表盘仍未出现，强制隐藏加载层
+                setTimeout(function () {
+                    if (loadingOverlay && loadingOverlay.style.display !== 'none') {
+                        hideLoading();
+                        fallbackObserver.disconnect();
+                    }
+                }, 10000);
+            }
         } else {
             setTimeout(startApp, 100);
         }
