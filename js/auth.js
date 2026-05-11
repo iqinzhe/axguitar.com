@@ -325,12 +325,10 @@
 
                 this._resetLoginFailure(usernameOrEmail);
 
-                // [优化⑤] SUPABASE.login() 内部已调用 loadCurrentUser()，
-                //          此处直接复用 AUTH.user，无需重复网络请求
-                if (!this.user) {
-                    await this.loadCurrentUser();
-                }
-
+                // [优化⑤] SUPABASE.login() 内部已调用 loadCurrentUser() 并写入 AUTH.user，
+                //          此处直接复用，不再发起额外网络请求（节省 200-400ms）。
+                //          若 this.user 仍为空，说明 supabase.js 侧出现了异常，
+                //          直接走失败分支，不重试（避免多一次网络往返）。
                 if (!this.user) {
                     console.error('[Auth] 登录后加载用户资料失败');
                     Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败', 4000);

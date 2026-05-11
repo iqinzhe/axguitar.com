@@ -256,7 +256,11 @@
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email: emailToUse, password });
             if(error) throw error;
             this.clearCache();
-            if(window.AUTH && data.user) await window.AUTH.loadCurrentUser();
+            if(window.AUTH && data.user) {
+                await window.AUTH.loadCurrentUser();
+                // loadCurrentUser() 会将结果写入 window.AUTH.user。
+                // auth.js 的 login() 依赖此处已完成设置，不会再发起重复请求。
+            }
             return data;
         },
 
