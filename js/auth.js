@@ -368,7 +368,7 @@
                 Utils.toast.error(Utils.lang === 'id' ? 'Terjadi kesalahan saat login' : '登录时发生错误', 4000);
                 return null;
             }
-        },,
+        },
 
         async loadCurrentUser() {
             try {
