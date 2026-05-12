@@ -1,4 +1,4 @@
-// supabase.js - v2.0 优化版（login 直接设置 AUTH.user，避免重复请求）
+// supabase.js - v2.0 (JF 命名空间) 
 // 1. deleteOrder 完整清理现金流（order_id + reference_id）
 // 2. 统一利息少付逻辑，确保前后端一致
 // 3. 缓存 practiceIds，避免重复查询
