@@ -1,5 +1,5 @@
-// app-capital.js - v2.0
-// 修复内容：门店选择状态持久化（使用 sessionStorage 替代全局变量）
+// app-capital.js - v2.0 (JF 命名空间) 
+// 门店选择状态持久化（使用 sessionStorage 替代全局变量）
 // 包含：资本注入、利润再投入、资金占用报告、资金健康度评估
 
 'use strict';
