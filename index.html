@@ -63,12 +63,12 @@
   --z-sidebar: 100; --z-sidebar-overlay: 99; --z-topbar: 50; --z-modal: 9999; --z-tooltip: 10000;
 }
 
-/* === critical.css 内联（防止 FOUC + 精美加载动画） === */
+/* === critical.css 内联（防止 FOUC + 优化版加载动画） === */
 @layer base {
   .dashboard-content { opacity: 0; }
   .dashboard-content.loaded { opacity: 1; transition: opacity 0.4s ease; }
 
-  /* 遮罩层：磨砂背景 + 点阵纹理 */
+  /* ── 遮罩层：磨砂背景 + 点阵纹理 ── */
   .loading-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: #eef3f8;
@@ -76,63 +76,114 @@
     background-size: 28px 28px;
     z-index: var(--z-modal);
     display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 22px;
+    align-items: center; justify-content: center; gap: 20px;
     transition: opacity 0.4s ease;
   }
 
-  /* 品牌标识区 */
+  /* ── 品牌区（置顶，垂直居中布局） ── */
   .loading-brand {
-    display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 10px;
+  }
+  .loading-brand-logo-wrap {
+    width: 56px; height: 56px;
+    display: flex; align-items: center; justify-content: center;
   }
   .loading-brand-logo {
-    height: 36px; width: auto;
+    height: 56px; width: auto;
+    border-radius: 12px;
   }
   .loading-brand-name {
     font-size: 1.35rem; font-weight: 700;
     color: #0e7490; letter-spacing: 0.5px;
     font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    margin: 0;
   }
-
-  /* 音量柱动画（5根） */
-  .loading-bars {
-    display: flex; gap: 5px; align-items: flex-end; height: 22px;
-  }
-  .loading-bar {
-    width: 4px; border-radius: 2px; background: #0e7490;
-    animation: loBar 1.2s ease-in-out infinite;
-    transform-origin: bottom;
-  }
-  .loading-bar:nth-child(1) { animation-delay: 0s;    height: 8px; }
-  .loading-bar:nth-child(2) { animation-delay: 0.15s; height: 14px; }
-  .loading-bar:nth-child(3) { animation-delay: 0.3s;  height: 20px; }
-  .loading-bar:nth-child(4) { animation-delay: 0.45s; height: 14px; }
-  .loading-bar:nth-child(5) { animation-delay: 0.6s;  height: 8px; }
-
-  /* 文字区 */
-  .loading-text {
-    font-size: 0.875rem; color: #3d5068;
+  .loading-brand-tagline {
+    font-size: 0.72rem; color: #6b7e95;
     font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    letter-spacing: 0.4px;
-    display: flex; align-items: center; gap: 4px;
+    letter-spacing: 0.3px;
+    margin-top: -6px;
   }
 
-  /* 进度条（真实进度驱动） */
+  /* ── 阶段指示点（5个圆点，对应5个加载阶段） ── */
+  .loading-steps {
+    display: flex; gap: 7px; align-items: center;
+  }
+  .loading-step {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(14, 116, 144, 0.18);
+    transition: background 0.35s ease, transform 0.35s ease;
+  }
+  .loading-step.done {
+    background: #0e7490;
+  }
+  .loading-step.active {
+    background: #06b6d4;
+    animation: loStepPulse 1s ease-in-out infinite;
+  }
+
+  /* ── 动态文字区（主文案 + 副文案） ── */
+  .loading-text {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 3px;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  }
+  .loading-text-main {
+    font-size: 0.875rem; font-weight: 500;
+    color: #3d5068; letter-spacing: 0.3px;
+    transition: opacity 0.3s ease;
+  }
+  .loading-text-sub {
+    font-size: 0.72rem; color: #6b7e95;
+    letter-spacing: 0.2px;
+    transition: opacity 0.3s ease;
+  }
+
+  /* ── 进度条区（进度条 + 百分比数字） ── */
+  .loading-progress-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 5px;
+  }
   .loading-progress {
-    width: 240px; height: 3px;
+    width: 240px; height: 5px;
     background: rgba(14,116,144,0.12);
-    border-radius: 2px; overflow: hidden;
+    border-radius: 3px; overflow: hidden;
+    position: relative;
   }
   .loading-progress-bar {
     height: 100%; width: 0%;
     background: linear-gradient(90deg, #0e7490, #06b6d4);
-    border-radius: 2px;
-    transition: width 0.4s ease;
+    border-radius: 3px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+  /* 流光扫过动效 */
+  .loading-progress-bar::after {
+    content: '';
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 24px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55));
+    border-radius: 3px;
+    animation: loShimmer 1.6s ease-in-out infinite;
+  }
+  .loading-progress-pct {
+    font-size: 0.7rem; font-weight: 600;
+    color: #0e7490;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    letter-spacing: 0.3px;
+    transition: opacity 0.3s ease;
+    min-width: 30px; text-align: center;
   }
 
-  /* 关键帧 */
-  @keyframes loBar {
-    0%,100% { opacity: 0.3; transform: scaleY(0.5); }
-    50%     { opacity: 1;   transform: scaleY(1); }
+  /* ── 关键帧 ── */
+  @keyframes loStepPulse {
+    0%,100% { transform: scale(1);   opacity: 1; }
+    50%      { transform: scale(1.5); opacity: 0.65; }
+  }
+  @keyframes loShimmer {
+    0%,100% { opacity: 0; }
+    50%      { opacity: 1; }
   }
   @keyframes loDot {
     0%,100% { opacity: 0.15; }
@@ -157,34 +208,41 @@
 </head>
 <body>
 
-<!-- ========== 加载动画层 ========== -->
+<!-- ========== 加载动画层（优化版） ========== -->
 <div class="loading-overlay" id="loadingOverlay">
 
-    <!-- 音量柱节奏动画 -->
-    <div class="loading-bars">
-        <div class="loading-bar"></div>
-        <div class="loading-bar"></div>
-        <div class="loading-bar"></div>
-        <div class="loading-bar"></div>
-        <div class="loading-bar"></div>
-    </div>
-
-    <!-- 品牌标识 -->
+    <!-- 1⃣ 品牌区（置顶：Logo + 名称 + 副标题） -->
     <div class="loading-brand">
-        <img class="loading-brand-logo"
-             src="icons/pagehead-logo.png" alt="JF!"
-             onerror="this.style.display='none'">
+        <div class="loading-brand-logo-wrap">
+            <img class="loading-brand-logo"
+                 src="icons/pagehead-logo.png" alt="JF!"
+                 onerror="this.style.display='none'">
+        </div>
         <span class="loading-brand-name">JF! by Gadai</span>
+        <span class="loading-brand-tagline">Sistem Manajemen Gadai</span>
     </div>
 
-    <!-- 文字提示 -->
+    <!-- 2⃣ 阶段指示点（5个，对应5个加载阶段） -->
+    <div class="loading-steps" id="loadingSteps">
+        <div class="loading-step" id="lstep1"></div>
+        <div class="loading-step" id="lstep2"></div>
+        <div class="loading-step" id="lstep3"></div>
+        <div class="loading-step" id="lstep4"></div>
+        <div class="loading-step" id="lstep5"></div>
+    </div>
+
+    <!-- 3⃣ 动态文字提示（主文案 + 副文案） -->
     <div class="loading-text">
-        Memuat sistem
+        <span class="loading-text-main" id="loadingTextMain">Memulai sistem...</span>
+        <span class="loading-text-sub"  id="loadingTextSub">Memeriksa sesi login</span>
     </div>
 
-    <!-- 进度条（真实进度驱动） -->
-    <div class="loading-progress">
-        <div class="loading-progress-bar" id="loadingProgressBar"></div>
+    <!-- 4⃣ 进度条 + 百分比 -->
+    <div class="loading-progress-wrap">
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="loadingProgressBar"></div>
+        </div>
+        <span class="loading-progress-pct" id="loadingProgressPct">0%</span>
     </div>
 
 </div>
@@ -198,7 +256,7 @@
   ==================== 脚本加载策略 ====================
 
   第 0 层：立即执行（内联同步脚本）
-    - Token 状态检查 + 进度控制初始化
+    - Token 状态检查 + 进度控制初始化（含伪进度平滑 + 动态文案 + 阶段点同步）
 
   第 1 层：CDN + 核心基础（defer，按序执行）
     - config.js → supabase-js（锁定版本 2.105.4）
@@ -214,31 +272,122 @@
   第 4 层：启动逻辑（type="module"）
     - module 脚本天然在所有 defer 脚本执行完毕后运行
 
-  📊 加载进度分布：
-    0%  ── 页面开始加载
+  📊 加载进度分布（优化版）：
+    0%  ── 页面开始加载（伪进度爬行启动：0→45%）
     50% ── 基础模块全部就绪（migration.js onload）
     90% ── app-dashboard-core.js 就绪（onload）
     93% ── DashboardCore.init() 开始执行
     96% ── KPI 数据查询完成
     100% ─ DOM 渲染完成，加载层淡出
+
+  📝 动态文案阶段：
+    0-15%   ── Memulai sistem...     / Memeriksa sesi login
+    16-49%  ── Memuat modul dasar... / utils · toast · cache · supabase
+    50-89%  ── Memuat modul inti...  / Menghubungkan ke server
+    90-95%  ── Menyiapkan dasbor...  / app-dashboard-core siap
+    96-99%  ── Memuat data KPI...    / Mengambil data terkini
+    100%    ── Siap!                 / Membuka sistem...
 -->
 
-<!-- ========== 第 0 层：Token 状态初始化 + 进度控制 ========== -->
+<!-- ========== 第 0 层：Token 状态初始化 + 进度控制（优化版） ========== -->
 <script>
 (function () {
     'use strict';
 
-    // ---- 加载进度控制 ----
+    // ================================================================
+    // 进度阶段配置（百分比阈值 → 文案 + 阶段点）
+    // ================================================================
+    var STAGES = [
+        { from:  0, to: 15, main: 'Memulai sistem...',      sub: 'Memeriksa sesi login',              step: 0 },
+        { from: 16, to: 49, main: 'Memuat modul dasar...',  sub: 'utils \u00b7 toast \u00b7 cache \u00b7 supabase', step: 1 },
+        { from: 50, to: 89, main: 'Memuat modul inti...',   sub: 'Menghubungkan ke server',            step: 2 },
+        { from: 90, to: 95, main: 'Menyiapkan dasbor...',   sub: 'app-dashboard-core siap',            step: 3 },
+        { from: 96, to: 99, main: 'Memuat data KPI...',     sub: 'Mengambil data terkini',             step: 3 },
+        { from:100, to:100, main: 'Siap!',                  sub: 'Membuka sistem...',                  step: 4 }
+    ];
+
+    // ================================================================
+    // 内部状态
+    // ================================================================
     var currentProgress = 0;
-    window.__updateLoadingProgress = function(targetPercent) {
-        if (targetPercent > currentProgress) {
-            currentProgress = targetPercent;
-            var bar = document.getElementById('loadingProgressBar');
-            if (bar) bar.style.width = currentProgress + '%';
+    var fakeTimer       = null;
+
+    // ================================================================
+    // 工具：根据进度值找到对应阶段
+    // ================================================================
+    function getStage(pct) {
+        for (var i = STAGES.length - 1; i >= 0; i--) {
+            if (pct >= STAGES[i].from) return STAGES[i];
+        }
+        return STAGES[0];
+    }
+
+    // ================================================================
+    // 工具：更新 5 个阶段点（done / active / 未激活）
+    // ================================================================
+    function updateSteps(activeIndex) {
+        for (var i = 1; i <= 5; i++) {
+            var el = document.getElementById('lstep' + i);
+            if (!el) continue;
+            var idx = i - 1; // 0-based
+            if (idx < activeIndex) {
+                el.className = 'loading-step done';
+            } else if (idx === activeIndex) {
+                el.className = 'loading-step active';
+            } else {
+                el.className = 'loading-step';
+            }
+        }
+    }
+
+    // ================================================================
+    // 核心：更新进度条 + 百分比 + 文案 + 阶段点
+    // ================================================================
+    window.__updateLoadingProgress = function (targetPercent) {
+        if (targetPercent <= currentProgress) return;
+        currentProgress = targetPercent;
+
+        // — 进度条宽度 —
+        var bar = document.getElementById('loadingProgressBar');
+        if (bar) bar.style.width = currentProgress + '%';
+
+        // — 百分比数字 —
+        var pctEl = document.getElementById('loadingProgressPct');
+        if (pctEl) pctEl.textContent = currentProgress + '%';
+
+        // — 动态文案 —
+        var stage = getStage(currentProgress);
+        var mainEl = document.getElementById('loadingTextMain');
+        var subEl  = document.getElementById('loadingTextSub');
+        if (mainEl) mainEl.textContent = stage.main;
+        if (subEl)  subEl.textContent  = stage.sub;
+
+        // — 阶段指示点 —
+        updateSteps(stage.step);
+
+        // — 到达真实节点后停止伪进度爬行 —
+        if (currentProgress >= 50 && fakeTimer) {
+            clearInterval(fakeTimer);
+            fakeTimer = null;
         }
     };
 
-    // ---- Token 状态检查 ----
+    // ================================================================
+    // 伪进度爬行：解决 0→50% 等待段用户感知空白
+    // 每 900ms 推进 3%，上限 45%（真实节点 50% 到达时自动停止）
+    // ================================================================
+    fakeTimer = setInterval(function () {
+        if (currentProgress < 45) {
+            window.__updateLoadingProgress(currentProgress + 3);
+        } else {
+            clearInterval(fakeTimer);
+            fakeTimer = null;
+        }
+    }, 900);
+
+    // ================================================================
+    // Token 状态检查（原有逻辑保持不变）
+    // ================================================================
     try {
         var hasValidToken = false;
         for (var i = 0; i < localStorage.length; i++) {
