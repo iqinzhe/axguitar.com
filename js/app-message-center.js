@@ -232,7 +232,7 @@
                 
                 document.getElementById("app").innerHTML = content;
                 
-                // 【修复 #10】返回按钮 - 使用更可靠的全局方法
+                // 返回按钮 - 使用更可靠的全局方法
                 const backBtn = document.getElementById('messageCenterBackBtn');
                 if (backBtn) {
                     backBtn.onclick = function(e) {
