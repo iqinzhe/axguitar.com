@@ -7,8 +7,7 @@
 <meta name="theme-color" content="#0e7490">
 <title>JF! by Gadai - Sistem Manajemen Gadai</title>
 
-<!-- ① 图标 -->
-<link rel="icon" href="icons/favicon-192x192.png">
+<!-- ① 图标 --><link rel="icon" href="icons/favicon-192x192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest?v=1">
 
@@ -63,146 +62,84 @@
   --z-sidebar: 100; --z-sidebar-overlay: 99; --z-topbar: 50; --z-modal: 9999; --z-tooltip: 10000;
 }
 
-/* === critical.css 内联（防止 FOUC + 优化版加载动画） === */
+/* === critical.css 内联 === */
 @layer base {
-  .dashboard-content { opacity: 0; }
-  .dashboard-content.loaded { opacity: 1; transition: opacity 0.4s ease; }
+  .dashboard-content{opacity:0}
+  .dashboard-content.loaded{opacity:1;transition:opacity 0.4s ease}
 
-  /* ── 遮罩层：磨砂背景 + 点阵纹理 ── */
-  .loading-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: #eef3f8;
-    background-image: radial-gradient(circle, #c4d8e6 1px, transparent 1px);
-    background-size: 28px 28px;
-    z-index: var(--z-modal);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 20px;
-    transition: opacity 0.4s ease;
-  }
-
-  /* ── 品牌区（置顶，垂直居中布局） ── */
-  .loading-brand {
-    display: flex; flex-direction: column;
-    align-items: center; gap: 10px;
-  }
-  .loading-brand-logo-wrap {
-    width: 56px; height: 56px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .loading-brand-logo {
-    height: 56px; width: auto;
-    border-radius: 12px;
-  }
-  .loading-brand-name {
-    font-size: 1.35rem; font-weight: 700;
-    color: #0e7490; letter-spacing: 0.5px;
-    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    margin: 0;
-  }
-  .loading-brand-tagline {
-    font-size: 0.72rem; color: #6b7e95;
-    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    letter-spacing: 0.3px;
-    margin-top: -6px;
+  .loading-overlay{
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:#eef3f8;
+    background-image:radial-gradient(circle,#c4d8e6 1px,transparent 1px);
+    background-size:28px 28px;
+    z-index:var(--z-modal);
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:20px;
+    transition:opacity 0.4s ease;
   }
 
-  /* ── 阶段指示点（5个圆点，对应5个加载阶段） ── */
-  .loading-steps {
-    display: flex; gap: 7px; align-items: center;
+  .loading-brand{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .loading-brand-logo-wrap{width:56px;height:56px;display:flex;align-items:center;justify-content:center}
+  .loading-brand-logo{height:56px;width:auto;border-radius:12px}
+  .loading-brand-name{
+    font-size:1.35rem;font-weight:700;color:#0e7490;letter-spacing:.5px;
+    font-family:'Segoe UI','Microsoft YaHei',sans-serif;margin:0;
   }
-  .loading-step {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: rgba(14, 116, 144, 0.18);
-    transition: background 0.35s ease, transform 0.35s ease;
-  }
-  .loading-step.done {
-    background: #0e7490;
-  }
-  .loading-step.active {
-    background: #06b6d4;
-    animation: loStepPulse 1s ease-in-out infinite;
+  .loading-brand-tagline{
+    font-size:.72rem;color:#6b7e95;
+    font-family:'Segoe UI','Microsoft YaHei',sans-serif;
+    letter-spacing:.3px;margin-top:-6px;
   }
 
-  /* ── 动态文字区（主文案 + 副文案） ── */
-  .loading-text {
-    display: flex; flex-direction: column;
-    align-items: center; gap: 4px;
-    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    /* 固定高度：防止不同文案长度引起容器高度抖动 */
-    height: 38px;
-    justify-content: center;
+  .loading-steps{display:flex;gap:7px;align-items:center}
+  .loading-step{
+    width:7px;height:7px;border-radius:50%;
+    background:rgba(14,116,144,.18);
+    transition:background .35s ease,transform .35s ease;
   }
-  .loading-text-main {
-    font-size: 0.875rem; font-weight: 500;
-    color: #3d5068; letter-spacing: 0.3px;
-    /* 固定行高，防止字体渲染差异导致跳动 */
-    line-height: 1.4;
-    white-space: nowrap;
-    opacity: 1;
-    transition: opacity 0.2s ease;
+  .loading-step.done{background:#0e7490}
+  .loading-step.active{background:#06b6d4;animation:loStepPulse 1s ease-in-out infinite}
+
+  .loading-text{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    font-family:'Segoe UI','Microsoft YaHei',sans-serif;
+    height:38px;justify-content:center;
   }
-  .loading-text-sub {
-    font-size: 0.72rem; color: #6b7e95;
-    letter-spacing: 0.2px;
-    line-height: 1.4;
-    white-space: nowrap;
-    opacity: 1;
-    transition: opacity 0.2s ease;
+  .loading-text-main{
+    font-size:.875rem;font-weight:500;color:#3d5068;letter-spacing:.3px;
+    line-height:1.4;white-space:nowrap;opacity:1;transition:opacity .2s ease;
   }
-  .loading-text-main.fading,
-  .loading-text-sub.fading {
-    opacity: 0;
+  .loading-text-sub{
+    font-size:.72rem;color:#6b7e95;letter-spacing:.2px;
+    line-height:1.4;white-space:nowrap;opacity:1;transition:opacity .2s ease;
+  }
+  .loading-text-main.fading,.loading-text-sub.fading{opacity:0}
+
+  .loading-progress-wrap{display:flex;flex-direction:column;align-items:center;gap:5px}
+  .loading-progress{
+    width:240px;height:5px;background:rgba(14,116,144,.12);
+    border-radius:3px;overflow:hidden;position:relative;
+  }
+  .loading-progress-bar{
+    height:100%;width:0%;
+    background:linear-gradient(90deg,#0e7490,#06b6d4);
+    border-radius:3px;
+    transition:width .5s cubic-bezier(.4,0,.2,1);
+    position:relative;
+  }
+  .loading-progress-bar::after{
+    content:'';position:absolute;right:0;top:0;bottom:0;width:24px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.55));
+    border-radius:3px;animation:loShimmer 1.6s ease-in-out infinite;
+  }
+  .loading-progress-pct{
+    font-size:.7rem;font-weight:600;color:#0e7490;
+    font-family:'Segoe UI','Microsoft YaHei',sans-serif;
+    letter-spacing:.3px;min-width:30px;text-align:center;
   }
 
-  /* ── 进度条区（进度条 + 百分比数字） ── */
-  .loading-progress-wrap {
-    display: flex; flex-direction: column;
-    align-items: center; gap: 5px;
-  }
-  .loading-progress {
-    width: 240px; height: 5px;
-    background: rgba(14,116,144,0.12);
-    border-radius: 3px; overflow: hidden;
-    position: relative;
-  }
-  .loading-progress-bar {
-    height: 100%; width: 0%;
-    background: linear-gradient(90deg, #0e7490, #06b6d4);
-    border-radius: 3px;
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-  }
-  /* 流光扫过动效 */
-  .loading-progress-bar::after {
-    content: '';
-    position: absolute; right: 0; top: 0; bottom: 0;
-    width: 24px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55));
-    border-radius: 3px;
-    animation: loShimmer 1.6s ease-in-out infinite;
-  }
-  .loading-progress-pct {
-    font-size: 0.7rem; font-weight: 600;
-    color: #0e7490;
-    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    letter-spacing: 0.3px;
-    transition: opacity 0.3s ease;
-    min-width: 30px; text-align: center;
-  }
-
-  /* ── 关键帧 ── */
-  @keyframes loStepPulse {
-    0%,100% { transform: scale(1);   opacity: 1; }
-    50%      { transform: scale(1.5); opacity: 0.65; }
-  }
-  @keyframes loShimmer {
-    0%,100% { opacity: 0; }
-    50%      { opacity: 1; }
-  }
-  @keyframes loDot {
-    0%,100% { opacity: 0.15; }
-    50%     { opacity: 1; }
-  }
+  @keyframes loStepPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.65}}
+  @keyframes loShimmer{0%,100%{opacity:0}50%{opacity:1}}
 }
 </style>
 
@@ -222,21 +159,15 @@
 </head>
 <body>
 
-<!-- ========== 加载动画层（优化版） ========== -->
+<!-- ========== 加载动画层 ========== -->
 <div class="loading-overlay" id="loadingOverlay">
-
-    <!-- 1⃣ 品牌区（置顶：Logo + 名称 + 副标题） -->
     <div class="loading-brand">
         <div class="loading-brand-logo-wrap">
-            <img class="loading-brand-logo"
-                 src="icons/pagehead-logo.png" alt="JF!"
-                 onerror="this.style.display='none'">
+            <img class="loading-brand-logo" src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'">
         </div>
         <span class="loading-brand-name">JF! by Gadai</span>
         <span class="loading-brand-tagline">Sistem Manajemen Gadai</span>
     </div>
-
-    <!-- 2⃣ 阶段指示点（5个，对应5个加载阶段） -->
     <div class="loading-steps" id="loadingSteps">
         <div class="loading-step" id="lstep1"></div>
         <div class="loading-step" id="lstep2"></div>
@@ -244,21 +175,16 @@
         <div class="loading-step" id="lstep4"></div>
         <div class="loading-step" id="lstep5"></div>
     </div>
-
-    <!-- 3⃣ 动态文字提示（主文案 + 副文案） -->
     <div class="loading-text">
         <span class="loading-text-main" id="loadingTextMain">Memulai sistem...</span>
         <span class="loading-text-sub"  id="loadingTextSub">Memeriksa sesi login</span>
     </div>
-
-    <!-- 4⃣ 进度条 + 百分比 -->
     <div class="loading-progress-wrap">
         <div class="loading-progress">
             <div class="loading-progress-bar" id="loadingProgressBar"></div>
         </div>
         <span class="loading-progress-pct" id="loadingProgressPct">0%</span>
     </div>
-
 </div>
 
 <!-- ========== 主内容区域 ========== -->
@@ -266,215 +192,85 @@
     <div id="app"></div>
 </div>
 
-<!--
-  ==================== 脚本加载策略 ====================
+<!-- 脚本层：0=Token检查+进度控制 1=基础模块(defer) 2=dashboard-core(defer) 3=页面模块(defer) 4=启动逻辑(module) -->
 
-  第 0 层：立即执行（内联同步脚本）
-    - Token 状态检查 + 进度控制初始化（含伪进度平滑 + 动态文案 + 阶段点同步）
-
-  第 1 层：CDN + 核心基础（defer，按序执行）
-    - config.js → supabase-js（锁定版本 2.105.4）
-    - js/utils.js → fee-config.js
-    - toast.js → cache.js → supabase.js → auth.js → permission.js → audit.js
-    - order.js → store.js → storage.js → migration.js
-
-  第 2 层：核心应用（defer）
-    - app-dashboard-core.js（首屏仪表盘）
-
-  第 3 层：非核心页面模块（defer，不阻塞首屏）
-
-  第 4 层：启动逻辑（type="module"）
-    - module 脚本天然在所有 defer 脚本执行完毕后运行
-
-  📊 加载进度分布（优化版）：
-    0%  ── 页面开始加载（伪进度爬行启动：0→45%）
-    50% ── 基础模块全部就绪（migration.js onload）
-    90% ── app-dashboard-core.js 就绪（onload）
-    93% ── DashboardCore.init() 开始执行
-    96% ── KPI 数据查询完成
-    100% ─ DOM 渲染完成，加载层淡出
-
-  📝 动态文案阶段：
-    0-15%   ── Memulai sistem...     / Memeriksa sesi login
-    16-49%  ── Memuat modul dasar... / utils · toast · cache · supabase
-    50-89%  ── Memuat modul inti...  / Menghubungkan ke server
-    90-95%  ── Menyiapkan dasbor...  / app-dashboard-core siap
-    96-99%  ── Memuat data KPI...    / Mengambil data terkini
-    100%    ── Siap!                 / Membuka sistem...
--->
-
-<!-- ========== 第 0 层：Token 状态初始化 + 进度控制（优化版） ========== -->
+<!-- ========== 第 0 层：Token 状态初始化 + 进度控制 ========== -->
 <script>
-(function () {
-    'use strict';
+(function(){
+'use strict';
+// 阶段配置：[进度下限, 主文案, 副文案, 步骤点索引]
+var S=[
+  [0,  'Memulai sistem...',     'Memeriksa sesi login',              0],
+  [16, 'Memuat modul dasar...', 'utils \u00b7 toast \u00b7 cache \u00b7 supabase', 1],
+  [50, 'Memuat modul inti...',  'Menghubungkan ke server',           2],
+  [90, 'Menyiapkan dasbor...',  'app-dashboard-core siap',           3],
+  [96, 'Memuat data KPI...',    'Mengambil data terkini',            3],
+  [100,'Siap!',                 'Membuka sistem...',                 4]
+];
+var cur=0, ft=null, lsi=-1, sw=false;
 
-    // ================================================================
-    // 进度阶段配置（百分比阈值 → 文案 + 阶段点）
-    // ================================================================
-    var STAGES = [
-        { from:  0, to: 15, main: 'Memulai sistem...',      sub: 'Memeriksa sesi login',              step: 0 },
-        { from: 16, to: 49, main: 'Memuat modul dasar...',  sub: 'utils \u00b7 toast \u00b7 cache \u00b7 supabase', step: 1 },
-        { from: 50, to: 89, main: 'Memuat modul inti...',   sub: 'Menghubungkan ke server',            step: 2 },
-        { from: 90, to: 95, main: 'Menyiapkan dasbor...',   sub: 'app-dashboard-core siap',            step: 3 },
-        { from: 96, to: 99, main: 'Memuat data KPI...',     sub: 'Mengambil data terkini',             step: 3 },
-        { from:100, to:100, main: 'Siap!',                  sub: 'Membuka sistem...',                  step: 4 }
-    ];
+function gS(p){for(var i=S.length-1;i>=0;i--)if(p>=S[i][0])return i;return 0;}
 
-    // ================================================================
-    // 内部状态
-    // ================================================================
-    var currentProgress = 0;
-    var fakeTimer       = null;
+function uSteps(a){
+  for(var i=1;i<=5;i++){
+    var el=document.getElementById('lstep'+i);
+    if(!el)continue;
+    el.className='loading-step'+(i-1<a?' done':i-1===a?' active':'');
+  }
+}
 
-    // ================================================================
-    // 工具：根据进度值找到对应阶段
-    // ================================================================
-    function getStage(pct) {
-        for (var i = STAGES.length - 1; i >= 0; i--) {
-            if (pct >= STAGES[i].from) return STAGES[i];
-        }
-        return STAGES[0];
+function swTxt(m,s){
+  var M=document.getElementById('loadingTextMain'),
+      S2=document.getElementById('loadingTextSub');
+  if(!M||!S2||M.textContent===m)return;
+  if(sw){M.classList.remove('fading');S2.classList.remove('fading');M.textContent=m;S2.textContent=s;return;}
+  sw=true;
+  M.classList.add('fading');S2.classList.add('fading');
+  setTimeout(function(){
+    M.textContent=m;S2.textContent=s;
+    void M.offsetWidth;
+    M.classList.remove('fading');S2.classList.remove('fading');
+    sw=false;
+  },210);
+}
+
+window.__updateLoadingProgress=function(t){
+  if(t<=cur)return;
+  cur=t;
+  var b=document.getElementById('loadingProgressBar');
+  if(b)b.style.width=cur+'%';
+  var p=document.getElementById('loadingProgressPct');
+  if(p)p.textContent=cur+'%';
+  var si=gS(cur);
+  if(si!==lsi){lsi=si;swTxt(S[si][1],S[si][2]);}
+  uSteps(S[si][3]);
+  if(cur>=50&&ft){clearInterval(ft);ft=null;}
+};
+
+// 伪进度爬行：0→45%，每900ms +3%，真实节点50%到达后自动停止
+ft=setInterval(function(){
+  if(cur<45)window.__updateLoadingProgress(cur+3);
+  else{clearInterval(ft);ft=null;}
+},900);
+
+// Token 状态检查
+try{
+  var ok=false,i,k,d;
+  for(i=0;i<localStorage.length;i++){
+    k=localStorage.key(i);
+    if(k&&k.startsWith('sb-')&&k.endsWith('-auth-token')){
+      try{d=JSON.parse(localStorage.getItem(k));if(d&&d.expires_at&&new Date(d.expires_at*1000)>new Date())ok=true;}catch(e){}
+      break;
     }
-
-    // ================================================================
-    // 工具：更新 5 个阶段点（done / active / 未激活）
-    // ================================================================
-    function updateSteps(activeIndex) {
-        for (var i = 1; i <= 5; i++) {
-            var el = document.getElementById('lstep' + i);
-            if (!el) continue;
-            var idx = i - 1; // 0-based
-            if (idx < activeIndex) {
-                el.className = 'loading-step done';
-            } else if (idx === activeIndex) {
-                el.className = 'loading-step active';
-            } else {
-                el.className = 'loading-step';
-            }
-        }
-    }
-
-    // ================================================================
-    // 工具：文案淡出 → 换字 → 淡入（消除闪动）
-    // ================================================================
-    var lastStageIndex = -1;
-    var textSwitching  = false;
-
-    function switchText(newMain, newSub) {
-        var mainEl = document.getElementById('loadingTextMain');
-        var subEl  = document.getElementById('loadingTextSub');
-        if (!mainEl || !subEl) return;
-
-        // 如果文案没有变化，跳过切换
-        if (mainEl.textContent === newMain && subEl.textContent === newSub) return;
-
-        // 防止重入：若上一次切换还未完成，直接跳到目标
-        if (textSwitching) {
-            mainEl.classList.remove('fading');
-            subEl.classList.remove('fading');
-            mainEl.textContent = newMain;
-            subEl.textContent  = newSub;
-            return;
-        }
-
-        textSwitching = true;
-
-        // 第一步：淡出（opacity → 0）
-        mainEl.classList.add('fading');
-        subEl.classList.add('fading');
-
-        // 第二步：200ms 后换字（对应 transition: opacity 0.2s）
-        setTimeout(function () {
-            mainEl.textContent = newMain;
-            subEl.textContent  = newSub;
-
-            // 第三步：强制重排后淡入（opacity → 1）
-            void mainEl.offsetWidth;
-            mainEl.classList.remove('fading');
-            subEl.classList.remove('fading');
-            textSwitching = false;
-        }, 210);
-    }
-
-    // ================================================================
-    // 核心：更新进度条 + 百分比 + 文案 + 阶段点
-    // ================================================================
-    window.__updateLoadingProgress = function (targetPercent) {
-        if (targetPercent <= currentProgress) return;
-        currentProgress = targetPercent;
-
-        // — 进度条宽度 —
-        var bar = document.getElementById('loadingProgressBar');
-        if (bar) bar.style.width = currentProgress + '%';
-
-        // — 百分比数字 —
-        var pctEl = document.getElementById('loadingProgressPct');
-        if (pctEl) pctEl.textContent = currentProgress + '%';
-
-        // — 动态文案（只在阶段切换时才执行淡入淡出，避免频繁闪烁）—
-        var stage      = getStage(currentProgress);
-        var stageIndex = STAGES.indexOf(stage);
-        if (stageIndex !== lastStageIndex) {
-            lastStageIndex = stageIndex;
-            switchText(stage.main, stage.sub);
-        }
-
-        // — 阶段指示点 —
-        updateSteps(stage.step);
-
-        // — 到达真实节点后停止伪进度爬行 —
-        if (currentProgress >= 50 && fakeTimer) {
-            clearInterval(fakeTimer);
-            fakeTimer = null;
-        }
-    };
-
-    // ================================================================
-    // 伪进度爬行：解决 0→50% 等待段用户感知空白
-    // 每 900ms 推进 3%，上限 45%（真实节点 50% 到达时自动停止）
-    // ================================================================
-    fakeTimer = setInterval(function () {
-        if (currentProgress < 45) {
-            window.__updateLoadingProgress(currentProgress + 3);
-        } else {
-            clearInterval(fakeTimer);
-            fakeTimer = null;
-        }
-    }, 900);
-
-    // ================================================================
-    // Token 状态检查（原有逻辑保持不变）
-    // ================================================================
-    try {
-        var hasValidToken = false;
-        for (var i = 0; i < localStorage.length; i++) {
-            var key = localStorage.key(i);
-            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                try {
-                    var tokenData = JSON.parse(localStorage.getItem(key));
-                    if (tokenData && tokenData.expires_at) {
-                        if (new Date(tokenData.expires_at * 1000) > new Date()) {
-                            hasValidToken = true;
-                        }
-                    }
-                } catch (e) { /* 数据损坏，忽略 */ }
-                break;
-            }
-        }
-        if (!hasValidToken) {
-            try {
-                var clearKeys = [
-                    'jf_current_state', 'jf_last_state', 'jf_current_page',
-                    'jf_current_filter', 'jf_current_order_id', 'jf_current_customer_id',
-                    'jf_last_page', 'jf_last_filter', 'jf_last_order_id', 'jf_last_customer_id'
-                ];
-                clearKeys.forEach(function (k) {
-                    sessionStorage.removeItem(k);
-                    localStorage.removeItem(k);
-                });
-            } catch (e) { /* ignore */ }
-        }
-    } catch (e) { /* 静默处理 */ }
+  }
+  if(!ok){
+    ['jf_current_state','jf_last_state','jf_current_page','jf_current_filter',
+     'jf_current_order_id','jf_current_customer_id','jf_last_page','jf_last_filter',
+     'jf_last_order_id','jf_last_customer_id'].forEach(function(k){
+      sessionStorage.removeItem(k);localStorage.removeItem(k);
+    });
+  }
+}catch(e){}
 })();
 </script>
 
