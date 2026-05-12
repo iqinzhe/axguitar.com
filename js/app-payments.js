@@ -1,4 +1,4 @@
-// app-payments.js - v2.0 (移除 loan_amount 篡改、少付告警、统一锁 key、幂等窗口缩小至2分钟)
+// app-payments.js - v2.0 (JF 命名空间) (移除 loan_amount 篡改、少付告警、统一锁 key、幂等窗口缩小至2分钟)
 
 'use strict';
 
