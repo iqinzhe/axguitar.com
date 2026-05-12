@@ -1,4 +1,4 @@
-// order.js - v2.0
+// order.js - v2.0 (JF 命名空间) 
 // getOrderCashFlow 返回订单专属流水（而非整个门店流水）
 
 'use strict';
