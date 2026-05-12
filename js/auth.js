@@ -1,4 +1,4 @@
-// auth.js - v2.0
+// auth.js - v2.0 优化版（登录后直接设置 user，避免重复请求）
 // 移除 Enter 键监听 + 修复 logout 重复调用 signOut
 
 'use strict';
@@ -256,7 +256,6 @@
 
         async isAdminAsync()        { return (await SUPABASE.getCurrentProfile())?.role === 'admin'; },
         async isStoreManagerAsync() { return (await SUPABASE.getCurrentProfile())?.role === 'store_manager'; },
-        // 【修复 #6】补全 try/catch，防止网络异常时产生未捕获的 rejection
         async isStaffAsync() {
             try { return (await SUPABASE.getCurrentProfile())?.role === 'staff'; }
             catch (e) { console.warn('[AUTH] isStaffAsync 失败:', e.message); return false; }
@@ -278,14 +277,13 @@
             return this.user?.stores?.name || this.user?.store_name || (Utils.lang === 'id' ? 'Tidak diketahui' : '未知门店');
         },
 
-        // ==================== 登录逻辑 ====================
+        // ==================== 登录逻辑（优化版） ====================
         async login(usernameOrEmail, password) {
             try {
-                // [优化①] 先检查锁定状态（纯本地，无网络开销）
+                // 先检查锁定状态
                 if (this._isLocked(usernameOrEmail)) return null;
 
-                // [优化②] 仅用 navigator.onLine 做快速离线拦截，
-                //          取消登录前多余的 Supabase HEAD 请求（省 200-500ms）
+                // 离线拦截
                 if (!navigator.onLine) {
                     Utils.toast.error(Utils.lang === 'id'
                         ? 'Tidak ada koneksi internet. Periksa jaringan Anda.'
@@ -293,8 +291,7 @@
                     return null;
                 }
 
-                // [优化③] 移除登录前的 forceClearAuth()（其内含 signOut 网络请求，
-                //          每次登录多花 300-800ms）；改为仅清除本地缓存即可
+                // 清除本地缓存（不清除远程会话，省去 signOut 网络请求）
                 SUPABASE.clearCache();
                 this.user = null;
                 try {
@@ -308,6 +305,7 @@
                     keysToRemove.forEach(key => localStorage.removeItem(key));
                 } catch (e) { /* ignore */ }
 
+                // 执行登录（supabase.login 内部会自动设置 AUTH.user）
                 const result = await SUPABASE.login(usernameOrEmail, password);
 
                 if (!result || result.error) {
@@ -317,29 +315,25 @@
                         ? 'Login gagal: ' + (result?.error?.message || 'Username atau password salah')
                         : '登录失败：' + (result?.error?.message || '用户名或密码错误'), 4000);
                     if (window.Audit) {
-                        // [优化④] 审计日志不阻塞登录流程（fire-and-forget）
                         window.Audit.logLoginFailure(usernameOrEmail, result?.error?.message || 'invalid_credentials').catch(() => {});
                     }
                     return null;
                 }
 
+                // 登录成功，清除失败记录
                 this._resetLoginFailure(usernameOrEmail);
 
-                // [优化⑤] SUPABASE.login() 内部已调用 loadCurrentUser() 并写入 AUTH.user，
-                //          此处直接复用，不再发起额外网络请求（节省 200-400ms）。
-                //          若 this.user 仍为空，说明 supabase.js 侧出现了异常，
-                //          直接走失败分支，不重试（避免多一次网络往返）。
+                // 此时 SUPABASE.login 内部已经加载了 profile 并设置了 AUTH.user
                 if (!this.user) {
                     console.error('[Auth] 登录后加载用户资料失败');
                     Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat profil pengguna' : '加载用户资料失败', 4000);
                     return null;
                 }
 
-                // [优化⑥] checkStoreStatus 复用已缓存的 stores 数据（来自 getCurrentProfile 的 join），
-                //          避免再发一次 Supabase SQL 请求
+                // 检查门店状态（复用已加载的 stores 信息）
                 if (this.user.store_id) {
                     try {
-                        const storeData = this.user.stores; // getCurrentProfile 已 join stores
+                        const storeData = this.user.stores;
                         const isActive = storeData ? storeData.is_active !== false : true;
                         const storeName = storeData?.name || '';
                         if (!isActive) {
@@ -354,8 +348,8 @@
                     }
                 }
 
+                // 审计日志
                 if (window.Audit) {
-                    // [优化⑦] 审计日志 fire-and-forget，不阻塞仪表盘渲染
                     window.Audit.logLoginSuccess(this.user.id, this.user.name).catch(() => {});
                 }
 
@@ -382,7 +376,7 @@
             }
         },
 
-        // 【修复 #2】logout 简化，只调用一次 forceClearAuth，避免重复 signOut
+        // 修复 logout，只调用一次 forceClearAuth
         async logout() {
             
             if (this.user && window.Audit) {
