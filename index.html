@@ -176,53 +176,104 @@
     <div id="app"></div>
 </div>
 
-<!-- 脚本层：0=Token检查+进度控制 1=基础模块(defer) 2=dashboard-core(defer) 3=页面模块(defer) 4=启动逻辑(module) -->
+<!-- 脚本层：0=Token检查+动画控制 1=基础模块(defer) 2=dashboard-core(defer) 3=页面模块(defer) 4=启动逻辑(module) -->
 
-<!-- ========== 第 0 层：Token 状态初始化 + 进度控制 ========== -->
+<!-- ========== 第 0 层：Token 状态初始化 + 动画控制 ========== -->
 <script>
 (function(){
 'use strict';
-// 阶段配置：[进度下限, 步骤点索引] — 8个步骤点，80%起第6点亮，93%起第7点亮
-var STEPS=[
-  [0,   0],
-  [14,  1],
-  [28,  2],
-  [42,  3],
-  [57,  4],
-  [71,  5],
-  [82,  6],
-  [93,  7],
-  [100, 7]
-];
-var cur=0, ft=null, lsi=-1;
 
-function gS(p){for(var i=STEPS.length-1;i>=0;i--)if(p>=STEPS[i][0])return i;return 0;}
+var cur = 0;
+var animPhase = 0;           // 0=圆点1-6动画中, 1=等待JS半程, 2=完成
+var halfReady = false;       // 第7个点：JS加载一半
+var fullReady = false;       // 第8个点：JS核心完成
+var finished = false;        // 防止重复触发
 
-function uSteps(a){
+// 更新圆点
+function setDot(n, state){
   for(var i=1;i<=8;i++){
     var el=document.getElementById('lstep'+i);
     if(!el)continue;
-    el.className='loading-step'+(i-1<a?' done':i-1===a?' active':'');
+    if(i<n){
+      el.className='loading-step done';
+    }else if(i===n){
+      el.className='loading-step '+(state==='active'?'active':'done');
+    }else{
+      el.className='loading-step';
+    }
   }
 }
 
-window.__updateLoadingProgress=function(t){
-  if(t<=cur)return;
-  cur=t;
+// 更新进度条
+function setProgress(v){
+  cur=v;
   var b=document.getElementById('loadingProgressBar');
-  if(b)b.style.width=cur+'%';
+  if(b)b.style.width=v+'%';
   var p=document.getElementById('loadingProgressPct');
-  if(p)p.textContent=cur+'%';
-  var si=gS(cur);
-  if(si!==lsi){lsi=si;uSteps(STEPS[si][1]);}
-  if(cur>=50&&ft){clearInterval(ft);ft=null;}
+  if(p)p.textContent=Math.round(v)+'%';
+}
+
+// 尝试跳到下一阶段
+function tryAdvance(){
+  if(finished)return;
+
+  // 阶段1：动画完成圆点1-6 → 进度82%，等待半程信号
+  if(animPhase===0 && halfReady){
+    animPhase=1;
+    setProgress(82);
+    setDot(7,'active');
+  }
+
+  // 阶段2：半程就绪 & 全成就绪 → 点亮8，进度100%
+  if(animPhase>=1 && fullReady){
+    finished=true;
+    setProgress(93);
+    setDot(8,'active');
+    setTimeout(function(){
+      setProgress(100);
+    },200);
+  }
+}
+
+// 外部调用：JS加载一半（migration.js完成）
+window.__onHalfReady = function(){
+  halfReady=true;
+  tryAdvance();
 };
 
-// 伪进度爬行：0→45%，每900ms +3%
-ft=setInterval(function(){
-  if(cur<45)window.__updateLoadingProgress(cur+3);
-  else{clearInterval(ft);ft=null;}
-},900);
+// 外部调用：JS核心完成
+window.__onFullReady = function(){
+  fullReady=true;
+  tryAdvance();
+};
+
+// 兼容旧接口
+window.__updateLoadingProgress = function(){};
+
+// 纯动画：900ms内圆点1-6依次点亮，进度0→82%
+(function runDots(){
+  var dots=[1,2,3,4,5,6];
+  var total=900;
+  var perDot=total/dots.length; // 150ms每个点
+  var progressPerDot=82/dots.length; // 每个点对应约13.67%
+
+  dots.forEach(function(dot,idx){
+    setTimeout(function(){
+      if(finished)return;
+      setProgress(Math.round(progressPerDot*(idx+1)));
+      setDot(dot,'active');
+      // 最后一个点(6)点亮后标记animPhase=0完成
+      if(dot===6){
+        setTimeout(function(){
+          if(!finished){
+            animPhase=0;
+            tryAdvance();
+          }
+        },perDot);
+      }
+    },perDot*(idx+1));
+  });
+})();
 
 // Token 状态检查
 try{
@@ -259,12 +310,12 @@ try{
 <script defer src="js/order.js"></script>
 <script defer src="js/store.js"></script>
 <script defer src="js/storage.js"></script>
+<!-- ★ 第7个点：migration.js加载完成 -->
 <script defer src="js/migration.js"
-    onload="window.__updateLoadingProgress && __updateLoadingProgress(50)"></script>
+    onload="window.__onHalfReady && __onHalfReady()"></script>
 
 <!-- ========== 第 2 层：核心应用（首屏仪表盘） ========== -->
-<script defer src="js/app-dashboard-core.js"
-    onload="window.__updateLoadingProgress && __updateLoadingProgress(90)"></script>
+<script defer src="js/app-dashboard-core.js"></script>
 
 <!-- ========== 第 3 层：非核心页面模块（defer） ========== -->
 <script defer src="js/app-capital.js"></script>
@@ -434,43 +485,31 @@ try{
 
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
-            if (window.__updateLoadingProgress) window.__updateLoadingProgress(93);
 
-            // ★ 80%→96% 慢速爬行，每0.8秒+1.1%，约12秒爬完16%，防止用户误以为宕机
-            var initCrawlTimer = setInterval(function () {
-                var bar = document.getElementById('loadingProgressBar');
-                if (bar) {
-                    var currentWidth = parseFloat(bar.style.width);
-                    if (currentWidth >= 80 && currentWidth < 95.8 && window.__updateLoadingProgress) {
-                        window.__updateLoadingProgress(currentWidth + 1.1);
-                    }
-                }
-            }, 800);
+            // ★ 第8个点：JS核心就绪
+            if (window.__onFullReady) window.__onFullReady();
 
             var originalRender = JF.DashboardCore.originalRenderDashboard;
             if (originalRender) {
                 JF.DashboardCore.originalRenderDashboard = async function () {
                     var result = await originalRender.apply(this, arguments);
-                    clearInterval(initCrawlTimer);
-                    if (window.__updateLoadingProgress) window.__updateLoadingProgress(96);
+                    hideLoading();
                     return result;
                 };
             }
 
-            // 兜底：init 完成或失败时停止爬行
             var initPromise = JF.DashboardCore.init();
             if (initPromise && typeof initPromise.then === 'function') {
                 initPromise.then(function () {
-                    clearInterval(initCrawlTimer);
+                    setTimeout(function () {
+                        if (loadingOverlay && loadingOverlay.style.display !== 'none') {
+                            hideLoading();
+                        }
+                    }, 500);
                 }).catch(function () {
-                    clearInterval(initCrawlTimer);
+                    hideLoading();
                 });
             }
-
-            // 安全阀：10秒后停止爬行
-            setTimeout(function () {
-                clearInterval(initCrawlTimer);
-            }, 10000);
 
             var appEl = document.getElementById('app');
             if (appEl) {
@@ -480,7 +519,7 @@ try{
                         hideLoading();
                         fallbackObserver.disconnect();
                     }
-                }, 15000);
+                }, 8000);
             }
         } else {
             setTimeout(startApp, 100);
