@@ -634,7 +634,7 @@
             }
         },
 
-        // 【修复 #21】printAllOrders - 增加数据量限制和分页提示
+        // printAllOrders - 增加数据量限制和分页提示
         async printAllOrders() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -643,7 +643,7 @@
             const filters = { status: APP.currentFilter || 'all' };
 
             try {
-                // 【修复 #21】限制最大打印数量为 500 条，避免浏览器卡死
+                // 限制最大打印数量为 500 条，避免浏览器卡死
                 const MAX_PRINT_ORDERS = 500;
                 
                 Utils.toast.info(lang === 'id' 
