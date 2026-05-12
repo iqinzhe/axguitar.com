@@ -99,7 +99,7 @@
                     }
                 }
 
-                // 【v2.5 新增】员工支出上限提示
+                // 员工支出上限提示
                 let staffExpenseInfoHtml = '';
                 if (PERMISSION.isStaff()) {
                     const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
@@ -210,7 +210,7 @@
             if (amountInput && Utils.bindAmountFormat) Utils.bindAmountFormat(amountInput);
         },
 
-        // ==================== 添加支出（v2.6 - 管理员支持总部支出） ====================
+        // ==================== 添加支出（管理员支持总部支出） ====================
         async addExpense() {
             const lang = Utils.lang;
             const expenseDate = document.getElementById("expenseDate").value || new Date().toISOString().split('T')[0];
@@ -236,7 +236,7 @@
                 return;
             }
 
-            // 【v2.7 新增】时间锁校验（仅非管理员，最多允许填3天前）
+            // 时间锁校验（仅非管理员，最多允许填3天前）
             const profileForDateCheck = await SUPABASE.getCurrentProfile();
             if (profileForDateCheck?.role !== 'admin') {
                 const todayStr = new Date().toISOString().split('T')[0];
@@ -251,7 +251,7 @@
                 }
             }
 
-            // 【v2.5 新增】员工支出金额上限检查
+            // 员工支出金额上限检查
             if (!PERMISSION.canAddExpenseAmount(amount)) {
                 const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
                 const warningMsg = lang === 'id'
