@@ -1,4 +1,4 @@
-// app-dashboard-anomaly.js - v2.0
+// app-dashboard-anomaly.js - v2.0 (JF 命名空间) 
 // 增加更完善的防重复请求机制 + 移除按钮禁用时的状态残留
 
 'use strict';
