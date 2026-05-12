@@ -52,10 +52,10 @@
             return Math.round(loanAmount * 0.01);  // 1%
         },
         
-        // ==================== 服务费计算（修复版） ====================
+        // ==================== 服务费计算 ====================
         /**
          * 根据当金金额和服务费百分比计算服务费
-         * 【修复 #4】百分比越上限时截断到最大值，而非重置为默认值
+         * 百分比越上限时截断到最大值，而非重置为默认值
          * @param {number} loanAmount - 当金金额
          * @param {number} percent - 服务费百分比（0-10）
          * @returns {Object} { percent: number, amount: number }
@@ -79,7 +79,7 @@
             }
             
             // 当金 > 5,000,000：按百分比计算
-            // 【修复 #4】截断到有效范围 [MIN_PERCENT, MAX_PERCENT]，而非重置为 DEFAULT_PERCENT
+            // 截断到有效范围 [MIN_PERCENT, MAX_PERCENT]，而非重置为 DEFAULT_PERCENT
             let validPercent = percent;
             
             if (percent === undefined || percent === null || isNaN(percent)) {
@@ -89,7 +89,7 @@
                 validPercent = cfg.MIN_PERCENT;
                 console.warn(`[FeeConfig] 服务费百分比 ${percent}% 低于最小值 ${cfg.MIN_PERCENT}%，已截断为 ${cfg.MIN_PERCENT}%`);
             } else if (percent > cfg.MAX_PERCENT) {
-                // 【修复 #4】超过最大值时，截断到最大值（而非重置为默认值）
+                // 超过最大值时，截断到最大值（而非重置为默认值）
                 validPercent = cfg.MAX_PERCENT;
                 console.warn(`[FeeConfig] 服务费百分比 ${percent}% 超过最大值 ${cfg.MAX_PERCENT}%，已截断为 ${cfg.MAX_PERCENT}%`);
             } else {
