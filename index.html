@@ -182,17 +182,16 @@
 <script>
 (function(){
 'use strict';
-// 阶段配置：[进度下限, 步骤点索引]
 var STEPS=[
-  [0,   0],   // 0%   → 点亮第0个（所有点灰）
-  [14,  1],   // 14%  → 点亮第1个
-  [28,  2],   // 28%  → 点亮第2个
-  [42,  3],   // 42%  → 点亮第3个
-  [57,  4],   // 57%  → 点亮第4个
-  [71,  5],   // 71%  → 点亮第5个
-  [85,  6],   // 85%  → 点亮第6个
-  [96,  7],   // 96%  → 点亮第7个
-  [100, 7]    // 100% → 全部点亮（第8个actived）
+  [0,   0],
+  [14,  1],
+  [28,  2],
+  [42,  3],
+  [57,  4],
+  [71,  5],
+  [85,  6],
+  [96,  7],
+  [100, 7]
 ];
 var cur=0, ft=null, lsi=-1;
 
@@ -218,13 +217,11 @@ window.__updateLoadingProgress=function(t){
   if(cur>=50&&ft){clearInterval(ft);ft=null;}
 };
 
-// 伪进度爬行：0→45%，每900ms +3%，真实节点50%到达后自动停止
 ft=setInterval(function(){
   if(cur<45)window.__updateLoadingProgress(cur+3);
   else{clearInterval(ft);ft=null;}
 },900);
 
-// Token 状态检查
 try{
   var ok=false,i,k,d;
   for(i=0;i<localStorage.length;i++){
