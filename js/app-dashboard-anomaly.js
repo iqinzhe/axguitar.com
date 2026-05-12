@@ -262,7 +262,7 @@
                     pageSize: 50, 
                     totalCount: blacklistTotalCount,
                     isLoadingMore: false,
-                    lastLoadTime: 0  // 【修复 #9】增加时间戳防止快速重复点击
+                    lastLoadTime: 0  // 增加时间戳防止快速重复点击
                 };
                 return content;
             } catch (error) {
@@ -343,7 +343,7 @@
             }
         },
 
-        // 【修复 #9】loadMoreBlacklist - 增强防重复机制
+        // loadMoreBlacklist - 增强防重复机制
         async loadMoreBlacklist() {
             const state = window._anomalyBlacklistState;
             if (!state) return;
