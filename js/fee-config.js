@@ -1,4 +1,4 @@
-// fee-config.js - v2.0
+// fee-config.js - v2.0 (JF 命名空间) 
 // 服务费百分比越上限时截断到最大值，而非重置为默认值
 
 'use strict';
