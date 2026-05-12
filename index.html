@@ -113,14 +113,20 @@
     font-size: 0.875rem; color: #3d5068;
     font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
     letter-spacing: 0.4px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  
+  /* 加载点：简洁3个点，依次闪烁 */
+  .loading-dots {
+    display: inline-flex; gap: 2px;
   }
   .loading-dots span {
-    display: inline-block;
-    animation: loDot 1.5s ease-in-out infinite; opacity: 0;
+    font-weight: bold; font-size: 1.2rem; line-height: 1;
+    animation: loDot 1.5s ease-in-out infinite;
   }
   .loading-dots span:nth-child(1) { animation-delay: 0s; }
-  .loading-dots span:nth-child(2) { animation-delay: 0.3s; }
-  .loading-dots span:nth-child(3) { animation-delay: 0.6s; }
+  .loading-dots span:nth-child(2) { animation-delay: 0.5s; }
+  .loading-dots span:nth-child(3) { animation-delay: 1.0s; }
 
   /* 进度扫描条 */
   .loading-progress {
@@ -141,8 +147,8 @@
     50%     { opacity: 1;   transform: scaleY(1); }
   }
   @keyframes loDot {
-    0%,80%,100% { opacity: 0; transform: translateY(0); }
-    40%         { opacity: 1; transform: translateY(-3px); }
+    0%,100% { opacity: 0.15; }
+    50%     { opacity: 1; }
   }
   @keyframes loProgress {
     0%   { transform: translateX(-100%); }
