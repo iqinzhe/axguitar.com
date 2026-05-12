@@ -1,4 +1,4 @@
-// auth.js - v2.0 优化版（登录后直接设置 user，避免重复请求）
+// auth.js - v2.0 (JF 命名空间) （登录后直接设置 user，避免重复请求）
 // 移除 Enter 键监听 + 修复 logout 重复调用 signOut
 
 'use strict';
