@@ -154,7 +154,7 @@
             document.getElementById("app").innerHTML = contentHTML;
         },
 
-        // ==================== 用户操作（完整保留） ====================
+        // ==================== 用户操作 ====================
         async addUser() {
             const lang = Utils.lang;
             const username = document.getElementById("newUsername").value.trim();
