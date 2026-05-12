@@ -100,49 +100,6 @@
   .loading-step.done{background:#0e7490}
   .loading-step.active{background:#06b6d4;animation:loStepPulse 1s ease-in-out infinite}
 
-  /* ★优化：loading-text 使用固定高度 + 双元素交叉淡入淡出，消除文字跳动 */
-  .loading-text{
-    display:flex;flex-direction:column;align-items:center;gap:4px;
-    font-family:'Segoe UI','Microsoft YaHei',sans-serif;
-    height:38px;justify-content:center;
-  }
-
-  /* ★优化：每行独立容器，固定高度，overflow:hidden 锁定布局 */
-  .loading-text-line{
-    position:relative;
-    height:1.4em;
-    overflow:hidden;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-
-  /* ★优化：主文案 - 绝对定位叠放 */
-  .loading-text-main{
-    font-size:.875rem;font-weight:500;color:#3d5068;letter-spacing:.3px;
-    line-height:1.4;white-space:nowrap;
-    position:absolute;
-    opacity:1;
-    transition:opacity 0.25s ease;
-  }
-  .loading-text-main.fading{opacity:0}
-
-  /* ★优化：副文案 - 绝对定位叠放 */
-  .loading-text-sub{
-    font-size:.72rem;color:#6b7e95;letter-spacing:.2px;
-    line-height:1.4;white-space:nowrap;
-    position:absolute;
-    opacity:1;
-    transition:opacity 0.25s ease;
-  }
-  .loading-text-sub.fading{opacity:0}
-
-  /* ★优化：下一个文案（隐藏等待） */
-  .loading-text-next{
-    opacity:0;
-    pointer-events:none;
-  }
-
   .loading-progress-wrap{display:flex;flex-direction:column;align-items:center;gap:5px}
   .loading-progress{
     width:240px;height:5px;background:rgba(14,116,144,.12);
@@ -203,17 +160,6 @@
         <div class="loading-step" id="lstep4"></div>
         <div class="loading-step" id="lstep5"></div>
     </div>
-    <!-- ★优化：loading-text 改为双槽结构，实现交叉淡入淡出 -->
-    <div class="loading-text">
-        <div class="loading-text-line" id="loadingTextMainLine">
-            <span class="loading-text-main" id="loadingTextMainA">Memulai sistem...</span>
-            <span class="loading-text-main loading-text-next" id="loadingTextMainB"></span>
-        </div>
-        <div class="loading-text-line" id="loadingTextSubLine">
-            <span class="loading-text-sub" id="loadingTextSubA">Memeriksa sesi login</span>
-            <span class="loading-text-sub loading-text-next" id="loadingTextSubB"></span>
-        </div>
-    </div>
     <div class="loading-progress-wrap">
         <div class="loading-progress">
             <div class="loading-progress-bar" id="loadingProgressBar"></div>
@@ -233,18 +179,18 @@
 <script>
 (function(){
 'use strict';
-// 阶段配置：[进度下限, 主文案, 副文案, 步骤点索引]
-var S=[
-  [0,  'Memulai sistem...',     'Memeriksa sesi login',              0],
-  [16, 'Memuat modul dasar...', 'Menyiapkan komponen sistem',         1],
-  [50, 'Memuat modul inti...',  'Menghubungkan ke server',           2],
-  [90, 'Menyiapkan dasbor...',  'Hampir selesai...',                 3],
-  [96, 'Memuat data KPI...',    'Mengambil data terkini',            3],
-  [100,'Siap!',                 'Membuka sistem...',                 4]
+// 阶段配置：[进度下限, 步骤点索引]
+var STEPS=[
+  [0,  0],
+  [16, 1],
+  [50, 2],
+  [90, 3],
+  [96, 3],
+  [100,4]
 ];
 var cur=0, ft=null, lsi=-1;
 
-function gS(p){for(var i=S.length-1;i>=0;i--)if(p>=S[i][0])return i;return 0;}
+function gS(p){for(var i=STEPS.length-1;i>=0;i--)if(p>=STEPS[i][0])return i;return 0;}
 
 function uSteps(a){
   for(var i=1;i<=5;i++){
@@ -252,62 +198,6 @@ function uSteps(a){
     if(!el)continue;
     el.className='loading-step'+(i-1<a?' done':i-1===a?' active':'');
   }
-}
-
-// ★优化：双元素交叉淡入淡出，消除文字跳动
-var swTimer=null;
-var currentMain='A', currentSub='A';
-
-function swTxt(m,s){
-    var lineM=document.getElementById('loadingTextMainLine'),
-        lineS=document.getElementById('loadingTextSubLine');
-    if(!lineM||!lineS)return;
-
-    // 获取当前可见元素和隐藏元素
-    var curM,nextM,curS,nextS;
-    if(currentMain==='A'){
-        curM=document.getElementById('loadingTextMainA');
-        nextM=document.getElementById('loadingTextMainB');
-    }else{
-        curM=document.getElementById('loadingTextMainB');
-        nextM=document.getElementById('loadingTextMainA');
-    }
-    if(currentSub==='A'){
-        curS=document.getElementById('loadingTextSubA');
-        nextS=document.getElementById('loadingTextSubB');
-    }else{
-        curS=document.getElementById('loadingTextSubB');
-        nextS=document.getElementById('loadingTextSubA');
-    }
-
-    // 如果内容和当前一致，跳过
-    if(curM.textContent===m&&curS.textContent===s)return;
-
-    if(swTimer){clearTimeout(swTimer);swTimer=null;}
-
-    // 把新内容写入隐藏元素
-    nextM.textContent=m;
-    nextS.textContent=s;
-
-    // 强制回流，确保过渡生效
-    void nextM.offsetWidth;void nextS.offsetWidth;
-
-    // 交叉淡入淡出：当前元素 fade out，下一个元素 fade in
-    curM.classList.add('fading');
-    curS.classList.add('fading');
-    nextM.classList.remove('fading');
-    nextS.classList.remove('fading');
-
-    // 切换指针
-    currentMain=(currentMain==='A'?'B':'A');
-    currentSub=(currentSub==='A'?'B':'A');
-
-    // 过渡结束后清理旧元素状态
-    swTimer=setTimeout(function(){
-        swTimer=null;
-        curM.classList.add('fading');
-        curS.classList.add('fading');
-    },260);
 }
 
 window.__updateLoadingProgress=function(t){
@@ -318,8 +208,7 @@ window.__updateLoadingProgress=function(t){
   var p=document.getElementById('loadingProgressPct');
   if(p)p.textContent=cur+'%';
   var si=gS(cur);
-  if(si!==lsi){lsi=si;swTxt(S[si][1],S[si][2]);}
-  uSteps(S[si][3]);
+  if(si!==lsi){lsi=si;uSteps(STEPS[si][1]);}
   if(cur>=50&&ft){clearInterval(ft);ft=null;}
 };
 
@@ -539,10 +428,8 @@ try{
 
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
-            // 核心模块就绪，开始初始化
             if (window.__updateLoadingProgress) window.__updateLoadingProgress(93);
 
-            // 注入 KPI 完成回调
             var originalRender = JF.DashboardCore.originalRenderDashboard;
             if (originalRender) {
                 JF.DashboardCore.originalRenderDashboard = async function () {
