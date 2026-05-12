@@ -290,6 +290,9 @@
 
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran berhasil disimpan' : '支出保存成功');
 
+                // 清除仪表盘缓存，确保收入构成中的支出合计即时更新
+                if (window.JF && JF.Cache) JF.Cache.clear();
+
                 // 刷新页面
                 await ExpensesPage.showExpenses();
 
@@ -515,6 +518,10 @@
                 }
 
                 ExpensesPage.closeEditExpenseModal();
+
+                // 清除仪表盘缓存，确保收入构成中的支出合计即时更新
+                if (window.JF && JF.Cache) JF.Cache.clear();
+
                 await ExpensesPage.showExpenses();
 
             } catch (error) {
@@ -569,6 +576,10 @@
                 }));
 
                 Utils.toast.success(lang === 'id' ? 'Pengeluaran dan arus kas terkait telah dihapus' : '支出及关联现金流已删除');
+
+                // 清除仪表盘缓存，确保收入构成中的支出合计即时更新
+                if (window.JF && JF.Cache) JF.Cache.clear();
+
                 await ExpensesPage.showExpenses();
             } catch (error) {
                 console.error("deleteExpense error:", error);

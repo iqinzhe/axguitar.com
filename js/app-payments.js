@@ -380,6 +380,7 @@
                             }));
                         }
                     }
+                    if (window.JF && JF.Cache) JF.Cache.clear();
                     await PaymentPage.showPayment(orderId);
                 } catch (error) {
                     console.error('payInterestWithMethod 事务失败:', error);
@@ -444,6 +445,7 @@
                         if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
                     }
                     Utils.toast.success(lang === 'id' ? 'Pembayaran pokok berhasil!' : '本金还款成功！');
+                    if (window.JF && JF.Cache) JF.Cache.clear();
                     await PaymentPage.showPayment(orderId);
                 } catch (error) {
                     console.error('payPrincipalWithMethod 事务失败:', error);
@@ -480,6 +482,7 @@
                 }
                 await SUPABASE.recordFixedPayment(orderId, method);
                 if (window.Audit) await window.Audit.logPayment(orderBefore.order_id, 'fixed_installment', fixedPaymentBefore, method);
+                if (window.JF && JF.Cache) JF.Cache.clear();
                 await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('payFixedInstallment error:', error);
@@ -512,6 +515,7 @@
                 }
                 await SUPABASE.earlySettleFixedOrder(orderId, method);
                 if (window.Audit) await window.Audit.logPayment(orderBefore.order_id, 'early_settlement', remainingPrincipal, method);
+                if (window.JF && JF.Cache) JF.Cache.clear();
                 await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('earlySettleFixedOrder error:', error);

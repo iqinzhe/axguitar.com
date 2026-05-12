@@ -394,6 +394,8 @@
                 await Order.delete(orderId);
                 if (window.Audit) await window.Audit.logOrderDelete(order.order_id, order.customer_name, order.loan_amount, AUTH.user?.name);
                 Utils.toast.success(Utils.t('order_deleted'));
+                // 清除仪表盘缓存，确保 KPI 数据即时更新
+                if (window.JF && JF.Cache) JF.Cache.clear();
                 await this.showOrderTable();
             } catch (error) {
                 console.error("deleteOrder error:", error);
