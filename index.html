@@ -115,7 +115,7 @@
     letter-spacing: 0.4px;
     display: flex; align-items: center; gap: 4px;
   }
-  
+
   /* 加载点：6个点依次闪烁 */
   .loading-dots {
     display: inline-flex; gap: 2px;
@@ -231,6 +231,14 @@
 
   第 4 层：启动逻辑（type="module"）
     - module 脚本天然在所有 defer 脚本执行完毕后运行
+
+  📊 加载进度分布：
+    0%  ── 页面开始加载
+    50% ── 基础模块全部就绪（migration.js onload）
+    90% ── app-dashboard-core.js 就绪（onload）
+    93% ── DashboardCore.init() 开始执行
+    96% ── KPI 数据查询完成
+    100% ─ DOM 渲染完成，加载层淡出
 -->
 
 <!-- ========== 第 0 层：Token 状态初始化 + 进度控制 ========== -->
@@ -284,14 +292,12 @@
 
 <!-- ========== 第 1 层：核心基础脚本（defer） ========== -->
 <script defer src="config.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4"
-    onload="window.__updateLoadingProgress && __updateLoadingProgress(20)"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4"></script>
 <script defer src="js/utils.js"></script>
 <script defer src="fee-config.js"></script>
 <script defer src="js/toast.js"></script>
 <script defer src="js/cache.js"></script>
-<script defer src="js/supabase.js"
-    onload="window.__updateLoadingProgress && __updateLoadingProgress(50)"></script>
+<script defer src="js/supabase.js"></script>
 <script defer src="js/auth.js"></script>
 <script defer src="js/permission.js"></script>
 <script defer src="js/audit.js"></script>
@@ -299,7 +305,7 @@
 <script defer src="js/store.js"></script>
 <script defer src="js/storage.js"></script>
 <script defer src="js/migration.js"
-    onload="window.__updateLoadingProgress && __updateLoadingProgress(70)"></script>
+    onload="window.__updateLoadingProgress && __updateLoadingProgress(50)"></script>
 
 <!-- ========== 第 2 层：核心应用（首屏仪表盘） ========== -->
 <script defer src="js/app-dashboard-core.js"
@@ -449,19 +455,21 @@
     var dashboardContent = document.getElementById('dashboardContent');
 
     function hideLoading() {
-        // 进度到 100%
         if (window.__updateLoadingProgress) window.__updateLoadingProgress(100);
-        if (loadingOverlay) {
-            loadingOverlay.style.transition = 'opacity 0.5s ease';
-            loadingOverlay.style.opacity = '0';
-            setTimeout(function () { loadingOverlay.style.display = 'none'; }, 500);
-        }
-        if (dashboardContent) dashboardContent.classList.add('loaded');
+
+        setTimeout(function () {
+            if (loadingOverlay) {
+                loadingOverlay.style.transition = 'opacity 0.5s ease';
+                loadingOverlay.style.opacity = '0';
+                setTimeout(function () { loadingOverlay.style.display = 'none'; }, 500);
+            }
+            if (dashboardContent) dashboardContent.classList.add('loaded');
+        }, 300);
     }
 
     window.__hideLoadingOverlay = hideLoading;
 
-    var fallbackObserver = new MutationObserver(function (mutations) {
+    var fallbackObserver = new MutationObserver(function () {
         var appEl = document.getElementById('app');
         if (appEl && appEl.querySelector('.dashboard-v2')) {
             hideLoading();
@@ -471,7 +479,21 @@
 
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
+            // 核心模块就绪，开始初始化
+            if (window.__updateLoadingProgress) window.__updateLoadingProgress(93);
+
+            // 注入 KPI 完成回调
+            var originalRender = JF.DashboardCore.originalRenderDashboard;
+            if (originalRender) {
+                JF.DashboardCore.originalRenderDashboard = async function () {
+                    var result = await originalRender.apply(this, arguments);
+                    if (window.__updateLoadingProgress) window.__updateLoadingProgress(96);
+                    return result;
+                };
+            }
+
             JF.DashboardCore.init();
+
             var appEl = document.getElementById('app');
             if (appEl) {
                 fallbackObserver.observe(appEl, { childList: true, subtree: true });
@@ -480,7 +502,7 @@
                         hideLoading();
                         fallbackObserver.disconnect();
                     }
-                }, 10000);
+                }, 15000);
             }
         } else {
             setTimeout(startApp, 100);
