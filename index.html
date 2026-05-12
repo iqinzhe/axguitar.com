@@ -116,7 +116,7 @@
     display: flex; align-items: center; gap: 4px;
   }
   
-  /* 加载点：简洁3个点，依次闪烁 */
+  /* 加载点：6个点依次闪烁 */
   .loading-dots {
     display: inline-flex; gap: 2px;
   }
@@ -125,20 +125,23 @@
     animation: loDot 1.5s ease-in-out infinite;
   }
   .loading-dots span:nth-child(1) { animation-delay: 0s; }
-  .loading-dots span:nth-child(2) { animation-delay: 0.5s; }
-  .loading-dots span:nth-child(3) { animation-delay: 1.0s; }
+  .loading-dots span:nth-child(2) { animation-delay: 0.25s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.5s; }
+  .loading-dots span:nth-child(4) { animation-delay: 0.75s; }
+  .loading-dots span:nth-child(5) { animation-delay: 1.0s; }
+  .loading-dots span:nth-child(6) { animation-delay: 1.25s; }
 
-  /* 进度扫描条 */
+  /* 进度条（真实进度驱动） */
   .loading-progress {
-    width: 120px; height: 2px;
-    background: rgba(14,116,144,0.15);
-    border-radius: 1px; overflow: hidden;
+    width: 240px; height: 3px;
+    background: rgba(14,116,144,0.12);
+    border-radius: 2px; overflow: hidden;
   }
   .loading-progress-bar {
-    height: 100%; width: 40%;
+    height: 100%; width: 0%;
     background: linear-gradient(90deg, #0e7490, #06b6d4);
-    border-radius: 1px;
-    animation: loProgress 1.8s ease-in-out infinite;
+    border-radius: 2px;
+    transition: width 0.4s ease;
   }
 
   /* 关键帧 */
@@ -150,15 +153,10 @@
     0%,100% { opacity: 0.15; }
     50%     { opacity: 1; }
   }
-  @keyframes loProgress {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
-  }
 }
 </style>
 
 <!-- ④ 非首屏 CSS 异步加载（reset / utilities / components / dashboard / responsive） -->
-<!-- 注：variables 和 critical 已内联，此处不再引用 -->
 <link rel="stylesheet" href="css/reset.css">
 <link rel="stylesheet" href="css/utilities.css">
 <link rel="stylesheet" href="css/components.css">
@@ -198,13 +196,13 @@
     <div class="loading-text">
         Memuat sistem
         <span class="loading-dots">
-            <span>·</span><span>·</span><span>·</span>
+            <span>·</span><span>·</span><span>·</span><span>·</span><span>·</span><span>·</span>
         </span>
     </div>
 
-    <!-- 扫描进度条 -->
+    <!-- 进度条（真实进度驱动） -->
     <div class="loading-progress">
-        <div class="loading-progress-bar"></div>
+        <div class="loading-progress-bar" id="loadingProgressBar"></div>
     </div>
 
 </div>
@@ -218,12 +216,11 @@
   ==================== 脚本加载策略 ====================
 
   第 0 层：立即执行（内联同步脚本）
-    - Token 状态检查：在 DOM 解析阶段立即运行，无需等待其他脚本。
-    - 仅操作 localStorage / sessionStorage，不依赖任何外部模块。
+    - Token 状态检查 + 进度控制初始化
 
   第 1 层：CDN + 核心基础（defer，按序执行）
     - config.js → supabase-js（锁定版本 2.105.4）
-    - js/utils.js → fee-config.js（顺序已修正）
+    - js/utils.js → fee-config.js
     - toast.js → cache.js → supabase.js → auth.js → permission.js → audit.js
     - order.js → store.js → storage.js → migration.js
 
@@ -233,19 +230,29 @@
   第 3 层：非核心页面模块（defer，不阻塞首屏）
 
   第 4 层：启动逻辑（type="module"）
-    - module 脚本天然在所有 defer 脚本执行完毕后运行，
-      彻底消除时序竞争。
+    - module 脚本天然在所有 defer 脚本执行完毕后运行
 -->
 
-<!-- ========== 第 0 层：Token 状态初始化（立即执行） ========== -->
+<!-- ========== 第 0 层：Token 状态初始化 + 进度控制 ========== -->
 <script>
 (function () {
     'use strict';
+
+    // ---- 加载进度控制 ----
+    var currentProgress = 0;
+    window.__updateLoadingProgress = function(targetPercent) {
+        if (targetPercent > currentProgress) {
+            currentProgress = targetPercent;
+            var bar = document.getElementById('loadingProgressBar');
+            if (bar) bar.style.width = currentProgress + '%';
+        }
+    };
+
+    // ---- Token 状态检查 ----
     try {
         var hasValidToken = false;
         for (var i = 0; i < localStorage.length; i++) {
             var key = localStorage.key(i);
-            /* 使用 endsWith 精确匹配 Supabase v2 auth-token key */
             if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
                 try {
                     var tokenData = JSON.parse(localStorage.getItem(key));
@@ -277,24 +284,26 @@
 
 <!-- ========== 第 1 层：核心基础脚本（defer） ========== -->
 <script defer src="config.js"></script>
-<!-- [优化②] 锁定 supabase-js 版本为 2.105.4，避免自动升级引入 breaking change -->
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4"></script>
-<!-- [优化③] utils.js 移到 fee-config.js 之前，修正加载顺序 -->
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4"
+    onload="window.__updateLoadingProgress && __updateLoadingProgress(20)"></script>
 <script defer src="js/utils.js"></script>
 <script defer src="fee-config.js"></script>
 <script defer src="js/toast.js"></script>
 <script defer src="js/cache.js"></script>
-<script defer src="js/supabase.js"></script>
+<script defer src="js/supabase.js"
+    onload="window.__updateLoadingProgress && __updateLoadingProgress(50)"></script>
 <script defer src="js/auth.js"></script>
 <script defer src="js/permission.js"></script>
 <script defer src="js/audit.js"></script>
 <script defer src="js/order.js"></script>
 <script defer src="js/store.js"></script>
 <script defer src="js/storage.js"></script>
-<script defer src="js/migration.js"></script>
+<script defer src="js/migration.js"
+    onload="window.__updateLoadingProgress && __updateLoadingProgress(70)"></script>
 
 <!-- ========== 第 2 层：核心应用（首屏仪表盘） ========== -->
-<script defer src="js/app-dashboard-core.js"></script>
+<script defer src="js/app-dashboard-core.js"
+    onload="window.__updateLoadingProgress && __updateLoadingProgress(90)"></script>
 
 <!-- ========== 第 3 层：非核心页面模块（defer） ========== -->
 <script defer src="js/app-capital.js"></script>
@@ -419,7 +428,6 @@
 
     // ==================== 全局快捷键 ====================
     document.addEventListener('keydown', function (e) {
-        // Alt+R：恢复状态
         if (e.altKey && !e.shiftKey && e.key === 'r') {
             e.preventDefault();
             if (JF.DashboardCore && typeof JF.DashboardCore.forceRecovery === 'function') {
@@ -430,7 +438,6 @@
                 location.reload();
             }
         }
-        // Alt+Shift+R：强制清除并重载
         if (e.altKey && e.shiftKey && e.key === 'R') {
             e.preventDefault();
             APP.forceClearAndReload();
@@ -441,8 +448,9 @@
     var loadingOverlay   = document.getElementById('loadingOverlay');
     var dashboardContent = document.getElementById('dashboardContent');
 
-    // 优化：隐藏加载遮罩的函数，可从外部调用
     function hideLoading() {
+        // 进度到 100%
+        if (window.__updateLoadingProgress) window.__updateLoadingProgress(100);
         if (loadingOverlay) {
             loadingOverlay.style.transition = 'opacity 0.5s ease';
             loadingOverlay.style.opacity = '0';
@@ -451,17 +459,8 @@
         if (dashboardContent) dashboardContent.classList.add('loaded');
     }
 
-    // 暴露为全局方法，供仪表盘渲染完成后直接调用
     window.__hideLoadingOverlay = hideLoading;
-    // 同样保留旧的 hideLoading 引用（若有其他地方使用）
-    window.__showLoadingOverlay = function () {
-        if (loadingOverlay) {
-            loadingOverlay.style.display = 'flex';
-            loadingOverlay.style.opacity = '1';
-        }
-    };
 
-    // 备用监听：如果仪表盘渲染后未主动调用，则由 MutationObserver 在 5 秒内兜底
     var fallbackObserver = new MutationObserver(function (mutations) {
         var appEl = document.getElementById('app');
         if (appEl && appEl.querySelector('.dashboard-v2')) {
@@ -473,11 +472,9 @@
     function startApp() {
         if (typeof JF !== 'undefined' && JF.DashboardCore && JF.DashboardCore.init) {
             JF.DashboardCore.init();
-            // 启动 DOM 观察者，检测仪表盘渲染
             var appEl = document.getElementById('app');
             if (appEl) {
                 fallbackObserver.observe(appEl, { childList: true, subtree: true });
-                // 超时保护：如果 10 秒内仪表盘仍未出现，强制隐藏加载层
                 setTimeout(function () {
                     if (loadingOverlay && loadingOverlay.style.display !== 'none') {
                         hideLoading();
