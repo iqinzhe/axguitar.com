@@ -1,4 +1,4 @@
-// storage.js - v2.0
+// storage.js - v2.0 (JF 命名空间) 
 // 备份恢复时 cash_flow 增加去重保护
 
 'use strict';
