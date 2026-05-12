@@ -757,7 +757,7 @@
                     <div class="message-center-card" style="display:flex; flex-direction:column;"><div class="card-header"><div class="card-title">💬 ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</div><div class="card-action" onclick="JF.MessageCenter.showMessageCenter()">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div></div><div class="message-preview">${previewHtml}</div></div>
                 </div>
             </div>
-        </div>`;
+        </div>;
 
                 // 渲染仪表盘 DOM
                 document.getElementById("app").innerHTML = finalHtml;
