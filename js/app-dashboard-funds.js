@@ -1,4 +1,4 @@
-// app-dashboard-funds.js - v2.0 管理员排除练习门店数据
+// app-dashboard-funds.js - v2.0 (JF 命名空间) 管理员排除练习门店数据
 
 'use strict';
 
