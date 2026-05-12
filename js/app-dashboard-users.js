@@ -1,4 +1,4 @@
-// app-dashboard-users.js - v2.0 (密码重置改为模态框，移除 prompt())
+// app-dashboard-users.js - v2.0 (JF 命名空间)  (密码重置改为模态框，移除 prompt())
 
 'use strict';
 
