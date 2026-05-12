@@ -230,7 +230,7 @@
                 
                 let currentStoreId = profile?.store_id;
                 if (isAdmin && stores.length > 0 && !currentStoreId) {
-                    // 【修复 #12】从 sessionStorage 恢复门店选择状态
+                    // 从 sessionStorage 恢复门店选择状态
                     const savedStoreId = sessionStorage.getItem('jf_profit_reinvest_store_id');
                     if (savedStoreId && stores.some(s => s.id === savedStoreId)) {
                         currentStoreId = savedStoreId;
@@ -248,7 +248,7 @@
                     analysis = await SUPABASE.getFullCapitalAnalysis();
                 }
                 
-                // 【修复 #12】保存到 sessionStorage 持久化
+                // 保存到 sessionStorage 持久化
                 if (currentStoreId) {
                     sessionStorage.setItem('jf_profit_reinvest_store_id', currentStoreId);
                 }
@@ -431,7 +431,7 @@
             }
         },
         
-        // 【修复 #12】加载利润再投入数据 - 使用 sessionStorage 持久化
+        // 加载利润再投入数据 - 使用 sessionStorage 持久化
         loadProfitReinvestData: async function() {
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
@@ -440,7 +440,7 @@
             if (isAdmin) {
                 const storeSelect = document.getElementById('reinvestStoreSelect');
                 storeId = storeSelect ? storeSelect.value : null;
-                // 【修复 #12】保存到 sessionStorage
+                // 保存到 sessionStorage
                 if (storeId) {
                     sessionStorage.setItem('jf_profit_reinvest_store_id', storeId);
                 }
