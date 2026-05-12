@@ -207,7 +207,7 @@ var S=[
   [96, 'Memuat data KPI...',    'Mengambil data terkini',            3],
   [100,'Siap!',                 'Membuka sistem...',                 4]
 ];
-var cur=0, ft=null, lsi=-1, sw=false;
+var cur=0, ft=null, lsi=-1;
 
 function gS(p){for(var i=S.length-1;i>=0;i--)if(p>=S[i][0])return i;return 0;}
 
@@ -219,18 +219,18 @@ function uSteps(a){
   }
 }
 
+var swTimer=null;
 function swTxt(m,s){
   var M=document.getElementById('loadingTextMain'),
       S2=document.getElementById('loadingTextSub');
-  if(!M||!S2||M.textContent===m)return;
-  if(sw){M.classList.remove('fading');S2.classList.remove('fading');M.textContent=m;S2.textContent=s;return;}
-  sw=true;
+  if(!M||!S2||(M.textContent===m&&S2.textContent===s))return;
+  if(swTimer){clearTimeout(swTimer);swTimer=null;}
   M.classList.add('fading');S2.classList.add('fading');
-  setTimeout(function(){
+  swTimer=setTimeout(function(){
+    swTimer=null;
     M.textContent=m;S2.textContent=s;
     void M.offsetWidth;
     M.classList.remove('fading');S2.classList.remove('fading');
-    sw=false;
   },210);
 }
 
