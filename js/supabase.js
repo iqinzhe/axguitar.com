@@ -1,4 +1,4 @@
-// supabase.js - v2.0
+// supabase.js - v2.0 优化版（login 直接设置 AUTH.user，避免重复请求）
 // 1. deleteOrder 完整清理现金流（order_id + reference_id）
 // 2. 统一利息少付逻辑，确保前后端一致
 // 3. 缓存 practiceIds，避免重复查询
@@ -112,13 +112,10 @@
     const STORES_TTL = 3600000; // 1小时
     const USERS_TTL = 3600000;   // 1小时
     
-    // 缓存 practiceIds
     let _practiceStoreIdsCache = null;
     let _practiceStoreIdsCacheTime = 0;
     const PRACTICE_IDS_TTL = 5 * 60 * 1000; // 5分钟
 
-    // 安全查询包装器
-    // 【修复 #7】全局 Supabase 查询超时时间
     const QUERY_TIMEOUT_MS = 12000;
 
     const safeQuery = async (fn, fallback = null, silent = false) => {
@@ -127,7 +124,6 @@
         } catch(error) {
             if(!silent) console.warn('[Supabase]', error.message || error);
             if(error.status===401 || (error.message && (error.message.includes('JWT')||error.message.includes('session')))){
-                // 增加 DashboardCore 存在性检查
                 if (JF.DashboardCore && typeof JF.DashboardCore.logout === 'function') {
                     setTimeout(() => JF.DashboardCore.logout(), 1000);
                 } else {
@@ -138,7 +134,6 @@
         }
     };
 
-    // 自动应用门店过滤（管理员不过滤，可查看所有门店）
     const applyStoreFilter = (query, profile, storeIdParam) => {
         if(!profile) return query;
         if(profile.role === 'admin') {
@@ -151,7 +146,6 @@
         return query;
     };
 
-    // ==================== 排除练习门店的通用过滤函数 ====================
     const excludePracticeStores = async (query, profile, options = {}) => {
         if (!profile) return query;
         const { includePractice = false } = options;
@@ -190,8 +184,6 @@
         },
 
         async getCurrentProfile() {
-            // [优化] 合并 getSession + getCurrentUser 为单次 getUser() 调用
-            // supabase-js v2 的 getUser() 内部包含 session 验证，减少一次往返
             if(_profileCache) return _profileCache;
 
             let userId;
@@ -201,7 +193,6 @@
                 userId = user.id;
             } catch(e) { _profileCache = null; return null; }
 
-            // [优化] 将 user_profiles + stores 合并为单次 JOIN 查询，减少一次 SQL 往返
             const { data, error } = await supabaseClient
                 .from('user_profiles')
                 .select('*, stores(*)')
@@ -227,7 +218,6 @@
             JF.Cache?.clear?.();
         },
 
-        // 【修复 #6】补全 try/catch，防止 getCurrentProfile 异常时产生未捕获的 rejection
         async isAdmin() {
             try { const p = await this.getCurrentProfile(); return p?.role === 'admin'; }
             catch (e) { console.warn('[SUPABASE] isAdmin 失败:', e.message); return false; }
@@ -241,6 +231,7 @@
             catch (e) { console.warn('[SUPABASE] getCurrentStoreName 失败:', e.message); return 'Kantor'; }
         },
 
+        // ---------- 优化后的 login 方法 ----------
         async login(emailOrUsername, password) {
             if(!supabaseClient) throw new Error('客户端未初始化');
             let emailToUse = emailOrUsername;
@@ -256,11 +247,25 @@
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email: emailToUse, password });
             if(error) throw error;
             this.clearCache();
-            if(window.AUTH && data.user) {
-                await window.AUTH.loadCurrentUser();
-                // loadCurrentUser() 会将结果写入 window.AUTH.user。
-                // auth.js 的 login() 依赖此处已完成设置，不会再发起重复请求。
+
+            // ---------- 关键优化：直接使用返回的 user.id 查询 profile，不再调用 getUser() ----------
+            const userId = data.user.id;
+            const { data: profile, error: profileError } = await supabaseClient
+                .from('user_profiles')
+                .select('*, stores(*)')
+                .eq('id', userId)
+                .single();
+
+            if (profileError) {
+                console.error('[Supabase] 登录后获取用户资料失败:', profileError);
+            } else {
+                _profileCache = profile;
+                if (window.AUTH) {
+                    window.AUTH.user = profile;
+                }
             }
+            // ------------------------------------------------------------------------------------
+            
             return data;
         },
 
@@ -314,10 +319,7 @@
                     .eq('id', storeId)
                     .single();
                 if (error) throw error;
-                return { 
-                    is_active: data?.is_active !== false, 
-                    name: data?.name || '' 
-                };
+                return { is_active: data?.is_active !== false, name: data?.name || '' };
             } catch (error) {
                 console.warn('[Supabase] checkStoreStatus failed:', error.message);
                 return { is_active: true, name: '' };
@@ -386,19 +388,15 @@
             return prefix + Date.now().toString().slice(-6) + String(Math.floor(Math.random()*100)).padStart(2,'0');
         },
 
-        /* 缓存 practiceIds */
         async _getPracticeStoreIds(forceRefresh = false) {
             const now = Date.now();
             if (!forceRefresh && _practiceStoreIdsCache && (now - _practiceStoreIdsCacheTime) < PRACTICE_IDS_TTL) {
                 return _practiceStoreIdsCache;
             }
-            
             const stores = await this.getAllStores(forceRefresh);
             const practiceIds = stores.filter(s => s.is_practice === true).map(s => s.id);
-            
             _practiceStoreIdsCache = practiceIds;
             _practiceStoreIdsCacheTime = now;
-            
             return practiceIds;
         },
 
@@ -600,7 +598,6 @@
             const profile = await this.getCurrentProfile();
             const storeId = flowData.store_id || profile?.store_id;
             if(!storeId) throw new Error(Utils.lang==='id'?'ID toko tidak ditemukan':'门店ID缺失');
-            // flow_date = 业务发生日期（支持补录历史），recorded_at = 实际操作时间（审计用）
             const record = {
                 store_id: storeId, flow_type: flowData.flow_type,
                 direction: flowData.direction, amount: flowData.amount,
@@ -659,12 +656,10 @@
             return true;
         },
 
-        /* 员工支出金额后端验证 + 管理员门店逻辑优化 */
         async addExpense(expenseData) {
             if (!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
             
-            // 员工支出金额后端验证
             if (profile?.role === 'staff') {
                 const maxAmount = window.PERMISSION?.STAFF_EXPENSE_MAX_AMOUNT || 5000000;
                 if (expenseData.amount > maxAmount) {
@@ -676,7 +671,6 @@
             
             let targetStoreId = expenseData.store_id || profile?.store_id;
             
-            // 管理员无门店时查找 STORE_000，若不存在则提示创建
             if (profile?.role === 'admin' && !targetStoreId) {
                 const stores = await this.getAllStores();
                 const hqStore = stores.find(s => s.code === 'STORE_000');
@@ -732,7 +726,7 @@
                         source_target: expenseData.payment_method || 'cash',
                         description: expenseData.category,
                         reference_id: data.id,
-                        flow_date: expenseData.expense_date || todayStr()  // 使用支出业务日期
+                        flow_date: expenseData.expense_date || todayStr()
                     });
                 } catch (flowError) {
                     console.warn('[addExpense] 现金流记录失败:', flowError.message);
@@ -1013,7 +1007,6 @@
         async createOrder(orderData) {
             if(!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
-            // 支持补录历史订单：custom_order_date 由前端传入，否则使用今天
             const nowDate = orderData.custom_order_date || todayStr();
             const nowDateTime = orderData.custom_order_date
                 ? orderData.custom_order_date + 'T00:00:00.000Z'
@@ -1140,7 +1133,6 @@
             return true;
         },
 
-        /* 统一利息少付逻辑 - 确保前后端一致 */
         async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
@@ -1154,7 +1146,6 @@
                 let paidAmount = (actualPaid!==null && !isNaN(actualPaid) && actualPaid>0) ? actualPaid : theoreticalInterest;
                 let interestToRecord = paidAmount, principalAdjustment=0, shortfallToTrack=0;
                 
-                /* 统一少付/超额处理逻辑 */
                 if(paidAmount >= theoreticalInterest){
                     interestToRecord = theoreticalInterest;
                     principalAdjustment = paidAmount - theoreticalInterest;
@@ -1381,7 +1372,6 @@
             return true;
         },
 
-        /* updateOverdueDays 失败时写入审计日志 */
         async updateOverdueDays() {
             if(!supabaseClient) return false;
             const { data: activeOrders, error } = await supabaseClient
@@ -1433,7 +1423,6 @@
             const failed = results.filter(r => r.status === 'rejected');
             if (failed.length > 0) {
                 console.error(`[updateOverdueDays] ${failed.length} 个更新失败:`, failed.map(f => f.reason?.message || 'unknown'));
-                /* 写入审计日志 */
                 if (window.Audit) {
                     await window.Audit.log('overdue_update_failed', JSON.stringify({
                         failed_count: failed.length,
@@ -1479,13 +1468,11 @@
             return true;
         },
 
-        /* deleteOrder 完整清理现金流 */
         async deleteOrder(orderId) {
             const profile = await this.getCurrentProfile();
             if(profile?.role!=='admin') throw new Error(Utils.lang==='id'?'Hanya admin yang dapat menghapus pesanan':'需管理员权限');
             const order = await this.getOrder(orderId);
             
-            // 清理 order_id 关联的现金流
             const { error: voidErr1 } = await supabaseClient.from('cash_flow_records')
                 .update({ is_voided:true, voided_at:nowStr(), voided_by:profile.id })
                 .eq('order_id', order.id);
@@ -1493,7 +1480,6 @@
                 await supabaseClient.from('cash_flow_records').delete().eq('order_id', order.id);
             }
             
-            // 清理 reference_id 关联的现金流（重要补充）
             const { error: voidErr2 } = await supabaseClient.from('cash_flow_records')
                 .update({ is_voided:true, voided_at:nowStr(), voided_by:profile.id })
                 .eq('reference_id', order.order_id);
@@ -1501,13 +1487,9 @@
                 await supabaseClient.from('cash_flow_records').delete().eq('reference_id', order.order_id);
             }
             
-            // 清理缴费记录
             await supabaseClient.from('payment_history').delete().eq('order_id', order.id);
-            
-            // 清理提醒记录
             await supabaseClient.from('reminder_logs').delete().eq('order_id', order.id);
             
-            // 最后删除订单
             const { error: delErr } = await supabaseClient.from('orders').delete().eq('order_id', orderId);
             if(delErr) throw delErr;
             
@@ -1842,7 +1824,6 @@
             });
         },
 
-        /* RPC 调用前检查函数是否存在 */
         async ensureInterestShortfallColumn() {
             try {
                 const session = await this.getSession();
@@ -1858,7 +1839,6 @@
                 if (error) {
                     if (error.message && error.message.includes('column "interest_shortfall" does not exist')) {
                         try {
-                            /* 先检查 RPC 函数是否存在 */
                             let rpcExists = false;
                             try {
                                 const { data: funcCheck } = await supabaseClient.rpc('check_function_exists', { 
@@ -1866,9 +1846,8 @@
                                 });
                                 rpcExists = !!funcCheck;
                             } catch (checkErr) {
-                                // 如果 check_function_exists 不存在，尝试直接调用
                                 console.warn('[Supabase] 无法检查 RPC 是否存在，尝试直接调用');
-                                rpcExists = true; // 假设存在，让 try-catch 处理
+                                rpcExists = true;
                             }
                             
                             if (rpcExists) {
@@ -1900,7 +1879,6 @@
         },
     };
 
-    // 延迟列检查
     setTimeout(() => safeQuery(() => SupabaseAPI.ensureInterestShortfallColumn?.()), 5000);
 
     JF.Supabase = SupabaseAPI;
