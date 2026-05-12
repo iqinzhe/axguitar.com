@@ -1,4 +1,4 @@
-// app-dashboard-expenses.js - v2.0
+// app-dashboard-expenses.js - v2.0 (JF 命名空间) 
 
 'use strict';
 
