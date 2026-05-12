@@ -523,7 +523,7 @@
                     const client = SUPABASE.getClient();
                     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
                     
-                    let expenseQuery = client.from('expenses').select('amount').gte('date', monthStart);
+                    let expenseQuery = client.from('expenses').select('amount').gte('expense_date', monthStart);
                     if (!isAdmin && storeId) {
                         expenseQuery = expenseQuery.eq('store_id', storeId);
                     } else if (isAdmin) {
