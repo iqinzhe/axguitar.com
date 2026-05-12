@@ -1,4 +1,4 @@
-// utils.js - v2.0（利息少付计算修正、累计少付显示助手）
+// utils.js - v2.0 (JF 命名空间) （利息少付计算修正、累计少付显示助手）
 
 'use strict';
 
@@ -729,7 +729,7 @@
     };
 
     /**
-     * 利息部分缴费计算（修复版：不暗示修改 loan_amount，少付通过 shortfall 记录）
+     * 利息部分缴费计算（不暗示修改 loan_amount，少付通过 shortfall 记录）
      * @param {Object} order - 订单对象
      * @param {number} actualPaid - 实际支付金额
      * @returns {Object} { interestPaid, principalDeducted, shortfall, isShortfall, isExcess, description }
