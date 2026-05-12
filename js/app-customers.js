@@ -1,4 +1,4 @@
-// app-customers.js - v2.0 服务费固定容器  + 金额0只读
+// app-customers.js - v2.0 (JF 命名空间) 服务费固定容器  + 金额0只读
 
 'use strict';
 
