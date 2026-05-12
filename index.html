@@ -126,18 +126,32 @@
   /* ── 动态文字区（主文案 + 副文案） ── */
   .loading-text {
     display: flex; flex-direction: column;
-    align-items: center; gap: 3px;
+    align-items: center; gap: 4px;
     font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    /* 固定高度：防止不同文案长度引起容器高度抖动 */
+    height: 38px;
+    justify-content: center;
   }
   .loading-text-main {
     font-size: 0.875rem; font-weight: 500;
     color: #3d5068; letter-spacing: 0.3px;
-    transition: opacity 0.3s ease;
+    /* 固定行高，防止字体渲染差异导致跳动 */
+    line-height: 1.4;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease;
   }
   .loading-text-sub {
     font-size: 0.72rem; color: #6b7e95;
     letter-spacing: 0.2px;
-    transition: opacity 0.3s ease;
+    line-height: 1.4;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+  }
+  .loading-text-main.fading,
+  .loading-text-sub.fading {
+    opacity: 0;
   }
 
   /* ── 进度条区（进度条 + 百分比数字） ── */
@@ -341,6 +355,48 @@
     }
 
     // ================================================================
+    // 工具：文案淡出 → 换字 → 淡入（消除闪动）
+    // ================================================================
+    var lastStageIndex = -1;
+    var textSwitching  = false;
+
+    function switchText(newMain, newSub) {
+        var mainEl = document.getElementById('loadingTextMain');
+        var subEl  = document.getElementById('loadingTextSub');
+        if (!mainEl || !subEl) return;
+
+        // 如果文案没有变化，跳过切换
+        if (mainEl.textContent === newMain && subEl.textContent === newSub) return;
+
+        // 防止重入：若上一次切换还未完成，直接跳到目标
+        if (textSwitching) {
+            mainEl.classList.remove('fading');
+            subEl.classList.remove('fading');
+            mainEl.textContent = newMain;
+            subEl.textContent  = newSub;
+            return;
+        }
+
+        textSwitching = true;
+
+        // 第一步：淡出（opacity → 0）
+        mainEl.classList.add('fading');
+        subEl.classList.add('fading');
+
+        // 第二步：200ms 后换字（对应 transition: opacity 0.2s）
+        setTimeout(function () {
+            mainEl.textContent = newMain;
+            subEl.textContent  = newSub;
+
+            // 第三步：强制重排后淡入（opacity → 1）
+            void mainEl.offsetWidth;
+            mainEl.classList.remove('fading');
+            subEl.classList.remove('fading');
+            textSwitching = false;
+        }, 210);
+    }
+
+    // ================================================================
     // 核心：更新进度条 + 百分比 + 文案 + 阶段点
     // ================================================================
     window.__updateLoadingProgress = function (targetPercent) {
@@ -355,12 +411,13 @@
         var pctEl = document.getElementById('loadingProgressPct');
         if (pctEl) pctEl.textContent = currentProgress + '%';
 
-        // — 动态文案 —
-        var stage = getStage(currentProgress);
-        var mainEl = document.getElementById('loadingTextMain');
-        var subEl  = document.getElementById('loadingTextSub');
-        if (mainEl) mainEl.textContent = stage.main;
-        if (subEl)  subEl.textContent  = stage.sub;
+        // — 动态文案（只在阶段切换时才执行淡入淡出，避免频繁闪烁）—
+        var stage      = getStage(currentProgress);
+        var stageIndex = STAGES.indexOf(stage);
+        if (stageIndex !== lastStageIndex) {
+            lastStageIndex = stageIndex;
+            switchText(stage.main, stage.sub);
+        }
 
         // — 阶段指示点 —
         updateSteps(stage.step);
