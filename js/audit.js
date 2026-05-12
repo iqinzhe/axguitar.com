@@ -1,4 +1,4 @@
-// audit.js - v2.0
+// audit.js - v2.0 (JF 命名空间) 
 // 所有日志写入增加 try-catch 保护，不阻塞主流程
 
 'use strict';
