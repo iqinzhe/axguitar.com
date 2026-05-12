@@ -252,7 +252,7 @@
             }
         },
 
-        // 【修复 #3】获取订单专属的资金流水（而非整个门店流水）
+        // 获取订单专属的资金流水（而非整个门店流水）
         async getOrderCashFlow(orderId) {
             try {
                 const order = await SUPABASE.getOrder(orderId);
