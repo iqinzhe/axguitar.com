@@ -523,39 +523,67 @@
   }
 
   /* 移动端 */
- @media (max-width: 768px) {
+  @media (max-width: 768px) {
     .dashboard-v2 {
       margin: -8px;
       width: calc(100% + 16px);
-      display: block;
+      display: block !important;
       min-height: 100vh;
     }
-    /* ... 其他样式保持不变 ... */
+    .dash-topbar {
+      position: sticky; top: 0; z-index: var(--z-topbar);
+      background: var(--white); padding: 0 12px; height: 56px;
+    }
+    .topbar-title { font-size: 1rem !important; white-space: normal !important; word-break: keep-all; max-width: 60vw; }
+    .topbar-sub { font-size: 0.7rem !important; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+    .topbar-left { gap: 6px; flex: 1; min-width: 0; }
+    .dash-topbar .btn--warning { display: none; }
 
-    /* 移除之前的分散 order 设置 */
+    .dash-sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 45vw; min-width: 160px; max-width: 200px;
+      height: 100%;
+      background: var(--gradient-sidebar);
+      z-index: calc(var(--z-sidebar) + 1);
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow-y: auto;
+      box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+    }
+    .dash-sidebar.open { transform: translateX(0); }
+    .sidebar-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(2px);
+      z-index: var(--z-sidebar-overlay);
+    }
+    .dash-main {
+      padding: 14px 12px;
+      margin-top: 0;
+      overflow-x: visible;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: calc(100vh - 56px);
+    }
+    body.menu-open { overflow: hidden; position: fixed; width: 100%; }
+
     .dash-main > * { order: 0; }
+    .message-center-card { order: 1 !important; }
+    .quick-card { order: 2 !important; }
+    .income-card { order: 3 !important; }
+    .kpi-row, .mid-row, .fund-flow-card, .cash-bank-row, .transfer-row-v2, .util-bar-wrap { order: 4 !important; }
+    .order-status-card { order: 999 !important; margin-top: 10px; }
 
-    /* 底部三列：移动端改为纵向弹性布局 */
-    .bottom-row {
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* 消息中心排第一 */
-    .message-center-card {
-        order: -2;
-    }
-
-    /* 快捷操作排第二 */
-    .quick-card {
-        order: -1;
-    }
-
-    /* 订单状态分布隐藏 */
-    .order-status-card {
-        display: none;
-    }
-}
+    .bottom-row { display: contents !important; }
+    .kpi-row { grid-template-columns: 1fr 1fr !important; gap: 8px; }
+    .mid-row, .fund-total-row, .cash-bank-row { grid-template-columns: 1fr; gap: 12px; }
+    .income-card { margin-top: 10px; border-top: 2px solid var(--border-light); padding-top: 18px; }
+    .donut-area { flex-direction: row; align-items: center; gap: 20px; }
+    .donut-legend { width: auto; flex: 1; }
+    .transfer-row-v2 { flex-wrap: wrap; }
+    .quick-grid { grid-template-columns: 1fr 1fr; }
+  }
 
   @media (max-width: 480px) {
     .dash-topbar { padding: 0 12px; }
