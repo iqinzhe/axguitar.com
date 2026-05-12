@@ -1,5 +1,5 @@
 // auth.js - v2.0 (JF 命名空间) （登录后直接设置 user，避免重复请求）
-// 移除 Enter 键监听 + 修复 logout 重复调用 signOut
+// 移除 Enter 键监听 + logout 重复调用 signOut
 
 'use strict';
 
@@ -376,7 +376,7 @@
             }
         },
 
-        // 修复 logout，只调用一次 forceClearAuth
+        // logout，只调用一次 forceClearAuth
         async logout() {
             
             if (this.user && window.Audit) {
