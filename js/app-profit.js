@@ -68,7 +68,7 @@
                     `;
                 }
 
-                // 【v2.3 新增】店长收益处置限额提示
+                // 店长收益处置限额提示
                 let storeManagerLimitHtml = '';
                 if (isStoreManager) {
                     storeManagerLimitHtml = `
@@ -180,7 +180,7 @@
             document.getElementById('externalBalanceValue').textContent = Utils.formatCurrency(external);
         },
 
-        // ==================== 执行收益处置（v2.3 - 增加复核机制） ====================
+        // ==================== 执行收益处置 ====================
         async executeDistribution(type) {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -210,7 +210,7 @@
                 if (found) storeName = found.name;
             } catch (e) { /* ignore */ }
 
-            // 【v2.3 新增】店长收益处置复核机制
+            // 店长收益处置复核机制
             if (isStoreManager && amount > this.STORE_MANAGER_DISTRIBUTION_MAX) {
                 const limitFormatted = Utils.formatCurrency(this.STORE_MANAGER_DISTRIBUTION_MAX);
                 const amountFormatted = Utils.formatCurrency(amount);
