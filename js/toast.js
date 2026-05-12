@@ -1,4 +1,4 @@
-// toast.js - v2.0 精简版
+// toast.js - v2.0 (JF 命名空间) 
 // Toast 通知与确认系统
 
 'use strict';
