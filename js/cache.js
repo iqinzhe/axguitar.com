@@ -1,4 +1,4 @@
-// cache.js - v2.0 统一缓存模块
+// cache.js - v2.0 (JF 命名空间) 统一缓存模块
 
 'use strict';
 
