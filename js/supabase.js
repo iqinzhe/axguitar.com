@@ -1,7 +1,4 @@
-// supabase.js - v2.0 (JF 命名空间) 
-// 1. deleteOrder 完整清理现金流（order_id + reference_id）
-// 2. 统一利息少付逻辑，确保前后端一致
-// 3. 缓存 practiceIds，避免重复查询
+// supabase.js - v2.2 (客户ID重用 + 原有全部功能)
 
 'use strict';
 
@@ -231,7 +228,7 @@
             catch (e) { console.warn('[SUPABASE] getCurrentStoreName 失败:', e.message); return 'Kantor'; }
         },
 
-        // ---------- 优化后的 login 方法 ----------
+        // ---------- login ----------
         async login(emailOrUsername, password) {
             if(!supabaseClient) throw new Error('客户端未初始化');
             let emailToUse = emailOrUsername;
@@ -247,8 +244,6 @@
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email: emailToUse, password });
             if(error) throw error;
             this.clearCache();
-
-            // ---------- 关键优化：直接使用返回的 user.id 查询 profile，不再调用 getUser() ----------
             const userId = data.user.id;
             const { data: profile, error: profileError } = await supabaseClient
                 .from('user_profiles')
@@ -264,8 +259,6 @@
                     window.AUTH.user = profile;
                 }
             }
-            // ------------------------------------------------------------------------------------
-            
             return data;
         },
 
@@ -364,28 +357,57 @@
             return prefix + Date.now().toString().slice(-6) + String(Math.floor(Math.random()*1000)).padStart(3,'0');
         },
 
-        async _generateCustomerId(storeId, maxRetries=10) {
+        // ==================== 客户ID生成（重用已删除ID） ====================
+        async _generateCustomerId(storeId, maxRetries = 10) {
             const prefix = await this._getStorePrefix(storeId);
-            for(let attempt=1; attempt<=maxRetries; attempt++){
-                try {
-                    const { data: existing } = await supabaseClient
-                        .from('customers').select('customer_id').like('customer_id', prefix+'%')
-                        .order('customer_id', { ascending: false }).limit(1);
-                    let maxNum = 0;
-                    if(existing?.length){
-                        const m = existing[0].customer_id.match(new RegExp(prefix+'(\\d{3})$'));
-                        if(m) maxNum = parseInt(m[1],10);
-                    }
-                    const cid = prefix + String(maxNum+1).padStart(3,'0');
-                    const { data: dup } = await supabaseClient.from('customers').select('id').eq('customer_id', cid).maybeSingle();
-                    if(!dup) return cid;
-                    await new Promise(r => setTimeout(r, 50*attempt));
-                } catch(err){
-                    if(attempt===maxRetries) throw err;
-                    await new Promise(r => setTimeout(r, 50*attempt));
+            // 查询该门店所有客户ID并按数字升序排列
+            const { data: existingCustomers, error } = await supabaseClient
+                .from('customers')
+                .select('customer_id')
+                .like('customer_id', prefix + '%')
+                .order('customer_id', { ascending: true });
+            
+            if (error) throw error;
+            
+            const usedNumbers = (existingCustomers || []).map(c => {
+                const match = c.customer_id.match(new RegExp(prefix + '(\\d{3})$'));
+                return match ? parseInt(match[1], 10) : 0;
+            }).filter(n => n > 0).sort((a, b) => a - b);
+            
+            let nextNumber = 1;
+            for (const num of usedNumbers) {
+                if (num === nextNumber) {
+                    nextNumber++;
+                } else {
+                    break;
                 }
             }
-            return prefix + Date.now().toString().slice(-6) + String(Math.floor(Math.random()*100)).padStart(2,'0');
+            
+            if (nextNumber > 999) {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Batas maksimal nasabah untuk toko ini telah tercapai (999).'
+                    : '该门店客户数量已达上限（999）。');
+            }
+            
+            const customerId = prefix + String(nextNumber).padStart(3, '0');
+            
+            // 防止并发冲突，二次确认
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                const { data: dup, error: dupError } = await supabaseClient
+                    .from('customers')
+                    .select('id')
+                    .eq('customer_id', customerId)
+                    .maybeSingle();
+                if (!dup) return customerId;
+                if (attempt < maxRetries) {
+                    await new Promise(r => setTimeout(r, 50 * attempt));
+                    nextNumber++;
+                    if (nextNumber > 999) throw new Error('ID pool exhausted');
+                    return prefix + String(nextNumber).padStart(3, '0');
+                }
+                throw new Error(Utils.lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '客户ID生成失败');
+            }
+            return customerId;
         },
 
         async _getPracticeStoreIds(forceRefresh = false) {
@@ -1827,9 +1849,7 @@
         async ensureInterestShortfallColumn() {
             try {
                 const session = await this.getSession();
-                if (!session) {
-                    return;
-                }
+                if (!session) return;
                 
                 const { data, error } = await supabaseClient
                     .from('orders')
@@ -1856,7 +1876,6 @@
                                     console.warn('[Supabase] 无法自动添加 interest_shortfall 列');
                                     console.warn('[Supabase] 请在 Supabase SQL Editor 中执行:');
                                     console.warn('ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
-                                } else {
                                 }
                             } else {
                                 console.warn('[Supabase] RPC 函数 add_interest_shortfall_column 不存在');
