@@ -1,4 +1,4 @@
-// app-customers.js - v2.0 (JF 命名空间) 服务费固定容器 + 下拉始终可见 + 0%正确联动
+// app-customers.js - v2.0 (JF 命名空间) 服务费下拉始终可操作，根据选择计算金额
 
 'use strict';
 
@@ -617,8 +617,8 @@
                     : `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
 
                 const serviceFeeHintText = lang === 'id'
-                    ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
-                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                    ? `• Silakan pilih persentase biaya layanan (0% - 12%)\n• Biaya akan dihitung otomatis berdasarkan persentase dan nilai gadai.`
+                    : `• 请选择服务费百分比（0% - 12%）\n• 金额将根据百分比和当金自动计算。`;
 
                 const pawnTermHintText = lang === 'id'
                     ? 'Pilih jangka waktu gadai (1-10 bulan). Tanggal jatuh tempo akan dihitung otomatis.'
@@ -661,13 +661,13 @@
                                     <div class="fee-card-hint" id="adminFeeHint">${adminFeeHintText}</div>
                                 </div>
                                 <div class="fee-card">
-                                    <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
+                                    <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Pilih Persentase' : '选择百分比'})</small></div>
                                     <div class="fee-card-body" id="serviceFeeDisplay" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                                         <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">
                                             ${Array.from({ length: 13 }, (_, i) => `<option value="${i}">${i}%</option>`).join('')}
                                         </select>
                                         <span style="font-weight:700;color:var(--text-primary);">Rp</span>
-                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()" style="flex:1;min-width:100px;" readonly>
+                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" readonly style="flex:1;min-width:100px;">
                                     </div>
                                     <div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div>
                                 </div>
@@ -878,7 +878,7 @@
             }
         },
 
-        // ==================== 费用重算 ====================
+        // ==================== 费用重算（下拉始终可操作，按选择计算金额） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
@@ -892,6 +892,7 @@
             const serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
             const serviceFeeInput = document.getElementById('serviceFeeInput');
 
+            // 金额 <= 0 时禁用下拉，输入只读显示 0
             if (amount <= 0) {
                 if (serviceFeeSelect) {
                     serviceFeeSelect.disabled = true;
@@ -904,49 +905,30 @@
                     delete serviceFeeInput.dataset.manual;
                 }
                 this._updateServiceFeeHint(amount, 0);
-            } else if (amount <= 3000000) {
-                if (serviceFeeSelect) {
-                    serviceFeeSelect.disabled = true;
-                    serviceFeeSelect.value = '0';
-                    delete serviceFeeSelect.dataset.manual;
-                }
-                if (serviceFeeInput) {
-                    serviceFeeInput.value = '0';
-                    serviceFeeInput.readOnly = true;
-                    delete serviceFeeInput.dataset.manual;
-                }
-                this._updateServiceFeeHint(amount, 0);
-            } else if (amount <= 5000000) {
-                if (serviceFeeSelect) {
-                    serviceFeeSelect.disabled = true;
-                    serviceFeeSelect.value = '1';
-                    delete serviceFeeSelect.dataset.manual;
-                }
-                if (serviceFeeInput) {
-                    serviceFeeInput.readOnly = true;
-                    delete serviceFeeInput.dataset.manual;
-                    const result = Utils.calculateServiceFee(amount, 1);
-                    serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
-                }
-                this._updateServiceFeeHint(amount, 1);
-            } else {
-                if (serviceFeeSelect) {
-                    serviceFeeSelect.disabled = false;
-                    if (!serviceFeeSelect.dataset.manual) {
-                        serviceFeeSelect.value = '2';
-                    }
-                }
-                if (serviceFeeInput) {
-                    serviceFeeInput.readOnly = false;
-                }
-                const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
-                if (serviceFeeInput && !serviceFeeInput.dataset.manual) {
-                    const result = Utils.calculateServiceFee(amount, percent);
-                    serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
-                }
-                this._updateServiceFeeHint(amount, percent);
+                return;
             }
 
+            // 金额 > 0：下拉始终可用
+            if (serviceFeeSelect) serviceFeeSelect.disabled = false;
+            if (serviceFeeInput) serviceFeeInput.readOnly = true; // 仅通过下拉控制金额
+
+            // 如果用户未手动选择百分比，设定默认值
+            if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
+                let defaultPercent = 0;
+                if (amount > 5000000) defaultPercent = 2;
+                else if (amount > 3000000) defaultPercent = 1;
+                // <= 3jt 默认 0%
+                serviceFeeSelect.value = defaultPercent.toString();
+            }
+
+            const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 0;
+            const result = Utils.calculateServiceFee(amount, percent);
+            if (serviceFeeInput) {
+                serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
+            }
+            this._updateServiceFeeHint(amount, percent);
+
+            // 固定还款计算
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
             if (repaymentType === 'fixed') { 
                 const rateSelect = document.getElementById('agreedInterestRateSelect'); 
@@ -1005,50 +987,33 @@
             
             if (amount <= 0) {
                 hint.innerHTML = lang === 'id'
-                    ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
-                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
+                    ? `• Silakan masukkan nilai gadai terlebih dahulu.`
+                    : `• 请先输入当金金额。`;
             } else {
                 const feeResult = Utils.calculateServiceFee(amount, percent);
-                let allHints = lang === 'id'
-                    ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
-                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
-                
-                let highlightedHint = '';
-                if (feeResult.percent === 0) {
-                    highlightedHint = lang === 'id'
-                        ? `✅ Nilai gadai ≤ Rp3.000.000 : <strong>gratis (0%)</strong>\n\n${allHints}`
-                        : `✅ 当金 ≤ Rp3,000,000 ：<strong>免服务费（0%）</strong>\n\n${allHints}`;
-                } else if (feeResult.percent === 1) {
-                    highlightedHint = lang === 'id'
-                        ? `📌 Nilai gadai Rp3.000.001–Rp5.000.000 : <strong>1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`
-                        : `📌 当金 Rp3,000,001～Rp5,000,000 ：<strong>1%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`;
-                } else {
-                    highlightedHint = lang === 'id'
-                        ? `🔢 Nilai gadai > Rp5.000.000 : <strong>dipilih ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`
-                        : `🔢 当金 > Rp5,000,000 ：<strong>已选 ${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}\n\n${allHints}`;
-                }
-                hint.innerHTML = highlightedHint;
+                hint.innerHTML = lang === 'id'
+                    ? `🔢 Persentase dipilih: <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}`
+                    : `🔢 已选百分比: <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}`;
             }
         },
 
-        // ===== fix: 清除手动标记，确保下拉选择0%生效 =====
         recalculateServiceFee() {
             const select = document.getElementById('serviceFeePercentSelect');
             if (!select) return;
             select.dataset.manual = 'true';
             const amount = Utils.getAmountFromInput('amount');
-            const percent = select ? parseFloat(select.value) : 2;
+            if (amount <= 0) return;
+            const percent = parseFloat(select.value);
             const result = Utils.calculateServiceFee(amount, percent);
             const input = document.getElementById('serviceFeeInput');
             if (input) {
                 input.value = Utils.formatNumberWithCommas(result.amount);
-                // 清除输入框的手动标记，以便金额变化时能自动跟随百分比重算
-                delete input.dataset.manual;
             }
             this._updateServiceFeeHint(amount, percent);
         },
 
         onServiceFeeManualChange() { 
+            // 保留方法，但输入框为 readonly，此方法通常不会被触发，维持兼容性
             const input = document.getElementById('serviceFeeInput'); 
             if (input) input.dataset.manual = 'true'; 
         },
