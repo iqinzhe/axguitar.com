@@ -1,4 +1,4 @@
-// supabase.js - v2.2 (客户ID重用 + 原有全部功能)
+// supabase.js - v2.0 (客户ID重用 + 原有全部功能)
 
 'use strict';
 
