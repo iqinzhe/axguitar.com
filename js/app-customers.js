@@ -1,4 +1,6 @@
-// app-customers.js - v2.0 (JF 命名空间) 服务费下拉完全由用户控制，仅按选择计算
+// app-customers.js - v2.1 (JF 命名空间) 
+// 管理费：≤3jt 固定30,000；>3jt 按1%取整到万位
+// 服务费：≤5jt 免收；>5jt 按2%取整到万位，移除下拉选项，改为只读自动计算
 
 'use strict';
 
@@ -593,7 +595,7 @@
             }
         },
 
-        // ==================== 为客户创建订单 ====================
+        // ==================== 为客户创建订单（完整版，服务费自动计算） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -612,13 +614,14 @@
                 APP.currentCustomerId = customerId; 
                 const occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
 
+                // 更新后的提示文案
                 const adminFeeHintText = lang === 'id'
-                    ? `• Nilai gadai ≤ Rp500.000 : biaya administrasi Rp20.000\n• Nilai gadai Rp500.000 – Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai`
-                    : `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
+                    ? `• Nilai gadai ≤ Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai (dibulatkan ke Rp10.000)`
+                    : `• 当金 ≤ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费（取整到Rp10,000）`;
 
                 const serviceFeeHintText = lang === 'id'
-                    ? `• Silakan pilih persentase biaya layanan (0% - 12%).\n• Biaya akan dihitung otomatis berdasarkan persentase dan nilai gadai.`
-                    : `• 请选择服务费百分比（0% - 12%）。\n• 金额将根据百分比和当金自动计算。`;
+                    ? `• Nilai gadai ≤ Rp5.000.000 : Gratis (0%)\n• Nilai gadai > Rp5.000.000 : Dikenakan biaya layanan sebesar 2% dari nilai gadai (dibulatkan ke Rp10.000)`
+                    : `• 当金 ≤ Rp5,000,000 ：免服务费 (0%)\n• 当金 > Rp5,000,000 ：按当金的 2% 收取服务费（取整到Rp10,000）`;
 
                 const pawnTermHintText = lang === 'id'
                     ? 'Pilih jangka waktu gadai (1-10 bulan). Tanggal jatuh tempo akan dihitung otomatis.'
@@ -661,13 +664,10 @@
                                     <div class="fee-card-hint" id="adminFeeHint">${adminFeeHintText}</div>
                                 </div>
                                 <div class="fee-card">
-                                    <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Pilih Persentase' : '选择百分比'})</small></div>
-                                    <div class="fee-card-body" id="serviceFeeDisplay" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                                        <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">
-                                            ${Array.from({ length: 13 }, (_, i) => `<option value="${i}">${i}%</option>`).join('')}
-                                        </select>
-                                        <span style="font-weight:700;color:var(--text-primary);">Rp</span>
-                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" readonly style="flex:1;min-width:100px;">
+                                    <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Otomatis' : '自动计算'})</small></div>
+                                    <div class="fee-card-body">
+                                        <span style="font-weight:700;color:var(--text-primary);margin-right:4px;">Rp</span>
+                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" readonly style="background:#f8fafc;">
                                     </div>
                                     <div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div>
                                 </div>
@@ -735,7 +735,7 @@
             }
         },
 
-        // ==================== 保存订单 ====================
+        // ==================== 保存订单（服务费自动计算版） ====================
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -752,12 +752,23 @@
                 adminFee = Utils.calculateAdminFee(amount);
             }
             
-            let serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 0;
-            const serviceFeeStr = document.getElementById("serviceFeeInput")?.value || '0'; 
-            let serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
-            if (serviceFee === 0 && amount > 0 && serviceFeePercent > 0) {
-                const result = Utils.calculateServiceFee(amount, serviceFeePercent); 
+            // 服务费：自动计算，不再依赖下拉框
+            let serviceFeePercent = 0;
+            let serviceFee = 0;
+            if (amount > 5000000) {
+                const result = Utils.calculateServiceFee(amount);
                 serviceFee = result.amount;
+                serviceFeePercent = result.percent;
+            } else {
+                // 金额 <= 5,000,000 或 <= 3,000,000，服务费为0
+                serviceFee = 0;
+                serviceFeePercent = 0;
+            }
+            // 如果输入框已有手动值（理论上只读，但以防万一）
+            const serviceFeeStr = document.getElementById("serviceFeeInput")?.value || '0';
+            const manualFee = Utils.parseNumberFromCommas(serviceFeeStr);
+            if (manualFee > 0 && amount > 5000000) {
+                serviceFee = manualFee;
             }
             
             const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
@@ -847,12 +858,6 @@
                     svcInput.readOnly = true;
                     delete svcInput.dataset.manual;
                 }
-                const svcSelect = document.getElementById("serviceFeePercentSelect");
-                if (svcSelect) {
-                    svcSelect.value = '0';
-                    svcSelect.disabled = true;   // 重置时禁用，等待再次输入金额
-                    delete svcSelect.dataset.manual;
-                }
                 const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
                 if (cashRadio) cashRadio.checked = true;
                 const loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]'); 
@@ -878,7 +883,7 @@
             }
         },
 
-        // ==================== 费用重算（彻底由用户控制服务费百分比） ====================
+        // ==================== 费用重算（服务费自动计算，无下拉） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
@@ -889,45 +894,20 @@
             }
             this._updateAdminFeeHint(amount);
 
-            const serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
+            // 服务费自动计算
             const serviceFeeInput = document.getElementById('serviceFeeInput');
-
-            // 金额 <= 0 时禁用下拉，显示 0
             if (amount <= 0) {
-                if (serviceFeeSelect) {
-                    serviceFeeSelect.disabled = true;
-                    serviceFeeSelect.value = '0';
-                    delete serviceFeeSelect.dataset.manual;
-                }
-                if (serviceFeeInput) {
-                    serviceFeeInput.value = '0';
-                    serviceFeeInput.readOnly = true;
-                    delete serviceFeeInput.dataset.manual;
-                }
-                this._updateServiceFeeHint(amount, 0);
+                if (serviceFeeInput) serviceFeeInput.value = '0';
+                this._updateServiceFeeHint(amount);
                 return;
             }
 
-            // 金额 > 0：下拉始终可用，输入框只读，仅通过下拉控制
-            if (serviceFeeSelect) serviceFeeSelect.disabled = false;
-            if (serviceFeeInput) serviceFeeInput.readOnly = true;
-
-            // 如果用户从未手动选择过百分比，设定一个初始默认值（建议值）
-            if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
-                let defaultPercent = 0;
-                if (amount > 5000000) defaultPercent = 2;
-                else if (amount > 3000000) defaultPercent = 1;
-                // <= 3jt 默认 0%
-                serviceFeeSelect.value = defaultPercent.toString();
-            }
-
-            // 获取当前选定百分比（用户手选或默认值）
-            const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 0;
-            const result = Utils.calculateServiceFee(amount, percent);
+            const result = Utils.calculateServiceFee(amount);
             if (serviceFeeInput) {
                 serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
+                serviceFeeInput.readOnly = true;
             }
-            this._updateServiceFeeHint(amount, percent);
+            this._updateServiceFeeHint(amount);
 
             // 固定还款计算
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
@@ -962,18 +942,16 @@
             
             if (amount <= 0) {
                 hint.innerHTML = lang === 'id'
-                    ? `• Nilai gadai ≤ Rp500.000 : biaya administrasi Rp20.000\n• Nilai gadai Rp500.000 – Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai`
-                    : `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
+                    ? `• Nilai gadai ≤ Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai (dibulatkan ke Rp10.000)`
+                    : `• 当金 ≤ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费（取整到Rp10,000）`;
             } else {
                 let highlightedHint = '';
                 let allHints = lang === 'id' 
-                    ? `• Nilai gadai ≤ Rp500.000 : biaya administrasi Rp20.000\n• Nilai gadai Rp500.000 – Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai`
-                    : `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
+                    ? `• Nilai gadai ≤ Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai (dibulatkan ke Rp10.000)`
+                    : `• 当金 ≤ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费（取整到Rp10,000）`;
                 
-                if (amount <= 500000) {
-                    highlightedHint = lang === 'id' ? `📌 Nilai gadai ≤ Rp500.000 : <strong>Rp20.000</strong>\n\n${allHints}` : `📌 当金 ≤ Rp500,000 ：<strong>Rp20,000</strong>\n\n${allHints}`;
-                } else if (amount <= 3000000) {
-                    highlightedHint = lang === 'id' ? `📌 Nilai gadai Rp500.000–Rp3.000.000 : <strong>Rp30.000</strong>\n\n${allHints}` : `📌 当金 Rp500,000～Rp3,000,000 ：<strong>Rp30,000</strong>\n\n${allHints}`;
+                if (amount <= 3000000) {
+                    highlightedHint = lang === 'id' ? `📌 Nilai gadai ≤ Rp3.000.000 : <strong>Rp30.000</strong>\n\n${allHints}` : `📌 当金 ≤ Rp3,000,000 ：<strong>Rp30,000</strong>\n\n${allHints}`;
                 } else {
                     highlightedHint = lang === 'id' ? `🔢 Nilai gadai > Rp3.000.000 : <strong>1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}` : `🔢 当金 > Rp3,000,000 ：<strong>1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}`;
                 }
@@ -981,7 +959,7 @@
             }
         },
 
-        _updateServiceFeeHint(amount, percent) {
+        _updateServiceFeeHint(amount) {
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
             const lang = Utils.lang;
@@ -991,32 +969,35 @@
                     ? `• Silakan masukkan nilai gadai terlebih dahulu.`
                     : `• 请先输入当金金额。`;
             } else {
-                const feeResult = Utils.calculateServiceFee(amount, percent);
-                hint.innerHTML = lang === 'id'
-                    ? `🔢 Persentase dipilih: <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}`
-                    : `🔢 已选百分比: <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}`;
+                const feeResult = Utils.calculateServiceFee(amount);
+                let ruleText = '';
+                if (amount <= 5000000) {
+                    ruleText = lang === 'id' 
+                        ? `🔢 Nilai gadai ≤ Rp5.000.000 → <strong>Gratis (0%)</strong>`
+                        : `🔢 当金 ≤ Rp5,000,000 → <strong>免服务费 (0%)</strong>`;
+                } else {
+                    ruleText = lang === 'id'
+                        ? `🔢 Nilai gadai > Rp5.000.000 → <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}<br><small style="color:#f59e0b;">(dibulatkan ke Rp10.000)</small>`
+                        : `🔢 当金 > Rp5,000,000 → <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}<br><small style="color:#f59e0b;">(取整到Rp10,000)</small>`;
+                }
+                hint.innerHTML = ruleText;
             }
         },
 
         recalculateServiceFee() {
-            const select = document.getElementById('serviceFeePercentSelect');
-            if (!select) return;
-            select.dataset.manual = 'true';   // 标记为用户手动选择
+            // 服务费改为自动计算，此方法仅保留兼容性
             const amount = Utils.getAmountFromInput('amount');
             if (amount <= 0) return;
-            const percent = parseFloat(select.value);
-            const result = Utils.calculateServiceFee(amount, percent);
+            const result = Utils.calculateServiceFee(amount);
             const input = document.getElementById('serviceFeeInput');
             if (input) {
                 input.value = Utils.formatNumberWithCommas(result.amount);
             }
-            this._updateServiceFeeHint(amount, percent);
+            this._updateServiceFeeHint(amount);
         },
 
         onServiceFeeManualChange() { 
-            // 保留兼容性，输入框为只读，通常不触发
-            const input = document.getElementById('serviceFeeInput'); 
-            if (input) input.dataset.manual = 'true'; 
+            // 输入框改为只读，此方法保留为空
         },
 
         onMonthlyPaymentManualChange() { 
@@ -1055,7 +1036,7 @@
                 if (error) throw error;
                 const statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
                 let rows = '';
-                if (!orders || orders.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`; }
+                if (!orders || orders.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></table>`; }
                 else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td class="date-cell">${Utils.formatDate(o.created_at)}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="amount">${Utils.formatCurrency(o.principal_paid)}</td><td class="text-center">${o.interest_paid_months} ${t('month')}</td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}</span></td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td></tr>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}</button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`; } }
                 return `<div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>📋 ${t('order_list')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
@@ -1090,7 +1071,7 @@
                 let rows = '';
                 if (allPayments.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td>`; }
                 else { for (const p of allPayments) { const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank'; rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td class="col-type">${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`; } }
-                return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></table></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
                 console.error("buildCustomerPaymentHistoryHTML error:", error); 
                 return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败'}</p></div>`; 
