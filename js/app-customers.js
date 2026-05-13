@@ -257,24 +257,27 @@
                     } catch (blErr) { console.warn('黑名单重复检查失败:', blErr.message); }
                 }
 
-                let maxRetries = 8, lastError = null, newCustomer = null;
-                for (let attempt = 0; attempt < maxRetries; attempt++) {
-                    try {
-                        const prefix = await SUPABASE._getStorePrefix(storeId);
-                        const client = SUPABASE.getClient();
-                        const { data: customers, error: queryError } = await client
-                            .from('customers').select('customer_id').like('customer_id', prefix + '%')
-                            .order('customer_id', { ascending: false }).limit(1);
-                        if (queryError) console.warn("查询最大客户ID失败:", queryError);
-
-                        let maxNumber = 0;
-                        if (customers && customers.length > 0) {
-                            const match = customers[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
-                            if (match) maxNumber = parseInt(match[1], 10);
-                        }
-                        const nextNumber = maxNumber + 1;
-                        const serial = String(nextNumber).padStart(3, '0');
-                        const customerId = prefix + serial;
+                let newCustomer = null;
+try {
+    const customerId = await SUPABASE._generateCustomerId(storeId);
+    const customerData = {
+        customer_id: customerId, store_id: storeId, name,
+        ktp_number: ktp || null, phone, occupation: occupation || null,
+        ktp_address: ktpAddress || null, address: ktpAddress || null,
+        living_same_as_ktp: livingSameAsKtp, living_address: livingAddress || null,
+        registered_date: registeredDate, created_by: profile.id
+    };
+    const { data, error } = await SUPABASE.getClient()
+        .from('customers')
+        .insert(customerData)
+        .select()
+        .single();
+    if (error) throw error;
+    newCustomer = data;
+} catch (error) {
+    console.error("addCustomer: 创建客户失败", error);
+    throw error;
+}
 
                         const customerData = {
                             customer_id: customerId, store_id: storeId, name,
