@@ -1,4 +1,4 @@
-// app-customers.js - v2.0 (JF 命名空间) 服务费下拉始终可操作，根据选择计算金额
+// app-customers.js - v2.0 (JF 命名空间) 服务费下拉完全由用户控制，仅按选择计算
 
 'use strict';
 
@@ -617,8 +617,8 @@
                     : `• 当金 ≤ Rp500,000 ：管理费 Rp20,000\n• 当金 Rp500,000 ～ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费`;
 
                 const serviceFeeHintText = lang === 'id'
-                    ? `• Silakan pilih persentase biaya layanan (0% - 12%)\n• Biaya akan dihitung otomatis berdasarkan persentase dan nilai gadai.`
-                    : `• 请选择服务费百分比（0% - 12%）\n• 金额将根据百分比和当金自动计算。`;
+                    ? `• Silakan pilih persentase biaya layanan (0% - 12%).\n• Biaya akan dihitung otomatis berdasarkan persentase dan nilai gadai.`
+                    : `• 请选择服务费百分比（0% - 12%）。\n• 金额将根据百分比和当金自动计算。`;
 
                 const pawnTermHintText = lang === 'id'
                     ? 'Pilih jangka waktu gadai (1-10 bulan). Tanggal jatuh tempo akan dihitung otomatis.'
@@ -850,7 +850,7 @@
                 const svcSelect = document.getElementById("serviceFeePercentSelect");
                 if (svcSelect) {
                     svcSelect.value = '0';
-                    svcSelect.disabled = true;
+                    svcSelect.disabled = true;   // 重置时禁用，等待再次输入金额
                     delete svcSelect.dataset.manual;
                 }
                 const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
@@ -878,7 +878,7 @@
             }
         },
 
-        // ==================== 费用重算（下拉始终可操作，按选择计算金额） ====================
+        // ==================== 费用重算（彻底由用户控制服务费百分比） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
@@ -892,7 +892,7 @@
             const serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
             const serviceFeeInput = document.getElementById('serviceFeeInput');
 
-            // 金额 <= 0 时禁用下拉，输入只读显示 0
+            // 金额 <= 0 时禁用下拉，显示 0
             if (amount <= 0) {
                 if (serviceFeeSelect) {
                     serviceFeeSelect.disabled = true;
@@ -908,11 +908,11 @@
                 return;
             }
 
-            // 金额 > 0：下拉始终可用
+            // 金额 > 0：下拉始终可用，输入框只读，仅通过下拉控制
             if (serviceFeeSelect) serviceFeeSelect.disabled = false;
-            if (serviceFeeInput) serviceFeeInput.readOnly = true; // 仅通过下拉控制金额
+            if (serviceFeeInput) serviceFeeInput.readOnly = true;
 
-            // 如果用户未手动选择百分比，设定默认值
+            // 如果用户从未手动选择过百分比，设定一个初始默认值（建议值）
             if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
                 let defaultPercent = 0;
                 if (amount > 5000000) defaultPercent = 2;
@@ -921,6 +921,7 @@
                 serviceFeeSelect.value = defaultPercent.toString();
             }
 
+            // 获取当前选定百分比（用户手选或默认值）
             const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 0;
             const result = Utils.calculateServiceFee(amount, percent);
             if (serviceFeeInput) {
@@ -1000,7 +1001,7 @@
         recalculateServiceFee() {
             const select = document.getElementById('serviceFeePercentSelect');
             if (!select) return;
-            select.dataset.manual = 'true';
+            select.dataset.manual = 'true';   // 标记为用户手动选择
             const amount = Utils.getAmountFromInput('amount');
             if (amount <= 0) return;
             const percent = parseFloat(select.value);
@@ -1013,7 +1014,7 @@
         },
 
         onServiceFeeManualChange() { 
-            // 保留方法，但输入框为 readonly，此方法通常不会被触发，维持兼容性
+            // 保留兼容性，输入框为只读，通常不触发
             const input = document.getElementById('serviceFeeInput'); 
             if (input) input.dataset.manual = 'true'; 
         },
