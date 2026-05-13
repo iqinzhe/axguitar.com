@@ -49,7 +49,7 @@
                     // 管理员查询时排除练习门店
                     let q = client
                         .from('cash_flow_records').select('*, stores(name)')
-                        .eq('is_voided', false).order('recorded_at', { ascending: false });
+                        .eq('is_voided', false).order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
                     const practiceIds = await SUPABASE._getPracticeStoreIds();
                     if (practiceIds.length > 0) {
                         q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
@@ -63,14 +63,14 @@
                         .eq('store_id', profile?.store_id)
                         .eq('is_voided', false)
                         .eq('recorded_by', profile?.id)
-                        .order('recorded_at', { ascending: false });
+                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
                     transactions = staffFlows || [];
                 } else {
                     // 店长：查看本店全部流水
                     const { data: storeFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id).eq('is_voided', false)
-                        .order('recorded_at', { ascending: false });
+                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
                     transactions = storeFlows || [];
                 }
 
@@ -211,7 +211,7 @@
                     // 管理员查询时排除练习门店
                     let q = client
                         .from('cash_flow_records').select('*, stores(name)')
-                        .eq('is_voided', false).order('recorded_at', { ascending: false });
+                        .eq('is_voided', false).order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
                     const practiceIds = await SUPABASE._getPracticeStoreIds();
                     if (practiceIds.length > 0) {
                         q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
@@ -225,13 +225,13 @@
                         .eq('store_id', profile?.store_id)
                         .eq('is_voided', false)
                         .eq('recorded_by', profile?.id)
-                        .order('recorded_at', { ascending: false });
+                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
                     transactions = staffFlows || [];
                 } else {
                     const { data: storeFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id).eq('is_voided', false)
-                        .order('recorded_at', { ascending: false });
+                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
                     transactions = storeFlows || [];
                 }
 
