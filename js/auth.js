@@ -1,13 +1,4 @@
-// auth.js - v2.1 (JF 命名空间)
-// 修复记录（v2.1）：
-//   [高危-1] 登录锁定改为服务端 Edge Function 验证，localStorage 仅作 UI 展示缓存
-//   [高危-2] deleteUser() Auth 清理失败时中止操作，不再继续删除 profile
-//   [中危-1] forceClearAuth() 使用白名单前缀清除 localStorage，移除过宽泛的 includes('token')
-//   [中危-2] logout() 去除重复的 user = null，状态管理统一由 forceClearAuth() 负责
-//   [中危-3] resetUserPassword() 移除明文密码传输说明（密码仍经 HTTPS 传输至 Edge Function，
-//            建议后续在 Edge Function 侧做参数脱敏日志）
-//   [优化-1] addUser() 改用 auth.admin.createUser 跳过邮件确认
-//   [优化-2] 异步角色查询方法（isAdminAsync 等）集中到 permission.js，此处仅保留同步版本
+// auth.js - v2.0 (JF 命名空间)
 
 'use strict';
 
