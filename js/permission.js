@@ -1,11 +1,4 @@
-// permission.js - v2.1 (JF 命名空间)
-// 修复记录（v2.1）：
-//   [中危-1] canEditOrder() 不再硬编码 return false，改为走统一规则表查询
-//   [中危-2] 敏感操作（internal_transfer、profit_distribute）新增 canAsync 强制异步版本，
-//            并在同步版本中打印警告提示调用方改用异步版本
-//   [优化-1] 移除与 auth.js 重复的异步角色查询方法（isAdminAsync 等），
-//            统一由 canAsync() + _checkByRole() 体系覆盖
-//   [优化-2] 新增 canOperateExpense() 补全支出操作的门店隔离检查
+// permission.js - v2.0 (JF 命名空间)
 
 'use strict';
 
