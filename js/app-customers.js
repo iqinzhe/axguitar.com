@@ -41,11 +41,11 @@
                 }
                 
                 // 按客户编号排序（字符串降序）
-customers.sort((a, b) => {
-    const idA = a.customer_id || '';
-    const idB = b.customer_id || '';
-    return idB.localeCompare(idA);
-});
+                customers.sort((a, b) => {
+                    const idA = a.customer_id || '';
+                    const idB = b.customer_id || '';
+                    return idB.localeCompare(idA);
+                 });
                 
                 // 辅助函数：生成表格行（接收已排序的客户列表）
                 const buildRowsForCustomers = (customerList) => {
