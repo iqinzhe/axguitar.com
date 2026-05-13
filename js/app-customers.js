@@ -1,5 +1,4 @@
-// app-customers.js - v2.2 (JF 命名空间)
-// 管理费/服务费：自动计算并可手工修改，服务费下拉移除
+// app-customers.js - v2.0 (客户列表ID排序、管理员分组、服务费可手工修改)
 
 'use strict';
 
@@ -9,20 +8,17 @@
 
     const CustomersPage = {
 
-        // ==================== 构建客户列表 HTML ====================
+        // ==================== 构建客户列表 HTML（支持管理员按门店分组、ID升序） ====================
         async buildCustomersHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
             const isAdmin = PERMISSION.isAdmin();
 
             try {
-                const [customers, stores] = await Promise.all([
-                    SUPABASE.getCustomers(),
-                    SUPABASE.getAllStores()
-                ]);
-                const storeMap = {};
-                for (const s of stores) storeMap[s.id] = s.name;
-
+                let customers = await SUPABASE.getCustomers();
+                const stores = await SUPABASE.getAllStores();
+                
+                // 获取活跃订单映射
                 const client = SUPABASE.getClient();
                 const customerIds = (customers || []).map(c => c.id);
                 const activeOrderMap = {};
@@ -43,13 +39,14 @@
                         }
                     }
                 }
-
-                const totalCols = 7;
-                let rows = '';
-                if (!customers || customers.length === 0) {
-                    rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}</td></tr>`;
-                } else {
-                    for (const c of customers) {
+                
+                // 按客户编号排序（字符串升序）
+                customers.sort((a, b) => (a.customer_id || '').localeCompare(b.customer_id || ''));
+                
+                // 辅助函数：生成表格行
+                const buildRowsForCustomers = (customerList) => {
+                    let rows = '';
+                    for (const c of customerList) {
                         const customerId = Utils.escapeHtml(c.customer_id || '-');
                         const name = Utils.escapeHtml(c.name);
                         const phone = Utils.escapeHtml(c.phone || '-');
@@ -78,8 +75,81 @@
                             <td class="text-center"><button onclick="APP.showCustomerDetailCard('${Utils.escapeAttr(c.id)}')" class="btn btn--sm">📋 ${t('detail')}</button></td>
                         </tr>`;
                     }
+                    return rows;
+                };
+                
+                let mainContent = '';
+                
+                if (isAdmin) {
+                    // 管理员：按门店分组，每组一个表格
+                    const customersByStore = {};
+                    for (const c of customers) {
+                        const storeId = c.store_id;
+                        if (!customersByStore[storeId]) customersByStore[storeId] = [];
+                        customersByStore[storeId].push(c);
+                    }
+                    // 获取门店列表并排序（按名称）
+                    const sortedStores = stores.filter(s => s.code !== 'STORE_000').sort((a, b) => a.name.localeCompare(b.name));
+                    let groupedTablesHtml = '';
+                    for (const store of sortedStores) {
+                        const storeCustomers = customersByStore[store.id] || [];
+                        if (storeCustomers.length === 0) continue;
+                        const storeName = Utils.escapeHtml(store.name);
+                        const storeCode = Utils.escapeHtml(store.code);
+                        const rows = buildRowsForCustomers(storeCustomers);
+                        groupedTablesHtml += `
+                            <div class="card" style="margin-bottom: 24px;">
+                                <h3>🏪 ${storeName} <span style="font-size:0.8rem; color:var(--text-muted);">(${storeCode})</span> <span style="float:right; font-size:0.8rem;">👥 ${storeCustomers.length} ${lang === 'id' ? 'nasabah' : '客户'}</span></h3>
+                                <div class="table-container">
+                                    <table class="data-table customer-list-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-id">${t('customer_id')}</th>
+                                                <th class="col-name">${t('customer_name')}</th>
+                                                <th class="col-ktp">${t('ktp_number')}</th>
+                                                <th class="col-phone">${t('phone')}</th>
+                                                <th class="col-occupation">${t('occupation')}</th>
+                                                <th class="text-center">${t('create_order_for')}</th>
+                                                <th class="text-center">${t('action')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${rows}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (groupedTablesHtml === '') {
+                        groupedTablesHtml = `<div class="card"><p class="text-center">${lang === 'id' ? 'Belum ada data nasabah' : '暂无客户数据'}</p></div>`;
+                    }
+                    mainContent = groupedTablesHtml;
+                } else {
+                    // 门店操作员：直接显示一个表格
+                    const rows = buildRowsForCustomers(customers);
+                    mainContent = `
+                        <div class="card">
+                            <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
+                            <div class="table-container">
+                                <table class="data-table customer-list-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-id">${t('customer_id')}</th>
+                                            <th class="col-name">${t('customer_name')}</th>
+                                            <th class="col-ktp">${t('ktp_number')}</th>
+                                            <th class="col-phone">${t('phone')}</th>
+                                            <th class="col-occupation">${t('occupation')}</th>
+                                            <th class="text-center">${t('create_order_for')}</th>
+                                            <th class="text-center">${t('action')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
                 }
-
+                
+                // 新增客户卡片（仅门店操作员可见）
                 let addCustomerCardHtml = '';
                 if (!isAdmin) {
                     addCustomerCardHtml =
@@ -104,7 +174,7 @@
                             </div>
                         </div>`;
                 }
-
+                
                 const content = `
                     <div class="page-header">
                         <h2>👥 ${t('customers')}</h2>
@@ -113,23 +183,7 @@
                             <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button>
                         </div>
                     </div>
-                    <div class="card">
-                        <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
-                        <div class="table-container">
-                            <table class="data-table customer-list-table">
-                                <thead><tr>
-                                    <th class="col-id">${t('customer_id')}</th>
-                                    <th class="col-name">${t('customer_name')}</th>
-                                    <th class="col-ktp">${t('ktp_number')}</th>
-                                    <th class="col-phone">${t('phone')}</th>
-                                    <th class="col-occupation">${t('occupation')}</th>
-                                    <th class="text-center">${t('create_order_for')}</th>
-                                    <th class="text-center">${t('action')}</th>
-                                </tr></thead>
-                                <tbody>${rows}</tbody>
-                            </table>
-                        </div>
-                    </div>
+                    ${mainContent}
                     ${addCustomerCardHtml}`;
                 return content;
             } catch (error) {
@@ -153,6 +207,7 @@
             if (el) el.style.display = value === 'different' ? 'block' : 'none';
         },
 
+        // ==================== 添加客户 ====================
         addCustomer: async function () {
             const isAdmin = PERMISSION.isAdmin();
             const lang = Utils.lang;
@@ -257,11 +312,8 @@
             }
         },
 
-        // 客户详情卡片等...（保持原有完整实现，限于篇幅不再重复，但实际文件应包含全部）
-        // 为了使答案可运行，我将在最终交付时包含完整代码，此处继续编写完整文件。
-        // 由于 token 限制，我将在最后一条消息中输出完整的 app-customers.js 内容。
-        // 但为满足一次性完整替换，我会在本条消息中输出剩余部分。
-
+        // 客户详情卡片等...
+   
         showCustomerDetailCard: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
