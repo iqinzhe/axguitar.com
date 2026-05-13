@@ -1,4 +1,4 @@
-// app-customers.js - v2.0 (JF 命名空间) 服务费固定容器  + 金额0只读
+// app-customers.js - v2.0 (JF 命名空间) 服务费固定容器 + 金额0只读 + 下拉始终可见
 
 'use strict';
 
@@ -595,7 +595,7 @@
             }
         },
 
-        // ==================== 为客户创建订单（服务费固定容器 + 只读状态） ====================
+        // ==================== 为客户创建订单（服务费下拉始终可见，通过disabled控制） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -664,8 +664,8 @@
                                 </div>
                                 <div class="fee-card">
                                     <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
-                                    <!-- 固定容器，始终显示，金额为0时只读 -->
                                     <div class="fee-card-body" id="serviceFeeDisplay" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                        <!-- 服务费下拉始终显示，通过disabled控制是否可选 -->
                                         <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">
                                             ${Array.from({ length: 13 }, (_, i) => `<option value="${i}">${i}%</option>`).join('')}
                                         </select>
@@ -854,7 +854,11 @@
                     delete svcInput.dataset.manual;
                 }
                 const svcSelect = document.getElementById("serviceFeePercentSelect");
-                if (svcSelect) { svcSelect.value = '0'; delete svcSelect.dataset.manual; }
+                if (svcSelect) {
+                    svcSelect.value = '0';
+                    svcSelect.disabled = true;   // ===== fix: 重置时下拉禁用 =====
+                    delete svcSelect.dataset.manual;
+                }
                 const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
                 if (cashRadio) cashRadio.checked = true;
                 const loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]'); 
@@ -880,7 +884,7 @@
             }
         },
 
-        // ==================== 费用重算（只读状态切换） ====================
+        // ==================== 费用重算（服务费下拉始终可见，通过disabled / readonly控制） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
@@ -892,14 +896,14 @@
             }
             this._updateAdminFeeHint(amount);
 
-            // 服务费：根据金额动态更新固定容器，金额为0时只读
             const serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
             const serviceFeeInput = document.getElementById('serviceFeeInput');
 
+            // ===== fix: 始终显示下拉，通过 disabled 和 readonly 控制 =====
             if (amount <= 0) {
-                // 无金额：隐藏下拉，输入框只读显示0
+                // 无金额：下拉禁用，强制0%，输入只读0
                 if (serviceFeeSelect) {
-                    serviceFeeSelect.style.display = 'none';
+                    serviceFeeSelect.disabled = true;
                     serviceFeeSelect.value = '0';
                     delete serviceFeeSelect.dataset.manual;
                 }
@@ -910,9 +914,9 @@
                 }
                 this._updateServiceFeeHint(amount, 0);
             } else if (amount <= 3000000) {
-                // ≤3jt：隐藏下拉，强制0%，输入框只读显示0
+                // ≤3jt：下拉禁用，强制0%，输入只读0
                 if (serviceFeeSelect) {
-                    serviceFeeSelect.style.display = 'none';
+                    serviceFeeSelect.disabled = true;
                     serviceFeeSelect.value = '0';
                     delete serviceFeeSelect.dataset.manual;
                 }
@@ -923,23 +927,23 @@
                 }
                 this._updateServiceFeeHint(amount, 0);
             } else if (amount <= 5000000) {
-                // 3~5jt：隐藏下拉，强制1%，输入框只读显示计算结果
+                // 3~5jt：下拉禁用，强制1%，输入只读自动计算
                 if (serviceFeeSelect) {
-                    serviceFeeSelect.style.display = 'none';
+                    serviceFeeSelect.disabled = true;
                     serviceFeeSelect.value = '1';
                     delete serviceFeeSelect.dataset.manual;
                 }
                 if (serviceFeeInput) {
                     serviceFeeInput.readOnly = true;
-                    delete serviceFeeInput.dataset.manual; // 强制按规则计算
+                    delete serviceFeeInput.dataset.manual;
                     const result = Utils.calculateServiceFee(amount, 1);
                     serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
                 }
                 this._updateServiceFeeHint(amount, 1);
             } else {
-                // >5jt：显示下拉，默认2%，输入框可编辑
+                // >5jt：下拉启用，默认2%（除非手动标记），输入可编辑，自动计算初始值
                 if (serviceFeeSelect) {
-                    serviceFeeSelect.style.display = '';
+                    serviceFeeSelect.disabled = false;
                     if (!serviceFeeSelect.dataset.manual) {
                         serviceFeeSelect.value = '2';
                     }
@@ -955,7 +959,7 @@
                 this._updateServiceFeeHint(amount, percent);
             }
 
-            // 固定还款计算
+            // 固定还款计算（利率默认10%）
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
             if (repaymentType === 'fixed') { 
                 const rateSelect = document.getElementById('agreedInterestRateSelect'); 
@@ -1008,7 +1012,7 @@
             }
         },
 
-        // ==================== 服务费提示更新（支持0%-10%） ====================
+        // ==================== 服务费提示更新（支持0%-12%） ====================
         _updateServiceFeeHint(amount, percent) {
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
@@ -1017,7 +1021,7 @@
             if (amount <= 0) {
                 hint.innerHTML = lang === 'id'
                     ? `• Nilai gadai ≤ Rp3.000.000 : gratis biaya layanan (0%)\n• Nilai gadai Rp3.000.001 – Rp5.000.000 : dikenakan biaya layanan 1%\n• Nilai gadai > Rp5.000.000 : mulai dari 2%, maksimal dibatasi hingga 12%`
-                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高10%封顶`;
+                    : `• 当金 ≤ Rp3,000,000 ：免服务费（0%）\n• 当金 Rp3,000,001 ～ Rp5,000,000 ：收取 1% 服务费\n• 当金 > Rp5,000,000 ：2%起跳，最高12%封顶`;
             } else {
                 const feeResult = Utils.calculateServiceFee(amount, percent);
                 let allHints = lang === 'id'
@@ -1045,7 +1049,7 @@
         recalculateServiceFee() {
             const select = document.getElementById('serviceFeePercentSelect');
             if (!select) return;
-            if (select) select.dataset.manual = 'true';
+            select.dataset.manual = 'true';
             const amount = Utils.getAmountFromInput('amount');
             const percent = select ? parseFloat(select.value) : 2;
             const result = Utils.calculateServiceFee(amount, percent);
