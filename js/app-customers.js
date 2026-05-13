@@ -1,4 +1,4 @@
-// app-customers.js - v2.2 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
+// app-customers.js - v2.0 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
 
 'use strict';
 
