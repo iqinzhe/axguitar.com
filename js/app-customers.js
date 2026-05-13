@@ -1,5 +1,4 @@
-// app-customers.js - v2.2 (JF 命名空间)
-// 管理费/服务费：自动计算并可手工修改，服务费下拉移除
+// app-customers.js - v2.2 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
 
 'use strict';
 
@@ -9,20 +8,17 @@
 
     const CustomersPage = {
 
-        // ==================== 构建客户列表 HTML ====================
+        // ==================== 构建客户列表 HTML（支持管理员按门店分组、ID升序） ====================
         async buildCustomersHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
             const isAdmin = PERMISSION.isAdmin();
 
             try {
-                const [customers, stores] = await Promise.all([
-                    SUPABASE.getCustomers(),
-                    SUPABASE.getAllStores()
-                ]);
-                const storeMap = {};
-                for (const s of stores) storeMap[s.id] = s.name;
-
+                let customers = await SUPABASE.getCustomers();
+                const stores = await SUPABASE.getAllStores();
+                
+                // 获取活跃订单映射
                 const client = SUPABASE.getClient();
                 const customerIds = (customers || []).map(c => c.id);
                 const activeOrderMap = {};
@@ -43,13 +39,18 @@
                         }
                     }
                 }
-
-                const totalCols = 7;
-                let rows = '';
-                if (!customers || customers.length === 0) {
-                    rows = `<tr><td colspan="${totalCols}" class="text-center">${t('no_data')}</td></tr>`;
-                } else {
-                    for (const c of customers) {
+                
+                // ========== 关键修复：按客户编号升序排序 ==========
+                customers.sort((a, b) => {
+                    const idA = a.customer_id || '';
+                    const idB = b.customer_id || '';
+                    return idA.localeCompare(idB);
+                });
+                
+                // 辅助函数：生成表格行（接收已排序的客户列表）
+                const buildRowsForCustomers = (customerList) => {
+                    let rows = '';
+                    for (const c of customerList) {
                         const customerId = Utils.escapeHtml(c.customer_id || '-');
                         const name = Utils.escapeHtml(c.name);
                         const phone = Utils.escapeHtml(c.phone || '-');
@@ -78,8 +79,81 @@
                             <td class="text-center"><button onclick="APP.showCustomerDetailCard('${Utils.escapeAttr(c.id)}')" class="btn btn--sm">📋 ${t('detail')}</button></td>
                         </tr>`;
                     }
+                    return rows;
+                };
+                
+                let mainContent = '';
+                
+                if (isAdmin) {
+                    // 管理员：按门店分组，每组一个表格（每个表格内客户已排序）
+                    const customersByStore = {};
+                    for (const c of customers) {
+                        const storeId = c.store_id;
+                        if (!customersByStore[storeId]) customersByStore[storeId] = [];
+                        customersByStore[storeId].push(c);
+                    }
+                    // 获取门店列表并排序（按名称）
+                    const sortedStores = stores.filter(s => s.code !== 'STORE_000').sort((a, b) => a.name.localeCompare(b.name));
+                    let groupedTablesHtml = '';
+                    for (const store of sortedStores) {
+                        const storeCustomers = customersByStore[store.id] || [];
+                        if (storeCustomers.length === 0) continue;
+                        const storeName = Utils.escapeHtml(store.name);
+                        const storeCode = Utils.escapeHtml(store.code);
+                        const rows = buildRowsForCustomers(storeCustomers);
+                        groupedTablesHtml += `
+                            <div class="card" style="margin-bottom: 24px;">
+                                <h3>🏪 ${storeName} <span style="font-size:0.8rem; color:var(--text-muted);">(${storeCode})</span> <span style="float:right; font-size:0.8rem;">👥 ${storeCustomers.length} ${lang === 'id' ? 'nasabah' : '客户'}</span></h3>
+                                <div class="table-container">
+                                    <table class="data-table customer-list-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-id">${t('customer_id')}</th>
+                                                <th class="col-name">${t('customer_name')}</th>
+                                                <th class="col-ktp">${t('ktp_number')}</th>
+                                                <th class="col-phone">${t('phone')}</th>
+                                                <th class="col-occupation">${t('occupation')}</th>
+                                                <th class="text-center">${t('create_order_for')}</th>
+                                                <th class="text-center">${t('action')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${rows}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    if (groupedTablesHtml === '') {
+                        groupedTablesHtml = `<div class="card"><p class="text-center">${lang === 'id' ? 'Belum ada data nasabah' : '暂无客户数据'}</p></div>`;
+                    }
+                    mainContent = groupedTablesHtml;
+                } else {
+                    // 门店操作员：直接显示一个表格（客户已全局排序）
+                    const rows = buildRowsForCustomers(customers);
+                    mainContent = `
+                        <div class="card">
+                            <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
+                            <div class="table-container">
+                                <table class="data-table customer-list-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-id">${t('customer_id')}</th>
+                                            <th class="col-name">${t('customer_name')}</th>
+                                            <th class="col-ktp">${t('ktp_number')}</th>
+                                            <th class="col-phone">${t('phone')}</th>
+                                            <th class="col-occupation">${t('occupation')}</th>
+                                            <th class="text-center">${t('create_order_for')}</th>
+                                            <th class="text-center">${t('action')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
                 }
-
+                
+                // 新增客户卡片（仅门店操作员可见）
                 let addCustomerCardHtml = '';
                 if (!isAdmin) {
                     addCustomerCardHtml =
@@ -104,7 +178,7 @@
                             </div>
                         </div>`;
                 }
-
+                
                 const content = `
                     <div class="page-header">
                         <h2>👥 ${t('customers')}</h2>
@@ -113,23 +187,7 @@
                             <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button>
                         </div>
                     </div>
-                    <div class="card">
-                        <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
-                        <div class="table-container">
-                            <table class="data-table customer-list-table">
-                                <thead><tr>
-                                    <th class="col-id">${t('customer_id')}</th>
-                                    <th class="col-name">${t('customer_name')}</th>
-                                    <th class="col-ktp">${t('ktp_number')}</th>
-                                    <th class="col-phone">${t('phone')}</th>
-                                    <th class="col-occupation">${t('occupation')}</th>
-                                    <th class="text-center">${t('create_order_for')}</th>
-                                    <th class="text-center">${t('action')}</th>
-                                </tr></thead>
-                                <tbody>${rows}</tbody>
-                            </table>
-                        </div>
-                    </div>
+                    ${mainContent}
                     ${addCustomerCardHtml}`;
                 return content;
             } catch (error) {
@@ -153,6 +211,7 @@
             if (el) el.style.display = value === 'different' ? 'block' : 'none';
         },
 
+        // ==================== 添加客户（使用 _generateCustomerId 实现 ID 重用） ====================
         addCustomer: async function () {
             const isAdmin = PERMISSION.isAdmin();
             const lang = Utils.lang;
@@ -181,6 +240,7 @@
                 const storeId = profile?.store_id;
                 if (!storeId) { if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); } Utils.toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店'); return; }
 
+                // 黑名单重复检查
                 if (ktp || phone) {
                     try {
                         const blacklistedCustomer = await SUPABASE.checkBlacklistDuplicate(ktp, phone);
@@ -202,50 +262,28 @@
                     } catch (blErr) { console.warn('黑名单重复检查失败:', blErr.message); }
                 }
 
-                let maxRetries = 8, lastError = null, newCustomer = null;
-                for (let attempt = 0; attempt < maxRetries; attempt++) {
-                    try {
-                        const prefix = await SUPABASE._getStorePrefix(storeId);
-                        const client = SUPABASE.getClient();
-                        const { data: customers, error: queryError } = await client
-                            .from('customers').select('customer_id').like('customer_id', prefix + '%')
-                            .order('customer_id', { ascending: false }).limit(1);
-                        if (queryError) console.warn("查询最大客户ID失败:", queryError);
-
-                        let maxNumber = 0;
-                        if (customers && customers.length > 0) {
-                            const match = customers[0].customer_id.match(new RegExp(prefix + '(\\d{3})$'));
-                            if (match) maxNumber = parseInt(match[1], 10);
-                        }
-                        const nextNumber = maxNumber + 1;
-                        const serial = String(nextNumber).padStart(3, '0');
-                        const customerId = prefix + serial;
-
-                        const customerData = {
-                            customer_id: customerId, store_id: storeId, name,
-                            ktp_number: ktp || null, phone, occupation: occupation || null,
-                            ktp_address: ktpAddress || null, address: ktpAddress || null,
-                            living_same_as_ktp: livingSameAsKtp, living_address: livingAddress || null,
-                            registered_date: registeredDate, created_by: profile.id
-                        };
-                        const { data, error } = await client.from('customers').insert(customerData).select().single();
-                        if (error) {
-                            if (error.code === '23505') {
-                                console.warn(`客户ID ${customerId} 冲突，重试第 ${attempt + 1}/${maxRetries} 次`);
-                                lastError = error;
-                                await new Promise(r => setTimeout(r, 50 * Math.pow(2, attempt)));
-                                continue;
-                            }
-                            throw error;
-                        }
-                        newCustomer = data;
-                        break;
-                    } catch (err) {
-                        if (err.code === '23505' && attempt < maxRetries - 1) continue;
-                        throw err;
-                    }
+                // 使用 _generateCustomerId 自动获取最小可用ID（支持重用）
+                let newCustomer = null;
+                try {
+                    const customerId = await SUPABASE._generateCustomerId(storeId);
+                    const customerData = {
+                        customer_id: customerId, store_id: storeId, name,
+                        ktp_number: ktp || null, phone, occupation: occupation || null,
+                        ktp_address: ktpAddress || null, address: ktpAddress || null,
+                        living_same_as_ktp: livingSameAsKtp, living_address: livingAddress || null,
+                        registered_date: registeredDate, created_by: profile.id
+                    };
+                    const { data, error } = await SUPABASE.getClient()
+                        .from('customers')
+                        .insert(customerData)
+                        .select()
+                        .single();
+                    if (error) throw error;
+                    newCustomer = data;
+                } catch (error) {
+                    console.error("addCustomer: 创建客户失败", error);
+                    throw error;
                 }
-                if (!newCustomer) throw lastError || new Error(lang === 'id' ? 'Gagal menghasilkan ID nasabah unik' : '无法生成唯一的客户ID');
 
                 if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); }
                 Utils.toast.success(lang === 'id' ? 'Nasabah berhasil ditambahkan! ID: ' + newCustomer.customer_id : '客户添加成功！ID: ' + newCustomer.customer_id);
@@ -257,11 +295,7 @@
             }
         },
 
-        // 客户详情卡片等...（保持原有完整实现，限于篇幅不再重复，但实际文件应包含全部）
-        // 为了使答案可运行，我将在最终交付时包含完整代码，此处继续编写完整文件。
-        // 由于 token 限制，我将在最后一条消息中输出完整的 app-customers.js 内容。
-        // 但为满足一次性完整替换，我会在本条消息中输出剩余部分。
-
+        // ==================== 客户详情卡片（完整保留） ====================
         showCustomerDetailCard: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -1047,8 +1081,8 @@
                 const statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
                 let rows = '';
                 if (!orders || orders.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`; }
-                else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td class="date-cell">${Utils.formatDate(o.created_at)}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="amount">${Utils.formatCurrency(o.principal_paid)}</td><td class="text-center">${o.interest_paid_months} ${t('month')}</td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}</span></td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td></td>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}</button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`; } }
-                return `<div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>📋 ${t('order_list')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+                else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td class="date-cell">${Utils.formatDate(o.created_at)}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="amount">${Utils.formatCurrency(o.principal_paid)}</td><td class="text-center">${o.interest_paid_months} ${t('month')}</td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}</span></td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td><table>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}</button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`; } }
+                return `<div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>📋 ${t('order_list')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></table></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
                 console.error("buildCustomerOrdersHTML error:", error); 
                 return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat order nasabah' : '加载客户订单失败'}</p></div>`; 
