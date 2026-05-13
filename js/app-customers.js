@@ -1,4 +1,4 @@
-// app-customers.js - v2.0 (JF 命名空间) 服务费固定容器 + 金额0只读 + 下拉始终可见
+// app-customers.js - v2.0 (JF 命名空间) 服务费固定容器 + 下拉始终可见 + 0%正确联动
 
 'use strict';
 
@@ -15,7 +15,6 @@
             const isAdmin = PERMISSION.isAdmin();
 
             try {
-                // [优化] customers + stores 并行加载，减少一次串行等待
                 const [customers, stores] = await Promise.all([
                     SUPABASE.getCustomers(),
                     SUPABASE.getAllStores()
@@ -23,7 +22,6 @@
                 const storeMap = {};
                 for (const s of stores) storeMap[s.id] = s.name;
 
-                // 批量查询所有客户的活跃订单状态
                 const client = SUPABASE.getClient();
                 const customerIds = (customers || []).map(c => c.id);
                 const activeOrderMap = {};
@@ -595,7 +593,7 @@
             }
         },
 
-        // ==================== 为客户创建订单（服务费下拉始终可见，通过disabled控制） ====================
+        // ==================== 为客户创建订单 ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -665,7 +663,6 @@
                                 <div class="fee-card">
                                     <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bertambah Sesuai Nominal' : '按额度递增'})</small></div>
                                     <div class="fee-card-body" id="serviceFeeDisplay" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                                        <!-- 服务费下拉始终显示，通过disabled控制是否可选 -->
                                         <select id="serviceFeePercentSelect" onchange="APP.recalculateServiceFee()" style="min-width:80px;">
                                             ${Array.from({ length: 13 }, (_, i) => `<option value="${i}">${i}%</option>`).join('')}
                                         </select>
@@ -738,7 +735,7 @@
             }
         },
 
-        // ==================== 保存订单（服务费重置时只读） ====================
+        // ==================== 保存订单 ====================
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -749,14 +746,12 @@
             const amount = Utils.getAmountFromInput("amount");
             const notes = document.getElementById("notes").value;
             
-            // 管理费：支持手动修改
             const adminFeeInput = document.getElementById("adminFeeInput");
             let adminFee = adminFeeInput ? Utils.parseNumberFromCommas(adminFeeInput.value) || 0 : 0;
             if (adminFee === 0 && amount > 0) {
                 adminFee = Utils.calculateAdminFee(amount);
             }
             
-            // 服务费：支持手动修改（固定容器中提取）
             let serviceFeePercent = parseFloat(document.getElementById("serviceFeePercentSelect")?.value) || 0;
             const serviceFeeStr = document.getElementById("serviceFeeInput")?.value || '0'; 
             let serviceFee = Utils.parseNumberFromCommas(serviceFeeStr) || 0;
@@ -793,7 +788,6 @@
             }
             const loanSource = document.querySelector('input[name="loanSource"]:checked')?.value || 'cash'; 
             const fullCollateralName = collateralNote ? `${collateral} (${collateralNote})` : collateral;
-            // 读取自定义订单日期（补录历史数据时使用）
             const orderDateInput = document.getElementById('orderDate');
             const customOrderDate = (orderDateInput && orderDateInput.value) ? orderDateInput.value : Utils.getLocalToday();
             if (!collateral || !amount || amount <= 0) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } Utils.toast.warning(t('fill_all_fields')); return; }
@@ -812,7 +806,7 @@
                     monthly_fixed_payment: monthlyFixedPayment, 
                     pawn_term_months: pawnTermMonths,
                     max_extension_months: 10,
-                    custom_order_date: customOrderDate  // 补录历史日期支持
+                    custom_order_date: customOrderDate
                 };
                 const newOrder = await Order.create(orderData);
                 if (adminFee > 0) {
@@ -856,7 +850,7 @@
                 const svcSelect = document.getElementById("serviceFeePercentSelect");
                 if (svcSelect) {
                     svcSelect.value = '0';
-                    svcSelect.disabled = true;   // ===== fix: 重置时下拉禁用 =====
+                    svcSelect.disabled = true;
                     delete svcSelect.dataset.manual;
                 }
                 const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
@@ -884,11 +878,10 @@
             }
         },
 
-        // ==================== 费用重算（服务费下拉始终可见，通过disabled / readonly控制） ====================
+        // ==================== 费用重算 ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
-            // 管理费：自动计算，允许手动修改
             const adminFee = Utils.calculateAdminFee(amount);
             const adminFeeInput = document.getElementById('adminFeeInput');
             if (adminFeeInput && !adminFeeInput.dataset.manual) {
@@ -899,9 +892,7 @@
             const serviceFeeSelect = document.getElementById('serviceFeePercentSelect');
             const serviceFeeInput = document.getElementById('serviceFeeInput');
 
-            // ===== fix: 始终显示下拉，通过 disabled 和 readonly 控制 =====
             if (amount <= 0) {
-                // 无金额：下拉禁用，强制0%，输入只读0
                 if (serviceFeeSelect) {
                     serviceFeeSelect.disabled = true;
                     serviceFeeSelect.value = '0';
@@ -914,7 +905,6 @@
                 }
                 this._updateServiceFeeHint(amount, 0);
             } else if (amount <= 3000000) {
-                // ≤3jt：下拉禁用，强制0%，输入只读0
                 if (serviceFeeSelect) {
                     serviceFeeSelect.disabled = true;
                     serviceFeeSelect.value = '0';
@@ -927,7 +917,6 @@
                 }
                 this._updateServiceFeeHint(amount, 0);
             } else if (amount <= 5000000) {
-                // 3~5jt：下拉禁用，强制1%，输入只读自动计算
                 if (serviceFeeSelect) {
                     serviceFeeSelect.disabled = true;
                     serviceFeeSelect.value = '1';
@@ -941,7 +930,6 @@
                 }
                 this._updateServiceFeeHint(amount, 1);
             } else {
-                // >5jt：下拉启用，默认2%（除非手动标记），输入可编辑，自动计算初始值
                 if (serviceFeeSelect) {
                     serviceFeeSelect.disabled = false;
                     if (!serviceFeeSelect.dataset.manual) {
@@ -959,7 +947,6 @@
                 this._updateServiceFeeHint(amount, percent);
             }
 
-            // 固定还款计算（利率默认10%）
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
             if (repaymentType === 'fixed') { 
                 const rateSelect = document.getElementById('agreedInterestRateSelect'); 
@@ -977,7 +964,6 @@
             }
         },
 
-        // ==================== 管理费手动修改标记 ====================
         onAdminFeeManualChange() {
             const input = document.getElementById('adminFeeInput');
             if (input) input.dataset.manual = 'true';
@@ -1012,7 +998,6 @@
             }
         },
 
-        // ==================== 服务费提示更新（支持0%-12%） ====================
         _updateServiceFeeHint(amount, percent) {
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
@@ -1046,6 +1031,7 @@
             }
         },
 
+        // ===== fix: 清除手动标记，确保下拉选择0%生效 =====
         recalculateServiceFee() {
             const select = document.getElementById('serviceFeePercentSelect');
             if (!select) return;
@@ -1056,7 +1042,8 @@
             const input = document.getElementById('serviceFeeInput');
             if (input) {
                 input.value = Utils.formatNumberWithCommas(result.amount);
-                input.dataset.manual = 'true';
+                // 清除输入框的手动标记，以便金额变化时能自动跟随百分比重算
+                delete input.dataset.manual;
             }
             this._updateServiceFeeHint(amount, percent);
         },
@@ -1147,10 +1134,8 @@
         async renderCustomerPaymentHistoryHTML(customerId) { return await this.buildCustomerPaymentHistoryHTML(customerId); }
     };
 
-    // 挂载到命名空间
     JF.CustomersPage = CustomersPage;
 
-    // 向下兼容 APP 方法
     if (window.APP) {
         window.APP.showCustomers = CustomersPage.showCustomers.bind(CustomersPage);
         window.APP.addCustomer = CustomersPage.addCustomer.bind(CustomersPage);
