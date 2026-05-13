@@ -72,6 +72,9 @@
                 }
                 actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
                 actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
+                if (isAdmin) {
+                    actionButtons += `<button onclick="APP.adminEditOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
+                }
                 if (PERMISSION.canDeleteOrder()) {
                     actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
                 }
@@ -188,6 +191,9 @@
                 }
                 actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
                 actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
+                if (isAdmin) {
+                    actionButtons += `<button onclick="APP.adminEditOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
+                }
                 if (PERMISSION.canDeleteOrder()) {
                     actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
                 }
@@ -836,6 +842,226 @@
         window.APP.deleteOrder = OrdersPage.deleteOrder.bind(OrdersPage);
         window.APP.printOrder = OrdersPage.printOrder.bind(OrdersPage);
         window.APP.showPaymentHistory = OrdersPage.showPaymentHistory.bind(OrdersPage);
+        window.APP.adminEditOrder = OrdersPage.adminEditOrder.bind(OrdersPage);
+        window.APP.adminSaveOrder = OrdersPage.adminSaveOrder.bind(OrdersPage);
     }
 
+})();
+
+// ==================== 管理员修改订单（问题3） ====================
+// 仅管理员可用。解锁订单 → 展示全字段编辑表单 → 保存后自动重新锁定。
+(function () {
+    if (!window.JF) window.JF = {};
+
+    const AdminEditOrder = {
+
+        async adminEditOrder(orderId) {
+            if (!PERMISSION.isAdmin()) { Utils.toast.error('仅管理员可修改订单'); return; }
+            const lang = Utils.lang;
+            const t = Utils.t.bind(Utils);
+            try {
+                const order = await SUPABASE.getOrder(orderId);
+                if (!order) throw new Error('订单不存在');
+
+                // 解锁订单，允许修改
+                await SUPABASE.unlockOrder(orderId);
+
+                const today = Utils.getLocalToday();
+                const orderDate = (order.created_at || '').substring(0, 10) || today;
+
+                document.getElementById('app').innerHTML = `
+                    <div class="page-header">
+                        <h2>✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'} — ${Utils.escapeHtml(orderId)}</h2>
+                        <div class="header-actions">
+                            <button onclick="APP.adminCancelEdit('${Utils.escapeAttr(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="info-bar warning"><span class="info-bar-icon">⚠️</span>
+                            <div class="info-bar-content"><strong>${lang === 'id' ? 'Mode Edit Admin' : '管理员编辑模式'}：</strong>
+                            ${lang === 'id' ? 'Pesanan telah dibuka kuncinya. Setelah simpan, pesanan akan dikunci kembali secara otomatis.' : '订单已临时解锁。保存后将自动重新锁定。'}</div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">📋</span> ${lang === 'id' ? 'Informasi Dasar' : '基本信息'}</div>
+                            <div class="form-grid">
+                                <div class="form-group"><label>${lang === 'id' ? 'Tanggal Pesanan' : '订单日期'}</label>
+                                    <input type="date" id="edit_order_date" value="${orderDate}" max="${today}"></div>
+                                <div class="form-group"><label>${t('collateral_name')}</label>
+                                    <input type="text" id="edit_collateral" value="${Utils.escapeHtml(order.collateral_name || '')}"></div>
+                                <div class="form-group"><label>${t('loan_amount')}</label>
+                                    <input type="text" id="edit_loan_amount" class="amount-input" value="${Utils.formatNumberWithCommas(order.loan_amount || 0)}"></div>
+                                <div class="form-group"><label>${t('notes')}</label>
+                                    <input type="text" id="edit_notes" value="${Utils.escapeHtml(order.notes || '')}"></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">👤</span> ${t('customer_info')}</div>
+                            <div class="form-grid">
+                                <div class="form-group"><label>${t('customer_name')}</label>
+                                    <input type="text" id="edit_customer_name" value="${Utils.escapeHtml(order.customer_name || '')}"></div>
+                                <div class="form-group"><label>${t('ktp_number')}</label>
+                                    <input type="text" id="edit_customer_ktp" value="${Utils.escapeHtml(order.customer_ktp || '')}"></div>
+                                <div class="form-group"><label>${t('phone')}</label>
+                                    <input type="text" id="edit_customer_phone" value="${Utils.escapeHtml(order.customer_phone || '')}"></div>
+                                <div class="form-group"><label>${t('address')}</label>
+                                    <input type="text" id="edit_customer_address" value="${Utils.escapeHtml(order.customer_address || '')}"></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">💰</span> ${lang === 'id' ? 'Rincian Biaya' : '费用明细'}</div>
+                            <div class="form-grid">
+                                <div class="form-group"><label>${t('admin_fee')} (Rp)</label>
+                                    <input type="text" id="edit_admin_fee" class="amount-input" value="${Utils.formatNumberWithCommas(order.admin_fee || 0)}">
+                                    <div class="form-hint">💡 ${lang === 'id' ? 'Isi 0 untuk dibebaskan' : '填0即为免除'}</div></div>
+                                <div class="form-group"><label>${t('service_fee')} (Rp)</label>
+                                    <input type="text" id="edit_service_fee" class="amount-input" value="${Utils.formatNumberWithCommas(order.service_fee_amount || 0)}">
+                                    <div class="form-hint">💡 ${lang === 'id' ? 'Isi 0 untuk dibebaskan' : '填0即为免除'}</div></div>
+                                <div class="form-group"><label>${t('service_fee')} %</label>
+                                    <input type="number" id="edit_service_fee_percent" value="${order.service_fee_percent || 0}" min="0" max="10" step="0.5"></div>
+                                <div class="form-group"><label>${lang === 'id' ? 'Suku Bunga (%)' : '月利率 (%)'}</label>
+                                    <select id="edit_interest_rate">${Utils.getInterestRateOptions((order.agreed_interest_rate || 0.10) * 100)}</select></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">📅</span> ${t('repayment_type')}</div>
+                            <div class="form-grid">
+                                <div class="form-group"><label>${t('repayment_type')}</label>
+                                    <select id="edit_repayment_type">
+                                        <option value="flexible" ${order.repayment_type === 'flexible' ? 'selected' : ''}>${t('flexible_repayment')}</option>
+                                        <option value="fixed" ${order.repayment_type === 'fixed' ? 'selected' : ''}>${t('fixed_repayment')}</option>
+                                    </select></div>
+                                <div class="form-group"><label>${t('term_months')} ${lang === 'id' ? '(Cicilan Tetap)' : '（固定期数）'}</label>
+                                    <input type="number" id="edit_repayment_term" value="${order.repayment_term || ''}" min="1" max="10" placeholder="${lang === 'id' ? 'Kosong jika fleksibel' : '灵活还款可留空'}"></div>
+                                <div class="form-group"><label>${t('monthly_payment')} (Rp)</label>
+                                    <input type="text" id="edit_monthly_payment" class="amount-input" value="${Utils.formatNumberWithCommas(order.monthly_fixed_payment || 0)}"></div>
+                                <div class="form-group"><label>${lang === 'id' ? 'Jangka Gadai (bln)' : '典当期限（月）'}</label>
+                                    <input type="number" id="edit_pawn_term" value="${order.pawn_term_months || ''}" min="1" max="36" placeholder="${lang === 'id' ? 'Kosong jika tidak ada' : '无则留空'}"></div>
+                                <div class="form-group"><label>${lang === 'id' ? 'Batas Perpanjangan (bln)' : '最大延期月数'}</label>
+                                    <input type="number" id="edit_max_extension" value="${order.max_extension_months || 10}" min="1" max="36"></div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <div class="form-section-title"><span class="section-icon">💳</span> ${lang === 'id' ? 'Status Pembayaran Biaya' : '费用缴纳状态'}</div>
+                            <div class="form-grid">
+                                <div class="form-group"><label>${t('admin_fee')} ${lang === 'id' ? 'Lunas?' : '已缴？'}</label>
+                                    <select id="edit_admin_fee_paid">
+                                        <option value="true" ${order.admin_fee_paid ? 'selected' : ''}>${lang === 'id' ? '✅ Sudah' : '✅ 已缴'}</option>
+                                        <option value="false" ${!order.admin_fee_paid ? 'selected' : ''}>${lang === 'id' ? '❌ Belum' : '❌ 未缴'}</option>
+                                    </select></div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button onclick="APP.adminSaveOrder('${Utils.escapeAttr(orderId)}')" class="btn btn--success" id="adminSaveBtn">
+                                💾 ${lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'}
+                            </button>
+                            <button onclick="APP.adminCancelEdit('${Utils.escapeAttr(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
+                        </div>
+                    </div>`;
+
+                // 绑定金额格式化
+                ['edit_loan_amount', 'edit_admin_fee', 'edit_service_fee', 'edit_monthly_payment'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && Utils.bindAmountFormat) Utils.bindAmountFormat(el);
+                });
+
+            } catch (error) {
+                console.error('adminEditOrder error:', error);
+                Utils.toast.error(error.message || (Utils.lang === 'id' ? 'Gagal membuka pesanan' : '打开订单失败'));
+            }
+        },
+
+        async adminSaveOrder(orderId) {
+            if (!PERMISSION.isAdmin()) { Utils.toast.error('仅管理员可修改订单'); return; }
+            const lang = Utils.lang;
+            const saveBtn = document.getElementById('adminSaveBtn');
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...'); }
+
+            try {
+                const loanAmount    = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount')?.value) || 0;
+                const adminFee      = Utils.parseNumberFromCommas(document.getElementById('edit_admin_fee')?.value) ?? 0;
+                const serviceFee    = Utils.parseNumberFromCommas(document.getElementById('edit_service_fee')?.value) ?? 0;
+                const servicePct    = parseFloat(document.getElementById('edit_service_fee_percent')?.value) || 0;
+                const interestRate  = parseFloat(document.getElementById('edit_interest_rate')?.value) || 10;
+                const repayType     = document.getElementById('edit_repayment_type')?.value || 'flexible';
+                const repayTerm     = parseInt(document.getElementById('edit_repayment_term')?.value) || null;
+                const monthlyPmt    = Utils.parseNumberFromCommas(document.getElementById('edit_monthly_payment')?.value) || 0;
+                const pawnTerm      = parseInt(document.getElementById('edit_pawn_term')?.value) || null;
+                const maxExtension  = parseInt(document.getElementById('edit_max_extension')?.value) || 10;
+                const adminFeePaid  = document.getElementById('edit_admin_fee_paid')?.value === 'true';
+                const orderDate     = document.getElementById('edit_order_date')?.value || Utils.getLocalToday();
+
+                const collateral    = document.getElementById('edit_collateral')?.value.trim() || '';
+                const custName      = document.getElementById('edit_customer_name')?.value.trim() || '';
+                const custKtp       = document.getElementById('edit_customer_ktp')?.value.trim() || '';
+                const custPhone     = document.getElementById('edit_customer_phone')?.value.trim() || '';
+                const custAddress   = document.getElementById('edit_customer_address')?.value.trim() || '';
+                const notes         = document.getElementById('edit_notes')?.value.trim() || '';
+
+                if (!collateral || loanAmount <= 0) {
+                    Utils.toast.warning(lang === 'id' ? 'Agunan dan jumlah pinjaman wajib diisi' : '抵押物和贷款金额不能为空');
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); }
+                    return;
+                }
+
+                const agreedRate = interestRate / 100;
+                const remainingPrincipal = loanAmount; // 保持原逻辑，管理员修改贷款金额后重新计算
+                const monthlyInterest = remainingPrincipal * agreedRate;
+
+                const updates = {
+                    collateral_name: collateral,
+                    loan_amount: loanAmount,
+                    monthly_interest: monthlyInterest,
+                    admin_fee: adminFee,
+                    admin_fee_paid: adminFeePaid,
+                    service_fee_amount: serviceFee,
+                    service_fee_percent: servicePct,
+                    agreed_interest_rate: agreedRate,
+                    agreed_service_fee_rate: servicePct / 100,
+                    repayment_type: repayType,
+                    repayment_term: repayTerm,
+                    monthly_fixed_payment: monthlyPmt || null,
+                    pawn_term_months: pawnTerm,
+                    max_extension_months: maxExtension,
+                    customer_name: custName,
+                    customer_ktp: custKtp,
+                    customer_phone: custPhone,
+                    customer_address: custAddress,
+                    notes: notes,
+                    created_at: orderDate + 'T00:00:00.000Z',
+                    updated_at: new Date().toISOString()
+                };
+
+                const client = SUPABASE.getClient();
+                const { error: updErr } = await client.from('orders').update(updates).eq('order_id', orderId);
+                if (updErr) throw updErr;
+
+                // 保存后自动重新锁定
+                await SUPABASE.relockOrder(orderId);
+
+                Utils.toast.success(lang === 'id' ? '✅ Pesanan berhasil diperbarui dan dikunci kembali!' : '✅ 订单已修改并重新锁定！');
+                if (window.JF && JF.Cache) JF.Cache.clear();
+                await JF.OrdersPage.viewOrder(orderId);
+
+            } catch (error) {
+                console.error('adminSaveOrder error:', error);
+                Utils.toast.error(error.message || (lang === 'id' ? 'Gagal menyimpan' : '保存失败'));
+                // 保存失败时尝试重新锁定，避免订单长时间处于解锁状态
+                try { await SUPABASE.relockOrder(orderId); } catch(e) {}
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); }
+            }
+        },
+
+        async adminCancelEdit(orderId) {
+            // 取消时重新锁定订单，恢复原状
+            try { await SUPABASE.relockOrder(orderId); } catch(e) {}
+            await JF.OrdersPage.viewOrder(orderId);
+        }
+    };
+
+    // 挂载到 APP
+    if (window.APP) {
+        window.APP.adminEditOrder  = AdminEditOrder.adminEditOrder.bind(AdminEditOrder);
+        window.APP.adminSaveOrder  = AdminEditOrder.adminSaveOrder.bind(AdminEditOrder);
+        window.APP.adminCancelEdit = AdminEditOrder.adminCancelEdit.bind(AdminEditOrder);
+    }
 })();

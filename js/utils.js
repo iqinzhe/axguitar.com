@@ -586,9 +586,10 @@
 
     Utils.calculateNextDueDate = function (startDate, paidMonths) {
         // 语义：已付 paidMonths 期利息后，下次到期 = startDate + (paidMonths + 1) 个月。
-        // [优化] 原写法使用手动模运算处理跨年，改用 Date.UTC 自动处理，
-        // 逻辑等价且可读性更好，同时正确处理月末边界（如1月31→2月28）。
-        const start = startDate || Utils.getLocalToday();
+        // [修复] created_at 可能是完整 datetime 字符串（如 '2025-07-15T08:30:00+07:00'），
+        // 直接 split('-').map(Number) 会让 day 变成 NaN，导致 "2026-07-NaN" 错误。
+        // 统一取前10位 'YYYY-MM-DD' 再解析，彻底避免 NaN。
+        const start = (startDate || Utils.getLocalToday()).substring(0, 10);
         const [year, month, day] = start.split('-').map(Number);
         // 让 Date.UTC 自动处理月份溢出（如 month=13 → 自动进位到次年1月）
         const target = new Date(Date.UTC(year, (month - 1) + paidMonths + 1, 1));
@@ -917,7 +918,8 @@
      */
     Utils.calculatePawnDueDate = function (startDate, termMonths) {
         if (!startDate || !termMonths || termMonths <= 0) return '';
-        const [year, month, day] = startDate.split('-').map(Number);
+        // [修复] 同 calculateNextDueDate，取前10位防止 datetime 字符串导致 day=NaN
+        const [year, month, day] = startDate.substring(0, 10).split('-').map(Number);
         const totalMonths = month - 1 + termMonths;
         const newYear = year + Math.floor(totalMonths / 12);
         const newMonth = (totalMonths % 12) + 1;

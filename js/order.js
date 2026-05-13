@@ -17,9 +17,10 @@
                 customer_address: data.customer.address,
                 collateral_name: data.collateral_name,
                 loan_amount: data.loan_amount,
-                admin_fee: data.admin_fee || Utils.calculateAdminFee(data.loan_amount),
+                // [修复] 用 !== undefined 而非 ||，防止手动设为0（免除）时被理论计算值覆盖
+                admin_fee: data.admin_fee !== undefined && data.admin_fee !== null ? data.admin_fee : Utils.calculateAdminFee(data.loan_amount),
                 service_fee_percent: data.service_fee_percent !== undefined ? data.service_fee_percent : 2,
-                service_fee_amount: data.service_fee_amount || 0,
+                service_fee_amount: data.service_fee_amount !== undefined && data.service_fee_amount !== null ? data.service_fee_amount : 0,
                 notes: data.notes,
                 customer_id: data.customer_id || null,
                 agreed_interest_rate: data.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT,

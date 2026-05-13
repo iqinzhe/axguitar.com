@@ -1033,9 +1033,16 @@
             const nowDateTime = orderData.custom_order_date
                 ? orderData.custom_order_date + 'T00:00:00.000Z'
                 : nowStr();
-            const adminFee = orderData.admin_fee || Utils.calculateAdminFee(orderData.loan_amount);
+            // [修复] 原写法 orderData.admin_fee || calculateAdminFee(...)：
+            // 当用户手动设为 0（免除管理费）时，0 是 falsy，会被||右侧的理论计算值覆盖，
+            // 导致免除的费用在保存后变成理论值。改为严格判断 null/undefined。
+            const adminFee = (orderData.admin_fee !== undefined && orderData.admin_fee !== null)
+                ? orderData.admin_fee
+                : Utils.calculateAdminFee(orderData.loan_amount);
             const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
-            const serviceFeeAmount = orderData.service_fee_amount || 0;
+            const serviceFeeAmount = (orderData.service_fee_amount !== undefined && orderData.service_fee_amount !== null)
+                ? orderData.service_fee_amount
+                : 0;
             const agreedInterestRate = (orderData.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT) / 100;
             const repaymentType = orderData.repayment_type || 'flexible';
             const repaymentTerm = orderData.repayment_term || null;
@@ -1161,8 +1168,10 @@
             return true;
         },
 
-        async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null) {
+        async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null, paymentDate=null) {
             if(paymentMethod===undefined) paymentMethod='cash';
+            // [问题1修复] paymentDate 支持补录历史日期，为空时回退到今天
+            const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
             if(currentOrder.status==='completed') throw new Error(Utils.t('order_completed'));
@@ -1229,9 +1238,9 @@
                 
                 if(interestToRecord>0){
                     const paymentData = {
-                        order_id: currentOrder.id, date: todayStr(), type:'interest',
+                        order_id: currentOrder.id, date: recordDate, type:'interest',
                         months, amount: interestToRecord,
-                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang==='id'?'bulan':'个月') + ' (' + (monthlyRate*100).toFixed(1)+'%)',
+                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang==='id'?'bulan':'个月') + ' (' + (monthlyRate*100).toFixed(1)+'%)' + (recordDate !== todayStr() ? ` [补录 ${recordDate}]` : ''),
                         recorded_by: profile.id, payment_method: paymentMethod
                     };
                     const { error: payErr } = await supabaseClient.from('payment_history').insert(paymentData);

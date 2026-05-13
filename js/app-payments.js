@@ -179,6 +179,7 @@
 
                 // 利息历史
                 let interestRows = '';
+                let lastInterestDate = '';  // 上次缴息日期，用于日期选择器下限
                 if (interestPayments.length === 0) {
                     interestRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td>`;
                 } else {
@@ -187,7 +188,13 @@
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
                         interestRows += `<tr><td class="text-center">${i + 1}</td><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="text-center">${p.months || 1} ${t('month')}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>`;
                     }
+                    // 取最后一笔利息记录的日期作为日期选择器的最早下限
+                    lastInterestDate = interestPayments[interestPayments.length - 1]?.date?.substring(0, 10) || '';
                 }
+                // 日期选择器：最早不能早于订单创建日，也不能早于上次缴息日，最晚不能超过今天
+                const orderCreatedDate = (order.created_at || '').substring(0, 10);
+                const interestDateMin = lastInterestDate > orderCreatedDate ? lastInterestDate : orderCreatedDate;
+                const interestDateMax = Utils.getLocalToday();
 
                 // 本金历史
                 let principalRows = '';
@@ -252,6 +259,7 @@
                                 <div class="card-header"><h3>💰 ${t('pay_interest')}</h3></div>
                                 <div class="card-body">
                                     <div class="info-box"><div class="info-row"><span>📌 ${lang === 'id' ? 'Pembayaran Bunga ke-' : '第'}${nextInterestNumber} ${lang === 'id' ? 'kali' : '次'}</span></div><div class="info-row"><span>💰 ${t('amount_due')}:</span><strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></div><div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(0)}%</strong></div></div>
+                                    <div class="action-input-group"><label class="action-label">📅 ${lang === 'id' ? 'Tanggal Pembayaran' : '入账日期'}:</label><input type="date" id="interestPaymentDate" class="amount-input" value="${interestDateMax}" min="${interestDateMin}" max="${interestDateMax}" style="font-size:14px;padding:8px 10px;"><div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}</div></div>
                                     <div class="action-input-group"><label class="action-label">${lang === 'id' ? 'Jumlah Dibayar' : '缴纳金额'}:</label><input type="text" id="interestAmount" class="amount-input" placeholder="${Utils.formatCurrency(currentMonthlyInterest)}" value="${Utils.formatNumberWithCommas(Math.round(currentMonthlyInterest))}"><div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Bunga 1 bln: ${Utils.formatCurrency(currentMonthlyInterest)} | Bisa kurang/lebih` : `1个月利息: ${Utils.formatCurrency(currentMonthlyInterest)} | 可少缴/多缴`}</div></div>
                                     <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label></div></div>
                                     <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="interestConfirmBtn">✅ ${t('confirm_payment')}</button>
@@ -293,11 +301,9 @@
                             <div class="summary-item"><span class="label">${t('payment_due_date')}:</span><span class="value">${nextDueDate}</span></div>
                             <div class="summary-item"><span class="label">${t('repayment_type')}:</span><span class="value">${order.repayment_type === 'fixed' ? '📅 ' + t('fixed_repayment') : '💰 ' + t('flexible_repayment')}${order.repayment_type === 'fixed' ? ' (' + order.repayment_term + ' ' + t('month') + ')' : ''}</span></div>
                             <div class="summary-item"><span class="label">💎 ${t('collateral_name')}:</span><span class="value">${Utils.escapeHtml(order.collateral_name || '-')}</span></div>
-                            <div class="summary-item"><span class="label">💰 ${t('service_fee')}:</span><span class="value">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%)</span></div>
-                            <div class="summary-item"><span class="label">📋 ${t('admin_fee')}:</span><span class="value">${Utils.formatCurrency(order.admin_fee)}</span></div>
+                            <div class="summary-item"><span class="label">💰 ${t('service_fee')}:</span><span class="value">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%) — <span class="income">${serviceFeePaidInfo}</span></span></div>
+                            <div class="summary-item"><span class="label">📋 ${t('admin_fee')}:</span><span class="value">${Utils.formatCurrency(order.admin_fee)} — <span class="income">${adminFeePaidInfo}</span></span></div>
                             <div class="summary-item"><span class="label">📈 ${t('agreed_rate')}:</span><span class="value">${((order.agreed_interest_rate || 0.10)*100).toFixed(0)}%</span></div>
-                            <div class="summary-item"><span class="label">✅ ${t('admin_fee')}:</span><span class="value income">${adminFeePaidInfo}</span></div>
-                            <div class="summary-item"><span class="label">✅ ${t('service_fee')}:</span><span class="value income">${serviceFeePaidInfo}</span></div>
                         </div>
                     </div>
                     ${fixedHtml}
@@ -321,6 +327,9 @@
             const method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
             const methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
+            // 读取日期选择器（补录时可选历史日期，默认今天）
+            const paymentDateInput = document.getElementById('interestPaymentDate');
+            const paymentDate = (paymentDateInput && paymentDateInput.value) ? paymentDateInput.value : Utils.getLocalToday();
 
             if (isNaN(actualPaid) || actualPaid <= 0) { Utils.toast.warning(Utils.t('invalid_amount')); return; }
 
@@ -356,14 +365,14 @@
                 }
 
                 const previewMsg = lang === 'id'
-                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(0)}%\nBunga 1 bln (teoritis): ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\nLanjutkan?`
-                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(0)}%\n1个月利息(理论): ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\n确认收款？`;
+                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}\nTanggal: ${paymentDate}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(0)}%\nBunga 1 bln (teoritis): ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\nLanjutkan?`
+                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期\n入账日期: ${paymentDate}\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(0)}%\n1个月利息(理论): ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\n确认收款？`;
 
                 const confirmed = await Utils.toast.confirm(previewMsg);
                 if (!confirmed) return;
 
                 try {
-                    const result = await SUPABASE.recordInterestPayment(orderId, 1, method, actualPaid);
+                    const result = await SUPABASE.recordInterestPayment(orderId, 1, method, actualPaid, paymentDate);
                     if (result && result.shortfall > 0) {
                         const shortfallMsg = lang === 'id'
                             ? `⚠️ Pembayaran kurang ${Utils.formatCurrency(result.shortfall)}. Hutang bunga total sekarang: ${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`
