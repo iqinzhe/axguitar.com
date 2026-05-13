@@ -682,7 +682,7 @@
                             </div>
                             <div class="form-group interest-rate-group">
                                 <label>📈 ${t('interest_rate_select')}</label>
-                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(8)}</select>
+                                <select id="agreedInterestRateSelect" onchange="APP.recalculateAllFees()">${Utils.getInterestRateOptions(10)}</select>
                             </div>
                         </div>
                         <div class="form-section">
@@ -766,7 +766,7 @@
             }
             
             const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
-            const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 8;
+            const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 10;
             const repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked'); 
             const repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
             let repaymentTerm = null, monthlyFixedPayment = null;
@@ -897,30 +897,60 @@
             const serviceFeeInput = document.getElementById('serviceFeeInput');
 
             if (amount <= 0) {
-                if (serviceFeeSelect) { serviceFeeSelect.value = '0'; delete serviceFeeSelect.dataset.manual; }
-                if (serviceFeeInput) { serviceFeeInput.value = '0'; serviceFeeInput.readOnly = true; }
-                this._updateServiceFeeHint(amount, 0);
-            } else {
-                if (serviceFeeInput) serviceFeeInput.readOnly = false;
-
-                let defaultPercent = 0;
-                if (amount > 5000000) defaultPercent = 2;
-                else if (amount > 3000000) defaultPercent = 1;
-
-                if (serviceFeeSelect && !serviceFeeSelect.dataset.manual) {
-                    serviceFeeSelect.value = defaultPercent;
+                // 无金额：隐藏下拉，输入框只读显示0
+                if (serviceFeeSelect) {
+                    serviceFeeSelect.style.display = 'none';
+                    serviceFeeSelect.value = '0';
+                    delete serviceFeeSelect.dataset.manual;
                 }
-
-                const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : defaultPercent;
+                if (serviceFeeInput) {
+                    serviceFeeInput.value = '0';
+                    serviceFeeInput.readOnly = true;
+                    delete serviceFeeInput.dataset.manual;
+                }
+                this._updateServiceFeeHint(amount, 0);
+            } else if (amount <= 3000000) {
+                // ≤3jt：隐藏下拉，强制0%，输入框只读显示0
+                if (serviceFeeSelect) {
+                    serviceFeeSelect.style.display = 'none';
+                    serviceFeeSelect.value = '0';
+                    delete serviceFeeSelect.dataset.manual;
+                }
+                if (serviceFeeInput) {
+                    serviceFeeInput.value = '0';
+                    serviceFeeInput.readOnly = true;
+                    delete serviceFeeInput.dataset.manual;
+                }
+                this._updateServiceFeeHint(amount, 0);
+            } else if (amount <= 5000000) {
+                // 3~5jt：隐藏下拉，强制1%，输入框只读显示计算结果
+                if (serviceFeeSelect) {
+                    serviceFeeSelect.style.display = 'none';
+                    serviceFeeSelect.value = '1';
+                    delete serviceFeeSelect.dataset.manual;
+                }
+                if (serviceFeeInput) {
+                    serviceFeeInput.readOnly = true;
+                    delete serviceFeeInput.dataset.manual; // 强制按规则计算
+                    const result = Utils.calculateServiceFee(amount, 1);
+                    serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
+                }
+                this._updateServiceFeeHint(amount, 1);
+            } else {
+                // >5jt：显示下拉，默认2%，输入框可编辑
+                if (serviceFeeSelect) {
+                    serviceFeeSelect.style.display = '';
+                    if (!serviceFeeSelect.dataset.manual) {
+                        serviceFeeSelect.value = '2';
+                    }
+                }
+                if (serviceFeeInput) {
+                    serviceFeeInput.readOnly = false;
+                }
+                const percent = serviceFeeSelect ? parseFloat(serviceFeeSelect.value) : 2;
                 if (serviceFeeInput && !serviceFeeInput.dataset.manual) {
                     const result = Utils.calculateServiceFee(amount, percent);
                     serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
-                }
-
-                // 控制下拉显示（仅当金 > 5,000,000 时显示下拉，否则隐藏）
-                const selectContainer = serviceFeeSelect?.closest('.form-group') || serviceFeeSelect?.parentElement;
-                if (selectContainer) {
-                    selectContainer.style.display = (amount > 5000000) ? '' : 'none';
                 }
                 this._updateServiceFeeHint(amount, percent);
             }
@@ -929,7 +959,7 @@
             const repaymentType = document.querySelector('input[name="repaymentType"]:checked')?.value;
             if (repaymentType === 'fixed') { 
                 const rateSelect = document.getElementById('agreedInterestRateSelect'); 
-                const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 8) / 100 : 0.08; 
+                const monthlyRate = rateSelect ? (parseFloat(rateSelect.value) || 10) / 100 : 0.10; 
                 const termSelect = document.getElementById('repaymentTermSelect'); 
                 const months = termSelect ? parseInt(termSelect.value) : 5; 
                 if (amount > 0 && months > 0) { 
