@@ -1,4 +1,4 @@
-// app-payments.js - v2.1 (JF 命名空间) (多标签页锁 / 超额还款提示 / 幂等性建议)
+// app-payments.js - v2.0 (JF 命名空间) (多标签页锁 / 超额还款提示 / 幂等性建议)
 
 'use strict';
 
