@@ -1,6 +1,5 @@
-// app-customers.js - v2.1 (JF 命名空间) 
-// 管理费：≤3jt 固定30,000；>3jt 按1%取整到万位
-// 服务费：≤5jt 免收；>5jt 按2%取整到万位，移除下拉选项，改为只读自动计算
+// app-customers.js - v2.2 (JF 命名空间)
+// 管理费/服务费：自动计算并可手工修改，服务费下拉移除
 
 'use strict';
 
@@ -10,7 +9,7 @@
 
     const CustomersPage = {
 
-        // ==================== 构建客户列表 HTML（活跃订单状态区分） ====================
+        // ==================== 构建客户列表 HTML ====================
         async buildCustomersHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -140,9 +139,7 @@
             }
         },
 
-        async renderCustomersHTML() {
-            return await this.buildCustomersHTML();
-        },
+        async renderCustomersHTML() { return await this.buildCustomersHTML(); },
 
         async showCustomers() {
             APP.currentPage = 'customers';
@@ -156,7 +153,6 @@
             if (el) el.style.display = value === 'different' ? 'block' : 'none';
         },
 
-        // ==================== 添加客户 ====================
         addCustomer: async function () {
             const isAdmin = PERMISSION.isAdmin();
             const lang = Utils.lang;
@@ -261,7 +257,11 @@
             }
         },
 
-        // ==================== 客户详情卡片 ====================
+        // 客户详情卡片等...（保持原有完整实现，限于篇幅不再重复，但实际文件应包含全部）
+        // 为了使答案可运行，我将在最终交付时包含完整代码，此处继续编写完整文件。
+        // 由于 token 限制，我将在最后一条消息中输出完整的 app-customers.js 内容。
+        // 但为满足一次性完整替换，我会在本条消息中输出剩余部分。
+
         showCustomerDetailCard: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -595,7 +595,7 @@
             }
         },
 
-        // ==================== 为客户创建订单（完整版，服务费自动计算） ====================
+        // ==================== 为客户创建订单（服务费可手工修改） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -614,14 +614,13 @@
                 APP.currentCustomerId = customerId; 
                 const occupationDisplay = Utils.escapeHtml(customer.occupation || '-');
 
-                // 更新后的提示文案
                 const adminFeeHintText = lang === 'id'
                     ? `• Nilai gadai ≤ Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai (dibulatkan ke Rp10.000)`
                     : `• 当金 ≤ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费（取整到Rp10,000）`;
 
                 const serviceFeeHintText = lang === 'id'
-                    ? `• Nilai gadai ≤ Rp5.000.000 : Gratis (0%)\n• Nilai gadai > Rp5.000.000 : Dikenakan biaya layanan sebesar 2% dari nilai gadai (dibulatkan ke Rp10.000)`
-                    : `• 当金 ≤ Rp5,000,000 ：免服务费 (0%)\n• 当金 > Rp5,000,000 ：按当金的 2% 收取服务费（取整到Rp10,000）`;
+                    ? `• Nilai gadai ≤ Rp5.000.000 : Gratis (0%)\n• Nilai gadai > Rp5.000.000 : Dikenakan biaya layanan sebesar 2% dari nilai gadai (dibulatkan ke Rp10.000, bisa diubah manual)`
+                    : `• 当金 ≤ Rp5,000,000 ：免服务费 (0%)\n• 当金 > Rp5,000,000 ：按当金的 2% 收取服务费（取整到Rp10,000，可手工修改）`;
 
                 const pawnTermHintText = lang === 'id'
                     ? 'Pilih jangka waktu gadai (1-10 bulan). Tanggal jatuh tempo akan dihitung otomatis.'
@@ -656,7 +655,7 @@
                             <div class="form-section-title"><span class="section-icon">💰</span> ${t('fee_details')}</div>
                             <div class="fee-cards-row">
                                 <div class="fee-card">
-                                    <div class="fee-card-label">📋 ${t('admin_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Biaya Tetap' : '固定收费'})</small></div>
+                                    <div class="fee-card-label">📋 ${t('admin_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bisa diubah manual' : '可手工修改'})</small></div>
                                     <div class="fee-card-body">
                                         <span style="font-weight:700;color:var(--text-primary);margin-right:4px;">Rp</span>
                                         <input type="text" id="adminFeeInput" value="0" class="amount-input" oninput="APP.onAdminFeeManualChange()">
@@ -664,10 +663,10 @@
                                     <div class="fee-card-hint" id="adminFeeHint">${adminFeeHintText}</div>
                                 </div>
                                 <div class="fee-card">
-                                    <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Otomatis' : '自动计算'})</small></div>
+                                    <div class="fee-card-label">✨ ${t('service_fee')} <small style="font-weight:400;text-transform:none;color:var(--text-muted);">(${lang === 'id' ? 'Bisa diubah manual' : '可手工修改'})</small></div>
                                     <div class="fee-card-body">
                                         <span style="font-weight:700;color:var(--text-primary);margin-right:4px;">Rp</span>
-                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" readonly style="background:#f8fafc;">
+                                        <input type="text" id="serviceFeeInput" value="0" class="amount-input" oninput="APP.onServiceFeeManualChange()">
                                     </div>
                                     <div class="fee-card-hint" id="serviceFeeHint">${serviceFeeHintText}</div>
                                 </div>
@@ -735,7 +734,7 @@
             }
         },
 
-        // ==================== 保存订单（服务费自动计算版） ====================
+        // ==================== 保存订单（服务费支持手工修改） ====================
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -752,23 +751,22 @@
                 adminFee = Utils.calculateAdminFee(amount);
             }
             
-            // 服务费：自动计算，不再依赖下拉框
+            // 服务费：优先使用手工录入的值，否则自动计算
             let serviceFeePercent = 0;
             let serviceFee = 0;
-            if (amount > 5000000) {
+            const serviceFeeInput = document.getElementById('serviceFeeInput');
+            const manualServiceFee = serviceFeeInput ? Utils.parseNumberFromCommas(serviceFeeInput.value) || 0 : 0;
+            
+            if (manualServiceFee > 0) {
+                serviceFee = manualServiceFee;
+                serviceFeePercent = 0;  // 手工修改时百分比置0，表示自定义金额
+            } else if (amount > 5000000) {
                 const result = Utils.calculateServiceFee(amount);
                 serviceFee = result.amount;
                 serviceFeePercent = result.percent;
             } else {
-                // 金额 <= 5,000,000 或 <= 3,000,000，服务费为0
                 serviceFee = 0;
                 serviceFeePercent = 0;
-            }
-            // 如果输入框已有手动值（理论上只读，但以防万一）
-            const serviceFeeStr = document.getElementById("serviceFeeInput")?.value || '0';
-            const manualFee = Utils.parseNumberFromCommas(serviceFeeStr);
-            if (manualFee > 0 && amount > 5000000) {
-                serviceFee = manualFee;
             }
             
             const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
@@ -855,7 +853,6 @@
                 const svcInput = document.getElementById("serviceFeeInput");
                 if (svcInput) {
                     svcInput.value = '0';
-                    svcInput.readOnly = true;
                     delete svcInput.dataset.manual;
                 }
                 const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
@@ -883,10 +880,11 @@
             }
         },
 
-        // ==================== 费用重算（服务费自动计算，无下拉） ====================
+        // ==================== 费用重算（支持手工标记） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
+            // 管理费自动计算（除非手工修改过）
             const adminFee = Utils.calculateAdminFee(amount);
             const adminFeeInput = document.getElementById('adminFeeInput');
             if (adminFeeInput && !adminFeeInput.dataset.manual) {
@@ -894,18 +892,15 @@
             }
             this._updateAdminFeeHint(amount);
 
-            // 服务费自动计算
+            // 服务费自动计算（除非手工修改过）
             const serviceFeeInput = document.getElementById('serviceFeeInput');
-            if (amount <= 0) {
-                if (serviceFeeInput) serviceFeeInput.value = '0';
-                this._updateServiceFeeHint(amount);
-                return;
-            }
-
-            const result = Utils.calculateServiceFee(amount);
-            if (serviceFeeInput) {
-                serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
-                serviceFeeInput.readOnly = true;
+            if (serviceFeeInput && serviceFeeInput.dataset.manual !== 'true') {
+                if (amount <= 0) {
+                    serviceFeeInput.value = '0';
+                } else {
+                    const result = Utils.calculateServiceFee(amount);
+                    serviceFeeInput.value = Utils.formatNumberWithCommas(result.amount);
+                }
             }
             this._updateServiceFeeHint(amount);
 
@@ -963,41 +958,56 @@
             const hint = document.getElementById('serviceFeeHint');
             if (!hint) return;
             const lang = Utils.lang;
+            const serviceFeeInput = document.getElementById('serviceFeeInput');
+            const manual = serviceFeeInput && serviceFeeInput.dataset.manual === 'true';
             
             if (amount <= 0) {
                 hint.innerHTML = lang === 'id'
                     ? `• Silakan masukkan nilai gadai terlebih dahulu.`
                     : `• 请先输入当金金额。`;
-            } else {
-                const feeResult = Utils.calculateServiceFee(amount);
-                let ruleText = '';
-                if (amount <= 5000000) {
-                    ruleText = lang === 'id' 
-                        ? `🔢 Nilai gadai ≤ Rp5.000.000 → <strong>Gratis (0%)</strong>`
-                        : `🔢 当金 ≤ Rp5,000,000 → <strong>免服务费 (0%)</strong>`;
-                } else {
-                    ruleText = lang === 'id'
-                        ? `🔢 Nilai gadai > Rp5.000.000 → <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}<br><small style="color:#f59e0b;">(dibulatkan ke Rp10.000)</small>`
-                        : `🔢 当金 > Rp5,000,000 → <strong>${feeResult.percent}%</strong> = ${Utils.formatCurrency(feeResult.amount)}<br><small style="color:#f59e0b;">(取整到Rp10,000)</small>`;
-                }
-                hint.innerHTML = ruleText;
+                return;
             }
+            
+            const autoResult = Utils.calculateServiceFee(amount);
+            const currentAmount = serviceFeeInput ? Utils.parseNumberFromCommas(serviceFeeInput.value) : 0;
+            const isModified = manual && currentAmount !== autoResult.amount;
+            
+            let ruleText = '';
+            if (amount <= 5000000) {
+                ruleText = lang === 'id' 
+                    ? `🔢 Nilai gadai ≤ Rp5.000.000 → <strong>Gratis (0%)</strong>`
+                    : `🔢 当金 ≤ Rp5,000,000 → <strong>免服务费 (0%)</strong>`;
+            } else {
+                ruleText = lang === 'id'
+                    ? `🔢 Nilai gadai > Rp5.000.000 → <strong>${autoResult.percent}%</strong> = ${Utils.formatCurrency(autoResult.amount)}<br><small style="color:#f59e0b;">(dibulatkan ke Rp10.000, bisa diubah manual)</small>`
+                    : `🔢 当金 > Rp5,000,000 → <strong>${autoResult.percent}%</strong> = ${Utils.formatCurrency(autoResult.amount)}<br><small style="color:#f59e0b;">(取整到Rp10,000，可手工修改)</small>`;
+            }
+            
+            if (isModified) {
+                ruleText += `<br><span style="color:#3b82f6;">✏️ ${lang === 'id' ? 'Telah diubah manual' : '已手工修改'}</span>`;
+            }
+            hint.innerHTML = ruleText;
         },
 
         recalculateServiceFee() {
-            // 服务费改为自动计算，此方法仅保留兼容性
+            // 兼容旧调用：重新计算服务费（不覆盖手工修改）
             const amount = Utils.getAmountFromInput('amount');
             if (amount <= 0) return;
             const result = Utils.calculateServiceFee(amount);
             const input = document.getElementById('serviceFeeInput');
-            if (input) {
+            if (input && input.dataset.manual !== 'true') {
                 input.value = Utils.formatNumberWithCommas(result.amount);
+                this._updateServiceFeeHint(amount);
             }
-            this._updateServiceFeeHint(amount);
         },
 
-        onServiceFeeManualChange() { 
-            // 输入框改为只读，此方法保留为空
+        onServiceFeeManualChange() {
+            const input = document.getElementById('serviceFeeInput');
+            if (input) {
+                input.dataset.manual = 'true';
+            }
+            const amount = Utils.getAmountFromInput('amount');
+            this._updateServiceFeeHint(amount);
         },
 
         onMonthlyPaymentManualChange() { 
@@ -1036,8 +1046,8 @@
                 if (error) throw error;
                 const statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
                 let rows = '';
-                if (!orders || orders.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></table>`; }
-                else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td class="date-cell">${Utils.formatDate(o.created_at)}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="amount">${Utils.formatCurrency(o.principal_paid)}</td><td class="text-center">${o.interest_paid_months} ${t('month')}</td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}</span></td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td></tr>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}</button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`; } }
+                if (!orders || orders.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td></tr>`; }
+                else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}</td><td class="date-cell">${Utils.formatDate(o.created_at)}</td><td class="amount">${Utils.formatCurrency(o.loan_amount)}</td><td class="amount">${Utils.formatCurrency(o.principal_paid)}</td><td class="text-center">${o.interest_paid_months} ${t('month')}</td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}</span></td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td></td>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}</button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}</button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}</td><td colspan="6"><div class="action-buttons">${actionButtons}</div></td></tr>`; } }
                 return `<div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>📋 ${t('order_list')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
                 console.error("buildCustomerOrdersHTML error:", error); 
@@ -1071,7 +1081,7 @@
                 let rows = '';
                 if (allPayments.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}</td>`; }
                 else { for (const p of allPayments) { const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank'; rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td class="col-type">${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`; } }
-                return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></table></thead><tbody>${rows}</tbody></table></div></div>`;
+                return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody><tr></div></div>`;
             } catch (error) { 
                 console.error("buildCustomerPaymentHistoryHTML error:", error); 
                 return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败'}</p></div>`; 
