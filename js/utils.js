@@ -585,17 +585,22 @@
     };
 
     Utils.calculateNextDueDate = function (startDate, paidMonths) {
+        // 语义：已付 paidMonths 期利息后，下次到期 = startDate + (paidMonths + 1) 个月。
+        // [优化] 原写法使用手动模运算处理跨年，改用 Date.UTC 自动处理，
+        // 逻辑等价且可读性更好，同时正确处理月末边界（如1月31→2月28）。
         const start = startDate || Utils.getLocalToday();
         const [year, month, day] = start.split('-').map(Number);
-        const totalMonths = month - 1 + paidMonths + 1;
-        const newYear = year + Math.floor(totalMonths / 12);
-        const newMonth = totalMonths % 12;
-        const daysInNewMonth = new Date(Date.UTC(newYear, newMonth + 1, 0)).getUTCDate();
-        const newDay = Math.min(day, daysInNewMonth);
+        // 让 Date.UTC 自动处理月份溢出（如 month=13 → 自动进位到次年1月）
+        const target = new Date(Date.UTC(year, (month - 1) + paidMonths + 1, 1));
+        const newYear  = target.getUTCFullYear();
+        const newMonth = target.getUTCMonth() + 1; // 始终 1-12
+        // 处理月末日期溢出（如原日=31，目标月只有28天则取28）
+        const lastDay = new Date(Date.UTC(newYear, newMonth, 0)).getUTCDate();
+        const newDay  = Math.min(day, lastDay);
         return (
             newYear +
             '-' +
-            String(newMonth + 1).padStart(2, '0') +
+            String(newMonth).padStart(2, '0') +
             '-' +
             String(newDay).padStart(2, '0')
         );
@@ -707,14 +712,13 @@
         if (window.JF?.FeeConfig?.calculateServiceFee) {
             return window.JF.FeeConfig.calculateServiceFee(loanAmount, percent);
         }
+        // [Bug5修复] 原回退逻辑对 3M-5M 区间收取 1% 服务费，与 FeeConfig 正式规则不符
+        // （FeeConfig: PERCENT_THRESHOLD=5M，≤5M 一律免服务费）。对齐修正。
         if (!loanAmount || loanAmount <= 0) return { percent: 0, amount: 0 };
-        if (loanAmount <= 3000000) return { percent: 0, amount: 0 };
-        if (loanAmount <= 5000000) {
-            const amount = Math.round(loanAmount * 0.01);
-            return { percent: 1, amount };
-        }
+        if (loanAmount <= 5000000) return { percent: 0, amount: 0 };   // ≤500万免服务费
         const finalPercent = percent >= 2 && percent <= 6 ? percent : 2;
-        return { percent: finalPercent, amount: Math.round(loanAmount * finalPercent / 100) };
+        const rawFee = loanAmount * (finalPercent / 100);
+        return { percent: finalPercent, amount: Math.ceil(rawFee / 10000) * 10000 };
     };
 
     Utils.calculateFixedMonthlyPayment = function (loanAmount, monthlyRate, months) {

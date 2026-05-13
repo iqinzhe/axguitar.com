@@ -251,7 +251,8 @@
                 }
             }
 
-            // 员工支出金额上限检查
+            // [Bug6修复] 原来使用同步 canAddExpenseAmount()（依赖内存中的 role，可被篡改绕过）。
+            // 改为先用同步版做 UI 快速反馈，提交时再调用异步版从数据库实时验证，双重保障。
             if (!PERMISSION.canAddExpenseAmount(amount)) {
                 const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
                 const warningMsg = lang === 'id'
@@ -268,6 +269,16 @@
             }
 
             try {
+                // 提交前用异步版再次实时验证（从数据库查询角色，防止内存 role 被篡改绕过）
+                const asyncAllowed = await PERMISSION.canAddExpenseAmountAsync(amount);
+                if (!asyncAllowed) {
+                    const maxAmount = PERMISSION.getStaffExpenseMaxAmount();
+                    Utils.toast.warning(lang === 'id'
+                        ? `⚠️ Verifikasi server gagal: jumlah melebihi batas ${Utils.formatCurrency(maxAmount)}`
+                        : `⚠️ 服务端验证未通过：金额超过限额 ${Utils.formatCurrency(maxAmount)}`, 6000);
+                    if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan' : '保存'); }
+                    return;
+                }
                 const profile = await SUPABASE.getCurrentProfile();
                 const isAdmin = profile?.role === 'admin';
 

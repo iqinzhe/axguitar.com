@@ -1105,6 +1105,12 @@
         async recordAdminFee(orderId, paymentMethod, adminFeeAmount) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
+            // [Bug4修复] 原来缺少幂等检查，重复调用会在 payment_history 和 cash_flow_records
+            // 产生重复记录导致财务虚增。对齐 recordServiceFee 的防重设计。
+            if (order.admin_fee_paid) {
+                console.warn(`[recordAdminFee] 订单 ${orderId} 管理费已记录，跳过重复写入`);
+                return true;
+            }
             const profile = await this.getCurrentProfile();
             const feeAmount = adminFeeAmount || order.admin_fee;
             const { error: e1 } = await supabaseClient.from('orders').update({
@@ -1180,7 +1186,10 @@
                 const newPaidTotal = (currentOrder.interest_paid_total||0) + interestToRecord;
                 const newShortfall = (currentOrder.interest_shortfall||0) + shortfallToTrack;
                 const maxMonths = currentOrder.max_extension_months || 10;
-                if(newPaidMonths>maxMonths && newShortfall>0){
+                // [Bug2修复] 原条件 newPaidMonths>maxMonths && newShortfall>0：
+                // 当足额还款(shortfall=0)时条件永不成立，可无限续期。
+                // 修复：只要 newPaidMonths>maxMonths 就拒绝，无论是否欠款。
+                if (newPaidMonths > maxMonths) {
                     throw new Error(Utils.lang==='id'?`❌ Mencapai batas maksimum perpanjangan (${maxMonths} bulan)`:`❌ 已达到最大延期期限 (${maxMonths}个月)`);
                 }
                 const originalState = {
@@ -1273,8 +1282,17 @@
             const newPaid = (currentOrder.principal_paid||0) + paid;
             const newRemaining = (currentOrder.loan_amount||0) - newPaid;
             const monthlyRate = currentOrder.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
-            let updates = { principal_paid: newPaid, principal_remaining: newRemaining, updated_at: nowStr() };
+            // [Bug3修复] 结清本金前，若存在累计利息欠款，必须先补缴，否则欠款随订单完结而消失。
             const isFull = newRemaining <= 0;
+            if (isFull) {
+                const shortfall = currentOrder.interest_shortfall || 0;
+                if (shortfall > 0) {
+                    throw new Error(Utils.lang === 'id'
+                        ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu sebelum melunasi pokok.`
+                        : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再结清本金。`);
+                }
+            }
+            let updates = { principal_paid: newPaid, principal_remaining: newRemaining, updated_at: nowStr() };
             if(isFull){
                 updates.status = 'completed';
                 updates.monthly_interest = 0;
@@ -1370,6 +1388,13 @@
             const order = await this.getOrder(orderId);
             if(order.status==='completed') throw new Error(Utils.t('order_completed'));
             if(order.repayment_type!=='fixed') throw new Error(Utils.lang==='id'?'Bukan cicilan tetap':'不是固定还款');
+            // [Bug3修复] 提前结清前检查累计利息欠款，防止欠款随订单完结自动消失。
+            const shortfall = order.interest_shortfall || 0;
+            if (shortfall > 0) {
+                throw new Error(Utils.lang === 'id'
+                    ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu sebelum pelunasan dipercepat.`
+                    : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再提前结清。`);
+            }
             const remaining = order.principal_remaining;
             await supabaseClient.from('payment_history').insert({
                 order_id: order.id, date: todayStr(), type:'principal',
