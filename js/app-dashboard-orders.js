@@ -92,9 +92,9 @@
             if (!isAdmin) {
                 // 门店账户：查看、打印、缴纳费用
                 actionButtonsHtml = `
+                    <button id="globalPayBtn" class="btn btn--sm btn--success">💰 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>
                     <button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>
                     <button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>
-                    <button id="globalPayBtn" class="btn btn--sm btn--success">💰 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>
                 `;
             } else {
                 // 管理员：全部按钮
