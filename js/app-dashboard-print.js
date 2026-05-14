@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.0 (修复资金流水打印分页问题)
+// app-dashboard-print.js - v2.1 (彻底修复资金流水打印分页问题)
 
 'use strict';
 
@@ -110,6 +110,9 @@
                             margin-bottom: 8px; 
                             padding-bottom: 6px; 
                             border-bottom: 2px solid #1e293b;
+                            /* 防止页眉被强制分页 */
+                            break-after: avoid;
+                            page-break-after: avoid;
                         }
                         .print-header .logo { 
                             font-size: 14pt; 
@@ -136,7 +139,23 @@
                             padding-top: 6px; 
                             border-top: 1px solid #e2e8f0; 
                         }
-                        table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+                        table { 
+                            width: 100%; 
+                            border-collapse: collapse; 
+                            margin: 6px 0;
+                            /* 允许表格跨页 */
+                            break-inside: auto;
+                            page-break-inside: auto;
+                        }
+                        /* 表头在每一页重复 */
+                        thead {
+                            display: table-header-group;
+                        }
+                        /* 避免单行被切断 */
+                        tbody tr {
+                            break-inside: avoid;
+                            page-break-inside: avoid;
+                        }
                         th { background: #f1f5f9; font-weight: 600; text-align: left; }
                         th, td { 
                             border: 1px solid #cbd5e1; 
@@ -151,8 +170,10 @@
                             border: 1px solid #e2e8f0; 
                             border-radius: 6px; 
                             padding: 8px; 
-                            margin-bottom: 10px; 
-                            break-inside: avoid;
+                            margin-bottom: 10px;
+                            /* 关键修复：允许卡片跨页，解决资金流水表格独占第二页的问题 */
+                            break-inside: auto !important;
+                            page-break-inside: auto !important;
                         }
                         .card h3 { 
                             font-size: 10pt; 
@@ -238,41 +259,24 @@
                         /* 用户/角色管理：操作行隐藏 */
                         .user-table .action-row,
                         .data-table .action-row { display: none !important; }
-                        /* ========== 修复资金流水打印分页问题 ========== */
+                        /* 确保页眉和第一个内容在同一页 */
                         .page-header {
                             break-after: avoid;
                             page-break-after: avoid;
                             margin-bottom: 10px;
                         }
-                        .card:first-of-type {
+                        .print-container > :first-child {
                             break-before: avoid;
                             page-break-before: avoid;
-                            margin-top: 0;
-                        }
-                        /* 允许表格内部跨页，但不要切断表头 */
-                        table {
-                            break-inside: auto;
-                            page-break-inside: auto;
-                        }
-                        thead {
-                            display: table-header-group;
-                        }
-                        tbody tr {
-                            break-inside: avoid;
-                            page-break-inside: avoid;
                         }
                         @media print {
                             @page { size: A4 portrait; margin: 8mm; }
                             body { margin: 0; padding: 0; }
                             .print-container { padding: 0; }
-                            .card { break-inside: avoid; }
+                            /* 只有部分特定卡片需要避免跨页（如异常页面卡片） */
                             .anomaly-card { break-inside: avoid; page-break-inside: avoid; }
                             .user-table .action-row,
                             .data-table .action-row { display: none !important; }
-                            /* 确保页眉和第一个卡片在同一页 */
-                            .page-header, .card:first-of-type {
-                                break-inside: avoid;
-                            }
                         }
                     </style>
                 </head>
@@ -309,19 +313,12 @@
 
         // ========== 清理所有表格中的操作行（订单列表、角色管理等通用） ==========
         _cleanOrderTableForPrint(printContent) {
-            // 1. 移除所有表格中的 action-row（通用，覆盖角色管理/订单管理等所有页面）
             printContent.querySelectorAll('.action-row').forEach(row => row.remove());
-
-            // 2. 移除所有操作按钮容器（双重保险）
             printContent.querySelectorAll('.action-buttons').forEach(el => el.remove());
-
-            // 3. 移除加载更多行
             ['#loadMoreRow', '#blacklistLoadMoreRow'].forEach(sel => {
                 const el = printContent.querySelector(sel);
                 if (el) el.remove();
             });
-
-            // 4. 针对订单表格：再次检查包含 button 的 tr（冗余保护）
             const orderTable = printContent.querySelector('.order-table');
             if (orderTable) {
                 const tbody = orderTable.querySelector('tbody');
@@ -331,8 +328,6 @@
                     });
                 }
             }
-
-            // 5. 角色管理 select.role-select 所在行也需移除
             printContent.querySelectorAll('select.role-select').forEach(el => {
                 const row = el.closest('tr');
                 if (row) row.remove();
@@ -341,13 +336,11 @@
 
         // 重新格式化订单信息为3列3行网格
         _reformatOrderInfoForPrint(printContent) {
-            // 查找包含订单信息的卡片
             const cards = printContent.querySelectorAll('.card');
             let orderInfoCard = null;
             
             for (const card of cards) {
                 const text = card.textContent || '';
-                // 检查是否包含订单关键信息
                 if ((text.includes('订单号') || text.includes('ID Pesanan')) &&
                     (text.includes('客户姓名') || text.includes('Nama Nasabah')) &&
                     (text.includes('贷款金额') || text.includes('Jumlah Pinjaman'))) {
@@ -358,7 +351,6 @@
             
             if (!orderInfoCard) return;
             
-            // 提取订单信息（从 p 标签或直接文本中）
             const lines = [];
             const paragraphs = orderInfoCard.querySelectorAll('p');
             
@@ -370,7 +362,6 @@
                     }
                 }
             } else {
-                // 如果没有 p 标签，从纯文本中提取
                 const text = orderInfoCard.innerText;
                 const textLines = text.split('\n');
                 for (const line of textLines) {
@@ -382,43 +373,29 @@
                 }
             }
             
-            // 定义需要提取的字段映射
             const fieldMap = {
-                '订单号': 'order_id',
-                'ID Pesanan': 'order_id',
-                '客户姓名': 'customer_name',
-                'Nama Nasabah': 'customer_name',
-                '质押物名称': 'collateral_name',
-                'Nama Jaminan': 'collateral_name',
-                '贷款金额': 'loan_amount',
-                'Jumlah Pinjaman': 'loan_amount',
-                '还款方式': 'repayment_type',
-                'Jenis Cicilan': 'repayment_type',
-                '状态': 'status',
-                'Status': 'status',
-                '约定利率': 'interest_rate',
-                'Suku Bunga': 'interest_rate',
-                '月利息': 'monthly_interest',
-                'Bunga Bulanan': 'monthly_interest',
-                '剩余本金': 'remaining_principal',
-                'Sisa Pokok': 'remaining_principal'
+                '订单号': 'order_id', 'ID Pesanan': 'order_id',
+                '客户姓名': 'customer_name', 'Nama Nasabah': 'customer_name',
+                '质押物名称': 'collateral_name', 'Nama Jaminan': 'collateral_name',
+                '贷款金额': 'loan_amount', 'Jumlah Pinjaman': 'loan_amount',
+                '还款方式': 'repayment_type', 'Jenis Cicilan': 'repayment_type',
+                '状态': 'status', 'Status': 'status',
+                '约定利率': 'interest_rate', 'Suku Bunga': 'interest_rate',
+                '月利息': 'monthly_interest', 'Bunga Bulanan': 'monthly_interest',
+                '剩余本金': 'remaining_principal', 'Sisa Pokok': 'remaining_principal'
             };
             
-            // 解析字段值
             const fields = {};
             for (const line of lines) {
                 for (const [label, key] of Object.entries(fieldMap)) {
                     if (line.startsWith(label) || line.includes(label + ' ')) {
                         let value = line.replace(label, '').replace(/^[:：\s]+/, '').trim();
-                        if (value) {
-                            fields[key] = value;
-                        }
+                        if (value) fields[key] = value;
                         break;
                     }
                 }
             }
             
-            // 语言判断
             const lang = Utils.lang;
             const labels = {
                 order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
@@ -432,7 +409,6 @@
                 remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
             };
             
-            // 构建3列网格
             const infoItems = [
                 { label: labels.order_id, value: fields.order_id || '-' },
                 { label: labels.customer_name, value: fields.customer_name || '-' },
@@ -456,12 +432,10 @@
                 </div>
             `;
             
-            // 保存原始卡片中的其他内容（如缴费记录表格）
             const otherContent = [];
             const children = orderInfoCard.children;
             for (const child of children) {
                 if (child.tagName === 'H3' && (child.innerText.includes('缴费记录') || child.innerText.includes('Riwayat Pembayaran'))) {
-                    // 保留缴费记录标题和后续内容
                     otherContent.push(child.outerHTML);
                     let next = child.nextElementSibling;
                     while (next && (!next.tagName === 'H3' || !next.innerText.includes('订单'))) {
@@ -472,7 +446,6 @@
                 }
             }
             
-            // 替换卡片内容
             orderInfoCard.innerHTML = gridHtml + otherContent.join('');
         }
     };
