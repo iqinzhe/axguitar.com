@@ -1,5 +1,4 @@
-// app-dashboard-orders.js - v2.0 (JF 命名空间) 
-// printAllOrders 增加数据量限制和分页提示
+// app-dashboard-orders.js - v2.1 (完整修复管理员修改订单)
 
 'use strict';
 
@@ -26,7 +25,6 @@
             let from = currentFrom || 0;
             let to = from + PAGE_SIZE - 1;
 
-            // [优化] 订单数据与门店列表并行加载
             const [{ orders, totalCount }, stores] = await Promise.all([
                 this._fetchOrderData(filters, from, to),
                 SUPABASE.getAllStores()
@@ -68,15 +66,16 @@
 
                 let actionButtons = '';
                 if (o.status === 'active' && !isAdmin) {
-                    actionButtons += `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
+                    actionButtons += `<button onclick="APP.payOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
                 }
-                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
-                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
+                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
+                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
                 if (isAdmin) {
-                    actionButtons += `<button onclick="APP.adminEditOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
+                    // 使用 JF.AdminEditOrder.adminEditOrder 确保函数存在
+                    actionButtons += `<button onclick="JF.AdminEditOrder.adminEditOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
                 }
                 if (PERMISSION.canDeleteOrder()) {
-                    actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
+                    actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
                 }
 
                 rows += `<tr class="action-row">
@@ -187,15 +186,15 @@
 
                 let actionButtons = '';
                 if (o.status === 'active' && !isAdmin) {
-                    actionButtons += `<button onclick="APP.payOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
+                    actionButtons += `<button onclick="APP.payOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
                 }
-                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
-                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
+                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
+                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
                 if (isAdmin) {
-                    actionButtons += `<button onclick="APP.adminEditOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
+                    actionButtons += `<button onclick="JF.AdminEditOrder.adminEditOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
                 }
                 if (PERMISSION.canDeleteOrder()) {
-                    actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
+                    actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
                 }
 
                 rows += `<tr class="action-row">
@@ -222,7 +221,6 @@
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
 
-            // [优化] profile 与订单数据并行加载
             const [profile, result] = await Promise.all([
                 SUPABASE.getCurrentProfile(),
                 SUPABASE.getPaymentHistory(orderId)
@@ -261,7 +259,7 @@
                     payRows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td>${typeText}</td><td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
                 }
             } else {
-                payRows = `<td><td colspan="6" class="text-center">${t('no_data')}</td>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
             }
 
             const content = `
@@ -269,7 +267,7 @@
                     <h2>📄 ${t('order_details')}</h2>
                     <div class="header-actions">
                         <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
-                        <button onclick="APP.printOrder('${Utils.escapeAttr(order.order_id)}')" class="btn btn--outline">🖨️ ${t('print')}</button>
+                        <button onclick="APP.printOrder('${Utils.escapeHtml(order.order_id)}')" class="btn btn--outline">🖨️ ${t('print')}</button>
                     </div>
                 </div>
                 <div class="card">
@@ -305,9 +303,9 @@
                     <div class="table-container"><table class="data-table payment-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${payRows}</tbody></table></div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">
                         <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
-                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(order.order_id)}'})" class="btn btn--success">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>` : ''}
-                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success">🧾 ${lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证'}</button>` : ''}
-                        <button onclick="APP.sendWAReminder('${Utils.escapeAttr(order.order_id)}')" class="btn btn--warning">📱 ${lang === 'id' ? 'WA提醒' : 'WA提醒'}</button>
+                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeHtml(order.order_id)}'})" class="btn btn--success">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>` : ''}
+                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeHtml(order.order_id)}')" class="btn btn--success">🧾 ${lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证'}</button>` : ''}
+                        <button onclick="APP.sendWAReminder('${Utils.escapeHtml(order.order_id)}')" class="btn btn--warning">📱 ${lang === 'id' ? 'WA提醒' : 'WA提醒'}</button>
                     </div>
                 </div>`;
             return content;
@@ -400,7 +398,6 @@
                 await Order.delete(orderId);
                 if (window.Audit) await window.Audit.logOrderDelete(order.order_id, order.customer_name, order.loan_amount, AUTH.user?.name);
                 Utils.toast.success(Utils.t('order_deleted'));
-                // 清除仪表盘缓存，确保 KPI 数据即时更新
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 await this.showOrderTable();
             } catch (error) {
@@ -611,7 +608,7 @@
 
                 let rows = '';
                 if (allPayments.length === 0) {
-                    rows = `<table><td colspan="8" class="text-center">${t('no_data')}</td>`;
+                    rows = `</table><td colspan="8" class="text-center">${t('no_data')}</td></tr>`;
                 } else {
                     for (const p of allPayments) {
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
@@ -651,7 +648,6 @@
             const filters = { status: APP.currentFilter || 'all' };
 
             try {
-                // 限制最大打印数量为 500 条，避免浏览器卡死
                 const MAX_PRINT_ORDERS = 500;
                 
                 Utils.toast.info(lang === 'id' 
@@ -829,7 +825,7 @@
         }
     };
 
-    // 挂载到命名空间
+    // 挂载 OrdersPage 到命名空间
     JF.OrdersPage = OrdersPage;
 
     // 向下兼容 APP 方法
@@ -842,28 +838,47 @@
         window.APP.deleteOrder = OrdersPage.deleteOrder.bind(OrdersPage);
         window.APP.printOrder = OrdersPage.printOrder.bind(OrdersPage);
         window.APP.showPaymentHistory = OrdersPage.showPaymentHistory.bind(OrdersPage);
-        window.APP.adminEditOrder = OrdersPage.adminEditOrder.bind(OrdersPage);
-        window.APP.adminSaveOrder = OrdersPage.adminSaveOrder.bind(OrdersPage);
+        window.APP.adminEditOrder = null;  // 占位，实际由下方独立 IIFE 覆盖
+        window.APP.adminSaveOrder = null;
+        window.APP.adminCancelEdit = null;
+    } else {
+        window.APP = {
+            showOrderTable: OrdersPage.showOrderTable.bind(OrdersPage),
+            loadMoreOrders: OrdersPage.loadMoreOrders.bind(OrdersPage),
+            payOrder: OrdersPage.payOrder.bind(OrdersPage),
+            filterOrders: OrdersPage.filterOrders.bind(OrdersPage),
+            viewOrder: OrdersPage.viewOrder.bind(OrdersPage),
+            deleteOrder: OrdersPage.deleteOrder.bind(OrdersPage),
+            printOrder: OrdersPage.printOrder.bind(OrdersPage),
+            showPaymentHistory: OrdersPage.showPaymentHistory.bind(OrdersPage),
+        };
     }
 
 })();
 
-// ==================== 管理员修改订单（问题3） ====================
-// 仅管理员可用。解锁订单 → 展示全字段编辑表单 → 保存后自动重新锁定。
-(function () {
+// ==================== 独立的管理员修改订单模块（确保函数存在且可靠） ====================
+(function() {
+    // 确保 JF 命名空间存在
     if (!window.JF) window.JF = {};
 
+    // 定义管理员编辑订单对象
     const AdminEditOrder = {
-
+        /**
+         * 管理员编辑订单 - 解锁订单并显示编辑表单
+         * @param {string} orderId 订单号
+         */
         async adminEditOrder(orderId) {
-            if (!PERMISSION.isAdmin()) { Utils.toast.error('仅管理员可修改订单'); return; }
+            if (!PERMISSION.isAdmin()) {
+                Utils.toast.error(Utils.lang === 'id' ? 'Hanya administrator yang dapat mengedit pesanan' : '仅管理员可修改订单');
+                return;
+            }
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
             try {
                 const order = await SUPABASE.getOrder(orderId);
                 if (!order) throw new Error('订单不存在');
 
-                // 解锁订单，允许修改
+                // 解锁订单
                 await SUPABASE.unlockOrder(orderId);
 
                 const today = Utils.getLocalToday();
@@ -873,7 +888,7 @@
                     <div class="page-header">
                         <h2>✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'} — ${Utils.escapeHtml(orderId)}</h2>
                         <div class="header-actions">
-                            <button onclick="APP.adminCancelEdit('${Utils.escapeAttr(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
+                            <button onclick="JF.AdminEditOrder.adminCancelEdit('${Utils.escapeHtml(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
                         </div>
                     </div>
                     <div class="card">
@@ -951,10 +966,10 @@
                             </div>
                         </div>
                         <div class="form-actions">
-                            <button onclick="APP.adminSaveOrder('${Utils.escapeAttr(orderId)}')" class="btn btn--success" id="adminSaveBtn">
+                            <button onclick="JF.AdminEditOrder.adminSaveOrder('${Utils.escapeHtml(orderId)}')" class="btn btn--success" id="adminSaveBtn">
                                 💾 ${lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'}
                             </button>
-                            <button onclick="APP.adminCancelEdit('${Utils.escapeAttr(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
+                            <button onclick="JF.AdminEditOrder.adminCancelEdit('${Utils.escapeHtml(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
                         </div>
                     </div>`;
 
@@ -971,10 +986,16 @@
         },
 
         async adminSaveOrder(orderId) {
-            if (!PERMISSION.isAdmin()) { Utils.toast.error('仅管理员可修改订单'); return; }
+            if (!PERMISSION.isAdmin()) {
+                Utils.toast.error(Utils.lang === 'id' ? 'Hanya administrator yang dapat menyimpan perubahan' : '仅管理员可保存修改');
+                return;
+            }
             const lang = Utils.lang;
             const saveBtn = document.getElementById('adminSaveBtn');
-            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...'); }
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
+            }
 
             try {
                 const loanAmount    = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount')?.value) || 0;
@@ -1004,7 +1025,7 @@
                 }
 
                 const agreedRate = interestRate / 100;
-                const remainingPrincipal = loanAmount; // 保持原逻辑，管理员修改贷款金额后重新计算
+                const remainingPrincipal = loanAmount; // 管理员修改贷款金额后重新计算
                 const monthlyInterest = remainingPrincipal * agreedRate;
 
                 const updates = {
@@ -1045,23 +1066,24 @@
             } catch (error) {
                 console.error('adminSaveOrder error:', error);
                 Utils.toast.error(error.message || (lang === 'id' ? 'Gagal menyimpan' : '保存失败'));
-                // 保存失败时尝试重新锁定，避免订单长时间处于解锁状态
                 try { await SUPABASE.relockOrder(orderId); } catch(e) {}
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); }
             }
         },
 
         async adminCancelEdit(orderId) {
-            // 取消时重新锁定订单，恢复原状
             try { await SUPABASE.relockOrder(orderId); } catch(e) {}
             await JF.OrdersPage.viewOrder(orderId);
         }
     };
 
-    // 挂载到 APP
-    if (window.APP) {
-        window.APP.adminEditOrder  = AdminEditOrder.adminEditOrder.bind(AdminEditOrder);
-        window.APP.adminSaveOrder  = AdminEditOrder.adminSaveOrder.bind(AdminEditOrder);
-        window.APP.adminCancelEdit = AdminEditOrder.adminCancelEdit.bind(AdminEditOrder);
-    }
+    // 挂载到 JF 命名空间（全局可访问）
+    JF.AdminEditOrder = AdminEditOrder;
+
+    // 同时挂载到 APP 以兼容旧的调用方式
+    if (!window.APP) window.APP = {};
+    window.APP.adminEditOrder  = AdminEditOrder.adminEditOrder.bind(AdminEditOrder);
+    window.APP.adminSaveOrder  = AdminEditOrder.adminSaveOrder.bind(AdminEditOrder);
+    window.APP.adminCancelEdit = AdminEditOrder.adminCancelEdit.bind(AdminEditOrder);
+
 })();
