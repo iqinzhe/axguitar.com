@@ -228,43 +228,43 @@
         _bindRowClickEvents() {
             const state = window._orderTableState;
             if (!state) return;
-            
+
             const rows = document.querySelectorAll('#orderTableBody .order-row');
-            const selectedDisplay = document.getElementById('selectedOrderDisplay');
-            const lang = Utils.lang;
-            
+
             // 先移除所有现有事件监听，避免重复绑定
             rows.forEach(row => {
-                const oldHandler = row._clickHandler;
-                if (oldHandler) {
-                    row.removeEventListener('click', oldHandler);
+                if (row._clickHandler) {
+                    row.removeEventListener('click', row._clickHandler);
+                    row._clickHandler = null;
                 }
             });
-            
-            // 重新绑定
+
+            // 重新绑定：每次点击时实时查找 selectedOrderDisplay，避免旧引用失效
             rows.forEach(row => {
                 const handler = (e) => {
-                    // 如果点击的是按钮或按钮内部元素，不触发选中
                     if (e.target.closest('button')) return;
-                    
-                    e.stopPropagation();
+
                     const orderId = row.dataset.orderId;
                     const orderStatus = row.dataset.orderStatus;
-                    
+
                     // 移除所有行的选中样式
-                    rows.forEach(r => r.classList.remove('row-selected'));
-                    
+                    document.querySelectorAll('#orderTableBody .order-row')
+                        .forEach(r => r.classList.remove('row-selected'));
+
                     // 添加当前行的选中样式
                     row.classList.add('row-selected');
-                    
+
                     // 更新状态
                     state.selectedOrderId = orderId;
                     state.selectedOrderStatus = orderStatus;
-                    
-                    // 更新显示
-                    if (selectedDisplay) {
-                        selectedDisplay.innerHTML = `${lang === 'id' ? '✅ Terpilih' : '✅ 已选中'}: ${Utils.escapeHtml(orderId)}`;
-                        selectedDisplay.style.color = 'var(--success-dark)';
+
+                    // 每次点击时实时查找元素，避免 sticky DOM 时序问题
+                    const display = document.getElementById('selectedOrderDisplay');
+                    const lang = Utils.lang;
+                    if (display) {
+                        display.textContent = (lang === 'id' ? '✅ Terpilih: ' : '✅ 已选中: ') + orderId;
+                        display.style.color = 'var(--success-dark)';
+                        display.style.background = 'var(--success-soft, #d1fae5)';
                     }
                 };
                 row.addEventListener('click', handler);
@@ -276,17 +276,18 @@
         _clearSelection() {
             const state = window._orderTableState;
             if (!state) return;
-            
-            const rows = document.querySelectorAll('#orderTableBody .order-row');
-            rows.forEach(r => r.classList.remove('row-selected'));
+
+            document.querySelectorAll('#orderTableBody .order-row')
+                .forEach(r => r.classList.remove('row-selected'));
             state.selectedOrderId = null;
             state.selectedOrderStatus = null;
-            
-            const selectedDisplay = document.getElementById('selectedOrderDisplay');
-            if (selectedDisplay) {
+
+            const display = document.getElementById('selectedOrderDisplay');
+            if (display) {
                 const lang = Utils.lang;
-                selectedDisplay.innerHTML = lang === 'id' ? '未选择任何订单' : '未选择任何订单';
-                selectedDisplay.style.color = 'var(--primary)';
+                display.textContent = lang === 'id' ? '未选择任何订单' : '未选择任何订单';
+                display.style.color = 'var(--primary)';
+                display.style.background = '';
             }
         },
 
@@ -530,11 +531,13 @@
             const filters = { status: APP.currentFilter || 'all' };
             const contentHTML = await this.buildOrderTableHTML(filters, 0, 50);
             document.getElementById("app").innerHTML = contentHTML;
-            // 绑定行点击事件和全局按钮事件（延迟执行确保DOM已渲染）
-            setTimeout(() => {
-                this._bindRowClickEvents();
-                this._initGlobalButtons();
-            }, 100);
+            // 双重确保 DOM 完全渲染后再绑定事件
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this._bindRowClickEvents();
+                    this._initGlobalButtons();
+                });
+            });
         },
 
         async loadMoreOrders() {
