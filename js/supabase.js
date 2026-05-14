@@ -1,4 +1,4 @@
-// supabase.js - v2.0 (客户ID重用 + 原有全部功能)
+// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费)
 
 'use strict';
 
@@ -1033,9 +1033,6 @@
             const nowDateTime = orderData.custom_order_date
                 ? orderData.custom_order_date + 'T00:00:00.000Z'
                 : nowStr();
-            // [修复] 原写法 orderData.admin_fee || calculateAdminFee(...)：
-            // 当用户手动设为 0（免除管理费）时，0 是 falsy，会被||右侧的理论计算值覆盖，
-            // 导致免除的费用在保存后变成理论值。改为严格判断 null/undefined。
             const adminFee = (orderData.admin_fee !== undefined && orderData.admin_fee !== null)
                 ? orderData.admin_fee
                 : Utils.calculateAdminFee(orderData.loan_amount);
@@ -1112,8 +1109,6 @@
         async recordAdminFee(orderId, paymentMethod, adminFeeAmount) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
-            // [Bug4修复] 原来缺少幂等检查，重复调用会在 payment_history 和 cash_flow_records
-            // 产生重复记录导致财务虚增。对齐 recordServiceFee 的防重设计。
             if (order.admin_fee_paid) {
                 console.warn(`[recordAdminFee] 订单 ${orderId} 管理费已记录，跳过重复写入`);
                 return true;
@@ -1168,12 +1163,20 @@
             return true;
         },
 
+        // ==================== 利息收款（增加 liquidated 拦截） ====================
         async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null, paymentDate=null) {
             if(paymentMethod===undefined) paymentMethod='cash';
-            // [问题1修复] paymentDate 支持补录历史日期，为空时回退到今天
             const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
+            
+            // ========== 新增：拦截已变卖订单 ==========
+            if (currentOrder.status === 'liquidated') {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
+                    : '抵押物已变卖，无法继续收款。');
+            }
+            
             if(currentOrder.status==='completed') throw new Error(Utils.t('order_completed'));
 
             try {
@@ -1195,9 +1198,6 @@
                 const newPaidTotal = (currentOrder.interest_paid_total||0) + interestToRecord;
                 const newShortfall = (currentOrder.interest_shortfall||0) + shortfallToTrack;
                 const maxMonths = currentOrder.max_extension_months || 10;
-                // [Bug2修复] 原条件 newPaidMonths>maxMonths && newShortfall>0：
-                // 当足额还款(shortfall=0)时条件永不成立，可无限续期。
-                // 修复：只要 newPaidMonths>maxMonths 就拒绝，无论是否欠款。
                 if (newPaidMonths > maxMonths) {
                     throw new Error(Utils.lang==='id'?`❌ Mencapai batas maksimum perpanjangan (${maxMonths} bulan)`:`❌ 已达到最大延期期限 (${maxMonths}个月)`);
                 }
@@ -1279,10 +1279,19 @@
             }
         },
 
+        // ==================== 本金收款（增加 liquidated 拦截） ====================
         async recordPrincipalPayment(orderId, amount, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
+            
+            // ========== 新增：拦截已变卖订单 ==========
+            if (currentOrder.status === 'liquidated') {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
+                    : '抵押物已变卖，无法继续收款。');
+            }
+            
             if(currentOrder.status==='completed') throw new Error(Utils.t('order_completed'));
             const remaining = (currentOrder.loan_amount||0) - (currentOrder.principal_paid||0);
             if(remaining<=0) throw new Error(Utils.lang==='id'?'Pokok sudah lunas':'本金已结清');
@@ -1291,7 +1300,6 @@
             const newPaid = (currentOrder.principal_paid||0) + paid;
             const newRemaining = (currentOrder.loan_amount||0) - newPaid;
             const monthlyRate = currentOrder.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
-            // [Bug3修复] 结清本金前，若存在累计利息欠款，必须先补缴，否则欠款随订单完结而消失。
             const isFull = newRemaining <= 0;
             if (isFull) {
                 const shortfall = currentOrder.interest_shortfall || 0;
@@ -1329,10 +1337,19 @@
             return true;
         },
 
+        // ==================== 固定还款（增加 liquidated 拦截） ====================
         async recordFixedPayment(orderId, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
+            
+            // ========== 新增：拦截已变卖订单 ==========
+            if (order.status === 'liquidated') {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
+                    : '抵押物已变卖，无法继续收款。');
+            }
+            
             if(order.status==='completed') throw new Error(Utils.t('order_completed'));
             if(order.repayment_type!=='fixed') throw new Error(Utils.lang==='id'?'Bukan cicilan tetap':'不是固定还款');
             const fixedPayment = order.monthly_fixed_payment;
@@ -1391,13 +1408,21 @@
             return true;
         },
 
+        // ==================== 提前结清（增加 liquidated 拦截） ====================
         async earlySettleFixedOrder(orderId, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
+            
+            // ========== 新增：拦截已变卖订单 ==========
+            if (order.status === 'liquidated') {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
+                    : '抵押物已变卖，无法继续收款。');
+            }
+            
             if(order.status==='completed') throw new Error(Utils.t('order_completed'));
             if(order.repayment_type!=='fixed') throw new Error(Utils.lang==='id'?'Bukan cicilan tetap':'不是固定还款');
-            // [Bug3修复] 提前结清前检查累计利息欠款，防止欠款随订单完结自动消失。
             const shortfall = order.interest_shortfall || 0;
             if (shortfall > 0) {
                 throw new Error(Utils.lang === 'id'
