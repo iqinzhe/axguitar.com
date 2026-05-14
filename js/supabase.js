@@ -1118,7 +1118,17 @@
                 return true;
             }
             const profile = await this.getCurrentProfile();
-            const feeAmount = adminFeeAmount || order.admin_fee;
+            const feeAmount = (adminFeeAmount !== undefined && adminFeeAmount !== null) ? adminFeeAmount : order.admin_fee;
+            // [修复] 管理费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
+            if (!feeAmount || feeAmount <= 0) {
+                const { error: e0 } = await supabaseClient.from('orders').update({
+                    admin_fee_paid: true, admin_fee_paid_date: todayStr(),
+                    admin_fee: 0, updated_at: nowStr()
+                }).eq('order_id', orderId);
+                if(e0) throw e0;
+                console.info(`[recordAdminFee] 订单 ${orderId} 管理费为0，仅标记已缴，不写流水`);
+                return true;
+            }
             const { error: e1 } = await supabaseClient.from('orders').update({
                 admin_fee_paid: true, admin_fee_paid_date: todayStr(),
                 admin_fee: feeAmount, updated_at: nowStr()
@@ -1143,10 +1153,19 @@
         async recordServiceFee(orderId, months, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
-            if(order.service_fee_percent<=0 && order.service_fee_amount<=0) return true;
+            // [修复] 服务费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
+            if(order.service_fee_percent<=0 && order.service_fee_amount<=0) {
+                await supabaseClient.from('orders').update({ service_fee_paid: 0, updated_at: nowStr() }).eq('order_id', orderId);
+                console.info(`[recordServiceFee] 订单 ${orderId} 服务费为0，仅标记，不写流水`);
+                return true;
+            }
             if(order.service_fee_paid>0) return true;
             const totalServiceFee = order.service_fee_amount || 0;
-            if(totalServiceFee<=0) return true;
+            if(totalServiceFee<=0) {
+                await supabaseClient.from('orders').update({ service_fee_paid: 0, updated_at: nowStr() }).eq('order_id', orderId);
+                console.info(`[recordServiceFee] 订单 ${orderId} 服务费金额为0，仅标记，不写流水`);
+                return true;
+            }
             const { error: e1 } = await supabaseClient.from('orders').update({
                 service_fee_paid: totalServiceFee, updated_at: nowStr()
             }).eq('order_id', orderId);
@@ -1164,6 +1183,65 @@
                 reference_id: order.order_id
             });
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'service_fee', totalServiceFee, paymentMethod);
+            return true;
+        },
+
+        // [新增] 管理员修改订单后，同步管理费和服务费的 payment_history 和 cash_flow_records
+        // 原则：锁定订单里的金额和已缴状态是合同基准，修改后必须与流水保持一致
+        async syncFeesAfterAdminEdit(orderId, newAdminFee, newAdminFeePaid, newServiceFeeAmount, orderDate) {
+            const order = await this.getOrder(orderId);
+            const profile = await this.getCurrentProfile();
+            const feeDate = (orderDate || (order.created_at || '').substring(0, 10) || todayStr());
+
+            // ---- 管理费同步 ----
+            // 先作废/删除所有旧的 admin_fee 流水记录
+            await supabaseClient.from('payment_history')
+                .delete().eq('order_id', order.id).eq('type', 'admin_fee');
+            await supabaseClient.from('cash_flow_records')
+                .delete().eq('order_id', order.id).eq('flow_type', 'admin_fee');
+
+            // 若已缴且金额>0，重新写入正确的记录
+            if (newAdminFeePaid && newAdminFee > 0) {
+                await supabaseClient.from('payment_history').insert({
+                    order_id: order.id, date: feeDate, type: 'admin_fee',
+                    amount: newAdminFee, description: Utils.t('admin_fee') + ' (管理员补录)',
+                    recorded_by: profile.id, payment_method: 'cash'
+                });
+                await this.recordCashFlow({
+                    store_id: order.store_id, flow_type: 'admin_fee', direction: 'inflow',
+                    amount: newAdminFee, source_target: 'cash', order_id: order.id,
+                    customer_id: order.customer_id,
+                    description: Utils.t('admin_fee') + ' (管理员补录) - ' + order.order_id,
+                    reference_id: order.order_id, flow_date: feeDate
+                });
+            }
+            // 若金额为0或未缴，不写流水（这正是本次修复的核心）
+
+            // ---- 服务费同步 ----
+            await supabaseClient.from('payment_history')
+                .delete().eq('order_id', order.id).eq('type', 'service_fee');
+            await supabaseClient.from('cash_flow_records')
+                .delete().eq('order_id', order.id).eq('flow_type', 'service_fee');
+
+            if (newServiceFeeAmount > 0) {
+                const sfPaid = order.service_fee_paid || 0;
+                if (sfPaid >= newServiceFeeAmount) {
+                    await supabaseClient.from('payment_history').insert({
+                        order_id: order.id, date: feeDate, type: 'service_fee',
+                        months: 1, amount: newServiceFeeAmount,
+                        description: Utils.t('service_fee') + ' (管理员补录)',
+                        recorded_by: profile.id, payment_method: 'cash'
+                    });
+                    await this.recordCashFlow({
+                        store_id: order.store_id, flow_type: 'service_fee', direction: 'inflow',
+                        amount: newServiceFeeAmount, source_target: 'cash', order_id: order.id,
+                        customer_id: order.customer_id,
+                        description: Utils.t('service_fee') + ' (管理员补录) - ' + order.order_id,
+                        reference_id: order.order_id, flow_date: feeDate
+                    });
+                }
+            }
+            // 服务费为0：不写流水
             return true;
         },
 
