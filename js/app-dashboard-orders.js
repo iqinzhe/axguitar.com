@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.1 (JF 命名空间) 
+// app-dashboard-orders.js - v2.0 (JF 命名空间) 
 // 新增：行点击选中高亮 + 顶部操作栏（单选模式）
 
 'use strict';
