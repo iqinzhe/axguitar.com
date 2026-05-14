@@ -1,5 +1,7 @@
-// app-dashboard-orders.js - v2.5 (兼容旧浏览器，移除可选链，修复订单列表选中及操作按钮失效)
-// 功能：订单选中高亮 + 顶部固定操作栏（含筛选+统计+操作按钮）+ 门店账户缴纳费用按钮
+// app-dashboard-orders.js - v3.2 (完整版，五状态筛选 + 权限控制 + 所有功能完整)
+// 功能：订单列表支持 全部/进行中/已逾期/已结清/已变卖 筛选
+//       不同状态下顶部操作栏按钮动态可用，逾期高亮，门店默认显示进行中
+//       包含完整的打印、缴费历史、管理员修改订单等全部功能
 
 'use strict';
 
@@ -26,11 +28,14 @@
             var from = currentFrom || 0;
             var to = from + PAGE_SIZE - 1;
 
-            var _this = this;
             var _a = await Promise.all([
                 this._fetchOrderData(filters, from, to),
                 SUPABASE.getAllStores()
-            ]), _b = _a[0], ordersResult = _b.orders, totalCount = _b.totalCount, stores = _a[1];
+            ]);
+            var ordersResult = _a[0].orders;
+            var totalCount = _a[0].totalCount;
+            var stores = _a[1];
+
             var allOrders = ordersResult;
             var currentFromVal = from + allOrders.length;
             var storeMap = {};
@@ -45,11 +50,15 @@
                 completed: t('status_completed'),
                 liquidated: t('status_liquidated')
             };
+            var overdueText = lang === 'id' ? 'Terlambat' : '已逾期';
 
             var rows = '';
             for (var idx = 0; idx < allOrders.length; idx++) {
                 var o = allOrders[idx];
-                var sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
+                var isOverdue = (o.status === 'active' && (o.overdue_days || 0) > 0);
+                var displayStatus = o.status;
+                if (isOverdue) displayStatus = 'overdue';
+                var statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
                 var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
                 var nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
@@ -57,7 +66,10 @@
                 var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
 
-                rows += '<tr class="order-row" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '">' +
+                var rowClass = 'order-row';
+                if (isOverdue) rowClass += ' order-row--overdue';
+
+                rows += '<tr class="' + rowClass + '" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '" data-is-overdue="' + isOverdue + '">' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
                     '<td class="col-name">' + Utils.escapeHtml(o.customer_name) + '</td>' +
                     '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
@@ -66,7 +78,7 @@
                     '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                     '<td class="date-cell text-center">' + nextDueDate + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
-                    '<td class="text-center"><span class="badge badge--' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
+                    '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
             }
@@ -74,7 +86,7 @@
             var loadMoreHtml = '';
             if (currentFromVal < totalCount) {
                 var remaining = totalCount - currentFromVal;
-                loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;"><button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')</button></td></tr>';
+                loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;"><button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')</button> Nosmoking Nosmoking</td></tr>';
             } else if (totalCount > PAGE_SIZE && allOrders.length > 0) {
                 loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;color:var(--text-muted);">✅ ' + (lang === 'id' ? 'Semua ' + totalCount + ' pesanan telah dimuat' : '已加载全部 ' + totalCount + ' 条订单') + '</td></tr>';
             }
@@ -92,17 +104,21 @@
                 renderOrdersIntoTable: this._renderOrdersIntoTable.bind(this)
             };
 
-            var actionButtonsHtml = '';
-            if (!isAdmin) {
-                actionButtonsHtml = '<button id="globalPayBtn" class="btn btn--sm btn--success">💰 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>' +
-                    '<button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ' + t('view_detail') + '</button>' +
-                    '<button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ' + t('print_this_order') + '</button>';
-            } else {
-                actionButtonsHtml = '<button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ' + t('view_detail') + '</button>' +
-                    '<button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ' + t('print_this_order') + '</button>' +
-                    '<button id="globalEditBtn" class="btn btn--sm btn--warning">✏️ ' + (lang === 'id' ? 'Edit Pesanan' : '修改订单') + '</button>' +
-                    '<button id="globalDeleteBtn" class="btn btn--sm btn--danger">🗑️ ' + t('delete') + '</button>';
+            // 筛选下拉选项
+            var filterOptions = [
+                { value: 'all', label: lang === 'id' ? 'Semua Pesanan' : '全部订单' },
+                { value: 'active', label: t('active') },
+                { value: 'overdue', label: lang === 'id' ? 'Terlambat' : '已逾期' },
+                { value: 'completed', label: t('completed') },
+                { value: 'liquidated', label: lang === 'id' ? 'Dijual' : '已变卖' }
+            ];
+            var filterSelectHtml = '<select id="statusFilter" onchange="APP.filterOrders(this.value)" class="status-filter-select">';
+            for (var fi = 0; fi < filterOptions.length; fi++) {
+                var opt = filterOptions[fi];
+                var selected = (filters.status === opt.value) ? ' selected' : '';
+                filterSelectHtml += '<option value="' + opt.value + '"' + selected + '>' + opt.label + '</option>';
             }
+            filterSelectHtml += '</select>';
 
             var content = '' +
                 '<div class="page-header">' +
@@ -118,11 +134,7 @@
                 '<span class="action-label-text">' + (lang === 'id' ? 'Operasi' : '操作') + ':</span>' +
                 '<span class="action-bar-divider"></span>' +
                 '<div class="action-bar-section action-bar-section--filter">' +
-                '<select id="statusFilter" onchange="APP.filterOrders(this.value)" class="status-filter-select">' +
-                '<option value="all"' + (filters.status === 'all' ? ' selected' : '') + '>' + (lang === 'id' ? 'Semua Pesanan' : '全部订单') + '</option>' +
-                '<option value="active"' + (filters.status === 'active' ? ' selected' : '') + '>' + t('active') + '</option>' +
-                '<option value="completed"' + (filters.status === 'completed' ? ' selected' : '') + '>' + t('completed') + '</option>' +
-                '</select>' +
+                filterSelectHtml +
                 '<span id="selectedOrderDisplay" class="selected-order-display">' + (lang === 'id' ? '未选择任何订单' : '未选择任何订单') + '</span>' +
                 '</div>' +
                 '<span class="action-bar-divider"></span>' +
@@ -176,19 +188,25 @@
             var storeMap = state.storeMap || {};
             var totalCols = state.totalCols;
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            var overdueText = lang === 'id' ? 'Terlambat' : '已逾期';
 
             var rows = '';
             for (var i = 0; i < orders.length; i++) {
                 var o = orders[i];
-                var sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated');
+                var isOverdue = (o.status === 'active' && (o.overdue_days || 0) > 0);
+                var displayStatus = o.status;
+                if (isOverdue) displayStatus = 'overdue';
+                var statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
                 var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
                 var nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
                 var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                 var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
+                var rowClass = 'order-row';
+                if (isOverdue) rowClass += ' order-row--overdue';
 
-                rows += '<tr class="order-row" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '">' +
+                rows += '<tr class="' + rowClass + '" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '" data-is-overdue="' + isOverdue + '">' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
                     '<td class="col-name">' + Utils.escapeHtml(o.customer_name) + '</td>' +
                     '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
@@ -197,7 +215,7 @@
                     '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                     '<td class="date-cell text-center">' + nextDueDate + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
-                    '<td class="text-center"><span class="badge badge--' + sc + '">' + (statusMap[o.status] || o.status) + '</span></td>' +
+                    '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
             }
@@ -211,37 +229,32 @@
             }
         },
 
+        // ==================== 事件委托：行点击选中 ====================
         _bindRowClickDelegate: function() {
             var tbody = document.getElementById('orderTableBody');
             if (!tbody) return;
-
             if (tbody._rowClickHandler) {
                 tbody.removeEventListener('click', tbody._rowClickHandler);
             }
-
             var self = this;
             var handler = function(e) {
                 var row = e.target.closest('.order-row');
                 if (!row) return;
                 if (e.target.closest('button')) return;
-
                 var orderId = row.dataset.orderId;
                 var orderStatus = row.dataset.orderStatus;
                 if (!orderId) return;
-
                 var allRows = document.querySelectorAll('#orderTableBody .order-row');
                 for (var i = 0; i < allRows.length; i++) {
                     allRows[i].classList.remove('row-selected');
                 }
                 row.classList.add('row-selected');
-
                 if (window._orderTableState) {
                     window._orderTableState.selectedOrderId = orderId;
                     window._orderTableState.selectedOrderStatus = orderStatus;
                 } else {
                     window._orderTableState = { selectedOrderId: orderId, selectedOrderStatus: orderStatus };
                 }
-
                 self._updateSelectedDisplay();
             };
             tbody.addEventListener('click', handler);
@@ -251,72 +264,82 @@
         _updateSelectedDisplay: function() {
             var displaySpan = document.getElementById('selectedOrderDisplay');
             if (!displaySpan) return;
-            var state = window._orderTableState;
+            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
             var lang = Utils.lang;
-            if (state && state.selectedOrderId) {
-                displaySpan.textContent = (lang === 'id' ? '✅ Terpilih: ' : '✅ 已选中: ') + state.selectedOrderId;
+            if (selectedRow && selectedRow.dataset.orderId) {
+                var orderId = selectedRow.dataset.orderId;
+                displaySpan.textContent = (lang === 'id' ? '✅ Terpilih: ' : '✅ 已选中: ') + orderId;
                 displaySpan.style.color = 'var(--success-dark)';
                 displaySpan.style.background = 'var(--success-soft, #d1fae5)';
+                if (window._orderTableState) {
+                    window._orderTableState.selectedOrderId = orderId;
+                    window._orderTableState.selectedOrderStatus = selectedRow.dataset.orderStatus;
+                }
             } else {
                 displaySpan.textContent = lang === 'id' ? '未选择任何订单' : '未选择任何订单';
                 displaySpan.style.color = 'var(--primary)';
                 displaySpan.style.background = '';
+                if (window._orderTableState) {
+                    window._orderTableState.selectedOrderId = null;
+                    window._orderTableState.selectedOrderStatus = null;
+                }
             }
         },
 
         _clearSelection: function() {
+            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            if (selectedRow) selectedRow.classList.remove('row-selected');
             if (window._orderTableState) {
                 window._orderTableState.selectedOrderId = null;
                 window._orderTableState.selectedOrderStatus = null;
             }
-            var allRows = document.querySelectorAll('#orderTableBody .order-row');
-            for (var i = 0; i < allRows.length; i++) {
-                allRows[i].classList.remove('row-selected');
-            }
             this._updateSelectedDisplay();
         },
 
-        _bindGlobalEvents: function() {
-            var viewBtn = document.getElementById('globalViewBtn');
-            var printBtn = document.getElementById('globalPrintBtn');
-            var payBtn = document.getElementById('globalPayBtn');
-            var editBtn = document.getElementById('globalEditBtn');
-            var deleteBtn = document.getElementById('globalDeleteBtn');
-
-            if (viewBtn) viewBtn.onclick = this._globalViewOrder.bind(this);
-            if (printBtn) printBtn.onclick = this._globalPrintOrder.bind(this);
-            if (payBtn) payBtn.onclick = this._globalPayOrder.bind(this);
-            if (editBtn) editBtn.onclick = this._globalEditOrder.bind(this);
-            if (deleteBtn) deleteBtn.onclick = this._globalDeleteOrder.bind(this);
-        },
-
         _getSelectedOrderId: function() {
+            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            if (selectedRow && selectedRow.dataset.orderId) return selectedRow.dataset.orderId;
             var state = window._orderTableState;
             return state ? state.selectedOrderId : null;
         },
 
         _getSelectedOrderStatus: function() {
+            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            if (selectedRow && selectedRow.dataset.orderStatus) return selectedRow.dataset.orderStatus;
             var state = window._orderTableState;
             return state ? state.selectedOrderStatus : null;
         },
 
+        _getSelectedIsOverdue: function() {
+            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            if (selectedRow && selectedRow.dataset.isOverdue) return selectedRow.dataset.isOverdue === 'true';
+            return false;
+        },
+
+        _canEditOrder: function(status, isAdmin) {
+            return (isAdmin && status === 'active');
+        },
+
+        _canDeleteOrder: function(status, isAdmin) {
+            return (isAdmin && status === 'active');
+        },
+
+        _canPayOrder: function(status, isAdmin) {
+            return (status === 'active');
+        },
+
+        // ==================== 全局操作实现 ====================
         _globalViewOrder: async function() {
             var lang = Utils.lang;
             var orderId = this._getSelectedOrderId();
-            if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? '请先点击选中一个订单' : '请先点击选中一个订单');
-                return;
-            }
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先点击选中一个订单' : '请先点击选中一个订单'); return; }
             await this.viewOrder(orderId);
         },
 
         _globalPrintOrder: async function() {
             var lang = Utils.lang;
             var orderId = this._getSelectedOrderId();
-            if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单');
-                return;
-            }
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
             await this.printOrder(orderId);
         },
 
@@ -324,13 +347,16 @@
             var lang = Utils.lang;
             var orderId = this._getSelectedOrderId();
             var orderStatus = this._getSelectedOrderStatus();
-            if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单');
-                return;
-            }
-            if (orderStatus !== 'active') {
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
+            if (!this._canPayOrder(orderStatus, PERMISSION.isAdmin())) {
                 Utils.toast.warning(lang === 'id' ? '只有进行中的订单可以缴费' : '只有进行中的订单可以缴费');
                 return;
+            }
+            var isOverdue = this._getSelectedIsOverdue();
+            if (isOverdue) {
+                var confirmMsg = lang === 'id' ? '⚠️ 订单已逾期，缴费将补缴逾期利息。是否继续？' : '⚠️ 订单已逾期，缴费将补缴逾期利息。是否继续？';
+                var ok = await Utils.toast.confirm(confirmMsg);
+                if (!ok) return;
             }
             await this.payOrder(orderId);
         },
@@ -338,13 +364,12 @@
         _globalEditOrder: async function() {
             var lang = Utils.lang;
             var isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单');
-                return;
-            }
+            if (!isAdmin) { Utils.toast.warning(lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单'); return; }
             var orderId = this._getSelectedOrderId();
-            if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单');
+            var orderStatus = this._getSelectedOrderStatus();
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
+            if (!this._canEditOrder(orderStatus, true)) {
+                Utils.toast.warning(lang === 'id' ? '只有进行中的订单可以修改' : '只有进行中的订单可以修改');
                 return;
             }
             if (JF.AdminEditOrder && JF.AdminEditOrder.adminEditOrder) {
@@ -357,26 +382,45 @@
         _globalDeleteOrder: async function() {
             var lang = Utils.lang;
             var isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? '仅管理员可删除订单' : '仅管理员可删除订单');
-                return;
-            }
+            if (!isAdmin) { Utils.toast.warning(lang === 'id' ? '仅管理员可删除订单' : '仅管理员可删除订单'); return; }
             var orderId = this._getSelectedOrderId();
-            if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单');
+            var orderStatus = this._getSelectedOrderStatus();
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
+            if (!this._canDeleteOrder(orderStatus, true)) {
+                Utils.toast.warning(lang === 'id' ? '只有进行中的订单可以删除' : '只有进行中的订单可以删除');
                 return;
             }
             await this.deleteOrder(orderId);
             this._clearSelection();
         },
 
+        _bindGlobalEvents: function() {
+            var viewBtn = document.getElementById('globalViewBtn');
+            var printBtn = document.getElementById('globalPrintBtn');
+            var payBtn = document.getElementById('globalPayBtn');
+            var editBtn = document.getElementById('globalEditBtn');
+            var deleteBtn = document.getElementById('globalDeleteBtn');
+            if (viewBtn) viewBtn.onclick = this._globalViewOrder.bind(this);
+            if (printBtn) printBtn.onclick = this._globalPrintOrder.bind(this);
+            if (payBtn) payBtn.onclick = this._globalPayOrder.bind(this);
+            if (editBtn) editBtn.onclick = this._globalEditOrder.bind(this);
+            if (deleteBtn) deleteBtn.onclick = this._globalDeleteOrder.bind(this);
+        },
+
+        // ==================== 页面渲染入口 ====================
         showOrderTable: async function() {
             APP.currentPage = 'orderTable';
             APP.saveCurrentPageState();
-            var filters = { status: APP.currentFilter || 'all' };
+            var isAdmin = PERMISSION.isAdmin();
+            var defaultStatus = isAdmin ? 'all' : 'active';
+            var currentStatus = APP.currentFilter || defaultStatus;
+            if (!isAdmin && currentStatus !== 'active') {
+                currentStatus = 'active';
+                APP.currentFilter = currentStatus;
+            }
+            var filters = { status: currentStatus };
             var contentHTML = await this.buildOrderTableHTML(filters, 0, 50);
             document.getElementById("app").innerHTML = contentHTML;
-
             var self = this;
             setTimeout(function() {
                 self._bindRowClickDelegate();
@@ -394,7 +438,6 @@
                 loadMoreBtn.disabled = true;
                 loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? '加载中...' : '加载中...');
             }
-
             try {
                 var result = await this._fetchOrderData(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
                 var orders = result.orders;
@@ -402,7 +445,6 @@
                 state.allOrders = state.allOrders.concat(orders);
                 state.currentFrom += orders.length;
                 state.totalCount = totalCount;
-
                 this._renderOrdersIntoTable(orders, true);
                 this._updateLoadMoreRow();
             } catch (err) {
@@ -422,7 +464,6 @@
             if (!tbody) return;
             var existingRow = document.getElementById('loadMoreRow');
             if (existingRow) existingRow.remove();
-
             var lang = Utils.lang;
             if (state.currentFrom < state.totalCount) {
                 var remaining = state.totalCount - state.currentFrom;
@@ -452,7 +493,6 @@
             APP.currentPage = 'viewOrder';
             APP.currentOrderId = orderId;
             APP.saveCurrentPageState();
-
             try {
                 var contentHTML = await this.renderViewOrderHTML(orderId);
                 document.getElementById("app").innerHTML = contentHTML;
@@ -486,32 +526,18 @@
             try {
                 var result = await SUPABASE.getPaymentHistory(orderId);
                 var order = result.order;
-                if (!order) {
-                    Utils.toast.error(Utils.t('order_not_found'));
-                    return;
-                }
-
+                if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
                 var profile = await SUPABASE.getCurrentProfile();
                 var isAdmin = PERMISSION.isAdmin();
-
-                var storeName = '';
-                var roleText = '';
-                var userName = '';
-
+                var storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
                     roleText = AUTH.isAdmin() ? (lang === 'id' ? '管理员' : '管理员') :
                                AUTH.isStoreManager() ? (lang === 'id' ? '店长' : '店长') : 
                                (lang === 'id' ? '员工' : '员工');
                     userName = AUTH.user ? (AUTH.user.name || '-') : '-';
-                } catch (e) {
-                    storeName = '-';
-                    roleText = '-';
-                    userName = '-';
-                }
-
+                } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
                 var printDateTime = new Date().toLocaleString();
-
                 var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
                 var monthlyRate = order.agreed_interest_rate || 0.10;
                 var currentMonthlyInterest = remainingPrincipal * monthlyRate;
@@ -520,7 +546,6 @@
                                    (lang === 'id' ? '已变卖' : '已变卖');
                 var repaymentText = order.repayment_type === 'fixed' ? (lang === 'id' ? '固定还款' : '固定还款') :
                                      (lang === 'id' ? '灵活还款' : '灵活还款');
-
                 var labels = {
                     order_id: lang === 'id' ? '订单号' : '订单号',
                     customer_name: lang === 'id' ? '客户姓名' : '客户姓名',
@@ -532,7 +557,6 @@
                     monthly_interest: lang === 'id' ? '月利息' : '月利息',
                     remaining_principal: lang === 'id' ? '剩余本金' : '剩余本金'
                 };
-
                 var infoItems = [
                     { label: labels.order_id, value: order.order_id },
                     { label: labels.customer_name, value: order.customer_name },
@@ -544,14 +568,12 @@
                     { label: labels.monthly_interest, value: Utils.formatCurrency(currentMonthlyInterest) },
                     { label: labels.remaining_principal, value: Utils.formatCurrency(remainingPrincipal) }
                 ];
-
                 var orderInfoGrid = '<div class="order-info-grid">';
                 for (var i = 0; i < infoItems.length; i++) {
                     var item = infoItems[i];
                     orderInfoGrid += '<div class="info-item"><div class="label">' + Utils.escapeHtml(item.label) + '</div><div class="value">' + Utils.escapeHtml(item.value) + '</div></div>';
                 }
                 orderInfoGrid += '</div>';
-
                 var paymentRows = '';
                 if (result.payments && result.payments.length > 0) {
                     for (var pIdx = 0; pIdx < result.payments.length; pIdx++) {
@@ -570,85 +592,8 @@
                 } else {
                     paymentRows = '<tr><td colspan="5" class="text-center">' + (lang === 'id' ? '无' : '无') + '</td></tr>';
                 }
-
                 var printWindow = window.open('', '_blank');
-                printWindow.document.write('<!DOCTYPE html>\n' +
-                    '<html>\n' +
-                    '<head>\n' +
-                    '<meta charset="UTF-8">\n' +
-                    '<title>JF! by Gadai - ' + (lang === 'id' ? '打印订单' : '打印订单') + ' - ' + Utils.escapeHtml(order.order_id) + '</title>\n' +
-                    '<style>\n' +
-                    '* { box-sizing: border-box; margin: 0; padding: 0; }\n' +
-                    'body { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; padding: 0; margin: 0; }\n' +
-                    '.print-container { padding: 5mm; }\n' +
-                    '.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n' +
-                    '.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n' +
-                    '.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }\n' +
-                    '.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; white-space: nowrap; }\n' +
-                    '.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; }\n' +
-                    '.page-title { font-size: 14pt; font-weight: bold; margin: 12px 0; color: #1e293b; }\n' +
-                    '.order-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-bottom: 20px; }\n' +
-                    '.info-item { padding: 4px 0; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }\n' +
-                    '.info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }\n' +
-                    '.info-item .value { font-size: 10pt; font-weight: 500; color: #1e293b; }\n' +
-                    '.card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; break-inside: avoid; }\n' +
-                    '.card h3 { font-size: 10pt; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }\n' +
-                    'table { width: 100%; border-collapse: collapse; margin: 6px 0; }\n' +
-                    'th { background: #f1f5f9; font-weight: 600; text-align: left; }\n' +
-                    'th, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }\n' +
-                    '.text-right { text-align: right; }\n' +
-                    '.text-center { text-align: center; }\n' +
-                    '@media print {\n' +
-                    '@page { size: A4; margin: 0mm 8mm 8mm 8mm; }\n' +
-                    'body { margin: 0; padding: 0; }\n' +
-                    '.print-container { padding: 5mm 0 0 0; }\n' +
-                    '.card { break-inside: avoid; }\n' +
-                    '.info-item { break-inside: avoid; }\n' +
-                    '}\n' +
-                    '</style>\n' +
-                    '</head>\n' +
-                    '<body>\n' +
-                    '<div class="print-container">\n' +
-                    '<div class="print-header">\n' +
-                    '<div class="logo">\n' +
-                    '<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\n' +
-                    'JF! by Gadai\n' +
-                    '</div>\n' +
-                    '<div class="print-header-info">\n' +
-                    '🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) +
-                    ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime +
-                    '</div>\n' +
-                    '</div>\n' +
-                    '<h1 class="page-title">📄 ' + (lang === 'id' ? '订单详情' : '订单详情') + '</h1>\n' +
-                    '<div class="card">\n' +
-                    '<h3>📋 ' + (lang === 'id' ? '订单信息' : '订单信息') + '</h3>\n' +
-                    orderInfoGrid +
-                    '<h3>📋 ' + (lang === 'id' ? '缴费记录' : '缴费记录') + '</h3>\n' +
-                    '<table>\n' +
-                    '<thead>\n' +
-                    '<tr>\n' +
-                    '<th>' + t('date') + '</th>\n' +
-                    '<th>' + t('type') + '</th>\n' +
-                    '<th class="text-right">' + t('amount') + '</th>\n' +
-                    '<th>' + t('payment_method') + '</th>\n' +
-                    '<th>' + t('description') + '</th>\n' +
-                    '</tr>\n' +
-                    '</thead>\n' +
-                    '<tbody>' + paymentRows + '</tbody>\n' +
-                    '</table>\n' +
-                    '</div>\n' +
-                    '<div class="print-footer">\n' +
-                    'JF! by Gadai - ' + (lang === 'id' ? '典当管理系统' : '典当管理系统') +
-                    '</div>\n' +
-                    '</div>\n' +
-                    '<script>\n' +
-                    'window.onload = function() {\n' +
-                    'window.print();\n' +
-                    'setTimeout(function() { window.close(); }, 800);\n' +
-                    '};\n' +
-                    '<\/script>\n' +
-                    '</body>\n' +
-                    '</html>');
+                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? '打印订单' : '打印订单') + ' - ' + Utils.escapeHtml(order.order_id) + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; padding: 0; margin: 0; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; white-space: nowrap; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; }\n.page-title { font-size: 14pt; font-weight: bold; margin: 12px 0; color: #1e293b; }\n.order-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-bottom: 20px; }\n.info-item { padding: 4px 0; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }\n.info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }\n.info-item .value { font-size: 10pt; font-weight: 500; color: #1e293b; }\n.card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; break-inside: avoid; }\n.card h3 { font-size: 10pt; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }\ntable { width: 100%; border-collapse: collapse; margin: 6px 0; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; }\nth, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }\n.text-right { text-align: right; }\n.text-center { text-align: center; }\n@media print { @page { size: A4; margin: 0mm 8mm 8mm 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 5mm 0 0 0; } .card { break-inside: avoid; } .info-item { break-inside: avoid; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n<h1 class="page-title">📄 ' + (lang === 'id' ? '订单详情' : '订单详情') + '</h1>\n<div class="card">\n<h3>📋 ' + (lang === 'id' ? '订单信息' : '订单信息') + '</h3>\n' + orderInfoGrid + '\n<h3>📋 ' + (lang === 'id' ? '缴费记录' : '缴费记录') + '</h3>\n<table>\n<thead>\n<tr>\n<th>' + t('date') + '</th>\n<th>' + t('type') + '</th>\n<th class="text-right">' + t('amount') + '</th>\n<th>' + t('payment_method') + '</th>\n<th>' + t('description') + '</th>\n</tr>\n</thead>\n<tbody>' + paymentRows + '</tbody>\n</table>\n</div>\n<div class="print-footer">\nJF! by Gadai - ' + (lang === 'id' ? '典当管理系统' : '典当管理系统') + '\n</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
                 console.error("printOrder error:", error);
@@ -673,13 +618,12 @@
                 }
                 var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
                 var methodMap = { cash: t('cash'), bank: t('bank') };
-
                 var rows = '';
                 if (allPayments.length === 0) {
                     rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td></tr>';
                 } else {
-                    for (var idx2 = 0; idx2 < allPayments.length; idx2++) {
-                        var p2 = allPayments[idx2];
+                    for (var idx = 0; idx < allPayments.length; idx++) {
+                        var p2 = allPayments[idx];
                         var methodClass = p2.payment_method === 'cash' ? 'cash' : 'bank';
                         rows += '<tr>' +
                             '<td class="order-id">' + Utils.escapeHtml(p2.orders ? p2.orders.order_id : '-') + '</td>' +
@@ -693,7 +637,6 @@
                             '</tr>';
                     }
                 }
-
                 document.getElementById("app").innerHTML = '' +
                     '<div class="page-header"><h2>💰 ' + t('payment_history') + '</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ' + t('back') + '</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ' + t('print') + '</button></div></div>' +
                     '<div class="stats-grid stats-grid--auto">' +
@@ -706,7 +649,7 @@
                     '<div class="card">' +
                     '<div class="table-container">' +
                     '<table class="data-table payment-table">' +
-                    '<thead><tr><th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
+                    '<thead><tr><th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></table></thead>' +
                     '<tbody>' + rows + '</tbody>' +
                     '</table>' +
                     '</div>' +
@@ -721,34 +664,20 @@
             var lang = Utils.lang;
             var t = Utils.t.bind(Utils);
             var isAdmin = PERMISSION.isAdmin();
-
             var filters = { status: APP.currentFilter || 'all' };
-
             try {
                 var MAX_PRINT_ORDERS = 500;
-                
                 Utils.toast.info(lang === 'id' ? '⏳ 正在准备打印数据...' : '⏳ 正在准备打印数据...', 2000);
-                
                 var result = await this._fetchOrderData(filters, 0, MAX_PRINT_ORDERS);
                 var orders = result.orders;
                 var totalCount = result.totalCount;
-                
                 if (totalCount > MAX_PRINT_ORDERS) {
                     Utils.toast.warning(lang === 'id' ? '⚠️ 仅打印前 ' + MAX_PRINT_ORDERS + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '⚠️ 仅打印前 ' + MAX_PRINT_ORDERS + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。', 5000);
                 }
-                
-                if (orders.length === 0) {
-                    Utils.toast.warning(lang === 'id' ? '没有可打印的数据' : '没有可打印的数据');
-                    return;
-                }
-                
+                if (orders.length === 0) { Utils.toast.warning(lang === 'id' ? '没有可打印的数据' : '没有可打印的数据'); return; }
                 var stores = await SUPABASE.getAllStores();
                 var storeMap = {};
-                for (var sIdx = 0; sIdx < stores.length; sIdx++) {
-                    var s = stores[sIdx];
-                    storeMap[s.id] = s.name;
-                }
-
+                for (var sIdx = 0; sIdx < stores.length; sIdx++) { var s = stores[sIdx]; storeMap[s.id] = s.name; }
                 var rows = '';
                 for (var oIdx = 0; oIdx < orders.length; oIdx++) {
                     var o = orders[oIdx];
@@ -757,7 +686,6 @@
                     var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                     var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? '固定' : '固定') : (lang === 'id' ? '灵活' : '灵活');
                     var statusText = o.status === 'active' ? t('status_active') : (o.status === 'completed' ? t('status_completed') : t('status_liquidated'));
-
                     rows += '<tr>' +
                         '<td>' + Utils.escapeHtml(o.order_id) + '</td>' +
                         '<td>' + Utils.escapeHtml(o.customer_name) + '</td>' +
@@ -771,7 +699,6 @@
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeMap[o.store_id] || '-') + '</td>' : '') +
                         '</tr>';
                 }
-
                 var headerHtml = '<tr>' +
                     '<th>' + t('order_id') + '</th>' +
                     '<th>' + t('customer_name') + '</th>' +
@@ -784,7 +711,6 @@
                     '<th class="text-center">' + t('status') + '</th>' +
                     (isAdmin ? '<th class="text-center">' + t('store') + '</th>' : '') +
                     '</tr>';
-
                 var storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
@@ -794,96 +720,8 @@
                     userName = AUTH.user ? (AUTH.user.name || '-') : '-';
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
                 var printDateTime = new Date().toLocaleString();
-
                 var printWindow = window.open('', '_blank');
-                printWindow.document.write('<!DOCTYPE html>\n' +
-                    '<html>\n' +
-                    '<head>\n' +
-                    '<meta charset="UTF-8">\n' +
-                    '<title>JF! by Gadai - ' + t('print_order_list') + '</title>\n' +
-                    '<style>\n' +
-                    '* { box-sizing: border-box; margin: 0; padding: 0; }\n' +
-                    'body { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }\n' +
-                    '.print-container { padding: 5mm; }\n' +
-                    '.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n' +
-                    '.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n' +
-                    '.print-header .logo img { height: 26px; width: auto; vertical-align: middle; }\n' +
-                    '.print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }\n' +
-                    '.page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }\n' +
-                    '.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; }\n' +
-                    'table { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }\n' +
-                    'th { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }\n' +
-                    'td { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }\n' +
-                    '.amount { text-align: right; }\n' +
-                    '.text-center { text-align: center; }\n' +
-                    'col.col-id       { width: 22mm; }\n' +
-                    'col.col-customer { width: 32mm; }\n' +
-                    'col.col-collat   { width: 30mm; }\n' +
-                    'col.col-loan     { width: 22mm; }\n' +
-                    'col.col-interest { width: 20mm; }\n' +
-                    'col.col-paid     { width: 14mm; }\n' +
-                    'col.col-due      { width: 18mm; }\n' +
-                    'col.col-type     { width: 13mm; }\n' +
-                    'col.col-status   { width: 14mm; }\n' +
-                    'col.col-store    { width: 19mm; }\n' +
-                    '@media print {\n' +
-                    '@page { size: A4 portrait; margin: 8mm; }\n' +
-                    'body { margin: 0; padding: 0; }\n' +
-                    '.print-container { padding: 0; }\n' +
-                    '}\n' +
-                    '.print-warning {\n' +
-                    'background: #fef3c7;\n' +
-                    'color: #d97706;\n' +
-                    'padding: 8px;\n' +
-                    'margin-bottom: 12px;\n' +
-                    'border-radius: 4px;\n' +
-                    'font-size: 8pt;\n' +
-                    'text-align: center;\n' +
-                    '}\n' +
-                    '</style>\n' +
-                    '</head>\n' +
-                    '<body>\n' +
-                    '<div class="print-container">\n' +
-                    '<div class="print-header">\n' +
-                    '<div class="logo">\n' +
-                    '<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\n' +
-                    'JF! by Gadai\n' +
-                    '</div>\n' +
-                    '<div class="print-header-info">\n' +
-                    '🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) +
-                    ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime +
-                    '</div>\n' +
-                    '</div>\n' +
-                    (totalCount > MAX_PRINT_ORDERS ? '<div class="print-warning">\n⚠️ ' + (lang === 'id' ? '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。') + '\n</div>\n' : '') +
-                    '<div class="page-title">📋 ' + t('order_list') + ' &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">' + (lang === 'id' ? '共' : '共') + ' ' + orders.length + ' ' + (lang === 'id' ? '条订单' : '条订单') + (totalCount > orders.length ? ' (共 ' + totalCount + ')' : '') + '</small></div>\n' +
-                    '<table>\n' +
-                    '<colgroup>\n' +
-                    '<col class="col-id">\n' +
-                    '<col class="col-customer">\n' +
-                    '<col class="col-collat">\n' +
-                    '<col class="col-loan">\n' +
-                    '<col class="col-interest">\n' +
-                    '<col class="col-paid">\n' +
-                    '<col class="col-due">\n' +
-                    '<col class="col-type">\n' +
-                    '<col class="col-status">\n' +
-                    (isAdmin ? '<col class="col-store">' : '') +
-                    '</colgroup>\n' +
-                    '<thead>' + headerHtml + '</thead>\n' +
-                    '<tbody>' + rows + '</tbody>\n' +
-                    '</table>\n' +
-                    '<div class="print-footer">\n' +
-                    'JF! by Gadai - ' + (lang === 'id' ? '典当管理系统' : '典当管理系统') +
-                    '</div>\n' +
-                    '</div>\n' +
-                    '<script>\n' +
-                    'window.onload = function() {\n' +
-                    'window.print();\n' +
-                    'setTimeout(function() { window.close(); }, 800);\n' +
-                    '};\n' +
-                    '<\/script>\n' +
-                    '</body>\n' +
-                    '</html>');
+                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + t('print_order_list') + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 26px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }\n.page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; }\ntable { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }\ntd { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }\n.amount { text-align: right; }\n.text-center { text-align: center; }\ncol.col-id       { width: 22mm; }\ncol.col-customer { width: 32mm; }\ncol.col-collat   { width: 30mm; }\ncol.col-loan     { width: 22mm; }\ncol.col-interest { width: 20mm; }\ncol.col-paid     { width: 14mm; }\ncol.col-due      { width: 18mm; }\ncol.col-type     { width: 13mm; }\ncol.col-status   { width: 14mm; }\ncol.col-store    { width: 19mm; }\n@media print { @page { size: A4 portrait; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n.print-warning { background: #fef3c7; color: #d97706; padding: 8px; margin-bottom: 12px; border-radius: 4px; font-size: 8pt; text-align: center; }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n' + (totalCount > MAX_PRINT_ORDERS ? '<div class="print-warning">\n⚠️ ' + (lang === 'id' ? '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。') + '\n</div>\n' : '') + '<div class="page-title">📋 ' + t('order_list') + ' &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">' + (lang === 'id' ? '共' : '共') + ' ' + orders.length + ' ' + (lang === 'id' ? '条订单' : '条订单') + (totalCount > orders.length ? ' (共 ' + totalCount + ')' : '') + '</small></div>\n<table>\n<colgroup>\n<col class="col-id">\n<col class="col-customer">\n<col class="col-collat">\n<col class="col-loan">\n<col class="col-interest">\n<col class="col-paid">\n<col class="col-due">\n<col class="col-type">\n<col class="col-status">\n' + (isAdmin ? '<col class="col-store">' : '') + '\n</colgroup>\n<thead>' + headerHtml + '</thead>\n<tbody>' + rows + '</tbody>\n</table>\n<div class="print-footer">\nJF! by Gadai - ' + (lang === 'id' ? '典当管理系统' : '典当管理系统') + '\n</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
                 console.error('打印订单列表失败:', error);
@@ -894,23 +732,18 @@
         renderViewOrderHTML: async function(orderId) {
             var lang = Utils.lang;
             var t = Utils.t.bind(Utils);
-
             var profile = await SUPABASE.getCurrentProfile();
             var result = await SUPABASE.getPaymentHistory(orderId);
             var isAdmin = PERMISSION.isAdmin();
-
             var order = result.order;
             var payments = result.payments;
             if (!order) throw new Error('order_not_found');
-
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
-
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
             var monthlyRate = order.agreed_interest_rate || 0.10;
             var currentMonthlyInterest = remainingPrincipal * monthlyRate;
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
-
             var repaymentInfoHtml = '';
             if (order.repayment_type === 'fixed') {
                 var paidMonths = order.fixed_paid_months || 0;
@@ -922,7 +755,6 @@
             } else {
                 repaymentInfoHtml = '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? '最长延期10个月' : '最长延期10个月') + ')</p>';
             }
-
             var payRows = '';
             if (payments && payments.length > 0) {
                 for (var i = 0; i < payments.length; i++) {
@@ -941,7 +773,6 @@
             } else {
                 payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
             }
-
             var content = '' +
                 '<div class="page-header">' +
                 '<h2>📄 ' + t('order_details') + '</h2>' +
@@ -1018,14 +849,16 @@
         };
     }
 
-    if (!document.getElementById('orderRowSelectedStyle')) {
+    // 添加逾期行样式
+    if (!document.getElementById('orderOverdueStyle')) {
         var style = document.createElement('style');
-        style.id = 'orderRowSelectedStyle';
-        style.textContent = '\n            .order-row {\n                cursor: pointer;\n                transition: background-color 0.2s ease;\n            }\n            .order-row:hover {\n                background-color: var(--bg-hover);\n            }\n            .order-row.row-selected {\n                background-color: var(--primary-soft) !important;\n                border-left: 3px solid var(--primary);\n            }\n            .order-table .order-row.row-selected td:first-child {\n                border-left-color: var(--primary);\n            }\n        ';
+        style.id = 'orderOverdueStyle';
+        style.textContent = '\n            .order-row--overdue { background-color: #fef2f2 !important; border-left: 3px solid #ef4444; }\n            .order-row--overdue:hover { background-color: #fee2e2 !important; }\n            .badge--overdue { background: #fee2e2; color: #dc2626; }\n            .order-row.row-selected { background-color: var(--primary-soft) !important; border-left: 3px solid var(--primary); }\n            .order-row--overdue.row-selected { background-color: #fde68a !important; border-left: 3px solid var(--warning); }\n        ';
         document.head.appendChild(style);
     }
 })();
 
+// ==================== 管理员修改订单模块（完整实现） ====================
 (function() {
     if (!window.JF) window.JF = {};
 
@@ -1040,12 +873,9 @@
             try {
                 var order = await SUPABASE.getOrder(orderId);
                 if (!order) throw new Error('订单不存在');
-
                 await SUPABASE.unlockOrder(orderId);
-
                 var today = Utils.getLocalToday();
                 var orderDate = (order.created_at || '').substring(0, 10) || today;
-
                 document.getElementById('app').innerHTML = '' +
                     '<div class="page-header">' +
                     '<h2>✏️ ' + (lang === 'id' ? '修改订单' : '修改订单') + ' — ' + Utils.escapeHtml(orderId) + '</h2>' +
@@ -1134,14 +964,10 @@
                     '<button onclick="JF.AdminEditOrder.adminCancelEdit(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--outline">↩️ ' + t('cancel') + '</button>' +
                     '</div>' +
                     '</div>';
-
-                var amountIds = ['edit_loan_amount', 'edit_admin_fee', 'edit_service_fee', 'edit_monthly_payment'];
-                for (var i = 0; i < amountIds.length; i++) {
-                    var id = amountIds[i];
+                ['edit_loan_amount', 'edit_admin_fee', 'edit_service_fee', 'edit_monthly_payment'].forEach(function(id) {
                     var el = document.getElementById(id);
                     if (el && Utils.bindAmountFormat) Utils.bindAmountFormat(el);
-                }
-
+                });
             } catch (error) {
                 console.error('adminEditOrder error:', error);
                 Utils.toast.error(error.message || (Utils.lang === 'id' ? '打开订单失败' : '打开订单失败'));
@@ -1159,7 +985,6 @@
                 saveBtn.disabled = true;
                 saveBtn.textContent = '⏳ ' + (lang === 'id' ? '保存中...' : '保存中...');
             }
-
             try {
                 var loanAmount    = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount') ? document.getElementById('edit_loan_amount').value : null) || 0;
                 var adminFee      = Utils.parseNumberFromCommas(document.getElementById('edit_admin_fee') ? document.getElementById('edit_admin_fee').value : null) || 0;
@@ -1173,58 +998,36 @@
                 var maxExtension  = parseInt(document.getElementById('edit_max_extension') ? document.getElementById('edit_max_extension').value : 0) || 10;
                 var adminFeePaid  = (document.getElementById('edit_admin_fee_paid') ? document.getElementById('edit_admin_fee_paid').value : 'false') === 'true';
                 var orderDate     = document.getElementById('edit_order_date') ? (document.getElementById('edit_order_date').value || Utils.getLocalToday()) : Utils.getLocalToday();
-
                 var collateral    = document.getElementById('edit_collateral') ? document.getElementById('edit_collateral').value.trim() : '';
                 var custName      = document.getElementById('edit_customer_name') ? document.getElementById('edit_customer_name').value.trim() : '';
                 var custKtp       = document.getElementById('edit_customer_ktp') ? document.getElementById('edit_customer_ktp').value.trim() : '';
                 var custPhone     = document.getElementById('edit_customer_phone') ? document.getElementById('edit_customer_phone').value.trim() : '';
                 var custAddress   = document.getElementById('edit_customer_address') ? document.getElementById('edit_customer_address').value.trim() : '';
                 var notes         = document.getElementById('edit_notes') ? document.getElementById('edit_notes').value.trim() : '';
-
                 if (!collateral || loanAmount <= 0) {
                     Utils.toast.warning(lang === 'id' ? '抵押物和贷款金额不能为空' : '抵押物和贷款金额不能为空');
                     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); }
                     return;
                 }
-
                 var agreedRate = interestRate / 100;
                 var remainingPrincipal = loanAmount;
                 var monthlyInterest = remainingPrincipal * agreedRate;
-
                 var updates = {
-                    collateral_name: collateral,
-                    loan_amount: loanAmount,
-                    monthly_interest: monthlyInterest,
-                    admin_fee: adminFee,
-                    admin_fee_paid: adminFeePaid,
-                    service_fee_amount: serviceFee,
-                    service_fee_percent: servicePct,
-                    agreed_interest_rate: agreedRate,
-                    agreed_service_fee_rate: servicePct / 100,
-                    repayment_type: repayType,
-                    repayment_term: repayTerm,
-                    monthly_fixed_payment: monthlyPmt || null,
-                    pawn_term_months: pawnTerm,
-                    max_extension_months: maxExtension,
-                    customer_name: custName,
-                    customer_ktp: custKtp,
-                    customer_phone: custPhone,
-                    customer_address: custAddress,
-                    notes: notes,
-                    created_at: orderDate + 'T00:00:00.000Z',
-                    updated_at: new Date().toISOString()
+                    collateral_name: collateral, loan_amount: loanAmount, monthly_interest: monthlyInterest,
+                    admin_fee: adminFee, admin_fee_paid: adminFeePaid, service_fee_amount: serviceFee,
+                    service_fee_percent: servicePct, agreed_interest_rate: agreedRate,
+                    agreed_service_fee_rate: servicePct / 100, repayment_type: repayType, repayment_term: repayTerm,
+                    monthly_fixed_payment: monthlyPmt || null, pawn_term_months: pawnTerm, max_extension_months: maxExtension,
+                    customer_name: custName, customer_ktp: custKtp, customer_phone: custPhone, customer_address: custAddress,
+                    notes: notes, created_at: orderDate + 'T00:00:00.000Z', updated_at: new Date().toISOString()
                 };
-
                 var client = SUPABASE.getClient();
                 var errorObj = await client.from('orders').update(updates).eq('order_id', orderId);
                 if (errorObj.error) throw errorObj.error;
-
                 await SUPABASE.relockOrder(orderId);
-
                 Utils.toast.success(lang === 'id' ? '✅ 订单已修改并重新锁定！' : '✅ 订单已修改并重新锁定！');
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 await JF.OrdersPage.viewOrder(orderId);
-
             } catch (error) {
                 console.error('adminSaveOrder error:', error);
                 Utils.toast.error(error.message || (lang === 'id' ? '保存失败' : '保存失败'));
