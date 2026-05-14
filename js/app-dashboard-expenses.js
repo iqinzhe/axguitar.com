@@ -1,4 +1,5 @@
 // app-dashboard-expenses.js - v2.0 (JF 命名空间) 
+// 顺序调整：总额卡片 → 新增运营支出卡片 → 支出列表卡片
 
 'use strict';
 
@@ -57,10 +58,6 @@
                             } else {
                                 actionHtml += `<span class="reconciled-badge">✅ ${lang === 'id' ? 'Direkonsiliasi' : '已平账'}</span> `;
                             }
-                            // 平账按钮已隐藏（保留功能，暂不对外显示）
-                            // if (!e.is_reconciled) {
-                            //     actionHtml += `<button onclick="APP.balanceExpenses()" class="btn btn--warning btn--sm">⚖️ ${lang === 'id' ? 'Rekonsiliasi' : '平账'}</button>`;
-                            // }
                         } else {
                             actionHtml += `<span class="locked-badge">🔒 ${lang === 'id' ? 'Terkunci' : '已锁定'}</span>`;
                         }
@@ -77,9 +74,7 @@
                     }
                 }
 
-                // 类别选项已移除，改为自由文本输入
-
-                // 获取门店练习状态提示
+                // 门店练习状态提示
                 let practiceWarningHtml = '';
                 if (!isAdmin && storeId) {
                     const storesData = await SUPABASE.getAllStores();
@@ -116,6 +111,7 @@
                     `;
                 }
 
+                // ==================== 顺序调整：总额卡片 → 新增运营支出卡片 → 支出列表卡片 ====================
                 const content = `
                     <div class="page-header">
                         <h2>📝 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</h2>
@@ -126,31 +122,14 @@
                     </div>
                     ${practiceWarningHtml}
                     ${staffExpenseInfoHtml}
+                    <!-- 1. 支出总额卡片 -->
                     <div class="card">
                         <div class="card card--stat" style="border:2px solid var(--danger);padding:var(--spacing-3) var(--spacing-4);">
                             <div class="stat-value expense">${Utils.formatCurrency(totalAmount)}</div>
                             <div class="stat-label">${lang === 'id' ? 'Total Pengeluaran' : '支出总额'}</div>
                         </div>
                     </div>
-                    <div class="card">
-                        <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
-                        <div class="table-container">
-                            <table class="data-table expense-table">
-                                <thead>
-                                    <tr>
-                                        <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                        <th class="col-type">${lang === 'id' ? 'Kategori' : '类别'}</th>
-                                        <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                        <th class="col-method text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
-                                        <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                        ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                        <th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>${rows}</tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <!-- 2. 新增运营支出卡片（原位于末尾，现移至列表之前） -->
                     <div class="card">
                         <h3>${lang === 'id' ? 'Tambah Pengeluaran Baru' : '新增运营支出'}</h3>
                         <div class="form-grid form-grid--4">
@@ -185,6 +164,26 @@
                             </div>
                         </div>
                         <p class="info-note">💡 ${lang === 'id' ? 'Pengeluaran akan dicatat sebagai arus kas keluar (outflow) dari Brankas atau Bank BNI.' : '支出将记录为从保险柜或银行流出的资金（流出）。'}</p>
+                    </div>
+                    <!-- 3. 支出列表卡片 -->
+                    <div class="card">
+                        <h3>${lang === 'id' ? 'Daftar Pengeluaran' : '支出列表'}</h3>
+                        <div class="table-container">
+                            <table class="data-table expense-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                        <th class="col-type">${lang === 'id' ? 'Kategori' : '类别'}</th>
+                                        <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                        <th class="col-method text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th>
+                                        <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                        ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                        <th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
                     </div>`;
                 return content;
             } catch (error) {
