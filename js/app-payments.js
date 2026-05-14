@@ -1,4 +1,4 @@
-// app-payments.js - v2.0 (JF 命名空间) (多标签页锁 / 超额还款提示 / 幂等性建议)
+// app-payments.js - v2.0 (JF 命名空间) 增加对 liquidated 订单的拦截
 
 'use strict';
 
@@ -158,6 +158,31 @@
                 if (!order) { Utils.toast.error(t('order_not_found')); APP.goBack(); return; }
                 if (order.store_id !== profile.store_id) { Utils.toast.error(t('unauthorized')); APP.goBack(); return; }
 
+                // ==================== 新增：拦截已变卖订单 ====================
+                if (order.status === 'liquidated') {
+                    document.getElementById("app").innerHTML = `
+                        <div class="page-header">
+                            <h2>💰 ${t('payment_page')}</h2>
+                            <div class="header-actions">
+                                <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                            </div>
+                        </div>
+                        <div class="card" style="text-align:center;padding:40px 20px;">
+                            <div style="font-size:48px;margin-bottom:16px;">⚖️</div>
+                            <h3 style="color:var(--danger);margin-bottom:12px;">
+                                ${lang === 'id' ? 'Pesanan telah dilikuidasi' : '订单已变卖'}
+                            </h3>
+                            <p style="color:var(--text-muted);margin-bottom:16px;">
+                                ${lang === 'id' 
+                                    ? 'Barang jaminan sudah dijual. Tidak dapat melakukan pembayaran lagi.' 
+                                    : '抵押物已变卖，无法继续缴费。'}
+                            </p>
+                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                        </div>
+                    `;
+                    return;
+                }
+
                 if (window.Audit) {
                     await window.Audit.log('payment_page_view', JSON.stringify({ order_id: order.order_id, customer_name: order.customer_name, viewed_by: profile.name }));
                 }
@@ -200,7 +225,7 @@
                 let principalRows = '';
                 let cumulativePaid = 0;
                 if (principalPayments.length === 0) {
-                    principalRows = `<td><td colspan="5" class="text-center text-muted">${t('no_data')}</td>`;
+                    principalRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td>`;
                 } else {
                     for (const p of principalPayments) {
                         cumulativePaid += p.amount;
@@ -264,7 +289,7 @@
                                     <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label></div></div>
                                     <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="interestConfirmBtn">✅ ${t('confirm_payment')}</button>
                                 </div>
-                                <div class="card-history"><div class="history-title">📋 ${t('interest_history')}</div><div class="table-container" style="overflow-x:auto;"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="text-center" style="width:50px;">${t('times')}</th><th class="col-date">${t('date')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th></tr></thead><tbody>${interestRows}</tbody></table></div></div>
+                                <div class="card-history"><div class="history-title">📋 ${t('interest_history')}</div><div class="table-container" style="overflow-x:auto;"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="text-center" style="width:50px;">${t('times')}</th><th class="col-date">${t('date')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th></table></thead><tbody>${interestRows}</tbody></table></div></div>
                             </div>
                             <div class="card" style="min-width:0;overflow-x:hidden;">
                                 <div class="card-header"><h3>🏦 ${t('return_principal')}</h3></div>
