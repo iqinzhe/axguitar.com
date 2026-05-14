@@ -158,6 +158,19 @@
                 if (!order) { Utils.toast.error(t('order_not_found')); APP.goBack(); return; }
                 if (order.store_id !== profile.store_id) { Utils.toast.error(t('unauthorized')); APP.goBack(); return; }
 
+                // 订单锁定检查（被锁定时给出提示，而不是静默报错跳仪表盘）
+                if (order.is_locked) {
+                    document.getElementById("app").innerHTML = `
+                        <div class="page-header"><h2>💰 ${t('payment_page')}</h2><div class="header-actions"><button onclick="APP.navigateTo('orderTable')" class="btn btn--outline">↩️ ${t('back')}</button></div></div>
+                        <div class="card" style="text-align:center;padding:40px 20px;">
+                            <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+                            <h3 style="color:#64748b;margin-bottom:12px;">${lang === 'id' ? 'Pesanan sedang dikunci' : '订单正在处理中'}</h3>
+                            <p style="color:#94a3b8;margin-bottom:16px;">${lang === 'id' ? 'Pesanan ini sedang dalam proses, silakan coba beberapa saat lagi.' : '该订单正在处理中，请稍后再试。'}</p>
+                            <button onclick="APP.navigateTo('orderTable')" class="btn btn--outline" style="padding:10px 24px;">↩️ ${t('back')}</button>
+                        </div>`;
+                    return;
+                }
+
                 // ==================== 新增：拦截已变卖订单 ====================
                 if (order.status === 'liquidated') {
                     document.getElementById("app").innerHTML = `
@@ -342,7 +355,12 @@
             } catch (error) {
                 console.error("showPayment error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data: ' + error.message : '加载失败：' + error.message);
-                APP.goBack();
+                // 用 navigateTo 明确跳回订单列表，避免 historyStack 为空时误跳仪表盘
+                if (APP.historyStack && APP.historyStack.length > 0) {
+                    APP.goBack();
+                } else {
+                    APP.navigateTo('orderTable');
+                }
             }
         },
 
