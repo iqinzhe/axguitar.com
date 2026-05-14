@@ -114,26 +114,39 @@
                         <button onclick="JF.OrdersPage.printAllOrders()" class="btn btn--outline">🖨️ ${t('print_order_list')}</button>
                     </div>
                 </div>
-                <!-- 固定操作栏：包含筛选、操作按钮（2行布局） -->
+                <!-- 固定操作栏：单行4区块，用竖线分隔 -->
                 <div class="sticky-action-bar">
                     <div class="action-bar-inner">
-                        <!-- 第1行：全部订单下拉 + 未选择任何订单 -->
-                        <div class="action-bar-row action-bar-row--top">
-                            <div class="filter-group">
+                        <div class="action-bar-single-row">
+                            <!-- 区块1：操作标签 -->
+                            <span class="action-label-text">${lang === 'id' ? 'Operasi' : '操作'}:</span>
+                            <span class="action-bar-divider"></span>
+                            <!-- 区块2：筛选下拉 + 未选择任何订单 -->
+                            <div class="action-bar-section action-bar-section--filter">
                                 <select id="statusFilter" onchange="APP.filterOrders(this.value)" class="status-filter-select">
                                     <option value="all" ${filters.status === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
                                     <option value="active" ${filters.status === 'active' ? 'selected' : ''}>${t('active')}</option>
                                     <option value="completed" ${filters.status === 'completed' ? 'selected' : ''}>${t('completed')}</option>
                                 </select>
+                                <span id="selectedOrderDisplay" class="selected-order-display">${lang === 'id' ? '未选择任何订单' : '未选择任何订单'}</span>
                             </div>
-                            <span id="selectedOrderDisplay" class="selected-order-display">${lang === 'id' ? '未选择任何订单' : '未选择任何订单'}</span>
-                        </div>
-                        <!-- 第2行：已选订单操作 + 操作按钮 -->
-                        <div class="action-bar-row action-bar-row--bottom">
-                            <span class="action-label-text">${lang === 'id' ? '已选订单操作' : '已选订单操作'}:</span>
-                            <div class="action-buttons">
-                                ${actionButtonsHtml}
+                            <span class="action-bar-divider"></span>
+                            <!-- 区块3：查看 + 打印 -->
+                            <div class="action-bar-section action-bar-section--view">
+                                ${!isAdmin ? `
+                                    <button id="globalPayBtn" class="btn btn--sm btn--success">💰 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>
+                                ` : ''}
+                                <button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>
+                                <button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>
                             </div>
+                            ${isAdmin ? `
+                            <span class="action-bar-divider"></span>
+                            <!-- 区块4（仅管理员）：修改 + 删除 -->
+                            <div class="action-bar-section action-bar-section--edit">
+                                <button id="globalEditBtn" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>
+                                <button id="globalDeleteBtn" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
