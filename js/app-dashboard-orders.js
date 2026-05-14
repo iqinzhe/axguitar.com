@@ -1,4 +1,5 @@
-// app-dashboard-orders.js - v2.0 (管理员修改订单)
+// app-dashboard-orders.js - v2.1 (JF 命名空间) 
+// 新增：行点击选中高亮 + 顶部操作栏（单选模式）
 
 'use strict';
 
@@ -51,9 +52,9 @@
                 const repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
 
-                rows += `<tr>
+                rows += `<tr class="order-row" data-order-id="${Utils.escapeHtml(o.order_id)}">
                     <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
-                    <td>${Utils.escapeHtml(o.customer_name)}</td>
+                    <td class="col-name">${Utils.escapeHtml(o.customer_name)}</td>
                     <td>${Utils.escapeHtml(o.collateral_name)}</td>
                     <td class="amount">${Utils.formatCurrency(o.loan_amount)}</td>
                     <td class="amount">${Utils.formatCurrency(currentMonthlyInterest)}</td>
@@ -62,25 +63,6 @@
                     <td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentTypeText}</span></td>
                     <td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td>
                     ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
-                </tr>`;
-
-                let actionButtons = '';
-                if (o.status === 'active' && !isAdmin) {
-                    actionButtons += `<button onclick="APP.payOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
-                }
-                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
-                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
-                if (isAdmin) {
-                    // 使用 JF.AdminEditOrder.adminEditOrder 确保函数存在
-                    actionButtons += `<button onclick="JF.AdminEditOrder.adminEditOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
-                }
-                if (PERMISSION.canDeleteOrder()) {
-                    actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
-                }
-
-                rows += `<tr class="action-row">
-                    <td class="action-label">${t('action')}</td>
-                    <td colspan="${totalCols - 1}"><div class="action-buttons">${actionButtons}</div></td>
                 </tr>`;
             }
 
@@ -100,8 +82,27 @@
                 pageSize: PAGE_SIZE,
                 filters,
                 storeMap,
+                selectedOrderId: null,
                 renderOrdersIntoTable: this._renderOrdersIntoTable.bind(this)
             };
+
+            // 构建顶部操作按钮（根据角色显示不同按钮）
+            let actionButtonsHtml = '';
+            if (!isAdmin) {
+                // 门店账户：只有查看和打印
+                actionButtonsHtml = `
+                    <button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>
+                    <button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>
+                `;
+            } else {
+                // 管理员：全部按钮
+                actionButtonsHtml = `
+                    <button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>
+                    <button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>
+                    <button id="globalEditBtn" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>
+                    <button id="globalDeleteBtn" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>
+                `;
+            }
 
             const content = `
                 <div class="page-header">
@@ -121,6 +122,16 @@
                 <div class="info-bar info">
                     <span class="info-bar-icon">📌</span>
                     <div class="info-bar-content"><strong>${lang === 'id' ? 'Total' : '共'} ${totalCount} ${lang === 'id' ? 'pesanan' : '条订单'}</strong> — ${lang === 'id' ? `Menampilkan ${Math.min(PAGE_SIZE, totalCount)} pertama` : `显示前 ${Math.min(PAGE_SIZE, totalCount)} 条`}</div>
+                </div>
+                <!-- 全局操作栏 -->
+                <div class="card" style="margin-bottom: 12px; padding: 12px 16px; background: var(--bg-hover);">
+                    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                        <span style="font-weight: 600; color: var(--text-secondary);">${lang === 'id' ? 'Aksi untuk pesanan terpilih' : '已选订单操作'}:</span>
+                        <div class="action-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            ${actionButtonsHtml}
+                        </div>
+                        <span id="selectedOrderDisplay" style="font-size: 12px; color: var(--primary); margin-left: auto;">${lang === 'id' ? 'Belum ada pesanan dipilih' : '未选择任何订单'}</span>
+                    </div>
                 </div>
                 <div class="card">
                     <div class="table-container">
@@ -171,9 +182,9 @@
                 const repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
 
-                rows += `<tr>
+                rows += `<tr class="order-row" data-order-id="${Utils.escapeHtml(o.order_id)}">
                     <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
-                    <td>${Utils.escapeHtml(o.customer_name)}</td>
+                    <td class="col-name">${Utils.escapeHtml(o.customer_name)}</td>
                     <td>${Utils.escapeHtml(o.collateral_name)}</td>
                     <td class="amount">${Utils.formatCurrency(o.loan_amount)}</td>
                     <td class="amount">${Utils.formatCurrency(currentMonthlyInterest)}</td>
@@ -183,32 +194,164 @@
                     <td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}</span></td>
                     ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
                 </tr>`;
-
-                let actionButtons = '';
-                if (o.status === 'active' && !isAdmin) {
-                    actionButtons += `<button onclick="APP.payOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--success btn--sm">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>`;
-                }
-                actionButtons += `<button onclick="APP.viewOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>`;
-                actionButtons += `<button onclick="APP.printOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>`;
-                if (isAdmin) {
-                    actionButtons += `<button onclick="JF.AdminEditOrder.adminEditOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--warning">✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'}</button>`;
-                }
-                if (PERMISSION.canDeleteOrder()) {
-                    actionButtons += `<button onclick="APP.deleteOrder('${Utils.escapeHtml(o.order_id)}')" class="btn btn--sm btn--danger">🗑️ ${t('delete')}</button>`;
-                }
-
-                rows += `<tr class="action-row">
-                    <td class="action-label">${t('action')}</td>
-                    <td colspan="${totalCols - 1}"><div class="action-buttons">${actionButtons}</div></td>
-                </tr>`;
             }
 
             if (append) {
                 const loadMoreRow = document.getElementById('loadMoreRow');
                 if (loadMoreRow) loadMoreRow.remove();
                 tbody.insertAdjacentHTML('beforeend', rows);
+                // 为新添加的行绑定点击事件
+                this._bindRowClickEvents();
             } else {
                 tbody.innerHTML = rows;
+            }
+        },
+
+        // 绑定行点击选中事件
+        _bindRowClickEvents() {
+            const state = window._orderTableState;
+            if (!state) return;
+            
+            const rows = document.querySelectorAll('#orderTableBody .order-row');
+            const selectedDisplay = document.getElementById('selectedOrderDisplay');
+            const lang = Utils.lang;
+            
+            rows.forEach(row => {
+                // 移除旧的事件监听，重新绑定
+                row.removeEventListener('click', this._rowClickHandler);
+                // 创建绑定到实例的处理函数
+                const handler = (e) => {
+                    // 如果点击的是按钮或按钮内部元素，不触发选中
+                    if (e.target.closest('button')) return;
+                    
+                    e.stopPropagation();
+                    const orderId = row.dataset.orderId;
+                    
+                    // 移除所有行的选中样式
+                    rows.forEach(r => r.classList.remove('row-selected'));
+                    
+                    // 添加当前行的选中样式
+                    row.classList.add('row-selected');
+                    
+                    // 更新状态
+                    state.selectedOrderId = orderId;
+                    
+                    // 更新显示
+                    if (selectedDisplay) {
+                        selectedDisplay.innerHTML = `${lang === 'id' ? '✅ Terpilih' : '✅ 已选中'}: ${Utils.escapeHtml(orderId)}`;
+                        selectedDisplay.style.color = 'var(--success-dark)';
+                    }
+                };
+                row.addEventListener('click', handler);
+                // 存储handler以便后续清理（可选）
+                row._clickHandler = handler;
+            });
+        },
+
+        _rowClickHandler: null, // 占位，实际在绑定时创建
+
+        // 清除选中高亮
+        _clearSelection() {
+            const state = window._orderTableState;
+            if (!state) return;
+            
+            const rows = document.querySelectorAll('#orderTableBody .order-row');
+            rows.forEach(r => r.classList.remove('row-selected'));
+            state.selectedOrderId = null;
+            
+            const selectedDisplay = document.getElementById('selectedDisplay');
+            if (selectedDisplay) {
+                const lang = Utils.lang;
+                selectedDisplay.innerHTML = lang === 'id' ? 'Belum ada pesanan dipilih' : '未选择任何订单';
+                selectedDisplay.style.color = 'var(--primary)';
+            }
+        },
+
+        // 获取当前选中的订单号
+        _getSelectedOrderId() {
+            const state = window._orderTableState;
+            if (!state || !state.selectedOrderId) return null;
+            return state.selectedOrderId;
+        },
+
+        // 全局操作：查看订单
+        async _globalViewOrder() {
+            const lang = Utils.lang;
+            const orderId = this._getSelectedOrderId();
+            if (!orderId) {
+                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                return;
+            }
+            await this.viewOrder(orderId);
+        },
+
+        // 全局操作：打印订单
+        async _globalPrintOrder() {
+            const lang = Utils.lang;
+            const orderId = this._getSelectedOrderId();
+            if (!orderId) {
+                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                return;
+            }
+            await this.printOrder(orderId);
+        },
+
+        // 全局操作：修改订单（仅管理员）
+        async _globalEditOrder() {
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            if (!isAdmin) {
+                Utils.toast.warning(lang === 'id' ? 'Hanya administrator yang dapat mengedit pesanan' : '仅管理员可修改订单');
+                return;
+            }
+            const orderId = this._getSelectedOrderId();
+            if (!orderId) {
+                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                return;
+            }
+            if (JF.AdminEditOrder && JF.AdminEditOrder.adminEditOrder) {
+                await JF.AdminEditOrder.adminEditOrder(orderId);
+            } else {
+                Utils.toast.error(lang === 'id' ? 'Fungsi edit tidak tersedia' : '编辑功能不可用');
+            }
+        },
+
+        // 全局操作：删除订单（仅管理员）
+        async _globalDeleteOrder() {
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            if (!isAdmin) {
+                Utils.toast.warning(lang === 'id' ? 'Hanya administrator yang dapat menghapus pesanan' : '仅管理员可删除订单');
+                return;
+            }
+            const orderId = this._getSelectedOrderId();
+            if (!orderId) {
+                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                return;
+            }
+            await this.deleteOrder(orderId);
+            // 删除后清除选中状态
+            this._clearSelection();
+        },
+
+        // 初始化全局按钮事件
+        _initGlobalButtons() {
+            const viewBtn = document.getElementById('globalViewBtn');
+            const printBtn = document.getElementById('globalPrintBtn');
+            const editBtn = document.getElementById('globalEditBtn');
+            const deleteBtn = document.getElementById('globalDeleteBtn');
+            
+            if (viewBtn) {
+                viewBtn.onclick = () => this._globalViewOrder();
+            }
+            if (printBtn) {
+                printBtn.onclick = () => this._globalPrintOrder();
+            }
+            if (editBtn) {
+                editBtn.onclick = () => this._globalEditOrder();
+            }
+            if (deleteBtn) {
+                deleteBtn.onclick = () => this._globalDeleteOrder();
             }
         },
 
@@ -256,7 +399,14 @@
                 for (const p of payments) {
                     const typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    payRows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td>${typeText}</td><td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
+                    payRows += `<tr>
+                        <td class="date-cell">${Utils.formatDate(p.date)}</td>
+                        <td>${typeText}</td>
+                        <td class="text-center">${p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-'}</td>
+                        <td class="amount">${Utils.formatCurrency(p.amount)}</td>
+                        <td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
+                        <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
+                    </tr>`;
                 }
             } else {
                 payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
@@ -317,6 +467,11 @@
             const filters = { status: APP.currentFilter || 'all' };
             const contentHTML = await this.buildOrderTableHTML(filters, 0, 50);
             document.getElementById("app").innerHTML = contentHTML;
+            // 绑定行点击事件和全局按钮事件
+            setTimeout(() => {
+                this._bindRowClickEvents();
+                this._initGlobalButtons();
+            }, 100);
         },
 
         async loadMoreOrders() {
@@ -334,6 +489,8 @@
 
                 this._renderOrdersIntoTable(orders, true);
                 this._updateLoadMoreRow();
+                // 重新绑定新行的点击事件
+                this._bindRowClickEvents();
             } catch (err) {
                 console.error("loadMoreOrders error:", err);
                 if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
@@ -608,11 +765,20 @@
 
                 let rows = '';
                 if (allPayments.length === 0) {
-                    rows = `</table><td colspan="8" class="text-center">${t('no_data')}</td></tr>`;
+                    rows = `<tr><td colspan="8" class="text-center">${t('no_data')}</td></tr>`;
                 } else {
                     for (const p of allPayments) {
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                        rows += `<tr><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td><td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td><td class="date-cell">${Utils.formatDate(p.date)}</td><td>${typeMap[p.type] || p.type}</td><td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td></tr>`;
+                        rows += `<tr>
+                            <td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}</td>
+                            <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
+                            <td class="date-cell">${Utils.formatDate(p.date)}</td>
+                            <td>${typeMap[p.type] || p.type}</td>
+                            <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                            <td class="amount">${Utils.formatCurrency(p.amount)}</td>
+                            <td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
+                            <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
+                        </tr>`;
                     }
                 }
 
@@ -853,6 +1019,26 @@
             showPaymentHistory: OrdersPage.showPaymentHistory.bind(OrdersPage),
         };
     }
+
+    // 添加选中行的CSS样式
+    const style = document.createElement('style');
+    style.textContent = `
+        .order-row {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .order-row:hover {
+            background-color: var(--bg-hover);
+        }
+        .order-row.row-selected {
+            background-color: var(--primary-soft) !important;
+            border-left: 3px solid var(--primary);
+        }
+        .order-table .order-row.row-selected td:first-child {
+            border-left-color: var(--primary);
+        }
+    `;
+    document.head.appendChild(style);
 
 })();
 
