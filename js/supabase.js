@@ -337,13 +337,17 @@
             const prefix = role==='admin' ? 'AD' : await this._getStorePrefix(storeId);
             for(let attempt=1; attempt<=maxRetries; attempt++){
                 try {
+                    // 取该前缀下所有订单号，找最大序号（兼容任意位数的历史异常格式）
                     const { data: existing } = await supabaseClient
-                        .from('orders').select('order_id').like('order_id', prefix+'%')
-                        .order('created_at', { ascending: false }).limit(1);
+                        .from('orders').select('order_id').like('order_id', prefix+'%');
                     let maxNum = 0;
-                    if(existing?.length){
-                        const m = existing[0].order_id.match(new RegExp(prefix+'(\\d{3})$'));
-                        if(m) maxNum = parseInt(m[1],10);
+                    const numRegex = new RegExp('^' + prefix + '(\\d+)$');
+                    for(const row of (existing || [])){
+                        const m = row.order_id.match(numRegex);
+                        if(m){
+                            const n = parseInt(m[1], 10);
+                            if(n <= 999 && n > maxNum) maxNum = n;
+                        }
                     }
                     const oid = prefix + String(maxNum+1).padStart(3,'0');
                     const { data: dup } = await supabaseClient.from('orders').select('id').eq('order_id', oid).maybeSingle();
@@ -354,7 +358,7 @@
                     await new Promise(r => setTimeout(r, 50*attempt));
                 }
             }
-            return prefix + Date.now().toString().slice(-6) + String(Math.floor(Math.random()*1000)).padStart(3,'0');
+            throw new Error(Utils.lang==='id' ? 'Gagal menghasilkan ID pesanan unik' : '订单号生成失败，请重试');
         },
 
         // ==================== 客户ID生成（重用已删除ID） ====================
