@@ -1,4 +1,5 @@
-// app-dashboard-funds.js - v2.0 (JF 命名空间) 管理员排除练习门店数据
+// app-dashboard-funds.js - v2.1 (JF 命名空间) 修复资金流水加载问题
+// 修复：变量名冲突导致页面卡在"加载中"的问题
 
 'use strict';
 
@@ -34,7 +35,6 @@
         },
 
         // ==================== 构建资金流水页面 HTML（纯内容） ====================
-        // 【v2.2 修改】管理员排除练习门店
         async buildCashFlowPageHTML() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -42,7 +42,7 @@
             const isStaff = PERMISSION.isStaff();
 
             try {
-                let transactions = [];
+                let cashFlowTransactions = [];  // 修复：改名避免变量冲突
                 const client = SUPABASE.getClient();
 
                 if (isAdmin) {
@@ -55,7 +55,7 @@
                         q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                     }
                     const { data: allFlows } = await q;
-                    transactions = allFlows || [];
+                    cashFlowTransactions = allFlows || [];
                 } else if (isStaff) {
                     // 员工仅可查看本人操作的资金流水记录
                     const { data: staffFlows } = await client
@@ -64,14 +64,14 @@
                         .eq('is_voided', false)
                         .eq('recorded_by', profile?.id)
                         .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    transactions = staffFlows || [];
+                    cashFlowTransactions = staffFlows || [];
                 } else {
                     // 店长：查看本店全部流水
                     const { data: storeFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id).eq('is_voided', false)
                         .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    transactions = storeFlows || [];
+                    cashFlowTransactions = storeFlows || [];
                 }
 
                 const typeMap = FundsPage._getFlowTypeMap(lang);
@@ -79,10 +79,10 @@
                 const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
 
                 let rows = '';
-                if (transactions.length === 0) {
+                if (cashFlowTransactions.length === 0) {
                     rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
                 } else {
-                    for (const t of transactions) {
+                    for (const t of cashFlowTransactions) {
                         rows += `<tr>
                             <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                             <td>${typeMap[t.flow_type] || t.flow_type}</td>
@@ -137,12 +137,12 @@
                         </div>
                     </div>`;
 
-                window._cashFlowPageData = transactions;
+                window._cashFlowPageData = cashFlowTransactions;
                 return content;
             } catch (error) {
                 console.error("buildCashFlowPageHTML error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data arus kas' : '加载资金流水失败');
-                return `<div class="card"><p>❌ ${Utils.t('loading_failed', { module: '资金流水' })}</p></div>`;
+                return `<div class="card"><p>❌ ${Utils.t('loading_failed', { module: '资金流水' })}</p><p style="color:var(--danger);font-size:12px;">${error.message}</p><button onclick="APP.showCashFlowPage()" class="btn btn--sm" style="margin-top:12px;">🔄 ${lang === 'id' ? 'Coba Lagi' : '重试'}</button></div>`;
             }
         },
 
@@ -191,24 +191,22 @@
                 rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
             } else {
                 for (const t of transactions) {
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}<tr><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                 }
             }
             tbody.innerHTML = rows;
         },
 
-        // ==================== 原有弹窗、转账、导出等方法（完整保留） ====================
-        // 管理员排除练习门店
+        // ==================== 原有弹窗、转账、导出等方法 ====================
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = PERMISSION.isAdmin();
             const isStaff = PERMISSION.isStaff();
             try {
-                let transactions = [];
+                let capitalTransactions = [];  // 修复：改名避免变量冲突
                 const client = SUPABASE.getClient();
                 if (isAdmin) {
-                    // 管理员查询时排除练习门店
                     let q = client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
@@ -217,22 +215,21 @@
                         q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                     }
                     const { data: allFlows } = await q;
-                    transactions = allFlows || [];
+                    capitalTransactions = allFlows || [];
                 } else if (isStaff) {
-                    // 员工在弹窗中也仅查看本人记录
                     const { data: staffFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id)
                         .eq('is_voided', false)
                         .eq('recorded_by', profile?.id)
                         .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    transactions = staffFlows || [];
+                    capitalTransactions = staffFlows || [];
                 } else {
                     const { data: storeFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id).eq('is_voided', false)
                         .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    transactions = storeFlows || [];
+                    capitalTransactions = storeFlows || [];
                 }
 
                 const typeMap = FundsPage._getFlowTypeMap(lang);
@@ -240,10 +237,10 @@
                 const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
 
                 let rows = '';
-                if (transactions.length === 0) {
+                if (capitalTransactions.length === 0) {
                     rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
                 } else {
-                    for (const t of transactions) {
+                    for (const t of capitalTransactions) {
                         rows += `<tr>
                             <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                             <td>${typeMap[t.flow_type] || t.flow_type}</td>
@@ -311,7 +308,7 @@
                         </div>
                     </div>`;
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
-                window._capitalTransactionsData = transactions;
+                window._capitalTransactionsData = capitalTransactions;
             } catch (error) {
                 console.error("showCapitalModal error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data transaksi' : '加载交易记录失败');
@@ -358,7 +355,7 @@
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<tr>`;
             } else {
                 for (const t of transactions) {
                     rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
@@ -397,7 +394,6 @@
         async showTransferModal(transferType) {
             const lang = Utils.lang;
             
-            // 员工禁止发起内部转账（双重保险：UI层也拦截）
             if (PERMISSION.isStaff()) {
                 Utils.toast.warning(lang === 'id'
                     ? 'Hanya manajer toko dan administrator yang dapat melakukan transfer internal.'
@@ -444,7 +440,6 @@
         async executeTransfer(transferType, amount) {
             const lang = Utils.lang;
             
-            // 员工禁止执行内部转账（双重保险）
             if (PERMISSION.isStaff()) {
                 Utils.toast.warning(lang === 'id'
                     ? 'Hanya manajer toko dan administrator yang dapat melakukan transfer internal.'
@@ -480,7 +475,7 @@
                 };
                 let rows = '';
                 if (transfers.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</tr>`;
+                    rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
                 } else {
                     for (const t of transfers) {
                         rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td>${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
@@ -522,7 +517,7 @@
                 rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
             } else {
                 for (const t of transfers) {
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td>${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td class="text-center">${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td class="text-center">${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                 }
             }
             tbody.innerHTML = rows;
