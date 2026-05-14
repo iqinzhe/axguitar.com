@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.1 (彻底修复资金流水打印分页问题)
+// app-dashboard-print.js - v2.0 
 
 'use strict';
 
