@@ -1,4 +1,4 @@
-// app-dashboard-orders.js - v2.4 (修复订单列表点击选中及操作按钮失效问题)
+// app-dashboard-orders.js - v2.0 
 // 功能：订单选中高亮 + 顶部固定操作栏（含筛选+统计+操作按钮）+ 门店账户缴纳费用按钮
 
 'use strict';
