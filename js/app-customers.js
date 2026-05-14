@@ -878,33 +878,13 @@
                 }
                 const successMsg = repaymentType === 'fixed' ? (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`) : (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nJangka Waktu Gadai: ${pawnTermMonths} bulan` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n典当期限: ${pawnTermMonths}个月`);
                 Utils.toast.success(successMsg, 5000);
-                document.getElementById("collateral").value = ''; 
-                document.getElementById("collateralNote").value = ''; 
-                document.getElementById("amount").value = ''; 
-                document.getElementById("notes").value = '';
-                const adminFeeEl = document.getElementById("adminFeeInput"); 
-                if (adminFeeEl) { adminFeeEl.value = '0'; delete adminFeeEl.dataset.manual; }
-                const svcInput = document.getElementById("serviceFeeInput");
-                if (svcInput) {
-                    svcInput.value = '0';
-                    delete svcInput.dataset.manual;
+                if (window.JF && JF.Cache) JF.Cache.clear();
+                // 保存成功后跳转到订单列表
+                if (window.APP && APP.showOrderTable) {
+                    APP.showOrderTable();
+                } else {
+                    APP.goBack();
                 }
-                const cashRadio = document.querySelector('input[name="feePaymentMethod"][value="cash"]'); 
-                if (cashRadio) cashRadio.checked = true;
-                const loanCashRadio = document.querySelector('input[name="loanSource"][value="cash"]'); 
-                if (loanCashRadio) loanCashRadio.checked = true;
-                const interestSelect = document.getElementById("agreedInterestRateSelect"); 
-                if (interestSelect) interestSelect.value = '10';
-                const flexibleRadio = document.getElementById("flexibleRadio"); 
-                if (flexibleRadio) { flexibleRadio.checked = true; APP.toggleRepaymentForm('flexible'); }
-                const pawnTermEl = document.getElementById('pawnTermSelect');
-                if (pawnTermEl) pawnTermEl.value = '';
-                const pawnDisplay = document.getElementById('pawnDueDateDisplay');
-                if (pawnDisplay) pawnDisplay.innerHTML = '';
-                APP.recalculateAllFees(); 
-                const monthlyInput = document.getElementById("monthlyPaymentInput"); 
-                if (monthlyInput) { monthlyInput.value = '0'; delete monthlyInput.dataset.manual; }
-                document.getElementById("collateral").focus();
             } catch (error) { 
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } 
                 console.error("saveOrderForCustomer error:", error); 
