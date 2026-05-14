@@ -1008,7 +1008,7 @@
             }
             if(filters.status && filters.status!=='all') q = q.eq('status', filters.status);
             if(from!==undefined && to!==undefined) q = q.range(from, to);
-            q = q.order('created_at', { ascending: false });
+            q = q.order('order_id', { ascending: false });
             const { data, error, count } = await q;
             if(error) throw error;
             return { data: data||[], totalCount: count||0 };
