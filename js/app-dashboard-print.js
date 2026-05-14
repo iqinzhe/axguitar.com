@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.0 (JF 命名空间) 
+// app-dashboard-print.js - v2.0 (修复资金流水打印分页问题)
 
 'use strict';
 
@@ -238,6 +238,29 @@
                         /* 用户/角色管理：操作行隐藏 */
                         .user-table .action-row,
                         .data-table .action-row { display: none !important; }
+                        /* ========== 修复资金流水打印分页问题 ========== */
+                        .page-header {
+                            break-after: avoid;
+                            page-break-after: avoid;
+                            margin-bottom: 10px;
+                        }
+                        .card:first-of-type {
+                            break-before: avoid;
+                            page-break-before: avoid;
+                            margin-top: 0;
+                        }
+                        /* 允许表格内部跨页，但不要切断表头 */
+                        table {
+                            break-inside: auto;
+                            page-break-inside: auto;
+                        }
+                        thead {
+                            display: table-header-group;
+                        }
+                        tbody tr {
+                            break-inside: avoid;
+                            page-break-inside: avoid;
+                        }
                         @media print {
                             @page { size: A4 portrait; margin: 8mm; }
                             body { margin: 0; padding: 0; }
@@ -246,6 +269,10 @@
                             .anomaly-card { break-inside: avoid; page-break-inside: avoid; }
                             .user-table .action-row,
                             .data-table .action-row { display: none !important; }
+                            /* 确保页眉和第一个卡片在同一页 */
+                            .page-header, .card:first-of-type {
+                                break-inside: avoid;
+                            }
                         }
                     </style>
                 </head>
@@ -425,7 +452,6 @@
                             <div class="label">${Utils.escapeHtml(item.label)}</div>
                             <div class="value">${Utils.escapeHtml(item.value)}</div>
                         </div>
-                    </div>
                     `).join('')}
                 </div>
             `;
