@@ -1,5 +1,5 @@
-// app-dashboard-orders.js - v2.0 (JF 命名空间) 
-// 订单选中高亮 + 顶部操作栏按钮功能 + 门店账户增加缴纳费用按钮
+// app-dashboard-orders.js - v2.3 (JF 命名空间) 
+// 功能：订单选中高亮 + 顶部固定操作栏（含筛选+统计+操作按钮）+ 门店账户缴纳费用按钮
 
 'use strict';
 
@@ -90,14 +90,14 @@
             // 构建顶部操作按钮（根据角色显示不同按钮）
             let actionButtonsHtml = '';
             if (!isAdmin) {
-                // 门店账户：查看、打印、缴纳费用
+                // 门店账户：缴纳费用、查看详细、打印本订单
                 actionButtonsHtml = `
                     <button id="globalPayBtn" class="btn btn--sm btn--success">💰 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>
                     <button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>
                     <button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>
                 `;
             } else {
-                // 管理员：全部按钮
+                // 管理员：查看、打印、修改、删除
                 actionButtonsHtml = `
                     <button id="globalViewBtn" class="btn btn--sm btn--primary">👁️ ${t('view_detail')}</button>
                     <button id="globalPrintBtn" class="btn btn--sm btn--outline">🖨️ ${t('print_this_order')}</button>
@@ -114,28 +114,29 @@
                         <button onclick="JF.OrdersPage.printAllOrders()" class="btn btn--outline">🖨️ ${t('print_order_list')}</button>
                     </div>
                 </div>
-                <div class="toolbar no-print">
-                    <select id="statusFilter" onchange="APP.filterOrders(this.value)">
-                        <option value="all" ${filters.status === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
-                        <option value="active" ${filters.status === 'active' ? 'selected' : ''}>${t('active')}</option>
-                        <option value="completed" ${filters.status === 'completed' ? 'selected' : ''}>${t('completed')}</option>
-                    </select>
-                </div>
-                <div class="info-bar info">
-                    <span class="info-bar-icon">📌</span>
-                    <div class="info-bar-content"><strong>${lang === 'id' ? 'Total' : '共'} ${totalCount} ${lang === 'id' ? 'pesanan' : '条订单'}</strong> — ${lang === 'id' ? `Menampilkan ${Math.min(PAGE_SIZE, totalCount)} pertama` : `显示前 ${Math.min(PAGE_SIZE, totalCount)} 条`}</div>
-                </div>
-                <!-- 全局操作栏 -->
-                <div class="card" style="margin-bottom: 12px; padding: 12px 16px; background: var(--bg-hover);">
-                    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                        <span style="font-weight: 600; color: var(--text-secondary);">${lang === 'id' ? 'Aksi untuk pesanan terpilih' : '已选订单操作'}:</span>
-                        <div class="action-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            ${actionButtonsHtml}
+                <!-- 固定操作栏：包含筛选、统计、操作按钮 -->
+                <div class="sticky-action-bar">
+                    <div class="action-bar-inner">
+                        <div class="action-bar-row">
+                            <div class="filter-group">
+                                <select id="statusFilter" onchange="APP.filterOrders(this.value)" class="status-filter-select">
+                                    <option value="all" ${filters.status === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
+                                    <option value="active" ${filters.status === 'active' ? 'selected' : ''}>${t('active')}</option>
+                                    <option value="completed" ${filters.status === 'completed' ? 'selected' : ''}>${t('completed')}</option>
+                                </select>
+                                <span class="order-stats-badge">📊 ${lang === 'id' ? 'Total' : '共'} ${totalCount} ${lang === 'id' ? 'pesanan' : '条订单'} — ${lang === 'id' ? `Menampilkan ${Math.min(PAGE_SIZE, totalCount)} pertama` : `显示前 ${Math.min(PAGE_SIZE, totalCount)} 条`}</span>
+                            </div>
+                            <div class="action-buttons-group">
+                                <span class="action-label-text">${lang === 'id' ? '已选订单操作' : '已选订单操作'}:</span>
+                                <div class="action-buttons">
+                                    ${actionButtonsHtml}
+                                </div>
+                                <span id="selectedOrderDisplay" class="selected-order-display">${lang === 'id' ? '未选择任何订单' : '未选择任何订单'}</span>
+                            </div>
                         </div>
-                        <span id="selectedOrderDisplay" style="font-size: 12px; color: var(--primary); margin-left: auto;">${lang === 'id' ? 'Belum ada pesanan dipilih' : '未选择任何订单'}</span>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card order-table-card">
                     <div class="table-container">
                         <table class="data-table order-table">
                             <thead>
@@ -270,7 +271,7 @@
             const selectedDisplay = document.getElementById('selectedOrderDisplay');
             if (selectedDisplay) {
                 const lang = Utils.lang;
-                selectedDisplay.innerHTML = lang === 'id' ? 'Belum ada pesanan dipilih' : '未选择任何订单';
+                selectedDisplay.innerHTML = lang === 'id' ? '未选择任何订单' : '未选择任何订单';
                 selectedDisplay.style.color = 'var(--primary)';
             }
         },
@@ -294,7 +295,7 @@
             const lang = Utils.lang;
             const orderId = this._getSelectedOrderId();
             if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                Utils.toast.warning(lang === 'id' ? '请先选择要操作的订单' : '请先选择要操作的订单');
                 return;
             }
             await this.viewOrder(orderId);
@@ -305,7 +306,7 @@
             const lang = Utils.lang;
             const orderId = this._getSelectedOrderId();
             if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                Utils.toast.warning(lang === 'id' ? '请先选择要操作的订单' : '请先选择要操作的订单');
                 return;
             }
             await this.printOrder(orderId);
@@ -318,12 +319,12 @@
             const orderStatus = this._getSelectedOrderStatus();
             
             if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                Utils.toast.warning(lang === 'id' ? '请先选择要操作的订单' : '请先选择要操作的订单');
                 return;
             }
             
             if (orderStatus !== 'active') {
-                Utils.toast.warning(lang === 'id' ? 'Hanya pesanan aktif yang dapat dibayar' : '只有进行中的订单可以缴费');
+                Utils.toast.warning(lang === 'id' ? '只有进行中的订单可以缴费' : '只有进行中的订单可以缴费');
                 return;
             }
             
@@ -335,18 +336,18 @@
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
             if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? 'Hanya administrator yang dapat mengedit pesanan' : '仅管理员可修改订单');
+                Utils.toast.warning(lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单');
                 return;
             }
             const orderId = this._getSelectedOrderId();
             if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                Utils.toast.warning(lang === 'id' ? '请先选择要操作的订单' : '请先选择要操作的订单');
                 return;
             }
             if (JF.AdminEditOrder && JF.AdminEditOrder.adminEditOrder) {
                 await JF.AdminEditOrder.adminEditOrder(orderId);
             } else {
-                Utils.toast.error(lang === 'id' ? 'Fungsi edit tidak tersedia' : '编辑功能不可用');
+                Utils.toast.error(lang === 'id' ? '编辑功能不可用' : '编辑功能不可用');
             }
         },
 
@@ -355,12 +356,12 @@
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
             if (!isAdmin) {
-                Utils.toast.warning(lang === 'id' ? 'Hanya administrator yang dapat menghapus pesanan' : '仅管理员可删除订单');
+                Utils.toast.warning(lang === 'id' ? '仅管理员可删除订单' : '仅管理员可删除订单');
                 return;
             }
             const orderId = this._getSelectedOrderId();
             if (!orderId) {
-                Utils.toast.warning(lang === 'id' ? 'Silakan pilih pesanan terlebih dahulu' : '请先选择要操作的订单');
+                Utils.toast.warning(lang === 'id' ? '请先选择要操作的订单' : '请先选择要操作的订单');
                 return;
             }
             await this.deleteOrder(orderId);
@@ -377,7 +378,6 @@
             const deleteBtn = document.getElementById('globalDeleteBtn');
             
             if (viewBtn) {
-                // 移除旧事件，避免重复绑定
                 const newViewBtn = viewBtn.cloneNode(true);
                 viewBtn.parentNode.replaceChild(newViewBtn, viewBtn);
                 newViewBtn.onclick = () => this._globalViewOrder();
@@ -440,7 +440,7 @@
                     <p><strong>${t('monthly_payment')}:</strong> ${Utils.formatCurrency(fixedPayment)}</p>
                     <p><strong>${lang === 'id' ? 'Progress' : '进度'}:</strong> ${paidMonths}/${totalMonths} ${lang === 'id' ? 'bulan' : '个月'}</p>`;
             } else {
-                repaymentInfoHtml = `<p><strong>${t('repayment_type')}:</strong> 💰 ${t('flexible_repayment')} (${lang === 'id' ? 'Maksimal perpanjangan 10 bulan' : '最长延期10个月'})</p>`;
+                repaymentInfoHtml = `<p><strong>${t('repayment_type')}:</strong> 💰 ${t('flexible_repayment')} (${lang === 'id' ? '最长延期10个月' : '最长延期10个月'})</p>`;
             }
 
             let payRows = '';
@@ -458,7 +458,7 @@
                     </tr>`;
                 }
             } else {
-                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></tr>`;
+                payRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td></td>`;
             }
 
             const content = `
@@ -472,10 +472,10 @@
                 <div class="card">
                     <div class="order-detail-grid">
                         <div class="info-column">
-                            <h3>📋 ${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
+                            <h3>📋 ${lang === 'id' ? '订单信息' : '订单信息'}</h3>
                             <p><strong>${t('order_id')}:</strong> ${Utils.escapeHtml(order.order_id)}</p>
                             <p><strong>${t('status')}:</strong> <span class="badge badge--${order.status}">${statusMap[order.status] || order.status}</span></p>
-                            <p><strong>${lang === 'id' ? 'Tanggal Dibuat' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
+                            <p><strong>${lang === 'id' ? '创建日期' : '创建日期'}:</strong> ${Utils.formatDate(order.created_at)}</p>
                             ${repaymentInfoHtml}
                             <h3 style="margin-top:16px;">👤 ${t('customer_info')}</h3>
                             <p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(order.customer_name)}</p>
@@ -487,23 +487,23 @@
                             <h3>💎 ${t('collateral_info')}</h3>
                             <p><strong>${t('collateral_name')}:</strong> ${Utils.escapeHtml(order.collateral_name)}</p>
                             <p><strong>${t('loan_amount')}:</strong> ${Utils.formatCurrency(order.loan_amount)}</p>
-                            <h3 style="margin-top:16px;">💰 ${lang === 'id' ? 'Rincian Biaya' : '费用明细'}</h3>
-                            <p><strong>${t('admin_fee')}:</strong> ${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')}</p>
-                            <p><strong>${t('service_fee')}:</strong> ${Utils.formatCurrency(order.service_fee_amount || 0)} (${order.service_fee_percent || 0}%) ${order.service_fee_amount > 0 ? ((order.service_fee_paid || 0) >= (order.service_fee_amount || 0) ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴')) : '—'}</p>
-                            <p><strong>${lang === 'id' ? 'Bunga Bulanan (saat ini)' : '月利息（当前）'}:</strong> ${Utils.formatCurrency(currentMonthlyInterest)} <small>（${lang === 'id' ? 'berdasarkan sisa pokok' : '基于剩余本金'} ${Utils.formatCurrency(remainingPrincipal)} × ${(monthlyRate*100).toFixed(0)}%）</small></p>
-                            <p><strong>${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? 'bulan' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
-                            <p><strong>${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
+                            <h3 style="margin-top:16px;">💰 ${lang === 'id' ? '费用明细' : '费用明细'}</h3>
+                            <p><strong>${t('admin_fee')}:</strong> ${Utils.formatCurrency(order.admin_fee)} ${order.admin_fee_paid ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴')}</p>
+                            <p><strong>${t('service_fee')}:</strong> ${Utils.formatCurrency(order.service_fee_amount || 0)} (${order.service_fee_percent || 0}%) ${order.service_fee_amount > 0 ? ((order.service_fee_paid || 0) >= (order.service_fee_amount || 0) ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴')) : '—'}</p>
+                            <p><strong>${lang === 'id' ? '月利息（当前）' : '月利息（当前）'}:</strong> ${Utils.formatCurrency(currentMonthlyInterest)} <small>（${lang === 'id' ? '基于剩余本金' : '基于剩余本金'} ${Utils.formatCurrency(remainingPrincipal)} × ${(monthlyRate*100).toFixed(0)}%）</small></p>
+                            <p><strong>${lang === 'id' ? '已付利息' : '已付利息'}:</strong> ${order.interest_paid_months} ${lang === 'id' ? '个月' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
+                            <p><strong>${lang === 'id' ? '剩余本金' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
                             <p><strong>${t('payment_due_date')}:</strong> ${nextDueDate}</p>
                             <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes || '-')}</p>
                         </div>
                     </div>
-                    <div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>${lang === 'id' ? 'Tips:' : '温馨提示：'}</strong> ${lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pembayaran pokok lebih awal dapat mengurangi beban bunga. Setelah lunas, sistem akan membuat tanda terima pelunasan secara otomatis.' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。'}</div></div>
-                    <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
-                    <div class="table-container"><table class="data-table payment-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${payRows}</tbody></table></div>
+                    <div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>${lang === 'id' ? '温馨提示：' : '温馨提示：'}</strong> ${lang === 'id' ? '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。'}</div></div>
+                    <h3>📋 ${lang === 'id' ? '缴费记录' : '缴费记录'}</h3>
+                    <div class="table-container"><table class="data-table payment-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${lang === 'id' ? '月数' : '月数'}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${lang === 'id' ? '支付方式' : '支付方式'}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${payRows}</tbody></table></div>
                     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">
                         <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
-                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeHtml(order.order_id)}'})" class="btn btn--success">💸 ${lang === 'id' ? 'Bayar Biaya' : '缴纳费用'}</button>` : ''}
-                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeHtml(order.order_id)}')" class="btn btn--success">🧾 ${lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证'}</button>` : ''}
+                        ${order.status === 'active' && !isAdmin ? `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeHtml(order.order_id)}'})" class="btn btn--success">💸 ${lang === 'id' ? '缴纳费用' : '缴纳费用'}</button>` : ''}
+                        ${order.status === 'completed' ? `<button onclick="APP.printSettlementReceipt('${Utils.escapeHtml(order.order_id)}')" class="btn btn--success">🧾 ${lang === 'id' ? '结清凭证' : '结清凭证'}</button>` : ''}
                         <button onclick="APP.sendWAReminder('${Utils.escapeHtml(order.order_id)}')" class="btn btn--warning">📱 ${lang === 'id' ? 'WA提醒' : 'WA提醒'}</button>
                     </div>
                 </div>`;
@@ -528,7 +528,7 @@
             if (!state) return;
             const lang = Utils.lang;
             const loadMoreBtn = document.querySelector('#loadMoreRow button');
-            if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...'); }
+            if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? '加载中...' : '加载中...'); }
 
             try {
                 const { orders, totalCount } = await this._fetchOrderData(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
@@ -542,8 +542,8 @@
                 this._bindRowClickEvents();
             } catch (err) {
                 console.error("loadMoreOrders error:", err);
-                if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'); }
-                Utils.toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
+                if (loadMoreBtn) { loadMoreBtn.disabled = false; loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? '加载更多' : '加载更多'); }
+                Utils.toast.error(lang === 'id' ? '加载更多失败' : '加载更多失败');
             }
         },
 
@@ -558,15 +558,15 @@
             const lang = Utils.lang;
             if (state.currentFrom < state.totalCount) {
                 const remaining = state.totalCount - state.currentFrom;
-                const btn = `<button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ${lang === 'id' ? 'Muat Lebih Banyak' : '加载更多'} (${remaining} ${lang === 'id' ? 'tersisa' : '剩余'})</button>`;
+                const btn = `<button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ${lang === 'id' ? '加载更多' : '加载更多'} (${remaining} ${lang === 'id' ? '剩余' : '剩余'})</button>`;
                 const row = document.createElement('tr');
                 row.id = 'loadMoreRow';
-                row.innerHTML = `<td colspan="${state.totalCols}" style="text-align:center;padding:14px;">${btn}</tr>`;
+                row.innerHTML = `<td colspan="${state.totalCols}" style="text-align:center;padding:14px;">${btn}</td>`;
                 tbody.appendChild(row);
             } else if (state.totalCount > 0) {
                 const row = document.createElement('tr');
                 row.id = 'loadMoreRow';
-                row.innerHTML = `<td colspan="${state.totalCols}" style="text-align:center;padding:14px;color:var(--text-muted);">✅ ${lang === 'id' ? `Semua ${state.totalCount} pesanan telah dimuat` : `已加载全部 ${state.totalCount} 条订单`}</td>`;
+                row.innerHTML = `<td colspan="${state.totalCols}" style="text-align:center;padding:14px;color:var(--text-muted);">✅ ${lang === 'id' ? `已加载全部 ${state.totalCount} 条订单` : `已加载全部 ${state.totalCount} 条订单`}</td>`;
                 tbody.appendChild(row);
             }
         },
@@ -590,7 +590,7 @@
                 document.getElementById("app").innerHTML = contentHTML;
             } catch (error) {
                 console.error("viewOrder error:", error);
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal memuat pesanan' : '加载订单失败');
+                Utils.toast.error(Utils.lang === 'id' ? '加载订单失败' : '加载订单失败');
                 APP.goBack();
             }
         },
@@ -608,7 +608,7 @@
                 await this.showOrderTable();
             } catch (error) {
                 console.error("deleteOrder error:", error);
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal hapus: ' + error.message : '删除失败：' + error.message);
+                Utils.toast.error(Utils.lang === 'id' ? '删除失败：' + error.message : '删除失败：' + error.message);
             }
         },
 
@@ -632,9 +632,9 @@
 
                 try {
                     storeName = AUTH.getCurrentStoreName();
-                    roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
-                               AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
-                               (lang === 'id' ? 'Staf' : '员工');
+                    roleText = AUTH.isAdmin() ? (lang === 'id' ? '管理员' : '管理员') :
+                               AUTH.isStoreManager() ? (lang === 'id' ? '店长' : '店长') : 
+                               (lang === 'id' ? '员工' : '员工');
                     userName = AUTH.user?.name || '-';
                 } catch (e) {
                     storeName = '-';
@@ -647,22 +647,22 @@
                 const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
                 const monthlyRate = order.agreed_interest_rate || 0.10;
                 const currentMonthlyInterest = remainingPrincipal * monthlyRate;
-                const statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
-                                   order.status === 'completed' ? (lang === 'id' ? 'Lunas' : '已结清') :
-                                   (lang === 'id' ? 'Likuidasi' : '已变卖');
-                const repaymentText = order.repayment_type === 'fixed' ? (lang === 'id' ? 'Cicilan Tetap' : '固定还款') :
-                                     (lang === 'id' ? 'Cicilan Fleksibel' : '灵活还款');
+                const statusText = order.status === 'active' ? (lang === 'id' ? '进行中' : '进行中') :
+                                   order.status === 'completed' ? (lang === 'id' ? '已结清' : '已结清') :
+                                   (lang === 'id' ? '已变卖' : '已变卖');
+                const repaymentText = order.repayment_type === 'fixed' ? (lang === 'id' ? '固定还款' : '固定还款') :
+                                     (lang === 'id' ? '灵活还款' : '灵活还款');
 
                 const labels = {
-                    order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
-                    customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
-                    collateral_name: lang === 'id' ? 'Nama Jaminan' : '质押物名称',
-                    loan_amount: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额',
-                    repayment_type: lang === 'id' ? 'Jenis Cicilan' : '还款方式',
-                    status: lang === 'id' ? 'Status' : '状态',
-                    interest_rate: lang === 'id' ? 'Suku Bunga' : '约定利率',
-                    monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
-                    remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
+                    order_id: lang === 'id' ? '订单号' : '订单号',
+                    customer_name: lang === 'id' ? '客户姓名' : '客户姓名',
+                    collateral_name: lang === 'id' ? '质押物名称' : '质押物名称',
+                    loan_amount: lang === 'id' ? '贷款金额' : '贷款金额',
+                    repayment_type: lang === 'id' ? '还款方式' : '还款方式',
+                    status: lang === 'id' ? '状态' : '状态',
+                    interest_rate: lang === 'id' ? '约定利率' : '约定利率',
+                    monthly_interest: lang === 'id' ? '月利息' : '月利息',
+                    remaining_principal: lang === 'id' ? '剩余本金' : '剩余本金'
                 };
 
                 const infoItems = [
@@ -703,7 +703,7 @@
                         </tr>`;
                     }
                 } else {
-                    paymentRows = `<tr><td colspan="5" class="text-center">${lang === 'id' ? 'Tidak ada' : '无'}</td></tr>`;
+                    paymentRows = `<tr><td colspan="5" class="text-center">${lang === 'id' ? '无' : '无'}</td></tr>`;
                 }
 
                 const printWindow = window.open('', '_blank');
@@ -712,7 +712,7 @@
                     <html>
                     <head>
                         <meta charset="UTF-8">
-                        <title>JF! by Gadai - ${lang === 'id' ? 'Cetak Pesanan' : '打印订单'} - ${Utils.escapeHtml(order.order_id)}</title>
+                        <title>JF! by Gadai - ${lang === 'id' ? '打印订单' : '打印订单'} - ${Utils.escapeHtml(order.order_id)}</title>
                         <style>
                             * { box-sizing: border-box; margin: 0; padding: 0; }
                             body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; padding: 0; margin: 0; }
@@ -752,16 +752,16 @@
                                 </div>
                                 <div class="print-header-info">
                                     🏪 ${isAdmin
-                                        ? (lang === 'id' ? 'Kantor Pusat' : '总部')
-                                        : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
+                                        ? (lang === 'id' ? '总部' : '总部')
+                                        : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)
                                     } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
                                 </div>
                             </div>
-                            <h1 class="page-title">📄 ${lang === 'id' ? 'Detail Pesanan' : '订单详情'}</h1>
+                            <h1 class="page-title">📄 ${lang === 'id' ? '订单详情' : '订单详情'}</h1>
                             <div class="card">
-                                <h3>📋 ${lang === 'id' ? 'Informasi Pesanan' : '订单信息'}</h3>
+                                <h3>📋 ${lang === 'id' ? '订单信息' : '订单信息'}</h3>
                                 ${orderInfoGrid}
-                                <h3>📋 ${lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录'}</h3>
+                                <h3>📋 ${lang === 'id' ? '缴费记录' : '缴费记录'}</h3>
                                 <table>
                                     <thead>
                                         <tr>
@@ -776,7 +776,7 @@
                                 </table>
                             </div>
                             <div class="print-footer">
-                                JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+                                JF! by Gadai - ${lang === 'id' ? '典当管理系统' : '典当管理系统'}
                             </div>
                         </div>
                         <script>
@@ -791,7 +791,7 @@
                 printWindow.document.close();
             } catch (error) {
                 console.error("printOrder error:", error);
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
+                Utils.toast.error(Utils.lang === 'id' ? '打印订单失败' : '打印订单失败');
             }
         },
 
@@ -823,7 +823,7 @@
                             <td>${Utils.escapeHtml(p.orders?.customer_name || '-')}</td>
                             <td class="date-cell">${Utils.formatDate(p.date)}</td>
                             <td>${typeMap[p.type] || p.type}</td>
-                            <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' bln' : ' 个月') : '-'}</td>
+                            <td class="text-center">${p.months ? p.months + (lang === 'id' ? ' 个月' : ' 个月') : '-'}</td>
                             <td class="amount">${Utils.formatCurrency(p.amount)}</td>
                             <td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
                             <td class="desc-cell">${Utils.escapeHtml(p.description || '-')}</td>
@@ -838,19 +838,19 @@
                         <div class="card card--stat"><div class="stat-value income">${Utils.formatCurrency(totalServiceFee)}</div><div class="stat-label">${t('service_fee')}</div></div>
                         <div class="card card--stat"><div class="stat-value income">${Utils.formatCurrency(totalInterest)}</div><div class="stat-label">${t('interest')}</div></div>
                         <div class="card card--stat"><div class="stat-value">${Utils.formatCurrency(totalPrincipal)}</div><div class="stat-label">${t('principal')}</div></div>
-                        <div class="card card--stat"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal)}</div><div class="stat-label">${lang === 'id' ? 'Total Keseluruhan' : '全部总计'}</div></div>
+                        <div class="card card--stat"><div class="stat-value">${Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal)}</div><div class="stat-label">${lang === 'id' ? '全部总计' : '全部总计'}</div></div>
                     </div>
                     <div class="card">
                         <div class="table-container">
                             <table class="data-table payment-table">
-                                <thead><tr><th class="col-id">${t('order_id')}</th><th class="col-name">${t('customer_name')}</th><th class="col-date">${t('date')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${lang === 'id' ? 'Bulan' : '月数'}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${lang === 'id' ? 'Metode' : '支付方式'}</th><th class="col-desc">${t('description')}</th></tr></thead>
+                                <thead><tr><th class="col-id">${t('order_id')}</th><th class="col-name">${t('customer_name')}</th><th class="col-date">${t('date')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${lang === 'id' ? '月数' : '月数'}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${lang === 'id' ? '支付方式' : '支付方式'}</th><th class="col-desc">${t('description')}</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                         </div>
                     </div>`;
             } catch (error) {
                 console.error("showPaymentHistory error:", error);
-                Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
+                Utils.toast.error(lang === 'id' ? '加载缴费记录失败' : '加载缴费记录失败');
             }
         },
 
@@ -866,7 +866,7 @@
                 const MAX_PRINT_ORDERS = 500;
                 
                 Utils.toast.info(lang === 'id' 
-                    ? '⏳ Sedang menyiapkan data untuk dicetak...' 
+                    ? '⏳ 正在准备打印数据...' 
                     : '⏳ 正在准备打印数据...', 2000);
                 
                 const { orders: allOrdersResult, totalCount } = await this._fetchOrderData(filters, 0, MAX_PRINT_ORDERS);
@@ -874,12 +874,12 @@
                 
                 if (totalCount > MAX_PRINT_ORDERS) {
                     Utils.toast.warning(lang === 'id' 
-                        ? `⚠️ Hanya ${MAX_PRINT_ORDERS} dari ${totalCount} pesanan yang akan dicetak. Gunakan filter untuk mencetak sebagian.`
+                        ? `⚠️ 仅打印前 ${MAX_PRINT_ORDERS} 条订单（共 ${totalCount} 条）。请使用筛选条件分批打印。`
                         : `⚠️ 仅打印前 ${MAX_PRINT_ORDERS} 条订单（共 ${totalCount} 条）。请使用筛选条件分批打印。`, 5000);
                 }
                 
                 if (orders.length === 0) {
-                    Utils.toast.warning(lang === 'id' ? 'Tidak ada data untuk dicetak' : '没有可打印的数据');
+                    Utils.toast.warning(lang === 'id' ? '没有可打印的数据' : '没有可打印的数据');
                     return;
                 }
                 
@@ -892,7 +892,7 @@
                     const nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                     const remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
                     const currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
-                    const repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
+                    const repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? '固定' : '固定') : (lang === 'id' ? '灵活' : '灵活');
                     const statusText = o.status === 'active' ? t('status_active') : (o.status === 'completed' ? t('status_completed') : t('status_liquidated'));
 
                     rows += `<tr>
@@ -901,7 +901,7 @@
                         <td>${Utils.escapeHtml(o.collateral_name)}</td>
                         <td class="amount">${Utils.formatCurrency(o.loan_amount)}</td>
                         <td class="amount">${Utils.formatCurrency(currentMonthlyInterest)}</td>
-                        <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? 'bln' : '个月'}</td>
+                        <td class="text-center">${o.interest_paid_months} ${lang === 'id' ? '个月' : '个月'}</td>
                         <td class="text-center">${nextDueDate}</td>
                         <td class="text-center">${repaymentTypeText}</td>
                         <td class="text-center">${statusText}</td>
@@ -915,8 +915,8 @@
                         <th>${t('customer_name')}</th>
                         <th>${t('collateral_name')}</th>
                         <th class="amount">${t('loan_amount')}</th>
-                        <th class="amount">${lang === 'id' ? 'Bunga Bulanan' : '月利息'}</th>
-                        <th class="text-center">${lang === 'id' ? 'Bunga Dibayar' : '已付利息'}</th>
+                        <th class="amount">${lang === 'id' ? '月利息' : '月利息'}</th>
+                        <th class="text-center">${lang === 'id' ? '已付利息' : '已付利息'}</th>
                         <th class="text-center">${t('payment_due_date')}</th>
                         <th class="text-center">${t('repayment_type')}</th>
                         <th class="text-center">${t('status')}</th>
@@ -926,9 +926,9 @@
                 let storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
-                    roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
-                               AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') :
-                               (lang === 'id' ? 'Staf' : '员工');
+                    roleText = AUTH.isAdmin() ? (lang === 'id' ? '管理员' : '管理员') :
+                               AUTH.isStoreManager() ? (lang === 'id' ? '店长' : '店长') :
+                               (lang === 'id' ? '员工' : '员工');
                     userName = AUTH.user?.name || '-';
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
                 const printDateTime = new Date().toLocaleString();
@@ -990,19 +990,19 @@
                                 </div>
                                 <div class="print-header-info">
                                     🏪 ${isAdmin
-                                        ? (lang === 'id' ? 'Kantor Pusat' : '总部')
-                                        : (lang === 'id' ? 'Toko：' : '门店：') + Utils.escapeHtml(storeName)
+                                        ? (lang === 'id' ? '总部' : '总部')
+                                        : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)
                                     } &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)} &nbsp;|&nbsp; 📅 ${printDateTime}
                                 </div>
                             </div>
                             ${totalCount > MAX_PRINT_ORDERS ? `
                             <div class="print-warning">
                                 ⚠️ ${lang === 'id' 
-                                    ? `Hanya ${orders.length} dari ${totalCount} pesanan yang dicetak. Gunakan filter untuk mencetak sebagian.`
+                                    ? `仅打印 ${orders.length} 条订单（共 ${totalCount} 条）。请使用筛选条件分批打印。`
                                     : `仅打印 ${orders.length} 条订单（共 ${totalCount} 条）。请使用筛选条件分批打印。`}
                             </div>
                             ` : ''}
-                            <div class="page-title">📋 ${t('order_list')} &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">${lang === 'id' ? 'Total' : '共'} ${orders.length} ${lang === 'id' ? 'pesanan' : '条订单'} ${totalCount > orders.length ? `(dari ${totalCount})` : ''}</small></div>
+                            <div class="page-title">📋 ${t('order_list')} &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">${lang === 'id' ? '共' : '共'} ${orders.length} ${lang === 'id' ? '条订单' : '条订单'} ${totalCount > orders.length ? `(共 ${totalCount})` : ''}</small></div>
                             <table>
                                 <colgroup>
                                     <col class="col-id">
@@ -1020,7 +1020,7 @@
                                 <tbody>${rows}</tbody>
                             </table>
                             <div class="print-footer">
-                                JF! by Gadai - ${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}
+                                JF! by Gadai - ${lang === 'id' ? '典当管理系统' : '典当管理系统'}
                             </div>
                         </div>
                         <script>
@@ -1035,7 +1035,7 @@
                 printWindow.document.close();
             } catch (error) {
                 console.error('打印订单列表失败:', error);
-                Utils.toast.error(lang === 'id' ? 'Gagal mencetak daftar pesanan' : '打印订单列表失败');
+                Utils.toast.error(lang === 'id' ? '打印订单列表失败' : '打印订单列表失败');
             }
         }
     };
@@ -1066,7 +1066,7 @@
         };
     }
 
-    // 添加选中行的CSS样式（立即执行）
+    // 添加选中行的CSS样式（立即执行）- 固定操作栏样式已移至 components.css
     if (!document.getElementById('orderRowSelectedStyle')) {
         const style = document.createElement('style');
         style.id = 'orderRowSelectedStyle';
@@ -1098,7 +1098,7 @@
     const AdminEditOrder = {
         async adminEditOrder(orderId) {
             if (!PERMISSION.isAdmin()) {
-                Utils.toast.error(Utils.lang === 'id' ? 'Hanya administrator yang dapat mengedit pesanan' : '仅管理员可修改订单');
+                Utils.toast.error(Utils.lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单');
                 return;
             }
             const lang = Utils.lang;
@@ -1114,20 +1114,20 @@
 
                 document.getElementById('app').innerHTML = `
                     <div class="page-header">
-                        <h2>✏️ ${lang === 'id' ? 'Edit Pesanan' : '修改订单'} — ${Utils.escapeHtml(orderId)}</h2>
+                        <h2>✏️ ${lang === 'id' ? '修改订单' : '修改订单'} — ${Utils.escapeHtml(orderId)}</h2>
                         <div class="header-actions">
                             <button onclick="JF.AdminEditOrder.adminCancelEdit('${Utils.escapeHtml(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
                         </div>
                     </div>
                     <div class="card">
                         <div class="info-bar warning"><span class="info-bar-icon">⚠️</span>
-                            <div class="info-bar-content"><strong>${lang === 'id' ? 'Mode Edit Admin' : '管理员编辑模式'}：</strong>
-                            ${lang === 'id' ? 'Pesanan telah dibuka kuncinya. Setelah simpan, pesanan akan dikunci kembali secara otomatis.' : '订单已临时解锁。保存后将自动重新锁定。'}</div>
+                            <div class="info-bar-content"><strong>${lang === 'id' ? '管理员编辑模式' : '管理员编辑模式'}：</strong>
+                            ${lang === 'id' ? '订单已临时解锁。保存后将自动重新锁定。' : '订单已临时解锁。保存后将自动重新锁定。'}</div>
                         </div>
                         <div class="form-section">
-                            <div class="form-section-title"><span class="section-icon">📋</span> ${lang === 'id' ? 'Informasi Dasar' : '基本信息'}</div>
+                            <div class="form-section-title"><span class="section-icon">📋</span> ${lang === 'id' ? '基本信息' : '基本信息'}</div>
                             <div class="form-grid">
-                                <div class="form-group"><label>${lang === 'id' ? 'Tanggal Pesanan' : '订单日期'}</label>
+                                <div class="form-group"><label>${lang === 'id' ? '订单日期' : '订单日期'}</label>
                                     <input type="date" id="edit_order_date" value="${orderDate}" max="${today}"></div>
                                 <div class="form-group"><label>${t('collateral_name')}</label>
                                     <input type="text" id="edit_collateral" value="${Utils.escapeHtml(order.collateral_name || '')}"></div>
@@ -1151,17 +1151,17 @@
                             </div>
                         </div>
                         <div class="form-section">
-                            <div class="form-section-title"><span class="section-icon">💰</span> ${lang === 'id' ? 'Rincian Biaya' : '费用明细'}</div>
+                            <div class="form-section-title"><span class="section-icon">💰</span> ${lang === 'id' ? '费用明细' : '费用明细'}</div>
                             <div class="form-grid">
                                 <div class="form-group"><label>${t('admin_fee')} (Rp)</label>
                                     <input type="text" id="edit_admin_fee" class="amount-input" value="${Utils.formatNumberWithCommas(order.admin_fee || 0)}">
-                                    <div class="form-hint">💡 ${lang === 'id' ? 'Isi 0 untuk dibebaskan' : '填0即为免除'}</div></div>
+                                    <div class="form-hint">💡 ${lang === 'id' ? '填0即为免除' : '填0即为免除'}</div></div>
                                 <div class="form-group"><label>${t('service_fee')} (Rp)</label>
                                     <input type="text" id="edit_service_fee" class="amount-input" value="${Utils.formatNumberWithCommas(order.service_fee_amount || 0)}">
-                                    <div class="form-hint">💡 ${lang === 'id' ? 'Isi 0 untuk dibebaskan' : '填0即为免除'}</div></div>
+                                    <div class="form-hint">💡 ${lang === 'id' ? '填0即为免除' : '填0即为免除'}</div></div>
                                 <div class="form-group"><label>${t('service_fee')} %</label>
                                     <input type="number" id="edit_service_fee_percent" value="${order.service_fee_percent || 0}" min="0" max="10" step="0.5"></div>
-                                <div class="form-group"><label>${lang === 'id' ? 'Suku Bunga (%)' : '月利率 (%)'}</label>
+                                <div class="form-group"><label>${lang === 'id' ? '月利率 (%)' : '月利率 (%)'}</label>
                                     <select id="edit_interest_rate">${Utils.getInterestRateOptions((order.agreed_interest_rate || 0.10) * 100)}</select></div>
                             </div>
                         </div>
@@ -1173,29 +1173,29 @@
                                         <option value="flexible" ${order.repayment_type === 'flexible' ? 'selected' : ''}>${t('flexible_repayment')}</option>
                                         <option value="fixed" ${order.repayment_type === 'fixed' ? 'selected' : ''}>${t('fixed_repayment')}</option>
                                     </select></div>
-                                <div class="form-group"><label>${t('term_months')} ${lang === 'id' ? '(Cicilan Tetap)' : '（固定期数）'}</label>
-                                    <input type="number" id="edit_repayment_term" value="${order.repayment_term || ''}" min="1" max="10" placeholder="${lang === 'id' ? 'Kosong jika fleksibel' : '灵活还款可留空'}"></div>
+                                <div class="form-group"><label>${t('term_months')} ${lang === 'id' ? '（固定期数）' : '（固定期数）'}</label>
+                                    <input type="number" id="edit_repayment_term" value="${order.repayment_term || ''}" min="1" max="10" placeholder="${lang === 'id' ? '灵活还款可留空' : '灵活还款可留空'}"></div>
                                 <div class="form-group"><label>${t('monthly_payment')} (Rp)</label>
                                     <input type="text" id="edit_monthly_payment" class="amount-input" value="${Utils.formatNumberWithCommas(order.monthly_fixed_payment || 0)}"></div>
-                                <div class="form-group"><label>${lang === 'id' ? 'Jangka Gadai (bln)' : '典当期限（月）'}</label>
-                                    <input type="number" id="edit_pawn_term" value="${order.pawn_term_months || ''}" min="1" max="36" placeholder="${lang === 'id' ? 'Kosong jika tidak ada' : '无则留空'}"></div>
-                                <div class="form-group"><label>${lang === 'id' ? 'Batas Perpanjangan (bln)' : '最大延期月数'}</label>
+                                <div class="form-group"><label>${lang === 'id' ? '典当期限（月）' : '典当期限（月）'}</label>
+                                    <input type="number" id="edit_pawn_term" value="${order.pawn_term_months || ''}" min="1" max="36" placeholder="${lang === 'id' ? '无则留空' : '无则留空'}"></div>
+                                <div class="form-group"><label>${lang === 'id' ? '最大延期月数' : '最大延期月数'}</label>
                                     <input type="number" id="edit_max_extension" value="${order.max_extension_months || 10}" min="1" max="36"></div>
                             </div>
                         </div>
                         <div class="form-section">
-                            <div class="form-section-title"><span class="section-icon">💳</span> ${lang === 'id' ? 'Status Pembayaran Biaya' : '费用缴纳状态'}</div>
+                            <div class="form-section-title"><span class="section-icon">💳</span> ${lang === 'id' ? '费用缴纳状态' : '费用缴纳状态'}</div>
                             <div class="form-grid">
-                                <div class="form-group"><label>${t('admin_fee')} ${lang === 'id' ? 'Lunas?' : '已缴？'}</label>
+                                <div class="form-group"><label>${t('admin_fee')} ${lang === 'id' ? '已缴？' : '已缴？'}</label>
                                     <select id="edit_admin_fee_paid">
-                                        <option value="true" ${order.admin_fee_paid ? 'selected' : ''}>${lang === 'id' ? '✅ Sudah' : '✅ 已缴'}</option>
-                                        <option value="false" ${!order.admin_fee_paid ? 'selected' : ''}>${lang === 'id' ? '❌ Belum' : '❌ 未缴'}</option>
+                                        <option value="true" ${order.admin_fee_paid ? 'selected' : ''}>${lang === 'id' ? '✅ 已缴' : '✅ 已缴'}</option>
+                                        <option value="false" ${!order.admin_fee_paid ? 'selected' : ''}>${lang === 'id' ? '❌ 未缴' : '❌ 未缴'}</option>
                                     </select></div>
                             </div>
                         </div>
                         <div class="form-actions">
                             <button onclick="JF.AdminEditOrder.adminSaveOrder('${Utils.escapeHtml(orderId)}')" class="btn btn--success" id="adminSaveBtn">
-                                💾 ${lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'}
+                                💾 ${lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'}
                             </button>
                             <button onclick="JF.AdminEditOrder.adminCancelEdit('${Utils.escapeHtml(orderId)}')" class="btn btn--outline">↩️ ${t('cancel')}</button>
                         </div>
@@ -1208,20 +1208,20 @@
 
             } catch (error) {
                 console.error('adminEditOrder error:', error);
-                Utils.toast.error(error.message || (Utils.lang === 'id' ? 'Gagal membuka pesanan' : '打开订单失败'));
+                Utils.toast.error(error.message || (Utils.lang === 'id' ? '打开订单失败' : '打开订单失败'));
             }
         },
 
         async adminSaveOrder(orderId) {
             if (!PERMISSION.isAdmin()) {
-                Utils.toast.error(Utils.lang === 'id' ? 'Hanya administrator yang dapat menyimpan perubahan' : '仅管理员可保存修改');
+                Utils.toast.error(Utils.lang === 'id' ? '仅管理员可保存修改' : '仅管理员可保存修改');
                 return;
             }
             const lang = Utils.lang;
             const saveBtn = document.getElementById('adminSaveBtn');
             if (saveBtn) {
                 saveBtn.disabled = true;
-                saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...');
+                saveBtn.textContent = '⏳ ' + (lang === 'id' ? '保存中...' : '保存中...');
             }
 
             try {
@@ -1246,8 +1246,8 @@
                 const notes         = document.getElementById('edit_notes')?.value.trim() || '';
 
                 if (!collateral || loanAmount <= 0) {
-                    Utils.toast.warning(lang === 'id' ? 'Agunan dan jumlah pinjaman wajib diisi' : '抵押物和贷款金额不能为空');
-                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); }
+                    Utils.toast.warning(lang === 'id' ? '抵押物和贷款金额不能为空' : '抵押物和贷款金额不能为空');
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); }
                     return;
                 }
 
@@ -1285,15 +1285,15 @@
 
                 await SUPABASE.relockOrder(orderId);
 
-                Utils.toast.success(lang === 'id' ? '✅ Pesanan berhasil diperbarui dan dikunci kembali!' : '✅ 订单已修改并重新锁定！');
+                Utils.toast.success(lang === 'id' ? '✅ 订单已修改并重新锁定！' : '✅ 订单已修改并重新锁定！');
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 await JF.OrdersPage.viewOrder(orderId);
 
             } catch (error) {
                 console.error('adminSaveOrder error:', error);
-                Utils.toast.error(error.message || (lang === 'id' ? 'Gagal menyimpan' : '保存失败'));
+                Utils.toast.error(error.message || (lang === 'id' ? '保存失败' : '保存失败'));
                 try { await SUPABASE.relockOrder(orderId); } catch(e) {}
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); }
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); }
             }
         },
 
