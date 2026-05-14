@@ -1,5 +1,4 @@
-// app-dashboard-funds.js - v2.1 (JF 命名空间) 修复资金流水加载问题
-// 修复：变量名冲突导致页面卡在"加载中"的问题
+// app-dashboard-funds.js - v2.0 (JF 命名空间) 
 
 'use strict';
 
