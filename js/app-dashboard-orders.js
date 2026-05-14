@@ -114,24 +114,25 @@
                         <button onclick="JF.OrdersPage.printAllOrders()" class="btn btn--outline">🖨️ ${t('print_order_list')}</button>
                     </div>
                 </div>
-                <!-- 固定操作栏：包含筛选、统计、操作按钮 -->
+                <!-- 固定操作栏：包含筛选、操作按钮（2行布局） -->
                 <div class="sticky-action-bar">
                     <div class="action-bar-inner">
-                        <div class="action-bar-row">
+                        <!-- 第1行：全部订单下拉 + 未选择任何订单 -->
+                        <div class="action-bar-row action-bar-row--top">
                             <div class="filter-group">
                                 <select id="statusFilter" onchange="APP.filterOrders(this.value)" class="status-filter-select">
                                     <option value="all" ${filters.status === 'all' ? 'selected' : ''}>${lang === 'id' ? 'Semua Pesanan' : '全部订单'}</option>
                                     <option value="active" ${filters.status === 'active' ? 'selected' : ''}>${t('active')}</option>
                                     <option value="completed" ${filters.status === 'completed' ? 'selected' : ''}>${t('completed')}</option>
                                 </select>
-                                <span class="order-stats-badge">📊 ${lang === 'id' ? 'Total' : '共'} ${totalCount} ${lang === 'id' ? 'pesanan' : '条订单'} — ${lang === 'id' ? `Menampilkan ${Math.min(PAGE_SIZE, totalCount)} pertama` : `显示前 ${Math.min(PAGE_SIZE, totalCount)} 条`}</span>
                             </div>
-                            <div class="action-buttons-group">
-                                <span class="action-label-text">${lang === 'id' ? '已选订单操作' : '已选订单操作'}:</span>
-                                <div class="action-buttons">
-                                    ${actionButtonsHtml}
-                                </div>
-                                <span id="selectedOrderDisplay" class="selected-order-display">${lang === 'id' ? '未选择任何订单' : '未选择任何订单'}</span>
+                            <span id="selectedOrderDisplay" class="selected-order-display">${lang === 'id' ? '未选择任何订单' : '未选择任何订单'}</span>
+                        </div>
+                        <!-- 第2行：已选订单操作 + 操作按钮 -->
+                        <div class="action-bar-row action-bar-row--bottom">
+                            <span class="action-label-text">${lang === 'id' ? '已选订单操作' : '已选订单操作'}:</span>
+                            <div class="action-buttons">
+                                ${actionButtonsHtml}
                             </div>
                         </div>
                     </div>
