@@ -1523,19 +1523,32 @@
     box-shadow: var(--shadow-sm);
   }
   .action-bar-inner {
-    padding: 12px 16px;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
-  .action-bar-row {
+  /* 第1行：筛选下拉 + 已选显示 */
+  .action-bar-row--top {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
+  }
+  /* 第2行：操作标签 + 按钮组 */
+  .action-bar-row--bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    border-top: 1px solid var(--border-light);
+    padding-top: 8px;
   }
   .filter-group {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
   }
   .status-filter-select {
@@ -1546,12 +1559,9 @@
     font-size: var(--font-sm);
     min-width: 140px;
   }
+  /* 隐藏统计文字徽章 */
   .order-stats-badge {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    background: var(--bg-hover);
-    padding: 6px 12px;
-    border-radius: var(--radius-md);
+    display: none;
   }
   .action-buttons-group {
     display: flex;
@@ -1563,6 +1573,7 @@
     font-weight: 600;
     color: var(--text-secondary);
     font-size: var(--font-sm);
+    white-space: nowrap;
   }
   .selected-order-display {
     font-size: var(--font-sm);
@@ -1577,14 +1588,12 @@
     .sticky-action-bar {
       top: 56px;
     }
-    .action-bar-row {
+    .action-bar-row--top,
+    .action-bar-row--bottom {
       flex-direction: column;
       align-items: stretch;
     }
     .filter-group {
-      justify-content: space-between;
-    }
-    .action-buttons-group {
       justify-content: space-between;
     }
     .action-buttons {
