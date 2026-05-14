@@ -185,6 +185,19 @@
   .data-table.striped tbody tr:nth-child(even) { background: var(--bg-page); }
   .data-table.striped tbody tr:hover { background: var(--bg-hover); }
 
+  /* 订单行可点击样式 */
+  .data-table tbody tr.order-row {
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  /* 选中高亮 */
+  .data-table tbody tr.row-selected,
+  .data-table tbody tr.row-selected:hover {
+    background: var(--primary-soft) !important;
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
+
   .data-table .text-left   { text-align: left; }
   .data-table .text-center { text-align: center; }
   .data-table .text-right  { text-align: right; }
