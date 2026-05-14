@@ -1,5 +1,5 @@
-// app-dashboard-orders.js - v2.2 (JF 命名空间) 
-// 修复：订单选中高亮 + 顶部操作栏按钮功能 + 门店账户增加缴纳费用按钮
+// app-dashboard-orders.js - v2.0 (JF 命名空间) 
+// 订单选中高亮 + 顶部操作栏按钮功能 + 门店账户增加缴纳费用按钮
 
 'use strict';
 
