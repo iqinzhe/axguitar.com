@@ -180,15 +180,14 @@
                 }
                 
                 const content = `
-                    <div class="page-header">
-                        <h2>👥 ${t('customers')}</h2>
-                        <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
-                            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button>
-                        </div>
-                    </div>
-                    ${mainContent}
-                    ${addCustomerCardHtml}`;
+    <div class="page-header">
+        <h2>👥 ${t('customers')}</h2>
+        <div class="header-actions">
+            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+            <button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${t('print')}</button>
+        </div>
+    </div>
+    ${!isAdmin ? addCustomerCardHtml + mainContent : mainContent}`;
                 return content;
             } catch (error) {
                 console.error("buildCustomersHTML error:", error);
