@@ -1512,6 +1512,7 @@
     }
 
   /* ---------- 固定操作栏（用于订单管理页面） ---------- */
+  /* ── 固定操作卡片 ── */
   .sticky-action-bar {
     position: sticky;
     top: 0;
@@ -1524,79 +1525,130 @@
   }
   .action-bar-inner {
     padding: 10px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
   }
-  /* 第1行：筛选下拉 + 已选显示 */
-  .action-bar-row--top {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  /* 第2行：操作标签 + 按钮组 */
-  .action-bar-row--bottom {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    border-top: 1px solid var(--border-light);
-    padding-top: 8px;
-  }
-  .filter-group {
+
+  /* 网页端：单行，所有区块水平排列 */
+  .action-bar-single-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 0;
+    flex-wrap: nowrap;
+    min-height: 40px;
   }
-  .status-filter-select {
-    padding: 8px 12px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-medium);
-    background: var(--bg-card);
-    font-size: var(--font-sm);
-    min-width: 140px;
+
+  /* 竖线分隔符 */
+  .action-bar-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border-medium);
+    margin: 0 12px;
+    flex-shrink: 0;
   }
-  /* 隐藏统计文字徽章 */
-  .order-stats-badge {
-    display: none;
-  }
-  .action-buttons-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
+
+  /* "操作:" 标签 */
   .action-label-text {
     font-weight: 600;
     color: var(--text-secondary);
     font-size: var(--font-sm);
     white-space: nowrap;
+    flex-shrink: 0;
   }
+
+  /* 每个区块 */
+  .action-bar-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  /* 区块2：筛选下拉 + 已选状态，允许收缩 */
+  .action-bar-section--filter {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  /* 区块3、4：按钮不换行 */
+  .action-bar-section--view,
+  .action-bar-section--edit {
+    flex-shrink: 0;
+  }
+
+  .status-filter-select {
+    padding: 6px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-medium);
+    background: var(--bg-card);
+    font-size: var(--font-sm);
+    min-width: 120px;
+    max-width: 150px;
+  }
+
   .selected-order-display {
     font-size: var(--font-sm);
     color: var(--primary);
     background: var(--primary-soft);
-    padding: 6px 12px;
+    padding: 5px 10px;
     border-radius: var(--radius-md);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
   }
 
-  /* 移动端适配 */
+  /* 隐藏统计文字徽章 */
+  .order-stats-badge {
+    display: none;
+  }
+
+  /* 旧布局类保留兼容（已不使用） */
+  .action-buttons-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .filter-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  /* ── 手机端：双列按钮网格 ── */
   @media (max-width: 768px) {
     .sticky-action-bar {
       top: 56px;
     }
-    .action-bar-row--top,
-    .action-bar-row--bottom {
-      flex-direction: column;
-      align-items: stretch;
-    }
-    .filter-group {
-      justify-content: space-between;
-    }
-    .action-buttons {
+    .action-bar-single-row {
       flex-wrap: wrap;
+      gap: 8px;
+    }
+    .action-bar-divider {
+      display: none;
+    }
+    /* 区块2占满整行 */
+    .action-bar-section--filter {
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .status-filter-select {
+      flex: 1;
+      max-width: none;
+    }
+    .selected-order-display {
+      flex: 1;
+      max-width: none;
+      text-align: center;
+    }
+    /* 区块3、4按钮双列网格 */
+    .action-bar-section--view,
+    .action-bar-section--edit {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      width: 100%;
+    }
+    .action-bar-section--view .btn,
+    .action-bar-section--edit .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    /* "操作:" 标签占满行 */
+    .action-label-text {
+      width: 100%;
+      padding-bottom: 2px;
+      border-bottom: 1px solid var(--border-light);
     }
   }
