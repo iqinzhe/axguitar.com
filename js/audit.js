@@ -1,7 +1,5 @@
 // audit.js - v2.0 (JF 命名空间) 
 // - 统一日志写入接口：log(action, detailsObject) 内部自动序列化
-// - 所有 logXxx() 方法传入对象而非预序列化字符串，避免双重序列化
-// - getLogs() 的安全说明：依赖 Supabase RLS 行级安全策略
 
 'use strict';
 
