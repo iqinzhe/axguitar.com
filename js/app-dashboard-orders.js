@@ -1132,7 +1132,7 @@
                 var client = SUPABASE.getClient();
                 var errorObj = await client.from('orders').update(updates).eq('order_id', orderId);
                 if (errorObj.error) throw errorObj.error;
-                // [修复] 管理员修改订单后，同步管理费和服务费的 payment_history 和 cash_flow_records
+                // 管理员修改订单后，同步管理费和服务费的 payment_history 和 cash_flow_records
                 await SUPABASE.syncFeesAfterAdminEdit(orderId, adminFee, adminFeePaid, serviceFee, orderDate);
                 await SUPABASE.relockOrder(orderId);
                 Utils.toast.success(lang === 'id' ? '✅ 订单已修改并重新锁定！' : '✅ 订单已修改并重新锁定！');
