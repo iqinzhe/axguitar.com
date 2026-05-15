@@ -1,6 +1,7 @@
 // store.js - v2.0 (JF 命名空间) 卡片式财务汇总
 // 打印：卡片单列垂直排列，占满宽度；屏幕：卡片间单列，内部4×3；手机：全单列
 // 12项双语标签；增加 totalOrders
+// [修复] 删除门店时增加完整的关联表检查，防止孤儿子数据
 
 'use strict';
 
@@ -63,10 +64,69 @@
             return updated;
         },
 
-        // ==================== 删除门店 ====================
+        // ==================== 删除门店（增强关联表检查） ====================
         async deleteStore(id) {
-            await SUPABASE.deleteStore(id);
-            StoreManager.stores = StoreManager.stores.filter(s => s.id !== id);
+            const lang = Utils.lang;
+            const client = SUPABASE.getClient();
+            
+            // 定义需要检查的关联表及其描述（用于错误提示）
+            const tablesToCheck = [
+                { table: 'orders', description: lang === 'id' ? 'pesanan' : '订单' },
+                { table: 'customers', description: lang === 'id' ? 'nasabah' : '客户' },
+                { table: 'expenses', description: lang === 'id' ? 'pengeluaran' : '支出记录' },
+                { table: 'blacklist', description: lang === 'id' ? 'blacklist' : '黑名单' },
+                { table: 'capital_injections', description: lang === 'id' ? 'injeksi modal' : '资本注入' },
+                { table: 'profit_distributions', description: lang === 'id' ? 'distribusi laba' : '收益处置' },
+                { table: 'internal_transfers', description: lang === 'id' ? 'transfer internal' : '内部转账' },
+                { table: 'cash_flow_records', description: lang === 'id' ? 'arus kas' : '资金流水' }
+            ];
+            
+            // 逐一检查每个关联表
+            for (const { table, description } of tablesToCheck) {
+                try {
+                    const { count, error } = await client
+                        .from(table)
+                        .select('*', { count: 'exact', head: true })
+                        .eq('store_id', id);
+                    
+                    if (error) {
+                        console.warn(`[StoreManager] 检查表 ${table} 失败:`, error.message);
+                        continue; // 查询失败时跳过该表检查（避免误拦截）
+                    }
+                    
+                    if (count > 0) {
+                        const errorMsg = lang === 'id'
+                            ? `Toko ini memiliki ${count} ${description}. Tidak dapat dihapus.`
+                            : `该门店包含 ${count} 条${description}，无法删除。`;
+                        throw new Error(errorMsg);
+                    }
+                } catch (checkError) {
+                    // 如果是我们主动抛出的错误，直接向上传递
+                    if (checkError.message && (checkError.message.includes('无法删除') || checkError.message.includes('Tidak dapat dihapus'))) {
+                        throw checkError;
+                    }
+                    // 其他查询错误仅记录，不阻塞删除（避免因某表查询失败而误判）
+                    console.warn(`[StoreManager] 检查表 ${table} 时发生异常:`, checkError.message);
+                }
+            }
+            
+            // 所有检查通过，执行删除
+            try {
+                const { error } = await client.from('stores').delete().eq('id', id);
+                if (error) throw error;
+                
+                // 更新本地缓存
+                StoreManager.stores = StoreManager.stores.filter(s => s.id !== id);
+                
+                if (window.Audit) {
+                    await window.Audit.logStoreAction(id, 'delete', '门店已删除，已检查所有关联表');
+                }
+                
+                Utils.toast.success(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
+            } catch (error) {
+                console.error('[StoreManager] deleteStore 执行失败:', error);
+                throw error;
+            }
         },
 
         // ==================== 暂停营业 ====================
@@ -582,7 +642,7 @@
                             <td>${Utils.escapeHtml(store.phone || '-')}</td>
                             <td><input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" onchange="StoreManager.updateStoreWANumber('${store.id}', this.value)"></td>
                             <td class="text-center">${statusBadgeHtml}</td>
-                         </tr>`;
+                          </tr>`;
 
                         let actionButtons = '';
                         if (isStore000) {
@@ -605,7 +665,7 @@
                         storeRows += `<tr class="action-row"${practiceRowStyle2}>
                             <td class="action-label">${t('action')}</td>
                             <td colspan="5"><div class="action-buttons">${actionButtons}</div></td>
-                         </tr>`;
+                          </tr>`;
                     }
                 }
 
