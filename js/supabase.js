@@ -555,7 +555,7 @@
     const { data, error } = await q;
     if(error) throw error;
     return data;
-}
+},
 
         escapePostgRESTValue(str) {
             if(!str) return '';
