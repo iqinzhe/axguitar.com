@@ -1,5 +1,6 @@
 // app-dashboard-anomaly.js - v2.0 (JF 命名空间) 
 // 增加更完善的防重复请求机制 + 移除按钮禁用时的状态残留
+// [修复 #7] 加载更多黑名单时间限制从 1000ms 改为 500ms
 
 'use strict';
 
@@ -166,16 +167,16 @@
                     let rows = '';
                     for (const o of orders) {
                         rows += `<tr>
-                            <td class="order-id">${Utils.escapeHtml(o.order_id)}</td>
-                            <td>${Utils.escapeHtml(o.customer_name)}</td>
-                            <td class="text-center expense">${o.overdue_days || 0}</td>
-                            <td class="amount">${Utils.formatCurrency(o.loan_amount)}</td>
+                            <td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td>
+                            <td>${Utils.escapeHtml(o.customer_name)}<\/td>
+                            <td class="text-center expense">${o.overdue_days || 0}<\/td>
+                            <td class="amount">${Utils.formatCurrency(o.loan_amount)}<\/td>
                             <td class="text-center">
-                                <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm">👁️ ${lang==='id'?'Lihat':'查看'}</button>
-                                ${stageKey==='collection'?`<button onclick="AnomalyPage.sendWAForStage('${Utils.escapeAttr(o.order_id)}','collection')" class="btn btn--sm" style="margin-left:4px;">📱 ${lang==='id'?'Kirim WA':'催收提醒'}</button>`:''}
-                                ${stageKey==='pre_auction'?`<button onclick="AnomalyPage.sendWAForStage('${Utils.escapeAttr(o.order_id)}','pre_auction')" class="btn btn--sm" style="margin-left:4px;">📣 ${lang==='id'?'Pemberitahuan':'发送公告'}</button>`:''}
-                                ${stageKey==='auction'&&showAuctionBtn?`<button onclick="AnomalyPage.startAuction('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger" style="margin-left:4px;">⚖️ ${lang==='id'?'Mulai Likuidasi':'启动变卖'}</button>`:''}
-                            </td>
+                                <button onclick="APP.viewOrder('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm">👁️ ${lang==='id'?'Lihat':'查看'}<\/button>
+                                ${stageKey==='collection'?`<button onclick="AnomalyPage.sendWAForStage('${Utils.escapeAttr(o.order_id)}','collection')" class="btn btn--sm" style="margin-left:4px;">📱 ${lang==='id'?'Kirim WA':'催收提醒'}<\/button>`:''}
+                                ${stageKey==='pre_auction'?`<button onclick="AnomalyPage.sendWAForStage('${Utils.escapeAttr(o.order_id)}','pre_auction')" class="btn btn--sm" style="margin-left:4px;">📣 ${lang==='id'?'Pemberitahuan':'发送公告'}<\/button>`:''}
+                                ${stageKey==='auction'&&showAuctionBtn?`<button onclick="AnomalyPage.startAuction('${Utils.escapeAttr(o.order_id)}')" class="btn btn--sm btn--danger" style="margin-left:4px;">⚖️ ${lang==='id'?'Mulai Likuidasi':'启动变卖'}<\/button>`:''}
+                            <\/td>
                         </tr>`;
                     }
                     const table = `<table class="data-table anomaly-table"><thead><tr><th class="col-id">${lang==='id'?'ID Pesanan':'订单号'}</th><th class="col-name">${lang==='id'?'Nama Nasabah':'客户姓名'}</th><th class="col-months text-center">${lang==='id'?'Hari Terlambat':'逾期天数'}</th><th class="col-amount amount">${lang==='id'?'Jumlah Pinjaman':'贷款金额'}</th><th class="text-center">${lang==='id'?'Aksi':'操作'}</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -199,11 +200,11 @@
                     if (!blacklist.length) return `<div class="empty-state"><div class="empty-state-icon">👍</div><div class="empty-state-text">${lang==='id'?'Tidak ada nasabah di blacklist':'暂无黑名单客户'}</div></div>`;
                     let rows = '';
                     for (const b of blacklist) {
-                        rows += `<tr><td>${Utils.escapeHtml(b.customers?.customer_id || '-')}</td><td>${Utils.escapeHtml(b.customers?.name || '-')}</td><td>${Utils.escapeHtml(b.customers?.phone || '-')}</td><td>${Utils.escapeHtml(b.reason)}</td></tr>`;
+                        rows += `<tr><td>${Utils.escapeHtml(b.customers?.customer_id || '-')}<\/td><td>${Utils.escapeHtml(b.customers?.name || '-')}<\/td><td>${Utils.escapeHtml(b.customers?.phone || '-')}<\/td><td>${Utils.escapeHtml(b.reason)}<\/td></tr>`;
                     }
                     let loadMoreHtml = '';
                     if (blacklistTotalCount > blacklist.length) {
-                        loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn btn--sm btn--primary" id="blacklistLoadMoreBtn">⬇️ ${lang==='id'?'Muat Lebih Banyak':'加载更多'} (${blacklistTotalCount - blacklist.length} ${lang==='id'?'tersisa':'剩余'})</button></td></tr>`;
+                        loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn btn--sm btn--primary" id="blacklistLoadMoreBtn">⬇️ ${lang==='id'?'Muat Lebih Banyak':'加载更多'} (${blacklistTotalCount - blacklist.length} ${lang==='id'?'tersisa':'剩余'})</button><\/td><\/tr>`;
                     }
                     return `<div class="table-container"><table class="data-table anomaly-table"><thead><tr><th class="col-id">${lang==='id'?'ID Nasabah':'客户ID'}</th><th class="col-name">${lang==='id'?'Nama':'姓名'}</th><th class="col-phone">${lang==='id'?'Telepon':'电话'}</th><th>${lang==='id'?'Alasan':'原因'}</th></tr></thead><tbody>${rows}${loadMoreHtml}</tbody></table></div>`;
                 };
@@ -343,7 +344,7 @@
             }
         },
 
-        // loadMoreBlacklist - 增强防重复机制
+        // [修复 #7] 加载更多黑名单 - 时间限制从 1000ms 改为 500ms
         async loadMoreBlacklist() {
             const state = window._anomalyBlacklistState;
             if (!state) return;
@@ -353,7 +354,8 @@
             if (state.isLoadingMore) {
                 return;
             }
-            if (state.lastLoadTime && (now - state.lastLoadTime) < 1000) {
+            // [修复 #7] 时间限制从 1000ms 改为 500ms
+            if (state.lastLoadTime && (now - state.lastLoadTime) < 500) {
                 Utils.toast.warning(Utils.lang === 'id' ? 'Mohon tunggu sebentar' : '请稍后再试', 1000);
                 return;
             }
@@ -376,7 +378,7 @@
                 const result = await AnomalyPage._getBlacklistCustomers(nextPage, state.pageSize);
                 let newRows = '';
                 for (const b of result.data) {
-                    newRows += `<tr><td>${Utils.escapeHtml(b.customers?.customer_id||'-')}</td><td>${Utils.escapeHtml(b.customers?.name||'-')}</td><td>${Utils.escapeHtml(b.customers?.phone||'-')}</td><td>${Utils.escapeHtml(b.reason)}</td></tr>`;
+                    newRows += `<tr><td>${Utils.escapeHtml(b.customers?.customer_id||'-')}<\/td><td>${Utils.escapeHtml(b.customers?.name||'-')}<\/td><td>${Utils.escapeHtml(b.customers?.phone||'-')}<\/td><td>${Utils.escapeHtml(b.reason)}<\/td><\/tr>`;
                 }
                 
                 const oldRow = document.getElementById('blacklistLoadMoreRow');
@@ -390,10 +392,10 @@
                     
                     const loadedCount = (nextPage + 1) * state.pageSize;
                     if (result.totalCount > loadedCount) {
-                        const loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn btn--sm btn--primary" id="blacklistLoadMoreBtn">⬇️ ${lang==='id'?'Muat Lebih Banyak':'加载更多'} (${result.totalCount - loadedCount} ${lang==='id'?'tersisa':'剩余'})</button> </tr>`;
+                        const loadMoreHtml = `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;"><button onclick="APP.loadMoreBlacklist()" class="btn btn--sm btn--primary" id="blacklistLoadMoreBtn">⬇️ ${lang==='id'?'Muat Lebih Banyak':'加载更多'} (${result.totalCount - loadedCount} ${lang==='id'?'tersisa':'剩余'})</button><\/td><\/tr>`;
                         tbody.insertAdjacentHTML('beforeend', loadMoreHtml);
                     } else {
-                        tbody.insertAdjacentHTML('beforeend', `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;color:var(--text-muted);">✅ ${lang==='id'?`Semua ${result.totalCount} data telah dimuat`:`已加载全部 ${result.totalCount} 条数据`}</tr>`);
+                        tbody.insertAdjacentHTML('beforeend', `<tr id="blacklistLoadMoreRow"><td colspan="4" style="text-align:center;padding:10px;color:var(--text-muted);">✅ ${lang==='id'?`Semua ${result.totalCount} data telah dimuat`:`已加载全部 ${result.totalCount} 条数据`}<\/td><\/tr>`);
                     }
                 }
             } catch (err) {
