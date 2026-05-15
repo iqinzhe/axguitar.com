@@ -379,7 +379,16 @@
             if (page === 'dashboard') { await this.originalRenderDashboard(); return; }
             let contentHtml = '<div class="card"><p>' + (Utils.lang === 'id' ? 'Memuat...' : '加载中...') + '</p></div>';
             try {
-                if (page === 'orderTable') { if (JF.OrdersPage?.buildOrderTableHTML) contentHtml = await JF.OrdersPage.buildOrderTableHTML({ status: this.currentFilter }, 0, 50); }
+                if (page === 'orderTable') {
+                    if (JF.OrdersPage?.buildOrderTableHTML) {
+                        const isAdm = window.PERMISSION?.isAdmin?.() || false;
+                        let filterStatus = this.currentFilter;
+                        if (!filterStatus) filterStatus = isAdm ? 'all' : 'active';
+                        if (!isAdm && filterStatus !== 'active') filterStatus = 'active';
+                        this.currentFilter = filterStatus;
+                        contentHtml = await JF.OrdersPage.buildOrderTableHTML({ status: filterStatus }, 0, 50);
+                    }
+                }
                 else if (page === 'customers') { if (JF.CustomersPage?.buildCustomersHTML) contentHtml = await JF.CustomersPage.buildCustomersHTML(); }
                 else if (page === 'expenses') { if (JF.ExpensesPage?.buildExpensesHTML) contentHtml = await JF.ExpensesPage.buildExpensesHTML(); }
                 else if (page === 'paymentHistory') { if (JF.FundsPage?.buildCashFlowPageHTML) contentHtml = await JF.FundsPage.buildCashFlowPageHTML(); }

@@ -413,11 +413,13 @@
             APP.saveCurrentPageState();
             var isAdmin = PERMISSION.isAdmin();
             var defaultStatus = isAdmin ? 'all' : 'active';
+            // 管理员：currentFilter 为 null 时默认 all；非 null 则尊重用户选择
+            // 非管理员：强制 active
             var currentStatus = APP.currentFilter || defaultStatus;
-            if (!isAdmin && currentStatus !== 'active') {
+            if (!isAdmin) {
                 currentStatus = 'active';
-                APP.currentFilter = currentStatus;
             }
+            APP.currentFilter = currentStatus;
             var filters = { status: currentStatus };
             var contentHTML = await this.buildOrderTableHTML(filters, 0, 50);
             document.getElementById("app").innerHTML = contentHTML;
@@ -485,6 +487,8 @@
         },
 
         filterOrders: function(status) {
+            var isAdmin = PERMISSION.isAdmin();
+            if (!isAdmin && status !== 'active') status = 'active';
             APP.currentFilter = status;
             this.showOrderTable();
         },
@@ -817,6 +821,7 @@
                 (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeHtml(order.order_id) + '\'})" class="btn btn--success">💸 ' + (lang === 'id' ? '缴纳费用' : '缴纳费用') + '</button>' : '') +
                 (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--success">🧾 ' + (lang === 'id' ? '结清凭证' : '结清凭证') + '</button>' : '') +
                 '<button onclick="APP.sendWAReminder(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--warning">📱 ' + (lang === 'id' ? 'WA提醒' : 'WA提醒') + '</button>' +
+                (isAdmin ? '<button onclick="APP.repairOrderFees(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--outline" style="border-color:#f59e0b;color:#b45309;" title="' + (lang === 'id' ? 'Bersihkan dan sinkronkan catatan biaya admin/layanan sesuai nilai di pesanan' : '清理并同步管理费/服务费流水，使其与订单数据保持一致') + '">🔧 ' + (lang === 'id' ? 'Perbaiki Biaya' : '修复费用流水') + '</button>' : '') +
                 '</div>' +
                 '</div>';
             return content;
@@ -835,6 +840,21 @@
         window.APP.printOrder = OrdersPage.printOrder.bind(OrdersPage);
         window.APP.showPaymentHistory = OrdersPage.showPaymentHistory.bind(OrdersPage);
         window.APP.printAllOrders = OrdersPage.printAllOrders.bind(OrdersPage);
+        window.APP.repairOrderFees = async function(orderId) {
+            var lang = Utils.lang;
+            var confirmed = await Utils.toast.confirm(lang === 'id'
+                ? '🔧 Perbaiki Catatan Biaya\n\nIni akan menghapus dan menyinkronkan ulang catatan biaya admin/layanan di pesanan ' + orderId + ' sesuai nilai yang tersimpan di pesanan.\n\nLanjutkan?'
+                : '🔧 修复费用流水\n\n将清理并重新同步订单 ' + orderId + ' 的管理费/服务费缴费记录，使其与订单中保存的金额保持一致。\n\n确认执行？');
+            if (!confirmed) return;
+            try {
+                await SUPABASE.repairOrderFees(orderId);
+                if (window.JF && JF.Cache) JF.Cache.clear();
+                Utils.toast.success(lang === 'id' ? '✅ Biaya berhasil diperbaiki!' : '✅ 费用流水已修复！');
+                await JF.OrdersPage.viewOrder(orderId);
+            } catch (e) {
+                Utils.toast.error(e.message || (lang === 'id' ? 'Gagal memperbaiki biaya' : '修复失败'));
+            }
+        };
     } else {
         window.APP = {
             showOrderTable: OrdersPage.showOrderTable.bind(OrdersPage),
