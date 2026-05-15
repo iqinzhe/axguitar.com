@@ -1,6 +1,5 @@
 // app-dashboard-anomaly.js - v2.0 (JF 命名空间) 
 // 增加更完善的防重复请求机制 + 移除按钮禁用时的状态残留
-// [修复 #7] 加载更多黑名单时间限制从 1000ms 改为 500ms
 
 'use strict';
 
@@ -344,7 +343,7 @@
             }
         },
 
-        // [修复 #7] 加载更多黑名单 - 时间限制从 1000ms 改为 500ms
+        // 加载更多黑名单 - 时间限
         async loadMoreBlacklist() {
             const state = window._anomalyBlacklistState;
             if (!state) return;
@@ -354,7 +353,7 @@
             if (state.isLoadingMore) {
                 return;
             }
-            // [修复 #7] 时间限制从 1000ms 改为 500ms
+            // 时间限制
             if (state.lastLoadTime && (now - state.lastLoadTime) < 500) {
                 Utils.toast.warning(Utils.lang === 'id' ? 'Mohon tunggu sebentar' : '请稍后再试', 1000);
                 return;
