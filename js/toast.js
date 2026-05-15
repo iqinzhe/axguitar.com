@@ -263,9 +263,18 @@
         return { modal: confirmModal, cleanup };
     }
 
+    // [修复 #16] 移除同步 confirm 降级，避免 UI 阻塞
+    // 如果自定义模态框不可用，返回 false 而不是使用原生 confirm
     function confirmPromise(message, title) {
         return new Promise((resolve) => {
-            confirmDialog(message, title, () => resolve(true), () => resolve(false));
+            // 检查自定义模态框是否可用
+            if (typeof confirmDialog === 'function') {
+                confirmDialog(message, title, () => resolve(true), () => resolve(false));
+            } else {
+                // 降级方案：静默失败，返回 false
+                console.warn('[Toast] confirmDialog 不可用，无法显示确认框');
+                resolve(false);
+            }
         });
     }
 
