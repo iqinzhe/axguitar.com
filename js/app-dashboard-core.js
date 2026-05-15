@@ -57,7 +57,7 @@
 
     let _overdueInterval = null;
 
-    // ========== 工作日历构建函数（修复 HTML 结构错误）==========
+    // ========== 工作日历构建函数 ==========
     function buildWorkCalendarHTML(dueOrders, lang, dueMap) {
         const today = Utils.getJakartaDate();
         const year = today.getUTCFullYear();
