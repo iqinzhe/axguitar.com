@@ -1126,7 +1126,7 @@
             }
             const profile = await this.getCurrentProfile();
             const feeAmount = (adminFeeAmount !== undefined && adminFeeAmount !== null) ? adminFeeAmount : order.admin_fee;
-            // [修复] 管理费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
+            // 管理费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
             if (!feeAmount || feeAmount <= 0) {
                 const { error: e0 } = await supabaseClient.from('orders').update({
                     admin_fee_paid: true, admin_fee_paid_date: todayStr(),
@@ -1160,7 +1160,7 @@
         async recordServiceFee(orderId, months, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
-            // [修复] 服务费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
+            // 服务费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
             if(order.service_fee_percent<=0 && order.service_fee_amount<=0) {
                 await supabaseClient.from('orders').update({ service_fee_paid: 0, updated_at: nowStr() }).eq('order_id', orderId);
                 console.info(`[recordServiceFee] 订单 ${orderId} 服务费为0，仅标记，不写流水`);
@@ -1269,7 +1269,7 @@
             return true;
         },
 
-        // [新增] 主动修复：清理并重新同步指定订单的管理费/服务费流水
+        // 主动修复：清理并重新同步指定订单的管理费/服务费流水
         // 适用于：在修复部署前已写入错误流水的历史订单（如管理费/服务费为0但流水有记录）
         async repairOrderFees(orderId) {
             if (!PERMISSION.isAdmin()) throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
