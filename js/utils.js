@@ -585,10 +585,7 @@
     };
 
     Utils.calculateNextDueDate = function (startDate, paidMonths) {
-        // 语义：已付 paidMonths 期利息后，下次到期 = startDate + (paidMonths + 1) 个月。
-        // [修复] created_at 可能是完整 datetime 字符串（如 '2025-07-15T08:30:00+07:00'），
-        // 直接 split('-').map(Number) 会让 day 变成 NaN，导致 "2026-07-NaN" 错误。
-        // 统一取前10位 'YYYY-MM-DD' 再解析，彻底避免 NaN。
+        // 语义：已付 paidMonths 期利息后，下次到期 = startDate + (paidMonths + 1) 个月
         const start = (startDate || Utils.getLocalToday()).substring(0, 10);
         const [year, month, day] = start.split('-').map(Number);
         // 让 Date.UTC 自动处理月份溢出（如 month=13 → 自动进位到次年1月）
@@ -713,7 +710,6 @@
         if (window.JF?.FeeConfig?.calculateServiceFee) {
             return window.JF.FeeConfig.calculateServiceFee(loanAmount, percent);
         }
-        // [Bug5修复] 原回退逻辑对 3M-5M 区间收取 1% 服务费，与 FeeConfig 正式规则不符
         // （FeeConfig: PERCENT_THRESHOLD=5M，≤5M 一律免服务费）。对齐修正。
         if (!loanAmount || loanAmount <= 0) return { percent: 0, amount: 0 };
         if (loanAmount <= 5000000) return { percent: 0, amount: 0 };   // ≤500万免服务费
@@ -918,7 +914,6 @@
      */
     Utils.calculatePawnDueDate = function (startDate, termMonths) {
         if (!startDate || !termMonths || termMonths <= 0) return '';
-        // [修复] 同 calculateNextDueDate，取前10位防止 datetime 字符串导致 day=NaN
         const [year, month, day] = startDate.substring(0, 10).split('-').map(Number);
         const totalMonths = month - 1 + termMonths;
         const newYear = year + Math.floor(totalMonths / 12);
