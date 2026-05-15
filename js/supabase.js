@@ -537,18 +537,25 @@
         },
 
         async getBlacklist(filterStoreId=null, profile=null) {
-            if(!profile) profile = await this.getCurrentProfile();
-            let q = supabaseClient.from('blacklist').select(`
-                *, customers:customer_id (
-                    id, customer_id, name, ktp_number, phone, occupation, ktp_address, store_id,
-                    stores:store_id (name, code)
-                ), blacklisted_by_profile:blacklisted_by (name)
-            `).order('blacklisted_at', { ascending: false });
-            if(profile?.role !== 'admin' && filterStoreId) q = q.eq('customers.store_id', filterStoreId);
-            const { data, error } = await q;
-            if(error) throw error;
-            return data;
-        },
+    if(!profile) profile = await this.getCurrentProfile();
+    let q = supabaseClient.from('blacklist').select(`
+        *, customers:customer_id (
+            id, customer_id, name, ktp_number, phone, occupation, ktp_address, store_id,
+            stores:store_id (name, code)
+        ), blacklisted_by_profile:blacklisted_by (name)
+    `).order('blacklisted_at', { ascending: false });
+    if(profile?.role !== 'admin' && filterStoreId) q = q.eq('customers.store_id', filterStoreId);
+    
+    // 管理员查看时排除练习门店
+    if(profile?.role === 'admin') {
+        const practiceIds = await this._getPracticeStoreIds();
+        if(practiceIds.length) q = q.not('customers.store_id', 'in', '(' + practiceIds.join(',') + ')');
+    }
+    
+    const { data, error } = await q;
+    if(error) throw error;
+    return data;
+}
 
         escapePostgRESTValue(str) {
             if(!str) return '';
@@ -1278,7 +1285,7 @@
             return true;
         },
 
-        // [新增] 批量修复：遍历所有订单，清理并同步管理费/服务费流水
+        // 批量修复：遍历所有订单，清理并同步管理费/服务费流水
         async batchRepairAllOrderFees(progressCallback) {
             if (!PERMISSION.isAdmin()) throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
             const profile = await this.getCurrentProfile();
@@ -1301,7 +1308,7 @@
                         o.service_fee_amount || 0,
                         (o.created_at || '').substring(0, 10)
                     );
-                    success++;
+                    success++;https://github.com/iqinzhe/axguitar.com/blob/main/js/supabase.js
                 } catch (e) {
                     failed++;
                     failedList.push({ order_id: o.order_id, error: e.message });
