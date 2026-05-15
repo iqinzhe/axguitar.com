@@ -1194,13 +1194,22 @@
             const feeDate = (orderDate || (order.created_at || '').substring(0, 10) || todayStr());
 
             // ---- 管理费同步 ----
-            // 先作废/删除所有旧的 admin_fee 流水记录
+            // 1. 删除旧的 payment_history 和 cash_flow_records
             await supabaseClient.from('payment_history')
                 .delete().eq('order_id', order.id).eq('type', 'admin_fee');
             await supabaseClient.from('cash_flow_records')
                 .delete().eq('order_id', order.id).eq('flow_type', 'admin_fee');
 
-            // 若已缴且金额>0，重新写入正确的记录
+            // 2. 同步 orders 表的 admin_fee / admin_fee_paid 字段
+            //    （收入构成卡片读取的是 orders.admin_fee × admin_fee_paid，必须同步）
+            await supabaseClient.from('orders').update({
+                admin_fee: newAdminFee,
+                admin_fee_paid: newAdminFeePaid && newAdminFee > 0,
+                admin_fee_paid_date: (newAdminFeePaid && newAdminFee > 0) ? feeDate : null,
+                updated_at: nowStr()
+            }).eq('order_id', orderId);
+
+            // 3. 若已缴且金额>0，重新写入正确的流水记录
             if (newAdminFeePaid && newAdminFee > 0) {
                 await supabaseClient.from('payment_history').insert({
                     order_id: order.id, date: feeDate, type: 'admin_fee',
@@ -1215,37 +1224,59 @@
                     reference_id: order.order_id, flow_date: feeDate
                 });
             }
-            // 若金额为0或未缴，不写流水（这正是本次修复的核心）
+            // 金额为0或未缴：不写流水，orders字段已在上方重置
 
             // ---- 服务费同步 ----
+            // 1. 删除旧的 payment_history 和 cash_flow_records
             await supabaseClient.from('payment_history')
                 .delete().eq('order_id', order.id).eq('type', 'service_fee');
             await supabaseClient.from('cash_flow_records')
                 .delete().eq('order_id', order.id).eq('flow_type', 'service_fee');
 
-            if (newServiceFeeAmount > 0) {
-                const sfPaid = order.service_fee_paid || 0;
-                if (sfPaid >= newServiceFeeAmount) {
-                    await supabaseClient.from('payment_history').insert({
-                        order_id: order.id, date: feeDate, type: 'service_fee',
-                        months: 1, amount: newServiceFeeAmount,
-                        description: Utils.t('service_fee') + ' (管理员补录)',
-                        recorded_by: profile.id, payment_method: 'cash'
-                    });
-                    await this.recordCashFlow({
-                        store_id: order.store_id, flow_type: 'service_fee', direction: 'inflow',
-                        amount: newServiceFeeAmount, source_target: 'cash', order_id: order.id,
-                        customer_id: order.customer_id,
-                        description: Utils.t('service_fee') + ' (管理员补录) - ' + order.order_id,
-                        reference_id: order.order_id, flow_date: feeDate
-                    });
-                }
+            // 2. 同步 orders 表的 service_fee_amount / service_fee_paid 字段
+            //    （收入构成卡片读取的是 orders.service_fee_paid，必须同步）
+            const newServiceFeePaid = newServiceFeeAmount > 0 ? newServiceFeeAmount : 0;
+            await supabaseClient.from('orders').update({
+                service_fee_amount: newServiceFeeAmount,
+                service_fee_paid: newServiceFeePaid,
+                updated_at: nowStr()
+            }).eq('order_id', orderId);
+
+            // 3. 若金额>0且已缴，重新写入正确的流水记录
+            if (newServiceFeeAmount > 0 && newServiceFeePaid >= newServiceFeeAmount) {
+                await supabaseClient.from('payment_history').insert({
+                    order_id: order.id, date: feeDate, type: 'service_fee',
+                    months: 1, amount: newServiceFeeAmount,
+                    description: Utils.t('service_fee') + ' (管理员补录)',
+                    recorded_by: profile.id, payment_method: 'cash'
+                });
+                await this.recordCashFlow({
+                    store_id: order.store_id, flow_type: 'service_fee', direction: 'inflow',
+                    amount: newServiceFeeAmount, source_target: 'cash', order_id: order.id,
+                    customer_id: order.customer_id,
+                    description: Utils.t('service_fee') + ' (管理员补录) - ' + order.order_id,
+                    reference_id: order.order_id, flow_date: feeDate
+                });
             }
-            // 服务费为0：不写流水
+            // 服务费为0：不写流水，orders.service_fee_paid 已在上方重置为0
             return true;
         },
 
-        // ==================== 利息收款（增加 liquidated 拦截） ====================
+        // [新增] 主动修复：清理并重新同步指定订单的管理费/服务费流水
+        // 适用于：在修复部署前已写入错误流水的历史订单（如管理费/服务费为0但流水有记录）
+        async repairOrderFees(orderId) {
+            if (!PERMISSION.isAdmin()) throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
+            const order = await this.getOrder(orderId);
+            await this.syncFeesAfterAdminEdit(
+                orderId,
+                order.admin_fee || 0,
+                order.admin_fee_paid || false,
+                order.service_fee_amount || 0,
+                (order.created_at || '').substring(0, 10)
+            );
+            if (window.Audit) await window.Audit.log('repair_order_fees', JSON.stringify({ order_id: orderId, admin_fee: order.admin_fee, service_fee: order.service_fee_amount }));
+            return true;
+        },
         async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null, paymentDate=null) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
