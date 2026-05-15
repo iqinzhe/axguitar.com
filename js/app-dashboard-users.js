@@ -1,4 +1,5 @@
 // app-dashboard-users.js - v2.0 (JF 命名空间)  (密码重置改为模态框，移除 prompt())
+// [修复] 重置密码后强制登出该用户（撤销所有活跃 session）
 
 'use strict';
 
@@ -25,7 +26,7 @@
                 // 构建用户列表行
                 let rows = '';
                 if (users.length === 0) {
-                    rows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td></tr>`;
+                    rows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td>`;
                 } else {
                     for (const u of users) {
                         const storeName = u.stores ? u.stores.name : (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
@@ -273,6 +274,7 @@
             }
         },
 
+        // ==================== 重置密码（修复：强制登出该用户） ====================
         async resetUserPassword(userId, userName) {
             const lang = Utils.lang;
 
@@ -284,42 +286,44 @@
                 modal.id = 'resetPasswordModal';
                 modal.className = 'modal-overlay';
                 modal.innerHTML = `
-                    <div class="modal-content" style="max-width:420px;">
-                        <h3>🔑 ${lang === 'id' ? 'Reset Password' : '重置密码'}</h3>
-                        <p style="color:var(--text-secondary);margin-bottom:16px;">
-                            ${lang === 'id'
-                                ? `Reset password untuk <strong>${Utils.escapeHtml(userName)}</strong>. Pengguna harus login ulang dengan password baru.`
-                                : `重置 <strong>${Utils.escapeHtml(userName)}</strong> 的密码，该用户需使用新密码重新登录。`}
-                        </p>
-                        <div class="form-group" style="margin-bottom:12px;">
-                            <label style="display:block;margin-bottom:4px;">
-                                ${lang === 'id' ? 'Password Baru' : '新密码'} *
-                                <small style="color:var(--text-muted);font-weight:400;">
-                                    (${lang === 'id' ? 'min. 6 karakter' : '至少6个字符'})
-                                </small>
-                            </label>
-                            <div style="position:relative;">
-                                <input id="rp_newPassword" type="password"
-                                    placeholder="${lang === 'id' ? 'Masukkan password baru' : '请输入新密码'}"
-                                    style="width:100%;padding-right:40px;box-sizing:border-box;">
-                                <span id="rp_toggleNew" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.55;font-size:16px;" title="${lang === 'id' ? 'Tampilkan/sembunyikan' : '显示/隐藏'}">👁️</span>
+                    <div id="resetPasswordModal" class="modal-overlay">
+                        <div class="modal-content" style="max-width:420px;">
+                            <h3>🔑 ${lang === 'id' ? 'Reset Password' : '重置密码'}</h3>
+                            <p style="color:var(--text-secondary);margin-bottom:16px;">
+                                ${lang === 'id'
+                                    ? `Reset password untuk <strong>${Utils.escapeHtml(userName)}</strong>. Pengguna harus login ulang dengan password baru.`
+                                    : `重置 <strong>${Utils.escapeHtml(userName)}</strong> 的密码，该用户需使用新密码重新登录。`}
+                            </p>
+                            <div class="form-group" style="margin-bottom:12px;">
+                                <label style="display:block;margin-bottom:4px;">
+                                    ${lang === 'id' ? 'Password Baru' : '新密码'} *
+                                    <small style="color:var(--text-muted);font-weight:400;">
+                                        (${lang === 'id' ? 'min. 6 karakter' : '至少6个字符'})
+                                    </small>
+                                </label>
+                                <div style="position:relative;">
+                                    <input id="rp_newPassword" type="password"
+                                        placeholder="${lang === 'id' ? 'Masukkan password baru' : '请输入新密码'}"
+                                        style="width:100%;padding-right:40px;box-sizing:border-box;">
+                                    <span id="rp_toggleNew" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.55;font-size:16px;" title="${lang === 'id' ? 'Tampilkan/sembunyikan' : '显示/隐藏'}">👁️</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:20px;">
-                            <label style="display:block;margin-bottom:4px;">
-                                ${lang === 'id' ? 'Konfirmasi Password' : '确认新密码'} *
-                            </label>
-                            <div style="position:relative;">
-                                <input id="rp_confirmPassword" type="password"
-                                    placeholder="${lang === 'id' ? 'Ulangi password baru' : '再次输入新密码'}"
-                                    style="width:100%;padding-right:40px;box-sizing:border-box;">
-                                <span id="rp_toggleConfirm" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.55;font-size:16px;" title="${lang === 'id' ? 'Tampilkan/sembunyikan' : '显示/隐藏'}">👁️</span>
+                            <div class="form-group" style="margin-bottom:20px;">
+                                <label style="display:block;margin-bottom:4px;">
+                                    ${lang === 'id' ? 'Konfirmasi Password' : '确认新密码'} *
+                                </label>
+                                <div style="position:relative;">
+                                    <input id="rp_confirmPassword" type="password"
+                                        placeholder="${lang === 'id' ? 'Ulangi password baru' : '再次输入新密码'}"
+                                        style="width:100%;padding-right:40px;box-sizing:border-box;">
+                                    <span id="rp_toggleConfirm" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;opacity:0.55;font-size:16px;" title="${lang === 'id' ? 'Tampilkan/sembunyikan' : '显示/隐藏'}">👁️</span>
+                                </div>
                             </div>
-                        </div>
-                        <div id="rp_error" style="display:none;color:var(--danger);font-size:13px;margin-bottom:12px;"></div>
-                        <div class="modal-actions">
-                            <button id="rp_submitBtn" class="btn btn--warning">🔑 ${lang === 'id' ? 'Reset Password' : '确认重置'}</button>
-                            <button id="rp_cancelBtn" class="btn btn--outline">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                            <div id="rp_error" style="display:none;color:var(--danger);font-size:13px;margin-bottom:12px;"></div>
+                            <div class="modal-actions">
+                                <button id="rp_submitBtn" class="btn btn--warning">🔑 ${lang === 'id' ? 'Reset Password' : '确认重置'}</button>
+                                <button id="rp_cancelBtn" class="btn btn--outline">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                            </div>
                         </div>
                     </div>`;
 
@@ -368,9 +372,26 @@
                     submitBtn.disabled = true;
                     submitBtn.textContent = lang === 'id' ? '⏳ Memproses...' : '⏳ 处理中...';
                     try {
+                        // 1. 重置密码
                         await AUTH.resetUserPassword(userId, newPassword);
+                        
+                        // 2. [修复] 强制登出该用户：撤销该用户的所有活跃 session
+                        try {
+                            const client = SUPABASE.getClient();
+                            // 调用 Admin API 撤销用户会话
+                            const { error: signOutError } = await client.auth.admin.signOut(userId);
+                            if (signOutError) {
+                                console.warn('[resetUserPassword] 撤销用户 session 失败:', signOutError.message);
+                                // 非致命错误，不阻断流程
+                            } else {
+                                console.log('[resetUserPassword] 已撤销用户 session:', userId);
+                            }
+                        } catch (logoutError) {
+                            console.warn('[resetUserPassword] 撤销 session 异常:', logoutError.message);
+                        }
+                        
                         closeModal();
-                        Utils.toast.success(lang === 'id' ? '✅ Password berhasil direset' : '✅ 密码已重置');
+                        Utils.toast.success(lang === 'id' ? '✅ Password berhasil direset, pengguna harus login ulang' : '✅ 密码已重置，该用户需要重新登录');
                     } catch (error) {
                         submitBtn.disabled = false;
                         submitBtn.textContent = `🔑 ${lang === 'id' ? 'Reset Password' : '确认重置'}`;
