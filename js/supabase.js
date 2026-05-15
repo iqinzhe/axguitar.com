@@ -1410,7 +1410,7 @@
                         store_id: currentOrder.store_id, flow_type:'interest', direction:'inflow',
                         amount: interestToRecord, source_target: paymentMethod, order_id: currentOrder.id,
                         customer_id: currentOrder.customer_id,
-                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang==='id'?'bulan':'个月'),
+                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang==='id'?'bulan':'个月') + prepaidLabel + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
                         reference_id: currentOrder.order_id
                     });
                 }
@@ -1418,14 +1418,14 @@
                     await supabaseClient.from('payment_history').insert({
                         order_id: currentOrder.id, date: todayStr(), type:'principal',
                         amount: principalAdjustment,
-                        description: (Utils.lang==='id'?'Kelebihan bunga dipotong pokok':'超额利息抵扣本金'),
+                        description: (Utils.lang==='id'?'Kelebihan bunga dipotong pokok':'超额利息抵扣本金') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
                         recorded_by: profile.id, payment_method: paymentMethod
                     });
                     await this.recordCashFlow({
                         store_id: currentOrder.store_id, flow_type:'principal', direction:'inflow',
                         amount: principalAdjustment, source_target: paymentMethod, order_id: currentOrder.id,
                         customer_id: currentOrder.customer_id,
-                        description: (Utils.lang==='id'?'Kelebihan bunga dipotong pokok':'超额利息抵扣本金'),
+                        description: (Utils.lang==='id'?'Kelebihan bunga dipotong pokok':'超额利息抵扣本金') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
                         reference_id: currentOrder.order_id
                     });
                 }
@@ -1481,14 +1481,18 @@
             await supabaseClient.from('payment_history').insert({
                 order_id: currentOrder.id, date: todayStr(), type:'principal',
                 amount: paid,
-                description: isFull ? (Utils.lang==='id'?'LUNAS':'结清') : (Utils.lang==='id'?'Pembayaran pokok':'还款'),
+                description: isFull
+                    ? (Utils.lang==='id' ? 'LUNAS' : '结清') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||'')
+                    : (Utils.lang==='id' ? 'Pembayaran pokok' : '还款') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
                 recorded_by: profile.id, payment_method: paymentMethod
             });
             await this.recordCashFlow({
                 store_id: currentOrder.store_id, flow_type:'principal', direction:'inflow',
                 amount: paid, source_target: paymentMethod, order_id: currentOrder.id,
                 customer_id: currentOrder.customer_id,
-                description: isFull ? (Utils.lang==='id'?'LUNAS':'结清') : (Utils.lang==='id'?'Pembayaran pokok':'还款'),
+                description: isFull
+                    ? (Utils.lang==='id' ? 'LUNAS' : '结清') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||'')
+                    : (Utils.lang==='id' ? 'Pembayaran pokok' : '还款') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
                 reference_id: currentOrder.order_id
             });
             if(window.Audit) await window.Audit.logPayment(currentOrder.order_id, 'principal', paid, paymentMethod);
@@ -1537,28 +1541,30 @@
             if(interestAmt>0){
                 await supabaseClient.from('payment_history').insert({
                     order_id: order.id, date: todayStr(), type:'interest', months:1,
-                    amount: interestAmt, description: (Utils.lang==='id'?'Cicilan tetap - Bunga':'固定还款-利息') + ' ' + newFixedPaid,
+                    amount: interestAmt,
+                    description: (Utils.lang==='id'?'Cicilan tetap - Bunga':'固定还款-利息') + ' ' + newFixedPaid + ' - ' + order.order_id + ' ' + (order.customer_name||''),
                     recorded_by: profile.id, payment_method: paymentMethod
                 });
                 await this.recordCashFlow({
                     store_id: order.store_id, flow_type:'interest', direction:'inflow',
                     amount: interestAmt, source_target: paymentMethod, order_id: order.id,
                     customer_id: order.customer_id,
-                    description: (Utils.lang==='id'?'Cicilan tetap bunga':'固定还款利息') + ' - ' + order.order_id,
+                    description: (Utils.lang==='id'?'Cicilan tetap bunga':'固定还款利息') + ' - ' + order.order_id + ' ' + (order.customer_name||''),
                     reference_id: order.order_id
                 });
             }
             if(principalAmt>0){
                 await supabaseClient.from('payment_history').insert({
                     order_id: order.id, date: todayStr(), type:'principal',
-                    amount: principalAmt, description: (Utils.lang==='id'?'Cicilan tetap - Pokok':'固定还款-本金') + ' ' + newFixedPaid,
+                    amount: principalAmt,
+                    description: (Utils.lang==='id'?'Cicilan tetap - Pokok':'固定还款-本金') + ' ' + newFixedPaid + ' - ' + order.order_id + ' ' + (order.customer_name||''),
                     recorded_by: profile.id, payment_method: paymentMethod
                 });
                 await this.recordCashFlow({
                     store_id: order.store_id, flow_type:'principal', direction:'inflow',
                     amount: principalAmt, source_target: paymentMethod, order_id: order.id,
                     customer_id: order.customer_id,
-                    description: (Utils.lang==='id'?'Cicilan tetap pokok':'固定还款本金') + ' - ' + order.order_id,
+                    description: (Utils.lang==='id'?'Cicilan tetap pokok':'固定还款本金') + ' - ' + order.order_id + ' ' + (order.customer_name||''),
                     reference_id: order.order_id
                 });
             }
