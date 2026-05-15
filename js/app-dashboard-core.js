@@ -84,12 +84,12 @@
             });
         }
 
-        // 修复：表头行正确闭合
+        // 表头行正确闭合
         let tableRows = '<tr>';
         for (let i = 0; i < 7; i++) {
             tableRows += `<th>${weekDays[i]}</th>`;
         }
-        tableRows += '</tr>';  // 原来错误地写成了 '<tr>'
+        tableRows += '</tr>';  
 
         let day = 1;
         for (let r = 0; r < 6; r++) {
@@ -252,7 +252,7 @@
             this._enterProcessing = false;
         },
 
-        // 修复：仅写入 sessionStorage，移除 localStorage 持久化敏感信息
+        // 仅写入 sessionStorage，移除 localStorage 持久化敏感信息
         saveCurrentPageState(extraParams = {}) {
             try {
                 if (!AUTH.isLoggedIn() || this.currentPage === 'login') return;
@@ -880,7 +880,7 @@
             else { await this.refreshCurrentPage(); }
         },
 
-        // 修复：移除“记住我”的 localStorage 明文存储，仅保留输入框的 autocomplete 属性
+        // 移除“记住我”的 localStorage 明文存储，仅保留输入框的 autocomplete 属性
         async renderLogin() {
             this.currentPage = 'login'; this.clearPageState(); this._cleanupOverlays(); this._clearOverdueInterval();
             const lang = Utils.lang;
