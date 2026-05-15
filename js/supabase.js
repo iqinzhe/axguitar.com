@@ -1308,7 +1308,7 @@
                         o.service_fee_amount || 0,
                         (o.created_at || '').substring(0, 10)
                     );
-                    success++;https://github.com/iqinzhe/axguitar.com/blob/main/js/supabase.js
+                    success++;
                 } catch (e) {
                     failed++;
                     failedList.push({ order_id: o.order_id, error: e.message });
