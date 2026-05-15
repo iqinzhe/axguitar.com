@@ -158,20 +158,12 @@
                 if (!order) { Utils.toast.error(t('order_not_found')); APP.goBack(); return; }
                 if (order.store_id !== profile.store_id) { Utils.toast.error(t('unauthorized')); APP.goBack(); return; }
 
-                // 订单锁定检查（被锁定时给出提示，而不是静默报错跳仪表盘）
-                if (order.is_locked) {
-                    document.getElementById("app").innerHTML = `
-                        <div class="page-header"><h2>💰 ${t('payment_page')}</h2><div class="header-actions"><button onclick="APP.navigateTo('orderTable')" class="btn btn--outline">↩️ ${t('back')}</button></div></div>
-                        <div class="card" style="text-align:center;padding:40px 20px;">
-                            <div style="font-size:48px;margin-bottom:16px;">🔒</div>
-                            <h3 style="color:#64748b;margin-bottom:12px;">${lang === 'id' ? 'Pesanan sedang dikunci' : '订单正在处理中'}</h3>
-                            <p style="color:#94a3b8;margin-bottom:16px;">${lang === 'id' ? 'Pesanan ini sedang dalam proses, silakan coba beberapa saat lagi.' : '该订单正在处理中，请稍后再试。'}</p>
-                            <button onclick="APP.navigateTo('orderTable')" class="btn btn--outline" style="padding:10px 24px;">↩️ ${t('back')}</button>
-                        </div>`;
-                    return;
-                }
+                // [修复问题1] 移除 is_locked 对缴费页的拦截。
+                // 订单锁定（is_locked）是合同保护机制，防止门店账户随意修改合同内容。
+                // 缴费窗口是履行合同义务的独立入口，不受锁定影响，应始终可以正常进入。
+                // 管理员修改订单内容（updateOrder）仍受 is_locked 保护，逻辑不变。
 
-                // ==================== 新增：拦截已变卖订单 ====================
+                // ==================== 拦截已变卖订单 ====================
                 if (order.status === 'liquidated') {
                     document.getElementById("app").innerHTML = `
                         <div class="page-header">
@@ -338,7 +330,10 @@
                                     <div class="info-box warning-box"><div class="info-row"><span>📊 ${t('principal_paid')}:</span><strong>${Utils.formatCurrency(principalPaid)}</strong></div><div class="info-row"><span>📊 ${t('remaining_principal')}:</span><strong class="${remainingPrincipal > 0 ? 'expense' : 'income'}">${Utils.formatCurrency(remainingPrincipal)}</strong></div></div>
                                     <div class="action-input-group"><label class="action-label">${t('payment_amount')}:</label><input type="text" id="principalAmount" class="amount-input" placeholder="0"></div>
                                     <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label><label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label></div></div>
-                                    <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="principalConfirmBtn">✅ ${t('confirm_payment')}</button>
+                                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                        <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="principalConfirmBtn">✅ ${t('confirm_payment')}</button>
+                                        <button onclick="APP.requestEarlySettleFlexible('${Utils.escapeAttr(order.order_id)}')" class="btn btn--special" id="flexibleSettleBtn">🎯 ${lang === 'id' ? 'Ajukan Pelunasan' : '申请结清'}</button>
+                                    </div>
                                 </div>
                                 <div class="card-history"><div class="history-title">📋 ${t('principal_history')}</div><div class="table-container" style="overflow-x:auto;"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('payment_amount')}</th><th class="col-amount amount">${t('total')} ${t('principal_paid')}</th><th class="col-amount amount">${t('remaining_principal')}</th><th class="col-method text-center">${t('payment_method')}</th></tr></thead><tbody>${principalRows}</tbody></table></div></div>
                             </div>
@@ -611,7 +606,7 @@
             }
         },
 
-        // ==================== 提前结清 ====================
+        // ==================== 提前结清（固定还款）====================
         async earlySettleFixedOrder(orderId) {
             const method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
             const lang = Utils.lang;
@@ -625,6 +620,15 @@
             try {
                 const orderBefore = await SUPABASE.getOrder(orderId);
                 const remainingPrincipal = orderBefore.principal_remaining || orderBefore.loan_amount || 0;
+
+                // [修复问题2] 提前结清前弹窗告知应还金额，由店长/管理员人工确认
+                const methodName = method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行');
+                const confirmMsg = lang === 'id'
+                    ? `🎯 Konfirmasi Pelunasan Dipercepat\n\nPesanan: ${orderBefore.order_id}\nNasabah: ${orderBefore.customer_name}\n\nSisa pokok yang harus dilunasi:\n💰 ${Utils.formatCurrency(remainingPrincipal)}\n\nMetode: ${methodName}\n\n⚠️ Jika nasabah membayar kurang dari jumlah di atas,\nselisihnya menjadi tanggung jawab toko.\n\nLanjutkan pelunasan?`
+                    : `🎯 提前结清确认\n\n订单号: ${orderBefore.order_id}\n客户: ${orderBefore.customer_name}\n\n应还剩余本金：\n💰 ${Utils.formatCurrency(remainingPrincipal)}\n\n入账方式: ${methodName}\n\n⚠️ 如客户实付金额少于上述金额，\n差额由门店负责核销。\n\n确认结清？`;
+                const confirmed = await Utils.toast.confirm(confirmMsg);
+                if (!confirmed) return;
+
                 const isDuplicate = await window.APP._checkIdempotency(orderId, 'early_settlement', remainingPrincipal, method);
                 if (isDuplicate) {
                     Utils.toast.warning(lang === 'id' ? 'Pelunasan ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔结清在2分钟内已记录，无需重复处理。');
@@ -633,6 +637,9 @@
                 await SUPABASE.earlySettleFixedOrder(orderId, method);
                 if (window.Audit) await window.Audit.logPayment(orderBefore.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
+                const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
+                const printConfirmed = await Utils.toast.confirm(printConfirm);
+                if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
                 await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('earlySettleFixedOrder error:', error);
@@ -641,6 +648,69 @@
                 window.APP._releasePaymentLock(lockKey);
                 this._setButtonLoading(confirmBtn, false);
                 this._restoreDisabledButtons(disabledButtons);
+            }
+        },
+
+        // ==================== 申请结清（灵活还款）====================
+        // [修复问题2] 灵活还款没有固定期数，结清由人工发起。
+        // 系统显示当前应还本金，店长/管理员看到差额后自行决策，确认即结清，取消即放弃。
+        async requestEarlySettleFlexible(orderId) {
+            const lang = Utils.lang;
+            const lockKey = orderId + '_early_settle';
+            if (!window.APP._acquirePaymentLock(lockKey)) {
+                Utils.toast.warning(lang === 'id' ? '⏳ Pembayaran sedang diproses di tab lain, harap tunggu...' : '⏳ 支付正在其他标签页处理中，请稍候...'); return;
+            }
+            try {
+                const order = await SUPABASE.getOrder(orderId);
+                const remainingPrincipal = order.principal_remaining ?? (order.loan_amount - (order.principal_paid || 0));
+                const method = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
+                const methodName = method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行');
+                const inputAmount = Utils.getAmountFromInput('principalAmount');
+                const hasInput = !isNaN(inputAmount) && inputAmount > 0;
+                const shortfall = hasInput ? (remainingPrincipal - inputAmount) : 0;
+
+                // 弹窗：告知应还金额、实付金额、差额，由人决策
+                let confirmMsg = '';
+                if (lang === 'id') {
+                    confirmMsg = `🎯 Ajukan Pelunasan\n\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\n\nSisa pokok (teori): ${Utils.formatCurrency(remainingPrincipal)}`;
+                    if (hasInput && shortfall > 0) {
+                        confirmMsg += `\nJumlah dibayar nasabah: ${Utils.formatCurrency(inputAmount)}\n\n⚠️ SELISIH KURANG: ${Utils.formatCurrency(shortfall)}\nSelisih ini akan menjadi tanggung jawab toko.`;
+                    } else if (hasInput && shortfall <= 0) {
+                        confirmMsg += `\nJumlah dibayar: ${Utils.formatCurrency(inputAmount)}\n✅ Pembayaran cukup.`;
+                    }
+                    confirmMsg += `\n\nMetode: ${methodName}\n\nKonfirmasi pelunasan?`;
+                } else {
+                    confirmMsg = `🎯 申请结清\n\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n\n理论应还本金: ${Utils.formatCurrency(remainingPrincipal)}`;
+                    if (hasInput && shortfall > 0) {
+                        confirmMsg += `\n客户实付金额: ${Utils.formatCurrency(inputAmount)}\n\n⚠️ 差额（少付）: ${Utils.formatCurrency(shortfall)}\n该差额由门店负责核销。`;
+                    } else if (hasInput && shortfall <= 0) {
+                        confirmMsg += `\n客户实付: ${Utils.formatCurrency(inputAmount)}\n✅ 金额足够。`;
+                    }
+                    confirmMsg += `\n\n入账方式: ${methodName}\n\n确认结清？取消即放弃。`;
+                }
+
+                const confirmed = await Utils.toast.confirm(confirmMsg);
+                if (!confirmed) return;
+
+                const isDuplicate = await window.APP._checkIdempotency(orderId, 'early_settlement', remainingPrincipal, method);
+                if (isDuplicate) {
+                    Utils.toast.warning(lang === 'id' ? 'Pelunasan ini sudah tercatat (2 menit terakhir).' : '此笔结清在2分钟内已记录，无需重复处理。');
+                    await PaymentPage.showPayment(orderId); return;
+                }
+
+                // 按理论剩余本金结清，差额线下核销
+                await SUPABASE.earlySettleFlexibleOrder(orderId, method, remainingPrincipal);
+                if (window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remainingPrincipal, method);
+                if (window.JF && JF.Cache) JF.Cache.clear();
+                const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
+                const printConfirmed = await Utils.toast.confirm(printConfirm);
+                if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
+                await PaymentPage.showPayment(orderId);
+            } catch (error) {
+                console.error('requestEarlySettleFlexible error:', error);
+                Utils.toast.error(error.message);
+            } finally {
+                window.APP._releasePaymentLock(lockKey);
             }
         },
 
@@ -724,6 +794,7 @@
         window.APP.payPrincipalWithMethod = PaymentPage.payPrincipalWithMethod.bind(PaymentPage);
         window.APP.payFixedInstallment = PaymentPage.payFixedInstallment.bind(PaymentPage);
         window.APP.earlySettleFixedOrder = PaymentPage.earlySettleFixedOrder.bind(PaymentPage);
+        window.APP.requestEarlySettleFlexible = PaymentPage.requestEarlySettleFlexible.bind(PaymentPage);
         window.APP.printSettlementReceipt = PaymentPage.printSettlementReceipt.bind(PaymentPage);
     } else {
         window.APP = {
@@ -732,6 +803,7 @@
             payPrincipalWithMethod: PaymentPage.payPrincipalWithMethod.bind(PaymentPage),
             payFixedInstallment: PaymentPage.payFixedInstallment.bind(PaymentPage),
             earlySettleFixedOrder: PaymentPage.earlySettleFixedOrder.bind(PaymentPage),
+            requestEarlySettleFlexible: PaymentPage.requestEarlySettleFlexible.bind(PaymentPage),
             printSettlementReceipt: PaymentPage.printSettlementReceipt.bind(PaymentPage)
         };
     }
