@@ -1,5 +1,7 @@
 // app-dashboard-core.js - v2.0 (JF 命名空间)  
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
+// [修复 #8] 订单列表绑定延迟从 50ms 改为 150ms
+
 'use strict';
 
 (function () {
@@ -84,23 +86,23 @@
             });
         }
 
-        // 表头行正确闭合
+        // 表头行
         let tableRows = '<tr>';
         for (let i = 0; i < 7; i++) {
             tableRows += `<th>${weekDays[i]}</th>`;
         }
-        tableRows += '</tr>';  
+        tableRows += '</tr>';
 
         let day = 1;
         for (let r = 0; r < 6; r++) {
             let row = '<tr>';
             for (let c = 0; c < 7; c++) {
                 if (r === 0 && c < startIndex) {
-                    row += '<td></td>';
+                    row += '<td><\/td>';
                     continue;
                 }
                 if (day > totalDays) {
-                    row += '<td></td>';
+                    row += '<td><\/td>';
                     continue;
                 }
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -110,7 +112,7 @@
                 if (count > 0) {
                     cellContent += `<span class="cal-due-count" data-date="${dateStr}" title="${count} ${lang==='id'?'pesanan':'orders'}">${count}</span>`;
                 }
-                row += `<td class="cal-cell${count>0?' has-due':''}">${cellContent}</td>`;
+                row += `<td class="cal-cell${count>0?' has-due':''}">${cellContent}<\/td>`;
                 day++;
             }
             row += '</tr>';
@@ -264,13 +266,12 @@
                     ...extraParams
                 };
                 sessionStorage.setItem('jf_current_state', JSON.stringify(state));
-                // 移除：localStorage.setItem('jf_last_state', JSON.stringify(state));
             } catch (e) { /* ignore */ }
         },
 
         restorePageState() {
             try {
-                let raw = sessionStorage.getItem('jf_current_state') || localStorage.getItem('jf_last_state'); // 兼容历史数据
+                let raw = sessionStorage.getItem('jf_current_state');
                 if (!raw) return { page: null, filter: "all", orderId: null, customerId: null };
                 const state = JSON.parse(raw);
                 const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist'];
@@ -286,7 +287,7 @@
         },
 
         clearPageState() {
-            try { sessionStorage.removeItem('jf_current_state'); localStorage.removeItem('jf_last_state'); } catch (e) {}
+            try { sessionStorage.removeItem('jf_current_state'); } catch(e) {}
             this.currentOrderId = null;
             this.currentCustomerId = null;
         },
@@ -311,11 +312,9 @@
                 console.warn('[IdleTimer] 闲置超时，自动登出');
                 Utils.toast.warning(Utils.lang === 'id' ? '⏰ Sesi berakhir karena tidak ada aktivitas selama 18 menit.' : '⏰ 已闲置18分钟，系统自动登出。', 4000);
                 await new Promise(r => setTimeout(r, 3000));
-                // 改用专用静默登出方法，保留审计日志
                 await this._idleLogout();
             }, this._IDLE_TIMEOUT);
         },
-        // 静默登出（闲置超时用，跳过确认，记录审计）
         async _idleLogout() {
             this._clearOverdueInterval();
             this._clearIdleTimer();
@@ -333,7 +332,7 @@
             sessionStorage.clear();
             this._isInitialized = false;
             this._idleListenerAttached = false;
-            await AUTH.forceClearAuth();  // 确保清除认证状态
+            await AUTH.forceClearAuth();
             await this.renderLogin();
         },
         _clearIdleTimer() {
@@ -390,12 +389,12 @@
                         await this._updateMainContent(contentHtml);
                         document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
                         this.saveCurrentPageState();
-                        // 关键：绑定行点击和操作按钮，否则列表不可交互
+                        // [修复 #8] 绑定延迟从 50ms 改为 150ms
                         setTimeout(() => {
                             if (JF.OrdersPage._bindRowClickDelegate) JF.OrdersPage._bindRowClickDelegate();
                             if (JF.OrdersPage._bindGlobalEvents) JF.OrdersPage._bindGlobalEvents();
                             if (JF.OrdersPage._updateSelectedDisplay) JF.OrdersPage._updateSelectedDisplay();
-                        }, 50);
+                        }, 150);
                         return;
                     }
                 }
@@ -682,8 +681,7 @@
                     };
                 }, { ttl: 10 * 60 * 1000 });
 
-                // 构建仪表盘 HTML（与之前相同，略）
-                // ...（因篇幅，直接使用原模板，不做调整）
+                // 构建仪表盘 HTML
                 const totalOrders = kpiReport.total_orders;
                 const activeOrders = kpiReport.active_orders;
                 const completedOrders = kpiReport.completed_orders;
@@ -751,7 +749,6 @@
                 const dueMap = {};
                 dueOrders.forEach(o => { const d = o.next_interest_due_date; if (!d) return; if (!dueMap[d]) dueMap[d] = []; dueMap[d].push(o); });
 
-                // 使用修复后的构建函数
                 const calendarHTML = buildWorkCalendarHTML(dueOrders, lang, dueMap);
 
                 const kpiRowHTML = `
@@ -880,7 +877,6 @@
             else { await this.refreshCurrentPage(); }
         },
 
-        // 移除“记住我”的 localStorage 明文存储，仅保留输入框的 autocomplete 属性
         async renderLogin() {
             this.currentPage = 'login'; this.clearPageState(); this._cleanupOverlays(); this._clearOverdueInterval();
             const lang = Utils.lang;
@@ -917,7 +913,6 @@
                 if (!username || !password) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.t('fill_all_fields'); } return; }
                 if (btn) { btn.disabled = true; btn.textContent = Utils.lang === 'id' ? 'Memuat...' : '登录中...'; }
                 AUTH.setRememberMe(rememberMe);
-                // 不再写入 localStorage
                 const user = await AUTH.login(username, password);
                 if (!user) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.lang === 'id' ? 'Login gagal. Periksa kembali email/username dan password Anda.' : '登录失败，请检查邮箱/用户名和密码。'; } if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); } return; }
                 this.clearPageState(); this._isInitialized = true; this._startOverdueInterval();
