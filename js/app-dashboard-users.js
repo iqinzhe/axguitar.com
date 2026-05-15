@@ -1,5 +1,5 @@
 // app-dashboard-users.js - v2.0 (JF 命名空间)  (密码重置改为模态框，移除 prompt())
-// [修复] 重置密码后强制登出该用户（撤销所有活跃 session）
+// 重置密码后强制登出该用户（撤销所有活跃 session）
 
 'use strict';
 
