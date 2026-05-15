@@ -1,6 +1,5 @@
 // app-dashboard-core.js - v2.0 (JF 命名空间)  
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
-// [修复 #8] 订单列表绑定延迟从 50ms 改为 150ms
 
 'use strict';
 
@@ -389,7 +388,7 @@
                         await this._updateMainContent(contentHtml);
                         document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
                         this.saveCurrentPageState();
-                        // [修复 #8] 绑定延迟从 50ms 改为 150ms
+                        // 绑定延迟100ms
                         setTimeout(() => {
                             if (JF.OrdersPage._bindRowClickDelegate) JF.OrdersPage._bindRowClickDelegate();
                             if (JF.OrdersPage._bindGlobalEvents) JF.OrdersPage._bindGlobalEvents();
