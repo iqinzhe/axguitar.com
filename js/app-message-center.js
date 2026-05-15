@@ -1,5 +1,6 @@
 // app-message-center.js - v2.0 (JF 命名空间) 
 // 返回按钮使用更可靠的全局方法 + 增加降级方案
+// [修复 #10] 消息中心过滤练习门店
 
 'use strict';
 
@@ -56,7 +57,7 @@
             }
         },
 
-        // 获取需要提醒的消息列表
+        // 获取需要提醒的消息列表（[修复 #10] 排除练习门店）
         async getPendingMessages() {
             this._cleanOldRecords();
             const lang = Utils.lang;
@@ -70,6 +71,15 @@
             if (!isAdmin && storeId) {
                 query = query.eq('store_id', storeId);
             }
+            
+            // [修复 #10] 管理员查看时排除练习门店
+            if (isAdmin) {
+                const practiceIds = await SUPABASE._getPracticeStoreIds();
+                if (practiceIds.length > 0) {
+                    query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+                }
+            }
+            
             const { data: orders, error } = await query;
             if (error) throw error;
             
@@ -144,7 +154,7 @@
             }
         },
 
-        // 【修复 #10】显示消息中心页面 - 返回按钮使用更可靠的全局方法
+        // 显示消息中心页面 - 返回按钮使用更可靠的全局方法
         async showMessageCenter() {
             APP.currentPage = 'messageCenter';
             APP.saveCurrentPageState();
@@ -158,21 +168,21 @@
                 
                 let rows = '';
                 if (messages.length === 0) {
-                    rows = `<tr><td colspan="5" class="text-center">✅ ${lang === 'id' ? 'Tidak ada pesan tertunda' : '暂无待发送消息'}</td></tr>`;
+                    rows = `<tr><td colspan="5" class="text-center">✅ ${lang === 'id' ? 'Tidak ada pesan tertunda' : '暂无待发送消息'}<\/td>`;
                 } else {
                     for (let i = 0; i < messages.length; i++) {
                         const m = messages[i];
                         rows += `<tr>
-                            <td class="text-center" style="width:40px;">${i + 1}</td>
-                            <td class="order-id">${Utils.escapeHtml(m.orderId)}</td>
-                            <td class="col-name">${Utils.escapeHtml(m.customerName)}</td>
-                            <td class="col-status">${m.typeLabel}</td>
+                            <td class="text-center" style="width:40px;">${i + 1}<\/td>
+                            <td class="order-id">${Utils.escapeHtml(m.orderId)}<\/td>
+                            <td class="col-name">${Utils.escapeHtml(m.customerName)}<\/td>
+                            <td class="col-status">${m.typeLabel}<\/td>
                             <td class="text-center" style="white-space:nowrap;">
-                                <button onclick="MessageCenter.copyToClipboard('${Utils.escapeAttr(m.waMessage)}', '${Utils.escapeAttr(m.orderId)}')" class="btn btn--sm btn--primary">📋 ${lang === 'id' ? 'Salin Pesan' : '复制消息'}</button>
-                                <button onclick="MessageCenter.markAsSentAndRemove('${Utils.escapeAttr(m.orderId)}', '${m.type}')" class="btn btn--sm btn--success">✅ ${lang === 'id' ? 'Tandai Terkirim' : '标记已发送'}</button>
-                                <button onclick="MessageCenter.openWhatsApp('${Utils.escapeAttr(m.customerPhone)}', '${Utils.escapeAttr(m.waMessage)}')" class="btn btn--sm btn--warning">📱 ${lang === 'id' ? 'Buka WA' : '打开WA'}</button>
-                            </td>
-                        ｜｜DSML｜｜`;
+                                <button onclick="MessageCenter.copyToClipboard('${Utils.escapeAttr(m.waMessage)}', '${Utils.escapeAttr(m.orderId)}')" class="btn btn--sm btn--primary">📋 ${lang === 'id' ? 'Salin Pesan' : '复制消息'}<\/button>
+                                <button onclick="MessageCenter.markAsSentAndRemove('${Utils.escapeAttr(m.orderId)}', '${m.type}')" class="btn btn--sm btn--success">✅ ${lang === 'id' ? 'Tandai Terkirim' : '标记已发送'}<\/button>
+                                <button onclick="MessageCenter.openWhatsApp('${Utils.escapeAttr(m.customerPhone)}', '${Utils.escapeAttr(m.waMessage)}')" class="btn btn--sm btn--warning">📱 ${lang === 'id' ? 'Buka WA' : '打开WA'}<\/button>
+                            <\/td>
+                        </tr>`;
                     }
                 }
                 
