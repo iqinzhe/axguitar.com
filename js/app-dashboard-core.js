@@ -315,7 +315,7 @@
                 await this._idleLogout();
             }, this._IDLE_TIMEOUT);
         },
-        // 新增：静默登出（闲置超时用，跳过确认，记录审计）
+        // 静默登出（闲置超时用，跳过确认，记录审计）
         async _idleLogout() {
             this._clearOverdueInterval();
             this._clearIdleTimer();
