@@ -486,25 +486,42 @@
             APP.navigateTo('payment', { orderId: orderId });
         },
 
-        filterOrders: function(status) {
+        filterOrders: async function(status) {
             var isAdmin = PERMISSION.isAdmin();
             if (!isAdmin && status !== 'active') status = 'active';
             APP.currentFilter = status;
-            this.showOrderTable();
+            // 原地刷新：只重新拉数据替换 tbody，不重建整页，不 push historyStack
+            var lang = Utils.lang;
+            var tbody = document.getElementById('orderTableBody');
+            if (!tbody) { this.showOrderTable(); return; }
+            // 显示加载中
+            var totalCols = window._orderTableState ? window._orderTableState.totalCols : 9;
+            tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:24px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</td></tr>';
+            try {
+                var result = await this._fetchOrderData({ status: status }, 0, 50);
+                var orders = result.orders;
+                var totalCount = result.totalCount;
+                var state = window._orderTableState || {};
+                state.filters = { status: status };
+                state.allOrders = orders;
+                state.currentFrom = orders.length;
+                state.totalCount = totalCount;
+                window._orderTableState = state;
+                this._renderOrdersIntoTable(orders, false);
+                this._updateLoadMoreRow();
+                this._clearSelection();
+                // 同步下拉框显示（以防通过代码调用）
+                var sel = document.getElementById('statusFilter');
+                if (sel && sel.value !== status) sel.value = status;
+            } catch (err) {
+                console.error('filterOrders error:', err);
+                tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:24px;color:var(--danger);">❌ ' + (lang === 'id' ? 'Gagal memuat data' : '加载失败，请重试') + '</td></tr>';
+            }
         },
 
         viewOrder: async function(orderId) {
-            APP.currentPage = 'viewOrder';
-            APP.currentOrderId = orderId;
-            APP.saveCurrentPageState();
-            try {
-                var contentHTML = await this.renderViewOrderHTML(orderId);
-                document.getElementById("app").innerHTML = contentHTML;
-            } catch (error) {
-                console.error("viewOrder error:", error);
-                Utils.toast.error(Utils.lang === 'id' ? '加载订单失败' : '加载订单失败');
-                APP.goBack();
-            }
+            // 通过 navigateTo 跳转，确保 historyStack 记录 orderTable，返回时能回到列表
+            APP.navigateTo('viewOrder', { orderId: orderId });
         },
 
         deleteOrder: async function(orderId) {
@@ -642,7 +659,7 @@
                     }
                 }
                 document.getElementById("app").innerHTML = '' +
-                    '<div class="page-header"><h2>💰 ' + t('payment_history') + '</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ' + t('back') + '</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ' + t('print') + '</button></div></div>' +
+                    '<div class="page-header"><h2>💰 ' + t('payment_history') + '</h2><div class="header-actions"><button onclick="APP.navigateTo(\'orderTable\')" class="btn btn--outline">↩️ ' + t('back') + '</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ' + t('print') + '</button></div></div>' +
                     '<div class="stats-grid stats-grid--auto">' +
                     '<div class="card card--stat"><div class="stat-value income">' + Utils.formatCurrency(totalAdminFee) + '</div><div class="stat-label">' + t('admin_fee') + '</div></div>' +
                     '<div class="card card--stat"><div class="stat-value income">' + Utils.formatCurrency(totalServiceFee) + '</div><div class="stat-label">' + t('service_fee') + '</div></div>' +
@@ -781,7 +798,7 @@
                 '<div class="page-header">' +
                 '<h2>📄 ' + t('order_details') + '</h2>' +
                 '<div class="header-actions">' +
-                '<button onclick="APP.goBack()" class="btn btn--outline">↩️ ' + t('back') + '</button>' +
+                '<button onclick="APP.navigateTo(\'orderTable\')" class="btn btn--outline">↩️ ' + t('back') + '</button>' +
                 '<button onclick="APP.printOrder(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--outline">🖨️ ' + t('print') + '</button>' +
                 '</div>' +
                 '</div>' +
@@ -817,7 +834,7 @@
                 '<h3>📋 ' + (lang === 'id' ? '缴费记录' : '缴费记录') + '</h3>' +
                 '<div class="table-container"><table class="data-table payment-table"><thead><tr><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead><tbody>' + payRows + '</tbody></table></div>' +
                 '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
-                '<button onclick="APP.goBack()" class="btn btn--outline">↩️ ' + t('back') + '</button>' +
+                '<button onclick="APP.navigateTo(\'orderTable\')" class="btn btn--outline">↩️ ' + t('back') + '</button>' +
                 (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeHtml(order.order_id) + '\'})" class="btn btn--success">💸 ' + (lang === 'id' ? '缴纳费用' : '缴纳费用') + '</button>' : '') +
                 (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--success">🧾 ' + (lang === 'id' ? '结清凭证' : '结清凭证') + '</button>' : '') +
                 '<button onclick="APP.sendWAReminder(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--warning">📱 ' + (lang === 'id' ? 'WA提醒' : 'WA提醒') + '</button>' +

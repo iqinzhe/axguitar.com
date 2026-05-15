@@ -387,6 +387,16 @@
                         if (!isAdm && filterStatus !== 'active') filterStatus = 'active';
                         this.currentFilter = filterStatus;
                         contentHtml = await JF.OrdersPage.buildOrderTableHTML({ status: filterStatus }, 0, 50);
+                        await this._updateMainContent(contentHtml);
+                        document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
+                        this.saveCurrentPageState();
+                        // 关键：绑定行点击和操作按钮，否则列表不可交互
+                        setTimeout(() => {
+                            if (JF.OrdersPage._bindRowClickDelegate) JF.OrdersPage._bindRowClickDelegate();
+                            if (JF.OrdersPage._bindGlobalEvents) JF.OrdersPage._bindGlobalEvents();
+                            if (JF.OrdersPage._updateSelectedDisplay) JF.OrdersPage._updateSelectedDisplay();
+                        }, 50);
+                        return;
                     }
                 }
                 else if (page === 'customers') { if (JF.CustomersPage?.buildCustomersHTML) contentHtml = await JF.CustomersPage.buildCustomersHTML(); }
