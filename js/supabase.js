@@ -1280,8 +1280,12 @@
                 const newPaidTotal = (currentOrder.interest_paid_total||0) + interestToRecord;
                 const newShortfall = (currentOrder.interest_shortfall||0) + shortfallToTrack;
                 const maxMonths = currentOrder.max_extension_months || 10;
-                if (newPaidMonths > maxMonths) {
+                // 预付款（months>1）不受 maxMonths 约束，但单次最多3期
+                if (months === 1 && newPaidMonths > maxMonths) {
                     throw new Error(Utils.lang==='id'?`❌ Mencapai batas maksimum perpanjangan (${maxMonths} bulan)`:`❌ 已达到最大延期期限 (${maxMonths}个月)`);
+                }
+                if (months > 3) {
+                    throw new Error(Utils.lang==='id'?'❌ Maksimal 3 bulan bayar muka sekaligus':'❌ 单次预付最多3期');
                 }
                 const originalState = {
                     interest_paid_months: currentOrder.interest_paid_months,
@@ -1319,10 +1323,14 @@
                 if(updateErr) throw updateErr;
                 
                 if(interestToRecord>0){
+                    const isPrepaid = months > 1;
+                    const prepaidLabel = isPrepaid
+                        ? (Utils.lang==='id' ? ` [bayar muka ${months} bln]` : ` [预付${months}期]`)
+                        : '';
                     const paymentData = {
                         order_id: currentOrder.id, date: recordDate, type:'interest',
                         months, amount: interestToRecord,
-                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang==='id'?'bulan':'个月') + ' (' + (monthlyRate*100).toFixed(1)+'%)' + (recordDate !== todayStr() ? ` [补录 ${recordDate}]` : ''),
+                        description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang==='id'?'bulan':'个月') + ' (' + (monthlyRate*100).toFixed(1)+'%)' + prepaidLabel + (recordDate !== todayStr() ? ` [${isPrepaid ? (Utils.lang==='id'?'bayar muka':'预付至') : (Utils.lang==='id'?'susulan':'补录')} ${recordDate}]` : ''),
                         recorded_by: profile.id, payment_method: paymentMethod
                     };
                     const { error: payErr } = await supabaseClient.from('payment_history').insert(paymentData);

@@ -232,7 +232,13 @@
                 // 日期选择器：最早不能早于订单创建日，也不能早于上次缴息日，最晚不能超过今天
                 const orderCreatedDate = (order.created_at || '').substring(0, 10);
                 const interestDateMin = lastInterestDate > orderCreatedDate ? lastInterestDate : orderCreatedDate;
-                const interestDateMax = Utils.getLocalToday();
+                const interestDateToday = Utils.getLocalToday();
+                // 预付款：日期上限放开到今天起3个月后
+                const interestDateMax = (() => {
+                    const d = new Date(interestDateToday);
+                    d.setMonth(d.getMonth() + 3);
+                    return d.toISOString().substring(0, 10);
+                })();
 
                 // 本金历史
                 let principalRows = '';
@@ -297,8 +303,30 @@
                                 <div class="card-header"><h3>💰 ${t('pay_interest')}</h3></div>
                                 <div class="card-body">
                                     <div class="info-box"><div class="info-row"><span>📌 ${lang === 'id' ? 'Pembayaran Bunga ke-' : '第'}${nextInterestNumber} ${lang === 'id' ? 'kali' : '次'}</span></div><div class="info-row"><span>💰 ${t('amount_due')}:</span><strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></div><div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(0)}%</strong></div></div>
-                                    <div class="action-input-group"><label class="action-label">📅 ${lang === 'id' ? 'Tanggal Pembayaran' : '入账日期'}:</label><input type="date" id="interestPaymentDate" class="amount-input" value="${interestDateMax}" min="${interestDateMin}" max="${interestDateMax}" style="font-size:14px;padding:8px 10px;"><div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}</div></div>
-                                    <div class="action-input-group"><label class="action-label">${lang === 'id' ? 'Jumlah Dibayar' : '缴纳金额'}:</label><input type="text" id="interestAmount" class="amount-input" placeholder="${Utils.formatCurrency(currentMonthlyInterest)}" value="${Utils.formatNumberWithCommas(Math.round(currentMonthlyInterest))}"><div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Bunga 1 bln: ${Utils.formatCurrency(currentMonthlyInterest)} | Bisa kurang/lebih` : `1个月利息: ${Utils.formatCurrency(currentMonthlyInterest)} | 可少缴/多缴`}</div></div>
+                                    <div class="action-input-group">
+                                        <label class="action-label">🔢 ${lang === 'id' ? 'Jumlah Bulan Dibayar' : '缴纳期数'}:</label>
+                                        <select id="interestMonthsSelect" class="amount-input" style="font-size:14px;padding:8px 10px;" onchange="(function(){
+                                            var m=parseInt(document.getElementById('interestMonthsSelect').value)||1;
+                                            var base=${Math.round(currentMonthlyInterest)};
+                                            document.getElementById('interestAmount').value=Utils.formatNumberWithCommas(base*m);
+                                            var today='${interestDateToday}';
+                                            var d=new Date(today);
+                                            d.setMonth(d.getMonth()+(m-1));
+                                            var maxD=d.toISOString().substring(0,10);
+                                            var dateEl=document.getElementById('interestPaymentDate');
+                                            dateEl.max=maxD;
+                                            if(dateEl.value>maxD) dateEl.value=maxD;
+                                            var hint=document.getElementById('interestDateHint');
+                                            if(hint) hint.textContent=m>1?'💡 ${lang === 'id' ? '预付' : '预付'} '+m+' ${lang === 'id' ? '期，入账日期可为未来' : '期，入账日期可选未来'}':'💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}';
+                                        })()">
+                                            <option value="1">1 ${lang === 'id' ? 'bulan (normal)' : '期（本期）'}</option>
+                                            <option value="2">2 ${lang === 'id' ? 'bulan (bayar muka 1 bln)' : '期（预付1期）'}</option>
+                                            <option value="3">3 ${lang === 'id' ? 'bulan (bayar muka 2 bln)' : '期（预付2期）'}</option>
+                                        </select>
+                                        <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? '1 periode = normal; 2/3 periode = bayar di muka' : '选1期=正常缴费；选2/3期=包含预付款'}</div>
+                                    </div>
+                                    <div class="action-input-group"><label class="action-label">📅 ${lang === 'id' ? 'Tanggal Pembayaran' : '入账日期'}:</label><input type="date" id="interestPaymentDate" class="amount-input" value="${interestDateToday}" min="${interestDateMin}" max="${interestDateToday}" style="font-size:14px;padding:8px 10px;"><div class="form-hint" id="interestDateHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}</div></div>
+                                    <div class="action-input-group"><label class="action-label">${lang === 'id' ? 'Jumlah Dibayar' : '缴纳金额'}:</label><input type="text" id="interestAmount" class="amount-input" placeholder="${Utils.formatCurrency(currentMonthlyInterest)}" value="${Utils.formatNumberWithCommas(Math.round(currentMonthlyInterest))}"><div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Bunga 1 bln: ${Utils.formatCurrency(currentMonthlyInterest)} | Otomatis dikalikan jumlah bulan` : `1个月利息: ${Utils.formatCurrency(currentMonthlyInterest)} | 金额随期数自动计算`}</div></div>
                                     <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label></div></div>
                                     <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="interestConfirmBtn">✅ ${t('confirm_payment')}</button>
                                 </div>
@@ -370,7 +398,11 @@
             const method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
             const methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
-            // 读取日期选择器（补录时可选历史日期，默认今天）
+            // 读取期数（1=正常，2/3=预付）
+            const monthsSelect = document.getElementById('interestMonthsSelect');
+            const selectedMonths = monthsSelect ? (parseInt(monthsSelect.value) || 1) : 1;
+            const isPrepaid = selectedMonths > 1;
+            // 读取日期选择器（补录时可选历史日期，预付时可选未来日期）
             const paymentDateInput = document.getElementById('interestPaymentDate');
             const paymentDate = (paymentDateInput && paymentDateInput.value) ? paymentDateInput.value : Utils.getLocalToday();
 
@@ -386,47 +418,68 @@
 
             try {
                 const order = await SUPABASE.getOrder(orderId);
-                const calcResult = Utils.calculateInterestPartialPayment(order, actualPaid);
 
-                const isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', actualPaid, method);
-                if (isDuplicate) {
-                    Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔付款在2分钟内已记录，无需重复处理。');
-                    await PaymentPage.showPayment(orderId); return;
+                // 幂等检查（仅对1期正常缴费做，预付跳过以避免误拦截）
+                if (!isPrepaid) {
+                    const isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', actualPaid, method);
+                    if (isDuplicate) {
+                        Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔付款在2分钟内已记录，无需重复处理。');
+                        await PaymentPage.showPayment(orderId); return;
+                    }
                 }
 
                 const monthlyRate = order.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
                 const remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
                 const theoreticalInterest = remainingPrincipal * monthlyRate;
+                const theoreticalTotal = theoreticalInterest * selectedMonths;
                 const nextInterestNumber = (order.interest_paid_months || 0) + 1;
 
+                // 预付时只允许足额，不允许少付
+                if (isPrepaid && actualPaid < theoreticalTotal) {
+                    Utils.toast.warning(lang === 'id'
+                        ? `⚠️ Bayar muka ${selectedMonths} bulan harus minimal ${Utils.formatCurrency(theoreticalTotal)}`
+                        : `⚠️ 预付 ${selectedMonths} 期需足额缴纳，最少 ${Utils.formatCurrency(theoreticalTotal)}`);
+                    return;
+                }
+
+                const calcResult = Utils.calculateInterestPartialPayment(order, actualPaid / selectedMonths);
+
                 let shortfallWarning = '';
-                if (calcResult.principalDeducted < 0) {
+                if (!isPrepaid && calcResult.principalDeducted < 0) {
                     const shortfall = Math.abs(calcResult.principalDeducted);
                     shortfallWarning = lang === 'id'
                         ? `\n\n⚠️ PERHATIAN: Jumlah yang dibayar KURANG ${Utils.formatCurrency(shortfall)} dari bunga bulan ini.\nKekurangan ini akan dicatat sebagai HUTANG BUNGA dan harus dilunasi pada pembayaran berikutnya.`
                         : `\n\n⚠️ 注意：支付金额不足，比本月利息少 ${Utils.formatCurrency(shortfall)}。\n差额将记录为利息欠款，需在下次还款时补足。`;
                 }
 
+                const prepaidNote = isPrepaid
+                    ? (lang === 'id'
+                        ? `\n🔔 BAYAR MUKA: Membayar ${selectedMonths} bulan sekaligus (ke-${nextInterestNumber} s/d ke-${nextInterestNumber + selectedMonths - 1})\nTotal: ${Utils.formatCurrency(theoreticalTotal)}`
+                        : `\n🔔 预付款：一次性缴纳 ${selectedMonths} 期（第${nextInterestNumber}~${nextInterestNumber + selectedMonths - 1}期）\n应付合计: ${Utils.formatCurrency(theoreticalTotal)}`)
+                    : '';
+
                 const previewMsg = lang === 'id'
-                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}\nTanggal: ${paymentDate}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(0)}%\nBunga 1 bln (teoritis): ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\nLanjutkan?`
-                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期\n入账日期: ${paymentDate}\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(0)}%\n1个月利息(理论): ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}\n\n${calcResult.description}${shortfallWarning}\n\n确认收款？`;
+                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}${isPrepaid ? ` s/d ke-${nextInterestNumber + selectedMonths - 1}` : ''}\nTanggal: ${paymentDate}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(0)}%\nBunga per bln: ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}${prepaidNote}${shortfallWarning}\n\nLanjutkan?`
+                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期${isPrepaid ? `～第${nextInterestNumber + selectedMonths - 1}期` : ''}\n入账日期: ${paymentDate}\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(0)}%\n每期利息: ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}${prepaidNote}${shortfallWarning}\n\n确认收款？`;
 
                 const confirmed = await Utils.toast.confirm(previewMsg);
                 if (!confirmed) return;
 
                 try {
-                    const result = await SUPABASE.recordInterestPayment(orderId, 1, method, actualPaid, paymentDate);
+                    const result = await SUPABASE.recordInterestPayment(orderId, selectedMonths, method, actualPaid, paymentDate);
                     if (result && result.shortfall > 0) {
                         const shortfallMsg = lang === 'id'
                             ? `⚠️ Pembayaran kurang ${Utils.formatCurrency(result.shortfall)}. Hutang bunga total sekarang: ${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`
                             : `⚠️ 本次少付 ${Utils.formatCurrency(result.shortfall)}，累计利息欠款：${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`;
                         Utils.toast.warning(shortfallMsg, 8000);
+                    } else if (isPrepaid) {
+                        Utils.toast.success(lang === 'id' ? `✅ Bayar muka ${selectedMonths} bulan berhasil!` : `✅ 预付 ${selectedMonths} 期利息成功！`, 5000);
                     } else {
                         Utils.toast.success(lang === 'id' ? 'Pembayaran bunga berhasil!' : '利息收款成功！');
                     }
 
                     if (window.Audit) {
-                        await window.Audit.logPayment(order.order_id, 'interest', actualPaid, method);
+                        await window.Audit.logPayment(order.order_id, isPrepaid ? 'interest_prepaid' : 'interest', actualPaid, method);
                         if (result && result.shortfall > 0) {
                             await window.Audit.log('interest_shortfall', JSON.stringify({
                                 order_id: order.order_id,
