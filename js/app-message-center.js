@@ -1,6 +1,5 @@
 // app-message-center.js - v2.0 (JF 命名空间) 
 // 返回按钮使用更可靠的全局方法 + 增加降级方案
-// [修复 #10] 消息中心过滤练习门店
 
 'use strict';
 
@@ -57,7 +56,7 @@
             }
         },
 
-        // 获取需要提醒的消息列表（[修复 #10] 排除练习门店）
+        // 获取需要提醒的消息列表
         async getPendingMessages() {
             this._cleanOldRecords();
             const lang = Utils.lang;
@@ -72,7 +71,7 @@
                 query = query.eq('store_id', storeId);
             }
             
-            // [修复 #10] 管理员查看时排除练习门店
+            // 管理员查看时排除练习门店
             if (isAdmin) {
                 const practiceIds = await SUPABASE._getPracticeStoreIds();
                 if (practiceIds.length > 0) {
