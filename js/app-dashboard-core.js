@@ -387,6 +387,34 @@
                 else if (page === 'userManagement') { if (JF.UsersPage?.buildUserManagementHTML) contentHtml = await JF.UsersPage.buildUserManagementHTML(); }
                 else if (page === 'storeManagement') { if (JF.StoreManager?.buildStoreManagementHTML) contentHtml = await JF.StoreManager.buildStoreManagementHTML(); }
                 else if (page === 'backupRestore') { if (JF.BackupStorage?.renderBackupUI) { await JF.BackupStorage.renderBackupUI(); this.saveCurrentPageState(); return; } }
+                else if (page === 'dataRepair') {
+                    const lang = Utils.lang;
+                    contentHtml = `<div class="page-header"><h2>🔧 ${lang === 'id' ? 'Perbaikan Data' : '数据修复'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button></div></div>
+                    <div class="card" style="max-width:680px;margin:0 auto;">
+                        <h3 style="margin:0 0 8px;">🧹 ${lang === 'id' ? 'Sinkronkan Semua Catatan Biaya' : '批量同步所有订单费用流水'}</h3>
+                        <p style="color:var(--text-muted);font-size:13px;margin:0 0 16px;">${lang === 'id'
+                            ? 'Fungsi ini akan membersihkan dan menyinkronkan ulang catatan biaya admin/layanan di <b>semua pesanan</b> sesuai nilai yang tersimpan di pesanan (bukan angka lama yang salah). Cocok untuk memperbaiki data historis sekaligus.'
+                            : '此功能将对<b>全部订单</b>的管理费/服务费进行一次性清理和重新同步，使缴费历史、收入构成、资金流水三处数据与订单中保存的金额完全一致。适用于历史脏数据的批量清理。'}</p>
+                        <div class="info-box" style="margin-bottom:16px;background:var(--warning-bg,#fffbeb);border-left:4px solid #f59e0b;padding:12px 16px;border-radius:6px;">
+                            ⚠️ ${lang === 'id'
+                                ? '<b>Perhatian:</b> Proses ini tidak dapat dibatalkan. Pastikan data pesanan sudah benar sebelum menjalankan.'
+                                : '<b>注意：</b>此操作不可撤销。执行前请确认各订单中的管理费/服务费金额已经是正确值。'}
+                        </div>
+                        <div id="dataRepairProgress" style="display:none;margin-bottom:16px;">
+                            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
+                                <span id="dataRepairProgressText" style="color:var(--text-muted);">0 / 0</span>
+                                <span id="dataRepairCurrentOrder" style="color:var(--text-muted);"></span>
+                            </div>
+                            <div style="background:var(--border-color,#e5e7eb);border-radius:999px;height:8px;overflow:hidden;">
+                                <div id="dataRepairProgressBar" style="height:100%;width:0%;background:var(--primary,#2563eb);transition:width 0.3s;border-radius:999px;"></div>
+                            </div>
+                        </div>
+                        <div id="dataRepairResult" style="display:none;"></div>
+                        <button id="dataRepairBtn" class="btn btn--primary" style="width:100%;" onclick="APP.runBatchRepair()">
+                            🔧 ${lang === 'id' ? 'Mulai Perbaikan Semua Pesanan' : '开始批量修复所有订单'}
+                        </button>
+                    </div>`;
+                }
                 else if (page === 'blacklist') { if (JF.BlacklistPage?.buildBlacklistHTML) contentHtml = await JF.BlacklistPage.buildBlacklistHTML(); }
                 else if (page === 'messageCenter') { if (JF.MessageCenter?.showMessageCenter) { await JF.MessageCenter.showMessageCenter(); this.saveCurrentPageState(); return; } }
                 else if (page === 'viewOrder' && this.currentOrderId) { if (JF.OrdersPage?.renderViewOrderHTML) contentHtml = await JF.OrdersPage.renderViewOrderHTML(this.currentOrderId); }
@@ -735,7 +763,8 @@
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('userManagement')"><span class="nav-icon">👤</span> ${t('user_management')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeManagement')"><span class="nav-icon">🏪</span> ${t('store_management')}</div>
-                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>` : `
+                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>
+                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('dataRepair')"><span class="nav-icon">🔧</span> ${lang === 'id' ? 'Perbaikan Data' : '数据修复'}</div>` : `
                     <div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
                     ${profile?.role === 'store_manager' ? `<div class="nav-item" onclick="JF.ProfitPage.showDistributionPage()"><span class="nav-icon">💸</span> ${lang === 'id' ? 'Distribusi Laba' : '收益处置'}</div>` : ''}
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
@@ -916,6 +945,63 @@
 
     if (!window.APP) { window.APP = DashboardCore; }
     else { for (const key of Object.keys(DashboardCore)) { if (typeof DashboardCore[key] === 'function' && !window.APP[key]) window.APP[key] = DashboardCore[key].bind(DashboardCore); } window.APP.navigateTo = DashboardCore.navigateTo.bind(DashboardCore); window.APP.goBack = DashboardCore.goBack.bind(DashboardCore); window.APP.refreshCurrentPage = DashboardCore.refreshCurrentPage.bind(DashboardCore); window.APP.renderDashboard = DashboardCore.renderDashboard.bind(DashboardCore); window.APP.logout = DashboardCore.logout.bind(DashboardCore); window.APP.forceRecovery = DashboardCore.forceRecovery.bind(DashboardCore); window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore); window.APP.toggleLanguage = DashboardCore.toggleLanguage.bind(DashboardCore); window.APP.login = DashboardCore.login.bind(DashboardCore); window.APP.renderLogin = DashboardCore.renderLogin.bind(DashboardCore); window.APP.init = DashboardCore.init.bind(DashboardCore); }
+
+    // 批量修复入口 — 挂载到 APP，供 dataRepair 页面按钮调用
+    window.APP.runBatchRepair = async function() {
+        const lang = Utils.lang;
+        const btn = document.getElementById('dataRepairBtn');
+        const progressBox = document.getElementById('dataRepairProgress');
+        const progressBar = document.getElementById('dataRepairProgressBar');
+        const progressText = document.getElementById('dataRepairProgressText');
+        const currentOrder = document.getElementById('dataRepairCurrentOrder');
+        const resultBox = document.getElementById('dataRepairResult');
+
+        const confirmed = await Utils.toast.confirm(lang === 'id'
+            ? '🔧 Mulai perbaikan semua pesanan?\n\nProses ini akan menyinkronkan ulang catatan biaya admin/layanan di SEMUA pesanan.\nTidak dapat dibatalkan. Lanjutkan?'
+            : '🔧 确认开始批量修复？\n\n将对所有订单的管理费/服务费进行清理和重新同步。\n此操作不可撤销，确认继续？');
+        if (!confirmed) return;
+
+        if (btn) { btn.disabled = true; btn.textContent = lang === 'id' ? '⏳ Sedang diproses...' : '⏳ 处理中，请稍候...'; }
+        if (progressBox) progressBox.style.display = 'block';
+        if (resultBox) resultBox.style.display = 'none';
+
+        try {
+            const result = await SUPABASE.batchRepairAllOrderFees(function(p) {
+                const pct = Math.round((p.current / p.total) * 100);
+                if (progressBar) progressBar.style.width = pct + '%';
+                if (progressText) progressText.textContent = p.current + ' / ' + p.total + ' (' + pct + '%)';
+                if (currentOrder) currentOrder.textContent = p.orderId;
+            });
+
+            if (progressBar) progressBar.style.width = '100%';
+            if (currentOrder) currentOrder.textContent = '';
+
+            const isAllOk = result.failed === 0;
+            const summaryColor = isAllOk ? '#16a34a' : '#dc2626';
+            const summaryIcon = isAllOk ? '✅' : '⚠️';
+            const failedHtml = result.failedList.length > 0
+                ? '<div style="margin-top:10px;font-size:12px;color:#dc2626;"><b>' + (lang === 'id' ? 'Gagal:' : '失败订单：') + '</b><br>' +
+                  result.failedList.map(f => f.order_id + ': ' + f.error).join('<br>') + '</div>'
+                : '';
+
+            if (resultBox) {
+                resultBox.style.display = 'block';
+                resultBox.innerHTML = '<div style="padding:16px;border-radius:8px;background:' + (isAllOk ? '#f0fdf4' : '#fef2f2') + ';border:1px solid ' + (isAllOk ? '#bbf7d0' : '#fecaca') + ';color:' + summaryColor + ';">' +
+                    '<div style="font-size:16px;font-weight:bold;margin-bottom:6px;">' + summaryIcon + ' ' + (lang === 'id' ? 'Selesai' : '修复完成') + '</div>' +
+                    '<div style="font-size:13px;line-height:1.8;">' +
+                    '📦 ' + (lang === 'id' ? 'Total pesanan' : '订单总数') + ': <b>' + result.total + '</b><br>' +
+                    '✅ ' + (lang === 'id' ? 'Berhasil' : '成功') + ': <b>' + result.success + '</b><br>' +
+                    (result.failed > 0 ? '❌ ' + (lang === 'id' ? 'Gagal' : '失败') + ': <b>' + result.failed + '</b>' : '') +
+                    '</div>' + failedHtml + '</div>';
+            }
+            if (window.JF && JF.Cache) JF.Cache.clear();
+            Utils.toast.success(lang === 'id' ? '✅ Perbaikan selesai! ' + result.success + ' pesanan berhasil.' : '✅ 批量修复完成！成功 ' + result.success + ' 笔，失败 ' + result.failed + ' 笔。', 6000);
+        } catch (e) {
+            Utils.toast.error(e.message || (lang === 'id' ? 'Gagal memulai perbaikan' : '批量修复启动失败'));
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = '🔧 ' + (lang === 'id' ? 'Mulai Perbaikan Semua Pesanan' : '开始批量修复所有订单'); }
+        }
+    };
 
     window.addEventListener('beforeunload', () => { if (JF.DashboardCore) JF.DashboardCore.saveCurrentPageState(); });
 

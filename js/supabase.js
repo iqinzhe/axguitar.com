@@ -1277,6 +1277,43 @@
             if (window.Audit) await window.Audit.log('repair_order_fees', JSON.stringify({ order_id: orderId, admin_fee: order.admin_fee, service_fee: order.service_fee_amount }));
             return true;
         },
+
+        // [新增] 批量修复：遍历所有订单，清理并同步管理费/服务费流水
+        async batchRepairAllOrderFees(progressCallback) {
+            if (!PERMISSION.isAdmin()) throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
+            const profile = await this.getCurrentProfile();
+            const { data: orders, error } = await supabaseClient
+                .from('orders')
+                .select('order_id, id, store_id, customer_id, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, created_at')
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            const total = orders.length;
+            let success = 0, failed = 0;
+            const failedList = [];
+            for (let i = 0; i < total; i++) {
+                const o = orders[i];
+                if (progressCallback) progressCallback({ current: i + 1, total, orderId: o.order_id, success, failed });
+                try {
+                    await this.syncFeesAfterAdminEdit(
+                        o.order_id,
+                        o.admin_fee || 0,
+                        o.admin_fee_paid || false,
+                        o.service_fee_amount || 0,
+                        (o.created_at || '').substring(0, 10)
+                    );
+                    success++;
+                } catch (e) {
+                    failed++;
+                    failedList.push({ order_id: o.order_id, error: e.message });
+                    console.error('[batchRepair] 订单失败:', o.order_id, e.message);
+                }
+                // 每10笔稍作间隔，避免数据库压力过大
+                if ((i + 1) % 10 === 0) await new Promise(r => setTimeout(r, 300));
+            }
+            if (window.Audit) await window.Audit.log('batch_repair_order_fees', JSON.stringify({ total, success, failed, operator: profile.id }));
+            return { total, success, failed, failedList };
+        },
+
         async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null, paymentDate=null) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
