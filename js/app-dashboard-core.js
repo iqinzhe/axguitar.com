@@ -394,7 +394,7 @@
                             if (JF.OrdersPage._bindRowClickDelegate) JF.OrdersPage._bindRowClickDelegate();
                             if (JF.OrdersPage._bindGlobalEvents) JF.OrdersPage._bindGlobalEvents();
                             if (JF.OrdersPage._updateSelectedDisplay) JF.OrdersPage._updateSelectedDisplay();
-                        }, 150);
+                        }, 100);
                         return;
                     }
                 }
