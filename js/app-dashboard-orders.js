@@ -22,8 +22,10 @@
             var lang = Utils.lang;
             var t = Utils.t.bind(Utils);
             var isAdmin = PERMISSION.isAdmin();
-            var PAGE_SIZE = pageSize || 50;
-            var from = currentFrom || 0;
+            // [分页] 默认每页15条；currentFrom改为传页码
+            var PAGE_SIZE = pageSize || 15;
+            var page = (currentFrom && currentFrom > 0) ? currentFrom : 1;
+            var from = (page - 1) * PAGE_SIZE;
             var to = from + PAGE_SIZE - 1;
 
             var _a = await Promise.all([
@@ -35,7 +37,6 @@
             var stores = _a[1];
 
             var allOrders = ordersResult;
-            var currentFromVal = from + allOrders.length;
             var storeMap = {};
             for (var i = 0; i < stores.length; i++) {
                 var s = stores[i];
@@ -81,26 +82,26 @@
                     '</tr>';
             }
 
-            var loadMoreHtml = '';
-            if (currentFromVal < totalCount) {
-                var remaining = totalCount - currentFromVal;
-                loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;"><button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ' + (lang === 'id' ? 'Muat Lebih Banyak' : '加载更多') + ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')</button> Nosmoking Nosmoking</td></tr>';
-            } else if (totalCount > PAGE_SIZE && allOrders.length > 0) {
-                loadMoreHtml = '<tr id="loadMoreRow"><td colspan="' + totalCols + '" style="text-align:center;padding:14px;color:var(--text-muted);">✅ ' + (lang === 'id' ? 'Semua ' + totalCount + ' pesanan telah dimuat' : '已加载全部 ' + totalCount + ' 条订单') + '</td></tr>';
-            }
+            // [分页] loadMore已由分页控件取代
 
+            // [分页] 保存状态供分页跳转使用
             window._orderTableState = {
-                currentFrom: currentFromVal,
+                currentFrom: from + allOrders.length,
                 totalCount: totalCount,
                 allOrders: allOrders,
                 totalCols: totalCols,
                 pageSize: PAGE_SIZE,
                 filters: filters,
                 storeMap: storeMap,
+                currentPage: page,
                 selectedOrderId: null,
                 selectedOrderStatus: null,
                 renderOrdersIntoTable: this._renderOrdersIntoTable.bind(this)
             };
+
+            // [分页] 构建分页控件 HTML
+            var totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+            var paginatorHtml = JF.OrdersPage._buildOrderPaginatorHtml(page, totalPages, PAGE_SIZE, totalCount, filters, lang);
 
             // 筛选下拉选项
             var filterOptions = [
@@ -166,11 +167,116 @@
                 (isAdmin ? '<th class="col-store text-center">' + t('store') + '</th>' : '') +
                 '</tr>' +
                 '</thead>' +
-                '<tbody id="orderTableBody">' + rows + loadMoreHtml + '</tbody>' +
+                '<tbody id="orderTableBody">' + rows + '</tbody>' +
                 '</table>' +
                 '</div>' +
-                '</div>';
+                '</div>' +
+                '<div id="orderTablePaginator"></div>';
+
+            // [分页] 注入分页控件内容
+            // 使用 setTimeout 确保 DOM 已渲染
+            (function(ph) {
+                setTimeout(function() {
+                    var el = document.getElementById('orderTablePaginator');
+                    if (el) el.innerHTML = ph;
+                    JF.OrdersPage._reattachOrderTableEvents();
+                }, 0);
+            })(paginatorHtml);
+
             return content;
+        },
+
+        // [分页] 构建订单列表分页控件 HTML
+        _buildOrderPaginatorHtml: function(page, totalPages, pageSize, total, filters, lang) {
+            if (total === 0) return '';
+            var from = (page - 1) * pageSize + 1;
+            var to = Math.min(page * pageSize, total);
+            var info = lang === 'id'
+                ? '<span class="jf-page-info">' + from + '–' + to + ' / ' + total + '</span>'
+                : '<span class="jf-page-info">第 ' + from + '–' + to + ' 条 / 共 ' + total + ' 条</span>';
+            var prevDisabled = page <= 1 ? ' disabled' : '';
+            var nextDisabled = page >= totalPages ? ' disabled' : '';
+            var prevLabel = lang === 'id' ? '‹ Prev' : '‹ 上一页';
+            var nextLabel = lang === 'id' ? 'Next ›' : '下一页 ›';
+            var filtersJson = JSON.stringify(filters).replace(/'/g, "\\'");
+
+            // 页码
+            var pageButtons = '';
+            var pages = [];
+            if (totalPages <= 7) {
+                for (var i = 1; i <= totalPages; i++) pages.push(i);
+            } else if (page <= 4) {
+                for (var i = 1; i <= 5; i++) pages.push(i);
+                pages.push('...'); pages.push(totalPages);
+            } else if (page >= totalPages - 3) {
+                pages.push(1); pages.push('...');
+                for (var i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+            } else {
+                pages.push(1); pages.push('...');
+                for (var i = page - 1; i <= page + 1; i++) pages.push(i);
+                pages.push('...'); pages.push(totalPages);
+            }
+            for (var pi = 0; pi < pages.length; pi++) {
+                var p = pages[pi];
+                if (p === '...') {
+                    pageButtons += '<span class="jf-page-ellipsis">…</span>';
+                } else {
+                    var active = p === page ? ' jf-page-active' : '';
+                    pageButtons += '<button class="jf-page-btn' + active + '" onclick="JF.OrdersPage.goToOrderPage(' + p + ')">' + p + '</button>';
+                }
+            }
+
+            // 每页条数
+            var sizes = [15, 25, 50];
+            var sizeOpts = sizes.map(function(s) {
+                return '<option value="' + s + '"' + (s === pageSize ? ' selected' : '') + '>' + s + '</option>';
+            }).join('');
+            var sizeLabel = lang === 'id' ? 'per hal' : '条/页';
+            var sizeSelector = '<select class="jf-page-size-select" onchange="JF.OrdersPage.changeOrderPageSize(this.value)">' + sizeOpts + '</select><span class="jf-page-size-label">' + sizeLabel + '</span>';
+
+            return '<div class="jf-paginator">' +
+                info +
+                '<div class="jf-page-controls">' +
+                '<button class="jf-page-btn jf-page-nav"' + prevDisabled + ' onclick="JF.OrdersPage.goToOrderPage(' + (page-1) + ')">' + prevLabel + '</button>' +
+                pageButtons +
+                '<button class="jf-page-btn jf-page-nav"' + nextDisabled + ' onclick="JF.OrdersPage.goToOrderPage(' + (page+1) + ')">' + nextLabel + '</button>' +
+                '</div>' +
+                sizeSelector +
+                '</div>';
+        },
+
+        // [分页] 跳转到订单列表指定页
+        goToOrderPage: async function(page) {
+            var state = window._orderTableState;
+            if (!state) return;
+            var lang = Utils.lang;
+            var paginator = document.getElementById('orderTablePaginator');
+            if (paginator) paginator.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? '加载中...' : '加载中...') + '</div>';
+            try {
+                var html = await JF.OrdersPage.buildOrderTableHTML(state.filters, page, state.pageSize);
+                var card = document.querySelector('.order-table-card');
+                if (card) {
+                    card.outerHTML = html.match(/<div class="card order-table-card">[\s\S]*<\/div>\s*<div id="orderTablePaginator"><\/div>/)?.[0] || card.outerHTML;
+                }
+                var newHtmlDiv = document.createElement('div');
+                newHtmlDiv.innerHTML = html;
+                var newCard = newHtmlDiv.querySelector('.order-table-card');
+                var newPaginator = newHtmlDiv.querySelector('#orderTablePaginator');
+                if (newCard) document.querySelector('.order-table-card').outerHTML = newCard.outerHTML;
+                if (newPaginator) document.getElementById('orderTablePaginator').innerHTML = newPaginator.innerHTML;
+                JF.OrdersPage._reattachOrderTableEvents();
+            } catch(e) {
+                console.error('goToOrderPage error:', e);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat halaman' : '加载失败');
+            }
+        },
+
+        // [分页] 修改每页条数
+        changeOrderPageSize: async function(newSize) {
+            var state = window._orderTableState;
+            if (!state) return;
+            state.pageSize = parseInt(newSize, 10);
+            await JF.OrdersPage.goToOrderPage(1);
         },
 
         _renderOrdersIntoTable: function(orders, append) {
@@ -406,6 +512,14 @@
         },
 
         // ==================== 页面渲染入口 ====================
+        // [分页] 分页跳转后重新绑定订单行点击事件
+        _reattachOrderTableEvents: function() {
+            var self = JF.OrdersPage;
+            self._bindRowClickDelegate();
+            self._bindGlobalEvents();
+            self._updateSelectedDisplay();
+        },
+
         showOrderTable: async function() {
             APP.currentPage = 'orderTable';
             APP.saveCurrentPageState();
@@ -419,7 +533,7 @@
             }
             APP.currentFilter = currentStatus;
             var filters = { status: currentStatus };
-            var contentHTML = await this.buildOrderTableHTML(filters, 0, 50);
+            var contentHTML = await this.buildOrderTableHTML(filters, 1, 15);
             document.getElementById("app").innerHTML = contentHTML;
             var self = this;
             setTimeout(function() {
@@ -848,6 +962,9 @@
     if (window.APP) {
         window.APP.showOrderTable = OrdersPage.showOrderTable.bind(OrdersPage);
         window.APP.loadMoreOrders = OrdersPage.loadMoreOrders.bind(OrdersPage);
+        window.APP.goToOrderPage = OrdersPage.goToOrderPage.bind(OrdersPage);
+        window.APP.changeOrderPageSize = OrdersPage.changeOrderPageSize.bind(OrdersPage);
+        JF.OrdersPage = OrdersPage;
         window.APP.payOrder = OrdersPage.payOrder.bind(OrdersPage);
         window.APP.filterOrders = OrdersPage.filterOrders.bind(OrdersPage);
         window.APP.viewOrder = OrdersPage.viewOrder.bind(OrdersPage);

@@ -101,7 +101,9 @@
                         if (storeCustomers.length === 0) continue;
                         const storeName = Utils.escapeHtml(store.name);
                         const storeCode = Utils.escapeHtml(store.code);
-                        const rows = buildRowsForCustomers(storeCustomers);
+                        const tbodyId = 'custBody_' + store.id;
+                        const paginatorId = 'custPag_' + store.id;
+                        const _storeCustomers = storeCustomers;
                         groupedTablesHtml += `
                             <div class="card" style="margin-bottom: 24px;">
                                 <h3>🏪 ${storeName} <span style="font-size:0.8rem; color:var(--text-muted);">(${storeCode})</span> <span style="float:right; font-size:0.8rem;">👥 ${storeCustomers.length} ${lang === 'id' ? 'nasabah' : '客户'}</span></h3>
@@ -118,11 +120,22 @@
                                                 <th class="text-center">${t('action')}</th>
                                             </tr>
                                         </thead>
-                                        <tbody>${rows}</tbody>
+                                        <tbody id="${tbodyId}"></tbody>
                                     </table>
                                 </div>
+                                <div id="${paginatorId}"></div>
                             </div>
                         `;
+                        // [分页] 每个门店的客户表各自分页
+                        setTimeout((function(bid, pid, sc) {
+                            return function() {
+                                if (window.JF && JF.Pagination) {
+                                    JF.Pagination.render(bid, sc, 1, 15, function(c) {
+                                        return buildRowsForCustomers([c]);
+                                    }, { paginatorId: pid });
+                                }
+                            };
+                        })(tbodyId, paginatorId, _storeCustomers), 0);
                     }
                     if (groupedTablesHtml === '') {
                         groupedTablesHtml = `<div class="card"><p class="text-center">${lang === 'id' ? 'Belum ada data nasabah' : '暂无客户数据'}</p></div>`;
@@ -131,9 +144,11 @@
                 } else {
                     // 门店操作员：直接显示一个表格（客户已全局排序）
                     const rows = buildRowsForCustomers(customers);
+                    const _custPageSize = 15;
+                    const _buildCustRow = buildRowsForCustomers;
                     mainContent = `
                         <div class="card">
-                            <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'}</h3>
+                            <h3>${lang === 'id' ? 'Daftar Nasabah' : '客户列表'} <span id="custCounterStore" style="font-size:12px;color:var(--text-muted);font-weight:normal;"></span></h3>
                             <div class="table-container">
                                 <table class="data-table customer-list-table">
                                     <thead>
@@ -147,11 +162,19 @@
                                             <th class="text-center">${t('action')}</th>
                                         </tr>
                                     </thead>
-                                    <tbody>${rows}</tbody>
+                                    <tbody id="custTableBody"></tbody>
                                 </table>
                             </div>
+                            <div id="custTablePaginator"></div>
                         </div>
                     `;
+                    setTimeout(function() {
+                        if (window.JF && JF.Pagination) {
+                            JF.Pagination.render('custTableBody', customers, 1, _custPageSize, function(c) {
+                                return _buildCustRow([c]);
+                            }, { paginatorId: 'custTablePaginator', counterId: 'custCounterStore' });
+                        }
+                    }, 0);
                 }
                 
                 // 新增客户卡片（仅门店操作员可见）

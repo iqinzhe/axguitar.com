@@ -181,10 +181,53 @@
                                         <th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                     </tr>
                                 </thead>
-                                <tbody>${rows}</tbody>
+                                <tbody id="expenseTableBody"></tbody>
                             </table>
                         </div>
+                        <div id="expenseTablePaginator"></div>
                     </div>`;
+
+                // [分页] 全量数据已在前端，用JF.Pagination切片显示
+                const expensePageSize = 15;
+                const buildExpenseRow = (exp) => {
+                    const date = Utils.formatDate(exp.expense_date);
+                    const amount = Utils.formatCurrency(exp.amount);
+                    const category = Utils.escapeHtml(exp.category || '-');
+                    const desc = Utils.escapeHtml(exp.description || '-');
+                    const method = exp.payment_method === 'bank' ? (lang === 'id' ? 'Bank' : '银行') : (lang === 'id' ? 'Tunai' : '现金');
+                    const storeName = isAdmin ? (storeMap[exp.store_id] || '-') : '';
+                    const reconciled = exp.is_reconciled
+                        ? `<span class="badge badge--completed">${lang === 'id' ? 'Sudah' : '已核'}</span>`
+                        : `<span class="badge badge--active">${lang === 'id' ? 'Belum' : '未核'}</span>`;
+                    const deleteBtn = (isAdmin || PERMISSION.isStoreManager())
+                        ? `<button onclick="APP.deleteExpense('${exp.id}')" class="btn btn--danger btn--sm">🗑️</button>`
+                        : '';
+                    const editBtn = (isAdmin || PERMISSION.isStoreManager())
+                        ? `<button onclick="APP.editExpense('${exp.id}')" class="btn btn--warning btn--sm" style="margin-right:4px;">✏️</button>`
+                        : '';
+                    const reconcileBtn = (isAdmin || PERMISSION.isStoreManager()) && !exp.is_reconciled
+                        ? `<button onclick="APP.reconcileExpense('${exp.id}')" class="btn btn--sm" style="margin-right:4px;">${lang === 'id' ? '✓ Cocok' : '✓ 核销'}</button>`
+                        : '';
+                    return `<tr>
+                        <td class="col-date">${date}</td>
+                        <td class="col-type">${category}</td>
+                        <td class="col-amount amount">${amount}</td>
+                        <td class="col-method text-center">${method}</td>
+                        <td class="col-desc">${desc}</td>
+                        ${isAdmin ? `<td class="col-store text-center">${Utils.escapeHtml(storeName)}</td>` : ''}
+                        <td class="col-action text-center">${reconcileBtn}${editBtn}${deleteBtn}</td>
+                    </tr>`;
+                };
+
+                setTimeout(function() {
+                    if (window.JF && JF.Pagination) {
+                        JF.Pagination.render('expenseTableBody', expenses, 1, expensePageSize, buildExpenseRow, {
+                            paginatorId: 'expenseTablePaginator',
+                            emptyHtml: `<tr><td colspan="99" style="text-align:center;padding:24px;color:var(--text-muted);">${lang === 'id' ? 'Belum ada pengeluaran' : '暂无支出记录'}</td></tr>`
+                        });
+                    }
+                }, 0);
+
                 return content;
             } catch (error) {
                 console.error("buildExpensesHTML error:", error);

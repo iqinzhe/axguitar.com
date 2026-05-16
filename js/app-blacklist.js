@@ -173,10 +173,41 @@
                         '<div class="table-container">' +
                             '<table class="data-table">' +
                                 '<thead>' + headerHtml + '</thead>' +
-                                '<tbody>' + rows + '</tbody>' +
+                                '<tbody id="blacklistTableBody"></tbody>' +
                             '</table>' +
                         '</div>' +
+                        '<div id="blacklistTablePaginator"></div>' +
                     '</div>';
+
+                // [分页] 黑名单前端分页
+                var _blItems = blacklist;
+                var _blIsAdmin = isAdmin;
+                var _blLang = lang;
+                setTimeout(function() {
+                    if (window.JF && JF.Pagination && _blItems) {
+                        JF.Pagination.render('blacklistTableBody', _blItems, 1, 15, function(item) {
+                            var iname = Utils.escapeHtml(item.customer_name || '-');
+                            var reason = Utils.escapeHtml(item.reason || '-');
+                            var addedDate = Utils.formatDate(item.added_at || item.created_at || '');
+                            var addedBy = Utils.escapeHtml(item.added_by_name || '-');
+                            var storeName = _blIsAdmin ? Utils.escapeHtml(item.store_name || item.store_id || '-') : '';
+                            var removeBtn = (_blIsAdmin || (window.PERMISSION && PERMISSION.isStoreManager()))
+                                ? '<button onclick="APP.removeFromBlacklist(\'' + item.id + '\')" class="btn btn--danger btn--sm">🗑️ ' + (_blLang === 'id' ? 'Hapus' : '移除') + '</button>'
+                                : '';
+                            return '<tr>' +
+                                '<td>' + iname + '</td>' +
+                                '<td>' + reason + '</td>' +
+                                '<td class="text-center">' + addedDate + '</td>' +
+                                '<td class="text-center">' + addedBy + '</td>' +
+                                (_blIsAdmin ? '<td class="text-center">' + storeName + '</td>' : '') +
+                                '<td class="text-center">' + removeBtn + '</td>' +
+                                '</tr>';
+                        }, {
+                            paginatorId: 'blacklistTablePaginator',
+                            emptyHtml: '<tr><td colspan="99" style="text-align:center;padding:24px;color:var(--text-muted);">' + (_blLang === 'id' ? 'Daftar hitam kosong' : '黑名单为空') + '</td></tr>'
+                        });
+                    }
+                }, 0);
 
             } catch (error) {
                 console.error("showBlacklist error:", error);
