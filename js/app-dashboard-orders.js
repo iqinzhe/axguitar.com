@@ -1010,11 +1010,146 @@
     }
 })();
 
-// ==================== 管理员修改订单模块（完整实现，支持编辑利息和本金） ====================
+// ==================== 管理员修改订单模块（完整实现，支持逐条编辑利息/本金记录） ====================
 (function() {
     if (!window.JF) window.JF = {};
 
+    // 内存中的缴费记录副本，供编辑使用
+    var _editPayments = [];   // [{id, type, date, amount, payment_method, months, description, _deleted, _new}, ...]
+    var _nextTmpId = -1;      // 新增记录用负数临时ID
+
     var AdminEditOrder = {
+
+        // ==================== 渲染缴费记录编辑区 ====================
+        _renderPaymentEditor: function(lang) {
+            var interest  = _editPayments.filter(function(p){ return p.type === 'interest'  && !p._deleted; });
+            var principal = _editPayments.filter(function(p){ return p.type === 'principal' && !p._deleted; });
+            var methodOpts = '<option value="cash">' + (lang === 'id' ? 'Tunai' : '现金') + '</option>' +
+                             '<option value="bank">' + (lang === 'id' ? 'Bank' : '银行') + '</option>';
+
+            function rowHtml(p) {
+                var mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
+                var isInterest = p.type === 'interest';
+                var mthHtml = isInterest
+                    ? '<input type="number" id="' + mid + '_months" value="' + (p.months || 1) + '" min="1" max="12" step="1" style="width:60px;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;" title="' + (lang === 'id' ? '期数' : '期数') + '">'
+                    : '<span style="color:var(--text-muted);font-size:12px;">—</span>';
+                var methodSel = '<select id="' + mid + '_method" style="padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;">' +
+                    methodOpts.replace('value="' + p.payment_method + '"', 'value="' + p.payment_method + '" selected') +
+                    '</select>';
+                return '<tr id="' + mid + '_row" style="border-bottom:1px solid var(--border-light);">' +
+                    '<td style="padding:7px 8px;"><input type="date" id="' + mid + '_date" value="' + (p.date || '') + '" style="padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;"></td>' +
+                    '<td style="padding:7px 8px;"><input type="text" id="' + mid + '_amount" value="' + Utils.formatNumberWithCommas(p.amount || 0) + '" class="amount-input" style="width:130px;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;"></td>' +
+                    '<td style="padding:7px 8px;">' + mthHtml + '</td>' +
+                    '<td style="padding:7px 8px;">' + methodSel + '</td>' +
+                    '<td style="padding:7px 8px;"><input type="text" id="' + mid + '_desc" value="' + Utils.escapeHtml(p.description || '') + '" placeholder="' + (lang === 'id' ? '备注（可选）' : '备注（可选）') + '" style="width:100%;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;"></td>' +
+                    '<td style="padding:7px 8px;text-align:center;">' +
+                    '<button onclick="JF.AdminEditOrder._deletePaymentRow(' + p.id + ')" style="background:var(--danger);color:#fff;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px;">🗑️</button>' +
+                    '</td>' +
+                    '</tr>';
+            }
+
+            var iRows = interest.length ? interest.map(rowHtml).join('') :
+                '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? '暂无记录' : '暂无记录') + '</td></tr>';
+            var pRows = principal.length ? principal.map(rowHtml).join('') :
+                '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? '暂无记录' : '暂无记录') + '</td></tr>';
+
+            var thStyle = 'style="padding:7px 8px;background:var(--bg-hover);font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;"';
+            var tableHead = '<thead><tr>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? '日期' : '日期') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? '金额 (Rp)' : '金额 (Rp)') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? '期数' : '期数') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? '方式' : '方式') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? '备注' : '备注') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? '操作' : '操作') + '</th>' +
+                '</tr></thead>';
+
+            var today = Utils.getLocalToday();
+
+            return '<div class="form-section" id="payment_editor_section">' +
+                '<div class="form-section-title"><span class="section-icon">💰</span> ' + (lang === 'id' ? '利息缴纳记录（逐条编辑）' : '利息缴纳记录（逐条编辑）') + '</div>' +
+                '<div style="overflow-x:auto;margin-bottom:10px;">' +
+                '<table style="width:100%;border-collapse:collapse;" id="interest_records_table">' +
+                tableHead + '<tbody id="interest_rows">' + iRows + '</tbody>' +
+                '</table></div>' +
+                '<button onclick="JF.AdminEditOrder._addPaymentRow(\'interest\')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;margin-bottom:18px;">＋ ' + (lang === 'id' ? '新增利息记录' : '新增利息记录') + '</button>' +
+                '<div class="form-section-title" style="margin-top:4px;"><span class="section-icon">🏦</span> ' + (lang === 'id' ? '返还本金记录（逐条编辑）' : '返还本金记录（逐条编辑）') + '</div>' +
+                '<div style="overflow-x:auto;margin-bottom:10px;">' +
+                '<table style="width:100%;border-collapse:collapse;" id="principal_records_table">' +
+                tableHead + '<tbody id="principal_rows">' + pRows + '</tbody>' +
+                '</table></div>' +
+                '<button onclick="JF.AdminEditOrder._addPaymentRow(\'principal\')" style="background:var(--success);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;">＋ ' + (lang === 'id' ? '新增本金记录' : '新增本金记录') + '</button>' +
+                '</div>';
+        },
+
+        _deletePaymentRow: function(pid) {
+            var p = _editPayments.find(function(x){ return x.id === pid; });
+            if (!p) return;
+            p._deleted = true;
+            var mid = 'pm_' + (pid < 0 ? 'new' + Math.abs(pid) : pid);
+            var row = document.getElementById(mid + '_row');
+            if (row) row.style.display = 'none';
+        },
+
+        _addPaymentRow: function(type) {
+            var lang = Utils.lang;
+            var today = Utils.getLocalToday();
+            var newRec = { id: _nextTmpId--, type: type, date: today, amount: 0, payment_method: 'cash', months: 1, description: '', _new: true };
+            _editPayments.push(newRec);
+            var tbody = document.getElementById(type === 'interest' ? 'interest_rows' : 'principal_rows');
+            if (!tbody) return;
+            // 移除"暂无记录"行
+            var emptyRow = tbody.querySelector('td[colspan]');
+            if (emptyRow) emptyRow.closest('tr').remove();
+            var tmp = document.createElement('tbody');
+            tmp.innerHTML = AdminEditOrder._renderPaymentEditor(lang).match(
+                new RegExp('<tbody id="' + (type === 'interest' ? 'interest' : 'principal') + '_rows">([\\s\\S]*?)</tbody>')
+            )?.[1] || '';
+            // 只追加最后一条（新增的）
+            var mid = 'pm_new' + Math.abs(newRec.id);
+            // 直接重新渲染整个编辑区更简单
+            var sec = document.getElementById('payment_editor_section');
+            if (sec) sec.outerHTML = AdminEditOrder._renderPaymentEditor(lang);
+            AdminEditOrder._bindPaymentAmountInputs();
+        },
+
+        _bindPaymentAmountInputs: function() {
+            _editPayments.filter(function(p){ return !p._deleted; }).forEach(function(p) {
+                var mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
+                var el = document.getElementById(mid + '_amount');
+                if (el && Utils.bindAmountFormat) Utils.bindAmountFormat(el);
+            });
+        },
+
+        // ==================== 从 DOM 中收集当前缴费记录 ====================
+        _collectPaymentEdits: function() {
+            var toDelete = [], toUpdate = [], toAdd = [];
+            _editPayments.forEach(function(p) {
+                var mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
+                if (p._deleted) {
+                    if (!p._new) toDelete.push(p.id);
+                    return;
+                }
+                var dateEl   = document.getElementById(mid + '_date');
+                var amtEl    = document.getElementById(mid + '_amount');
+                var mthEl    = document.getElementById(mid + '_months');
+                var methEl   = document.getElementById(mid + '_method');
+                var descEl   = document.getElementById(mid + '_desc');
+                var date   = dateEl   ? dateEl.value   : p.date;
+                var amount = amtEl    ? (Utils.parseNumberFromCommas(amtEl.value) || 0) : p.amount;
+                var months = mthEl    ? (parseInt(mthEl.value) || 1) : p.months;
+                var method = methEl   ? methEl.value   : p.payment_method;
+                var desc   = descEl   ? descEl.value.trim() : p.description;
+
+                if (p._new) {
+                    toAdd.push({ type: p.type, date: date, amount: amount, payment_method: method, months: months, description: desc });
+                } else {
+                    toUpdate.push({ id: p.id, date: date, amount: amount, payment_method: method, months: months, description: desc });
+                }
+            });
+            return { toDelete: toDelete, toUpdate: toUpdate, toAdd: toAdd };
+        },
+
+        // ==================== 打开订单编辑页 ====================
         adminEditOrder: async function(orderId) {
             if (!PERMISSION.isAdmin()) {
                 Utils.toast.error(Utils.lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单');
@@ -1026,24 +1161,39 @@
                 var order = await SUPABASE.getOrder(orderId);
                 if (!order) throw new Error('订单不存在');
                 await SUPABASE.unlockOrder(orderId);
+
+                // 拉取缴费记录，初始化内存副本
+                var histResult = await SUPABASE.getPaymentHistory(orderId);
+                _editPayments = (histResult.payments || [])
+                    .filter(function(p){ return p.type === 'interest' || p.type === 'principal'; })
+                    .map(function(p){ return {
+                        id: p.id, type: p.type,
+                        date: (p.date || '').substring(0, 10),
+                        amount: p.amount || 0,
+                        payment_method: p.payment_method || 'cash',
+                        months: p.months || 1,
+                        description: p.description || '',
+                        _deleted: false, _new: false
+                    }; });
+                _nextTmpId = -1;
+
                 var today = Utils.getLocalToday();
                 var orderDate = (order.created_at || '').substring(0, 10) || today;
-                
-                // 计算剩余本金
                 var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-                
-                document.getElementById('app').innerHTML = '' +
+
+                var paymentEditorHtml = this._renderPaymentEditor(lang);
+
+                document.getElementById('app').innerHTML =
                     '<div class="page-header">' +
                     '<h2>✏️ ' + (lang === 'id' ? '修改订单' : '修改订单') + ' — ' + Utils.escapeHtml(orderId) + '</h2>' +
                     '<div class="header-actions">' +
                     '<button onclick="JF.AdminEditOrder.adminCancelEdit(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--outline">↩️ ' + t('cancel') + '</button>' +
-                    '</div>' +
-                    '</div>' +
+                    '</div></div>' +
                     '<div class="card">' +
                     '<div class="info-bar warning"><span class="info-bar-icon">⚠️</span>' +
                     '<div class="info-bar-content"><strong>' + (lang === 'id' ? '管理员编辑模式' : '管理员编辑模式') + '：</strong>' +
-                    (lang === 'id' ? '订单已临时解锁。保存后将自动重新锁定。' : '订单已临时解锁。保存后将自动重新锁定。') + '</div>' +
-                    '</div>' +
+                    (lang === 'id' ? '订单已临时解锁，保存后自动重新锁定。缴费记录的修改将直接影响利息/本金汇总统计。' : '订单已临时解锁，保存后自动重新锁定。缴费记录的修改将直接影响利息/本金汇总统计。') + '</div></div>' +
+
                     '<div class="form-section">' +
                     '<div class="form-section-title"><span class="section-icon">📋</span> ' + (lang === 'id' ? '基本信息' : '基本信息') + '</div>' +
                     '<div class="form-grid">' +
@@ -1055,8 +1205,8 @@
                     '<input type="text" id="edit_loan_amount" class="amount-input" value="' + Utils.formatNumberWithCommas(order.loan_amount || 0) + '"></div>' +
                     '<div class="form-group"><label>' + t('notes') + '</label>' +
                     '<input type="text" id="edit_notes" value="' + Utils.escapeHtml(order.notes || '') + '"></div>' +
-                    '</div>' +
-                    '</div>' +
+                    '</div></div>' +
+
                     '<div class="form-section">' +
                     '<div class="form-section-title"><span class="section-icon">👤</span> ' + t('customer_info') + '</div>' +
                     '<div class="form-grid">' +
@@ -1068,8 +1218,8 @@
                     '<input type="text" id="edit_customer_phone" value="' + Utils.escapeHtml(order.customer_phone || '') + '"></div>' +
                     '<div class="form-group"><label>' + t('address') + '</label>' +
                     '<input type="text" id="edit_customer_address" value="' + Utils.escapeHtml(order.customer_address || '') + '"></div>' +
-                    '</div>' +
-                    '</div>' +
+                    '</div></div>' +
+
                     '<div class="form-section">' +
                     '<div class="form-section-title"><span class="section-icon">💰</span> ' + (lang === 'id' ? '费用明细' : '费用明细') + '</div>' +
                     '<div class="form-grid">' +
@@ -1083,25 +1233,8 @@
                     '<input type="number" id="edit_service_fee_percent" value="' + (order.service_fee_percent || 0) + '" min="0" max="10" step="0.5"></div>' +
                     '<div class="form-group"><label>' + (lang === 'id' ? '月利率 (%)' : '月利率 (%)') + '</label>' +
                     '<select id="edit_interest_rate">' + Utils.getInterestRateOptions((order.agreed_interest_rate || 0.10) * 100) + '</select></div>' +
-                    '</div>' +
-                    '</div>' +
-                    '<div class="form-section">' +
-                    '<div class="form-section-title"><span class="section-icon">📋</span> ' + (lang === 'id' ? '缴费进度' : '缴费进度') + '</div>' +
-                    '<div class="form-grid">' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '已付利息期数' : '已付利息期数') + '</label>' +
-                    '<input type="number" id="edit_interest_paid_months" value="' + (order.interest_paid_months || 0) + '" min="0" step="1" style="width:100%;padding:8px;border-radius:6px;">' +
-                    '<div class="form-hint">' + (lang === 'id' ? '客户已缴纳的利息期数' : '客户已缴纳的利息期数') + '</div></div>' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '已付利息总额 (Rp)' : '已付利息总额 (Rp)') + '</label>' +
-                    '<input type="text" id="edit_interest_paid_total" class="amount-input" value="' + Utils.formatNumberWithCommas(order.interest_paid_total || 0) + '">' +
-                    '<div class="form-hint">' + (lang === 'id' ? '累计已缴利息金额' : '累计已缴利息金额') + '</div></div>' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '已还本金 (Rp)' : '已还本金 (Rp)') + '</label>' +
-                    '<input type="text" id="edit_principal_paid" class="amount-input" value="' + Utils.formatNumberWithCommas(order.principal_paid || 0) + '">' +
-                    '<div class="form-hint">' + (lang === 'id' ? '已返还的本金金额' : '已返还的本金金额') + '</div></div>' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '剩余本金 (Rp)' : '剩余本金 (Rp)') + '</label>' +
-                    '<input type="text" id="edit_principal_remaining" class="amount-input" value="' + Utils.formatNumberWithCommas(remainingPrincipal) + '" readonly style="background:var(--bg-input-readonly);">' +
-                    '<div class="form-hint">' + (lang === 'id' ? '自动计算：当金 - 已还本金' : '自动计算：当金 - 已还本金') + '</div></div>' +
-                    '</div>' +
-                    '</div>' +
+                    '</div></div>' +
+
                     '<div class="form-section">' +
                     '<div class="form-section-title"><span class="section-icon">📅</span> ' + t('repayment_type') + '</div>' +
                     '<div class="form-grid">' +
@@ -1118,8 +1251,8 @@
                     '<input type="number" id="edit_pawn_term" value="' + (order.pawn_term_months || '') + '" min="1" max="36" placeholder="' + (lang === 'id' ? '无则留空' : '无则留空') + '"></div>' +
                     '<div class="form-group"><label>' + (lang === 'id' ? '最大延期月数' : '最大延期月数') + '</label>' +
                     '<input type="number" id="edit_max_extension" value="' + (order.max_extension_months || 10) + '" min="1" max="36"></div>' +
-                    '</div>' +
-                    '</div>' +
+                    '</div></div>' +
+
                     '<div class="form-section">' +
                     '<div class="form-section-title"><span class="section-icon">💳</span> ' + (lang === 'id' ? '费用缴纳状态' : '费用缴纳状态') + '</div>' +
                     '<div class="form-grid">' +
@@ -1128,50 +1261,34 @@
                     '<option value="true"' + (order.admin_fee_paid ? ' selected' : '') + '>' + (lang === 'id' ? '✅ 已缴' : '✅ 已缴') + '</option>' +
                     '<option value="false"' + (!order.admin_fee_paid ? ' selected' : '') + '>' + (lang === 'id' ? '❌ 未缴' : '❌ 未缴') + '</option>' +
                     '</select></div>' +
-                    '</div>' +
-                    '</div>' +
+                    '</div></div>' +
+
+                    paymentEditorHtml +
+
+                    '<div class="info-bar info" style="margin-top:4px;"><span class="info-bar-icon">💡</span>' +
+                    '<div class="info-bar-content">' + (lang === 'id' ? '保存后，系统将根据以上缴费记录自动重新计算：已付利息期数、已付利息总额、已还本金、剩余本金、订单状态。' : '保存后，系统将根据以上缴费记录自动重新计算：已付利息期数、已付利息总额、已还本金、剩余本金、订单状态。') + '</div></div>' +
+
                     '<div class="form-actions">' +
                     '<button onclick="JF.AdminEditOrder.adminSaveOrder(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--success" id="adminSaveBtn">' +
                     '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定') +
                     '</button>' +
                     '<button onclick="JF.AdminEditOrder.adminCancelEdit(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--outline">↩️ ' + t('cancel') + '</button>' +
-                    '</div>' +
-                    '</div>';
-                
-                // 绑定金额输入格式化
-                ['edit_loan_amount', 'edit_admin_fee', 'edit_service_fee', 'edit_monthly_payment', 'edit_interest_paid_total', 'edit_principal_paid', 'edit_principal_remaining'].forEach(function(id) {
+                    '</div></div>';
+
+                // 绑定金额格式化
+                ['edit_loan_amount', 'edit_admin_fee', 'edit_service_fee', 'edit_monthly_payment'].forEach(function(id) {
                     var el = document.getElementById(id);
                     if (el && Utils.bindAmountFormat) Utils.bindAmountFormat(el);
                 });
-                
-                // 添加本金联动：当已还本金变化时，自动更新剩余本金
-                var principalPaidInput = document.getElementById('edit_principal_paid');
-                var loanAmountInput = document.getElementById('edit_loan_amount');
-                var principalRemainingInput = document.getElementById('edit_principal_remaining');
-                
-                var updatePrincipalRemaining = function() {
-                    var loanAmt = Utils.parseNumberFromCommas(loanAmountInput ? loanAmountInput.value : '0') || 0;
-                    var paidAmt = Utils.parseNumberFromCommas(principalPaidInput ? principalPaidInput.value : '0') || 0;
-                    var remaining = Math.max(0, loanAmt - paidAmt);
-                    if (principalRemainingInput) {
-                        principalRemainingInput.value = Utils.formatNumberWithCommas(remaining);
-                    }
-                };
-                
-                if (principalPaidInput) {
-                    principalPaidInput.addEventListener('input', updatePrincipalRemaining);
-                }
-                if (loanAmountInput) {
-                    loanAmountInput.addEventListener('input', updatePrincipalRemaining);
-                }
-                updatePrincipalRemaining();
-                
+                this._bindPaymentAmountInputs();
+
             } catch (error) {
                 console.error('adminEditOrder error:', error);
                 Utils.toast.error(error.message || (Utils.lang === 'id' ? '打开订单失败' : '打开订单失败'));
             }
         },
 
+        // ==================== 保存订单 ====================
         adminSaveOrder: async function(orderId) {
             if (!PERMISSION.isAdmin()) {
                 Utils.toast.error(Utils.lang === 'id' ? '仅管理员可保存修改' : '仅管理员可保存修改');
@@ -1179,78 +1296,70 @@
             }
             var lang = Utils.lang;
             var saveBtn = document.getElementById('adminSaveBtn');
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.textContent = '⏳ ' + (lang === 'id' ? '保存中...' : '保存中...');
-            }
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? '保存中...' : '保存中...'); }
             try {
-                var loanAmount    = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount') ? document.getElementById('edit_loan_amount').value : null) || 0;
-                var adminFee      = Utils.parseNumberFromCommas(document.getElementById('edit_admin_fee') ? document.getElementById('edit_admin_fee').value : null) || 0;
-                var serviceFee    = Utils.parseNumberFromCommas(document.getElementById('edit_service_fee') ? document.getElementById('edit_service_fee').value : null) || 0;
-                var servicePct    = parseFloat(document.getElementById('edit_service_fee_percent') ? document.getElementById('edit_service_fee_percent').value : 0) || 0;
-                var interestRate  = parseFloat(document.getElementById('edit_interest_rate') ? document.getElementById('edit_interest_rate').value : 0) || 10;
-                var repayType     = document.getElementById('edit_repayment_type') ? document.getElementById('edit_repayment_type').value : 'flexible';
-                var repayTerm     = parseInt(document.getElementById('edit_repayment_term') ? document.getElementById('edit_repayment_term').value : 0) || null;
-                var monthlyPmt    = Utils.parseNumberFromCommas(document.getElementById('edit_monthly_payment') ? document.getElementById('edit_monthly_payment').value : null) || 0;
-                var pawnTerm      = parseInt(document.getElementById('edit_pawn_term') ? document.getElementById('edit_pawn_term').value : 0) || null;
-                var maxExtension  = parseInt(document.getElementById('edit_max_extension') ? document.getElementById('edit_max_extension').value : 0) || 10;
-                var adminFeePaid  = (document.getElementById('edit_admin_fee_paid') ? document.getElementById('edit_admin_fee_paid').value : 'false') === 'true';
-                var orderDate     = document.getElementById('edit_order_date') ? (document.getElementById('edit_order_date').value || Utils.getLocalToday()) : Utils.getLocalToday();
-                var collateral    = document.getElementById('edit_collateral') ? document.getElementById('edit_collateral').value.trim() : '';
-                var custName      = document.getElementById('edit_customer_name') ? document.getElementById('edit_customer_name').value.trim() : '';
-                var custKtp       = document.getElementById('edit_customer_ktp') ? document.getElementById('edit_customer_ktp').value.trim() : '';
-                var custPhone     = document.getElementById('edit_customer_phone') ? document.getElementById('edit_customer_phone').value.trim() : '';
-                var custAddress   = document.getElementById('edit_customer_address') ? document.getElementById('edit_customer_address').value.trim() : '';
-                var notes         = document.getElementById('edit_notes') ? document.getElementById('edit_notes').value.trim() : '';
-                
-                // 获取利息/本金相关字段
-                var interestPaidMonths = parseInt(document.getElementById('edit_interest_paid_months') ? document.getElementById('edit_interest_paid_months').value : 0) || 0;
-                var interestPaidTotal = Utils.parseNumberFromCommas(document.getElementById('edit_interest_paid_total') ? document.getElementById('edit_interest_paid_total').value : null) || 0;
-                var principalPaid = Utils.parseNumberFromCommas(document.getElementById('edit_principal_paid') ? document.getElementById('edit_principal_paid').value : null) || 0;
-                var principalRemaining = loanAmount - principalPaid;
-                
+                var loanAmount   = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount') ? document.getElementById('edit_loan_amount').value : null) || 0;
+                var adminFee     = Utils.parseNumberFromCommas(document.getElementById('edit_admin_fee') ? document.getElementById('edit_admin_fee').value : null) || 0;
+                var serviceFee   = Utils.parseNumberFromCommas(document.getElementById('edit_service_fee') ? document.getElementById('edit_service_fee').value : null) || 0;
+                var servicePct   = parseFloat(document.getElementById('edit_service_fee_percent') ? document.getElementById('edit_service_fee_percent').value : 0) || 0;
+                var interestRate = parseFloat(document.getElementById('edit_interest_rate') ? document.getElementById('edit_interest_rate').value : 0) || 10;
+                var repayType    = document.getElementById('edit_repayment_type') ? document.getElementById('edit_repayment_type').value : 'flexible';
+                var repayTerm    = parseInt(document.getElementById('edit_repayment_term') ? document.getElementById('edit_repayment_term').value : 0) || null;
+                var monthlyPmt   = Utils.parseNumberFromCommas(document.getElementById('edit_monthly_payment') ? document.getElementById('edit_monthly_payment').value : null) || 0;
+                var pawnTerm     = parseInt(document.getElementById('edit_pawn_term') ? document.getElementById('edit_pawn_term').value : 0) || null;
+                var maxExtension = parseInt(document.getElementById('edit_max_extension') ? document.getElementById('edit_max_extension').value : 0) || 10;
+                var adminFeePaid = (document.getElementById('edit_admin_fee_paid') ? document.getElementById('edit_admin_fee_paid').value : 'false') === 'true';
+                var orderDate    = document.getElementById('edit_order_date') ? (document.getElementById('edit_order_date').value || Utils.getLocalToday()) : Utils.getLocalToday();
+                var collateral   = document.getElementById('edit_collateral') ? document.getElementById('edit_collateral').value.trim() : '';
+                var custName     = document.getElementById('edit_customer_name') ? document.getElementById('edit_customer_name').value.trim() : '';
+                var custKtp      = document.getElementById('edit_customer_ktp') ? document.getElementById('edit_customer_ktp').value.trim() : '';
+                var custPhone    = document.getElementById('edit_customer_phone') ? document.getElementById('edit_customer_phone').value.trim() : '';
+                var custAddress  = document.getElementById('edit_customer_address') ? document.getElementById('edit_customer_address').value.trim() : '';
+                var notes        = document.getElementById('edit_notes') ? document.getElementById('edit_notes').value.trim() : '';
+
                 if (!collateral || loanAmount <= 0) {
                     Utils.toast.warning(lang === 'id' ? '抵押物和贷款金额不能为空' : '抵押物和贷款金额不能为空');
                     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); }
                     return;
                 }
-                
-                // 获取原订单状态
+
+                // 验证缴费记录：日期和金额不能为空
+                var payEdits = this._collectPaymentEdits();
+                var allRecs = payEdits.toUpdate.concat(payEdits.toAdd);
+                for (var ri = 0; ri < allRecs.length; ri++) {
+                    var rec = allRecs[ri];
+                    if (!rec.date) { Utils.toast.warning(lang === 'id' ? '缴费记录日期不能为空' : '缴费记录日期不能为空'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); } return; }
+                    if (!rec.amount || rec.amount <= 0) { Utils.toast.warning(lang === 'id' ? '缴费记录金额必须大于0' : '缴费记录金额必须大于0'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); } return; }
+                }
+
                 var order = await SUPABASE.getOrder(orderId);
                 var agreedRate = interestRate / 100;
-                var monthlyInterest = principalRemaining * agreedRate;
-                
-                // 判断是否已结清
-                var newStatus = order.status;
-                if (principalRemaining <= 0) {
-                    newStatus = 'completed';
-                } else if (newStatus === 'completed' && principalRemaining > 0) {
-                    newStatus = 'active';
-                }
-                
+
+                // Step 1：保存订单基本字段（汇总字段暂留，后面由 adminSyncPaymentRecords 覆盖）
                 var updates = {
-                    collateral_name: collateral, loan_amount: loanAmount, monthly_interest: monthlyInterest,
-                    admin_fee: adminFee, admin_fee_paid: adminFeePaid, service_fee_amount: serviceFee,
-                    service_fee_percent: servicePct, agreed_interest_rate: agreedRate,
-                    agreed_service_fee_rate: servicePct / 100, repayment_type: repayType, repayment_term: repayTerm,
-                    monthly_fixed_payment: monthlyPmt || null, pawn_term_months: pawnTerm, max_extension_months: maxExtension,
-                    customer_name: custName, customer_ktp: custKtp, customer_phone: custPhone, customer_address: custAddress,
-                    notes: notes, created_at: orderDate + 'T00:00:00.000Z', updated_at: new Date().toISOString(),
-                    interest_paid_months: interestPaidMonths, interest_paid_total: interestPaidTotal,
-                    principal_paid: principalPaid, principal_remaining: principalRemaining,
-                    status: newStatus
+                    collateral_name: collateral, loan_amount: loanAmount,
+                    admin_fee: adminFee, admin_fee_paid: adminFeePaid,
+                    service_fee_amount: serviceFee, service_fee_percent: servicePct,
+                    agreed_interest_rate: agreedRate, agreed_service_fee_rate: servicePct / 100,
+                    repayment_type: repayType, repayment_term: repayTerm,
+                    monthly_fixed_payment: monthlyPmt || null,
+                    pawn_term_months: pawnTerm, max_extension_months: maxExtension,
+                    customer_name: custName, customer_ktp: custKtp,
+                    customer_phone: custPhone, customer_address: custAddress,
+                    notes: notes,
+                    created_at: orderDate + 'T00:00:00.000Z',
+                    updated_at: new Date().toISOString()
                 };
-                
-                // 如果已结清，设置结清时间
-                if (newStatus === 'completed' && order.status !== 'completed') {
-                    updates.completed_at = new Date().toISOString();
-                }
-                
                 var client = SUPABASE.getClient();
-                var errorObj = await client.from('orders').update(updates).eq('order_id', orderId);
-                if (errorObj.error) throw errorObj.error;
-                // 管理员修改订单后，同步管理费和服务费的 payment_history 和 cash_flow_records
+                var res = await client.from('orders').update(updates).eq('order_id', orderId);
+                if (res.error) throw res.error;
+
+                // Step 2：同步管理费/服务费流水
                 await SUPABASE.syncFeesAfterAdminEdit(orderId, adminFee, adminFeePaid, serviceFee, orderDate);
+
+                // Step 3：逐条同步利息/本金缴费记录，并重算汇总字段
+                await SUPABASE.adminSyncPaymentRecords(orderId, payEdits);
+
                 await SUPABASE.relockOrder(orderId);
                 Utils.toast.success(lang === 'id' ? '✅ 订单已修改并重新锁定！' : '✅ 订单已修改并重新锁定！');
                 if (window.JF && JF.Cache) JF.Cache.clear();
