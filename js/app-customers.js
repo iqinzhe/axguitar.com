@@ -1,6 +1,5 @@
 // app-customers.js - v2.0 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
-// [修复 #6] 编辑客户后清除 JF.Cache
-// [修复 #7] 当金发放描述添加订单号和客户姓名
+// 当金发放描述添加订单号和客户姓名
 
 'use strict';
 
@@ -531,7 +530,7 @@
             if (el) el.style.display = val === 'different' ? 'block' : 'none'; 
         },
 
-        // [修复 #6] 编辑客户后清除 JF.Cache
+        // 编辑客户后清除 JF.Cache
         _saveEditCustomer: async function (customerId) {
             const isAdmin = PERMISSION.isAdmin(); 
             const lang = Utils.lang; 
@@ -895,7 +894,7 @@
                     });
                 }
                 if (amount > 0) {
-                    // 【修复】当金发放描述中添加订单号和客户姓名
+                    // 当金发放描述中添加订单号和客户姓名
                     const desc = lang === 'id'
                         ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'} - Order: ${newOrder.order_id} - ${customer.name}`
                         : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'} - 订单: ${newOrder.order_id} - ${customer.name}`;
