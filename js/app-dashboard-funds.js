@@ -128,6 +128,7 @@
                             <input type="date" id="cashFlowFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
                             <button onclick="APP.filterCashFlowPage()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
                             ${isAdmin ? `<button onclick="APP.showVoidCashFlowModal()" class="btn btn--sm btn--danger">🚫 ${lang === 'id' ? 'Batalkan Transaksi' : '作废流水'}</button>` : ''}
+                            ${isAdmin ? `<button onclick="APP.showDiagnoseCashFlowModal()" class="btn btn--sm btn--warning">🔍 ${lang === 'id' ? 'Diagnosa & Bersihkan' : '诊断 & 清理垃圾流水'}</button>` : ''}
                             <button onclick="APP.resetCashFlowPageFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                         </div>
                         <div class="table-container">
@@ -533,7 +534,171 @@
             }
         },
 
-        // ==================== 资金弹窗相关方法 ====================
+        // ==================== 诊断 & 清理垃圾流水（管理员）====================
+        async showDiagnoseCashFlowModal() {
+            const lang = Utils.lang;
+            if (!PERMISSION.isAdmin()) {
+                Utils.toast.warning(lang === 'id' ? 'Hanya admin' : '仅管理员可操作');
+                return;
+            }
+
+            // 先弹提示，说明在做什么
+            const intro = lang === 'id'
+                ? '🔍 Diagnosa Arus Kas\n\nSistem akan menganalisis cash_flow_records dan membandingkan dengan payment_history + orders yang ada sekarang.\n\nTemuan akan ditampilkan sehingga Anda dapat memilih tindakan.\n\nLanjutkan diagnosa?'
+                : '🔍 现金流水诊断\n\n系统将扫描 cash_flow_records，与当前 payment_history 和 orders 数据进行比对，找出：\n① 孤立流水（对应订单已删除）\n② 重复流水（同订单同类型同金额多条）\n③ 金额偏差流水（与 payment_history 不一致）\n\n诊断结果会列出，由您选择是否批量清理。\n\n确认开始诊断？';
+            const ok = await Utils.toast.confirm(intro);
+            if (!ok) return;
+
+            Utils.toast.info(lang === 'id' ? '⏳ Mendiagnosa...' : '⏳ 诊断中，请稍候...', 3000);
+
+            try {
+                const result = await SUPABASE.diagnoseCashFlow();
+                const { orphaned, duplicates, totalOrphaned, totalDuplicates } = result;
+
+                if (totalOrphaned === 0 && totalDuplicates === 0) {
+                    Utils.toast.success(lang === 'id' ? '✅ Tidak ada data rusak ditemukan!' : '✅ 未发现垃圾流水，数据一切正常！');
+                    return;
+                }
+
+                // 构建诊断报告弹窗
+                let orphanRows = '';
+                for (const r of orphaned) {
+                    orphanRows += `<tr style="background:var(--danger-soft,#fef2f2);">
+                        <td style="padding:6px 8px;font-size:12px;">${Utils.formatDate(r.flow_date || r.recorded_at)}</td>
+                        <td style="padding:6px 8px;font-size:12px;">${Utils.escapeHtml(r.flow_type)}</td>
+                        <td style="padding:6px 8px;font-size:12px;text-align:right;">${Utils.formatCurrency(r.amount)}</td>
+                        <td style="padding:6px 8px;font-size:12px;">${Utils.escapeHtml(r.source_target)}</td>
+                        <td style="padding:6px 8px;font-size:12px;color:var(--danger);">${lang === 'id' ? 'Pesanan tidak ada' : '订单不存在'}</td>
+                        <td style="padding:6px 8px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${Utils.escapeHtml(r.description || '-')}</td>
+                    </tr>`;
+                }
+                let dupRows = '';
+                for (const r of duplicates) {
+                    dupRows += `<tr style="background:var(--warning-soft,#fffbeb);">
+                        <td style="padding:6px 8px;font-size:12px;">${Utils.formatDate(r.flow_date || r.recorded_at)}</td>
+                        <td style="padding:6px 8px;font-size:12px;">${Utils.escapeHtml(r.flow_type)}</td>
+                        <td style="padding:6px 8px;font-size:12px;text-align:right;">${Utils.formatCurrency(r.amount)}</td>
+                        <td style="padding:6px 8px;font-size:12px;">${Utils.escapeHtml(r.source_target)}</td>
+                        <td style="padding:6px 8px;font-size:12px;color:var(--warning-dark,#b45309);">${lang === 'id' ? 'Duplikat' : '重复记录'}</td>
+                        <td style="padding:6px 8px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${Utils.escapeHtml(r.description || '-')}</td>
+                    </tr>`;
+                }
+
+                const thStyle = 'style="padding:6px 8px;font-size:11px;font-weight:600;background:var(--bg-hover);white-space:nowrap;"';
+                const tableHead = `<thead><tr>
+                    <th ${thStyle}>${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                    <th ${thStyle}>${lang === 'id' ? 'Tipe' : '类型'}</th>
+                    <th ${thStyle}>${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                    <th ${thStyle}>${lang === 'id' ? 'Sumber' : '来源'}</th>
+                    <th ${thStyle}>${lang === 'id' ? 'Masalah' : '问题'}</th>
+                    <th ${thStyle}>${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                </tr></thead>`;
+
+                const modalHtml = `
+                <div id="diagnoseCashFlowModal" class="modal-overlay">
+                    <div class="modal-content" style="max-width:760px;max-height:85vh;display:flex;flex-direction:column;">
+                        <h3>🔍 ${lang === 'id' ? 'Hasil Diagnosa Arus Kas' : '现金流水诊断报告'}</h3>
+                        <div style="display:flex;gap:16px;margin:12px 0;flex-wrap:wrap;">
+                            <div style="background:var(--danger-soft,#fef2f2);border:1px solid var(--danger,#ef4444);border-radius:8px;padding:10px 18px;text-align:center;">
+                                <div style="font-size:22px;font-weight:700;color:var(--danger);">${totalOrphaned}</div>
+                                <div style="font-size:12px;color:var(--text-secondary);">${lang === 'id' ? 'Arus kas yatim piatu' : '孤立流水（订单不存在）'}</div>
+                            </div>
+                            <div style="background:var(--warning-soft,#fffbeb);border:1px solid var(--warning,#f59e0b);border-radius:8px;padding:10px 18px;text-align:center;">
+                                <div style="font-size:22px;font-weight:700;color:var(--warning-dark,#b45309);">${totalDuplicates}</div>
+                                <div style="font-size:12px;color:var(--text-secondary);">${lang === 'id' ? 'Arus kas duplikat' : '重复流水'}</div>
+                            </div>
+                            <div style="background:var(--bg-hover);border-radius:8px;padding:10px 18px;flex:1;display:flex;align-items:center;">
+                                <p style="font-size:12px;color:var(--text-secondary);margin:0;">
+                                    ${lang === 'id'
+                                        ? '⚠️ Membersihkan akan menandai data ini sebagai <strong>is_voided=true</strong> (soft delete). Data asli tidak akan dihapus secara permanen.'
+                                        : '⚠️ 清理操作会将这些记录标记为 <strong>is_voided=true</strong>（软删除），不会永久删除原始数据，可通过数据库恢复。'}
+                                </p>
+                            </div>
+                        </div>
+                        <div style="flex:1;overflow-y:auto;border:1px solid var(--border-light);border-radius:8px;">
+                            ${totalOrphaned > 0 ? `
+                            <div style="padding:8px 12px;background:var(--danger-soft,#fef2f2);font-size:12px;font-weight:600;color:var(--danger);border-bottom:1px solid var(--border-light);">
+                                🗑️ ${lang === 'id' ? 'Arus Kas Yatim Piatu' : '孤立流水'} (${totalOrphaned})
+                            </div>
+                            <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">${tableHead}<tbody>${orphanRows}</tbody></table>
+                            </div>` : ''}
+                            ${totalDuplicates > 0 ? `
+                            <div style="padding:8px 12px;background:var(--warning-soft,#fffbeb);font-size:12px;font-weight:600;color:var(--warning-dark,#b45309);border-top:${totalOrphaned > 0 ? '1px solid var(--border-light)' : 'none'};border-bottom:1px solid var(--border-light);">
+                                ⚠️ ${lang === 'id' ? 'Arus Kas Duplikat' : '重复流水'} (${totalDuplicates})
+                            </div>
+                            <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">${tableHead}<tbody>${dupRows}</tbody></table>
+                            </div>` : ''}
+                        </div>
+                        <div class="modal-actions" style="margin-top:16px;gap:10px;display:flex;flex-wrap:wrap;">
+                            ${totalOrphaned > 0 ? `<button onclick="APP.cleanOrphanedCashFlows()" class="btn btn--danger">🗑️ ${lang === 'id' ? 'Bersihkan ' + totalOrphaned + ' Arus Kas Yatim' : '清理 ' + totalOrphaned + ' 条孤立流水'}</button>` : ''}
+                            ${totalDuplicates > 0 ? `<button onclick="APP.cleanDuplicateCashFlows()" class="btn btn--warning">⚠️ ${lang === 'id' ? 'Bersihkan ' + totalDuplicates + ' Duplikat' : '清理 ' + totalDuplicates + ' 条重复流水'}</button>` : ''}
+                            ${(totalOrphaned > 0 || totalDuplicates > 0) ? `<button onclick="APP.cleanAllDirtyCashFlows()" class="btn btn--danger" style="background:var(--danger);">🔥 ${lang === 'id' ? 'Bersihkan Semua (' + (totalOrphaned + totalDuplicates) + ')' : '全部清理 (' + (totalOrphaned + totalDuplicates) + ' 条)'}</button>` : ''}
+                            <button onclick="APP.closeDiagnoseCashFlowModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                        </div>
+                    </div>
+                </div>`;
+
+                window._diagnoseCashFlowResult = result;
+                const old = document.getElementById('diagnoseCashFlowModal');
+                if (old) old.remove();
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            } catch (err) {
+                console.error('diagnoseCashFlow error:', err);
+                Utils.toast.error((lang === 'id' ? 'Gagal: ' : '诊断失败：') + err.message);
+            }
+        },
+
+        closeDiagnoseCashFlowModal() {
+            const modal = document.getElementById('diagnoseCashFlowModal');
+            if (modal) modal.remove();
+            window._diagnoseCashFlowResult = null;
+        },
+
+        async _doCleanCashFlows(ids, successMsg) {
+            const lang = Utils.lang;
+            if (!ids || ids.length === 0) return;
+            const confirmMsg = lang === 'id'
+                ? `⚠️ Konfirmasi pembersihan ${ids.length} record arus kas?\n\nData akan ditandai is_voided=true. Tidak dapat dibatalkan dari UI.\n\nLanjutkan?`
+                : `⚠️ 确认清理 ${ids.length} 条流水记录？\n\n记录将被标记为 is_voided=true（软删除）。\n此操作无法从界面撤销。\n\n确认清理？`;
+            const confirmed = await Utils.toast.confirm(confirmMsg);
+            if (!confirmed) return;
+            try {
+                await SUPABASE.voidCashFlowBatch(ids);
+                Utils.toast.success(successMsg);
+                FundsPage.closeDiagnoseCashFlowModal();
+                if (window.JF && JF.Cache) JF.Cache.clear();
+                await FundsPage.showCashFlowPage();
+            } catch (err) {
+                Utils.toast.error((lang === 'id' ? 'Gagal: ' : '清理失败：') + err.message);
+            }
+        },
+
+        async cleanOrphanedCashFlows() {
+            const lang = Utils.lang;
+            const result = window._diagnoseCashFlowResult;
+            if (!result) return;
+            const ids = result.orphaned.map(r => r.id);
+            await FundsPage._doCleanCashFlows(ids, lang === 'id' ? `✅ ${ids.length} arus kas yatim dibersihkan!` : `✅ 已清理 ${ids.length} 条孤立流水！`);
+        },
+
+        async cleanDuplicateCashFlows() {
+            const lang = Utils.lang;
+            const result = window._diagnoseCashFlowResult;
+            if (!result) return;
+            const ids = result.duplicates.map(r => r.id);
+            await FundsPage._doCleanCashFlows(ids, lang === 'id' ? `✅ ${ids.length} duplikat dibersihkan!` : `✅ 已清理 ${ids.length} 条重复流水！`);
+        },
+
+        async cleanAllDirtyCashFlows() {
+            const lang = Utils.lang;
+            const result = window._diagnoseCashFlowResult;
+            if (!result) return;
+            const ids = [...result.orphaned.map(r => r.id), ...result.duplicates.map(r => r.id)];
+            await FundsPage._doCleanCashFlows(ids, lang === 'id' ? `✅ Semua ${ids.length} data rusak dibersihkan!` : `✅ 已清理全部 ${ids.length} 条垃圾流水！`);
+        },
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -903,6 +1068,11 @@
         window.APP.filterVoidFlowList = FundsPage.filterVoidFlowList.bind(FundsPage);
         window.APP.clearVoidFlowSearch = FundsPage.clearVoidFlowSearch.bind(FundsPage);
         window.APP.selectVoidFlowItem = FundsPage.selectVoidFlowItem.bind(FundsPage);
+        window.APP.showDiagnoseCashFlowModal = FundsPage.showDiagnoseCashFlowModal.bind(FundsPage);
+        window.APP.closeDiagnoseCashFlowModal = FundsPage.closeDiagnoseCashFlowModal.bind(FundsPage);
+        window.APP.cleanOrphanedCashFlows = FundsPage.cleanOrphanedCashFlows.bind(FundsPage);
+        window.APP.cleanDuplicateCashFlows = FundsPage.cleanDuplicateCashFlows.bind(FundsPage);
+        window.APP.cleanAllDirtyCashFlows = FundsPage.cleanAllDirtyCashFlows.bind(FundsPage);
     }
 
 })();

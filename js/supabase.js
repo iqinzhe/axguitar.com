@@ -2366,4 +2366,83 @@
 
     JF.Supabase = SupabaseAPI;
     window.SUPABASE = SupabaseAPI;
+
+    // ==================== 现金流水诊断 & 批量清理（管理员）====================
+    // diagnoseCashFlow：扫描 cash_flow_records，找出：
+    //   ① 孤立流水：flow 的 order_id 指向的 orders 记录已不存在（订单被删除后遗留）
+    //   ② 重复流水：同一订单、同一 flow_type、同一金额出现 2+ 条未作废记录
+    // voidCashFlowBatch：批量将指定 id 的流水标记 is_voided=true
+    SupabaseAPI.diagnoseCashFlow = async function() {
+        if (!supabaseClient) throw new Error('客户端未初始化');
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') throw new Error('需管理员权限');
+
+        // 拉取所有未作废流水（只取诊断必要字段）
+        const { data: flows, error: flowErr } = await supabaseClient
+            .from('cash_flow_records')
+            .select('id, order_id, flow_type, direction, amount, source_target, flow_date, recorded_at, description, reference_id')
+            .eq('is_voided', false)
+            .order('flow_date', { ascending: false });
+        if (flowErr) throw flowErr;
+
+        // 拉取所有 orders 的内部 UUID，用于比对
+        const { data: orderRows } = await supabaseClient
+            .from('orders')
+            .select('id');
+        const existingOrderUUIDs = new Set((orderRows || []).map(o => o.id));
+
+        // ① 找孤立流水：flow.order_id 非空，但对应 orders 行不存在
+        const orphaned = (flows || []).filter(f => f.order_id && !existingOrderUUIDs.has(f.order_id));
+
+        // ② 找重复流水：同 order_id + flow_type + amount 出现 2+ 条
+        const seen = {};
+        const duplicates = [];
+        for (const f of (flows || [])) {
+            if (!f.order_id) continue;
+            const key = f.order_id + '|' + f.flow_type + '|' + f.amount;
+            if (!seen[key]) { seen[key] = []; }
+            seen[key].push(f);
+        }
+        for (const key of Object.keys(seen)) {
+            const group = seen[key];
+            if (group.length >= 2) {
+                // 保留最早一条，其余标为重复
+                const sorted = group.slice().sort((a, b) =>
+                    new Date(a.flow_date || a.recorded_at) - new Date(b.flow_date || b.recorded_at));
+                for (let i = 1; i < sorted.length; i++) {
+                    // 不与孤立流水重复报告
+                    if (!orphaned.find(o => o.id === sorted[i].id)) {
+                        duplicates.push(sorted[i]);
+                    }
+                }
+            }
+        }
+
+        return {
+            orphaned,
+            duplicates,
+            totalOrphaned: orphaned.length,
+            totalDuplicates: duplicates.length,
+        };
+    };
+
+    SupabaseAPI.voidCashFlowBatch = async function(ids) {
+        if (!supabaseClient) throw new Error('客户端未初始化');
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') throw new Error('需管理员权限');
+        if (!ids || ids.length === 0) return;
+        const nowTs = nowStr();
+        // 分批处理，每批最多 50 条，避免 URL 超长
+        const BATCH = 50;
+        for (let i = 0; i < ids.length; i += BATCH) {
+            const batch = ids.slice(i, i + BATCH);
+            const { error } = await supabaseClient
+                .from('cash_flow_records')
+                .update({ is_voided: true, voided_at: nowTs, voided_by: profile.id })
+                .in('id', batch);
+            if (error) throw error;
+        }
+        if (window.JF && JF.Cache) JF.Cache.clear();
+        return true;
+    };
 })();
