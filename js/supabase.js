@@ -1056,45 +1056,10 @@
             const pawnDueDate = (repaymentType === 'flexible' && pawnTermMonths)
                 ? Utils.calculatePawnDueDate(nowDate, pawnTermMonths) : null;
 
-            // [修复] 订单ID直接沿用客户ID，保证两者永远一致。
-            // 一个客户同时只能有一个活跃订单，所以正常情况下不会冲突。
-            // 极少数历史异常（如直接删库再建单）加后缀 -2/-3 兜底。
-            let _derivedOrderId = null;
-            if (orderData.customer_id) {
-                try {
-                    const { data: cust } = await supabaseClient
-                        .from('customers').select('customer_id')
-                        .eq('id', orderData.customer_id).single();
-                    if (cust && cust.customer_id) {
-                        // 检查该ID是否已被使用（理论上不会，但做安全兜底）
-                        const baseId = cust.customer_id;
-                        const { data: existOrd } = await supabaseClient
-                            .from('orders').select('order_id')
-                            .eq('order_id', baseId).maybeSingle();
-                        if (!existOrd) {
-                            _derivedOrderId = baseId;
-                        } else {
-                            // 极少数情况：该客户有历史已结清订单，加后缀区分
-                            for (let sfx = 2; ; sfx++) { // 无上限，顺延直到找到空缺号
-                                const candidate = baseId + '-' + sfx;
-                                const { data: dup } = await supabaseClient
-                                    .from('orders').select('order_id')
-                                    .eq('order_id', candidate).maybeSingle();
-                                if (!dup) { _derivedOrderId = candidate; break; }
-                            }
-                        }
-                    }
-                } catch(e) {
-                    console.warn('[createOrder] 派生订单号失败，回退自动生成:', e);
-                }
-            }
-
             let retryCount=0, lastError=null, newOrder=null;
             while(retryCount<5){
                 try {
-                    // 优先用派生的订单号；若派生失败则回退到自动生成（兜底）
-                    const orderId = _derivedOrderId || await this._generateOrderId(profile.role, targetStoreId, 5);
-                    _derivedOrderId = null; // 只用一次，重试时走自动生成
+                    const orderId = await this._generateOrderId(profile.role, targetStoreId, 5);
                     let monthlyFixedPayment = null;
                     if(repaymentType==='fixed' && repaymentTerm && repaymentTerm>0){
                         monthlyFixedPayment = orderData.monthly_fixed_payment ||
@@ -1746,6 +1711,77 @@
             const { error } = await supabaseClient.from('orders').update({ is_locked:true, locked_at:nowStr(), locked_by:profile.id, updated_at:nowStr() }).eq('order_id', orderId);
             if(error) throw error;
             return true;
+        },
+
+        // ==================== 作废流水（软删除）====================
+        // 仅 admin 可操作。
+        // 同步将 cash_flow_records 和关联的 payment_history 标记 is_voided=true。
+        // 注意：payment_history 表需要在 Supabase 里手动添加以下两列：
+        //   is_voided  boolean  default false
+        //   voided_at  timestamptz
+        //   voided_by  uuid (references auth.users)
+        async voidCashFlowRecord(flowId) {
+            const profile = await this.getCurrentProfile();
+            if (profile?.role !== 'admin') {
+                throw new Error(Utils.lang === 'id'
+                    ? 'Hanya admin yang dapat membatalkan transaksi'
+                    : '仅管理员可作废流水');
+            }
+
+            // 1. 读取该条流水
+            const { data: flow, error: fetchErr } = await supabaseClient
+                .from('cash_flow_records').select('*').eq('id', flowId).single();
+            if (fetchErr || !flow) throw new Error(Utils.lang === 'id' ? 'Data tidak ditemukan' : '流水记录不存在');
+            if (flow.is_voided) throw new Error(Utils.lang === 'id' ? 'Sudah dibatalkan sebelumnya' : '该流水已作废，无需重复操作');
+
+            const nowTs = nowStr();
+
+            // 2. 作废 cash_flow_records
+            const { error: voidErr } = await supabaseClient
+                .from('cash_flow_records')
+                .update({ is_voided: true, voided_at: nowTs, voided_by: profile.id })
+                .eq('id', flowId);
+            if (voidErr) throw voidErr;
+
+            // 3. 同步作废 payment_history（通过 order_id + amount + type 关联）
+            //    flow_type → payment type 映射
+            const typeMap = {
+                interest: 'interest', principal: 'principal',
+                admin_fee: 'admin_fee', service_fee: 'service_fee',
+                loan_disbursement: 'loan_disbursement'
+            };
+            const phType = typeMap[flow.flow_type];
+            if (phType && flow.order_id) {
+                // 找 payment_history 里同订单、同类型、同金额、未作废的最近一条
+                const { data: phRows } = await supabaseClient
+                    .from('payment_history')
+                    .select('id')
+                    .eq('order_id', flow.order_id)
+                    .eq('type', phType)
+                    .eq('amount', flow.amount)
+                    .eq('is_voided', false)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                if (phRows && phRows.length > 0) {
+                    await supabaseClient
+                        .from('payment_history')
+                        .update({ is_voided: true, voided_at: nowTs, voided_by: profile.id })
+                        .eq('id', phRows[0].id);
+                }
+            }
+
+            // 4. 审计日志
+            if (window.Audit) {
+                await window.Audit.log({
+                    action: 'void_cash_flow',
+                    order_id: flow.reference_id || null,
+                    details: `作废流水: ${flow.flow_type} ${Utils.formatCurrency(flow.amount)} (${flow.direction}) [id:${flowId}]`,
+                    performed_by: profile.id
+                }).catch(() => {});
+            }
+
+            if (window.JF && JF.Cache) JF.Cache.clear();
+            return { flow };
         },
 
         async deleteOrder(orderId) {

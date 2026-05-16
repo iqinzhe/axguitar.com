@@ -79,9 +79,12 @@
 
                 let rows = '';
                 if (cashFlowTransactions.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                    rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
                 } else {
                     for (const t of cashFlowTransactions) {
+                        const voidBtn = isAdmin
+                            ? `<td class="text-center"><button onclick="APP.voidCashFlow('${Utils.escapeAttr(t.id)}')" class="btn btn--danger btn--sm" title="${lang === 'id' ? 'Batalkan transaksi ini' : '作废此流水'}">🚫</button></td>`
+                            : '';
                         rows += `<tr>
                             <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                             <td>${typeMap[t.flow_type] || t.flow_type}</td>
@@ -90,6 +93,7 @@
                             <td class="amount">${Utils.formatCurrency(t.amount)}</td>
                             <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
                             ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                            ${voidBtn}
                         </tr>`;
                     }
                 }
@@ -130,51 +134,14 @@
                                     <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                     <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                     ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                    ${isAdmin ? `<th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>` : ''}
                                 </tr></thead>
-                                <tbody id="cashFlowPageBody"></tbody>
+                                <tbody id="cashFlowPageBody">${rows}</tbody>
                             </table>
                         </div>
-                        <div id="cashFlowPaginator"></div>
                     </div>`;
 
                 window._cashFlowPageData = cashFlowTransactions;
-
-                // [分页] 资金流水前端分页
-                const _cfItems = cashFlowTransactions;
-                const _cfIsAdmin = isAdmin;
-                const _cfLang = lang;
-                setTimeout(function() {
-                    if (window.JF && JF.Pagination && _cfItems) {
-                        const typeMap = {
-                            interest: _cfLang === 'id' ? 'Bunga' : '利息',
-                            principal: _cfLang === 'id' ? 'Pokok' : '本金',
-                            loan: _cfLang === 'id' ? 'Pinjaman' : '放款',
-                            expense: _cfLang === 'id' ? 'Pengeluaran' : '支出',
-                            admin_fee: _cfLang === 'id' ? 'Biaya Admin' : '管理费',
-                            service_fee: _cfLang === 'id' ? 'Biaya Layanan' : '服务费',
-                            capital: _cfLang === 'id' ? 'Modal' : '资本金',
-                            transfer: _cfLang === 'id' ? 'Transfer' : '转账',
-                            profit: _cfLang === 'id' ? 'Laba' : '利润'
-                        };
-                        const srcMap = { bank: _cfLang === 'id' ? 'Bank' : '银行', cash: _cfLang === 'id' ? 'Tunai' : '现金' };
-                        JF.Pagination.render('cashFlowPageBody', _cfItems, 1, 15, function(row) {
-                            const date = Utils.formatDate(row.date || row.created_at);
-                            const typeLabel = typeMap[row.flow_type] || row.flow_type || '-';
-                            const dir = row.direction === 'inflow'
-                                ? `<span class='badge badge--completed'>${_cfLang === 'id' ? 'Masuk' : '流入'}</span>`
-                                : `<span class='badge badge--danger'>${_cfLang === 'id' ? 'Keluar' : '流出'}</span>`;
-                            const src = srcMap[row.source_target] || row.source_target || '-';
-                            const amt = `<span class='${row.direction === 'inflow' ? 'income' : 'expense'}'>${Utils.formatCurrency(row.amount)}</span>`;
-                            const desc = Utils.escapeHtml(row.description || '-');
-                            const store = _cfIsAdmin ? `<td class='text-center'>${Utils.escapeHtml((row.stores && row.stores.name) || '-')}</td>` : '';
-                            return `<tr><td>${date}</td><td>${typeLabel}</td><td class='text-center'>${dir}</td><td class='text-center'>${src}</td><td class='amount'>${amt}</td><td>${desc}</td>${store}</tr>`;
-                        }, {
-                            paginatorId: 'cashFlowPaginator',
-                            emptyHtml: `<tr><td colspan='99' style='text-align:center;padding:24px;color:var(--text-muted);'>${_cfLang === 'id' ? 'Belum ada data arus kas' : '暂无资金流水记录'}</td></tr>`
-                        });
-                    }
-                }, 0);
-
                 return content;
             } catch (error) {
                 console.error("buildCashFlowPageHTML error:", error);
@@ -225,10 +192,22 @@
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
             } else {
                 for (const t of transactions) {
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}<tr><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    const voidBtn = isAdmin
+                        ? `<td class="text-center"><button onclick="APP.voidCashFlow('${Utils.escapeAttr(t.id)}')" class="btn btn--danger btn--sm" title="${lang === 'id' ? 'Batalkan transaksi ini' : '作废此流水'}">🚫</button></td>`
+                        : '';
+                    rows += `<tr>
+                        <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
+                        <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                        <td class="text-center">${directionMap[t.direction] || t.direction}</td>
+                        <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
+                        <td class="amount">${Utils.formatCurrency(t.amount)}</td>
+                        <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
+                        ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                        ${voidBtn}
+                    </tr>`;
                 }
             }
             tbody.innerHTML = rows;
@@ -579,6 +558,33 @@
     // 挂载到命名空间
     JF.FundsPage = FundsPage;
 
+    // ==================== 作废流水（admin专属）====================
+    FundsPage.voidCashFlow = async function(flowId) {
+        const lang = Utils.lang;
+        if (!PERMISSION.isAdmin()) {
+            Utils.toast.error(lang === 'id' ? 'Hanya admin yang dapat membatalkan transaksi' : '仅管理员可作废流水');
+            return;
+        }
+
+        // 弹窗确认
+        const confirmed = await Utils.toast.confirm(
+            lang === 'id'
+                ? `⚠️ Konfirmasi Pembatalan\n\nAnda akan membatalkan transaksi ini.\nTindakan ini tidak dapat dibatalkan.\n\nLanjutkan?`
+                : `⚠️ 确认作废\n\n您即将作废该条流水记录。\n此操作不可撤销，记录将从账目中移除。\n\n同时关联的还款记录也会一并作废。\n\n确认继续？`
+        );
+        if (!confirmed) return;
+
+        try {
+            await SUPABASE.voidCashFlowRecord(flowId);
+            Utils.toast.success(lang === 'id' ? '✅ Transaksi berhasil dibatalkan' : '✅ 流水已作废，账目已更新');
+            // 刷新资金流水页
+            await FundsPage.showCashFlowPage();
+        } catch (err) {
+            console.error('voidCashFlow error:', err);
+            Utils.toast.error((lang === 'id' ? 'Gagal membatalkan: ' : '作废失败：') + err.message);
+        }
+    };
+
     // 向下兼容 APP 方法
     if (window.APP) {
         window.APP.showCashFlowPage = FundsPage.showCashFlowPage.bind(FundsPage);
@@ -597,6 +603,7 @@
         window.APP.filterInternalTransferHistory = FundsPage.filterInternalTransferHistory.bind(FundsPage);
         window.APP.resetInternalTransferFilters = FundsPage.resetInternalTransferFilters.bind(FundsPage);
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
+        window.APP.voidCashFlow = FundsPage.voidCashFlow.bind(FundsPage);
     }
 
 })();
