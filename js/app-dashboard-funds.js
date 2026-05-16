@@ -1,5 +1,4 @@
 // app-dashboard-funds.js - v2.0 (JF 命名空间) 
-// [修复] loan_disbursement 翻译增强 + 作废按钮改为模态框选择
 
 'use strict';
 
