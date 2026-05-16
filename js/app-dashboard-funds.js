@@ -1,5 +1,4 @@
 // app-dashboard-funds.js - v2.0 (JF 命名空间) 
-// [修复] loan_disbursement 翻译增强，添加备用匹配
 
 'use strict';
 
@@ -230,7 +229,7 @@
             tbody.innerHTML = rows;
         },
 
-        // ==================== 原有弹窗、转账、导出等方法 ====================
+        // ==================== 弹窗、转账、导出等方法 ====================
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
