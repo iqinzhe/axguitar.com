@@ -1,4 +1,5 @@
 // app-dashboard-funds.js - v2.0 (JF 命名空间) 
+// [修复] loan_disbursement 翻译增强 + 保持原始表格结构
 
 'use strict';
 
@@ -10,10 +11,7 @@
         // ==================== 获取流水类型翻译映射 ====================
         _getFlowTypeMap(lang) {
             return {
-                // 贷款发放 - 支持多种可能的字段值
-                'loan_disbursement': lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
-                'loan': lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
-                'disbursement': lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+                loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
                 admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
                 service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
                 interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
@@ -47,7 +45,7 @@
             return flowType || '-';
         },
 
-        // ==================== 构建资金流水页面 HTML（纯内容） ====================
+        // ==================== 构建资金流水页面 HTML ====================
         async buildCashFlowPageHTML() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -59,7 +57,6 @@
                 const client = SUPABASE.getClient();
 
                 if (isAdmin) {
-                    // 管理员查询时排除练习门店
                     let q = client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('is_voided', false).order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
@@ -70,7 +67,6 @@
                     const { data: allFlows } = await q;
                     cashFlowTransactions = allFlows || [];
                 } else if (isStaff) {
-                    // 员工仅可查看本人操作的资金流水记录
                     const { data: staffFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id)
@@ -79,7 +75,6 @@
                         .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
                     cashFlowTransactions = staffFlows || [];
                 } else {
-                    // 店长：查看本店全部流水
                     const { data: storeFlows } = await client
                         .from('cash_flow_records').select('*, stores(name)')
                         .eq('store_id', profile?.store_id).eq('is_voided', false)
@@ -93,10 +88,9 @@
 
                 let rows = '';
                 if (cashFlowTransactions.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                    rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
                 } else {
                     for (const t of cashFlowTransactions) {
-                        // 使用增强的翻译方法
                         const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
                         const voidBtn = isAdmin
                             ? `<td class="text-center"><button onclick="APP.voidCashFlow('${Utils.escapeAttr(t.id)}')" class="btn btn--danger btn--sm" title="${lang === 'id' ? 'Batalkan transaksi ini' : '作废此流水'}">🚫</button></td>`
@@ -114,7 +108,6 @@
                     }
                 }
 
-                // 员工受限提示
                 let staffRestrictionHtml = '';
                 if (isStaff) {
                     staffRestrictionHtml = `
@@ -130,6 +123,7 @@
                     `;
                 }
 
+                // 保持原始表格结构，使用 CSS 中定义的列宽类名
                 const content = `
                     <div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${Utils.t('print')}</button></div></div>
                     ${staffRestrictionHtml}
@@ -142,16 +136,18 @@
                         </div>
                         <div class="table-container">
                             <table class="data-table cashflow-table">
-                                <thead><tr>
-                                    <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
-                                    <th class="col-type">${lang === 'id' ? 'Tipe' : '类型'}</th>
-                                    <th class="col-status text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
-                                    <th class="col-method text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
-                                    <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
-                                    <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
-                                    ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                    ${isAdmin ? `<th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>` : ''}
-                                </table></thead>
+                                <thead>
+                                    <tr>
+                                        <th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th>
+                                        <th class="col-type">${lang === 'id' ? 'Tipe' : '类型'}</th>
+                                        <th class="col-status text-center">${lang === 'id' ? 'Arah' : '方向'}</th>
+                                        <th class="col-method text-center">${lang === 'id' ? 'Sumber' : '来源/去向'}</th>
+                                        <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
+                                        <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
+                                        ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
+                                        ${isAdmin ? `<th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>` : ''}
+                                    </tr>
+                                </thead>
                                 <tbody id="cashFlowPageBody">${rows}</tbody>
                             </table>
                         </div>
@@ -166,12 +162,10 @@
             }
         },
 
-        // 供外壳调用
         async renderCashFlowPageHTML() {
             return await this.buildCashFlowPageHTML();
         },
 
-        // 原有的 showCashFlowPage
         async showCashFlowPage() {
             APP.currentPage = 'paymentHistory';
             APP.saveCurrentPageState();
@@ -207,7 +201,7 @@
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
             } else {
                 for (const t of transactions) {
                     const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
@@ -229,7 +223,7 @@
             tbody.innerHTML = rows;
         },
 
-        // ==================== 弹窗、转账、导出等方法 ====================
+        // ==================== 资金弹窗相关方法 ====================
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -524,6 +518,7 @@
         },
 
         closeInternalTransferModal() { const modal = document.getElementById('internalTransferModal'); if (modal) modal.remove(); },
+        
         filterInternalTransferHistory() {
             const transfers = window._internalTransfersData || [];
             const startDate = document.getElementById('transferFilterStart')?.value;
@@ -535,6 +530,7 @@
             });
             FundsPage._renderInternalTransferHistory(filtered);
         },
+        
         resetInternalTransferFilters() { document.getElementById('transferFilterStart').value = ''; document.getElementById('transferFilterEnd').value = ''; FundsPage.filterInternalTransferHistory(); },
 
         _renderInternalTransferHistory(transfers) {
@@ -581,7 +577,6 @@
             return;
         }
 
-        // 弹窗确认
         const confirmed = await Utils.toast.confirm(
             lang === 'id'
                 ? `⚠️ Konfirmasi Pembatalan\n\nAnda akan membatalkan transaksi ini.\nTindakan ini tidak dapat dibatalkan.\n\nLanjutkan?`
@@ -592,7 +587,6 @@
         try {
             await SUPABASE.voidCashFlowRecord(flowId);
             Utils.toast.success(lang === 'id' ? '✅ Transaksi berhasil dibatalkan' : '✅ 流水已作废，账目已更新');
-            // 刷新资金流水页
             await FundsPage.showCashFlowPage();
         } catch (err) {
             console.error('voidCashFlow error:', err);
