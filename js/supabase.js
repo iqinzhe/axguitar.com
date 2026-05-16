@@ -2195,16 +2195,18 @@
     setTimeout(() => safeQuery(() => SupabaseAPI.ensureInterestShortfallColumn?.()), 5000);
 
     // ==================== 管理员：逐条同步缴费记录（利息/本金）====================
-    // 用于管理员修改订单时，对每一笔 interest/principal 记录进行增删改，
-    // 同时重新计算 orders 表的汇总字段（interest_paid_months/total, principal_paid 等）。
+    // 修复说明：
+    //   Fix①：同步 cash_flow_records 利息/本金流水——先清除旧流水，再按最新 payment_history 重建。
+    //   Fix②：同步 customers 表——修改客户信息时同步更新独立的客户档案记录。
     SupabaseAPI.adminSyncPaymentRecords = async function(orderId, editedRecords) {
         if (!supabaseClient) throw new Error('客户端未初始化');
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
 
-        // 1. 获取订单行 UUID
+        // 1. 获取订单完整信息（含 customer_id、store_id 用于写流水和同步客户档案）
         const { data: orderRow, error: orderErr } = await supabaseClient
-            .from('orders').select('id, loan_amount, agreed_interest_rate, interest_shortfall')
+            .from('orders')
+            .select('id, order_id, loan_amount, agreed_interest_rate, interest_shortfall, store_id, customer_id, customer_name, customer_ktp, customer_phone, customer_address')
             .eq('order_id', orderId).single();
         if (orderErr || !orderRow) throw new Error(Utils.lang === 'id' ? 'Pesanan tidak ditemukan' : '订单不存在');
         const orderUUID = orderRow.id;
@@ -2212,18 +2214,17 @@
         // editedRecords 格式:
         // { toDelete: [payment_history.id, ...],
         //   toUpdate: [{ id, date, amount, payment_method, months, description }, ...],
-        //   toAdd:    [{ type:'interest'|'principal', date, amount, payment_method, months, description }, ...] }
-        const { toDelete = [], toUpdate = [], toAdd = [] } = editedRecords;
+        //   toAdd:    [{ type:'interest'|'principal', date, amount, payment_method, months, description }, ...],
+        //   customerUpdates: { name, ktp, phone, address } | null }
+        const { toDelete = [], toUpdate = [], toAdd = [], customerUpdates = null } = editedRecords;
 
-        // 2. 删除被标记删除的记录
+        // 2. 删除被标记删除的 payment_history 记录
         for (const pid of toDelete) {
             const { error: delErr } = await supabaseClient.from('payment_history').delete().eq('id', pid);
             if (delErr) throw delErr;
-            // 同步删除对应的 cash_flow_records（按 reference_id 关联）
-            await supabaseClient.from('cash_flow_records').delete().eq('reference_id', pid);
         }
 
-        // 3. 更新被修改的记录
+        // 3. 更新被修改的 payment_history 记录
         for (const rec of toUpdate) {
             const upd = {
                 date: rec.date,
@@ -2236,7 +2237,7 @@
             if (updErr) throw updErr;
         }
 
-        // 4. 新增记录
+        // 4. 新增 payment_history 记录
         for (const rec of toAdd) {
             const newRec = {
                 order_id: orderUUID,
@@ -2252,7 +2253,7 @@
             if (insErr) throw insErr;
         }
 
-        // 5. 重新计算汇总字段，从 payment_history 重新统计
+        // 5. 重新计算汇总字段（从 payment_history 全量统计）
         const { data: allPay, error: payErr } = await supabaseClient
             .from('payment_history')
             .select('type, amount, months, is_voided')
@@ -2264,30 +2265,101 @@
             if (p.is_voided) continue;
             if (p.type === 'interest') {
                 interestMonths += (p.months || 1);
-                interestTotal += (p.amount || 0);
+                interestTotal  += (p.amount || 0);
             } else if (p.type === 'principal') {
                 principalPaid += (p.amount || 0);
             }
         }
-        const loanAmount = orderRow.loan_amount || 0;
+        const loanAmount        = orderRow.loan_amount || 0;
         const principalRemaining = Math.max(0, loanAmount - principalPaid);
-        const agreedRate = orderRow.agreed_interest_rate || 0.10;
-        const monthlyInterest = principalRemaining * agreedRate;
-        const newStatus = principalRemaining <= 0 ? 'completed' : 'active';
+        const agreedRate        = orderRow.agreed_interest_rate || 0.10;
+        const monthlyInterest   = principalRemaining * agreedRate;
+        const newStatus         = principalRemaining <= 0 ? 'completed' : 'active';
 
         const summaryUpd = {
             interest_paid_months: interestMonths,
-            interest_paid_total: interestTotal,
-            principal_paid: principalPaid,
-            principal_remaining: principalRemaining,
-            monthly_interest: monthlyInterest,
-            status: newStatus,
-            updated_at: nowStr(),
+            interest_paid_total:  interestTotal,
+            principal_paid:       principalPaid,
+            principal_remaining:  principalRemaining,
+            monthly_interest:     monthlyInterest,
+            status:               newStatus,
+            updated_at:           nowStr(),
         };
         if (newStatus === 'completed') summaryUpd.completed_at = summaryUpd.updated_at;
 
         const { error: sumErr } = await supabaseClient.from('orders').update(summaryUpd).eq('id', orderUUID);
         if (sumErr) throw sumErr;
+
+        // ============================================================
+        // Fix①：同步 cash_flow_records 利息/本金流水
+        // 策略：清除该订单所有 interest/principal 流水，然后按最新 payment_history 逐条重建。
+        // ============================================================
+        await supabaseClient
+            .from('cash_flow_records')
+            .delete()
+            .eq('order_id', orderUUID)
+            .in('flow_type', ['interest', 'principal']);
+
+        // 从 payment_history 重新拉取所有有效利息/本金记录，逐条重建流水
+        const { data: freshPay } = await supabaseClient
+            .from('payment_history')
+            .select('id, type, date, amount, payment_method, months, description, is_voided')
+            .eq('order_id', orderUUID)
+            .in('type', ['interest', 'principal'])
+            .order('date', { ascending: true });
+
+        for (const p of (freshPay || [])) {
+            if (p.is_voided) continue;
+            const flowType = p.type === 'interest' ? 'interest' : 'principal';
+            const monthsLabel = (p.type === 'interest' && p.months)
+                ? (' ' + p.months + (Utils.lang === 'id' ? ' bln' : ' 期'))
+                : '';
+            await this.recordCashFlow({
+                store_id:      orderRow.store_id,
+                flow_type:     flowType,
+                direction:     'inflow',
+                amount:        p.amount,
+                source_target: p.payment_method || 'cash',
+                order_id:      orderUUID,
+                customer_id:   orderRow.customer_id || null,
+                flow_date:     p.date,
+                description:   (p.description || (flowType === 'interest'
+                    ? (Utils.lang === 'id' ? 'Bunga' : '利息') + monthsLabel
+                    : (Utils.lang === 'id' ? 'Pokok' : '本金')))
+                    + ' [Admin Edit] - ' + orderId + ' ' + (orderRow.customer_name || ''),
+                reference_id:  orderId,
+            });
+        }
+
+        // ============================================================
+        // Fix②：同步 customers 表
+        // 若管理员修改了客户姓名/KTP/电话/地址，同步更新 customers 表中的独立记录。
+        // ============================================================
+        if (orderRow.customer_id) {
+            // 先从 orders 表中取当前（刚保存的）客户字段（adminSaveOrder 已写入 orders）
+            const { data: freshOrder } = await supabaseClient
+                .from('orders')
+                .select('customer_name, customer_ktp, customer_phone, customer_address')
+                .eq('id', orderUUID).single();
+
+            if (freshOrder) {
+                const custUpd = { updated_at: nowStr() };
+                if (freshOrder.customer_name)    custUpd.name        = freshOrder.customer_name;
+                if (freshOrder.customer_ktp)     custUpd.ktp_number  = freshOrder.customer_ktp;
+                if (freshOrder.customer_phone)   custUpd.phone       = freshOrder.customer_phone;
+                if (freshOrder.customer_address) {
+                    custUpd.ktp_address = freshOrder.customer_address;
+                    custUpd.address     = freshOrder.customer_address;
+                }
+                // 只在有实质内容时才更新，避免覆盖 customers 表里独有的字段
+                if (Object.keys(custUpd).length > 1) {
+                    await supabaseClient
+                        .from('customers')
+                        .update(custUpd)
+                        .eq('id', orderRow.customer_id);
+                }
+            }
+        }
 
         return { interestMonths, interestTotal, principalPaid, principalRemaining, newStatus };
     };
