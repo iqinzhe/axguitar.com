@@ -1,5 +1,6 @@
 // app-customers.js - v2.0 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
 // [修复 #6] 编辑客户后清除 JF.Cache
+// [修复 #7] 当金发放描述添加订单号和客户姓名
 
 'use strict';
 
@@ -166,8 +167,7 @@
                                 </table>
                             </div>
                             <div id="custTablePaginator"></div>
-                        </div>
-                    `;
+                        </div>`;
                     setTimeout(function() {
                         if (window.JF && JF.Pagination) {
                             JF.Pagination.render('custTableBody', customers, 1, _custPageSize, function(c) {
@@ -895,9 +895,10 @@
                     });
                 }
                 if (amount > 0) {
+                    // 【修复】当金发放描述中添加订单号和客户姓名
                     const desc = lang === 'id'
-                        ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'}`
-                        : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'}`;
+                        ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'} - Order: ${newOrder.order_id} - ${customer.name}`
+                        : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'} - 订单: ${newOrder.order_id} - ${customer.name}`;
                     await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, desc).catch(() => {
                         Utils.toast.warning(lang === 'id'
                             ? `⚠️ Pesanan ${newOrder.order_id} tersimpan, tapi pencairan dana GAGAL dicatat. Harap catat manual!`
@@ -1121,9 +1122,9 @@
                 if (orderIds.length > 0) { const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false }); allPayments = data || []; }
                 const typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') }; 
                 let rows = '';
-                if (allPayments.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td>`; }
+                if (allPayments.length === 0) { rows = `<td><td colspan="7" class="text-center">${t('no_data')}<\/td>`; }
                 else { for (const p of allPayments) { const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank'; rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}<\/td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td><td class="col-type">${typeMap[p.type] || p.type}<\/td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}<\/td><td class="amount">${Utils.formatCurrency(p.amount)}<\/td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}<\/span><\/td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}<\/td>`; } }
-                return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></table></thead><tbody>${rows}</tbody></table></div></div>`;
+                return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
                 console.error("buildCustomerPaymentHistoryHTML error:", error); 
                 return `<div class="card"><p>❌ ${lang === 'id' ? 'Gagal memuat riwayat' : '加载记录失败'}</p></div>`; 
