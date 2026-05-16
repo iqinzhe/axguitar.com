@@ -1,5 +1,5 @@
 // app-dashboard-funds.js - v2.0 (JF 命名空间) 
-// [修复] loan_disbursement 翻译增强 + 保持原始表格结构
+// [修复] loan_disbursement 翻译增强 + 作废按钮改为模态框选择
 
 'use strict';
 
@@ -38,7 +38,6 @@
         _getFlowTypeDisplay(flowType, lang) {
             const typeMap = FundsPage._getFlowTypeMap(lang);
             if (typeMap[flowType]) return typeMap[flowType];
-            // 兜底：检查是否包含 loan 或 disbursement 关键字
             if (flowType && (flowType.includes('loan') || flowType.includes('disbursement'))) {
                 return lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放';
             }
@@ -82,19 +81,16 @@
                     cashFlowTransactions = storeFlows || [];
                 }
 
-                const typeMap = FundsPage._getFlowTypeMap(lang);
                 const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
                 const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
 
                 let rows = '';
                 if (cashFlowTransactions.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
+                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
                 } else {
                     for (const t of cashFlowTransactions) {
                         const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
-                        const voidBtn = isAdmin
-                            ? `<td class="text-center"><button onclick="APP.voidCashFlow('${Utils.escapeAttr(t.id)}')" class="btn btn--danger btn--sm" title="${lang === 'id' ? 'Batalkan transaksi ini' : '作废此流水'}">🚫</button></td>`
-                            : '';
+                        // 注意：移除了每行的作废按钮
                         rows += `<tr>
                             <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                             <td class="col-type">${typeDisplay}</td>
@@ -103,7 +99,6 @@
                             <td class="amount">${Utils.formatCurrency(t.amount)}</td>
                             <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
                             ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                            ${voidBtn}
                         </tr>`;
                     }
                 }
@@ -123,7 +118,8 @@
                     `;
                 }
 
-                // 保持原始表格结构，使用 CSS 中定义的列宽类名
+                // 管理员视图：7列（日期、类型、方向、来源、金额、描述、门店）
+                // 非管理员视图：6列（无门店列）
                 const content = `
                     <div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${Utils.t('print')}</button></div></div>
                     ${staffRestrictionHtml}
@@ -132,6 +128,7 @@
                             <input type="date" id="cashFlowFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}">
                             <input type="date" id="cashFlowFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}">
                             <button onclick="APP.filterCashFlowPage()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
+                            ${isAdmin ? `<button onclick="APP.showVoidCashFlowModal()" class="btn btn--sm btn--danger">🚫 ${lang === 'id' ? 'Batalkan Transaksi' : '作废流水'}</button>` : ''}
                             <button onclick="APP.resetCashFlowPageFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                         </div>
                         <div class="table-container">
@@ -145,7 +142,6 @@
                                         <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                         <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                         ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                        ${isAdmin ? `<th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>` : ''}
                                     </tr>
                                 </thead>
                                 <tbody id="cashFlowPageBody">${rows}</tbody>
@@ -201,13 +197,10 @@
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></table>`;
             } else {
                 for (const t of transactions) {
                     const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
-                    const voidBtn = isAdmin
-                        ? `<td class="text-center"><button onclick="APP.voidCashFlow('${Utils.escapeAttr(t.id)}')" class="btn btn--danger btn--sm" title="${lang === 'id' ? 'Batalkan transaksi ini' : '作废此流水'}">🚫</button></td>`
-                        : '';
                     rows += `<tr>
                         <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                         <td class="col-type">${typeDisplay}</td>
@@ -216,11 +209,329 @@
                         <td class="amount">${Utils.formatCurrency(t.amount)}</td>
                         <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
                         ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                        ${voidBtn}
                     </tr>`;
                 }
             }
             tbody.innerHTML = rows;
+        },
+
+        // ==================== 作废流水模态框（管理员） ====================
+        async showVoidCashFlowModal() {
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            
+            if (!isAdmin) {
+                Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat membatalkan transaksi' : '仅管理员可作废流水');
+                return;
+            }
+
+            // 获取当前显示的流水数据（已筛选后的）
+            const transactions = window._cashFlowPageData || [];
+            
+            if (transactions.length === 0) {
+                Utils.toast.warning(lang === 'id' ? 'Tidak ada transaksi yang dapat dibatalkan' : '没有可作废的流水记录');
+                return;
+            }
+
+            // 构建流水列表 HTML
+            let listHtml = '';
+            for (let i = 0; i < transactions.length; i++) {
+                const t = transactions[i];
+                const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
+                const dateStr = Utils.formatDate(t.flow_date || t.recorded_at);
+                const amountStr = Utils.formatCurrency(t.amount);
+                
+                listHtml += `
+                    <div class="void-item" data-flow-id="${Utils.escapeAttr(t.id)}" data-flow-desc="${Utils.escapeAttr(t.description || '-')}" data-flow-type="${Utils.escapeAttr(typeDisplay)}" data-flow-date="${Utils.escapeAttr(dateStr)}" data-flow-amount="${Utils.escapeAttr(amountStr)}" onclick="APP.selectVoidFlowItem(this)">
+                        <div class="void-item-radio"><input type="radio" name="voidFlowSelect" value="${Utils.escapeAttr(t.id)}"></div>
+                        <div class="void-item-info">
+                            <div class="void-item-date">${dateStr}</div>
+                            <div class="void-item-type">${typeDisplay}</div>
+                            <div class="void-item-amount">${amountStr}</div>
+                            <div class="void-item-desc">${Utils.escapeHtml(t.description || '-')}</div>
+                            ${isAdmin ? `<div class="void-item-store">${Utils.escapeHtml(t.stores?.name || '-')}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            const modalHtml = `
+                <div id="voidCashFlowModal" class="modal-overlay">
+                    <div class="modal-content" style="max-width: 700px; max-height: 80vh; display: flex; flex-direction: column;">
+                        <h3>🚫 ${lang === 'id' ? 'Batalkan Transaksi' : '作废流水记录'}</h3>
+                        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">
+                            ${lang === 'id' 
+                                ? 'Pilih transaksi yang akan dibatalkan. Tindakan ini tidak dapat dibatalkan.'
+                                : '选择要作废的流水记录。此操作不可撤销。'}
+                        </p>
+                        <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                            <input type="text" id="voidSearchInput" placeholder="🔍 ${lang === 'id' ? 'Cari deskripsi atau tipe...' : '搜索描述或类型...'}" style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-medium);">
+                            <button onclick="APP.filterVoidFlowList()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Cari' : '搜索'}</button>
+                            <button onclick="APP.clearVoidFlowSearch()" class="btn btn--sm btn--outline">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
+                        </div>
+                        <div id="voidFlowList" style="flex: 1; overflow-y: auto; border: 1px solid var(--border-light); border-radius: 8px; background: var(--bg-card);">
+                            ${listHtml}
+                        </div>
+                        <div class="modal-actions" style="margin-top: 16px;">
+                            <button id="confirmVoidBtn" class="btn btn--danger" disabled>🚫 ${lang === 'id' ? 'Batalkan Terpilih' : '作废选中记录'}</button>
+                            <button onclick="APP.closeVoidCashFlowModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Batal' : '取消'}</button>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                    .void-item {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 10px 12px;
+                        border-bottom: 1px solid var(--border-light);
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    }
+                    .void-item:hover {
+                        background: var(--bg-hover);
+                    }
+                    .void-item.selected {
+                        background: var(--primary-soft);
+                    }
+                    .void-item-radio {
+                        flex-shrink: 0;
+                    }
+                    .void-item-radio input {
+                        width: 18px;
+                        height: 18px;
+                        cursor: pointer;
+                        accent-color: var(--primary);
+                    }
+                    .void-item-info {
+                        flex: 1;
+                        display: flex;
+                        flex-wrap: wrap;
+                        align-items: center;
+                        gap: 12px;
+                        font-size: 13px;
+                    }
+                    .void-item-date {
+                        min-width: 90px;
+                        color: var(--text-secondary);
+                    }
+                    .void-item-type {
+                        min-width: 130px;
+                        font-weight: 500;
+                    }
+                    .void-item-amount {
+                        min-width: 100px;
+                        text-align: right;
+                        font-weight: 600;
+                        font-family: monospace;
+                    }
+                    .void-item-desc {
+                        flex: 1;
+                        color: var(--text-muted);
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    .void-item-store {
+                        min-width: 100px;
+                        color: var(--text-secondary);
+                    }
+                    @media (max-width: 768px) {
+                        .void-item-info { flex-direction: column; align-items: flex-start; gap: 4px; }
+                        .void-item-date, .void-item-type, .void-item-amount, .void-item-desc, .void-item-store { width: 100%; }
+                        .void-item-amount { text-align: left; }
+                    }
+                </style>
+            `;
+
+            const oldModal = document.getElementById('voidCashFlowModal');
+            if (oldModal) oldModal.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            // 保存流水数据供搜索使用
+            window._voidFlowListData = transactions;
+            window._selectedVoidFlowId = null;
+
+            // 监听单选按钮变化
+            const radios = document.querySelectorAll('#voidFlowList input[name="voidFlowSelect"]');
+            const confirmBtn = document.getElementById('confirmVoidBtn');
+            
+            const updateSelection = () => {
+                const selectedRadio = document.querySelector('#voidFlowList input[name="voidFlowSelect"]:checked');
+                if (selectedRadio) {
+                    window._selectedVoidFlowId = selectedRadio.value;
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = `🚫 ${lang === 'id' ? 'Batalkan' : '作废'} ${selectedRadio.closest('.void-item')?.querySelector('.void-item-type')?.textContent || ''}`;
+                    }
+                    // 高亮选中行
+                    document.querySelectorAll('#voidFlowList .void-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    if (selectedRadio.closest('.void-item')) {
+                        selectedRadio.closest('.void-item').classList.add('selected');
+                    }
+                } else {
+                    window._selectedVoidFlowId = null;
+                    if (confirmBtn) {
+                        confirmBtn.disabled = true;
+                        confirmBtn.textContent = `🚫 ${lang === 'id' ? 'Batalkan Terpilih' : '作废选中记录'}`;
+                    }
+                }
+            };
+
+            radios.forEach(radio => {
+                radio.addEventListener('change', updateSelection);
+            });
+
+            // 点击整行也可选中
+            document.querySelectorAll('#voidFlowList .void-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const radio = item.querySelector('input[type="radio"]');
+                    if (radio && !e.target.closest('.void-item-radio')) {
+                        radio.checked = true;
+                        updateSelection();
+                    }
+                });
+            });
+
+            // 确认作废按钮
+            if (confirmBtn) {
+                confirmBtn.onclick = async () => {
+                    const selectedId = window._selectedVoidFlowId;
+                    if (!selectedId) {
+                        Utils.toast.warning(lang === 'id' ? 'Pilih transaksi terlebih dahulu' : '请先选择要作废的流水');
+                        return;
+                    }
+                    
+                    // 找到选中的流水信息
+                    const selectedFlow = transactions.find(t => t.id === selectedId);
+                    if (!selectedFlow) return;
+                    
+                    const typeDisplay = FundsPage._getFlowTypeDisplay(selectedFlow.flow_type, lang);
+                    const confirmMsg = lang === 'id'
+                        ? `⚠️ Batalkan transaksi ini?\n\n📅 ${Utils.formatDate(selectedFlow.flow_date || selectedFlow.recorded_at)}\n📋 ${typeDisplay}\n💰 ${Utils.formatCurrency(selectedFlow.amount)}\n📝 ${selectedFlow.description || '-'}\n\nTindakan ini tidak dapat dibatalkan!\n\nLanjutkan?`
+                        : `⚠️ 确认作废此流水？\n\n📅 ${Utils.formatDate(selectedFlow.flow_date || selectedFlow.recorded_at)}\n📋 ${typeDisplay}\n💰 ${Utils.formatCurrency(selectedFlow.amount)}\n📝 ${selectedFlow.description || '-'}\n\n此操作不可撤销！\n\n确认作废？`;
+                    
+                    const confirmed = await Utils.toast.confirm(confirmMsg);
+                    if (!confirmed) return;
+                    
+                    try {
+                        await SUPABASE.voidCashFlowRecord(selectedId);
+                        Utils.toast.success(lang === 'id' ? '✅ Transaksi berhasil dibatalkan' : '✅ 流水已作废');
+                        FundsPage.closeVoidCashFlowModal();
+                        await FundsPage.showCashFlowPage();
+                    } catch (err) {
+                        console.error('voidCashFlow error:', err);
+                        Utils.toast.error((lang === 'id' ? 'Gagal membatalkan: ' : '作废失败：') + err.message);
+                    }
+                };
+            }
+        },
+
+        closeVoidCashFlowModal() {
+            const modal = document.getElementById('voidCashFlowModal');
+            if (modal) modal.remove();
+            window._selectedVoidFlowId = null;
+            window._voidFlowListData = null;
+        },
+
+        filterVoidFlowList() {
+            const searchTerm = document.getElementById('voidSearchInput')?.value.toLowerCase() || '';
+            const transactions = window._voidFlowListData || [];
+            const listContainer = document.getElementById('voidFlowList');
+            if (!listContainer) return;
+            
+            const filtered = transactions.filter(t => {
+                const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, Utils.lang);
+                const desc = (t.description || '').toLowerCase();
+                const type = typeDisplay.toLowerCase();
+                const amount = Utils.formatCurrency(t.amount);
+                return desc.includes(searchTerm) || type.includes(searchTerm) || amount.includes(searchTerm);
+            });
+            
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            
+            let listHtml = '';
+            for (const t of filtered) {
+                const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
+                const dateStr = Utils.formatDate(t.flow_date || t.recorded_at);
+                const amountStr = Utils.formatCurrency(t.amount);
+                const isChecked = window._selectedVoidFlowId === t.id;
+                
+                listHtml += `
+                    <div class="void-item ${isChecked ? 'selected' : ''}" data-flow-id="${Utils.escapeAttr(t.id)}" onclick="APP.selectVoidFlowItem(this, event)">
+                        <div class="void-item-radio"><input type="radio" name="voidFlowSelect" value="${Utils.escapeAttr(t.id)}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation()"></div>
+                        <div class="void-item-info">
+                            <div class="void-item-date">${dateStr}</div>
+                            <div class="void-item-type">${typeDisplay}</div>
+                            <div class="void-item-amount">${amountStr}</div>
+                            <div class="void-item-desc">${Utils.escapeHtml(t.description || '-')}</div>
+                            ${isAdmin ? `<div class="void-item-store">${Utils.escapeHtml(t.stores?.name || '-')}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (filtered.length === 0) {
+                listHtml = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">${lang === 'id' ? 'Tidak ada transaksi yang cocok' : '没有匹配的流水记录'}</div>`;
+            }
+            
+            listContainer.innerHTML = listHtml;
+            
+            // 重新绑定事件
+            document.querySelectorAll('#voidFlowList input[name="voidFlowSelect"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    const selectedRadio = document.querySelector('#voidFlowList input[name="voidFlowSelect"]:checked');
+                    if (selectedRadio) {
+                        window._selectedVoidFlowId = selectedRadio.value;
+                        document.querySelectorAll('#voidFlowList .void-item').forEach(item => {
+                            item.classList.remove('selected');
+                        });
+                        if (selectedRadio.closest('.void-item')) {
+                            selectedRadio.closest('.void-item').classList.add('selected');
+                        }
+                        const confirmBtn = document.getElementById('confirmVoidBtn');
+                        if (confirmBtn) {
+                            confirmBtn.disabled = false;
+                        }
+                    } else {
+                        window._selectedVoidFlowId = null;
+                        const confirmBtn = document.getElementById('confirmVoidBtn');
+                        if (confirmBtn) confirmBtn.disabled = true;
+                    }
+                });
+            });
+            
+            document.querySelectorAll('#voidFlowList .void-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.void-item-radio')) return;
+                    const radio = item.querySelector('input[type="radio"]');
+                    if (radio) {
+                        radio.checked = true;
+                        const changeEvent = new Event('change');
+                        radio.dispatchEvent(changeEvent);
+                    }
+                });
+            });
+        },
+
+        clearVoidFlowSearch() {
+            const searchInput = document.getElementById('voidSearchInput');
+            if (searchInput) searchInput.value = '';
+            FundsPage.filterVoidFlowList();
+        },
+
+        selectVoidFlowItem(element, event) {
+            // 兼容旧调用
+            if (event && event.target.closest('.void-item-radio')) return;
+            const radio = element.querySelector('input[type="radio"]');
+            if (radio) {
+                radio.checked = true;
+                const changeEvent = new Event('change');
+                radio.dispatchEvent(changeEvent);
+            }
         },
 
         // ==================== 资金弹窗相关方法 ====================
@@ -569,31 +880,6 @@
     // 挂载到命名空间
     JF.FundsPage = FundsPage;
 
-    // ==================== 作废流水（admin专属）====================
-    FundsPage.voidCashFlow = async function(flowId) {
-        const lang = Utils.lang;
-        if (!PERMISSION.isAdmin()) {
-            Utils.toast.error(lang === 'id' ? 'Hanya admin yang dapat membatalkan transaksi' : '仅管理员可作废流水');
-            return;
-        }
-
-        const confirmed = await Utils.toast.confirm(
-            lang === 'id'
-                ? `⚠️ Konfirmasi Pembatalan\n\nAnda akan membatalkan transaksi ini.\nTindakan ini tidak dapat dibatalkan.\n\nLanjutkan?`
-                : `⚠️ 确认作废\n\n您即将作废该条流水记录。\n此操作不可撤销，记录将从账目中移除。\n\n同时关联的还款记录也会一并作废。\n\n确认继续？`
-        );
-        if (!confirmed) return;
-
-        try {
-            await SUPABASE.voidCashFlowRecord(flowId);
-            Utils.toast.success(lang === 'id' ? '✅ Transaksi berhasil dibatalkan' : '✅ 流水已作废，账目已更新');
-            await FundsPage.showCashFlowPage();
-        } catch (err) {
-            console.error('voidCashFlow error:', err);
-            Utils.toast.error((lang === 'id' ? 'Gagal membatalkan: ' : '作废失败：') + err.message);
-        }
-    };
-
     // 向下兼容 APP 方法
     if (window.APP) {
         window.APP.showCashFlowPage = FundsPage.showCashFlowPage.bind(FundsPage);
@@ -612,7 +898,12 @@
         window.APP.filterInternalTransferHistory = FundsPage.filterInternalTransferHistory.bind(FundsPage);
         window.APP.resetInternalTransferFilters = FundsPage.resetInternalTransferFilters.bind(FundsPage);
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
-        window.APP.voidCashFlow = FundsPage.voidCashFlow.bind(FundsPage);
+        // 新增作废相关方法
+        window.APP.showVoidCashFlowModal = FundsPage.showVoidCashFlowModal.bind(FundsPage);
+        window.APP.closeVoidCashFlowModal = FundsPage.closeVoidCashFlowModal.bind(FundsPage);
+        window.APP.filterVoidFlowList = FundsPage.filterVoidFlowList.bind(FundsPage);
+        window.APP.clearVoidFlowSearch = FundsPage.clearVoidFlowSearch.bind(FundsPage);
+        window.APP.selectVoidFlowItem = FundsPage.selectVoidFlowItem.bind(FundsPage);
     }
 
 })();
