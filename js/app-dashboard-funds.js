@@ -1,4 +1,5 @@
 // app-dashboard-funds.js - v2.0 (JF 命名空间) 
+// [修复] loan_disbursement 翻译增强，添加备用匹配
 
 'use strict';
 
@@ -10,7 +11,10 @@
         // ==================== 获取流水类型翻译映射 ====================
         _getFlowTypeMap(lang) {
             return {
-                loan_disbursement: lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+                // 贷款发放 - 支持多种可能的字段值
+                'loan_disbursement': lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+                'loan': lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
+                'disbursement': lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放',
                 admin_fee: lang === 'id' ? '📋 Admin Fee' : '📋 管理费',
                 service_fee: lang === 'id' ? '✨ Service Fee' : '✨ 服务费',
                 interest: lang === 'id' ? '📈 Bunga' : '📈 利息',
@@ -33,6 +37,17 @@
             };
         },
 
+        // 辅助函数：获取类型显示（支持备用匹配）
+        _getFlowTypeDisplay(flowType, lang) {
+            const typeMap = FundsPage._getFlowTypeMap(lang);
+            if (typeMap[flowType]) return typeMap[flowType];
+            // 兜底：检查是否包含 loan 或 disbursement 关键字
+            if (flowType && (flowType.includes('loan') || flowType.includes('disbursement'))) {
+                return lang === 'id' ? '💰 Pencairan Pinjaman' : '💰 贷款发放';
+            }
+            return flowType || '-';
+        },
+
         // ==================== 构建资金流水页面 HTML（纯内容） ====================
         async buildCashFlowPageHTML() {
             const lang = Utils.lang;
@@ -41,7 +56,7 @@
             const isStaff = PERMISSION.isStaff();
 
             try {
-                let cashFlowTransactions = [];  // 修复：改名避免变量冲突
+                let cashFlowTransactions = [];
                 const client = SUPABASE.getClient();
 
                 if (isAdmin) {
@@ -82,12 +97,14 @@
                     rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
                 } else {
                     for (const t of cashFlowTransactions) {
+                        // 使用增强的翻译方法
+                        const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
                         const voidBtn = isAdmin
                             ? `<td class="text-center"><button onclick="APP.voidCashFlow('${Utils.escapeAttr(t.id)}')" class="btn btn--danger btn--sm" title="${lang === 'id' ? 'Batalkan transaksi ini' : '作废此流水'}">🚫</button></td>`
                             : '';
                         rows += `<tr>
                             <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
-                            <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                            <td class="col-type">${typeDisplay}</td>
                             <td class="text-center">${directionMap[t.direction] || t.direction}</td>
                             <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
                             <td class="amount">${Utils.formatCurrency(t.amount)}</td>
@@ -135,7 +152,7 @@
                                     <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                     ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
                                     ${isAdmin ? `<th class="col-action text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>` : ''}
-                                </tr></thead>
+                                </table></thead>
                                 <tbody id="cashFlowPageBody">${rows}</tbody>
                             </table>
                         </div>
@@ -187,7 +204,6 @@
             if (!tbody) return;
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
-            const typeMap = FundsPage._getFlowTypeMap(lang);
             const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
@@ -195,12 +211,13 @@
                 rows = `<tr><td colspan="${isAdmin ? 8 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
             } else {
                 for (const t of transactions) {
+                    const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
                     const voidBtn = isAdmin
                         ? `<td class="text-center"><button onclick="APP.voidCashFlow('${Utils.escapeAttr(t.id)}')" class="btn btn--danger btn--sm" title="${lang === 'id' ? 'Batalkan transaksi ini' : '作废此流水'}">🚫</button></td>`
                         : '';
                     rows += `<tr>
                         <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
-                        <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                        <td class="col-type">${typeDisplay}</td>
                         <td class="text-center">${directionMap[t.direction] || t.direction}</td>
                         <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
                         <td class="amount">${Utils.formatCurrency(t.amount)}</td>
@@ -220,7 +237,7 @@
             const isAdmin = PERMISSION.isAdmin();
             const isStaff = PERMISSION.isStaff();
             try {
-                let capitalTransactions = [];  // 修复：改名避免变量冲突
+                let capitalTransactions = [];
                 const client = SUPABASE.getClient();
                 if (isAdmin) {
                     let q = client
@@ -248,7 +265,6 @@
                     capitalTransactions = storeFlows || [];
                 }
 
-                const typeMap = FundsPage._getFlowTypeMap(lang);
                 const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
                 const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
 
@@ -257,9 +273,10 @@
                     rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
                 } else {
                     for (const t of capitalTransactions) {
+                        const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
                         rows += `<tr>
                             <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
-                            <td>${typeMap[t.flow_type] || t.flow_type}</td>
+                            <td class="col-type">${typeDisplay}</td>
                             <td class="text-center">${directionMap[t.direction] || t.direction}</td>
                             <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
                             <td class="amount">${Utils.formatCurrency(t.amount)}</td>
@@ -366,15 +383,15 @@
             if (!tbody) return;
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
-            const typeMap = FundsPage._getFlowTypeMap(lang);
             const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<tr>`;
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
             } else {
                 for (const t of transactions) {
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td>${typeMap[t.flow_type] || t.flow_type}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td class="col-type">${typeDisplay}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                 }
             }
             tbody.innerHTML = rows;
@@ -396,8 +413,7 @@
             const transactions = window._capitalTransactionsData || [];
             const lang = Utils.lang;
             const headers = lang === 'id' ? ['Tanggal', 'Tipe', 'Arah', 'Sumber', 'Jumlah', 'Deskripsi'] : ['日期', '类型', '方向', '来源/去向', '金额', '描述'];
-            const typeMap = FundsPage._getFlowTypeMap(lang);
-            const rows = transactions.map(t => [(t.flow_date || t.recorded_at || '').split('T')[0], typeMap[t.flow_type] || t.flow_type, t.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'), t.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'), t.amount, t.description || '-']);
+            const rows = transactions.map(t => [(t.flow_date || t.recorded_at || '').split('T')[0], FundsPage._getFlowTypeDisplay(t.flow_type, lang), t.direction === 'inflow' ? (lang === 'id' ? 'Masuk' : '流入') : (lang === 'id' ? 'Keluar' : '流出'), t.source_target === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行'), t.amount, t.description || '-']);
             const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
@@ -494,7 +510,7 @@
                     rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
                 } else {
                     for (const t of transfers) {
-                        rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td>${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td>${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                        rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td class="text-center">${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td class="text-center">${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                     }
                 }
                 const modalHtml = `<div id="internalTransferModal" class="modal-overlay"><div class="modal-content" style="max-width:800px;"><h3>🔄 ${lang === 'id' ? 'Riwayat Transfer Internal' : '内部转账记录'}</h3><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;"><input type="date" id="transferFilterStart" placeholder="${lang === 'id' ? 'Dari tanggal' : '开始日期'}"><input type="date" id="transferFilterEnd" placeholder="${lang === 'id' ? 'Sampai tanggal' : '结束日期'}"><button onclick="APP.filterInternalTransferHistory()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button><button onclick="APP.resetInternalTransferFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button></div><div class="table-container" style="max-height:400px;overflow-y:auto;"><table class="data-table transfer-table" style="min-width:600px;"><thead><tr><th class="col-date">${lang === 'id' ? 'Tanggal' : '日期'}</th><th class="col-type">${lang === 'id' ? 'Jenis Transfer' : '转账类型'}</th><th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th><th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th><th class="col-name">${lang === 'id' ? 'Oleh' : '操作人'}</th>${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}</tr></thead><tbody id="internalTransferBody">${rows}</tbody></table></div><div class="modal-actions"><button onclick="APP.exportInternalTransferToCSV()" class="btn btn--success">📎 ${lang === 'id' ? 'Ekspor CSV' : '导出CSV'}</button><button onclick="APP.closeInternalTransferModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button></div></div></div>`;
