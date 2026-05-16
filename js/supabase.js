@@ -1056,10 +1056,45 @@
             const pawnDueDate = (repaymentType === 'flexible' && pawnTermMonths)
                 ? Utils.calculatePawnDueDate(nowDate, pawnTermMonths) : null;
 
+            // [修复] 订单ID直接沿用客户ID，保证两者永远一致。
+            // 一个客户同时只能有一个活跃订单，所以正常情况下不会冲突。
+            // 极少数历史异常（如直接删库再建单）加后缀 -2/-3 兜底。
+            let _derivedOrderId = null;
+            if (orderData.customer_id) {
+                try {
+                    const { data: cust } = await supabaseClient
+                        .from('customers').select('customer_id')
+                        .eq('id', orderData.customer_id).single();
+                    if (cust && cust.customer_id) {
+                        // 检查该ID是否已被使用（理论上不会，但做安全兜底）
+                        const baseId = cust.customer_id;
+                        const { data: existOrd } = await supabaseClient
+                            .from('orders').select('order_id')
+                            .eq('order_id', baseId).maybeSingle();
+                        if (!existOrd) {
+                            _derivedOrderId = baseId;
+                        } else {
+                            // 极少数情况：该客户有历史已结清订单，加后缀区分
+                            for (let sfx = 2; ; sfx++) { // 无上限，顺延直到找到空缺号
+                                const candidate = baseId + '-' + sfx;
+                                const { data: dup } = await supabaseClient
+                                    .from('orders').select('order_id')
+                                    .eq('order_id', candidate).maybeSingle();
+                                if (!dup) { _derivedOrderId = candidate; break; }
+                            }
+                        }
+                    }
+                } catch(e) {
+                    console.warn('[createOrder] 派生订单号失败，回退自动生成:', e);
+                }
+            }
+
             let retryCount=0, lastError=null, newOrder=null;
             while(retryCount<5){
                 try {
-                    const orderId = await this._generateOrderId(profile.role, targetStoreId, 5);
+                    // 优先用派生的订单号；若派生失败则回退到自动生成（兜底）
+                    const orderId = _derivedOrderId || await this._generateOrderId(profile.role, targetStoreId, 5);
+                    _derivedOrderId = null; // 只用一次，重试时走自动生成
                     let monthlyFixedPayment = null;
                     if(repaymentType==='fixed' && repaymentTerm && repaymentTerm>0){
                         monthlyFixedPayment = orderData.monthly_fixed_payment ||
@@ -1614,59 +1649,6 @@
             if(error) throw error;
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remaining, paymentMethod);
             Utils.toast.success(Utils.lang==='id'?'Pelunasan dipercepat berhasil!':'提前结清成功！');
-            return true;
-        },
-
-        // ==================== 申请结清（灵活还款）====================
-        // [新增] 对应 app-payments.js 的 requestEarlySettleFlexible。
-        // 按理论剩余本金入账，差额由门店线下核销，不影响账面平衡。
-        async earlySettleFlexibleOrder(orderId, paymentMethod, settleAmount) {
-            if(paymentMethod===undefined) paymentMethod='cash';
-            const profile = await this.getCurrentProfile();
-            const order = await this.getOrder(orderId);
-
-            if (order.status === 'liquidated') {
-                throw new Error(Utils.lang === 'id'
-                    ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
-                    : '抵押物已变卖，无法继续收款。');
-            }
-            if(order.status==='completed') throw new Error(Utils.t('order_completed'));
-            if(order.repayment_type==='fixed') throw new Error(Utils.lang==='id'?'Gunakan pelunasan cicilan tetap':'请使用固定还款的提前结清');
-
-            const shortfall = order.interest_shortfall || 0;
-            if (shortfall > 0) {
-                throw new Error(Utils.lang === 'id'
-                    ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu.`
-                    : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再结清。`);
-            }
-
-            const remaining = settleAmount ?? order.principal_remaining ?? (order.loan_amount - (order.principal_paid || 0));
-
-            await supabaseClient.from('payment_history').insert({
-                order_id: order.id, date: todayStr(), type: 'principal',
-                amount: remaining,
-                description: (Utils.lang==='id'?'Pelunasan':'结清') + ' - ' + order.order_id + ' ' + (order.customer_name||''),
-                recorded_by: profile.id, payment_method: paymentMethod
-            });
-            await this.recordCashFlow({
-                store_id: order.store_id, flow_type: 'principal', direction: 'inflow',
-                amount: remaining, source_target: paymentMethod, order_id: order.id,
-                customer_id: order.customer_id,
-                description: (Utils.lang==='id'?'Pelunasan':'结清') + ' - ' + order.order_id,
-                reference_id: order.order_id
-            });
-            const { error } = await supabaseClient.from('orders').update({
-                status: 'completed',
-                principal_paid: order.loan_amount,
-                principal_remaining: 0,
-                monthly_interest: 0,
-                fund_status: 'returned',
-                completed_at: nowStr(),
-                updated_at: nowStr()
-            }).eq('order_id', orderId);
-            if(error) throw error;
-            if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remaining, paymentMethod);
-            Utils.toast.success(Utils.lang==='id'?'Pelunasan berhasil!':'结清成功！');
             return true;
         },
 
