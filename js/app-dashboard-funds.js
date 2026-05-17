@@ -129,6 +129,7 @@
                             <button onclick="APP.filterCashFlowPage()" class="btn btn--sm">🔍 ${lang === 'id' ? 'Filter' : '筛选'}</button>
                             ${isAdmin ? `<button onclick="APP.showVoidCashFlowModal()" class="btn btn--sm btn--danger">🚫 ${lang === 'id' ? 'Batalkan Transaksi' : '作废流水'}</button>` : ''}
                             ${isAdmin ? `<button onclick="APP.showDiagnoseCashFlowModal()" class="btn btn--sm btn--warning">🔍 ${lang === 'id' ? 'Diagnosa & Bersihkan' : '诊断 & 清理垃圾流水'}</button>` : ''}
+                            ${isAdmin ? `<button onclick="APP.showGapDetectiveModal()" class="btn btn--sm btn--outline">🕵️ ${lang === 'id' ? 'Detektif Selisih' : '差额侦探'}</button>` : ''}
                             <button onclick="APP.resetCashFlowPageFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                         </div>
                         <div class="table-container">
@@ -699,6 +700,263 @@
             const ids = [...result.orphaned.map(r => r.id), ...result.duplicates.map(r => r.id)];
             await FundsPage._doCleanCashFlows(ids, lang === 'id' ? `✅ Semua ${ids.length} data rusak dibersihkan!` : `✅ 已清理全部 ${ids.length} 条垃圾流水！`);
         },
+
+        // ==================== 差额侦探（管理员）====================
+        // 从数据库实时查询，逐项列出保险柜支出与在押资金的差额组成
+        async showGapDetectiveModal() {
+            const lang = Utils.lang;
+            if (!PERMISSION.isAdmin()) { Utils.toast.warning(lang === 'id' ? 'Hanya admin' : '仅管理员可操作'); return; }
+
+            const old = document.getElementById('gapDetectiveModal');
+            if (old) old.remove();
+
+            // 先弹加载中
+            document.body.insertAdjacentHTML('beforeend', `
+            <div id="gapDetectiveModal" class="modal-overlay">
+                <div class="modal-content" style="max-width:820px;max-height:90vh;display:flex;flex-direction:column;">
+                    <h3>🕵️ ${lang === 'id' ? 'Detektif Selisih Dana' : '差额侦探 — 保险柜 vs 在押资金'}</h3>
+                    <div style="text-align:center;padding:40px;color:var(--text-muted);">⏳ ${lang === 'id' ? 'Menganalisa...' : '正在深度分析，请稍候...'}</div>
+                    <div class="modal-actions"><button onclick="APP.closeGapDetectiveModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button></div>
+                </div>
+            </div>`);
+
+            try {
+                const client = SUPABASE.getClient();
+
+                // ① 拉取所有未作废的 cash outflow（现金支出）
+                const { data: cashOutflows } = await client
+                    .from('cash_flow_records')
+                    .select('id, flow_type, amount, direction, description, flow_date, reference_id, order_id')
+                    .eq('is_voided', false)
+                    .eq('direction', 'outflow')
+                    .eq('source_target', 'cash')
+                    .order('flow_date', { ascending: false });
+
+                // ② 拉取所有未作废的 cash inflow（现金收入）
+                const { data: cashInflows } = await client
+                    .from('cash_flow_records')
+                    .select('id, flow_type, amount, direction, description, flow_date, reference_id, order_id')
+                    .eq('is_voided', false)
+                    .eq('direction', 'inflow')
+                    .eq('source_target', 'cash')
+                    .order('flow_date', { ascending: false });
+
+                // ③ 拉取所有 active 订单（在押资金来源）
+                const { data: activeOrders } = await client
+                    .from('orders')
+                    .select('order_id, customer_name, loan_amount, created_at')
+                    .eq('status', 'active');
+
+                // ④ 拉取所有 completed 订单（已完成，但当时贷款发放是支出）
+                const { data: completedOrders } = await client
+                    .from('orders')
+                    .select('order_id, customer_name, loan_amount, principal_paid, completed_at')
+                    .eq('status', 'completed');
+
+                const totalCashOut = (cashOutflows || []).reduce((s, r) => s + (r.amount || 0), 0);
+                const totalCashIn  = (cashInflows  || []).reduce((s, r) => s + (r.amount || 0), 0);
+                const cashBalance   = totalCashIn - totalCashOut;
+                const deployedCapital = (activeOrders || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
+                const gap = Math.abs(totalCashOut - deployedCapital);
+
+                // 支出分组
+                const outflowGroups = {};
+                for (const r of (cashOutflows || [])) {
+                    const k = r.flow_type || 'unknown';
+                    if (!outflowGroups[k]) outflowGroups[k] = { total: 0, count: 0, items: [] };
+                    outflowGroups[k].total += (r.amount || 0);
+                    outflowGroups[k].count++;
+                    outflowGroups[k].items.push(r);
+                }
+
+                // 收入分组
+                const inflowGroups = {};
+                for (const r of (cashInflows || [])) {
+                    const k = r.flow_type || 'unknown';
+                    if (!inflowGroups[k]) inflowGroups[k] = { total: 0, count: 0, items: [] };
+                    inflowGroups[k].total += (r.amount || 0);
+                    inflowGroups[k].count++;
+                    inflowGroups[k].items.push(r);
+                }
+
+                const flowTypeLabel = (k) => ({
+                    loan_disbursement: lang === 'id' ? '当金发放' : '当金发放',
+                    expense: lang === 'id' ? '运营支出' : '运营支出',
+                    return_of_capital: lang === 'id' ? '资本返还' : '资本返还',
+                    capital_injection: lang === 'id' ? '资本注入' : '资本注入',
+                    interest: lang === 'id' ? '利息收入' : '利息收入',
+                    principal: lang === 'id' ? '本金归还' : '本金归还',
+                    admin_fee: lang === 'id' ? '管理费' : '管理费',
+                    service_fee: lang === 'id' ? '服务费' : '服务费',
+                    internal_transfer: lang === 'id' ? '内部转账' : '内部转账',
+                    profit_distribution: lang === 'id' ? '利润分配' : '利润分配',
+                }[k] || k);
+
+                const thS = 'style="padding:7px 10px;font-size:12px;font-weight:600;background:var(--bg-hover);white-space:nowrap;"';
+                const tdS = 'style="padding:7px 10px;font-size:12px;"';
+                const tdR = 'style="padding:7px 10px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;"';
+
+                // 构建支出明细表
+                let outRows = '';
+                for (const [k, g] of Object.entries(outflowGroups).sort((a,b) => b[1].total - a[1].total)) {
+                    const isLoan = k === 'loan_disbursement';
+                    const rowBg = isLoan ? 'background:var(--warning-soft,#fffbeb);' : '';
+                    outRows += `<tr style="${rowBg}border-bottom:1px solid var(--border-light);">
+                        <td ${tdS}>${flowTypeLabel(k)}</td>
+                        <td ${tdR}>${g.count} ${lang === 'id' ? '笔' : '笔'}</td>
+                        <td ${tdR} style="padding:7px 10px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--danger);">${Utils.formatCurrency(g.total)}</td>
+                        <td ${tdS}>${isLoan ? (lang === 'id' ? '⚠️ 含已完成订单的发放' : '⚠️ 含已完成订单的发放额') : ''}</td>
+                    </tr>`;
+                }
+
+                // 构建收入明细表
+                let inRows = '';
+                for (const [k, g] of Object.entries(inflowGroups).sort((a,b) => b[1].total - a[1].total)) {
+                    inRows += `<tr style="border-bottom:1px solid var(--border-light);">
+                        <td ${tdS}>${flowTypeLabel(k)}</td>
+                        <td ${tdR}>${g.count} ${lang === 'id' ? '笔' : '笔'}</td>
+                        <td ${tdR} style="padding:7px 10px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--success);">${Utils.formatCurrency(g.total)}</td>
+                        <td ${tdS}></td>
+                    </tr>`;
+                }
+
+                // 完成订单列表
+                let compRows = '';
+                const compTotal = (completedOrders || []).reduce((s, o) => s + (o.loan_amount || 0), 0);
+                for (const o of (completedOrders || []).sort((a,b) => (b.loan_amount||0)-(a.loan_amount||0)).slice(0, 30)) {
+                    compRows += `<tr style="border-bottom:1px solid var(--border-light);">
+                        <td ${tdS}>${Utils.escapeHtml(o.order_id)}</td>
+                        <td ${tdS}>${Utils.escapeHtml(o.customer_name || '-')}</td>
+                        <td ${tdR}>${Utils.formatCurrency(o.loan_amount || 0)}</td>
+                        <td ${tdR}>${Utils.formatCurrency(o.principal_paid || 0)}</td>
+                        <td ${tdS} style="padding:7px 10px;font-size:12px;color:${Math.abs((o.principal_paid||0)-(o.loan_amount||0)) < 1000 ? 'var(--success)' : 'var(--warning)'};">
+                            ${Math.abs((o.principal_paid||0)-(o.loan_amount||0)) < 1000 ? '✅ 已还清' : '⚠️ 部分已还'}
+                        </td>
+                    </tr>`;
+                }
+
+                // 理论差额拆解
+                const loanDisbGroup = outflowGroups['loan_disbursement'] || { total: 0, count: 0 };
+                const expenseGroup  = outflowGroups['expense']           || { total: 0, count: 0 };
+                const principalInflowGroup = inflowGroups['principal']   || { total: 0, count: 0 };
+                // 差额理论 = 已完成订单的贷款发放 + 支出 − 本金回收
+                const theoreticalGap = loanDisbGroup.total - deployedCapital - principalInflowGroup.total;
+
+                const modal = document.getElementById('gapDetectiveModal');
+                if (!modal) return;
+                modal.querySelector('.modal-content').innerHTML = `
+                    <h3>🕵️ ${lang === 'id' ? 'Detektif Selisih Dana' : '差额侦探 — 完整资金流向分析'}</h3>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0;">
+                        <div style="background:var(--danger-soft,#fef2f2);border:1px solid var(--danger,#ef4444);border-radius:8px;padding:10px 14px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">${lang === 'id' ? '总现金支出' : '总现金支出'}</div>
+                            <div style="font-size:16px;font-weight:600;color:var(--danger);">${Utils.formatCurrency(totalCashOut)}</div>
+                        </div>
+                        <div style="background:var(--success-soft,#f0fdf4);border:1px solid var(--success,#10b981);border-radius:8px;padding:10px 14px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">${lang === 'id' ? '总现金收入' : '总现金收入'}</div>
+                            <div style="font-size:16px;font-weight:600;color:var(--success);">${Utils.formatCurrency(totalCashIn)}</div>
+                        </div>
+                        <div style="background:var(--bg-hover);border:1px solid var(--border-light);border-radius:8px;padding:10px 14px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">${lang === 'id' ? '保险柜余额' : '保险柜余额'}</div>
+                            <div style="font-size:16px;font-weight:600;color:${cashBalance>=0?'var(--success)':'var(--danger)'};">${Utils.formatCurrency(cashBalance)}</div>
+                        </div>
+                        <div style="background:var(--primary-soft,#cffafe);border:1px solid var(--primary);border-radius:8px;padding:10px 14px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">${lang === 'id' ? '在押资金' : '在押资金 (active)'}</div>
+                            <div style="font-size:16px;font-weight:600;color:var(--primary-dark);">${Utils.formatCurrency(deployedCapital)}</div>
+                        </div>
+                        <div style="background:var(--warning-soft,#fffbeb);border:1px solid var(--warning,#f59e0b);border-radius:8px;padding:10px 14px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">${lang === 'id' ? '支出 vs 在押 差额' : '支出 − 在押 差额'}</div>
+                            <div style="font-size:16px;font-weight:600;color:var(--warning-dark,#b45309);">${Utils.formatCurrency(gap)}</div>
+                        </div>
+                        <div style="background:var(--bg-hover);border:1px solid var(--border-light);border-radius:8px;padding:10px 14px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">${lang === 'id' ? '已完成订单' : '已完成订单贷款总额'}</div>
+                            <div style="font-size:16px;font-weight:600;color:var(--text-secondary);">${Utils.formatCurrency(compTotal)}</div>
+                        </div>
+                    </div>
+
+                    <div style="background:var(--warning-soft,#fffbeb);border:1px solid var(--warning,#f59e0b);border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px;">
+                        <strong>${lang === 'id' ? '📐 理论差额拆解：' : '📐 理论差额拆解：'}</strong><br>
+                        ${lang === 'id' ? '当金发放总额' : '当金发放总额'} ${Utils.formatCurrency(loanDisbGroup.total)}
+                        &nbsp;−&nbsp; ${lang === 'id' ? '在押资金' : '在押资金'} ${Utils.formatCurrency(deployedCapital)}
+                        &nbsp;−&nbsp; ${lang === 'id' ? '本金回收流水' : '本金回收流水'} ${Utils.formatCurrency(principalInflowGroup.total)}
+                        &nbsp;=&nbsp; <strong style="color:var(--warning-dark,#b45309);">${Utils.formatCurrency(theoreticalGap)}</strong><br>
+                        <span style="color:var(--text-muted);font-size:12px;">
+                        ${lang === 'id'
+                            ? '若此值接近 0，说明本金回收流水完整；若接近差额，说明已完成订单缺少本金流水。剩余部分为支出等其他科目。'
+                            : '若此值接近 0，说明本金回收流水完整记录了；若接近差额，说明已完成订单缺少对应的本金现金流水记录，是差额主要来源。'}
+                        </span>
+                    </div>
+
+                    <div style="flex:1;overflow-y:auto;max-height:380px;">
+                        <div style="padding:8px 12px;background:var(--danger-soft,#fef2f2);font-size:12px;font-weight:600;color:var(--danger);border-radius:6px 6px 0 0;border:1px solid var(--border-light);">
+                            💸 ${lang === 'id' ? '现金支出明细（按科目汇总）' : '现金支出明细（按科目汇总）'}
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-light);border-top:none;margin-bottom:12px;">
+                            <thead><tr style="background:var(--bg-hover);">
+                                <th ${thS}>${lang === 'id' ? '科目' : '科目'}</th>
+                                <th ${thS} style="text-align:right;">${lang === 'id' ? '笔数' : '笔数'}</th>
+                                <th ${thS} style="text-align:right;">${lang === 'id' ? '金额' : '金额'}</th>
+                                <th ${thS}>${lang === 'id' ? '备注' : '备注'}</th>
+                            </tr></thead>
+                            <tbody>${outRows}</tbody>
+                            <tfoot><tr style="background:var(--bg-hover);font-weight:600;">
+                                <td ${tdS}><strong>${lang === 'id' ? '合计' : '合计'}</strong></td>
+                                <td ${tdR}>${(cashOutflows||[]).length}</td>
+                                <td ${tdR} style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;color:var(--danger);">${Utils.formatCurrency(totalCashOut)}</td>
+                                <td></td>
+                            </tr></tfoot>
+                        </table>
+
+                        <div style="padding:8px 12px;background:var(--success-soft,#f0fdf4);font-size:12px;font-weight:600;color:var(--success);border-radius:6px 6px 0 0;border:1px solid var(--border-light);">
+                            💰 ${lang === 'id' ? '现金收入明细（按科目汇总）' : '现金收入明细（按科目汇总）'}
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-light);border-top:none;margin-bottom:12px;">
+                            <thead><tr style="background:var(--bg-hover);">
+                                <th ${thS}>${lang === 'id' ? '科目' : '科目'}</th>
+                                <th ${thS} style="text-align:right;">${lang === 'id' ? '笔数' : '笔数'}</th>
+                                <th ${thS} style="text-align:right;">${lang === 'id' ? '金额' : '金额'}</th>
+                                <th ${thS}></th>
+                            </tr></thead>
+                            <tbody>${inRows}</tbody>
+                            <tfoot><tr style="background:var(--bg-hover);font-weight:600;">
+                                <td ${tdS}><strong>${lang === 'id' ? '合计' : '合计'}</strong></td>
+                                <td ${tdR}>${(cashInflows||[]).length}</td>
+                                <td ${tdR} style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;color:var(--success);">${Utils.formatCurrency(totalCashIn)}</td>
+                                <td></td>
+                            </tr></tfoot>
+                        </table>
+
+                        <div style="padding:8px 12px;background:var(--bg-hover);font-size:12px;font-weight:600;border-radius:6px 6px 0 0;border:1px solid var(--border-light);">
+                            📋 ${lang === 'id' ? '已完成订单列表（贷款已发放、本金已还回）' : '已完成订单列表（贷款已发放、本金已还回）'}
+                            &nbsp;<span style="font-weight:400;color:var(--text-muted);">${lang === 'id' ? '共' : '共'} ${(completedOrders||[]).length} ${lang === 'id' ? '笔' : '笔'}，合计贷款 ${Utils.formatCurrency(compTotal)}</span>
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-light);border-top:none;">
+                            <thead><tr style="background:var(--bg-hover);">
+                                <th ${thS}>${lang === 'id' ? '单号' : '单号'}</th>
+                                <th ${thS}>${lang === 'id' ? '客户' : '客户'}</th>
+                                <th ${thS} style="text-align:right;">${lang === 'id' ? '贷款额' : '贷款额'}</th>
+                                <th ${thS} style="text-align:right;">${lang === 'id' ? '已还本金' : '已还本金'}</th>
+                                <th ${thS}>${lang === 'id' ? '状态' : '状态'}</th>
+                            </tr></thead>
+                            <tbody>${compRows || `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-muted);">暂无已完成订单</td></tr>`}</tbody>
+                        </table>
+                    </div>
+                    <div class="modal-actions" style="margin-top:14px;">
+                        <button onclick="APP.closeGapDetectiveModal()" class="btn btn--outline">✖ ${lang === 'id' ? 'Tutup' : '关闭'}</button>
+                    </div>`;
+
+            } catch (err) {
+                console.error('gapDetective error:', err);
+                Utils.toast.error((lang === 'id' ? 'Gagal: ' : '分析失败：') + err.message);
+                const m = document.getElementById('gapDetectiveModal');
+                if (m) m.remove();
+            }
+        },
+
+        closeGapDetectiveModal() {
+            const m = document.getElementById('gapDetectiveModal');
+            if (m) m.remove();
+        },
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -1063,8 +1321,8 @@
         window.APP.resetInternalTransferFilters = FundsPage.resetInternalTransferFilters.bind(FundsPage);
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
         // 新增作废相关方法
-        window.APP.showVoidCashFlowModal = FundsPage.showVoidCashFlowModal.bind(FundsPage);
-        window.APP.closeVoidCashFlowModal = FundsPage.closeVoidCashFlowModal.bind(FundsPage);
+        window.APP.showDiagnoseCashFlowModal = FundsPage.showDiagnoseCashFlowModal.bind(FundsPage);
+        window.APP.closeDiagnoseCashFlowModal = FundsPage.closeDiagnoseCashFlowModal.bind(FundsPage);
         window.APP.filterVoidFlowList = FundsPage.filterVoidFlowList.bind(FundsPage);
         window.APP.clearVoidFlowSearch = FundsPage.clearVoidFlowSearch.bind(FundsPage);
         window.APP.selectVoidFlowItem = FundsPage.selectVoidFlowItem.bind(FundsPage);
@@ -1073,6 +1331,8 @@
         window.APP.cleanOrphanedCashFlows = FundsPage.cleanOrphanedCashFlows.bind(FundsPage);
         window.APP.cleanDuplicateCashFlows = FundsPage.cleanDuplicateCashFlows.bind(FundsPage);
         window.APP.cleanAllDirtyCashFlows = FundsPage.cleanAllDirtyCashFlows.bind(FundsPage);
+        window.APP.showGapDetectiveModal = FundsPage.showGapDetectiveModal.bind(FundsPage);
+        window.APP.closeGapDetectiveModal = FundsPage.closeGapDetectiveModal.bind(FundsPage);
     }
 
 })();
