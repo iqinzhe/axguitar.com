@@ -130,7 +130,6 @@
                             ${isAdmin ? `<button onclick="APP.showVoidCashFlowModal()" class="btn btn--sm btn--danger">🚫 ${lang === 'id' ? 'Batalkan Transaksi' : '作废流水'}</button>` : ''}
                             ${isAdmin ? `<button onclick="APP.showDiagnoseCashFlowModal()" class="btn btn--sm btn--warning">🔍 ${lang === 'id' ? 'Diagnosa & Bersihkan' : '诊断 & 清理垃圾流水'}</button>` : ''}
                             ${isAdmin ? `<button onclick="APP.showGapDetectiveModal()" class="btn btn--sm btn--outline">🕵️ ${lang === 'id' ? 'Detektif Selisih' : '差额侦探'}</button>` : ''}
-                            ${isAdmin ? `<button onclick="APP.showRebuildOrderIdsModal()" class="btn btn--sm btn--outline" style="border-color:var(--primary);color:var(--primary);">🔢 ${lang === 'id' ? 'Rebuild ID Pesanan' : '重建订单号'}</button>` : ''}
                             <button onclick="APP.resetCashFlowPageFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                         </div>
                         <div class="table-container">
