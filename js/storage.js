@@ -373,14 +373,95 @@
 
         // ==================== 导出功能 ====================
         async exportOrdersToCSV() {
+            const lang = Utils.lang;
             try {
                 const orders = await SUPABASE.getOrdersLegacy();
-                Utils.exportToCSV(orders, `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`);
-                if (window.Audit) await window.Audit.logExport('orders', `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`, AUTH.user?.name);
+                if (!orders || orders.length === 0) {
+                    Utils.toast.warning(lang === 'id' ? 'Tidak ada data pesanan' : '暂无订单数据');
+                    return;
+                }
+
+                // ── 人性化字段映射 ──
+                const statusMap = {
+                    active:    lang === 'id' ? '活跃'    : '活跃',
+                    completed: lang === 'id' ? '已完成'  : '已完成',
+                    overdue:   lang === 'id' ? '已逾期'  : '已逾期',
+                    liquidated:lang === 'id' ? '已变卖'  : '已变卖',
+                };
+                const yesNo = (v) => v ? (lang === 'id' ? '是' : '是') : (lang === 'id' ? '否' : '否');
+                const feeStatus = (amount, paid) => {
+                    if (!amount || amount === 0) return lang === 'id' ? '免除' : '免除';
+                    return paid ? (lang === 'id' ? '已缴' : '已缴') : (lang === 'id' ? '未缴' : '未缴');
+                };
+                const svcStatus = (amount, paid) => {
+                    if (!amount || amount === 0) return lang === 'id' ? '免除' : '免除';
+                    return (paid || 0) >= (amount || 0) ? (lang === 'id' ? '已缴' : '已缴') : (lang === 'id' ? '未缴' : '未缴');
+                };
+                const fmtAmt = (v) => (!v || v === 0) ? '0' : String(v);
+                const fmtDate = (v) => v ? String(v).substring(0, 10) : '-';
+                const fmtPct = (v) => v ? (v * 100).toFixed(1) + '%' : '0%';
+
+                const headers = lang === 'id' ? [
+                    'No. Pesanan','Status','Tanggal Buka','Nama Nasabah','KTP','Telepon','Alamat',
+                    'Nama Agunan','Jumlah Pinjaman','Bunga Bulanan (%)',
+                    'Adm. Fee','Status Adm. Fee','Service Fee','Service Fee %','Status Service Fee',
+                    'Cicilan/Bln','Jenis Cicilan','Term (bln)',
+                    'Bunga Dibayar (bln)','Total Bunga Dibayar','Pokok Dibayar','Sisa Pokok',
+                    'Jatuh Tempo','Hari Telat','Ket'
+                ] : [
+                    '订单号','状态','开单日期','客户姓名','KTP','电话','地址',
+                    '质押物','贷款金额','月利率(%)',
+                    '管理费','管理费状态','服务费','服务费比例','服务费状态',
+                    '月还款额','还款方式','还款期数',
+                    '已付利息(期)','已付利息总额','已还本金','剩余本金',
+                    '下次到期日','逾期天数','备注'
+                ];
+
+                const rows = orders.map(o => [
+                    o.order_id || '-',
+                    statusMap[o.status] || o.status || '-',
+                    fmtDate(o.created_at),
+                    o.customer_name || '-',
+                    o.customer_ktp || '-',
+                    o.customer_phone || '-',
+                    o.customer_address || '-',
+                    o.collateral_name || '-',
+                    fmtAmt(o.loan_amount),
+                    o.agreed_interest_rate ? (o.agreed_interest_rate * 100).toFixed(1) : '10.0',
+                    // 管理费：金额为0显示"免除"，否则显示金额
+                    (!o.admin_fee || o.admin_fee === 0) ? (lang === 'id' ? '免除' : '免除') : fmtAmt(o.admin_fee),
+                    feeStatus(o.admin_fee, o.admin_fee_paid),
+                    // 服务费：金额为0显示"免除"
+                    (!o.service_fee_amount || o.service_fee_amount === 0) ? (lang === 'id' ? '免除' : '免除') : fmtAmt(o.service_fee_amount),
+                    o.service_fee_percent ? o.service_fee_percent + '%' : '0%',
+                    svcStatus(o.service_fee_amount, o.service_fee_paid),
+                    fmtAmt(o.monthly_fixed_payment || 0),
+                    o.repayment_type === 'fixed' ? (lang === 'id' ? '固定' : '固定') : (lang === 'id' ? '灵活' : '灵活'),
+                    o.repayment_term || '-',
+                    o.interest_paid_months || 0,
+                    fmtAmt(o.interest_paid_total || 0),
+                    fmtAmt(o.principal_paid || 0),
+                    fmtAmt(o.principal_remaining || o.loan_amount || 0),
+                    fmtDate(o.next_interest_due_date),
+                    o.overdue_days || 0,
+                    o.notes || '-',
+                ]);
+
+                const csvContent = [headers, ...rows]
+                    .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+                    .join('\n');
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const filename = `jf_gadai_orders_${new Date().toISOString().split('T')[0]}.csv`;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = filename; a.click();
+                URL.revokeObjectURL(url);
+
+                if (window.Audit) await window.Audit.logExport('orders', filename, AUTH.user?.name);
                 Utils.toast.success(Utils.t('export_success'));
             } catch (err) {
                 Utils.ErrorHandler.capture(err, 'BackupStorage.exportOrdersToCSV');
-                Utils.toast.error(Utils.lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
+                Utils.toast.error(lang === 'id' ? 'Gagal ekspor: ' + err.message : '导出失败：' + err.message);
             }
         },
 
