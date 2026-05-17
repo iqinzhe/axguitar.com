@@ -16,6 +16,9 @@
             FREE_THRESHOLD: 3000000,
             PERCENT_THRESHOLD: 5000000,
             FIXED_PERCENT: 2,
+            MIN_PERCENT: 2,
+            MAX_PERCENT: 10,
+            DEFAULT_PERCENT: 2,
         },
         
         DEFAULT_INTEREST_RATE: 0.10,
@@ -37,12 +40,27 @@
         calculateServiceFee(loanAmount, percent) {
             if (!loanAmount || loanAmount <= 0) return { percent: 0, amount: 0 };
             const cfg = this.SERVICE_FEE_CONFIG;
-            if (loanAmount <= cfg.PERCENT_THRESHOLD) {
+            // ≤300万：免服务费
+            if (loanAmount <= cfg.FREE_THRESHOLD) {
                 return { percent: 0, amount: 0 };
             }
-            const rawFee = loanAmount * (cfg.FIXED_PERCENT / 100);
+            // 300万~500万：固定1%，不受传入 percent 影响
+            if (loanAmount <= cfg.PERCENT_THRESHOLD) {
+                const amount = Math.ceil(loanAmount * 0.01 / 10000) * 10000;
+                return { percent: 1, amount };
+            }
+            // >500万：使用传入 percent，范围限制在 MIN~MAX 之间
+            let validPercent = percent;
+            if (validPercent === undefined || validPercent === null || isNaN(validPercent)) {
+                validPercent = cfg.DEFAULT_PERCENT;
+            } else if (validPercent < cfg.MIN_PERCENT) {
+                validPercent = cfg.MIN_PERCENT;
+            } else if (validPercent > cfg.MAX_PERCENT) {
+                validPercent = cfg.MAX_PERCENT;
+            }
+            const rawFee = loanAmount * (validPercent / 100);
             const amount = Math.ceil(rawFee / 10000) * 10000;
-            return { percent: cfg.FIXED_PERCENT, amount: amount };
+            return { percent: validPercent, amount };
         },
         
         getServiceFeePercentOptionsHtml() {

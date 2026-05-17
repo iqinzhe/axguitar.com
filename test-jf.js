@@ -55,49 +55,56 @@ function section(title) {
 // ─────────────────────────────────────────────
 const FeeConfig = {
     ADMIN_FEE_TIERS: [
-        { max: 500000, fee: 20000 },
         { max: 3000000, fee: 30000 },
         { max: Infinity, feePercent: 1 }
     ],
     SERVICE_FEE_CONFIG: {
         FREE_THRESHOLD: 3000000,
         PERCENT_THRESHOLD: 5000000,
+        FIXED_PERCENT: 2,
         MIN_PERCENT: 2,
         MAX_PERCENT: 10,
-        DEFAULT_PERCENT: 2
+        DEFAULT_PERCENT: 2,
     },
     DEFAULT_INTEREST_RATE: 0.10,
     DEFAULT_INTEREST_RATE_PERCENT: 10,
     AVAILABLE_INTEREST_RATES: [10, 9.5, 9, 8.5, 8],
     MIN_REPAYMENT_TERM: 1,
     MAX_REPAYMENT_TERM: 10,
+    DEFAULT_REPAYMENT_TERM: 5,
+    MAX_EXTENSION_MONTHS: 10,
 
     calculateAdminFee(loanAmount) {
         if (!loanAmount || loanAmount <= 0) return 0;
-        if (loanAmount <= 500000) return 20000;
         if (loanAmount <= 3000000) return 30000;
-        return Math.round(loanAmount * 0.01);
+        const rawFee = loanAmount * 0.01;
+        return Math.ceil(rawFee / 10000) * 10000;
     },
 
     calculateServiceFee(loanAmount, percent) {
         if (!loanAmount || loanAmount <= 0) return { percent: 0, amount: 0 };
         const cfg = this.SERVICE_FEE_CONFIG;
-        if (loanAmount <= cfg.FREE_THRESHOLD) return { percent: 0, amount: 0 };
-        if (loanAmount <= cfg.PERCENT_THRESHOLD) {
-            return { percent: 1, amount: Math.round(loanAmount * 0.01) };
+        // ≤300万：免服务费
+        if (loanAmount <= cfg.FREE_THRESHOLD) {
+            return { percent: 0, amount: 0 };
         }
+        // 300万~500万：固定1%，不受传入 percent 影响
+        if (loanAmount <= cfg.PERCENT_THRESHOLD) {
+            const amount = Math.ceil(loanAmount * 0.01 / 10000) * 10000;
+            return { percent: 1, amount };
+        }
+        // >500万：使用传入 percent，范围限制在 MIN~MAX 之间
         let validPercent = percent;
-        if (percent === undefined || percent === null || isNaN(percent)) {
+        if (validPercent === undefined || validPercent === null || isNaN(validPercent)) {
             validPercent = cfg.DEFAULT_PERCENT;
-        } else if (percent < cfg.MIN_PERCENT) {
+        } else if (validPercent < cfg.MIN_PERCENT) {
             validPercent = cfg.MIN_PERCENT;
-        } else if (percent > cfg.MAX_PERCENT) {
+        } else if (validPercent > cfg.MAX_PERCENT) {
             validPercent = cfg.MAX_PERCENT;
         }
-        return {
-            percent: validPercent,
-            amount: Math.round(loanAmount * validPercent / 100)
-        };
+        const rawFee = loanAmount * (validPercent / 100);
+        const amount = Math.ceil(rawFee / 10000) * 10000;
+        return { percent: validPercent, amount };
     },
 
     calculateFixedMonthlyPayment(loanAmount, monthlyRate, months) {
@@ -167,23 +174,15 @@ expect(
     FeeConfig.calculateAdminFee(0), 0
 );
 expect(
-    '当金 300,000（≤500k）→ 管理费 20,000',
-    FeeConfig.calculateAdminFee(300000), 20000
-);
-expect(
-    '当金 500,000（边界）→ 管理费 20,000',
-    FeeConfig.calculateAdminFee(500000), 20000
-);
-expect(
-    '当金 1,000,000（501k~3M）→ 管理费 30,000',
+    '当金 1,000,000（≤300万）→ 管理费固定 30,000',
     FeeConfig.calculateAdminFee(1000000), 30000
 );
 expect(
-    '当金 3,000,000（边界）→ 管理费 30,000',
+    '当金 3,000,000（边界）→ 管理费固定 30,000',
     FeeConfig.calculateAdminFee(3000000), 30000
 );
 expect(
-    '当金 5,000,000（>3M）→ 管理费 1%=50,000',
+    '当金 5,000,000（>300万）→ 管理费 1%=50,000，向上取万位',
     FeeConfig.calculateAdminFee(5000000), 50000
 );
 expect(
@@ -191,31 +190,43 @@ expect(
     FeeConfig.calculateAdminFee(10000000), 100000
 );
 expect(
-    '当金 10,500,000 → 管理费 1%=105,000（四舍五入）',
-    FeeConfig.calculateAdminFee(10500000), 105000
+    '当金 10,100,000 → 管理费 1%=101,000，向上取万位=110,000',
+    FeeConfig.calculateAdminFee(10100000), 110000
+);
+expect(
+    '当金 10,000,001 → 管理费 向上取万位=110,000',
+    FeeConfig.calculateAdminFee(10000001), 110000
 );
 
 // ── 服务费 ──
 section('服务费 calculateServiceFee');
 
 expect(
-    '当金 ≤3,000,000 → 免服务费',
+    '当金 1,000,000（≤300万）→ 免服务费',
+    FeeConfig.calculateServiceFee(1000000, 5), { percent: 0, amount: 0 }
+);
+expect(
+    '当金 3,000,000（边界=300万）→ 免服务费',
     FeeConfig.calculateServiceFee(3000000, 5), { percent: 0, amount: 0 }
 );
 expect(
-    '当金 3,000,001~5,000,000 → 固定 1%，忽略传入百分比',
+    '当金 4,000,000（300万~500万）→ 固定1%，忽略传入百分比，向上取万',
     FeeConfig.calculateServiceFee(4000000, 8), { percent: 1, amount: 40000 }
 );
 expect(
-    '当金 >5,000,000，百分比 5% → 正常计算',
+    '当金 5,000,000（边界=500万）→ 固定1%',
+    FeeConfig.calculateServiceFee(5000000, 8), { percent: 1, amount: 50000 }
+);
+expect(
+    '当金 10,000,000（>500万），百分比 5% → 正常计算',
     FeeConfig.calculateServiceFee(10000000, 5), { percent: 5, amount: 500000 }
 );
 expect(
-    '当金 >5,000,000，百分比 10%（上限）→ 不超出',
+    '当金 10,000,000（>500万），百分比 10%（上限）→ 不超出',
     FeeConfig.calculateServiceFee(10000000, 10), { percent: 10, amount: 1000000 }
 );
 expect(
-    '百分比 15%（超上限）→ 截断为 10%，不重置为默认 2%',
+    '百分比 15%（超上限）→ 截断为 10%',
     FeeConfig.calculateServiceFee(10000000, 15), { percent: 10, amount: 1000000 }
 );
 expect(
