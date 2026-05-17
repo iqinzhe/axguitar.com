@@ -130,6 +130,7 @@
                             ${isAdmin ? `<button onclick="APP.showVoidCashFlowModal()" class="btn btn--sm btn--danger">🚫 ${lang === 'id' ? 'Batalkan Transaksi' : '作废流水'}</button>` : ''}
                             ${isAdmin ? `<button onclick="APP.showDiagnoseCashFlowModal()" class="btn btn--sm btn--warning">🔍 ${lang === 'id' ? 'Diagnosa & Bersihkan' : '诊断 & 清理垃圾流水'}</button>` : ''}
                             ${isAdmin ? `<button onclick="APP.showGapDetectiveModal()" class="btn btn--sm btn--outline">🕵️ ${lang === 'id' ? 'Detektif Selisih' : '差额侦探'}</button>` : ''}
+                            ${isAdmin ? `<button onclick="APP.showRebuildOrderIdsModal()" class="btn btn--sm btn--outline" style="border-color:var(--primary);color:var(--primary);">🔢 ${lang === 'id' ? 'Rebuild ID Pesanan' : '重建订单号'}</button>` : ''}
                             <button onclick="APP.resetCashFlowPageFilters()" class="btn btn--sm">🔄 ${lang === 'id' ? 'Reset' : '重置'}</button>
                         </div>
                         <div class="table-container">
@@ -997,6 +998,122 @@
             }
         },
 
+        // ==================== 重建订单号（管理员）====================
+        async showRebuildOrderIdsModal() {
+            const lang = Utils.lang;
+            if (!PERMISSION.isAdmin()) { Utils.toast.warning(lang==='id'?'Hanya admin':'仅管理员可操作'); return; }
+
+            const old = document.getElementById('rebuildOrderIdsModal');
+            if (old) old.remove();
+
+            document.body.insertAdjacentHTML('beforeend', `
+            <div id="rebuildOrderIdsModal" class="modal-overlay">
+                <div class="modal-content" style="max-width:780px;max-height:88vh;display:flex;flex-direction:column;">
+                    <h3>🔢 ${lang==='id'?'Rebuild ID Pesanan':'重建订单号'}</h3>
+                    <div style="text-align:center;padding:40px;color:var(--text-muted);">⏳ ${lang==='id'?'Menganalisa...':'正在预览变更，请稍候...'}</div>
+                    <div class="modal-actions"><button onclick="APP.closeRebuildOrderIdsModal()" class="btn btn--outline">✖ ${lang==='id'?'Tutup':'关闭'}</button></div>
+                </div>
+            </div>`);
+
+            try {
+                // 先 dry-run 预览
+                const result = await SUPABASE.adminRebuildAllOrderIds(true);
+                const { mapping, total, changed } = result;
+
+                const thS = 'style="padding:7px 10px;font-size:12px;font-weight:600;background:var(--bg-hover);white-space:nowrap;"';
+                const tdS = 'style="padding:7px 10px;font-size:12px;"';
+
+                let rows = mapping.length ? mapping.map(m => `
+                    <tr style="border-bottom:1px solid var(--border-light);">
+                        <td ${tdS}>${Utils.escapeHtml(m.customerName)}</td>
+                        <td ${tdS} style="padding:7px 10px;font-size:12px;color:var(--danger);text-decoration:line-through;">${Utils.escapeHtml(m.oldId)}</td>
+                        <td ${tdS}>→</td>
+                        <td ${tdS} style="padding:7px 10px;font-size:12px;color:var(--success);font-weight:600;">${Utils.escapeHtml(m.newId)}</td>
+                        <td ${tdS} style="padding:7px 10px;font-size:12px;color:var(--text-muted);">${m.status==='active'?'🟢 活跃':m.status==='completed'?'✅ 已完成':'⚫ '+m.status}</td>
+                    </tr>`).join('') :
+                    `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--success);">✅ 所有订单号已符合新规则，无需变更</td></tr>`;
+
+                const modal = document.getElementById('rebuildOrderIdsModal');
+                if (!modal) return;
+                modal.querySelector('.modal-content').innerHTML = `
+                    <h3>🔢 ${lang==='id'?'Rebuild ID Pesanan':'重建订单号 — 预览变更'}</h3>
+
+                    <div style="display:flex;gap:12px;margin:10px 0;flex-wrap:wrap;">
+                        <div style="background:var(--bg-hover);border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">订单总数</div>
+                            <div style="font-size:20px;font-weight:600;">${total}</div>
+                        </div>
+                        <div style="background:${changed>0?'var(--warning-soft,#fffbeb)':'var(--success-soft,#f0fdf4)'};border:1px solid ${changed>0?'var(--warning,#f59e0b)':'var(--success)'};border-radius:8px;padding:10px 18px;text-align:center;">
+                            <div style="font-size:11px;color:var(--text-muted);">需要变更</div>
+                            <div style="font-size:20px;font-weight:600;color:${changed>0?'var(--warning-dark,#b45309)':'var(--success)'};">${changed}</div>
+                        </div>
+                        <div style="flex:1;background:var(--danger-soft,#fef2f2);border:1px solid var(--danger);border-radius:8px;padding:10px 18px;display:flex;align-items:center;">
+                            <p style="font-size:12px;color:var(--danger);margin:0;">
+                                ⚠️ <strong>此操作不可撤销。</strong>执行后订单号将永久变更，同步更新现金流水的 reference_id 和催款日志。请在数据库备份后再执行。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+                        新规则：<strong>{客户ID}-{序号}</strong>（同一客户按开单日期升序，从 01 开始），无客户ID的订单保持不变。
+                    </div>
+
+                    <div style="flex:1;overflow-y:auto;max-height:380px;border:1px solid var(--border-light);border-radius:8px;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead><tr>
+                                <th ${thS}>客户名</th>
+                                <th ${thS}>旧订单号</th>
+                                <th ${thS}></th>
+                                <th ${thS}>新订单号</th>
+                                <th ${thS}>状态</th>
+                            </tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+
+                    <div class="modal-actions" style="margin-top:14px;gap:10px;display:flex;flex-wrap:wrap;">
+                        ${changed > 0 ? `<button onclick="APP.executeRebuildOrderIds()" class="btn btn--danger" id="rebuildExecBtn">⚡ 确认执行（更新 ${changed} 条）</button>` : ''}
+                        <button onclick="APP.closeRebuildOrderIdsModal()" class="btn btn--outline">✖ 关闭</button>
+                    </div>`;
+
+                window._rebuildOrderIdMapping = mapping;
+
+            } catch (err) {
+                console.error('rebuildOrderIds error:', err);
+                Utils.toast.error((lang==='id'?'Gagal: ':'预览失败：') + err.message);
+                const m = document.getElementById('rebuildOrderIdsModal');
+                if (m) m.remove();
+            }
+        },
+
+        closeRebuildOrderIdsModal() {
+            const m = document.getElementById('rebuildOrderIdsModal');
+            if (m) m.remove();
+            window._rebuildOrderIdMapping = null;
+        },
+
+        async executeRebuildOrderIds() {
+            const lang = Utils.lang;
+            const mapping = window._rebuildOrderIdMapping || [];
+            if (!mapping.length) return;
+            const ok = await Utils.toast.confirm(
+                `⚠️ 确认执行订单号重建？\n\n将变更 ${mapping.length} 条订单号，同步更新现金流水和催款日志。\n\n此操作不可撤销，建议先备份数据库。\n\n确认继续？`
+            );
+            if (!ok) return;
+            const btn = document.getElementById('rebuildExecBtn');
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ 执行中...'; }
+            try {
+                const result = await SUPABASE.adminRebuildAllOrderIds(false);
+                Utils.toast.success(`✅ 重建完成！共更新 ${result.changed} 条订单号。`);
+                FundsPage.closeRebuildOrderIdsModal();
+                if (window.JF && JF.Cache) JF.Cache.clear();
+            } catch (err) {
+                console.error('executeRebuildOrderIds error:', err);
+                Utils.toast.error((lang==='id'?'Gagal: ':'执行失败：') + err.message);
+                if (btn) { btn.disabled = false; btn.textContent = `⚡ 确认执行`; }
+            }
+        },
+
         async showCapitalModal() {
             const lang = Utils.lang;
             const profile = await SUPABASE.getCurrentProfile();
@@ -1375,6 +1492,9 @@
         window.APP.closeGapDetectiveModal = FundsPage.closeGapDetectiveModal.bind(FundsPage);
         window.APP.voidOrphanDisbursement = FundsPage.voidOrphanDisbursement.bind(FundsPage);
         window.APP.voidAllOrphanDisbursements = FundsPage.voidAllOrphanDisbursements.bind(FundsPage);
+        window.APP.showRebuildOrderIdsModal = FundsPage.showRebuildOrderIdsModal.bind(FundsPage);
+        window.APP.closeRebuildOrderIdsModal = FundsPage.closeRebuildOrderIdsModal.bind(FundsPage);
+        window.APP.executeRebuildOrderIds = FundsPage.executeRebuildOrderIds.bind(FundsPage);
     }
 
 })();

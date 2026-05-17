@@ -332,22 +332,45 @@
             } catch(e){ return 'AD'; }
         },
 
-        async _generateOrderId(role, storeId, maxRetries=10) {
+        async _generateOrderId(role, storeId, maxRetries=10, customerId=null) {
             if(!supabaseClient) throw new Error('客户端未初始化');
+
+            // ——新格式：{customer_id}-{nn}（如 BL001-01, BL001-02）——
+            if (customerId) {
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        const { data: existing } = await supabaseClient
+                            .from('orders').select('order_id').like('order_id', customerId + '-%');
+                        let maxNum = 0;
+                        const escaped = customerId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,'\\$&');
+                        const numRegex = new RegExp('^' + escaped + '-(\\d+)$');
+                        for (const row of (existing || [])) {
+                            const m = row.order_id.match(numRegex);
+                            if (m) { const n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+                        }
+                        const oid = customerId + '-' + String(maxNum + 1).padStart(2, '0');
+                        const { data: dup } = await supabaseClient.from('orders').select('id').eq('order_id', oid).maybeSingle();
+                        if (!dup) return oid;
+                        await new Promise(r => setTimeout(r, 50 * attempt));
+                    } catch (err) {
+                        if (attempt === maxRetries) throw err;
+                        await new Promise(r => setTimeout(r, 50 * attempt));
+                    }
+                }
+                throw new Error(Utils.lang==='id' ? 'Gagal menghasilkan ID pesanan unik' : '订单号生成失败，请重试');
+            }
+
+            // 兼容旧逻辑（无 customerId 时退回前缀+序号）
             const prefix = role==='admin' ? 'AD' : await this._getStorePrefix(storeId);
             for(let attempt=1; attempt<=maxRetries; attempt++){
                 try {
-                    // 取该前缀下所有订单号，找最大序号（兼容任意位数的历史异常格式）
                     const { data: existing } = await supabaseClient
                         .from('orders').select('order_id').like('order_id', prefix+'%');
                     let maxNum = 0;
                     const numRegex = new RegExp('^' + prefix + '(\\d+)$');
                     for(const row of (existing || [])){
                         const m = row.order_id.match(numRegex);
-                        if(m){
-                            const n = parseInt(m[1], 10);
-                            if(n <= 999 && n > maxNum) maxNum = n;
-                        }
+                        if(m){ const n = parseInt(m[1], 10); if(n <= 999 && n > maxNum) maxNum = n; }
                     }
                     const oid = prefix + String(maxNum+1).padStart(3,'0');
                     const { data: dup } = await supabaseClient.from('orders').select('id').eq('order_id', oid).maybeSingle();
@@ -1059,7 +1082,7 @@
             let retryCount=0, lastError=null, newOrder=null;
             while(retryCount<5){
                 try {
-                    const orderId = await this._generateOrderId(profile.role, targetStoreId, 5);
+                    const orderId = await this._generateOrderId(profile.role, targetStoreId, 5, orderData.customer_id || null);
                     let monthlyFixedPayment = null;
                     if(repaymentType==='fixed' && repaymentTerm && repaymentTerm>0){
                         monthlyFixedPayment = orderData.monthly_fixed_payment ||
@@ -2362,6 +2385,74 @@
         }
 
         return { interestMonths, interestTotal, principalPaid, principalRemaining, newStatus };
+    };
+
+    // ==================== 管理员：全量重建订单号 ====================
+    // 按新规则 {customer_id}-{nn}（同一客户按 created_at 升序，从 01 开始）
+    // 同步更新：orders.order_id、cash_flow_records.reference_id、reminder_logs.order_id
+    SupabaseAPI.adminRebuildAllOrderIds = async function(dryRun = true) {
+        if (!supabaseClient) throw new Error('客户端未初始化');
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') throw new Error('需管理员权限');
+
+        // 1. 拉取全部订单（含已完成），按 created_at 升序
+        const { data: allOrders, error: ordErr } = await supabaseClient
+            .from('orders')
+            .select('id, order_id, customer_id, customer_name, created_at, status')
+            .order('created_at', { ascending: true });
+        if (ordErr) throw ordErr;
+
+        // 2. 按 customer_id 分组，依次分配序号
+        const groups = {};
+        for (const o of (allOrders || [])) {
+            const cid = o.customer_id || ('__NO_CID__' + o.id); // 无客户ID的单独处理
+            if (!groups[cid]) groups[cid] = [];
+            groups[cid].push(o);
+        }
+
+        // 3. 生成新旧订单号映射
+        const mapping = []; // { oldId, newId, orderUUID, customerName }
+        for (const [cid, orders] of Object.entries(groups)) {
+            const hasRealCid = !cid.startsWith('__NO_CID__');
+            orders.forEach((o, idx) => {
+                let newId;
+                if (hasRealCid) {
+                    newId = cid + '-' + String(idx + 1).padStart(2, '0');
+                } else {
+                    // 无客户ID：保留原单号（不变）
+                    newId = o.order_id;
+                }
+                if (newId !== o.order_id) {
+                    mapping.push({ oldId: o.order_id, newId, orderUUID: o.id, customerName: o.customer_name || '-', status: o.status });
+                }
+            });
+        }
+
+        if (dryRun) return { mapping, total: allOrders.length, changed: mapping.length };
+
+        // 4. 检查新 ID 是否有冲突（两笔订单被分配了同一个新 ID）
+        const newIds = mapping.map(m => m.newId);
+        const uniqueNewIds = new Set(newIds);
+        if (uniqueNewIds.size !== newIds.length) throw new Error('新订单号存在冲突，请联系开发者');
+
+        // 5. 逐笔更新（先 orders，再同步关联表）
+        let done = 0;
+        for (const { oldId, newId, orderUUID } of mapping) {
+            // 5a. orders 表
+            const { error: e1 } = await supabaseClient.from('orders').update({ order_id: newId, updated_at: nowStr() }).eq('id', orderUUID);
+            if (e1) throw new Error(`更新订单 ${oldId} 失败：${e1.message}`);
+
+            // 5b. cash_flow_records.reference_id（字符串 order_id）
+            await supabaseClient.from('cash_flow_records').update({ reference_id: newId }).eq('reference_id', oldId);
+
+            // 5c. reminder_logs.order_id（字符串 order_id）
+            await supabaseClient.from('reminder_logs').update({ order_id: newId }).eq('order_id', oldId);
+
+            done++;
+        }
+
+        if (window.JF && JF.Cache) JF.Cache.clear();
+        return { mapping, total: allOrders.length, changed: done };
     };
 
     JF.Supabase = SupabaseAPI;
