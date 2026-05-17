@@ -2272,6 +2272,7 @@
                 amount: rec.amount,
                 payment_method: rec.payment_method || 'cash',
                 description: rec.description || null,
+                recorded_by: profile.id,
                 created_at: nowStr(),
             };
             if (rec.type === 'interest' && rec.months) newRec.months = rec.months;
