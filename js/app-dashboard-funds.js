@@ -85,7 +85,7 @@
 
                 let rows = '';
                 if (cashFlowTransactions.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<tr>`;
+                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
                 } else {
                     for (const t of cashFlowTransactions) {
                         const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
@@ -97,7 +97,7 @@
                             <td class="amount">${Utils.formatCurrency(t.amount)}</td>
                             <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
                             ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                        </table>`;
+                        </tr>`;
                     }
                 }
 
@@ -140,14 +140,17 @@
                                         <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                         <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                         ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                    </table>
+                                    </tr>
                                 </thead>
                                 <tbody id="cashFlowPageBody">${rows}</tbody>
                             </table>
                         </div>
+                        <div id="cashFlowPaginator"></div>
                     </div>`;
 
                 window._cashFlowPageData = cashFlowTransactions;
+                // 分页初始化在 DOM 渲染完成后执行
+                setTimeout(() => FundsPage._renderCashFlowPageTable(cashFlowTransactions), 0);
                 return content;
             } catch (error) {
                 console.error("buildCashFlowPageHTML error:", error);
@@ -187,16 +190,37 @@
         },
 
         _renderCashFlowPageTable(transactions) {
-            const tbody = document.getElementById('cashFlowPageBody');
-            if (!tbody) return;
             const lang = Utils.lang;
             const isAdmin = PERMISSION.isAdmin();
+            const colCount = isAdmin ? 7 : 6;
             const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
-            let rows = '';
-            if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+
+            if (window.JF && JF.Pagination) {
+                JF.Pagination.render('cashFlowPageBody', transactions, 1, 15, function(t) {
+                    const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
+                    return `<tr>
+                        <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
+                        <td class="col-type">${typeDisplay}</td>
+                        <td class="text-center">${directionMap[t.direction] || t.direction}</td>
+                        <td class="text-center">${sourceMap[t.source_target] || t.source_target}</td>
+                        <td class="amount">${Utils.formatCurrency(t.amount)}</td>
+                        <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
+                        ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
+                    </tr>`;
+                }, {
+                    paginatorId: 'cashFlowPaginator',
+                    emptyHtml: `<tr><td colspan="${colCount}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`
+                });
             } else {
+                // 降级：直接渲染全部
+                const tbody = document.getElementById('cashFlowPageBody');
+                if (!tbody) return;
+                if (transactions.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
+                    return;
+                }
+                let rows = '';
                 for (const t of transactions) {
                     const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
                     rows += `<tr>
@@ -209,8 +233,8 @@
                         ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
                     </tr>`;
                 }
+                tbody.innerHTML = rows;
             }
-            tbody.innerHTML = rows;
         },
 
         // ==================== 作废流水模态框（管理员） ====================

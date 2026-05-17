@@ -408,6 +408,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="reinvestHistoryPaginator"></div>
                     </div>
                 `;
                 
@@ -831,10 +832,9 @@
                 return;
             }
             
-            let rows = '';
-            for (const acc of accumulations) {
-                rows += `
-                    <tr>
+            if (window.JF && JF.Pagination) {
+                JF.Pagination.render('reinvestHistoryBody', accumulations, 1, 15, function(acc) {
+                    return `<tr>
                         <td class="date-cell">${Utils.formatDate(acc.accumulation_date)}</td>
                         <td>${Utils.escapeHtml(acc.stores?.name || '-')}</td>
                         <td class="amount">${Utils.formatCurrency(acc.total_amount || 0)}</td>
@@ -842,10 +842,26 @@
                         <td class="amount">${Utils.formatCurrency(acc.service_fee_amount || 0)}</td>
                         <td class="amount">${Utils.formatCurrency(acc.interest_amount || 0)}</td>
                         <td class="desc-cell">${Utils.escapeHtml(acc.description || '-')}</td>
-                    </tr>
-                `;
+                    </tr>`;
+                }, {
+                    paginatorId: 'reinvestHistoryPaginator',
+                    emptyHtml: `<tr><td colspan="7" class="text-center">${lang === 'id' ? 'Belum ada riwayat' : '暂无记录'}</td></tr>`
+                });
+            } else {
+                let rows = '';
+                for (const acc of accumulations) {
+                    rows += `<tr>
+                        <td class="date-cell">${Utils.formatDate(acc.accumulation_date)}</td>
+                        <td>${Utils.escapeHtml(acc.stores?.name || '-')}</td>
+                        <td class="amount">${Utils.formatCurrency(acc.total_amount || 0)}</td>
+                        <td class="amount">${Utils.formatCurrency(acc.admin_fee_amount || 0)}</td>
+                        <td class="amount">${Utils.formatCurrency(acc.service_fee_amount || 0)}</td>
+                        <td class="amount">${Utils.formatCurrency(acc.interest_amount || 0)}</td>
+                        <td class="desc-cell">${Utils.escapeHtml(acc.description || '-')}</td>
+                    </tr>`;
+                }
+                tbody.innerHTML = rows;
             }
-            tbody.innerHTML = rows;
         }
     };
 
