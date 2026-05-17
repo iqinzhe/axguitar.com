@@ -1,4 +1,5 @@
 // app-dashboard-funds.js - v2.0 (JF 命名空间) 
+// 已删除：重建订单号按钮及相关函数
 
 'use strict';
 
@@ -85,11 +86,10 @@
 
                 let rows = '';
                 if (cashFlowTransactions.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
+                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}<tr>`;
                 } else {
                     for (const t of cashFlowTransactions) {
                         const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
-                        // 注意：移除了每行的作废按钮
                         rows += `<tr>
                             <td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td>
                             <td class="col-type">${typeDisplay}</td>
@@ -98,7 +98,7 @@
                             <td class="amount">${Utils.formatCurrency(t.amount)}</td>
                             <td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>
                             ${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}
-                        </tr>`;
+                        </table>`;
                     }
                 }
 
@@ -117,8 +117,6 @@
                     `;
                 }
 
-                // 管理员视图：7列（日期、类型、方向、来源、金额、描述、门店）
-                // 非管理员视图：6列（无门店列）
                 const content = `
                     <div class="page-header"><h2>💰 ${lang === 'id' ? 'Riwayat Arus Kas' : '资金流水记录'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button><button onclick="APP.printCurrentPage()" class="btn btn--outline">🖨️ ${Utils.t('print')}</button></div></div>
                     ${staffRestrictionHtml}
@@ -143,7 +141,7 @@
                                         <th class="col-amount amount">${lang === 'id' ? 'Jumlah' : '金额'}</th>
                                         <th class="col-desc">${lang === 'id' ? 'Deskripsi' : '描述'}</th>
                                         ${isAdmin ? `<th class="col-store text-center">${lang === 'id' ? 'Toko' : '门店'}</th>` : ''}
-                                    </tr>
+                                    </table>
                                 </thead>
                                 <tbody id="cashFlowPageBody">${rows}</tbody>
                             </table>
@@ -198,7 +196,7 @@
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></table>`;
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
             } else {
                 for (const t of transactions) {
                     const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
@@ -226,7 +224,6 @@
                 return;
             }
 
-            // 获取当前显示的流水数据（已筛选后的）
             const transactions = window._cashFlowPageData || [];
             
             if (transactions.length === 0) {
@@ -234,7 +231,6 @@
                 return;
             }
 
-            // 构建流水列表 HTML
             let listHtml = '';
             for (let i = 0; i < transactions.length; i++) {
                 const t = transactions[i];
@@ -349,11 +345,9 @@
             if (oldModal) oldModal.remove();
             document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-            // 保存流水数据供搜索使用
             window._voidFlowListData = transactions;
             window._selectedVoidFlowId = null;
 
-            // 监听单选按钮变化
             const radios = document.querySelectorAll('#voidFlowList input[name="voidFlowSelect"]');
             const confirmBtn = document.getElementById('confirmVoidBtn');
             
@@ -365,7 +359,6 @@
                         confirmBtn.disabled = false;
                         confirmBtn.textContent = `🚫 ${lang === 'id' ? 'Batalkan' : '作废'} ${selectedRadio.closest('.void-item')?.querySelector('.void-item-type')?.textContent || ''}`;
                     }
-                    // 高亮选中行
                     document.querySelectorAll('#voidFlowList .void-item').forEach(item => {
                         item.classList.remove('selected');
                     });
@@ -385,7 +378,6 @@
                 radio.addEventListener('change', updateSelection);
             });
 
-            // 点击整行也可选中
             document.querySelectorAll('#voidFlowList .void-item').forEach(item => {
                 item.addEventListener('click', (e) => {
                     const radio = item.querySelector('input[type="radio"]');
@@ -396,7 +388,6 @@
                 });
             });
 
-            // 确认作废按钮
             if (confirmBtn) {
                 confirmBtn.onclick = async () => {
                     const selectedId = window._selectedVoidFlowId;
@@ -405,7 +396,6 @@
                         return;
                     }
                     
-                    // 找到选中的流水信息
                     const selectedFlow = transactions.find(t => t.id === selectedId);
                     if (!selectedFlow) return;
                     
@@ -481,7 +471,6 @@
             
             listContainer.innerHTML = listHtml;
             
-            // 重新绑定事件
             document.querySelectorAll('#voidFlowList input[name="voidFlowSelect"]').forEach(radio => {
                 radio.addEventListener('change', () => {
                     const selectedRadio = document.querySelector('#voidFlowList input[name="voidFlowSelect"]:checked');
@@ -525,7 +514,6 @@
         },
 
         selectVoidFlowItem(element, event) {
-            // 兼容旧调用
             if (event && event.target.closest('.void-item-radio')) return;
             const radio = element.querySelector('input[type="radio"]');
             if (radio) {
@@ -543,7 +531,6 @@
                 return;
             }
 
-            // 先弹提示，说明在做什么
             const intro = lang === 'id'
                 ? '🔍 Diagnosa Arus Kas\n\nSistem akan menganalisis cash_flow_records dan membandingkan dengan payment_history + orders yang ada sekarang.\n\nTemuan akan ditampilkan sehingga Anda dapat memilih tindakan.\n\nLanjutkan diagnosa?'
                 : '🔍 现金流水诊断\n\n系统将扫描 cash_flow_records，与当前 payment_history 和 orders 数据进行比对，找出：\n① 孤立流水（对应订单已删除）\n② 重复流水（同订单同类型同金额多条）\n③ 金额偏差流水（与 payment_history 不一致）\n\n诊断结果会列出，由您选择是否批量清理。\n\n确认开始诊断？';
@@ -561,7 +548,6 @@
                     return;
                 }
 
-                // 构建诊断报告弹窗
                 let orphanRows = '';
                 for (const r of orphaned) {
                     orphanRows += `<tr style="background:var(--danger-soft,#fef2f2);">
@@ -702,7 +688,6 @@
         },
 
         // ==================== 差额侦探（管理员）====================
-        // 从数据库实时查询，逐项列出保险柜支出与在押资金的差额组成
         async showGapDetectiveModal() {
             const lang = Utils.lang;
             if (!PERMISSION.isAdmin()) { Utils.toast.warning(lang === 'id' ? 'Hanya admin' : '仅管理员可操作'); return; }
@@ -722,7 +707,6 @@
             try {
                 const client = SUPABASE.getClient();
 
-                // 并行拉取所有需要的数据
                 const [
                     { data: cashOutflows },
                     { data: cashInflows },
@@ -743,27 +727,16 @@
                 const deployedCapital = (activeOrders||[]).reduce((s,o)=>s+(o.loan_amount||0),0);
                 const gap = totalCashOut - deployedCapital;
 
-                // ============================================================
-                // 新功能①：孤立发放流水 — loan_disbursement 流水里 order_id
-                //          指向的 orders 行已不存在（订单被删除后的遗留）
-                // ============================================================
                 const activeOrderUUIDs  = new Set((activeOrders||[]).map(o=>o.id));
                 const completedOrderUUIDs = new Set();
-                // 拉取全部 orders UUID（含已完成），用于判断是否真的孤立
                 const { data: allOrderUUIDs } = await client.from('orders').select('id');
                 const allExistingUUIDs = new Set((allOrderUUIDs||[]).map(o=>o.id));
 
                 const orphanDisb = (allDisbursements||[]).filter(r => r.order_id && !allExistingUUIDs.has(r.order_id));
 
-                // ============================================================
-                // 新功能②：缺失发放流水的 active 订单
-                //          active 订单在 cash_flow_records 里没有任何
-                //          loan_disbursement 记录（已作废的不算）
-                // ============================================================
                 const disbOrderUUIDs = new Set((allDisbursements||[]).map(r=>r.order_id).filter(Boolean));
                 const missingDisbOrders = (activeOrders||[]).filter(o => !disbOrderUUIDs.has(o.id));
 
-                // 支出分组
                 const outflowGroups = {};
                 for (const r of (cashOutflows||[])) {
                     const k = r.flow_type||'unknown';
@@ -796,12 +769,9 @@
                 const principalInflowGroup = inflowGroups['principal']||{total:0,count:0};
                 const theoreticalGap = loanDisbGroup.total - deployedCapital - principalInflowGroup.total;
 
-                // 孤立发放流水的总金额（这部分是"假支出"——订单删了但流水还在）
                 const orphanTotal = orphanDisb.reduce((s,r)=>s+(r.amount||0),0);
-                // 缺失流水的订单贷款总额（这部分是"真支出但未登记"）
                 const missingTotal = missingDisbOrders.reduce((s,o)=>s+(o.loan_amount||0),0);
 
-                // 孤立流水行
                 let orphanRows = orphanDisb.length ? orphanDisb.map(r=>`
                     <tr style="border-bottom:1px solid var(--border-light);">
                         <td ${tdS}>${Utils.formatDate(r.flow_date)}</td>
@@ -814,7 +784,6 @@
                     </tr>`).join('') :
                     `<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--success);font-size:13px;">✅ 无孤立流水</td></tr>`;
 
-                // 缺失流水订单行
                 let missingRows = missingDisbOrders.length ? missingDisbOrders.map(o=>`
                     <tr style="border-bottom:1px solid var(--border-light);">
                         <td ${tdS}>${Utils.escapeHtml(o.order_id)}</td>
@@ -823,9 +792,8 @@
                         <td ${tdS}>${Utils.formatDate(o.created_at)}</td>
                         <td style="padding:7px 10px;font-size:12px;color:var(--warning-dark,#b45309);">⚠️ 缺少发放流水</td>
                     </tr>`).join('') :
-                    `<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--success);font-size:13px;">✅ 所有在押订单均有发放流水</td></tr>`;
+                    `<td><td colspan="5" style="text-align:center;padding:14px;color:var(--success);font-size:13px;">✅ 所有在押订单均有发放流水</td></tr>`;
 
-                // 支出汇总行
                 let outRows = Object.entries(outflowGroups).sort((a,b)=>b[1].total-a[1].total).map(([k,g])=>`
                     <tr style="${k==='loan_disbursement'?'background:var(--warning-soft,#fffbeb);':''}border-bottom:1px solid var(--border-light);">
                         <td ${tdS}>${flowTypeLabel(k)}</td>
@@ -890,7 +858,6 @@
 
                     <div style="flex:1;overflow-y:auto;max-height:420px;">
 
-                        <!-- 孤立发放流水（订单已删除的遗留） -->
                         <div style="padding:8px 12px;background:var(--danger-soft,#fef2f2);font-size:12px;font-weight:600;color:var(--danger);border-radius:6px 6px 0 0;border:1px solid var(--border-light);">
                             🗑️ 孤立发放流水（订单已删除，流水仍在统计） — ${orphanDisb.length} 条 ${orphanTotal>0?'/ '+Utils.formatCurrency(orphanTotal):''}
                         </div>
@@ -901,7 +868,6 @@
                             <tbody>${orphanRows}</tbody>
                         </table>
 
-                        <!-- 缺失发放流水的在押订单 -->
                         <div style="padding:8px 12px;background:var(--warning-soft,#fffbeb);font-size:12px;font-weight:600;color:var(--warning-dark,#b45309);border-radius:6px 6px 0 0;border:1px solid var(--border-light);">
                             ⚠️ 在押订单缺少发放流水（贷款已发但未登记支出） — ${missingDisbOrders.length} 笔 ${missingTotal>0?'/ '+Utils.formatCurrency(missingTotal):''}
                         </div>
@@ -912,23 +878,21 @@
                             <tbody>${missingRows}</tbody>
                         </table>
 
-                        <!-- 支出汇总 -->
                         <div style="padding:8px 12px;background:var(--danger-soft,#fef2f2);font-size:12px;font-weight:600;color:var(--danger);border-radius:6px 6px 0 0;border:1px solid var(--border-light);">
                             💸 现金支出明细（按科目汇总）
                         </div>
                         <table style="width:100%;border-collapse:collapse;border:1px solid var(--border-light);border-top:none;margin-bottom:14px;">
                             <thead><tr style="background:var(--bg-hover);">
                                 <th ${thS}>科目</th><th ${thS} style="text-align:right;">笔数</th><th ${thS} style="text-align:right;">金额</th>
-                            </tr></thead>
+                            <tr></thead>
                             <tbody>${outRows}</tbody>
                             <tfoot><tr style="background:var(--bg-hover);">
                                 <td ${tdS}><strong>合计</strong></td>
                                 <td ${tdR}>${(cashOutflows||[]).length} 笔</td>
                                 <td ${tdR} style="padding:7px 10px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--danger);"><strong>${Utils.formatCurrency(totalCashOut)}</strong></td>
-                            </tr></tfoot>
+                            <tr></tfoot>
                         </table>
 
-                        <!-- 收入汇总 -->
                         <div style="padding:8px 12px;background:var(--success-soft,#f0fdf4);font-size:12px;font-weight:600;color:var(--success);border-radius:6px 6px 0 0;border:1px solid var(--border-light);">
                             💰 现金收入明细（按科目汇总）
                         </div>
@@ -950,7 +914,6 @@
                         <button onclick="APP.closeGapDetectiveModal()" class="btn btn--outline">✖ 关闭</button>
                     </div>`;
 
-                // 保存孤立流水 ID 供批量作废用
                 window._orphanDisbIds = orphanDisb.map(r=>r.id);
 
             } catch (err) {
@@ -997,121 +960,7 @@
             }
         },
 
-        // ==================== 重建订单号（管理员）====================
-        async showRebuildOrderIdsModal() {
-            const lang = Utils.lang;
-            if (!PERMISSION.isAdmin()) { Utils.toast.warning(lang==='id'?'Hanya admin':'仅管理员可操作'); return; }
-
-            const old = document.getElementById('rebuildOrderIdsModal');
-            if (old) old.remove();
-
-            document.body.insertAdjacentHTML('beforeend', `
-            <div id="rebuildOrderIdsModal" class="modal-overlay">
-                <div class="modal-content" style="max-width:780px;max-height:88vh;display:flex;flex-direction:column;">
-                    <h3>🔢 ${lang==='id'?'Rebuild ID Pesanan':'重建订单号'}</h3>
-                    <div style="text-align:center;padding:40px;color:var(--text-muted);">⏳ ${lang==='id'?'Menganalisa...':'正在预览变更，请稍候...'}</div>
-                    <div class="modal-actions"><button onclick="APP.closeRebuildOrderIdsModal()" class="btn btn--outline">✖ ${lang==='id'?'Tutup':'关闭'}</button></div>
-                </div>
-            </div>`);
-
-            try {
-                // 先 dry-run 预览
-                const result = await SUPABASE.adminRebuildAllOrderIds(true);
-                const { mapping, total, changed } = result;
-
-                const thS = 'style="padding:7px 10px;font-size:12px;font-weight:600;background:var(--bg-hover);white-space:nowrap;"';
-                const tdS = 'style="padding:7px 10px;font-size:12px;"';
-
-                let rows = mapping.length ? mapping.map(m => `
-                    <tr style="border-bottom:1px solid var(--border-light);">
-                        <td ${tdS}>${Utils.escapeHtml(m.customerName)}</td>
-                        <td ${tdS} style="padding:7px 10px;font-size:12px;color:var(--danger);text-decoration:line-through;">${Utils.escapeHtml(m.oldId)}</td>
-                        <td ${tdS}>→</td>
-                        <td ${tdS} style="padding:7px 10px;font-size:12px;color:var(--success);font-weight:600;">${Utils.escapeHtml(m.newId)}</td>
-                        <td ${tdS} style="padding:7px 10px;font-size:12px;color:var(--text-muted);">${m.status==='active'?'🟢 活跃':m.status==='completed'?'✅ 已完成':'⚫ '+m.status}</td>
-                    </tr>`).join('') :
-                    `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--success);">✅ 所有订单号已符合新规则，无需变更</td></tr>`;
-
-                const modal = document.getElementById('rebuildOrderIdsModal');
-                if (!modal) return;
-                modal.querySelector('.modal-content').innerHTML = `
-                    <h3>🔢 ${lang==='id'?'Rebuild ID Pesanan':'重建订单号 — 预览变更'}</h3>
-
-                    <div style="display:flex;gap:12px;margin:10px 0;flex-wrap:wrap;">
-                        <div style="background:var(--bg-hover);border-radius:8px;padding:10px 18px;text-align:center;">
-                            <div style="font-size:11px;color:var(--text-muted);">订单总数</div>
-                            <div style="font-size:20px;font-weight:600;">${total}</div>
-                        </div>
-                        <div style="background:${changed>0?'var(--warning-soft,#fffbeb)':'var(--success-soft,#f0fdf4)'};border:1px solid ${changed>0?'var(--warning,#f59e0b)':'var(--success)'};border-radius:8px;padding:10px 18px;text-align:center;">
-                            <div style="font-size:11px;color:var(--text-muted);">需要变更</div>
-                            <div style="font-size:20px;font-weight:600;color:${changed>0?'var(--warning-dark,#b45309)':'var(--success)'};">${changed}</div>
-                        </div>
-                        <div style="flex:1;background:var(--danger-soft,#fef2f2);border:1px solid var(--danger);border-radius:8px;padding:10px 18px;display:flex;align-items:center;">
-                            <p style="font-size:12px;color:var(--danger);margin:0;">
-                                ⚠️ <strong>此操作不可撤销。</strong>执行后订单号将永久变更，同步更新现金流水的 reference_id 和催款日志。请在数据库备份后再执行。
-                            </p>
-                        </div>
-                    </div>
-
-                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">
-                        新规则：<strong>{客户ID}-{序号}</strong>（同一客户按开单日期升序，从 01 开始），无客户ID的订单保持不变。
-                    </div>
-
-                    <div style="flex:1;overflow-y:auto;max-height:380px;border:1px solid var(--border-light);border-radius:8px;">
-                        <table style="width:100%;border-collapse:collapse;">
-                            <thead><tr>
-                                <th ${thS}>客户名</th>
-                                <th ${thS}>旧订单号</th>
-                                <th ${thS}></th>
-                                <th ${thS}>新订单号</th>
-                                <th ${thS}>状态</th>
-                            </tr></thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
-
-                    <div class="modal-actions" style="margin-top:14px;gap:10px;display:flex;flex-wrap:wrap;">
-                        ${changed > 0 ? `<button onclick="APP.executeRebuildOrderIds()" class="btn btn--danger" id="rebuildExecBtn">⚡ 确认执行（更新 ${changed} 条）</button>` : ''}
-                        <button onclick="APP.closeRebuildOrderIdsModal()" class="btn btn--outline">✖ 关闭</button>
-                    </div>`;
-
-                window._rebuildOrderIdMapping = mapping;
-
-            } catch (err) {
-                console.error('rebuildOrderIds error:', err);
-                Utils.toast.error((lang==='id'?'Gagal: ':'预览失败：') + err.message);
-                const m = document.getElementById('rebuildOrderIdsModal');
-                if (m) m.remove();
-            }
-        },
-
-        closeRebuildOrderIdsModal() {
-            const m = document.getElementById('rebuildOrderIdsModal');
-            if (m) m.remove();
-            window._rebuildOrderIdMapping = null;
-        },
-
-        async executeRebuildOrderIds() {
-            const lang = Utils.lang;
-            const mapping = window._rebuildOrderIdMapping || [];
-            if (!mapping.length) return;
-            const ok = await Utils.toast.confirm(
-                `⚠️ 确认执行订单号重建？\n\n将变更 ${mapping.length} 条订单号，同步更新现金流水和催款日志。\n\n此操作不可撤销，建议先备份数据库。\n\n确认继续？`
-            );
-            if (!ok) return;
-            const btn = document.getElementById('rebuildExecBtn');
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ 执行中...'; }
-            try {
-                const result = await SUPABASE.adminRebuildAllOrderIds(false);
-                Utils.toast.success(`✅ 重建完成！共更新 ${result.changed} 条订单号。`);
-                FundsPage.closeRebuildOrderIdsModal();
-                if (window.JF && JF.Cache) JF.Cache.clear();
-            } catch (err) {
-                console.error('executeRebuildOrderIds error:', err);
-                Utils.toast.error((lang==='id'?'Gagal: ':'执行失败：') + err.message);
-                if (btn) { btn.disabled = false; btn.textContent = `⚡ 确认执行`; }
-            }
-        },
+        // 注意：showRebuildOrderIdsModal、closeRebuildOrderIdsModal、executeRebuildOrderIds 已被删除
 
         async showCapitalModal() {
             const lang = Utils.lang;
@@ -1273,7 +1122,7 @@
             } else {
                 for (const t of transactions) {
                     const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td class="col-type">${typeDisplay}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td class="col-type">${typeDisplay}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}<td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                 }
             }
             tbody.innerHTML = rows;
@@ -1430,7 +1279,7 @@
             const typeMap = { cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行', bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取出现金', store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部' };
             let rows = '';
             if (transfers.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
+                rows = `<td><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
             } else {
                 for (const t of transfers) {
                     rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td class="text-center">${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td class="text-center">${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
@@ -1476,14 +1325,12 @@
         window.APP.filterInternalTransferHistory = FundsPage.filterInternalTransferHistory.bind(FundsPage);
         window.APP.resetInternalTransferFilters = FundsPage.resetInternalTransferFilters.bind(FundsPage);
         window.APP.exportInternalTransferToCSV = FundsPage.exportInternalTransferToCSV.bind(FundsPage);
-        // 新增作废相关方法
+        // 作废相关方法
         window.APP.showDiagnoseCashFlowModal = FundsPage.showDiagnoseCashFlowModal.bind(FundsPage);
         window.APP.closeDiagnoseCashFlowModal = FundsPage.closeDiagnoseCashFlowModal.bind(FundsPage);
         window.APP.filterVoidFlowList = FundsPage.filterVoidFlowList.bind(FundsPage);
         window.APP.clearVoidFlowSearch = FundsPage.clearVoidFlowSearch.bind(FundsPage);
         window.APP.selectVoidFlowItem = FundsPage.selectVoidFlowItem.bind(FundsPage);
-        window.APP.showDiagnoseCashFlowModal = FundsPage.showDiagnoseCashFlowModal.bind(FundsPage);
-        window.APP.closeDiagnoseCashFlowModal = FundsPage.closeDiagnoseCashFlowModal.bind(FundsPage);
         window.APP.cleanOrphanedCashFlows = FundsPage.cleanOrphanedCashFlows.bind(FundsPage);
         window.APP.cleanDuplicateCashFlows = FundsPage.cleanDuplicateCashFlows.bind(FundsPage);
         window.APP.cleanAllDirtyCashFlows = FundsPage.cleanAllDirtyCashFlows.bind(FundsPage);
@@ -1491,9 +1338,7 @@
         window.APP.closeGapDetectiveModal = FundsPage.closeGapDetectiveModal.bind(FundsPage);
         window.APP.voidOrphanDisbursement = FundsPage.voidOrphanDisbursement.bind(FundsPage);
         window.APP.voidAllOrphanDisbursements = FundsPage.voidAllOrphanDisbursements.bind(FundsPage);
-        window.APP.showRebuildOrderIdsModal = FundsPage.showRebuildOrderIdsModal.bind(FundsPage);
-        window.APP.closeRebuildOrderIdsModal = FundsPage.closeRebuildOrderIdsModal.bind(FundsPage);
-        window.APP.executeRebuildOrderIds = FundsPage.executeRebuildOrderIds.bind(FundsPage);
+        // 注意：showRebuildOrderIdsModal、closeRebuildOrderIdsModal、executeRebuildOrderIds 已删除
     }
 
 })();
