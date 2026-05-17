@@ -1,5 +1,5 @@
 // app-customers.js - v2.0 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
-// 订单ID格式：客户ID-序号（如 BL026001-01, BL026001-02...）
+// 订单ID格式：客户ID-序号（如 BL001-01, BL001-02...）
 
 'use strict';
 
@@ -885,7 +885,8 @@
                 }
                 const nextSeq = maxSeq + 1;
                 const orderIdSuffix = nextSeq.toString().padStart(2, '0');
-                const generatedOrderId = `${customer.customer_id}-${orderIdSuffix}`;
+                const bizId = customer.customer_id; 
+                const generatedOrderId = `${bizId}-${orderIdSuffix}`;
                 // ==================== 订单ID生成结束 ====================
                 
                 const orderData = { 
