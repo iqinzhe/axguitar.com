@@ -714,19 +714,19 @@
                 const topbarSubtitle = isAdmin ? (lang === 'id' ? 'Semua Toko · Data Real-time' : '全部门店 · 实时数据') : (lang === 'id' ? 'Data Toko · Real-time' : '门店数据 · 实时更新');
                 const activeBadgeCount = activeOrders;
 
-                let quickActions = [];
+                                let quickActions = [];
                 if (isAdmin) {
                     quickActions = [
                         { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
                         { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
+                        { icon: '💰', label: lang === 'id' ? 'Arus Kas' : '资金流水', action: "JF.DashboardCore.navigateTo('paymentHistory')", cls: '' },
                         { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
-                        { icon: '💸', label: lang === 'id' ? 'Distribusi Laba' : '收益处置', action: "JF.ProfitPage.showDistributionPage()", cls: '' },
                     ];
                 } else {
                     quickActions = [
                         { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
                         { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
-                        { icon: '💰', label: lang === 'id' ? 'Bayar Biaya' : '缴费收款', action: "JF.DashboardCore.navigateTo('orderTable');setTimeout(function(){if(window.APP && APP.filterOrders)APP.filterOrders('active');},300)", cls: '' },
+                        { icon: '💰', label: lang === 'id' ? 'Arus Kas' : '资金流水', action: "JF.DashboardCore.navigateTo('paymentHistory')", cls: '' },
                         { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
                     ];
                 }
