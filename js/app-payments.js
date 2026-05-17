@@ -221,9 +221,9 @@
                     // 取最后一笔利息记录的日期作为日期选择器的最早下限
                     lastInterestDate = interestPayments[interestPayments.length - 1]?.date?.substring(0, 10) || '';
                 }
-                // 日期选择器：最早不能早于订单创建日，也不能早于上次缴息日，最晚不能超过今天
+                // 日期选择器：最早不能早于订单创建日（取消上次缴息日限制，允许补录历史数据）
                 const orderCreatedDate = (order.created_at || '').substring(0, 10);
-                const interestDateMin = lastInterestDate > orderCreatedDate ? lastInterestDate : orderCreatedDate;
+                const interestDateMin = orderCreatedDate;
                 const interestDateToday = Utils.getLocalToday();
                 // 预付款：日期上限放开到今天起3个月后
                 const interestDateMax = (() => {
