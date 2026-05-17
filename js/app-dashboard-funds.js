@@ -1,5 +1,4 @@
 // app-dashboard-funds.js - v2.0 (JF 命名空间) 
-// 已删除：重建订单号按钮及相关函数
 
 'use strict';
 
