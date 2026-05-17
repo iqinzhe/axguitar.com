@@ -1082,7 +1082,10 @@
             let retryCount=0, lastError=null, newOrder=null;
             while(retryCount<5){
                 try {
-                    const orderId = await this._generateOrderId(profile.role, targetStoreId, 5, orderData.customer_id || null);
+                    // 优先使用调用方（如 app-customers.js）已生成的 order_id，
+                    // 避免此处用数据库 UUID 作为 customerId 重新生成错误的订单号。
+                    const orderId = orderData.order_id
+                        || await this._generateOrderId(profile.role, targetStoreId, 5, null);
                     let monthlyFixedPayment = null;
                     if(repaymentType==='fixed' && repaymentTerm && repaymentTerm>0){
                         monthlyFixedPayment = orderData.monthly_fixed_payment ||
