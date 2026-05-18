@@ -1722,7 +1722,7 @@
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement_flexible', paidAmount, paymentMethod);
             Utils.toast.success(Utils.lang === 'id' ? '✅ Pelunasan berhasil!' : '✅ 结清成功！');
             return true;
-        };
+        },
         
         // ==================== 逾期天数更新（已修复雅加达时区） ====================
         async updateOverdueDays() {
