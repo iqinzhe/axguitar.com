@@ -1,6 +1,7 @@
 // app-dashboard-orders.js - v2.0 (完整版，五状态筛选 + 权限控制 + 所有功能完整 + 管理员可编辑利息/本金)
 // 功能：订单列表支持 全部/进行中/已逾期/已结清/已变卖 筛选
 // 费用显示：管理费/服务费为0时显示"免费"
+// 修复：利息历史表格列对齐（5列），翻译键 times, amount_due 等正确使用
 
 'use strict';
 
@@ -47,7 +48,6 @@
             var lang = Utils.lang;
             var t = Utils.t.bind(Utils);
             var isAdmin = PERMISSION.isAdmin();
-            // [分页] 默认每页15条；currentFrom改为传页码
             var PAGE_SIZE = pageSize || 15;
             var page = (currentFrom && currentFrom > 0) ? currentFrom : 1;
             var from = (page - 1) * PAGE_SIZE;
@@ -111,7 +111,6 @@
                     '</tr>';
             }
 
-            // [分页] 保存状态供分页跳转使用
             window._orderTableState = {
                 currentFrom: from + allOrders.length,
                 totalCount: totalCount,
@@ -126,11 +125,9 @@
                 renderOrdersIntoTable: this._renderOrdersIntoTable.bind(this)
             };
 
-            // [分页] 构建分页控件 HTML
             var totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
             var paginatorHtml = JF.OrdersPage._buildOrderPaginatorHtml(page, totalPages, PAGE_SIZE, totalCount, filters, lang);
 
-            // 筛选下拉选项
             var filterOptions = [
                 { value: 'all', label: lang === 'id' ? 'Semua Pesanan' : '全部订单' },
                 { value: 'active', label: t('active') },
@@ -202,19 +199,15 @@
                 '</div>' +
                 '<div id="orderTablePaginator"></div>';
 
-            // [分页] 注入分页控件内容
-            (function(ph) {
-                setTimeout(function() {
-                    var el = document.getElementById('orderTablePaginator');
-                    if (el) el.innerHTML = ph;
-                    JF.OrdersPage._reattachOrderTableEvents();
-                }, 0);
-            })(paginatorHtml);
+            setTimeout(function() {
+                var el = document.getElementById('orderTablePaginator');
+                if (el) el.innerHTML = paginatorHtml;
+                JF.OrdersPage._reattachOrderTableEvents();
+            }, 0);
 
             return content;
         },
 
-        // [分页] 构建订单列表分页控件 HTML
         _buildOrderPaginatorHtml: function(page, totalPages, pageSize, total, filters, lang) {
             if (total === 0) return '';
             var from = (page - 1) * pageSize + 1;
@@ -228,7 +221,6 @@
             var nextLabel = lang === 'id' ? 'Next ›' : '下一页 ›';
             var filtersJson = JSON.stringify(filters).replace(/'/g, "\\'");
 
-            // 页码
             var pageButtons = '';
             var pages = [];
             if (totalPages <= 7) {
@@ -254,7 +246,6 @@
                 }
             }
 
-            // 每页条数
             var sizes = [15, 25, 50];
             var sizeOpts = sizes.map(function(s) {
                 return '<option value="' + s + '"' + (s === pageSize ? ' selected' : '') + '>' + s + '</option>';
@@ -273,7 +264,6 @@
                 '</div>';
         },
 
-        // [分页] 跳转到订单列表指定页
         goToOrderPage: async function(page) {
             var state = window._orderTableState;
             if (!state) return;
@@ -299,7 +289,6 @@
             }
         },
 
-        // [分页] 修改每页条数
         changeOrderPageSize: async function(newSize) {
             var state = window._orderTableState;
             if (!state) return;
@@ -365,7 +354,6 @@
             }
         },
 
-        // ==================== 事件委托：行点击选中 ====================
         _bindRowClickDelegate: function() {
             var tbody = document.getElementById('orderTableBody');
             if (!tbody) return;
@@ -464,7 +452,6 @@
             return (status === 'active');
         },
 
-        // ==================== 全局操作实现 ====================
         _globalViewOrder: async function() {
             var lang = Utils.lang;
             var orderId = this._getSelectedOrderId();
@@ -543,8 +530,6 @@
             if (deleteBtn) deleteBtn.onclick = this._globalDeleteOrder.bind(this);
         },
 
-        // ==================== 页面渲染入口 ====================
-        // [分页] 分页跳转后重新绑定订单行点击事件
         _reattachOrderTableEvents: function() {
             var self = JF.OrdersPage;
             self._bindRowClickDelegate();
@@ -779,12 +764,12 @@
                 var methodMap = { cash: t('cash'), bank: t('bank') };
                 var rows = '';
                 if (allPayments.length === 0) {
-                    rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td></tr>';
+                    rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td></td>';
                 } else {
                     for (var idx = 0; idx < allPayments.length; idx++) {
                         var p2 = allPayments[idx];
                         var methodClass = p2.payment_method === 'cash' ? 'cash' : 'bank';
-                        rows += '<tr>' +
+                        rows += '<td>' +
                             '<td class="order-id">' + Utils.escapeHtml(p2.orders ? p2.orders.order_id : '-') + '</td>' +
                             '<td>' + Utils.escapeHtml(p2.orders ? p2.orders.customer_name : '-') + '</td>' +
                             '<td class="date-cell">' + Utils.formatDate(p2.date) + '</td>' +
@@ -810,7 +795,7 @@
                     '<table class="data-table payment-table">' +
                     '<thead><tr><th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
                     '<tbody>' + rows + '</tbody>' +
-                    '<table>' +
+                    '</table>' +
                     '</div>' +
                     '</div>';
             } catch (error) {
@@ -860,7 +845,7 @@
                         '<td class="text-center">' + serviceFeeStatus + '</td>' +
                         '<td class="text-center">' + statusText + '</td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeMap[o.store_id] || '-') + '</td>' : '') +
-                        '</tr>';
+                        '</table>';
                 }
                 var headerHtml = '<tr>' +
                     '<th>' + t('order_id') + '</th>' +
@@ -924,24 +909,64 @@
             } else {
                 repaymentInfoHtml = '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? '最长延期10个月' : '最长延期10个月') + ')</p>';
             }
+            // 修复：利息历史表格 5 列，使用 t('times') 等翻译键
             var payRows = '';
             if (payments && payments.length > 0) {
                 for (var i = 0; i < payments.length; i++) {
                     var p = payments[i];
                     var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    payRows += '<td>' +
-                        '<td class="date-cell">' + Utils.formatDate(p.date) + '<tr>' +
-                        '<td>' + typeText + '</td>' +
-                        '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
-                        '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
-                        '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
-                        '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
-                        '</tr>';
+                    // 利息表格单独处理，保持 5 列；本金表格可沿用原 6 列（但此处统一简化）
+                    if (p.type === 'interest') {
+                        payRows += '<td>' +
+                            '<td class="text-center">' + (i + 1) + '</td>' +
+                            '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                            '<td class="text-center">' + (p.months || 1) + ' ' + t('month') + '</td>' +
+                            '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                            '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                            '</tr>';
+                    } else {
+                        payRows += '<tr>' +
+                            '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                            '<td>' + typeText + '</td>' +
+                            '<td class="text-center">' + (p.months ? p.months + ' ' + t('month') : '-') + '</td>' +
+                            '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                            '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                            '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
+                            '</tr>';
+                    }
                 }
             } else {
                 payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
             }
+            // 分离利息和本金表格展示，便于阅读
+            var interestRows = '', principalRows = '';
+            var interestCount = 0, principalCount = 0;
+            for (var j = 0; j < (payments || []).length; j++) {
+                var pj = payments[j];
+                if (pj.type === 'interest') {
+                    interestCount++;
+                    var methodClassInt = pj.payment_method === 'cash' ? 'cash' : 'bank';
+                    interestRows += '<tr>' +
+                        '<td class="text-center">' + interestCount + '</td>' +
+                        '<td class="date-cell">' + Utils.formatDate(pj.date) + '</td>' +
+                        '<td class="text-center">' + (pj.months || 1) + ' ' + t('month') + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(pj.amount) + '</td>' +
+                        '<td class="text-center"><span class="badge badge--' + methodClassInt + '">' + (methodMap[pj.payment_method] || '-') + '</span></td>' +
+                        '</tr>';
+                } else if (pj.type === 'principal') {
+                    principalCount++;
+                    var methodClassPr = pj.payment_method === 'cash' ? 'cash' : 'bank';
+                    principalRows += '<tr>' +
+                        '<td class="date-cell">' + Utils.formatDate(pj.date) + '</td>' +
+                        '<td class="amount">' + Utils.formatCurrency(pj.amount) + '</td>' +
+                        '<td class="text-center"><span class="badge badge--' + methodClassPr + '">' + (methodMap[pj.payment_method] || '-') + '</span></td>' +
+                        '<tr>';
+                }
+            }
+            if (interestRows === '') interestRows = '<td><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
+            if (principalRows === '') principalRows = '<tr><td colspan="3" class="text-center">' + t('no_data') + '</td></tr>';
+
             var content = '' +
                 '<div class="page-header">' +
                 '<h2>📄 ' + t('order_details') + '</h2>' +
@@ -979,8 +1004,16 @@
                 '</div>' +
                 '</div>' +
                 '<div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>' + (lang === 'id' ? '温馨提示：' : '温馨提示：') + '</strong> ' + (lang === 'id' ? '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。') + '</div></div>' +
-                '<h3>📋 ' + (lang === 'id' ? '缴费记录' : '缴费记录') + '</h3>' +
-                '<div class="table-container"><table class="data-table payment-table"><thead><tr><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead><tbody>' + payRows + '</tbody></table></div>' +
+                '<div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px;">' +
+                '<div style="flex: 1; min-width: 280px;">' +
+                '<h3>📋 ' + t('interest_history') + '</h3>' +
+                '<div class="table-container"><table class="data-table"><thead><tr><th class="text-center" style="width:50px;">' + t('times') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + t('month') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead><tbody>' + interestRows + '</tbody></table></div>' +
+                '</div>' +
+                '<div style="flex: 1; min-width: 280px;">' +
+                '<h3>🏦 ' + t('principal_history') + '</h3>' +
+                '<div class="table-container"><table class="data-table"><thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead><tbody>' + principalRows + '</tbody></table></div>' +
+                '</div>' +
+                '</div>' +
                 '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
                 '<button onclick="APP.navigateTo(\'orderTable\')" class="btn btn--outline">↩️ ' + t('back') + '</button>' +
                 (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeHtml(order.order_id) + '\'})" class="btn btn--success">💸 ' + (lang === 'id' ? '缴纳费用' : '缴纳费用') + '</button>' : '') +
@@ -1050,13 +1083,11 @@
 (function() {
     if (!window.JF) window.JF = {};
 
-    // 内存中的缴费记录副本，供编辑使用
-    var _editPayments = [];   // [{id, type, date, amount, payment_method, months, description, _deleted, _new}, ...]
-    var _nextTmpId = -1;      // 新增记录用负数临时ID
+    var _editPayments = [];
+    var _nextTmpId = -1;
 
     var AdminEditOrder = {
 
-        // ==================== 渲染缴费记录编辑区 ====================
         _renderPaymentEditor: function(lang) {
             var interest  = _editPayments.filter(function(p){ return p.type === 'interest'  && !p._deleted; });
             var principal = _editPayments.filter(function(p){ return p.type === 'principal' && !p._deleted; });
@@ -1112,7 +1143,7 @@
                 '<div style="overflow-x:auto;margin-bottom:10px;">' +
                 '<table style="width:100%;border-collapse:collapse;" id="principal_records_table">' +
                 tableHead + '<tbody id="principal_rows">' + pRows + '</tbody>' +
-                '</td></div>' +
+                '</table></div>' +
                 '<button onclick="JF.AdminEditOrder._addPaymentRow(\'principal\')" style="background:var(--success);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;">＋ ' + (lang === 'id' ? '新增本金记录' : '新增本金记录') + '</button>' +
                 '</div>';
         },
@@ -1133,16 +1164,8 @@
             _editPayments.push(newRec);
             var tbody = document.getElementById(type === 'interest' ? 'interest_rows' : 'principal_rows');
             if (!tbody) return;
-            // 移除"暂无记录"行
             var emptyRow = tbody.querySelector('td[colspan]');
             if (emptyRow) emptyRow.closest('tr').remove();
-            var tmp = document.createElement('tbody');
-            tmp.innerHTML = AdminEditOrder._renderPaymentEditor(lang).match(
-                new RegExp('<tbody id="' + (type === 'interest' ? 'interest' : 'principal') + '_rows">([\\s\\S]*?)</tbody>')
-            )?.[1] || '';
-            // 只追加最后一条（新增的）
-            var mid = 'pm_new' + Math.abs(newRec.id);
-            // 直接重新渲染整个编辑区更简单
             var sec = document.getElementById('payment_editor_section');
             if (sec) sec.outerHTML = AdminEditOrder._renderPaymentEditor(lang);
             AdminEditOrder._bindPaymentAmountInputs();
@@ -1156,7 +1179,6 @@
             });
         },
 
-        // ==================== 从 DOM 中收集当前缴费记录 ====================
         _collectPaymentEdits: function() {
             var toDelete = [], toUpdate = [], toAdd = [];
             _editPayments.forEach(function(p) {
@@ -1185,7 +1207,6 @@
             return { toDelete: toDelete, toUpdate: toUpdate, toAdd: toAdd };
         },
 
-        // ==================== 打开订单编辑页 ====================
         adminEditOrder: async function(orderId) {
             if (!PERMISSION.isAdmin()) {
                 Utils.toast.error(Utils.lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单');
@@ -1198,7 +1219,6 @@
                 if (!order) throw new Error('订单不存在');
                 await SUPABASE.unlockOrder(orderId);
 
-                // 拉取缴费记录，初始化内存副本
                 var histResult = await SUPABASE.getPaymentHistory(orderId);
                 _editPayments = (histResult.payments || [])
                     .filter(function(p){ return p.type === 'interest' || p.type === 'principal'; })
@@ -1311,7 +1331,6 @@
                     '<button onclick="JF.AdminEditOrder.adminCancelEdit(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--outline">↩️ ' + t('cancel') + '</button>' +
                     '</div></div>';
 
-                // 绑定金额格式化
                 ['edit_loan_amount', 'edit_admin_fee', 'edit_service_fee', 'edit_monthly_payment'].forEach(function(id) {
                     var el = document.getElementById(id);
                     if (el && Utils.bindAmountFormat) Utils.bindAmountFormat(el);
@@ -1324,7 +1343,6 @@
             }
         },
 
-        // ==================== 保存订单 ====================
         adminSaveOrder: async function(orderId) {
             if (!PERMISSION.isAdmin()) {
                 Utils.toast.error(Utils.lang === 'id' ? '仅管理员可保存修改' : '仅管理员可保存修改');
@@ -1359,7 +1377,6 @@
                     return;
                 }
 
-                // 验证缴费记录：日期和金额不能为空
                 var payEdits = this._collectPaymentEdits();
                 var allRecs = payEdits.toUpdate.concat(payEdits.toAdd);
                 for (var ri = 0; ri < allRecs.length; ri++) {
@@ -1371,7 +1388,6 @@
                 var order = await SUPABASE.getOrder(orderId);
                 var agreedRate = interestRate / 100;
 
-                // Step 1：保存订单基本字段（汇总字段暂留，后面由 adminSyncPaymentRecords 覆盖）
                 var updates = {
                     collateral_name: collateral, loan_amount: loanAmount,
                     admin_fee: adminFee, admin_fee_paid: adminFeePaid && adminFee > 0,
@@ -1390,13 +1406,10 @@
                 var res = await client.from('orders').update(updates).eq('order_id', orderId);
                 if (res.error) throw res.error;
 
-                // Step 2：同步管理费/服务费流水
                 await SUPABASE.syncFeesAfterAdminEdit(orderId, adminFee, adminFeePaid && adminFee > 0, serviceFee, orderDate);
-
-                // Step 3：逐条同步利息/本金缴费记录，并重算汇总字段
                 await SUPABASE.adminSyncPaymentRecords(orderId, payEdits);
-
                 await SUPABASE.relockOrder(orderId);
+
                 Utils.toast.success(lang === 'id' ? '✅ 订单已修改并重新锁定！' : '✅ 订单已修改并重新锁定！');
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 await JF.OrdersPage.viewOrder(orderId);
