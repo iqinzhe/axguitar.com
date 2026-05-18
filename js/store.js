@@ -2,6 +2,7 @@
 // 打印：卡片单列垂直排列，占满宽度；屏幕：卡片间单列，内部4×3；手机：全单列
 // 12项双语标签；增加 totalOrders
 // [修复] 删除门店时增加完整的关联表检查，防止孤儿子数据
+// [新增] 门店操作员也能看到本门店财务汇总卡片
 
 'use strict';
 
@@ -91,7 +92,7 @@
                     
                     if (error) {
                         console.warn(`[StoreManager] 检查表 ${table} 失败:`, error.message);
-                        continue; // 查询失败时跳过该表检查（避免误拦截）
+                        continue;
                     }
                     
                     if (count > 0) {
@@ -101,21 +102,17 @@
                         throw new Error(errorMsg);
                     }
                 } catch (checkError) {
-                    // 如果是我们主动抛出的错误，直接向上传递
                     if (checkError.message && (checkError.message.includes('无法删除') || checkError.message.includes('Tidak dapat dihapus'))) {
                         throw checkError;
                     }
-                    // 其他查询错误仅记录，不阻塞删除（避免因某表查询失败而误判）
                     console.warn(`[StoreManager] 检查表 ${table} 时发生异常:`, checkError.message);
                 }
             }
             
-            // 所有检查通过，执行删除
             try {
                 const { error } = await client.from('stores').delete().eq('id', id);
                 if (error) throw error;
                 
-                // 更新本地缓存
                 StoreManager.stores = StoreManager.stores.filter(s => s.id !== id);
                 
                 if (window.Audit) {
@@ -386,6 +383,9 @@
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
+            const isAdmin = PERMISSION.isAdmin();
+            const profile = await SUPABASE.getCurrentProfile();
+            
             try {
                 await StoreManager.loadStores(true);
                 const client = SUPABASE.getClient();
@@ -395,24 +395,54 @@
                 const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
                 const monthEnd = Utils.getLocalToday();
 
-                const { data: allOrders, error: orderError } = await client
-                    .from('orders')
+                // 获取所有订单数据
+                let orderQuery = client.from('orders')
                     .select('id, store_id, status, loan_amount, created_at, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid');
+                
+                if (!isAdmin && profile?.store_id) {
+                    orderQuery = orderQuery.eq('store_id', profile.store_id);
+                }
+                
+                const { data: allOrders, error: orderError } = await orderQuery;
                 if (orderError) console.error('[StoreManager] 查询订单失败:', orderError);
 
-                const { data: allExpenses, error: expenseError } = await client
-                    .from('expenses').select('id, store_id, amount, expense_date');
+                // 获取所有支出数据
+                let expenseQuery = client.from('expenses').select('id, store_id, amount, expense_date');
+                if (!isAdmin && profile?.store_id) {
+                    expenseQuery = expenseQuery.eq('store_id', profile.store_id);
+                }
+                const { data: allExpenses, error: expenseError } = await expenseQuery;
                 if (expenseError) console.error('[StoreManager] 查询支出失败:', expenseError);
 
-                const { data: returnCapitalData, error: returnError } = await client
-                    .from('profit_distributions').select('store_id, amount').eq('type', 'return_capital');
+                // 获取偿还本金数据
+                let returnCapitalQuery = client.from('profit_distributions').select('store_id, amount').eq('type', 'return_capital');
+                if (!isAdmin && profile?.store_id) {
+                    returnCapitalQuery = returnCapitalQuery.eq('store_id', profile.store_id);
+                }
+                const { data: returnCapitalData, error: returnError } = await returnCapitalQuery;
                 if (returnError) console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
 
+                // 获取现金流余额
                 const storeBalances = await StoreManager._getAllStoreCashFlowBalances();
 
+                // 构建统计数据
                 const storeStats = {};
-                for (const s of StoreManager.stores) {
+                
+                // 确定要统计的门店列表
+                let storesToProcess = [];
+                if (isAdmin) {
+                    storesToProcess = StoreManager.stores.filter(s => s.code !== 'STORE_000');
+                } else {
+                    const currentStore = StoreManager.stores.find(s => s.id === profile?.store_id);
+                    if (currentStore && currentStore.code !== 'STORE_000') {
+                        storesToProcess = [currentStore];
+                    }
+                }
+
+                for (const s of storesToProcess) {
                     storeStats[s.id] = {
+                        name: s.name,
+                        code: s.code,
                         monthNewOrders: 0, monthLoanAmount: 0, monthAdminFee: 0,
                         monthServiceFee: 0, monthInterest: 0, monthExpense: 0,
                         totalOrders: 0, activeOrders: 0, completedOrders: 0,
@@ -422,6 +452,7 @@
                     };
                 }
 
+                // 统计订单数据
                 for (const o of (allOrders || [])) {
                     const sid = o.store_id;
                     if (!storeStats[sid]) continue;
@@ -444,6 +475,7 @@
                     }
                 }
 
+                // 获取本月管理费/服务费/利息（通过 payment_history）
                 const allOrderIds = (allOrders || []).map(o => o.id);
                 if (allOrderIds.length > 0) {
                     const { data: monthAdminFees } = await client
@@ -457,6 +489,7 @@
                             if (sid && storeStats[sid]) storeStats[sid].monthAdminFee += (p.amount || 0);
                         }
                     }
+                    
                     const { data: monthServiceFees } = await client
                         .from('payment_history').select('order_id, amount')
                         .eq('type', 'service_fee').gte('date', monthStart).lte('date', monthEnd).in('order_id', allOrderIds);
@@ -468,6 +501,7 @@
                             if (sid && storeStats[sid]) storeStats[sid].monthServiceFee += (p.amount || 0);
                         }
                     }
+                    
                     const { data: monthInterests } = await client
                         .from('payment_history').select('order_id, amount')
                         .eq('type', 'interest').gte('date', monthStart).lte('date', monthEnd).in('order_id', allOrderIds);
@@ -481,6 +515,7 @@
                     }
                 }
 
+                // 统计支出
                 for (const e of (allExpenses || [])) {
                     const sid = e.store_id;
                     if (!storeStats[sid]) continue;
@@ -490,117 +525,103 @@
                     }
                 }
 
+                // 统计偿还本金
                 for (const rc of (returnCapitalData || [])) {
                     const sid = rc.store_id;
                     if (!storeStats[sid]) continue;
                     storeStats[sid].returnCapital += (rc.amount || 0);
                 }
 
+                // 计算利润和可用资金
                 for (const sid of Object.keys(storeStats)) {
                     const s = storeStats[sid];
                     s.monthProfit = s.monthAdminFee + s.monthServiceFee + s.monthInterest - s.monthExpense;
                     s.totalProfit = s.totalAdminFee + s.totalServiceFee + s.totalInterest - s.totalExpense;
-                    s.availableCapital = (storeBalances[sid]?.cashBalance || 0) + (storeBalances[sid]?.bankBalance || 0);
+                    const balance = storeBalances[sid] || { cashBalance: 0, bankBalance: 0 };
+                    s.cashBalance = balance.cashBalance;
+                    s.bankBalance = balance.bankBalance;
+                    s.availableCapital = balance.cashBalance + balance.bankBalance;
                 }
-
-                const grandTotal = {
-                    monthNewOrders: 0, totalOrders: 0, activeOrders: 0, completedOrders: 0,
-                    monthLoanAmount: 0, totalLoanAmount: 0,
-                    monthAdminFee: 0, totalAdminFee: 0,
-                    monthServiceFee: 0, totalServiceFee: 0,
-                    monthInterest: 0, totalInterest: 0,
-                    deployedCapital: 0, availableCapital: 0,
-                    cashBalance: 0, bankBalance: 0,
-                    monthExpense: 0, totalExpense: 0,
-                    monthProfit: 0, totalProfit: 0,
-                    returnCapital: 0
-                };
-
-                const storeCards = [];
-                for (const store of StoreManager.stores) {
-                    const isPractice = store.is_practice === true;
-                    const isHQ = (store.code === 'STORE_000');  // 总部不参与财务汇总
-                    const stats = storeStats[store.id] || {};
-                    const balance = storeBalances[store.id] || { cashBalance: 0, bankBalance: 0 };
-                    if (!isPractice && !isHQ) {
-                        grandTotal.monthNewOrders += (stats.monthNewOrders || 0);
-                        grandTotal.totalOrders += (stats.totalOrders || 0);
-                        grandTotal.activeOrders += (stats.activeOrders || 0);
-                        grandTotal.completedOrders += (stats.completedOrders || 0);
-                        grandTotal.monthLoanAmount += (stats.monthLoanAmount || 0);
-                        grandTotal.totalLoanAmount += (stats.totalLoanAmount || 0);
-                        grandTotal.monthAdminFee += (stats.monthAdminFee || 0);
-                        grandTotal.totalAdminFee += (stats.totalAdminFee || 0);
-                        grandTotal.monthServiceFee += (stats.monthServiceFee || 0);
-                        grandTotal.totalServiceFee += (stats.totalServiceFee || 0);
-                        grandTotal.monthInterest += (stats.monthInterest || 0);
-                        grandTotal.totalInterest += (stats.totalInterest || 0);
-                        grandTotal.deployedCapital += (stats.deployedCapital || 0);
-                        grandTotal.availableCapital += (stats.availableCapital || 0);
-                        grandTotal.cashBalance += balance.cashBalance;
-                        grandTotal.bankBalance += balance.bankBalance;
-                        grandTotal.monthExpense += (stats.monthExpense || 0);
-                        grandTotal.totalExpense += (stats.totalExpense || 0);
-                        grandTotal.monthProfit += (stats.monthProfit || 0);
-                        grandTotal.totalProfit += (stats.totalProfit || 0);
-                        grandTotal.returnCapital += (stats.returnCapital || 0);
-                        storeCards.push({
-                            name: store.name,
-                            code: store.code,
-                            monthNewOrders: stats.monthNewOrders || 0,
-                            totalOrders: stats.totalOrders || 0,
-                            activeOrders: stats.activeOrders || 0,
-                            completedOrders: stats.completedOrders || 0,
-                            monthLoanAmount: stats.monthLoanAmount || 0,
-                            totalLoanAmount: stats.totalLoanAmount || 0,
-                            monthAdminFee: stats.monthAdminFee || 0,
-                            totalAdminFee: stats.totalAdminFee || 0,
-                            monthServiceFee: stats.monthServiceFee || 0,
-                            totalServiceFee: stats.totalServiceFee || 0,
-                            monthInterest: stats.monthInterest || 0,
-                            totalInterest: stats.totalInterest || 0,
-                            deployedCapital: stats.deployedCapital || 0,
-                            availableCapital: stats.availableCapital || 0,
-                            cashBalance: balance.cashBalance,
-                            bankBalance: balance.bankBalance,
-                            monthExpense: stats.monthExpense || 0,
-                            totalExpense: stats.totalExpense || 0,
-                            monthProfit: stats.monthProfit || 0,
-                            totalProfit: stats.totalProfit || 0,
-                            returnCapital: stats.returnCapital || 0
-                        });
-                    }
-                }
-                window._storeCardsData = storeCards;
 
                 const fmt = (val) => Utils.formatCurrency(val);
-                let cardsHtml = '<div class="store-cards-grid">';
-                for (const s of storeCards) {
-                    cardsHtml += `
+                
+                // 构建单个门店财务卡片 HTML
+                const buildStoreFinanceCard = (stats) => {
+                    return `
 <div class="store-finance-card">
-    <div class="card-header">${Utils.escapeHtml(s.name)} <span style="font-size:0.8rem;">(${Utils.escapeHtml(s.code)})</span></div>
+    <div class="card-header">${Utils.escapeHtml(stats.name)} <span style="font-size:0.8rem;">(${Utils.escapeHtml(stats.code)})</span></div>
     <div class="card-grid">
-        <div><strong>📋 ${lang === 'id' ? 'Pesanan Baru / Total' : '本月新增订单 / 单数总计'}</strong><br>${s.monthNewOrders} / ${s.totalOrders}</div>
-        <div><strong>🔄 ${lang === 'id' ? 'Aktif / Lunas' : '进行中订单/已结清订单'}</strong><br>${s.activeOrders} / ${s.completedOrders}</div>
-        <div><strong>💰 ${lang === 'id' ? 'Pinjaman Bulan Ini' : '本月当金'}</strong><br>${fmt(s.monthLoanAmount)}</div>
+        <div><strong>📋 ${lang === 'id' ? 'Pesanan Baru / Total' : '本月新增订单 / 单数总计'}</strong><br>${stats.monthNewOrders} / ${stats.totalOrders}</div>
+        <div><strong>🔄 ${lang === 'id' ? 'Aktif / Lunas' : '进行中订单/已结清订单'}</strong><br>${stats.activeOrders} / ${stats.completedOrders}</div>
+        <div><strong>💰 ${lang === 'id' ? 'Pinjaman Bulan Ini' : '本月当金'}</strong><br>${fmt(stats.monthLoanAmount)}</div>
 
-        <div><strong>🧾 ${lang === 'id' ? 'Admin Bulan Ini / Total Admin' : '本月管理费 / 累管理费'}</strong><br>${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}</div>
-        <div><strong>🛠️ ${lang === 'id' ? 'Layanan Bulan Ini / Total Layanan' : '本月服务费 / 累计服务费'}</strong><br>${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}</div>
-        <div><strong>💸 ${lang === 'id' ? 'Bunga Bulan Ini / Total Bunga' : '本月利息 / 累计利息'}</strong><br>${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}</div>
+        <div><strong>🧾 ${lang === 'id' ? 'Admin Bulan Ini / Total Admin' : '本月管理费 / 累管理费'}</strong><br>${fmt(stats.monthAdminFee)} / ${fmt(stats.totalAdminFee)}</div>
+        <div><strong>🛠️ ${lang === 'id' ? 'Layanan Bulan Ini / Total Layanan' : '本月服务费 / 累计服务费'}</strong><br>${fmt(stats.monthServiceFee)} / ${fmt(stats.totalServiceFee)}</div>
+        <div><strong>💸 ${lang === 'id' ? 'Bunga Bulan Ini / Total Bunga' : '本月利息 / 累计利息'}</strong><br>${fmt(stats.monthInterest)} / ${fmt(stats.totalInterest)}</div>
 
-        <div><strong>📦 ${lang === 'id' ? 'Dana Terjamin' : '在押资金'}</strong><br>${fmt(s.deployedCapital)}</div>
-        <div><strong>💵 ${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</strong><br>${fmt(s.availableCapital)}</div>
-        <div><strong>🏦 ${lang === 'id' ? 'Brankas / Bank BNI' : '保险柜现金 / 银行BNI存款'}</strong><br>${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}</div>
+        <div><strong>📦 ${lang === 'id' ? 'Dana Terjamin' : '在押资金'}</strong><br>${fmt(stats.deployedCapital)}</div>
+        <div><strong>💵 ${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</strong><br>${fmt(stats.availableCapital)}</div>
+        <div><strong>🏦 ${lang === 'id' ? 'Brankas / Bank BNI' : '保险柜现金 / 银行BNI存款'}</strong><br>${fmt(stats.cashBalance)} / ${fmt(stats.bankBalance)}</div>
 
-        <div><strong>📉 ${lang === 'id' ? 'Pengeluaran Bulan Ini / Total' : '本月支出 / 累支出'}</strong><br>${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}</div>
-        <div><strong>📈 ${lang === 'id' ? 'Laba Bulan Ini / Total Laba' : '本月利润 / 累计利润'}</strong><br>${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}</div>
-        <div><strong>💳 ${lang === 'id' ? 'Cicilan Pokok' : '偿还本金'}</strong><br>${fmt(s.returnCapital)}</div>
+        <div><strong>📉 ${lang === 'id' ? 'Pengeluaran Bulan Ini / Total' : '本月支出 / 累支出'}</strong><br>${fmt(stats.monthExpense)} / ${fmt(stats.totalExpense)}</div>
+        <div><strong>📈 ${lang === 'id' ? 'Laba Bulan Ini / Total Laba' : '本月利润 / 累计利润'}</strong><br>${fmt(stats.monthProfit)} / ${fmt(stats.totalProfit)}</div>
+        <div><strong>💳 ${lang === 'id' ? 'Cicilan Pokok' : '偿还本金'}</strong><br>${fmt(stats.returnCapital)}</div>
     </div>
 </div>`;
-                }
-                cardsHtml += '</div>';
+                };
 
-                const summaryHtml = `
+                // 构建门店财务汇总区域
+                let cardsHtml = '';
+                const statsArray = Object.values(storeStats);
+                
+                if (statsArray.length > 0) {
+                    cardsHtml = '<div class="store-cards-grid">';
+                    for (const stats of statsArray) {
+                        cardsHtml += buildStoreFinanceCard(stats);
+                    }
+                    cardsHtml += '</div>';
+                    
+                    // 如果是管理员且有多门店，显示总计卡片
+                    if (isAdmin && statsArray.length > 1) {
+                        // 计算总计
+                        const grandTotal = {
+                            monthNewOrders: 0, totalOrders: 0, activeOrders: 0, completedOrders: 0,
+                            monthLoanAmount: 0, totalLoanAmount: 0,
+                            monthAdminFee: 0, totalAdminFee: 0,
+                            monthServiceFee: 0, totalServiceFee: 0,
+                            monthInterest: 0, totalInterest: 0,
+                            deployedCapital: 0, availableCapital: 0,
+                            cashBalance: 0, bankBalance: 0,
+                            monthExpense: 0, totalExpense: 0,
+                            monthProfit: 0, totalProfit: 0,
+                            returnCapital: 0
+                        };
+                        
+                        for (const stats of statsArray) {
+                            grandTotal.monthNewOrders += stats.monthNewOrders;
+                            grandTotal.totalOrders += stats.totalOrders;
+                            grandTotal.activeOrders += stats.activeOrders;
+                            grandTotal.completedOrders += stats.completedOrders;
+                            grandTotal.monthLoanAmount += stats.monthLoanAmount;
+                            grandTotal.totalLoanAmount += stats.totalLoanAmount;
+                            grandTotal.monthAdminFee += stats.monthAdminFee;
+                            grandTotal.totalAdminFee += stats.totalAdminFee;
+                            grandTotal.monthServiceFee += stats.monthServiceFee;
+                            grandTotal.totalServiceFee += stats.totalServiceFee;
+                            grandTotal.monthInterest += stats.monthInterest;
+                            grandTotal.totalInterest += stats.totalInterest;
+                            grandTotal.deployedCapital += stats.deployedCapital;
+                            grandTotal.availableCapital += stats.availableCapital;
+                            grandTotal.cashBalance += stats.cashBalance;
+                            grandTotal.bankBalance += stats.bankBalance;
+                            grandTotal.monthExpense += stats.monthExpense;
+                            grandTotal.totalExpense += stats.totalExpense;
+                            grandTotal.monthProfit += stats.monthProfit;
+                            grandTotal.totalProfit += stats.totalProfit;
+                            grandTotal.returnCapital += stats.returnCapital;
+                        }
+                        
+                        cardsHtml += `
 <div class="store-summary-card">
     <div class="card-header">📊 ${lang === 'id' ? 'TOTAL SEMUA TOKO' : '全部门店合计'}</div>
     <div class="card-grid summary">
@@ -621,36 +642,34 @@
         <div><strong>💳 ${lang === 'id' ? 'Cicilan Pokok' : '偿还本金'}</strong><br>${fmt(grandTotal.returnCapital)}</div>
     </div>
 </div>`;
+                    }
+                }
 
-                // 门店列表行保持不变
+                // 构建门店列表行（非管理员不显示门店列表）
                 let storeRows = '';
-                if (StoreManager.stores.length === 0) {
-                    storeRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td>`;
-                } else {
-                    for (const store of StoreManager.stores) {
-                        const isActive = store.is_active !== false;
-                        const isStorePractice = store.is_practice === true;
-                        const isStore000 = (store.code === 'STORE_000');
-                        if (isStore000) continue;  // 总部账户不在此处显示
-                        let statusBadgeHtml = isActive
-                            ? `<span class="badge badge--active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
-                            : `<span class="badge badge--liquidated">${lang === 'id' ? 'Ditutup' : '已暂停'}</span>`;
-                        if (isStorePractice) statusBadgeHtml += ` <span class="badge" style="background:#a78bfa;color:#fff;">🎓 ${lang === 'id' ? 'Latihan' : '练习'}</span>`;
-                        const practiceRowStyle2 = isStorePractice ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
-                        storeRows += `<tr${practiceRowStyle2}>
-                            <td class="store-code">${Utils.escapeHtml(store.code)}</td>
-                            <td class="store-name">${Utils.escapeHtml(store.name)}</td>
-                            <td class="store-address desc-cell">${Utils.escapeHtml(store.address || '-')}</td>
-                            <td>${Utils.escapeHtml(store.phone || '-')}</td>
-                            <td><input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" onchange="StoreManager.updateStoreWANumber('${store.id}', this.value)"></td>
-                            <td class="text-center">${statusBadgeHtml}</td>
-                          </tr>`;
+                if (isAdmin) {
+                    if (StoreManager.stores.filter(s => s.code !== 'STORE_000').length === 0) {
+                        storeRows = `<tr><td colspan="6" class="text-center">${t('no_data')}</td>`;
+                    } else {
+                        for (const store of StoreManager.stores) {
+                            if (store.code === 'STORE_000') continue;
+                            const isActive = store.is_active !== false;
+                            const isStorePractice = store.is_practice === true;
+                            let statusBadgeHtml = isActive
+                                ? `<span class="badge badge--active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
+                                : `<span class="badge badge--liquidated">${lang === 'id' ? 'Ditutup' : '已暂停'}</span>`;
+                            if (isStorePractice) statusBadgeHtml += ` <span class="badge" style="background:#a78bfa;color:#fff;">🎓 ${lang === 'id' ? 'Latihan' : '练习'}</span>`;
+                            const practiceRowStyle2 = isStorePractice ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
+                            storeRows += `<tr${practiceRowStyle2}>
+                                <td class="store-code">${Utils.escapeHtml(store.code)}</td>
+                                <td class="store-name">${Utils.escapeHtml(store.name)}</td>
+                                <td class="store-address desc-cell">${Utils.escapeHtml(store.address || '-')}</td>
+                                <td>${Utils.escapeHtml(store.phone || '-')}</td>
+                                <td><input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" onchange="StoreManager.updateStoreWANumber('${store.id}', this.value)"></td>
+                                <td class="text-center">${statusBadgeHtml}</td>
+                              </tr>`;
 
-                        let actionButtons = '';
-                        if (isStore000) {
-                            actionButtons = `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>`;
-                            actionButtons += `<span style="color:var(--text-muted);font-size:10px;margin-left:4px;">🔒 ${lang === 'id' ? 'Toko Pusat' : '总部门店'}</span>`;
-                        } else {
+                            let actionButtons = '';
                             actionButtons = `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>` +
                                 (isActive
                                     ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn btn--sm btn--warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
@@ -663,23 +682,22 @@
                                 actionButtons += `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}">${practiceLabel}</button>`;
                             }
                             actionButtons += `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
+                            storeRows += `<tr class="action-row"${practiceRowStyle2}>
+                                <td class="action-label">${t('action')}</td>
+                                <td colspan="5"><div class="action-buttons">${actionButtons}</div></td>
+                              </tr>`;
                         }
-                        storeRows += `<tr class="action-row"${practiceRowStyle2}>
-                            <td class="action-label">${t('action')}</td>
-                            <td colspan="5"><div class="action-buttons">${actionButtons}</div></td>
-                          </tr>`;
                     }
                 }
 
-                const content = `
+                // 构建内容
+                let content = `
                     <style>
-                        /* 卡片之间单列排列 */
                         .store-cards-grid {
                             display: flex !important;
                             flex-direction: column !important;
                             gap: 16px !important;
                         }
-                        /* 卡片内部：桌面端4列，手机端单列 */
                         .store-finance-card .card-grid,
                         .store-summary-card .card-grid {
                             display: grid;
@@ -700,30 +718,43 @@
                             <button onclick="StoreManager.printStoreFinanceSummary()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak Ringkasan' : '打印财务汇总'}</button>
                         </div>
                     </div>
+                    
+                    <!-- 财务汇总卡片（管理员显示所有门店，门店操作员显示本门店） -->
+                    <div class="card">
+                        <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
+                        ${cardsHtml || `<div class="empty-state"><div class="empty-state-text">${lang === 'id' ? 'Belum ada data keuangan' : '暂无财务数据'}</div></div>`}
+                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total' : '格式: 本月 / 累计'}</p>
+                    </div>`;
+
+                // 管理员显示现金流汇总和门店列表
+                if (isAdmin) {
+                    // 计算总计现金流
+                    let totalCashBalance = 0, totalBankBalance = 0;
+                    for (const stats of statsArray) {
+                        totalCashBalance += stats.cashBalance || 0;
+                        totalBankBalance += stats.bankBalance || 0;
+                    }
+                    
+                    content += `
                     <div class="card cashflow-card no-print">
                         <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
                         <div class="cashflow-stats">
                             <div class="cashflow-item-card">
                                 <div class="label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜 (现金)'}</div>
-                                <div class="value ${grandTotal.cashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(grandTotal.cashBalance)}</div>
+                                <div class="value ${totalCashBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(totalCashBalance)}</div>
                             </div>
                             <div class="cashflow-item-card">
                                 <div class="label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div>
-                                <div class="value ${grandTotal.bankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(grandTotal.bankBalance)}</div>
+                                <div class="value ${totalBankBalance < 0 ? 'negative' : ''}">${Utils.formatCurrency(totalBankBalance)}</div>
                             </div>
                             <div class="cashflow-item-card">
                                 <div class="label">📊 ${lang === 'id' ? 'Total Kas' : '总现金'}</div>
-                                <div class="value">${Utils.formatCurrency(grandTotal.cashBalance + grandTotal.bankBalance)}</div>
+                                <div class="value">${Utils.formatCurrency(totalCashBalance + totalBankBalance)}</div>
                             </div>
                         </div>
                         <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Tidak termasuk Toko Latihan' : '不含练习门店'}</p>
                     </div>
-                    <div class="card">
-                        <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
-                        ${cardsHtml}
-                        ${summaryHtml}
-                        <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total' : '格式: 本月 / 累计'}</p>
-                    </div>
+                    
                     <div class="card no-print">
                         <h3>${lang === 'id' ? 'Daftar Toko' : '门店列表'}</h3>
                         <div class="table-container">
@@ -742,6 +773,7 @@
                             </table>
                         </div>
                     </div>
+                    
                     <div class="card no-print">
                         <h3>${lang === 'id' ? 'Tambah Toko Baru' : '新增门店'}</h3>
                         <div class="form-grid">
@@ -762,6 +794,7 @@
                             </div>
                         </div>
                     </div>`;
+                }
 
                 return content;
             } catch (error) {
@@ -783,13 +816,15 @@
         // ==================== 打印门店财务汇总（卡片单列垂直排列，占满宽度） ====================
         printStoreFinanceSummary() {
             const lang = Utils.lang;
-            const cards = window._storeCardsData || [];
-            if (cards.length === 0) {
-                Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
+            const isAdmin = PERMISSION.isAdmin();
+            
+            // 获取当前显示的财务数据
+            const financeCards = document.querySelectorAll('.store-finance-card');
+            if (financeCards.length === 0) {
+                Utils.toast.warning(lang === 'id' ? 'Tidak ada data keuangan' : '没有财务数据');
                 return;
             }
 
-            const isAdmin = PERMISSION.isAdmin();
             let storeName = '', roleText = '', userName = '';
             try {
                 storeName = AUTH.getCurrentStoreName();
@@ -802,11 +837,18 @@
             const periodStart = `${_pNow.getFullYear()}-${String(_pNow.getMonth() + 1).padStart(2, '0')}-01`;
             const periodEnd = Utils.getLocalToday();
 
-            const fmt = (val) => Utils.formatCurrency(val);
             const isZh = lang !== 'id';
+            const fmt = (val) => Utils.formatCurrency(val);
 
             const cell = (icon, label, value) =>
                 `<div class="mc"><div class="ml">${icon} ${label}</div><div class="mv">${value}</div></div>`;
+
+            // 提取卡片内容用于打印
+            let cardsHtml = '';
+            for (const card of financeCards) {
+                const cardClone = card.cloneNode(true);
+                cardsHtml += cardClone.outerHTML;
+            }
 
             const headerBlock = `
                 <div class="ph">
@@ -819,34 +861,12 @@
                     </div>
                 </div>`;
 
-            // 构建卡片 HTML，单列垂直排列
-            let cardsHtml = headerBlock;
-            for (const s of cards) {
-                cardsHtml += `
-<div class="sc">
-    <div class="st">${Utils.escapeHtml(s.name)} <span class="sc2">(${Utils.escapeHtml(s.code)})</span></div>
-    <div class="mg">
-        ${cell('📋', isZh ? '本月新增订单 / 单数总计' : 'Pesanan Baru / Total', `${s.monthNewOrders} / ${s.totalOrders}`)}
-        ${cell('🔄', isZh ? '进行中订单/已结清订单' : 'Aktif / Lunas', `${s.activeOrders} / ${s.completedOrders}`)}
-        ${cell('💰', isZh ? '本月当金' : 'Pinjaman Bulan Ini', fmt(s.monthLoanAmount))}
-        ${cell('🧾', isZh ? '本月管理费 / 累管理费' : 'Admin Bulan Ini / Total Admin', `${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}`)}
-        ${cell('🛠️', isZh ? '本月服务费 / 累计服务费' : 'Layanan Bulan Ini / Total Layanan', `${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}`)}
-        ${cell('💸', isZh ? '本月利息 / 累计利息' : 'Bunga Bulan Ini / Total Bunga', `${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}`)}
-        ${cell('📦', isZh ? '在押资金' : 'Dana Terjamin', fmt(s.deployedCapital))}
-        ${cell('💵', isZh ? '可动用资金' : 'Dana Tersedia', fmt(s.availableCapital))}
-        ${cell('🏦', isZh ? '保险柜现金 / 银行BNI存款' : 'Brankas / Bank BNI', `${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}`)}
-        ${cell('📉', isZh ? '本月支出 / 累支出' : 'Pengeluaran Bulan Ini / Total', `${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}`)}
-        ${cell('📈', isZh ? '本月利润 / 累计利润' : 'Laba Bulan Ini / Total Laba', `${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}`)}
-        ${cell('💳', isZh ? '偿还本金' : 'Cicilan Pokok', fmt(s.returnCapital))}
-    </div>
-</div>`;
-            }
-
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
                 Utils.toast.warning(lang === 'id' ? 'Popup diblokir. Izinkan popup untuk halaman ini lalu coba lagi.' : '弹出窗口被拦截，请允许本页弹出窗口后重试。', 5000);
                 return;
             }
+
             printWindow.document.write(`
 <!DOCTYPE html>
 <html>
@@ -860,7 +880,6 @@
         @page { size: A4 portrait; margin: 8mm 10mm; }
         @media print { html { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 
-        /* 页眉 */
         .ph {
             text-align: center;
             border-bottom: 2px solid #1e293b;
@@ -870,7 +889,6 @@
         .ph-logo { font-size: 13pt; font-weight: bold; color: #0e7490; margin-bottom: 2px; }
         .ph-info { font-size: 7.5pt; color: #475569; white-space: nowrap; }
 
-        /* 页脚 */
         .pf {
             border-top: 1px solid #e2e8f0;
             padding-top: 4px;
@@ -880,8 +898,7 @@
             color: #94a3b8;
         }
 
-        /* 卡片：单列，占满宽度 */
-        .sc {
+        .store-finance-card {
             border: 1.5px solid #334155;
             border-radius: 5px;
             margin-bottom: 5mm;
@@ -889,7 +906,7 @@
             page-break-inside: avoid;
             width: 100%;
         }
-        .st {
+        .card-header {
             font-weight: bold;
             font-size: 12pt;
             text-align: center;
@@ -897,10 +914,9 @@
             background: #f1f5f9;
             border-bottom: 1.5px solid #334155;
         }
-        .sc2 { font-size: 10pt; color: #64748b; font-weight: normal; }
+        .card-header span { font-size: 10pt; color: #64748b; font-weight: normal; }
 
-        /* 指标网格：4列 */
-        .mg {
+        .card-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
         }
@@ -916,6 +932,7 @@
     </style>
 </head>
 <body>
+    ${headerBlock}
     ${cardsHtml}
     <div class="pf">
         JF! by Gadai &nbsp;·&nbsp; ${isZh ? '典当管理系统' : 'Sistem Manajemen Gadai'}
@@ -925,7 +942,7 @@
             window.addEventListener('afterprint', function() { window.close(); });
             window.print();
         };
-    </script>
+    <\/script>
 </body>
 </html>`);
             printWindow.document.close();
