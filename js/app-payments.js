@@ -247,6 +247,36 @@
                 // 固定还款部分（保持不变）
                 let fixedHtml = '';
                 if (order.repayment_type === 'fixed') {
+                    // 构建固定还款月供历史表：将 interest + principal 按期数合并为一行
+                    const fixedInterestRows = payments.filter(p => p.type === 'interest' && !p.is_voided).sort((a, b) => new Date(a.date) - new Date(b.date));
+                    const fixedPrincipalRows = payments.filter(p => p.type === 'principal' && !p.is_voided).sort((a, b) => new Date(a.date) - new Date(b.date));
+                    let installmentHistoryRows = '';
+                    if (fixedInterestRows.length === 0 && fixedPrincipalRows.length === 0) {
+                        installmentHistoryRows = `<tr><td colspan="6" class="text-center text-muted">${lang === 'id' ? 'Belum ada riwayat angsuran' : '暂无还款记录'}</td></tr>`;
+                    } else {
+                        const maxLen = Math.max(fixedInterestRows.length, fixedPrincipalRows.length);
+                        let runningPrincipalPaid = 0;
+                        for (let i = 0; i < maxLen; i++) {
+                            const ip = fixedInterestRows[i];
+                            const pp = fixedPrincipalRows[i];
+                            const interestAmt = ip ? (ip.amount || 0) : 0;
+                            const principalAmt = pp ? (pp.amount || 0) : 0;
+                            const totalAmt = interestAmt + principalAmt;
+                            runningPrincipalPaid += principalAmt;
+                            const remainAfter = loanAmount - runningPrincipalPaid;
+                            const rowDate = Utils.formatDate((ip || pp).date);
+                            const rowMethod = methodMap[(ip || pp).payment_method] || '-';
+                            installmentHistoryRows += `<tr>
+                                <td class="text-center">${i + 1}</td>
+                                <td>${rowDate}</td>
+                                <td class="amount">${Utils.formatCurrency(totalAmt)}</td>
+                                <td class="amount" style="color:var(--text-muted);font-size:11px;">${Utils.formatCurrency(principalAmt)} / ${Utils.formatCurrency(interestAmt)}</td>
+                                <td class="amount" style="color:${remainAfter > 0 ? 'var(--warning-dark,#b45309)' : 'var(--success)'};">${Utils.formatCurrency(Math.max(0, remainAfter))}</td>
+                                <td class="text-center">${rowMethod}</td>
+                            </tr>`;
+                        }
+                    }
+
                     const paidMonths = order.fixed_paid_months || 0;
                     const totalMonths = order.repayment_term;
                     const remainingMonths = totalMonths - paidMonths;
@@ -278,6 +308,22 @@
                                 </div>
                             </div>
                             <div class="card-info"><small>💡 ${t('each_installment_includes')}</small></div>
+                        </div>
+                        <div class="card-history">
+                            <div class="history-title">📋 ${lang === 'id' ? 'Riwayat Angsuran' : '月供还款历史'}</div>
+                            <div class="table-container" style="overflow-x:auto;">
+                                <table class="data-table history-table" style="min-width:360px;">
+                                    <thead><tr>
+                                        <th class="text-center" style="width:44px;">${t('times')}</th>
+                                        <th class="col-date">${t('date')}</th>
+                                        <th class="col-amount amount">${lang === 'id' ? 'Angsuran' : '月供总额'}</th>
+                                        <th class="col-amount amount" style="font-size:11px;">${lang === 'id' ? 'Pokok / Bunga' : '本金 / 利息'}</th>
+                                        <th class="col-amount amount">${lang === 'id' ? 'Sisa Pokok' : '剩余本金'}</th>
+                                        <th class="col-method text-center">${t('payment_method')}</th>
+                                    </tr></thead>
+                                    <tbody>${installmentHistoryRows}</tbody>
+                                </table>
+                            </div>
                         </div>`;
                 }
 
