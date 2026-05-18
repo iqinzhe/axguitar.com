@@ -1,4 +1,6 @@
-// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
+// supabase.js - v2.1 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
+// v2.1 修复：recordPrincipalPayment / recordFixedPayment / earlySettleFixedOrder / recordInterestPayment 超额抵扣
+//           中 payment_history.date 和 cash_flow_records.flow_date 统一改用订单创建日期，不再使用 todayStr()
 
 'use strict';
 
@@ -1438,12 +1440,13 @@
                         amount: interestToRecord, source_target: paymentMethod, order_id: currentOrder.id,
                         customer_id: currentOrder.customer_id,
                         description: Utils.t('interest') + ' ' + months + ' ' + (Utils.lang==='id'?'bulan':'个月') + prepaidLabel + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
-                        reference_id: currentOrder.order_id
+                        reference_id: currentOrder.order_id,
+                        flow_date: recordDate
                     });
                 }
                 if(principalAdjustment>0){
                     await supabaseClient.from('payment_history').insert({
-                        order_id: currentOrder.id, date: todayStr(), type:'principal',
+                        order_id: currentOrder.id, date: recordDate, type:'principal',
                         amount: principalAdjustment,
                         description: (Utils.lang==='id'?'Kelebihan bunga dipotong pokok':'超额利息抵扣本金') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
                         recorded_by: profile.id, payment_method: paymentMethod
@@ -1453,7 +1456,8 @@
                         amount: principalAdjustment, source_target: paymentMethod, order_id: currentOrder.id,
                         customer_id: currentOrder.customer_id,
                         description: (Utils.lang==='id'?'Kelebihan bunga dipotong pokok':'超额利息抵扣本金') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
-                        reference_id: currentOrder.order_id
+                        reference_id: currentOrder.order_id,
+                        flow_date: recordDate
                     });
                 }
                 if(shortfallToTrack>0) console.warn(`订单 ${orderId} 利息少付 ${Utils.formatCurrency(shortfallToTrack)}`);
@@ -1468,6 +1472,8 @@
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
+            // 确定流水日期：优先使用订单创建日期，否则用当天
+            const recordDate = currentOrder.created_at ? currentOrder.created_at.substring(0, 10) : todayStr();
             
             if (currentOrder.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
@@ -1504,7 +1510,7 @@
             const { error: updErr } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
             if(updErr) throw updErr;
             await supabaseClient.from('payment_history').insert({
-                order_id: currentOrder.id, date: todayStr(), type:'principal',
+                order_id: currentOrder.id, date: recordDate, type:'principal',
                 amount: paid,
                 description: isFull
                     ? (Utils.lang==='id' ? 'LUNAS' : '结清') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||'')
@@ -1518,7 +1524,8 @@
                 description: isFull
                     ? (Utils.lang==='id' ? 'LUNAS' : '结清') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||'')
                     : (Utils.lang==='id' ? 'Pembayaran pokok' : '还款') + ' - ' + currentOrder.order_id + ' ' + (currentOrder.customer_name||''),
-                reference_id: currentOrder.order_id
+                reference_id: currentOrder.order_id,
+                flow_date: recordDate
             });
             if(window.Audit) await window.Audit.logPayment(currentOrder.order_id, 'principal', paid, paymentMethod);
             return true;
@@ -1528,6 +1535,8 @@
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
+            // 确定流水日期：优先使用订单创建日期，否则用当天
+            const recordDate = order.created_at ? order.created_at.substring(0, 10) : todayStr();
             
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
@@ -1563,7 +1572,7 @@
             await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
             if(interestAmt>0){
                 await supabaseClient.from('payment_history').insert({
-                    order_id: order.id, date: todayStr(), type:'interest', months:1,
+                    order_id: order.id, date: recordDate, type:'interest', months:1,
                     amount: interestAmt,
                     description: (Utils.lang==='id'?'Cicilan tetap - Bunga':'固定还款-利息') + ' ' + newFixedPaid + ' - ' + order.order_id + ' ' + (order.customer_name||''),
                     recorded_by: profile.id, payment_method: paymentMethod
@@ -1573,12 +1582,13 @@
                     amount: interestAmt, source_target: paymentMethod, order_id: order.id,
                     customer_id: order.customer_id,
                     description: (Utils.lang==='id'?'Cicilan tetap bunga':'固定还款利息') + ' - ' + order.order_id + ' ' + (order.customer_name||''),
-                    reference_id: order.order_id
+                    reference_id: order.order_id,
+                    flow_date: recordDate
                 });
             }
             if(principalAmt>0){
                 await supabaseClient.from('payment_history').insert({
-                    order_id: order.id, date: todayStr(), type:'principal',
+                    order_id: order.id, date: recordDate, type:'principal',
                     amount: principalAmt,
                     description: (Utils.lang==='id'?'Cicilan tetap - Pokok':'固定还款-本金') + ' ' + newFixedPaid + ' - ' + order.order_id + ' ' + (order.customer_name||''),
                     recorded_by: profile.id, payment_method: paymentMethod
@@ -1588,7 +1598,8 @@
                     amount: principalAmt, source_target: paymentMethod, order_id: order.id,
                     customer_id: order.customer_id,
                     description: (Utils.lang==='id'?'Cicilan tetap pokok':'固定还款本金') + ' - ' + order.order_id + ' ' + (order.customer_name||''),
-                    reference_id: order.order_id
+                    reference_id: order.order_id,
+                    flow_date: recordDate
                 });
             }
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'fixed_installment', fixedPayment, paymentMethod);
@@ -1599,6 +1610,8 @@
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
+            // 确定流水日期：优先使用订单创建日期，否则用当天
+            const recordDate = order.created_at ? order.created_at.substring(0, 10) : todayStr();
             
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
@@ -1616,7 +1629,7 @@
             }
             const remaining = order.principal_remaining;
             await supabaseClient.from('payment_history').insert({
-                order_id: order.id, date: todayStr(), type:'principal',
+                order_id: order.id, date: recordDate, type:'principal',
                 amount: remaining, description: Utils.lang==='id'?'Pelunasan dipercepat':'提前结清',
                 recorded_by: profile.id, payment_method: paymentMethod
             });
@@ -1625,7 +1638,8 @@
                 amount: remaining, source_target: paymentMethod, order_id: order.id,
                 customer_id: order.customer_id,
                 description: (Utils.lang==='id'?'Pelunasan dipercepat':'提前结清') + ' - ' + order.order_id,
-                reference_id: order.order_id
+                reference_id: order.order_id,
+                flow_date: recordDate
             });
             const { error } = await supabaseClient.from('orders').update({
                 status:'completed', principal_paid: order.loan_amount, principal_remaining:0,
