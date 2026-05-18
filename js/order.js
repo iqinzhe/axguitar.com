@@ -1,6 +1,6 @@
 // order.js - v2.0 (JF 命名空间) 
 // getOrderCashFlow 返回订单专属流水（而非整个门店流水）
-// 修复：订单号传递问题，确保客户ID-序号格式生效
+// 订单号传递确保客户ID-序号格式生效
 
 'use strict';
 
@@ -12,7 +12,7 @@
         // ==================== 创建订单 ====================
         async create(data) {
             const orderData = {
-                order_id: data.order_id,  // 【修复】传递订单号，确保客户ID-序号格式生效
+                order_id: data.order_id,  // 传递订单号，确保客户ID-序号格式生效
                 customer_name: data.customer.name,
                 customer_ktp: data.customer.ktp,
                 customer_phone: data.customer.phone,
