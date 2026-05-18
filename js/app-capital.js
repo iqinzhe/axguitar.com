@@ -868,7 +868,203 @@
     // 挂载到命名空间
     JF.CapitalModule = CapitalModule;
 
-    // 向下兼容：将方法挂载到 APP
+        // ==================== 月度资金健康报表 ====================
+        async buildFundHealthReportHTML() {
+            const lang = Utils.lang;
+            const client = SUPABASE.getClient();
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
+
+            // 生成最近6个月的月份列表
+            const months = [];
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(1);
+                d.setMonth(d.getMonth() - i);
+                months.push({
+                    year: d.getFullYear(),
+                    month: d.getMonth() + 1,
+                    label: d.toLocaleDateString(lang === 'id' ? 'id-ID' : 'zh-CN', { year: 'numeric', month: 'long' }),
+                    start: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`,
+                    end: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().substring(0, 10)
+                });
+            }
+
+            // 并行拉取：payment_history（利息/本金/管理费/服务费）+ expenses（支出）+ orders（在外本金）
+            const [phRes, expRes, ordersRes, injRes] = await Promise.all([
+                client.from('payment_history').select('type, amount, date, payment_method').eq('is_voided', false),
+                client.from('expenses').select('amount, date, category').eq('is_voided', false),
+                client.from('orders').select('status, loan_amount, principal_paid, created_at').in('status', ['active', 'completed', 'liquidated']),
+                client.from('capital_injections').select('amount').eq('is_voided', false)
+            ]);
+
+            const payments = phRes.data || [];
+            const expenses = expRes.data || [];
+            const orders = ordersRes.data || [];
+            const totalInjected = (injRes.data || []).reduce((s, r) => s + (r.amount || 0), 0);
+
+            // 当前在外本金
+            const deployedNow = orders.filter(o => o.status === 'active').reduce((s, o) => s + (o.loan_amount || 0), 0);
+            // 历史累计回笼本金
+            const totalPrincipalBack = payments.filter(p => p.type === 'principal').reduce((s, p) => s + (p.amount || 0), 0);
+
+            // 按月聚合
+            const monthlyData = months.map(m => {
+                const inRange = arr => arr.filter(r => r.date >= m.start && r.date <= m.end);
+                const ph = inRange(payments);
+                const interest = ph.filter(p => p.type === 'interest').reduce((s, p) => s + (p.amount || 0), 0);
+                const adminFee = ph.filter(p => p.type === 'admin_fee').reduce((s, p) => s + (p.amount || 0), 0);
+                const serviceFee = ph.filter(p => p.type === 'service_fee').reduce((s, p) => s + (p.amount || 0), 0);
+                const principalBack = ph.filter(p => p.type === 'principal').reduce((s, p) => s + (p.amount || 0), 0);
+                const principalOut = ph.filter(p => p.type === 'loan_disbursement').reduce((s, p) => s + (p.amount || 0), 0);
+                const exp = inRange(expenses).reduce((s, e) => s + (e.amount || 0), 0);
+                const trueIncome = interest + adminFee + serviceFee;
+                const netProfit = trueIncome - exp;
+                return { ...m, interest, adminFee, serviceFee, trueIncome, principalBack, principalOut, exp, netProfit };
+            });
+
+            // 累计总计行
+            const totals = monthlyData.reduce((t, m) => ({
+                interest: t.interest + m.interest,
+                adminFee: t.adminFee + m.adminFee,
+                serviceFee: t.serviceFee + m.serviceFee,
+                trueIncome: t.trueIncome + m.trueIncome,
+                principalBack: t.principalBack + m.principalBack,
+                principalOut: t.principalOut + m.principalOut,
+                exp: t.exp + m.exp,
+                netProfit: t.netProfit + m.netProfit,
+            }), { interest: 0, adminFee: 0, serviceFee: 0, trueIncome: 0, principalBack: 0, principalOut: 0, exp: 0, netProfit: 0 });
+
+            const fmt = v => Utils.formatCurrency(v);
+            const profitColor = v => v >= 0 ? 'color:#16a34a;font-weight:700' : 'color:#dc2626;font-weight:700';
+
+            // 月度明细表格行
+            const tableRows = monthlyData.map(m => `
+                <tr>
+                    <td style="font-weight:600;white-space:nowrap">${m.label}</td>
+                    <td class="amount" style="color:#06b6d4">${fmt(m.interest)}</td>
+                    <td class="amount" style="color:#6366f1">${fmt(m.adminFee)}</td>
+                    <td class="amount" style="color:#8b5cf6">${fmt(m.serviceFee)}</td>
+                    <td class="amount;font-weight:700">${fmt(m.trueIncome)}</td>
+                    <td class="amount" style="color:#ef4444">−${fmt(m.exp)}</td>
+                    <td class="amount" style="${profitColor(m.netProfit)}">${fmt(m.netProfit)}</td>
+                    <td class="amount" style="color:#94a3b8">${fmt(m.principalBack)}</td>
+                </tr>`).join('');
+
+            const totalRow = `
+                <tr style="background:var(--bg-highlight);font-weight:700;border-top:2px solid var(--border-medium)">
+                    <td>${lang === 'id' ? '6 Bulan' : '6个月合计'}</td>
+                    <td class="amount" style="color:#06b6d4">${fmt(totals.interest)}</td>
+                    <td class="amount" style="color:#6366f1">${fmt(totals.adminFee)}</td>
+                    <td class="amount" style="color:#8b5cf6">${fmt(totals.serviceFee)}</td>
+                    <td class="amount">${fmt(totals.trueIncome)}</td>
+                    <td class="amount" style="color:#ef4444">−${fmt(totals.exp)}</td>
+                    <td class="amount" style="${profitColor(totals.netProfit)}">${fmt(totals.netProfit)}</td>
+                    <td class="amount" style="color:#94a3b8">${fmt(totals.principalBack)}</td>
+                </tr>`;
+
+            // 资金健康度评分（简单规则）
+            const utilizationRate = totalInjected > 0 ? (deployedNow / totalInjected * 100) : 0;
+            let healthScore = 100;
+            if (utilizationRate > 90) healthScore -= 20;
+            else if (utilizationRate < 30) healthScore -= 10;
+            if (totals.netProfit < 0) healthScore -= 30;
+            const healthColor = healthScore >= 80 ? '#16a34a' : healthScore >= 60 ? '#d97706' : '#dc2626';
+            const healthLabel = healthScore >= 80
+                ? (lang === 'id' ? '✅ Sehat' : '✅ 健康')
+                : healthScore >= 60
+                    ? (lang === 'id' ? '⚠️ Perlu Perhatian' : '⚠️ 需关注')
+                    : (lang === 'id' ? '❌ Berisiko' : '❌ 有风险');
+
+            return `
+            <div class="page-header">
+                <h2>📈 ${lang === 'id' ? 'Laporan Keuangan Bulanan' : '月度资金健康报表'}</h2>
+                <div class="header-actions">
+                    <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
+                </div>
+            </div>
+
+            <!-- 顶部摘要卡片 -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px;">
+                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid #16a34a">
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">💰 ${lang === 'id' ? 'Pendapatan Nyata (6 bln)' : '真实收入（6个月）'}</div>
+                    <div style="font-size:20px;font-weight:800;color:#16a34a">${fmt(totals.trueIncome)}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Bunga + Admin + Layanan' : '利息 + 管理费 + 服务费'}</div>
+                </div>
+                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid #ef4444">
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📤 ${lang === 'id' ? 'Pengeluaran (6 bln)' : '运营支出（6个月）'}</div>
+                    <div style="font-size:20px;font-weight:800;color:#ef4444">−${fmt(totals.exp)}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Biaya operasional' : '独立核算，非资金流转'}</div>
+                </div>
+                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid ${totals.netProfit >= 0 ? '#0e7490' : '#dc2626'}">
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📊 ${lang === 'id' ? 'Laba Bersih (6 bln)' : '净利润（6个月）'}</div>
+                    <div style="font-size:20px;font-weight:800;${profitColor(totals.netProfit)}">${fmt(totals.netProfit)}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Pendapatan − Pengeluaran' : '真实收入 − 运营支出'}</div>
+                </div>
+                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid ${healthColor}">
+                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🏦 ${lang === 'id' ? 'Kesehatan Dana' : '资金健康度'}</div>
+                    <div style="font-size:20px;font-weight:800;color:${healthColor}">${healthScore}分</div>
+                    <div style="font-size:12px;font-weight:600;color:${healthColor};margin-top:2px">${healthLabel}</div>
+                </div>
+            </div>
+
+            <!-- 资金结构说明 -->
+            <div class="card" style="margin-bottom:16px;border-left:4px solid var(--primary)">
+                <div class="card-header"><div class="card-title">🔄 ${lang === 'id' ? 'Struktur Modal Saat Ini' : '当前资金结构'}</div></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:4px 0 8px">
+                    <div style="text-align:center">
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '💼 Total Modal Disetor' : '💼 总投入资本'}</div>
+                        <div style="font-size:17px;font-weight:700">${fmt(totalInjected)}</div>
+                    </div>
+                    <div style="text-align:center">
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '📤 Dalam Gadai (Modal Keluar)' : '📤 在押资金（资金出口②）'}</div>
+                        <div style="font-size:17px;font-weight:700;color:var(--primary)">${fmt(deployedNow)}</div>
+                    </div>
+                    <div style="text-align:center">
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '🔄 Pokok Kembali (Bukan Pendapatan)' : '🔄 已回笼本金（非收入）'}</div>
+                        <div style="font-size:17px;font-weight:700;color:#94a3b8">${fmt(totalPrincipalBack)}</div>
+                    </div>
+                    <div style="text-align:center">
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '📈 Utilisasi Modal' : '📈 资金利用率'}</div>
+                        <div style="font-size:17px;font-weight:700;color:${utilizationRate > 85 ? '#d97706' : '#16a34a'}">${utilizationRate.toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);padding:8px;background:var(--bg-highlight);border-radius:6px;line-height:1.6">
+                    💡 ${lang === 'id'
+                        ? '<strong>Prinsip: "Pokok kembali bukan pendapatan"</strong> — Pokok yang kembali adalah modal Anda sendiri yang kembali ke kas, bukan keuntungan. Pendapatan nyata hanya: Bunga + Biaya Admin + Biaya Layanan.'
+                        : '<strong>原则：「本金回笼不是收入，是自有资金归位」</strong> — 本金回笼只是您的资金从外部归位，不计入损益。真实收入仅为：利息 + 管理费 + 服务费。'}
+                </div>
+            </div>
+
+            <!-- 月度明细表 -->
+            <div class="card">
+                <div class="card-header"><div class="card-title">📅 ${lang === 'id' ? 'Rincian Per Bulan (6 Bulan Terakhir)' : '近6个月明细'}</div></div>
+                <div class="table-container">
+                    <table class="data-table" style="min-width:700px">
+                        <thead>
+                            <tr>
+                                <th>${lang === 'id' ? 'Bulan' : '月份'}</th>
+                                <th class="amount" style="color:#06b6d4">${lang === 'id' ? 'Bunga' : '利息收入'}</th>
+                                <th class="amount" style="color:#6366f1">${lang === 'id' ? 'Adm.' : '管理费'}</th>
+                                <th class="amount" style="color:#8b5cf6">${lang === 'id' ? 'Layanan' : '服务费'}</th>
+                                <th class="amount">${lang === 'id' ? 'Total Pendapatan' : '真实收入合计'}</th>
+                                <th class="amount" style="color:#ef4444">${lang === 'id' ? 'Pengeluaran' : '运营支出'}</th>
+                                <th class="amount">${lang === 'id' ? 'Laba Bersih' : '净利润'}</th>
+                                <th class="amount" style="color:#94a3b8">${lang === 'id' ? 'Pokok Kembali' : '本金回笼'}</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}${totalRow}</tbody>
+                    </table>
+                </div>
+                <div style="margin-top:10px;font-size:11px;color:var(--text-muted);padding:8px;border-top:1px solid var(--border-light)">
+                    ⚠️ ${lang === 'id'
+                        ? '「Pokok Kembali」ditampilkan terpisah dan <strong>tidak termasuk</strong> dalam kolom Pendapatan maupun Laba Bersih, karena merupakan modal Anda sendiri yang kembali.'
+                        : '「本金回笼」单独列示，<strong>不计入</strong>真实收入和净利润，因为它是您的自有资金归位，与损益无关。'}
+                </div>
+            </div>`;
+        },
+
+    // ==================== 向下兼容挂载 ====================
     if (window.APP) {
         window.APP.showCapitalInjectionModal = CapitalModule.showCapitalInjectionModal.bind(CapitalModule);
         window.APP.closeCapitalInjectionModal = CapitalModule.closeCapitalInjectionModal.bind(CapitalModule);

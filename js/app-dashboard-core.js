@@ -444,6 +444,7 @@
                     </div>`;
                 }
                 else if (page === 'blacklist') { if (JF.BlacklistPage?.buildBlacklistHTML) contentHtml = await JF.BlacklistPage.buildBlacklistHTML(); }
+                else if (page === 'fundHealthReport') { if (JF.CapitalModule?.buildFundHealthReportHTML) contentHtml = await JF.CapitalModule.buildFundHealthReportHTML(); }
                 else if (page === 'messageCenter') { if (JF.MessageCenter?.showMessageCenter) { await JF.MessageCenter.showMessageCenter(); this.saveCurrentPageState(); return; } }
                 else if (page === 'viewOrder' && this.currentOrderId) { if (JF.OrdersPage?.renderViewOrderHTML) contentHtml = await JF.OrdersPage.renderViewOrderHTML(this.currentOrderId); }
                 else if (page === 'payment' && this.currentOrderId) { if (JF.PaymentPage?.showPayment) { await JF.PaymentPage.showPayment(this.currentOrderId); this.saveCurrentPageState(); return; } }
@@ -553,10 +554,12 @@
             if (bankFlowEl) { bankFlowEl.style.transition = 'opacity 0.4s'; bankFlowEl.style.opacity = '0'; setTimeout(function(){ bankFlowEl.innerHTML = '<span class="in">↑ +' + Utils.formatCurrency(bankIncome) + '</span><span class="out">↓ −' + Utils.formatCurrency(bankExpense) + '</span>'; bankFlowEl.style.opacity = '1'; }, 400); }
             const totalIncome = (kpiReport.admin_fees_collected || 0) + (kpiReport.service_fees_collected || 0) + (kpiReport.interest_collected || 0);
             const netProfit = totalIncome - totalExpenses;
-            const npValEl = document.querySelector('.np-val');
+            const npValEl = document.getElementById('netProfitVal') || document.querySelector('.np-val');
             if (npValEl) { npValEl.style.transition = 'opacity 0.4s'; npValEl.style.opacity = '0'; setTimeout(function(){ npValEl.textContent = Utils.formatCurrency(netProfit); npValEl.style.opacity = '1'; }, 400); }
-            const expenseAmtEl = document.querySelector('.income-item .income-amt.expense');
-            if (expenseAmtEl) { expenseAmtEl.style.transition = 'opacity 0.4s'; expenseAmtEl.style.opacity = '0'; setTimeout(function(){ expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses); expenseAmtEl.style.opacity = '1'; }, 400); const expenseSubEl = expenseAmtEl.closest('.income-item') && expenseAmtEl.closest('.income-item').querySelector('.income-sub'); if (expenseSubEl) expenseSubEl.textContent = lang === 'id' ? 'Bulan ini' : '本月合计'; }
+            const expenseAmtEl = document.getElementById('expenseAmt');
+            if (expenseAmtEl) { expenseAmtEl.style.transition = 'opacity 0.4s'; expenseAmtEl.style.opacity = '0'; setTimeout(function(){ expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses); expenseAmtEl.style.opacity = '1'; }, 400); }
+            const expenseSubEl = document.getElementById('expenseSub');
+            if (expenseSubEl) { setTimeout(function(){ expenseSubEl.textContent = lang === 'id' ? 'Bulan ini' : '本月合计'; }, 400); }
             const messagePreview = document.querySelector('.message-preview');
             if (messagePreview) {
                 const pendingCount = messages.length;
@@ -746,13 +749,24 @@
                 const quickActionsHtml = quickActions.map(q => `<div class="quick-btn${q.cls ? ' ' + q.cls : ''}" onclick="${q.action}"><span class="qb-icon">${q.icon}</span><span class="qb-label">${q.label}</span></div>`).join('');
 
                 const totalIncomeInitial = kpiReport.admin_fees_collected + kpiReport.service_fees_collected + kpiReport.interest_collected;
-                const incomeItems = [
-                    { dot: '#6366f1', label: t('admin_fee'), sub: lang === 'id' ? 'Terkumpul' : '已收取', amt: kpiReport.admin_fees_collected, cls: '' },
-                    { dot: '#8b5cf6', label: t('service_fee'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: kpiReport.service_fees_collected, cls: '' },
-                    { dot: '#06b6d4', label: t('interest'), sub: lang === 'id' ? 'Bulan ini' : '月累计', amt: kpiReport.interest_collected, cls: '' },
-                    { dot: '#ef4444', label: lang === 'id' ? 'Pengeluaran' : '支出合计', sub: lang === 'id' ? 'Memuat...' : '加载中...', amt: 0, cls: 'expense' },
-                ];
-                const incomeItemsHtml = incomeItems.map(item => `<div class="income-item"><div class="income-dot" style="background:${item.dot}"></div><div><div class="income-name">${item.label}</div><div class="income-sub">${item.sub}</div></div><div class="income-amt${item.cls === 'expense' ? ' expense' : ''}">${item.cls === 'expense' ? '−' : ''}${Utils.formatCurrency(item.amt)}</div></div>`).join('');
+                const principalCollected = kpiReport.principal_collected || 0;
+                // 三区分离：真实收入 / 本金流转 / 运营支出
+                const incomeItemsHtml = `
+                  <div class="income-section">
+                    <div class="income-section-title">💰 ${lang === 'id' ? 'Pendapatan Nyata' : '真实收入'}</div>
+                    <div class="income-item"><div class="income-dot" style="background:#6366f1"></div><div><div class="income-name">${t('admin_fee')}</div><div class="income-sub">${lang === 'id' ? 'Terkumpul' : '累计已收'}</div></div><div class="income-amt">${Utils.formatCurrency(kpiReport.admin_fees_collected)}</div></div>
+                    <div class="income-item"><div class="income-dot" style="background:#8b5cf6"></div><div><div class="income-name">${t('service_fee')}</div><div class="income-sub">${lang === 'id' ? 'Terkumpul' : '累计已收'}</div></div><div class="income-amt">${Utils.formatCurrency(kpiReport.service_fees_collected)}</div></div>
+                    <div class="income-item"><div class="income-dot" style="background:#06b6d4"></div><div><div class="income-name">${t('interest')}</div><div class="income-sub">${lang === 'id' ? 'Terkumpul' : '累计已收'}</div></div><div class="income-amt">${Utils.formatCurrency(kpiReport.interest_collected)}</div></div>
+                  </div>
+                  <div class="income-section income-section--neutral">
+                    <div class="income-section-title">🔄 ${lang === 'id' ? 'Perputaran Modal (Pokok)' : '资金流转（本金）'}</div>
+                    <div class="income-item"><div class="income-dot" style="background:#94a3b8"></div><div><div class="income-name">${lang === 'id' ? 'Pokok Dikembalikan' : '已回笼本金'}</div><div class="income-sub">${lang === 'id' ? 'Bukan pendapatan · Dana kembali' : '非收入 · 自有资金归位'}</div></div><div class="income-amt" style="color:var(--text-secondary)">${Utils.formatCurrency(principalCollected)}</div></div>
+                    <div class="income-item"><div class="income-dot" style="background:#0e7490"></div><div><div class="income-name">${lang === 'id' ? 'Pokok Masih di Luar' : '在外本金'}</div><div class="income-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div><div class="income-amt" style="color:var(--primary)">${Utils.formatCurrency(deployed)}</div></div>
+                  </div>
+                  <div class="income-section income-section--expense">
+                    <div class="income-section-title">📤 ${lang === 'id' ? 'Pengeluaran Operasional' : '运营支出'}</div>
+                    <div class="income-item"><div class="income-dot" style="background:#ef4444"></div><div><div class="income-name">${lang === 'id' ? 'Total Pengeluaran' : '支出合计'}</div><div class="income-sub" id="expenseSub">${lang === 'id' ? 'Memuat...' : '加载中...'}</div></div><div class="income-amt expense" id="expenseAmt">−${Utils.formatCurrency(0)}</div></div>
+                  </div>`;
 
                 let previewHtml = '<div class="empty-preview">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</div>';
                 const netProfitInitial = 0;
@@ -780,6 +794,7 @@
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('orderTable')"><span class="nav-icon">📋</span> ${t('order_list')}${activeBadgeCount > 0 ? `<span class="nav-badge">${activeBadgeCount}</span>` : ''}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('paymentHistory')"><span class="nav-icon">💰</span> ${lang === 'id' ? 'Arus Kas' : '资金流水'}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('expenses')"><span class="nav-icon">📝</span> ${t('expenses')}</div>
+                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('fundHealthReport')"><span class="nav-icon">📈</span> ${lang === 'id' ? 'Laporan Bulanan' : '月度资金报表'}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('messageCenter')"><span class="nav-icon">💬</span> ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</div>
                     ${isAdmin ? `<div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
                     <div class="nav-item" onclick="JF.CapitalModule.showCapitalInjectionModal()"><span class="nav-icon">💉</span> ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</div>
@@ -831,7 +846,20 @@
                             <div class="tx-btn-v2" onclick="JF.FundsPage.showTransferModal('bank_to_cash')">🏧→🏦 ${lang === 'id' ? 'Tarik Tunai dari Bank' : '银行取现金'}</div>
                         </div>
                     </div>
-                    <div class="income-card"><div class="card-header"><div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div></div><div class="income-items">${incomeItemsHtml}</div><div class="net-profit-box"><div><div class="np-label">${t('net_profit')}</div><div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div></div><div class="np-val">${Utils.formatCurrency(netProfitInitial)}</div></div></div>
+                    <div class="income-card">
+                        <div class="card-header">
+                            <div class="card-title">📊 ${lang === 'id' ? 'Komposisi Pendapatan' : '收入构成'}</div>
+                            <div class="card-action" onclick="JF.DashboardCore.navigateTo('fundHealthReport')" style="font-size:12px;cursor:pointer;color:var(--primary)">📈 ${lang === 'id' ? 'Laporan Bulanan →' : '月度报表 →'}</div>
+                        </div>
+                        <div class="income-items">${incomeItemsHtml}</div>
+                        <div class="net-profit-box">
+                            <div>
+                                <div class="np-label">${t('net_profit')}</div>
+                                <div class="np-sub">${lang === 'id' ? 'Admin + Layanan + Bunga − Pengeluaran' : '管理费 + 服务费 + 利息 − 支出'}</div>
+                            </div>
+                            <div class="np-val" id="netProfitVal">${Utils.formatCurrency(netProfitInitial)}</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="bottom-row">
                     <div class="quick-card"><div class="card-header"><div class="card-title">⚡ ${lang === 'id' ? 'Aksi Cepat' : '快捷操作'}</div></div><div class="quick-grid">${quickActionsHtml}</div></div>
