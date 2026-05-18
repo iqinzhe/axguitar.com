@@ -1,4 +1,4 @@
-// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费)
+// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查)
 
 'use strict';
 
@@ -1053,6 +1053,7 @@
             return { order, payments: data };
         },
 
+        // ==================== 创建订单（增加费用缴纳检查） ====================
         async createOrder(orderData) {
             if(!supabaseClient) throw new Error('客户端未初始化');
             const profile = await this.getCurrentProfile();
@@ -1060,13 +1061,36 @@
             const nowDateTime = orderData.custom_order_date
                 ? orderData.custom_order_date + 'T00:00:00.000Z'
                 : nowStr();
+            
+            // 获取管理费金额
             const adminFee = (orderData.admin_fee !== undefined && orderData.admin_fee !== null)
                 ? orderData.admin_fee
                 : Utils.calculateAdminFee(orderData.loan_amount);
-            const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
+            
+            // 获取服务费金额
             const serviceFeeAmount = (orderData.service_fee_amount !== undefined && orderData.service_fee_amount !== null)
                 ? orderData.service_fee_amount
                 : 0;
+            
+            // ========== 费用缴纳检查（新增） ==========
+            // 检查管理费：如果管理费 > 0 且未标记为已缴，则不能创建订单
+            const adminFeePaid = orderData.admin_fee_paid !== undefined ? orderData.admin_fee_paid : (adminFee === 0);
+            if (adminFee > 0 && !adminFeePaid) {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Biaya admin harus dibayar sebelum pesanan dibuat'
+                    : '管理费必须在订单创建前缴纳');
+            }
+            
+            // 检查服务费：如果服务费 > 0 且未标记为已缴，则不能创建订单
+            const serviceFeePaid = orderData.service_fee_paid !== undefined ? orderData.service_fee_paid : (serviceFeeAmount === 0);
+            if (serviceFeeAmount > 0 && !serviceFeePaid) {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Biaya layanan harus dibayar sebelum pesanan dibuat'
+                    : '服务费必须在订单创建前缴纳');
+            }
+            // ========== 费用缴纳检查结束 ==========
+            
+            const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
             const agreedInterestRate = (orderData.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT) / 100;
             const repaymentType = orderData.repayment_type || 'flexible';
             const repaymentTerm = orderData.repayment_term || null;
@@ -1100,9 +1124,12 @@
                         customer_ktp: orderData.customer_ktp, customer_phone: orderData.customer_phone,
                         customer_address: orderData.customer_address || '',
                         collateral_name: orderData.collateral_name, loan_amount: orderData.loan_amount,
-                        admin_fee: adminFee, admin_fee_paid: false,
+                        admin_fee: adminFee, 
+                        admin_fee_paid: adminFeePaid,
+                        admin_fee_paid_date: (adminFeePaid && adminFee > 0) ? nowDate : null,
                         service_fee_percent: serviceFeePercent, service_fee_amount: serviceFeeAmount,
-                        service_fee_paid: 0, monthly_interest: monthlyInterest,
+                        service_fee_paid: serviceFeePaid ? serviceFeeAmount : 0,
+                        monthly_interest: monthlyInterest,
                         interest_paid_months: 0, interest_paid_total: 0,
                         next_interest_due_date: nextDueDate,
                         principal_paid: 0, principal_remaining: orderData.loan_amount,
