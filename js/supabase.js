@@ -1670,89 +1670,89 @@
             return true;
         },
 
-        async updateOverdueDays() {
-    if(!supabaseClient) return false;
-    const { data: activeOrders, error } = await supabaseClient
-        .from('orders')
-        .select('id, next_interest_due_date, overdue_days, liquidation_status, fund_status, created_at')
-        .eq('status', 'active');
-    if(error) throw error;
-    if(!activeOrders?.length) return true;
-    
-    // 修复：使用雅加达时间 (UTC+7)
-    const todayJakarta = Utils.getJakartaDate();
-    todayJakarta.setUTCHours(0, 0, 0, 0);
-    const todayTime = todayJakarta.getTime();
-    
-    const updates = [];
-    for(const o of activeOrders){
-        if(!o.next_interest_due_date) continue;
-        
-        // 解析到期日并转换为雅加达时区的0点时间戳
-        const dueDateStr = o.next_interest_due_date;
-        const [year, month, day] = dueDateStr.split('-').map(Number);
-        const dueJakarta = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-        const dueTime = dueJakarta.getTime();
-        
-        let overdue = 0;
-        if(todayTime > dueTime) {
-            overdue = Math.floor((todayTime - dueTime) / 86400000);
-        }
-        
-        let status = o.liquidation_status||'normal';
-        let fund = o.fund_status;
-        if(overdue>=30){ status='auction'; fund='forfeited'; }
-        else if(overdue>=20) status='pre_auction';
-        else if(overdue>=10) status='collection';
-        else status='normal';
-        
-        if(overdue!==o.overdue_days || status!==o.liquidation_status || fund!==o.fund_status){
-            updates.push({ id:o.id, overdue_days:overdue, liquidation_status:status, fund_status:fund });
-        }
-    }
-    
-    if(!updates.length) return true;
-    
-    const BATCH=20;
-    const results = [];
-    const failedOrders = [];
-    for(let i=0;i<updates.length;i+=BATCH){
-        const batch = updates.slice(i,i+BATCH);
-        const batchResults = await Promise.allSettled(
-            batch.map(async (o) => {
-                const { error: updateError } = await supabaseClient.from('orders')
-                    .update({ 
-                        overdue_days:o.overdue_days, 
-                        liquidation_status:o.liquidation_status, 
-                        fund_status:o.fund_status, 
-                        updated_at:nowStr() 
-                    })
-                    .eq('id', o.id);
-                if (updateError) throw updateError;
-                return o.id;
-            })
-        );
-        for (let j = 0; j < batchResults.length; j++) {
-            const result = batchResults[j];
-            if (result.status === 'rejected') {
-                failedOrders.push({ orderId: batch[j].id, error: result.reason?.message || 'unknown' });
+                async updateOverdueDays() {
+            if(!supabaseClient) return false;
+            const { data: activeOrders, error } = await supabaseClient
+                .from('orders')
+                .select('id, next_interest_due_date, overdue_days, liquidation_status, fund_status, created_at')
+                .eq('status', 'active');
+            if(error) throw error;
+            if(!activeOrders?.length) return true;
+            
+            // 修复：使用雅加达时间 (UTC+7)
+            const todayJakarta = Utils.getJakartaDate();
+            todayJakarta.setUTCHours(0, 0, 0, 0);
+            const todayTime = todayJakarta.getTime();
+            
+            const updates = [];
+            for(const o of activeOrders){
+                if(!o.next_interest_due_date) continue;
+                
+                // 解析到期日并转换为雅加达时区的0点时间戳
+                const dueDateStr = o.next_interest_due_date;
+                const [year, month, day] = dueDateStr.split('-').map(Number);
+                const dueJakarta = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+                const dueTime = dueJakarta.getTime();
+                
+                let overdue = 0;
+                if(todayTime > dueTime) {
+                    overdue = Math.floor((todayTime - dueTime) / 86400000);
+                }
+                
+                let status = o.liquidation_status||'normal';
+                let fund = o.fund_status;
+                if(overdue>=30){ status='auction'; fund='forfeited'; }
+                else if(overdue>=20) status='pre_auction';
+                else if(overdue>=10) status='collection';
+                else status='normal';
+                
+                if(overdue!==o.overdue_days || status!==o.liquidation_status || fund!==o.fund_status){
+                    updates.push({ id:o.id, overdue_days:overdue, liquidation_status:status, fund_status:fund });
+                }
             }
-        }
-        results.push(...batchResults);
-    }
-    const failed = results.filter(r => r.status === 'rejected');
-    if (failed.length > 0) {
-        console.error(`[updateOverdueDays] ${failed.length} 个更新失败:`, failed.map(f => f.reason?.message || 'unknown'));
-        if (window.Audit) {
-            await window.Audit.log('overdue_update_failed', JSON.stringify({
-                failed_count: failed.length,
-                failed_orders: failedOrders.slice(0, 10),
-                timestamp: nowStr()
-            }));
-        }
-    }
-    return failed.length === 0;
-}
+            
+            if(!updates.length) return true;
+            
+            const BATCH=20;
+            const results = [];
+            const failedOrders = [];
+            for(let i=0;i<updates.length;i+=BATCH){
+                const batch = updates.slice(i,i+BATCH);
+                const batchResults = await Promise.allSettled(
+                    batch.map(async (o) => {
+                        const { error: updateError } = await supabaseClient.from('orders')
+                            .update({ 
+                                overdue_days:o.overdue_days, 
+                                liquidation_status:o.liquidation_status, 
+                                fund_status:o.fund_status, 
+                                updated_at:nowStr() 
+                            })
+                            .eq('id', o.id);
+                        if (updateError) throw updateError;
+                        return o.id;
+                    })
+                );
+                for (let j = 0; j < batchResults.length; j++) {
+                    const result = batchResults[j];
+                    if (result.status === 'rejected') {
+                        failedOrders.push({ orderId: batch[j].id, error: result.reason?.message || 'unknown' });
+                    }
+                }
+                results.push(...batchResults);
+            }
+            const failed = results.filter(r => r.status === 'rejected');
+            if (failed.length > 0) {
+                console.error(`[updateOverdueDays] ${failed.length} 个更新失败:`, failed.map(f => f.reason?.message || 'unknown'));
+                if (window.Audit) {
+                    await window.Audit.log('overdue_update_failed', JSON.stringify({
+                        failed_count: failed.length,
+                        failed_orders: failedOrders.slice(0, 10),
+                        timestamp: nowStr()
+                    }));
+                }
+            }
+            return failed.length === 0;
+        },
 
         async updateOrder(orderId, updateData, customerId) {
             const currentOrder = await this.getOrder(orderId);
