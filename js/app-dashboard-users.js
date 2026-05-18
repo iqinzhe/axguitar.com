@@ -29,6 +29,7 @@
                     rows = `<tr><td colspan="5" class="text-center">${t('no_data')}</td>`;
                 } else {
                     for (const u of users) {
+                        if (u.role === 'admin') continue;  // 管理员账户不在此处显示
                         const storeName = u.stores ? u.stores.name : (u.store_id ? (lang === 'id' ? 'Toko tidak diketahui' : '未知门店') : (lang === 'id' ? 'Kantor Pusat' : '总部'));
                         let nameDisplay = Utils.escapeHtml(u.name);
                         if (u.ktp_number) nameDisplay += `<br><small style="color:var(--text-muted);">${lang === 'id' ? 'KTP: ' : '身份证: '}${Utils.escapeHtml(u.ktp_number)}</small>`;

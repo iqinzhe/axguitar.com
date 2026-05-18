@@ -392,8 +392,8 @@
                 const today = new Date();
                 const currentYear = today.getFullYear();
                 const currentMonth = today.getMonth();
-                const monthStart = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-                const monthEnd = today.toISOString().split('T')[0];
+                const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+                const monthEnd = Utils.getLocalToday();
 
                 const { data: allOrders, error: orderError } = await client
                     .from('orders')
@@ -519,9 +519,10 @@
                 const storeCards = [];
                 for (const store of StoreManager.stores) {
                     const isPractice = store.is_practice === true;
+                    const isHQ = (store.code === 'STORE_000');  // 总部不参与财务汇总
                     const stats = storeStats[store.id] || {};
                     const balance = storeBalances[store.id] || { cashBalance: 0, bankBalance: 0 };
-                    if (!isPractice) {
+                    if (!isPractice && !isHQ) {
                         grandTotal.monthNewOrders += (stats.monthNewOrders || 0);
                         grandTotal.totalOrders += (stats.totalOrders || 0);
                         grandTotal.activeOrders += (stats.activeOrders || 0);
@@ -630,6 +631,7 @@
                         const isActive = store.is_active !== false;
                         const isStorePractice = store.is_practice === true;
                         const isStore000 = (store.code === 'STORE_000');
+                        if (isStore000) continue;  // 总部账户不在此处显示
                         let statusBadgeHtml = isActive
                             ? `<span class="badge badge--active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
                             : `<span class="badge badge--liquidated">${lang === 'id' ? 'Ditutup' : '已暂停'}</span>`;
@@ -796,8 +798,9 @@
             } catch (e) { /* ignore */ }
 
             const printDateTime = new Date().toLocaleString();
-            const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const periodEnd = new Date().toISOString().split('T')[0];
+            const _pNow = new Date();
+            const periodStart = `${_pNow.getFullYear()}-${String(_pNow.getMonth() + 1).padStart(2, '0')}-01`;
+            const periodEnd = Utils.getLocalToday();
 
             const fmt = (val) => Utils.formatCurrency(val);
             const isZh = lang !== 'id';
