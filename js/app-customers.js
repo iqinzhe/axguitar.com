@@ -819,24 +819,6 @@
             
             const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
             
-            // 管理费检查：金额 > 0 时必须缴纳
-            if (adminFee > 0) {
-                Utils.toast.warning(lang === 'id' 
-                    ? '⚠️ Biaya admin harus dibayar sebelum pesanan dibuat. Nasabah harus membayar admin fee terlebih dahulu.'
-                    : '⚠️ 管理费未缴纳。客户必须先缴纳管理费才能创建订单。');
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
-                return;
-            }
-            
-            // 服务费检查：金额 > 0 时必须缴纳
-            if (serviceFee > 0) {
-                Utils.toast.warning(lang === 'id' 
-                    ? '⚠️ Biaya layanan harus dibayar sebelum pesanan dibuat. Nasabah harus membayar service fee terlebih dahulu.'
-                    : '⚠️ 服务费未缴纳。客户必须先缴纳服务费才能创建订单。');
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
-                return;
-            }
-            
             const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 10;
             const repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked'); 
             const repaymentType = repaymentTypeRadio ? repaymentTypeRadio.value : 'flexible';
