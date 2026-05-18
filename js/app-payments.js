@@ -215,6 +215,8 @@
                 const orderCreatedDate = (order.created_at || '').substring(0, 10);
                 const interestDateMin = orderCreatedDate;
                 const interestDateToday = Utils.getLocalToday();
+                const principalDateMin = orderCreatedDate;
+                const principalDateToday = Utils.getLocalToday();
                 const interestDateMax = (() => {
                     const d = new Date(interestDateToday);
                     d.setMonth(d.getMonth() + 3);
@@ -332,13 +334,16 @@
                 if (order.repayment_type !== 'fixed') {
                     flexibleHtml = `
                         <div class="payment-double-column">
-                            <div class="card" style="min-width:0;overflow-x:hidden;">
+                            <div class="card">
                                 <div class="card-header"><h3>💰 ${t('pay_interest')}</h3></div>
                                 <div class="card-body">
-                                    <div class="info-box"><div class="info-row"><span>📌 ${lang === 'id' ? 'Pembayaran Bunga ke-' : '第'}${nextInterestNumber} ${lang === 'id' ? 'kali' : '次'}</span></div><div class="info-row"><span>💰 ${t('amount_due')}:</span><strong>${Utils.formatCurrency(currentMonthlyInterest)}</strong></div><div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(0)}%</strong></div></div>
+                                    <div class="info-box success-box">
+                                        <div class="info-row"><span>📌 ${lang === 'id' ? 'Pembayaran ke-' : '第'} ${nextInterestNumber} ${lang === 'id' ? 'kali' : '次'}</span><strong style="color:var(--primary)">${Utils.formatCurrency(currentMonthlyInterest)}</strong></div>
+                                        <div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(0)}%</strong></div>
+                                    </div>
                                     <div class="action-input-group">
                                         <label class="action-label">🔢 ${lang === 'id' ? 'Jumlah Bulan Dibayar' : '缴纳期数'}:</label>
-                                        <select id="interestMonthsSelect" class="amount-input" style="font-size:14px;padding:8px 10px;" onchange="(function(){
+                                        <select id="interestMonthsSelect" class="amount-input" onchange="(function(){
                                             var m=parseInt(document.getElementById('interestMonthsSelect').value)||1;
                                             var base=${Math.round(currentMonthlyInterest)};
                                             document.getElementById('interestAmount').value=Utils.formatNumberWithCommas(base*m);
@@ -356,27 +361,67 @@
                                             <option value="2">2 ${lang === 'id' ? 'bulan (bayar muka 1 bln)' : '期（预付1期）'}</option>
                                             <option value="3">3 ${lang === 'id' ? 'bulan (bayar muka 2 bln)' : '期（预付2期）'}</option>
                                         </select>
-                                        <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? '1 periode = normal; 2/3 periode = bayar di muka' : '选1期=正常缴费；选2/3期=包含预付款'}</div>
+                                        <div class="form-hint">💡 ${lang === 'id' ? '1 periode = normal; 2/3 periode = bayar di muka' : '选1期=正常缴费；选2/3期=包含预付款'}</div>
                                     </div>
-                                    <div class="action-input-group"><label class="action-label">📅 ${lang === 'id' ? 'Tanggal Pembayaran' : '入账日期'}:</label><input type="date" id="interestPaymentDate" class="amount-input" value="${interestDateToday}" min="${interestDateMin}" max="${interestDateToday}" style="font-size:14px;padding:8px 10px;"><div class="form-hint" id="interestDateHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}</div></div>
-                                    <div class="action-input-group"><label class="action-label">${lang === 'id' ? 'Jumlah Dibayar' : '缴纳金额'}:</label><input type="text" id="interestAmount" class="amount-input" placeholder="${Utils.formatCurrency(currentMonthlyInterest)}" value="${Utils.formatNumberWithCommas(Math.round(currentMonthlyInterest))}"><div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 ${lang === 'id' ? `Bunga 1 bln: ${Utils.formatCurrency(currentMonthlyInterest)} | Otomatis dikalikan jumlah bulan` : `1个月利息: ${Utils.formatCurrency(currentMonthlyInterest)} | 金额随期数自动计算`}</div></div>
-                                    <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label></div></div>
-                                    <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="interestConfirmBtn">✅ ${t('confirm_payment')}</button>
+                                    <div class="action-input-group">
+                                        <label class="action-label">📅 ${lang === 'id' ? 'Tanggal Pembayaran' : '入账日期'}:</label>
+                                        <input type="date" id="interestPaymentDate" class="amount-input" value="${interestDateToday}" min="${interestDateMin}" max="${interestDateToday}">
+                                        <div class="form-hint" id="interestDateHint">💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}</div>
+                                    </div>
+                                    <div class="action-input-group">
+                                        <label class="action-label">💵 ${lang === 'id' ? 'Jumlah Dibayar' : '缴纳金额'}:</label>
+                                        <input type="text" id="interestAmount" class="amount-input" placeholder="${Utils.formatCurrency(currentMonthlyInterest)}" value="${Utils.formatNumberWithCommas(Math.round(currentMonthlyInterest))}">
+                                        <div class="form-hint">💡 ${lang === 'id' ? `Bunga 1 bln: ${Utils.formatCurrency(currentMonthlyInterest)} | Otomatis dikalikan jumlah bulan` : `1个月利息: ${Utils.formatCurrency(currentMonthlyInterest)} | 金额随期数自动计算`}</div>
+                                    </div>
+                                    <div class="payment-method-group">
+                                        <div class="payment-method-title">${t('recording_method')}:</div>
+                                        <div class="payment-method-options">
+                                            <label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label>
+                                            <label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label>
+                                        </div>
+                                    </div>
+                                    <div class="action-buttons">
+                                        <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success btn--full" id="interestConfirmBtn">✅ ${t('confirm_payment')}</button>
+                                    </div>
                                 </div>
-                                <div class="card-history"><div class="history-title">📋 ${t('interest_history')}</div><div class="table-container" style="overflow-x:auto;"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="text-center" style="width:50px;">${t('times')}</th><th class="col-date">${t('date')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th></tr></thead><tbody>${interestRows}</tbody></table></div></div>
+                                <div class="card-history">
+                                    <div class="history-title">📋 ${t('interest_history')}</div>
+                                    <div class="table-container"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="text-center" style="width:44px;">${t('times')}</th><th class="col-date">${t('date')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th></tr></thead><tbody>${interestRows}</tbody></table></div>
+                                </div>
                             </div>
-                            <div class="card" style="min-width:0;overflow-x:hidden;">
+                            <div class="card">
                                 <div class="card-header"><h3>🏦 ${t('return_principal')}</h3></div>
                                 <div class="card-body">
-                                    <div class="info-box warning-box"><div class="info-row"><span>📊 ${t('principal_paid')}:</span><strong>${Utils.formatCurrency(principalPaid)}</strong></div><div class="info-row"><span>📊 ${t('remaining_principal')}:</span><strong class="${remainingPrincipal > 0 ? 'expense' : 'income'}">${Utils.formatCurrency(remainingPrincipal)}</strong></div></div>
-                                    <div class="action-input-group"><label class="action-label">${t('payment_amount')}:</label><input type="text" id="principalAmount" class="amount-input" placeholder="0"></div>
-                                    <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label><label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label></div></div>
-                                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                    <div class="info-box warning-box">
+                                        <div class="info-row"><span>✅ ${t('principal_paid')}:</span><strong class="income">${Utils.formatCurrency(principalPaid)}</strong></div>
+                                        <div class="info-row"><span>📊 ${t('remaining_principal')}:</span><strong class="${remainingPrincipal > 0 ? 'expense' : 'income'}">${Utils.formatCurrency(remainingPrincipal)}</strong></div>
+                                    </div>
+                                    <div class="action-input-group">
+                                        <label class="action-label">📅 ${lang === 'id' ? 'Tanggal Pembayaran' : '入账日期'}:</label>
+                                        <input type="date" id="principalPaymentDate" class="amount-input" value="${principalDateToday}" min="${principalDateMin}" max="${principalDateToday}">
+                                        <div class="form-hint">💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${principalDateMin})` : `可选择以前日期补录（最早：${principalDateMin}）`}</div>
+                                    </div>
+                                    <div class="action-input-group">
+                                        <label class="action-label">💵 ${t('payment_amount')}:</label>
+                                        <input type="text" id="principalAmount" class="amount-input" placeholder="0">
+                                        <div class="form-hint">💡 ${lang === 'id' ? `Sisa pokok: ${Utils.formatCurrency(remainingPrincipal)}` : `剩余本金：${Utils.formatCurrency(remainingPrincipal)}`}</div>
+                                    </div>
+                                    <div class="payment-method-group">
+                                        <div class="payment-method-title">${t('recording_method')}:</div>
+                                        <div class="payment-method-options">
+                                            <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label>
+                                            <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
+                                        </div>
+                                    </div>
+                                    <div class="action-buttons">
                                         <button onclick="APP.payPrincipalWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="principalConfirmBtn">✅ ${t('confirm_payment')}</button>
                                         <button onclick="APP.requestEarlySettleFlexible('${Utils.escapeAttr(order.order_id)}')" class="btn btn--special" id="flexibleSettleBtn">🎯 ${lang === 'id' ? 'Ajukan Pelunasan' : '申请结清'}</button>
                                     </div>
                                 </div>
-                                <div class="card-history"><div class="history-title">📋 ${t('principal_history')}</div><div class="table-container" style="overflow-x:auto;"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('payment_amount')}</th><th class="col-amount amount">${t('total')} ${t('principal_paid')}</th><th class="col-amount amount">${t('remaining_principal')}</th><th class="col-method text-center">${t('payment_method')}</th></tr></thead><tbody>${principalRows}</tbody></table></div></div>
+                                <div class="card-history">
+                                    <div class="history-title">📋 ${t('principal_history')}</div>
+                                    <div class="table-container"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('payment_amount')}</th><th class="col-amount amount">${t('total')} ${t('principal_paid')}</th><th class="col-amount amount">${t('remaining_principal')}</th><th class="col-method text-center">${t('payment_method')}</th></tr></thead><tbody>${principalRows}</tbody></table></div>
+                                </div>
                             </div>
                         </div>`;
                 }
@@ -536,6 +581,8 @@
             const target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
             const targetName = target === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
+            const principalDateInput = document.getElementById('principalPaymentDate');
+            const paymentDate = (principalDateInput && principalDateInput.value) ? principalDateInput.value : Utils.getLocalToday();
 
             if (isNaN(amount) || amount <= 0) { Utils.toast.warning(Utils.t('invalid_amount')); return; }
 
@@ -577,7 +624,7 @@
                 const confirmed = await Utils.toast.confirm(previewMsg);
                 if (!confirmed) return;
 
-                await SUPABASE.recordPrincipalPayment(orderId, actualAmount, target);
+                await SUPABASE.recordPrincipalPayment(orderId, actualAmount, target, paymentDate);
                 if (window.Audit) await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
 
                 if (isFullSettlement) {

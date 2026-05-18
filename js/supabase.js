@@ -1471,12 +1471,12 @@
             }
         },
 
-        async recordPrincipalPayment(orderId, amount, paymentMethod) {
+        async recordPrincipalPayment(orderId, amount, paymentMethod, paymentDate) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
-            // 确定流水日期：优先使用订单创建日期，否则用当天
-            const recordDate = currentOrder.created_at ? currentOrder.created_at.substring(0, 10) : todayStr();
+            // 优先使用调用方传入的日期，否则用当天
+            const recordDate = paymentDate || Utils.getLocalToday();
             
             if (currentOrder.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
