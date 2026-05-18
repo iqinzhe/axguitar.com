@@ -671,8 +671,8 @@
                     : `• 当金 ≤ Rp5,000,000 ：免服务费 (0%)\n• 当金 > Rp5,000,000 ：按当金的 2% 收取服务费（取整到Rp10,000，可手工修改）\n• 填 0 表示免费`;
 
                 const pawnTermHintText = lang === 'id'
-                    ? 'Pilih jangka waktu gadai (1-10 bulan). Tanggal jatuh tempo akan dihitung otomatis.'
-                    : '选择典当期限（1-10个月）。到期日将自动计算。';
+                    ? 'Pilih jangka waktu gadai (1-12 bulan). Tanggal jatuh tempo akan dihitung otomatis.'
+                    : '选择典当期限（1-12个月）。到期日将自动计算。';
 
                 document.getElementById("app").innerHTML = `
                     <div class="page-header"><h2>📝 ${t('create_order')}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div>
