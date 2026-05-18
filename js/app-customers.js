@@ -1,6 +1,7 @@
 // app-customers.js - v2.0 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
 // 订单ID格式：客户ID-序号（如 BL001-01, BL001-02...）
 // 资金流水日期与订单创建日期保持一致
+// 修复：创建订单时管理费和服务费自动标记为已缴，避免后端检查拦截
 
 'use strict';
 
@@ -882,10 +883,10 @@
                     customer: { name: customer.name, ktp: customer.ktp_number || '', phone: customer.phone, address: customer.ktp_address || customer.address || '' }, 
                     collateral_name: fullCollateralName, loan_amount: amount, notes, customer_id: customerId, store_id: storeId, 
                     admin_fee: adminFee, 
-                    admin_fee_paid: adminFee === 0 ? true : false,
+                    admin_fee_paid: true,   // ✅ 管理费在创建订单时自动收取，标记为已缴纳
                     service_fee_percent: serviceFeePercent, 
                     service_fee_amount: serviceFee,
-                    service_fee_paid: serviceFee === 0 ? 0 : 0,
+                    service_fee_paid: serviceFee,   // ✅ 服务费同理，金额即为已缴金额
                     agreed_interest_rate: agreedInterestRate, repayment_type: repaymentType, repayment_term: repaymentTerm, 
                     monthly_fixed_payment: monthlyFixedPayment, 
                     pawn_term_months: pawnTermMonths,
@@ -1143,7 +1144,7 @@
                 if (orderIds.length > 0) { const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false }); allPayments = data || []; }
                 const typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') }; 
                 let rows = '';
-                if (allPayments.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td>`; }
+                if (allPayments.length === 0) { rows = `<td><td colspan="7" class="text-center">${t('no_data')}<\/td>`; }
                 else { for (const p of allPayments) { const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank'; rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}<\/td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td><td class="col-type">${typeMap[p.type] || p.type}<\/td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}<\/td><td class="amount">${Utils.formatCurrency(p.amount)}<\/td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}<\/span><\/td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}<\/td>`; } }
                 return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
