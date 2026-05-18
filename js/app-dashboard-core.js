@@ -1,5 +1,9 @@
-// app-dashboard-core.js - v2.0 (JF 命名空间)  
+// app-dashboard-core.js - v2.1 (JF 命名空间)  
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
+// v2.1 修复：
+//   ① 保险柜/银行初始值从 getCashFlowSummary() 真实数据读取，不再硬编码为 0
+//   ② 可动用资金 = 保险柜余额 + 银行余额（基于流水实算），与订单金额变更同步
+//   ③ kpiReport 与 detailsData 并行 await，消除初始渲染数据缺失问题
 
 'use strict';
 
@@ -617,7 +621,10 @@
                 }, { ttl: 10 * 60 * 1000 });
 
                 const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
-                const kpiReport = await JF.Cache.get(kpiCacheKey, async () => {
+
+                // 并行拉取 KPI 和资金流水，两者同步完成后再渲染，确保保险柜/银行/可动用资金初始值准确
+                const [kpiReport, detailsData] = await Promise.all([
+                    JF.Cache.get(kpiCacheKey, async () => {
                     const client = SUPABASE.getClient();
                     const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
                     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -683,7 +690,9 @@
                         principal_collected: principalCollected, total_injected_capital: injected,
                         deployed_capital: deployed, available_capital: injected - deployed, due_orders: dueOrdersRes
                     };
-                }, { ttl: 10 * 60 * 1000 });
+                }, { ttl: 10 * 60 * 1000 }),
+                    detailsPromise  // 与 kpiReport 并行，避免串行等待
+                ]);
 
                 const totalOrders = kpiReport.total_orders;
                 const activeOrders = kpiReport.active_orders;
@@ -692,10 +701,17 @@
                 const newThisMonth = kpiReport.new_this_month;
                 const newLoanThisMonth = kpiReport.new_loan_this_month;
                 const injected = kpiReport.total_injected_capital;
-                const deployed = kpiReport.deployed_capital;
-                const available = kpiReport.available_capital;
+                const deployed = kpiReport.deployed_capital;       // 在押资金 = 活跃订单 loan_amount 之和（实时）
+                // 可动用资金 = 总现金流水余额（保险柜 + 银行），反映真实可用现金，与订单金额同步
+                const _cf = detailsData?.cashFlow;
+                const cashBalance  = (_cf?.cash?.balance)  || 0;
+                const bankBalance  = (_cf?.bank?.balance)  || 0;
+                const cashIncome   = (_cf?.cash?.income)   || 0;
+                const cashExpense  = (_cf?.cash?.expense)  || 0;
+                const bankIncome   = (_cf?.bank?.income)   || 0;
+                const bankExpense  = (_cf?.bank?.expense)  || 0;
+                const available    = cashBalance + bankBalance;    // 可动用 = 保险柜余额 + 银行余额
                 const utilizationRate = injected > 0 ? ((deployed / injected) * 100).toFixed(1) : '0';
-                const cashBalance = 0, bankBalance = 0, cashIncome = 0, cashExpense = 0, bankIncome = 0, bankExpense = 0;
                 const activeNormal = activeOrders - overdueOrders;
 
                 const donutData = [
