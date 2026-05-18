@@ -1,9 +1,9 @@
-// supabase.js - v2.3 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
-// v2.1 修复：recordPrincipalPayment / recordFixedPayment / earlySettleFixedOrder / recordInterestPayment 超额抵扣
-//           中 payment_history.date 和 cash_flow_records.flow_date 统一改用订单创建日期，不再使用 todayStr()
-// v2.2 修复：updateOrder 修改 loan_amount 时，同步更新 cash_flow_records 中对应的 loan_disbursement 流水金额
-// v2.3 修复：adminSyncPaymentRecords（管理员保存订单）同样同步 loan_disbursement 流水金额
-//           确保管理员编辑订单金额后，资金流水、保险柜支出、在押资金、可动用资金全部与订单一致
+// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
+// 修复1：recordPrincipalPayment / recordFixedPayment / earlySettleFixedOrder / recordInterestPayment 超额抵扣
+//        中 payment_history.date 和 cash_flow_records.flow_date 统一改用订单创建日期，不再使用 todayStr()
+// 修复2：updateOrder 修改 loan_amount 时，同步更新 cash_flow_records 中对应的 loan_disbursement 流水金额
+// 修复3：adminSyncPaymentRecords（管理员保存订单）同样同步 loan_disbursement 流水金额
+//        确保管理员编辑订单金额后，资金流水、保险柜支出、在押资金、可动用资金全部与订单一致
 
 'use strict';
 
@@ -2468,6 +2468,64 @@
             totalDuplicates: duplicates.length,
         };
     };
+
+    // 补录缺失的贷款发放流水（针对在押订单没有发放记录的）
+SupabaseAPI.generateMissingDisbursements = async function() {
+    const profile = await this.getCurrentProfile();
+    if (profile?.role !== 'admin') throw new Error('需管理员权限');
+    if (!supabaseClient) throw new Error('客户端未初始化');
+
+    // 1. 查出所有 active 订单
+    const { data: activeOrders, error: ordersErr } = await supabaseClient
+        .from('orders')
+        .select('id, order_id, loan_amount, store_id, customer_id, created_at')
+        .eq('status', 'active');
+    if (ordersErr) throw ordersErr;
+    if (!activeOrders.length) return { missing: 0, created: 0 };
+
+    // 2. 查询已有发放流水（未作废）
+    const orderIds = activeOrders.map(o => o.id);
+    const { data: existingDisb, error: disbErr } = await supabaseClient
+        .from('cash_flow_records')
+        .select('order_id')
+        .eq('flow_type', 'loan_disbursement')
+        .eq('is_voided', false)
+        .in('order_id', orderIds);
+    if (disbErr) throw disbErr;
+
+    const existingSet = new Set(existingDisb.map(d => d.order_id));
+    const missingOrders = activeOrders.filter(o => !existingSet.has(o.id));
+
+    let created = 0;
+    for (const order of missingOrders) {
+        const flowDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
+        const description = Utils.lang === 'id'
+            ? `Pencairan gadai (perbaikan otomatis) - ${order.order_id}`
+            : `当金发放 (自动补录) - ${order.order_id}`;
+        await this.recordCashFlow({
+            store_id: order.store_id,
+            flow_type: 'loan_disbursement',
+            direction: 'outflow',
+            amount: order.loan_amount,
+            source_target: 'cash',
+            order_id: order.id,
+            customer_id: order.customer_id,
+            description: description,
+            reference_id: order.order_id,
+            flow_date: flowDate
+        });
+        created++;
+        if (created % 10 === 0) await new Promise(r => setTimeout(r, 100));
+    }
+    if (window.Audit) {
+        await window.Audit.log('generate_missing_disbursements', JSON.stringify({
+            missing_count: missingOrders.length,
+            created_count: created,
+            operator: profile.id
+        }));
+    }
+    return { missing: missingOrders.length, created };
+};
 
     SupabaseAPI.voidCashFlowBatch = async function(ids) {
         if (!supabaseClient) throw new Error('客户端未初始化');
