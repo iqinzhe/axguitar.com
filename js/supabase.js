@@ -1,8 +1,9 @@
-// supabase.js - v2.2 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
+// supabase.js - v2.3 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
 // v2.1 修复：recordPrincipalPayment / recordFixedPayment / earlySettleFixedOrder / recordInterestPayment 超额抵扣
 //           中 payment_history.date 和 cash_flow_records.flow_date 统一改用订单创建日期，不再使用 todayStr()
 // v2.2 修复：updateOrder 修改 loan_amount 时，同步更新 cash_flow_records 中对应的 loan_disbursement 流水金额
-//           确保资金结构总览（保险柜支出）与订单金额始终保持一致
+// v2.3 修复：adminSyncPaymentRecords（管理员保存订单）同样同步 loan_disbursement 流水金额
+//           确保管理员编辑订单金额后，资金流水、保险柜支出、在押资金、可动用资金全部与订单一致
 
 'use strict';
 
@@ -2339,6 +2340,19 @@
 
         const { error: sumErr } = await supabaseClient.from('orders').update(summaryUpd).eq('id', orderUUID);
         if (sumErr) throw sumErr;
+
+        // 同步 loan_disbursement 流水金额：管理员编辑了 loan_amount 时，
+        // 保险柜支出、在押资金、可动用资金必须与订单保持一致
+        try {
+            await supabaseClient
+                .from('cash_flow_records')
+                .update({ amount: loanAmount })
+                .eq('order_id', orderUUID)
+                .eq('flow_type', 'loan_disbursement')
+                .eq('is_voided', false);
+        } catch (disbErr) {
+            console.warn('[adminSyncPaymentRecords] 同步 loan_disbursement 流水失败:', disbErr.message);
+        }
 
         await supabaseClient
             .from('cash_flow_records')
