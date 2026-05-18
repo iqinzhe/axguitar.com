@@ -1,5 +1,6 @@
 // app-dashboard-core.js - v2.0 (JF 命名空间)  
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
+// [新增] 门店操作员财务汇总菜单
 
 'use strict';
 
@@ -85,7 +86,6 @@
             });
         }
 
-        // 表头行
         let tableRows = '<tr>';
         for (let i = 0; i < 7; i++) {
             tableRows += `<th>${weekDays[i]}</th>`;
@@ -114,7 +114,7 @@
                 row += `<td class="cal-cell${count>0?' has-due':''}">${cellContent}<\/td>`;
                 day++;
             }
-            row += '</tr>';
+            row += '<tr>';
             tableRows += row;
             if (day > totalDays) break;
         }
@@ -253,7 +253,6 @@
             this._enterProcessing = false;
         },
 
-        // 仅写入 sessionStorage，移除 localStorage 持久化敏感信息
         saveCurrentPageState(extraParams = {}) {
             try {
                 if (!AUTH.isLoggedIn() || this.currentPage === 'login') return;
@@ -273,7 +272,7 @@
                 let raw = sessionStorage.getItem('jf_current_state');
                 if (!raw) return { page: null, filter: "all", orderId: null, customerId: null };
                 const state = JSON.parse(raw);
-                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist'];
+                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist','storeFinance'];
                 const validFilters = ['all', 'active', 'completed', 'liquidated'];
                 if (!state.filter || !validFilters.includes(state.filter)) state.filter = 'all';
                 if (state.page && validPages.includes(state.page) && AUTH.isLoggedIn()) {
@@ -388,7 +387,6 @@
                         await this._updateMainContent(contentHtml);
                         document.querySelectorAll('.amount-input').forEach(el => Utils.bindAmountFormat && Utils.bindAmountFormat(el));
                         this.saveCurrentPageState();
-                        // 绑定延迟100ms
                         setTimeout(() => {
                             if (JF.OrdersPage._bindRowClickDelegate) JF.OrdersPage._bindRowClickDelegate();
                             if (JF.OrdersPage._bindGlobalEvents) JF.OrdersPage._bindGlobalEvents();
@@ -404,6 +402,15 @@
                 else if (page === 'userManagement') { if (JF.UsersPage?.buildUserManagementHTML) contentHtml = await JF.UsersPage.buildUserManagementHTML(); }
                 else if (page === 'storeManagement') { if (JF.StoreManager?.buildStoreManagementHTML) contentHtml = await JF.StoreManager.buildStoreManagementHTML(); }
                 else if (page === 'backupRestore') { if (JF.BackupStorage?.renderBackupUI) { await JF.BackupStorage.renderBackupUI(); this.saveCurrentPageState(); return; } }
+                else if (page === 'storeFinance') {
+                    if (JF.StoreManager && JF.StoreManager.showStoreFinance) {
+                        await JF.StoreManager.showStoreFinance();
+                    } else {
+                        await JF.StoreManager.renderStoreManagement();
+                    }
+                    this.saveCurrentPageState();
+                    return;
+                }
                 else if (page === 'dataRepair') {
                     const lang = Utils.lang;
                     contentHtml = `<div class="page-header"><h2>🔧 ${lang === 'id' ? 'Perbaikan Data' : '数据修复'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button></div></div>
@@ -578,7 +585,6 @@
                 const isAdmin = PERMISSION.isAdmin();
                 const storeId = profile?.store_id;
 
-                // ========== 优化：KPI 数据和细节数据并行加载 ==========
                 const detailCacheKey = 'dashboard_details_' + (isAdmin ? 'admin' : storeId);
                 
                 const detailsPromise = JF.Cache.get(detailCacheKey, async () => {
@@ -680,7 +686,6 @@
                     };
                 }, { ttl: 10 * 60 * 1000 });
 
-                // 构建仪表盘 HTML
                 const totalOrders = kpiReport.total_orders;
                 const activeOrders = kpiReport.active_orders;
                 const completedOrders = kpiReport.completed_orders;
@@ -714,7 +719,7 @@
                 const topbarSubtitle = isAdmin ? (lang === 'id' ? 'Semua Toko · Data Real-time' : '全部门店 · 实时数据') : (lang === 'id' ? 'Data Toko · Real-time' : '门店数据 · 实时更新');
                 const activeBadgeCount = activeOrders;
 
-                                let quickActions = [];
+                let quickActions = [];
                 if (isAdmin) {
                     quickActions = [
                         { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
@@ -758,12 +763,8 @@
     <div class="kpi-card kpi-card--calendar">${calendarHTML}</div>
 </div>`;
 
-                const finalHtml = `
-        <div class="dashboard-v2">
-            <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
-            <div class="dash-sidebar" id="dashSidebar">
-                <div class="sidebar-logo"><div class="logo-mark"><div class="logo-icon">JF</div><div><div class="logo-text">JF! by Gadai</div><div class="logo-sub">${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div></div></div>
-                <div class="sidebar-user"><div class="user-av">${userInitial}</div><div class="user-info"><div class="user-name-top">${Utils.escapeHtml(profile?.name || 'User')}</div><div class="user-detail-row"><span class="user-role">${userRoleText}</span><span class="user-store-badge">${storeDisplay}</span></div></div></div>
+                // 构建侧边栏菜单
+                const sidebarMenuHtml = `
                 <div class="sidebar-nav">
                     <div class="nav-section-label">${lang === 'id' ? 'Menu Utama' : '主菜单'}</div>
                     <div class="nav-item active" onclick="JF.DashboardCore.navigateTo('dashboard')"><span class="nav-icon">◼</span> ${lang === 'id' ? 'Dasbor' : '仪表盘'}</div>
@@ -776,17 +777,26 @@
                     <div class="nav-item" onclick="JF.CapitalModule.showCapitalInjectionModal()"><span class="nav-icon">💉</span> ${lang === 'id' ? 'Injeksi Modal' : '资本注入'}</div>
                     <div class="nav-item" onclick="JF.ProfitPage.showDistributionPage()"><span class="nav-icon">💸</span> ${lang === 'id' ? 'Distribusi Laba' : '收益处置'}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
-                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('userManagement')"><span class="nav-icon">👤</span> ${t('user_management')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeManagement')"><span class="nav-icon">🏪</span> ${t('store_management')}</div>
+                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('userManagement')"><span class="nav-icon">👤</span> ${t('user_management')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('dataRepair')"><span class="nav-icon">🔧</span> ${lang === 'id' ? 'Perbaikan Data' : '数据修复'}</div>` : `
                     <div class="nav-section-label" style="margin-top:8px;">${lang === 'id' ? 'Manajemen' : '管理'}</div>
                     ${profile?.role === 'store_manager' ? `<div class="nav-item" onclick="JF.ProfitPage.showDistributionPage()"><span class="nav-icon">💸</span> ${lang === 'id' ? 'Distribusi Laba' : '收益处置'}</div>` : ''}
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
+                    <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeFinance')"><span class="nav-icon">📊</span> ${lang === 'id' ? 'Ringkasan Keuangan' : '财务汇总'}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>`}
                     <div style="flex:1;"></div>
                     <div class="nav-item danger" onclick="JF.DashboardCore.logout()"><span class="nav-icon">🚪</span> ${t('save_exit')}</div>
-                </div>
+                </div>`;
+
+                const finalHtml = `
+        <div class="dashboard-v2">
+            <div class="sidebar-overlay" id="sidebarOverlay" onclick="JF.DashboardCore._toggleSidebar()"></div>
+            <div class="dash-sidebar" id="dashSidebar">
+                <div class="sidebar-logo"><div class="logo-mark"><div class="logo-icon">JF</div><div><div class="logo-text">JF! by Gadai</div><div class="logo-sub">${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div></div></div>
+                <div class="sidebar-user"><div class="user-av">${userInitial}</div><div class="user-info"><div class="user-name-top">${Utils.escapeHtml(profile?.name || 'User')}</div><div class="user-detail-row"><span class="user-role">${userRoleText}</span><span class="user-store-badge">${storeDisplay}</span></div></div></div>
+                ${sidebarMenuHtml}
                 <div class="sidebar-footer"><div class="lang-toggle"><div class="lang-btn-side${Utils.lang === 'zh' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('zh')">中文</div><div class="lang-btn-side${Utils.lang === 'id' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('id')">Bahasa</div></div></div>
             </div>
             <div class="dash-topbar">
@@ -959,7 +969,6 @@
     if (!window.APP) { window.APP = DashboardCore; }
     else { for (const key of Object.keys(DashboardCore)) { if (typeof DashboardCore[key] === 'function' && !window.APP[key]) window.APP[key] = DashboardCore[key].bind(DashboardCore); } window.APP.navigateTo = DashboardCore.navigateTo.bind(DashboardCore); window.APP.goBack = DashboardCore.goBack.bind(DashboardCore); window.APP.refreshCurrentPage = DashboardCore.refreshCurrentPage.bind(DashboardCore); window.APP.renderDashboard = DashboardCore.renderDashboard.bind(DashboardCore); window.APP.logout = DashboardCore.logout.bind(DashboardCore); window.APP.forceRecovery = DashboardCore.forceRecovery.bind(DashboardCore); window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore); window.APP.toggleLanguage = DashboardCore.toggleLanguage.bind(DashboardCore); window.APP.login = DashboardCore.login.bind(DashboardCore); window.APP.renderLogin = DashboardCore.renderLogin.bind(DashboardCore); window.APP.init = DashboardCore.init.bind(DashboardCore); }
 
-    // 批量修复入口 — 挂载到 APP，供 dataRepair 页面按钮调用
     window.APP.runBatchRepair = async function() {
         const lang = Utils.lang;
         const btn = document.getElementById('dataRepairBtn');
