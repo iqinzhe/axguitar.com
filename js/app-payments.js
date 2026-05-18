@@ -1,5 +1,4 @@
 // app-payments.js - v2.0 (JF 命名空间) 
-// 修复：利息历史表格列对齐，翻译键 times, amount_due 等正确使用
 
 'use strict';
 
