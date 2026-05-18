@@ -1,5 +1,5 @@
 // audit.js - v2.0 (JF 命名空间) 
-// - 统一日志写入接口：log(action, detailsObject) 内部自动序列化
+// 统一日志写入接口：log(action, detailsObject) 内部自动序列化
 
 'use strict';
 
