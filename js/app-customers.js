@@ -1,6 +1,7 @@
 // app-customers.js - v2.0 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
 // 订单ID格式：客户ID-序号（如 BL001-01, BL001-02...）
 // 费用检查：管理费/服务费 > 0 且未缴时禁止创建订单
+// 修复：手工将管理费改为0时，不会被自动覆盖
 
 'use strict';
 
@@ -807,7 +808,11 @@
             
             const adminFeeInput = document.getElementById("adminFeeInput");
             let adminFee = adminFeeInput ? Utils.parseNumberFromCommas(adminFeeInput.value) || 0 : 0;
-            if (adminFee === 0 && amount > 0) {
+            
+            // 修复：只有用户没有手工修改过，且管理费为0时，才自动计算默认管理费
+            // 如果用户手工改为了0，则尊重用户的选择（免费）
+            const isManualAdminFee = adminFeeInput && adminFeeInput.dataset.manual === 'true';
+            if (!isManualAdminFee && adminFee === 0 && amount > 0) {
                 adminFee = Utils.calculateAdminFee(amount);
             }
             
@@ -816,11 +821,12 @@
             let serviceFee = 0;
             const serviceFeeInput = document.getElementById('serviceFeeInput');
             const manualServiceFee = serviceFeeInput ? Utils.parseNumberFromCommas(serviceFeeInput.value) || 0 : 0;
+            const isManualServiceFee = serviceFeeInput && serviceFeeInput.dataset.manual === 'true';
             
             if (manualServiceFee > 0) {
                 serviceFee = manualServiceFee;
                 serviceFeePercent = 0;
-            } else if (amount > 5000000) {
+            } else if (!isManualServiceFee && amount > 5000000) {
                 const result = Utils.calculateServiceFee(amount);
                 serviceFee = result.amount;
                 serviceFeePercent = result.percent;
@@ -924,7 +930,7 @@
                     admin_fee_paid: adminFee === 0 ? true : false,  // 费用为0时自动标记为已缴
                     service_fee_percent: serviceFeePercent, 
                     service_fee_amount: serviceFee,
-                    service_fee_paid: serviceFee === 0 ? (serviceFee === 0 ? 0 : 0) : 0,
+                    service_fee_paid: serviceFee === 0 ? 0 : 0,
                     agreed_interest_rate: agreedInterestRate, repayment_type: repaymentType, repayment_term: repaymentTerm, 
                     monthly_fixed_payment: monthlyFixedPayment, 
                     pawn_term_months: pawnTermMonths,
@@ -1020,7 +1026,9 @@
 
         onAdminFeeManualChange() {
             const input = document.getElementById('adminFeeInput');
-            if (input) input.dataset.manual = 'true';
+            if (input) {
+                input.dataset.manual = 'true';
+            }
             const amount = Utils.getAmountFromInput('amount');
             this._updateAdminFeeHint(amount);
         },
@@ -1142,7 +1150,7 @@
                 const statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
                 let rows = '';
                 if (!orders || orders.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td>`; }
-                else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<td><td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td><td class="date-cell">${Utils.formatDate(o.created_at)}<\/td><td class="amount">${Utils.formatCurrency(o.loan_amount)}<\/td><td class="amount">${Utils.formatCurrency(o.principal_paid)}<\/td><td class="text-center">${o.interest_paid_months} ${t('month')}<\/td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}<\/span><\/td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}<\/span><\/td>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}<\/button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}<\/button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}<\/td><td colspan="6"><div class="action-buttons">${actionButtons}<\/div><\/td>`; } }
+                else { for (const o of orders) { const sc = o.status === 'active' ? 'active' : (o.status === 'completed' ? 'completed' : 'liquidated'); const repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible'; const repaymentText = o.repayment_type === 'fixed' ? t('fixed_repayment') : t('flexible_repayment'); rows += `<tr><td class="order-id">${Utils.escapeHtml(o.order_id)}<\/td><td class="date-cell">${Utils.formatDate(o.created_at)}<\/td><td class="amount">${Utils.formatCurrency(o.loan_amount)}<\/td><td class="amount">${Utils.formatCurrency(o.principal_paid)}<\/td><td class="text-center">${o.interest_paid_months} ${t('month')}<\/td><td class="text-center"><span class="badge badge--${repaymentClass}">${repaymentText}<\/span><\/td><td class="text-center"><span class="badge badge--${sc}">${statusMap[o.status] || o.status}<\/span><\/td>`; let actionButtons = ''; if (o.status === 'active' && !PERMISSION.isAdmin()) actionButtons += `<button onclick="APP.navigateTo('payment',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--success btn--sm">💰 ${t('pay_fee')}<\/button>`; actionButtons += `<button onclick="APP.navigateTo('viewOrder',{orderId:'${Utils.escapeAttr(o.order_id)}'})" class="btn btn--sm btn--primary">👁️ ${t('view')}<\/button>`; rows += `<tr class="action-row"><td class="action-label">${t('action')}<\/td><td colspan="6"><div class="action-buttons">${actionButtons}<\/div><\/td>`; } }
                 return `<div class="page-header"><h2>📋 ${t('customer_orders')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_id')}:</strong> ${Utils.escapeHtml(customer.customer_id || '-')}</p><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('ktp_number')}:</strong> ${Utils.escapeHtml(customer.ktp_number || '-')}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>📋 ${t('order_list')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-id">ID</th><th class="col-date">${t('date')}</th><th class="col-amount amount">${t('loan_amount')}</th><th class="col-amount amount">${t('principal_paid')}</th><th class="col-months text-center">${t('interest')}</th><th class="col-status text-center">${t('repayment_type')}</th><th class="col-status text-center">${t('status')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
                 console.error("buildCustomerOrdersHTML error:", error); 
@@ -1174,7 +1182,7 @@
                 if (orderIds.length > 0) { const { data } = await client.from('payment_history').select('*, orders(order_id, customer_name)').in('order_id', orderIds).order('date', { ascending: false }); allPayments = data || []; }
                 const typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') }; 
                 let rows = '';
-                if (allPayments.length === 0) { rows = `<td><td colspan="7" class="text-center">${t('no_data')}<\/td>`; }
+                if (allPayments.length === 0) { rows = `<tr><td colspan="7" class="text-center">${t('no_data')}<\/td>`; }
                 else { for (const p of allPayments) { const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank'; rows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}<\/td><td class="order-id">${Utils.escapeHtml(p.orders?.order_id || '-')}<\/td><td class="col-type">${typeMap[p.type] || p.type}<\/td><td class="text-center">${p.months ? p.months + ' ' + t('month') : '-'}<\/td><td class="amount">${Utils.formatCurrency(p.amount)}<\/td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}<\/span><\/td><td class="desc-cell">${Utils.escapeHtml(p.description || '-')}<\/td>`; } }
                 return `<div class="page-header"><h2>💰 ${t('payment_history')} - ${Utils.escapeHtml(customer.name)}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div></div><div class="card customer-summary"><p><strong>${t('customer_name')}:</strong> ${Utils.escapeHtml(customer.name)}</p><p><strong>${t('phone')}:</strong> ${Utils.escapeHtml(customer.phone)}</p><p><strong>${t('occupation')}:</strong> ${Utils.escapeHtml(customer.occupation || '-')}</p></div><div class="card"><h3>💰 ${t('payment_history')}</h3><div class="table-container"><table class="data-table"><thead><tr><th class="col-date">${t('date')}</th><th class="col-id">${t('order_id')}</th><th class="col-type">${t('type')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th><th class="col-desc">${t('description')}</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
             } catch (error) { 
