@@ -1,5 +1,6 @@
 // order.js - v2.0 (JF 命名空间) 
 // getOrderCashFlow 返回订单专属流水（而非整个门店流水）
+// 修复：订单号传递问题，确保客户ID-序号格式生效
 
 'use strict';
 
@@ -11,23 +12,27 @@
         // ==================== 创建订单 ====================
         async create(data) {
             const orderData = {
+                order_id: data.order_id,  // 【修复】传递订单号，确保客户ID-序号格式生效
                 customer_name: data.customer.name,
                 customer_ktp: data.customer.ktp,
                 customer_phone: data.customer.phone,
                 customer_address: data.customer.address,
                 collateral_name: data.collateral_name,
                 loan_amount: data.loan_amount,
-                // [修复] 用 !== undefined 而非 ||，防止手动设为0（免除）时被理论计算值覆盖
                 admin_fee: data.admin_fee !== undefined && data.admin_fee !== null ? data.admin_fee : Utils.calculateAdminFee(data.loan_amount),
+                admin_fee_paid: data.admin_fee_paid !== undefined ? data.admin_fee_paid : (data.admin_fee === 0),
                 service_fee_percent: data.service_fee_percent !== undefined ? data.service_fee_percent : 2,
                 service_fee_amount: data.service_fee_amount !== undefined && data.service_fee_amount !== null ? data.service_fee_amount : 0,
+                service_fee_paid: data.service_fee_paid !== undefined ? data.service_fee_paid : (data.service_fee_amount === 0),
                 notes: data.notes,
                 customer_id: data.customer_id || null,
                 agreed_interest_rate: data.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT,
                 repayment_type: data.repayment_type || 'flexible',
                 repayment_term: data.repayment_term || null,
                 monthly_fixed_payment: data.monthly_fixed_payment || null,
-                max_extension_months: data.max_extension_months || 10
+                max_extension_months: data.max_extension_months || 10,
+                pawn_term_months: data.pawn_term_months || null,
+                custom_order_date: data.custom_order_date || null
             };
 
             try {
