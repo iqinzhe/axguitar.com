@@ -1027,29 +1027,39 @@
             this._updateAdminFeeHint(amount);
         },
 
-        _updateAdminFeeHint(amount) {
+                _updateAdminFeeHint(amount) {
             const hint = document.getElementById('adminFeeHint');
             if (!hint) return;
             const lang = Utils.lang;
             const adminFee = Utils.calculateAdminFee(amount);
+            const adminFeeInput = document.getElementById('adminFeeInput');
+            const manual = adminFeeInput && adminFeeInput.dataset.manual === 'true';
+            const currentAmount = adminFeeInput ? Utils.parseNumberFromCommas(adminFeeInput.value) : 0;
+            const isModified = manual && currentAmount !== adminFee;
             
             if (amount <= 0) {
                 hint.innerHTML = lang === 'id'
                     ? `• Nilai gadai ≤ Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai (dibulatkan ke Rp10.000)\n• Isi 0 untuk GRATIS`
                     : `• 当金 ≤ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费（取整到Rp10,000）\n• 填 0 表示免费`;
-            } else {
-                let highlightedHint = '';
-                let allHints = lang === 'id' 
-                    ? `• Nilai gadai ≤ Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai (dibulatkan ke Rp10.000)\n• Isi 0 untuk GRATIS`
-                    : `• 当金 ≤ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费（取整到Rp10,000）\n• 填 0 表示免费`;
-                
-                if (amount <= 3000000) {
-                    highlightedHint = lang === 'id' ? `📌 Nilai gadai ≤ Rp3.000.000 : <strong>Rp30.000</strong>\n\n${allHints}` : `📌 当金 ≤ Rp3,000,000 ：<strong>Rp30,000</strong>\n\n${allHints}`;
-                } else {
-                    highlightedHint = lang === 'id' ? `🔢 Nilai gadai > Rp3.000.000 : <strong>1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}` : `🔢 当金 > Rp3,000,000 ：<strong>1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}`;
-                }
-                hint.innerHTML = highlightedHint;
+                return;
             }
+            
+            let highlightedHint = '';
+            let allHints = lang === 'id' 
+                ? `• Nilai gadai ≤ Rp3.000.000 : biaya administrasi Rp30.000\n• Nilai gadai > Rp3.000.000 : dikenakan biaya administrasi sebesar 1% dari nilai gadai (dibulatkan ke Rp10.000)\n• Isi 0 untuk GRATIS`
+                : `• 当金 ≤ Rp3,000,000 ：管理费 Rp30,000\n• 当金 > Rp3,000,000 ：按当金的 1% 收取管理费（取整到Rp10,000）\n• 填 0 表示免费`;
+            
+            if (amount <= 3000000) {
+                highlightedHint = lang === 'id' ? `📌 Nilai gadai ≤ Rp3.000.000 : <strong>Rp30.000</strong>\n\n${allHints}` : `📌 当金 ≤ Rp3,000,000 ：<strong>Rp30,000</strong>\n\n${allHints}`;
+            } else {
+                highlightedHint = lang === 'id' ? `🔢 Nilai gadai > Rp3.000.000 : <strong>1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}` : `🔢 当金 > Rp3,000,000 ：<strong>1%</strong> = ${Utils.formatCurrency(adminFee)}\n\n${allHints}`;
+            }
+            
+            if (isModified) {
+                highlightedHint += `<br><span style="color:#3b82f6;">✏️ ${lang === 'id' ? 'Telah diubah manual' : '已手工修改'}</span>`;
+            }
+            
+            hint.innerHTML = highlightedHint;
         },
 
         _updateServiceFeeHint(amount) {
