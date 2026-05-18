@@ -1,4 +1,5 @@
-// app-payments.js - v2.0 (JF 命名空间) 增加对 liquidated 订单的拦截
+// app-payments.js - v2.0 (JF 命名空间) 
+// 修复：利息历史表格列对齐，翻译键 times, amount_due 等正确使用
 
 'use strict';
 
@@ -7,7 +8,7 @@
     window.JF = JF;
 
     // ========== 跨标签页支付锁（基于 sessionStorage，30秒超时） ==========
-    const LOCK_TIMEOUT_MS = 30000; // 锁超时时间
+    const LOCK_TIMEOUT_MS = 30000;
     if (!window.APP) window.APP = {};
 
     window.APP._acquirePaymentLock = function (lockKey) {
@@ -16,10 +17,7 @@
         const existing = sessionStorage.getItem(storageKey);
         if (existing) {
             const lockTime = parseInt(existing, 10);
-            if (now - lockTime < LOCK_TIMEOUT_MS) {
-                return false; // 锁仍有效
-            }
-            // 超时，清除旧锁
+            if (now - lockTime < LOCK_TIMEOUT_MS) return false;
             sessionStorage.removeItem(storageKey);
         }
         sessionStorage.setItem(storageKey, now.toString());
@@ -31,7 +29,6 @@
         sessionStorage.removeItem(storageKey);
     };
 
-    // 幂等性检查（2分钟窗口，客户端辅助，服务端应有唯一索引）
     window.APP._checkIdempotency = async function (orderId, type, amount, paymentMethod) {
         try {
             const client = SUPABASE.getClient();
@@ -55,7 +52,6 @@
 
     const PaymentPage = {
 
-        // ==================== 辅助：设置按钮加载状态 ====================
         _setButtonLoading(btn, loading) {
             if (!btn) return;
             const lang = Utils.lang;
@@ -121,7 +117,6 @@
             return null;
         },
 
-        // ==================== 显示缴费页面 ====================
         async showPayment(orderId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -158,12 +153,6 @@
                 if (!order) { Utils.toast.error(t('order_not_found')); APP.goBack(); return; }
                 if (order.store_id !== profile.store_id) { Utils.toast.error(t('unauthorized')); APP.goBack(); return; }
 
-                // [修复问题1] 移除 is_locked 对缴费页的拦截。
-                // 订单锁定（is_locked）是合同保护机制，防止门店账户随意修改合同内容。
-                // 缴费窗口是履行合同义务的独立入口，不受锁定影响，应始终可以正常进入。
-                // 管理员修改订单内容（updateOrder）仍受 is_locked 保护，逻辑不变。
-
-                // ==================== 拦截已变卖订单 ====================
                 if (order.status === 'liquidated') {
                     document.getElementById("app").innerHTML = `
                         <div class="page-header">
@@ -178,9 +167,7 @@
                                 ${lang === 'id' ? 'Pesanan telah dilikuidasi' : '订单已变卖'}
                             </h3>
                             <p style="color:var(--text-muted);margin-bottom:16px;">
-                                ${lang === 'id' 
-                                    ? 'Barang jaminan sudah dijual. Tidak dapat melakukan pembayaran lagi.' 
-                                    : '抵押物已变卖，无法继续缴费。'}
+                                ${lang === 'id' ? 'Barang jaminan sudah dijual. Tidak dapat melakukan pembayaran lagi.' : '抵押物已变卖，无法继续缴费。'}
                             </p>
                             <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
                         </div>
@@ -207,49 +194,58 @@
                 const serviceFeePaid = order.service_fee_paid || 0;
                 const isServiceFeePaid = serviceFeePaid >= serviceFeeAmount;
 
-                // 利息历史
+                // 利息历史行 - 修复列对齐，确保5列
                 let interestRows = '';
-                let lastInterestDate = '';  // 上次缴息日期，用于日期选择器下限
+                let lastInterestDate = '';
                 if (interestPayments.length === 0) {
-                    interestRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td>`;
+                    interestRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td></tr>`;
                 } else {
                     for (let i = 0; i < interestPayments.length; i++) {
                         const p = interestPayments[i];
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                        interestRows += `<tr><td class="text-center">${i + 1}</td><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="text-center">${p.months || 1} ${t('month')}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>`;
+                        interestRows += `<tr>
+                            <td class="text-center">${i + 1}</td>
+                            <td class="date-cell">${Utils.formatDate(p.date)}</td>
+                            <td class="text-center">${p.months || 1} ${t('month')}</td>
+                            <td class="amount">${Utils.formatCurrency(p.amount)}</td>
+                            <td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
+                        </tr>`;
                     }
-                    // 取最后一笔利息记录的日期作为日期选择器的最早下限
                     lastInterestDate = interestPayments[interestPayments.length - 1]?.date?.substring(0, 10) || '';
                 }
-                // 日期选择器：最早不能早于订单创建日（取消上次缴息日限制，允许补录历史数据）
                 const orderCreatedDate = (order.created_at || '').substring(0, 10);
                 const interestDateMin = orderCreatedDate;
                 const interestDateToday = Utils.getLocalToday();
-                // 预付款：日期上限放开到今天起3个月后
                 const interestDateMax = (() => {
                     const d = new Date(interestDateToday);
                     d.setMonth(d.getMonth() + 3);
                     return d.toISOString().substring(0, 10);
                 })();
 
-                // 本金历史
+                // 本金历史行（保持原有）
                 let principalRows = '';
                 let cumulativePaid = 0;
                 if (principalPayments.length === 0) {
-                    principalRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td>`;
+                    principalRows = `<tr><td colspan="5" class="text-center text-muted">${t('no_data')}</td></tr>`;
                 } else {
                     for (const p of principalPayments) {
                         cumulativePaid += p.amount;
                         const remainingAfter = loanAmount - cumulativePaid;
                         const methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                        principalRows += `<tr><td class="date-cell">${Utils.formatDate(p.date)}</td><td class="amount">${Utils.formatCurrency(p.amount)}</td><td class="amount">${Utils.formatCurrency(cumulativePaid)}</td><td class="amount ${remainingAfter <= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(remainingAfter)}</td><td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>`;
+                        principalRows += `<tr>
+                            <td class="date-cell">${Utils.formatDate(p.date)}</td>
+                            <td class="amount">${Utils.formatCurrency(p.amount)}</td>
+                            <td class="amount">${Utils.formatCurrency(cumulativePaid)}</td>
+                            <td class="amount ${remainingAfter <= 0 ? 'income' : 'expense'}">${Utils.formatCurrency(remainingAfter)}</td>
+                            <td class="text-center"><span class="badge badge--${methodClass}">${methodMap[p.payment_method] || '-'}</span></td>
+                        </tr>`;
                     }
                 }
 
                 const nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
                 const nextInterestNumber = interestPayments.length + 1;
 
-                // 固定还款部分
+                // 固定还款部分（保持不变）
                 let fixedHtml = '';
                 if (order.repayment_type === 'fixed') {
                     const paidMonths = order.fixed_paid_months || 0;
@@ -286,7 +282,7 @@
                         </div>`;
                 }
 
-                // 灵活还款部分
+                // 灵活还款部分 - 修复 amount_due 翻译
                 let flexibleHtml = '';
                 if (order.repayment_type !== 'fixed') {
                     flexibleHtml = `
@@ -322,7 +318,7 @@
                                     <div class="payment-method-group"><div class="payment-method-title">${t('recording_method')}:</div><div class="payment-method-options"><label><input type="radio" name="interestMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="interestMethod" value="bank"> 🏧 ${t('bank')}</label></div></div>
                                     <button onclick="APP.payInterestWithMethod('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="interestConfirmBtn">✅ ${t('confirm_payment')}</button>
                                 </div>
-                                <div class="card-history"><div class="history-title">📋 ${t('interest_history')}</div><div class="table-container" style="overflow-x:auto;"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="text-center" style="width:50px;">${t('times')}</th><th class="col-date">${t('date')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th></table></thead><tbody>${interestRows}</tbody></table></div></div>
+                                <div class="card-history"><div class="history-title">📋 ${t('interest_history')}</div><div class="table-container" style="overflow-x:auto;"><table class="data-table history-table" style="min-width:300px;"><thead><tr><th class="text-center" style="width:50px;">${t('times')}</th><th class="col-date">${t('date')}</th><th class="col-months text-center">${t('month')}</th><th class="col-amount amount">${t('amount')}</th><th class="col-method text-center">${t('payment_method')}</th></tr></thead><tbody>${interestRows}</tbody></table></div></div>
                             </div>
                             <div class="card" style="min-width:0;overflow-x:hidden;">
                                 <div class="card-header"><h3>🏦 ${t('return_principal')}</h3></div>
@@ -378,7 +374,6 @@
             } catch (error) {
                 console.error("showPayment error:", error);
                 Utils.toast.error(lang === 'id' ? 'Gagal memuat data: ' + error.message : '加载失败：' + error.message);
-                // 用 navigateTo 明确跳回订单列表，避免 historyStack 为空时误跳仪表盘
                 if (APP.historyStack && APP.historyStack.length > 0) {
                     APP.goBack();
                 } else {
@@ -393,11 +388,9 @@
             const method = document.querySelector('input[name="interestMethod"]:checked')?.value || 'cash';
             const methodName = method === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
-            // 读取期数（1=正常，2/3=预付）
             const monthsSelect = document.getElementById('interestMonthsSelect');
             const selectedMonths = monthsSelect ? (parseInt(monthsSelect.value) || 1) : 1;
             const isPrepaid = selectedMonths > 1;
-            // 读取日期选择器（补录时可选历史日期，预付时可选未来日期）
             const paymentDateInput = document.getElementById('interestPaymentDate');
             const paymentDate = (paymentDateInput && paymentDateInput.value) ? paymentDateInput.value : Utils.getLocalToday();
 
@@ -413,8 +406,6 @@
 
             try {
                 const order = await SUPABASE.getOrder(orderId);
-
-                // 幂等检查（仅对1期正常缴费做，预付跳过以避免误拦截）
                 if (!isPrepaid) {
                     const isDuplicate = await window.APP._checkIdempotency(orderId, 'interest', actualPaid, method);
                     if (isDuplicate) {
@@ -429,7 +420,6 @@
                 const theoreticalTotal = theoreticalInterest * selectedMonths;
                 const nextInterestNumber = (order.interest_paid_months || 0) + 1;
 
-                // 预付时只允许足额，不允许少付
                 if (isPrepaid && actualPaid < theoreticalTotal) {
                     Utils.toast.warning(lang === 'id'
                         ? `⚠️ Bayar muka ${selectedMonths} bulan harus minimal ${Utils.formatCurrency(theoreticalTotal)}`
@@ -460,39 +450,34 @@
                 const confirmed = await Utils.toast.confirm(previewMsg);
                 if (!confirmed) return;
 
-                try {
-                    const result = await SUPABASE.recordInterestPayment(orderId, selectedMonths, method, actualPaid, paymentDate);
-                    if (result && result.shortfall > 0) {
-                        const shortfallMsg = lang === 'id'
-                            ? `⚠️ Pembayaran kurang ${Utils.formatCurrency(result.shortfall)}. Hutang bunga total sekarang: ${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`
-                            : `⚠️ 本次少付 ${Utils.formatCurrency(result.shortfall)}，累计利息欠款：${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`;
-                        Utils.toast.warning(shortfallMsg, 8000);
-                    } else if (isPrepaid) {
-                        Utils.toast.success(lang === 'id' ? `✅ Bayar muka ${selectedMonths} bulan berhasil!` : `✅ 预付 ${selectedMonths} 期利息成功！`, 5000);
-                    } else {
-                        Utils.toast.success(lang === 'id' ? 'Pembayaran bunga berhasil!' : '利息收款成功！');
-                    }
-
-                    if (window.Audit) {
-                        await window.Audit.logPayment(order.order_id, isPrepaid ? 'interest_prepaid' : 'interest', actualPaid, method);
-                        if (result && result.shortfall > 0) {
-                            await window.Audit.log('interest_shortfall', JSON.stringify({
-                                order_id: order.order_id,
-                                paid: actualPaid,
-                                shortfall: result.shortfall,
-                                total_shortfall: (order.interest_shortfall || 0) + result.shortfall
-                            }));
-                        }
-                    }
-                    if (window.JF && JF.Cache) JF.Cache.clear();
-                    await PaymentPage.showPayment(orderId);
-                } catch (error) {
-                    console.error('payInterestWithMethod 事务失败:', error);
-                    Utils.toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
+                const result = await SUPABASE.recordInterestPayment(orderId, selectedMonths, method, actualPaid, paymentDate);
+                if (result && result.shortfall > 0) {
+                    const shortfallMsg = lang === 'id'
+                        ? `⚠️ Pembayaran kurang ${Utils.formatCurrency(result.shortfall)}. Hutang bunga total sekarang: ${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`
+                        : `⚠️ 本次少付 ${Utils.formatCurrency(result.shortfall)}，累计利息欠款：${Utils.formatCurrency((order.interest_shortfall || 0) + result.shortfall)}`;
+                    Utils.toast.warning(shortfallMsg, 8000);
+                } else if (isPrepaid) {
+                    Utils.toast.success(lang === 'id' ? `✅ Bayar muka ${selectedMonths} bulan berhasil!` : `✅ 预付 ${selectedMonths} 期利息成功！`, 5000);
+                } else {
+                    Utils.toast.success(lang === 'id' ? 'Pembayaran bunga berhasil!' : '利息收款成功！');
                 }
+
+                if (window.Audit) {
+                    await window.Audit.logPayment(order.order_id, isPrepaid ? 'interest_prepaid' : 'interest', actualPaid, method);
+                    if (result && result.shortfall > 0) {
+                        await window.Audit.log('interest_shortfall', JSON.stringify({
+                            order_id: order.order_id,
+                            paid: actualPaid,
+                            shortfall: result.shortfall,
+                            total_shortfall: (order.interest_shortfall || 0) + result.shortfall
+                        }));
+                    }
+                }
+                if (window.JF && JF.Cache) JF.Cache.clear();
+                await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('payInterestWithMethod error:', error);
-                Utils.toast.error(error.message);
+                Utils.toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
             } finally {
                 window.APP._releasePaymentLock(lockKey);
                 this._setButtonLoading(confirmBtn, false);
@@ -500,7 +485,7 @@
             }
         },
 
-        // ==================== 本金收款（超额还款提示） ====================
+        // ==================== 本金收款 ====================
         async payPrincipalWithMethod(orderId) {
             const amount = Utils.getAmountFromInput('principalAmount');
             const target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
@@ -547,22 +532,17 @@
                 const confirmed = await Utils.toast.confirm(previewMsg);
                 if (!confirmed) return;
 
-                try {
-                    await SUPABASE.recordPrincipalPayment(orderId, actualAmount, target);
-                    if (window.Audit) await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
+                await SUPABASE.recordPrincipalPayment(orderId, actualAmount, target);
+                if (window.Audit) await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
 
-                    if (isFullSettlement) {
-                        const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
-                        const printConfirmed = await Utils.toast.confirm(printConfirm);
-                        if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
-                    }
-                    Utils.toast.success(lang === 'id' ? 'Pembayaran pokok berhasil!' : '本金还款成功！');
-                    if (window.JF && JF.Cache) JF.Cache.clear();
-                    await PaymentPage.showPayment(orderId);
-                } catch (error) {
-                    console.error('payPrincipalWithMethod 事务失败:', error);
-                    Utils.toast.error(error.message || (lang === 'id' ? 'Gagal memproses pembayaran' : '处理失败'));
+                if (isFullSettlement) {
+                    const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
+                    const printConfirmed = await Utils.toast.confirm(printConfirm);
+                    if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
                 }
+                Utils.toast.success(lang === 'id' ? 'Pembayaran pokok berhasil!' : '本金还款成功！');
+                if (window.JF && JF.Cache) JF.Cache.clear();
+                await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('payPrincipalWithMethod error:', error);
                 Utils.toast.error(error.message);
@@ -606,7 +586,7 @@
             }
         },
 
-        // ==================== 提前结清（固定还款）====================
+        // ==================== 提前结清（固定还款） ====================
         async earlySettleFixedOrder(orderId) {
             const method = document.querySelector('input[name="fixedMethod"]:checked')?.value || 'cash';
             const lang = Utils.lang;
@@ -620,8 +600,6 @@
             try {
                 const orderBefore = await SUPABASE.getOrder(orderId);
                 const remainingPrincipal = orderBefore.principal_remaining || orderBefore.loan_amount || 0;
-
-                // [修复问题2] 提前结清前弹窗告知应还金额，由店长/管理员人工确认
                 const methodName = method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行');
                 const confirmMsg = lang === 'id'
                     ? `🎯 Konfirmasi Pelunasan Dipercepat\n\nPesanan: ${orderBefore.order_id}\nNasabah: ${orderBefore.customer_name}\n\nSisa pokok yang harus dilunasi:\n💰 ${Utils.formatCurrency(remainingPrincipal)}\n\nMetode: ${methodName}\n\n⚠️ Jika nasabah membayar kurang dari jumlah di atas,\nselisihnya menjadi tanggung jawab toko.\n\nLanjutkan pelunasan?`
@@ -651,9 +629,7 @@
             }
         },
 
-        // ==================== 申请结清（灵活还款）====================
-        // [修复问题2] 灵活还款没有固定期数，结清由人工发起。
-        // 系统显示当前应还本金，店长/管理员看到差额后自行决策，确认即结清，取消即放弃。
+        // ==================== 申请结清（灵活还款） ====================
         async requestEarlySettleFlexible(orderId) {
             const lang = Utils.lang;
             const lockKey = orderId + '_early_settle';
@@ -669,7 +645,6 @@
                 const hasInput = !isNaN(inputAmount) && inputAmount > 0;
                 const shortfall = hasInput ? (remainingPrincipal - inputAmount) : 0;
 
-                // 弹窗：告知应还金额、实付金额、差额，由人决策
                 let confirmMsg = '';
                 if (lang === 'id') {
                     confirmMsg = `🎯 Ajukan Pelunasan\n\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\n\nSisa pokok (teori): ${Utils.formatCurrency(remainingPrincipal)}`;
@@ -698,7 +673,6 @@
                     await PaymentPage.showPayment(orderId); return;
                 }
 
-                // 按理论剩余本金结清，差额线下核销
                 await SUPABASE.earlySettleFlexibleOrder(orderId, method, remainingPrincipal);
                 if (window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
@@ -785,7 +759,6 @@
         }
     };
 
-    // 挂载到命名空间
     JF.PaymentPage = PaymentPage;
 
     if (window.APP) {
