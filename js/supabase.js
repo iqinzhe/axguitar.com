@@ -1655,6 +1655,77 @@
             return true;
         },
 
+// ==================== 灵活还款提前结清 ====================
+SupabaseAPI.earlySettleFlexibleOrder = async function(orderId, paymentMethod, finalPrincipalAmount = null) {
+    if(paymentMethod===undefined) paymentMethod='cash';
+    const profile = await this.getCurrentProfile();
+    const order = await this.getOrder(orderId);
+    
+    if (order.status === 'liquidated') {
+        throw new Error(Utils.lang === 'id' 
+            ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
+            : '抵押物已变卖，无法继续收款。');
+    }
+    
+    if(order.status === 'completed') throw new Error(Utils.t('order_completed'));
+    if(order.repayment_type !== 'flexible') throw new Error(Utils.lang === 'id' ? 'Bukan cicilan fleksibel' : '不是灵活还款');
+    
+    // 检查利息欠款
+    const shortfall = order.interest_shortfall || 0;
+    if (shortfall > 0) {
+        throw new Error(Utils.lang === 'id'
+            ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu sebelum pelunasan.`
+            : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再结清。`);
+    }
+    
+    // 确定结清本金金额：优先使用传入值，否则使用剩余本金
+    let remainingPrincipal = order.principal_remaining ?? (order.loan_amount - (order.principal_paid || 0));
+    let paidAmount = (finalPrincipalAmount !== null && finalPrincipalAmount > 0) 
+        ? Math.min(finalPrincipalAmount, remainingPrincipal) 
+        : remainingPrincipal;
+    
+    if (paidAmount <= 0) throw new Error(Utils.t('invalid_amount'));
+    
+    // 确定流水日期：使用订单创建日期
+    const recordDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
+    
+    // 记录本金付款
+    await supabaseClient.from('payment_history').insert({
+        order_id: order.id, date: recordDate, type:'principal',
+        amount: paidAmount, description: Utils.lang === 'id' ? 'Pelunasan (fleksibel)' : '结清（灵活还款）',
+        recorded_by: profile.id, payment_method: paymentMethod
+    });
+    
+    await this.recordCashFlow({
+        store_id: order.store_id, flow_type:'principal', direction:'inflow',
+        amount: paidAmount, source_target: paymentMethod, order_id: order.id,
+        customer_id: order.customer_id,
+        description: (Utils.lang === 'id' ? 'Pelunasan fleksibel' : '灵活还款结清') + ' - ' + order.order_id,
+        reference_id: order.order_id,
+        flow_date: recordDate
+    });
+    
+    // 更新订单状态为已完成
+    const newPrincipalPaid = (order.principal_paid || 0) + paidAmount;
+    const newPrincipalRemaining = (order.loan_amount || 0) - newPrincipalPaid;
+    const updates = {
+        status: newPrincipalRemaining <= 0 ? 'completed' : 'active',
+        principal_paid: newPrincipalPaid,
+        principal_remaining: newPrincipalRemaining,
+        monthly_interest: 0,
+        fund_status: newPrincipalRemaining <= 0 ? 'returned' : 'deployed',
+        completed_at: newPrincipalRemaining <= 0 ? nowStr() : null,
+        updated_at: nowStr()
+    };
+    
+    const { error } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
+    if(error) throw error;
+    
+    if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement_flexible', paidAmount, paymentMethod);
+    Utils.toast.success(Utils.lang === 'id' ? '✅ Pelunasan berhasil!' : '✅ 结清成功！');
+    return true;
+};
+        
         // ==================== 逾期天数更新（已修复雅加达时区） ====================
         async updateOverdueDays() {
             if(!supabaseClient) return false;
