@@ -1,4 +1,4 @@
-// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查)
+// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复)
 
 'use strict';
 
@@ -106,12 +106,12 @@
     let _profileCache = null;
     const _storePrefixCache = new Map();
     let _storesCache = null, _storesCacheTime = 0;
-    const STORES_TTL = 3600000; // 1小时
-    const USERS_TTL = 3600000;   // 1小时
+    const STORES_TTL = 3600000;
+    const USERS_TTL = 3600000;
     
     let _practiceStoreIdsCache = null;
     let _practiceStoreIdsCacheTime = 0;
-    const PRACTICE_IDS_TTL = 5 * 60 * 1000; // 5分钟
+    const PRACTICE_IDS_TTL = 5 * 60 * 1000;
 
     const QUERY_TIMEOUT_MS = 12000;
 
@@ -335,7 +335,6 @@
         async _generateOrderId(role, storeId, maxRetries=10, customerId=null) {
             if(!supabaseClient) throw new Error('客户端未初始化');
 
-            // ——新格式：{customer_id}-{nn}（如 BL001-01, BL001-02）——
             if (customerId) {
                 for (let attempt = 1; attempt <= maxRetries; attempt++) {
                     try {
@@ -360,7 +359,6 @@
                 throw new Error(Utils.lang==='id' ? 'Gagal menghasilkan ID pesanan unik' : '订单号生成失败，请重试');
             }
 
-            // 兼容旧逻辑（无 customerId 时退回前缀+序号）
             const prefix = role==='admin' ? 'AD' : await this._getStorePrefix(storeId);
             for(let attempt=1; attempt<=maxRetries; attempt++){
                 try {
@@ -384,10 +382,8 @@
             throw new Error(Utils.lang==='id' ? 'Gagal menghasilkan ID pesanan unik' : '订单号生成失败，请重试');
         },
 
-        // ==================== 客户ID生成（重用已删除ID） ====================
         async _generateCustomerId(storeId, maxRetries = 10) {
             const prefix = await this._getStorePrefix(storeId);
-            // 查询该门店所有客户ID并按数字升序排列
             const { data: existingCustomers, error } = await supabaseClient
                 .from('customers')
                 .select('customer_id')
@@ -418,7 +414,6 @@
             
             const customerId = prefix + String(nextNumber).padStart(3, '0');
             
-            // 防止并发冲突，二次确认
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 const { data: dup, error: dupError } = await supabaseClient
                     .from('customers')
@@ -1062,18 +1057,14 @@
                 ? orderData.custom_order_date + 'T00:00:00.000Z'
                 : nowStr();
             
-            // 获取管理费金额
             const adminFee = (orderData.admin_fee !== undefined && orderData.admin_fee !== null)
                 ? orderData.admin_fee
                 : Utils.calculateAdminFee(orderData.loan_amount);
             
-            // 获取服务费金额
             const serviceFeeAmount = (orderData.service_fee_amount !== undefined && orderData.service_fee_amount !== null)
                 ? orderData.service_fee_amount
                 : 0;
             
-            // ========== 费用缴纳检查（新增） ==========
-            // 检查管理费：如果管理费 > 0 且未标记为已缴，则不能创建订单
             const adminFeePaid = orderData.admin_fee_paid !== undefined ? orderData.admin_fee_paid : (adminFee === 0);
             if (adminFee > 0 && !adminFeePaid) {
                 throw new Error(Utils.lang === 'id' 
@@ -1081,14 +1072,12 @@
                     : '管理费必须在订单创建前缴纳');
             }
             
-            // 检查服务费：如果服务费 > 0 且未标记为已缴，则不能创建订单
             const serviceFeePaid = orderData.service_fee_paid !== undefined ? orderData.service_fee_paid : (serviceFeeAmount === 0);
             if (serviceFeeAmount > 0 && !serviceFeePaid) {
                 throw new Error(Utils.lang === 'id' 
                     ? 'Biaya layanan harus dibayar sebelum pesanan dibuat'
                     : '服务费必须在订单创建前缴纳');
             }
-            // ========== 费用缴纳检查结束 ==========
             
             const serviceFeePercent = orderData.service_fee_percent !== undefined ? orderData.service_fee_percent : 0;
             const agreedInterestRate = (orderData.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE_PERCENT) / 100;
@@ -1106,8 +1095,6 @@
             let retryCount=0, lastError=null, newOrder=null;
             while(retryCount<5){
                 try {
-                    // 优先使用调用方（如 app-customers.js）已生成的 order_id，
-                    // 避免此处用数据库 UUID 作为 customerId 重新生成错误的订单号。
                     const orderId = orderData.order_id
                         || await this._generateOrderId(profile.role, targetStoreId, 5, null);
                     let monthlyFixedPayment = null;
@@ -1172,7 +1159,6 @@
             }
             const profile = await this.getCurrentProfile();
             const feeAmount = (adminFeeAmount !== undefined && adminFeeAmount !== null) ? adminFeeAmount : order.admin_fee;
-            // [修复] 管理费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
             if (!feeAmount || feeAmount <= 0) {
                 const { error: e0 } = await supabaseClient.from('orders').update({
                     admin_fee_paid: true, admin_fee_paid_date: todayStr(),
@@ -1206,7 +1192,6 @@
         async recordServiceFee(orderId, months, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
-            // [修复] 服务费为0时，仅标记已缴，不写入 payment_history 和 cash_flow_records
             if(order.service_fee_percent<=0 && order.service_fee_amount<=0) {
                 await supabaseClient.from('orders').update({ service_fee_paid: 0, updated_at: nowStr() }).eq('order_id', orderId);
                 console.info(`[recordServiceFee] 订单 ${orderId} 服务费为0，仅标记，不写流水`);
@@ -1239,22 +1224,16 @@
             return true;
         },
 
-        // [新增] 管理员修改订单后，同步管理费和服务费的 payment_history 和 cash_flow_records
-        // 原则：锁定订单里的金额和已缴状态是合同基准，修改后必须与流水保持一致
         async syncFeesAfterAdminEdit(orderId, newAdminFee, newAdminFeePaid, newServiceFeeAmount, orderDate) {
             const order = await this.getOrder(orderId);
             const profile = await this.getCurrentProfile();
             const feeDate = (orderDate || (order.created_at || '').substring(0, 10) || todayStr());
 
-            // ---- 管理费同步 ----
-            // 1. 删除旧的 payment_history 和 cash_flow_records
             await supabaseClient.from('payment_history')
                 .delete().eq('order_id', order.id).eq('type', 'admin_fee');
             await supabaseClient.from('cash_flow_records')
                 .delete().eq('order_id', order.id).eq('flow_type', 'admin_fee');
 
-            // 2. 同步 orders 表的 admin_fee / admin_fee_paid 字段
-            //    （收入构成卡片读取的是 orders.admin_fee × admin_fee_paid，必须同步）
             await supabaseClient.from('orders').update({
                 admin_fee: newAdminFee,
                 admin_fee_paid: newAdminFeePaid && newAdminFee > 0,
@@ -1262,7 +1241,6 @@
                 updated_at: nowStr()
             }).eq('order_id', orderId);
 
-            // 3. 若已缴且金额>0，重新写入正确的流水记录
             if (newAdminFeePaid && newAdminFee > 0) {
                 await supabaseClient.from('payment_history').insert({
                     order_id: order.id, date: feeDate, type: 'admin_fee',
@@ -1277,17 +1255,12 @@
                     reference_id: order.order_id, flow_date: feeDate
                 });
             }
-            // 金额为0或未缴：不写流水，orders字段已在上方重置
 
-            // ---- 服务费同步 ----
-            // 1. 删除旧的 payment_history 和 cash_flow_records
             await supabaseClient.from('payment_history')
                 .delete().eq('order_id', order.id).eq('type', 'service_fee');
             await supabaseClient.from('cash_flow_records')
                 .delete().eq('order_id', order.id).eq('flow_type', 'service_fee');
 
-            // 2. 同步 orders 表的 service_fee_amount / service_fee_paid 字段
-            //    （收入构成卡片读取的是 orders.service_fee_paid，必须同步）
             const newServiceFeePaid = newServiceFeeAmount > 0 ? newServiceFeeAmount : 0;
             await supabaseClient.from('orders').update({
                 service_fee_amount: newServiceFeeAmount,
@@ -1295,7 +1268,6 @@
                 updated_at: nowStr()
             }).eq('order_id', orderId);
 
-            // 3. 若金额>0且已缴，重新写入正确的流水记录
             if (newServiceFeeAmount > 0 && newServiceFeePaid >= newServiceFeeAmount) {
                 await supabaseClient.from('payment_history').insert({
                     order_id: order.id, date: feeDate, type: 'service_fee',
@@ -1311,12 +1283,9 @@
                     reference_id: order.order_id, flow_date: feeDate
                 });
             }
-            // 服务费为0：不写流水，orders.service_fee_paid 已在上方重置为0
             return true;
         },
 
-        // [新增] 主动修复：清理并重新同步指定订单的管理费/服务费流水
-        // 适用于：在修复部署前已写入错误流水的历史订单（如管理费/服务费为0但流水有记录）
         async repairOrderFees(orderId) {
             if (!PERMISSION.isAdmin()) throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
             const order = await this.getOrder(orderId);
@@ -1331,7 +1300,6 @@
             return true;
         },
 
-        // [新增] 批量修复：遍历所有订单，清理并同步管理费/服务费流水
         async batchRepairAllOrderFees(progressCallback) {
             if (!PERMISSION.isAdmin()) throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
             const profile = await this.getCurrentProfile();
@@ -1360,7 +1328,6 @@
                     failedList.push({ order_id: o.order_id, error: e.message });
                     console.error('[batchRepair] 订单失败:', o.order_id, e.message);
                 }
-                // 每10笔稍作间隔，避免数据库压力过大
                 if ((i + 1) % 10 === 0) await new Promise(r => setTimeout(r, 300));
             }
             if (window.Audit) await window.Audit.log('batch_repair_order_fees', JSON.stringify({ total, success, failed, operator: profile.id }));
@@ -1373,7 +1340,6 @@
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
             
-            // ========== 新增：拦截已变卖订单 ==========
             if (currentOrder.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
                     ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
@@ -1401,7 +1367,6 @@
                 const newPaidTotal = (currentOrder.interest_paid_total||0) + interestToRecord;
                 const newShortfall = (currentOrder.interest_shortfall||0) + shortfallToTrack;
                 const maxMonths = currentOrder.max_extension_months || 10;
-                // 预付款（months>1）不受 maxMonths 约束，但单次最多3期
                 if (months === 1 && newPaidMonths > maxMonths) {
                     throw new Error(Utils.lang==='id'?`❌ Mencapai batas maksimum perpanjangan (${maxMonths} bulan)`:`❌ 已达到最大延期期限 (${maxMonths}个月)`);
                 }
@@ -1490,13 +1455,11 @@
             }
         },
 
-        // ==================== 本金收款（增加 liquidated 拦截） ====================
         async recordPrincipalPayment(orderId, amount, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
             
-            // ========== 新增：拦截已变卖订单 ==========
             if (currentOrder.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
                     ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
@@ -1552,13 +1515,11 @@
             return true;
         },
 
-        // ==================== 固定还款（增加 liquidated 拦截） ====================
         async recordFixedPayment(orderId, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
             
-            // ========== 新增：拦截已变卖订单 ==========
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
                     ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
@@ -1625,13 +1586,11 @@
             return true;
         },
 
-        // ==================== 提前结清（增加 liquidated 拦截） ====================
         async earlySettleFixedOrder(orderId, paymentMethod) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
             
-            // ========== 新增：拦截已变卖订单 ==========
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
                     ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
@@ -1670,7 +1629,8 @@
             return true;
         },
 
-                async updateOverdueDays() {
+        // ==================== 逾期天数更新（已修复雅加达时区） ====================
+        async updateOverdueDays() {
             if(!supabaseClient) return false;
             const { data: activeOrders, error } = await supabaseClient
                 .from('orders')
@@ -1788,13 +1748,6 @@
             return true;
         },
 
-        // ==================== 作废流水（软删除）====================
-        // 仅 admin 可操作。
-        // 同步将 cash_flow_records 和关联的 payment_history 标记 is_voided=true。
-        // 注意：payment_history 表需要在 Supabase 里手动添加以下两列：
-        //   is_voided  boolean  default false
-        //   voided_at  timestamptz
-        //   voided_by  uuid (references auth.users)
         async voidCashFlowRecord(flowId) {
             const profile = await this.getCurrentProfile();
             if (profile?.role !== 'admin') {
@@ -1803,7 +1756,6 @@
                     : '仅管理员可作废流水');
             }
 
-            // 1. 读取该条流水
             const { data: flow, error: fetchErr } = await supabaseClient
                 .from('cash_flow_records').select('*').eq('id', flowId).single();
             if (fetchErr || !flow) throw new Error(Utils.lang === 'id' ? 'Data tidak ditemukan' : '流水记录不存在');
@@ -1811,15 +1763,12 @@
 
             const nowTs = nowStr();
 
-            // 2. 作废 cash_flow_records
             const { error: voidErr } = await supabaseClient
                 .from('cash_flow_records')
                 .update({ is_voided: true, voided_at: nowTs, voided_by: profile.id })
                 .eq('id', flowId);
             if (voidErr) throw voidErr;
 
-            // 3. 同步作废 payment_history（通过 order_id + amount + type 关联）
-            //    flow_type → payment type 映射
             const typeMap = {
                 interest: 'interest', principal: 'principal',
                 admin_fee: 'admin_fee', service_fee: 'service_fee',
@@ -1827,7 +1776,6 @@
             };
             const phType = typeMap[flow.flow_type];
             if (phType && flow.order_id) {
-                // 找 payment_history 里同订单、同类型、同金额、未作废的最近一条
                 const { data: phRows } = await supabaseClient
                     .from('payment_history')
                     .select('id')
@@ -1845,7 +1793,6 @@
                 }
             }
 
-            // 4. 审计日志
             if (window.Audit) {
                 await window.Audit.log({
                     action: 'void_cash_flow',
@@ -2270,15 +2217,11 @@
     setTimeout(() => safeQuery(() => SupabaseAPI.ensureInterestShortfallColumn?.()), 5000);
 
     // ==================== 管理员：逐条同步缴费记录（利息/本金）====================
-    // 修复说明：
-    //   Fix①：同步 cash_flow_records 利息/本金流水——先清除旧流水，再按最新 payment_history 重建。
-    //   Fix②：同步 customers 表——修改客户信息时同步更新独立的客户档案记录。
     SupabaseAPI.adminSyncPaymentRecords = async function(orderId, editedRecords) {
         if (!supabaseClient) throw new Error('客户端未初始化');
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
 
-        // 1. 获取订单完整信息（含 customer_id、store_id 用于写流水和同步客户档案）
         const { data: orderRow, error: orderErr } = await supabaseClient
             .from('orders')
             .select('id, order_id, loan_amount, agreed_interest_rate, interest_shortfall, store_id, customer_id, customer_name, customer_ktp, customer_phone, customer_address')
@@ -2286,20 +2229,13 @@
         if (orderErr || !orderRow) throw new Error(Utils.lang === 'id' ? 'Pesanan tidak ditemukan' : '订单不存在');
         const orderUUID = orderRow.id;
 
-        // editedRecords 格式:
-        // { toDelete: [payment_history.id, ...],
-        //   toUpdate: [{ id, date, amount, payment_method, months, description }, ...],
-        //   toAdd:    [{ type:'interest'|'principal', date, amount, payment_method, months, description }, ...],
-        //   customerUpdates: { name, ktp, phone, address } | null }
         const { toDelete = [], toUpdate = [], toAdd = [], customerUpdates = null } = editedRecords;
 
-        // 2. 删除被标记删除的 payment_history 记录
         for (const pid of toDelete) {
             const { error: delErr } = await supabaseClient.from('payment_history').delete().eq('id', pid);
             if (delErr) throw delErr;
         }
 
-        // 3. 更新被修改的 payment_history 记录
         for (const rec of toUpdate) {
             const upd = {
                 date: rec.date,
@@ -2312,7 +2248,6 @@
             if (updErr) throw updErr;
         }
 
-        // 4. 新增 payment_history 记录
         for (const rec of toAdd) {
             const newRec = {
                 order_id: orderUUID,
@@ -2329,7 +2264,6 @@
             if (insErr) throw insErr;
         }
 
-        // 5. 重新计算汇总字段（从 payment_history 全量统计）
         const { data: allPay, error: payErr } = await supabaseClient
             .from('payment_history')
             .select('type, amount, months, is_voided')
@@ -2366,17 +2300,12 @@
         const { error: sumErr } = await supabaseClient.from('orders').update(summaryUpd).eq('id', orderUUID);
         if (sumErr) throw sumErr;
 
-        // ============================================================
-        // Fix①：同步 cash_flow_records 利息/本金流水
-        // 策略：清除该订单所有 interest/principal 流水，然后按最新 payment_history 逐条重建。
-        // ============================================================
         await supabaseClient
             .from('cash_flow_records')
             .delete()
             .eq('order_id', orderUUID)
             .in('flow_type', ['interest', 'principal']);
 
-        // 从 payment_history 重新拉取所有有效利息/本金记录，逐条重建流水
         const { data: freshPay } = await supabaseClient
             .from('payment_history')
             .select('id, type, date, amount, payment_method, months, description, is_voided')
@@ -2407,12 +2336,7 @@
             });
         }
 
-        // ============================================================
-        // Fix②：同步 customers 表
-        // 若管理员修改了客户姓名/KTP/电话/地址，同步更新 customers 表中的独立记录。
-        // ============================================================
         if (orderRow.customer_id) {
-            // 先从 orders 表中取当前（刚保存的）客户字段（adminSaveOrder 已写入 orders）
             const { data: freshOrder } = await supabaseClient
                 .from('orders')
                 .select('customer_name, customer_ktp, customer_phone, customer_address')
@@ -2427,7 +2351,6 @@
                     custUpd.ktp_address = freshOrder.customer_address;
                     custUpd.address     = freshOrder.customer_address;
                 }
-                // 只在有实质内容时才更新，避免覆盖 customers 表里独有的字段
                 if (Object.keys(custUpd).length > 1) {
                     await supabaseClient
                         .from('customers')
@@ -2444,16 +2367,11 @@
     window.SUPABASE = SupabaseAPI;
 
     // ==================== 现金流水诊断 & 批量清理（管理员）====================
-    // diagnoseCashFlow：扫描 cash_flow_records，找出：
-    //   ① 孤立流水：flow 的 order_id 指向的 orders 记录已不存在（订单被删除后遗留）
-    //   ② 重复流水：同一订单、同一 flow_type、同一金额出现 2+ 条未作废记录
-    // voidCashFlowBatch：批量将指定 id 的流水标记 is_voided=true
     SupabaseAPI.diagnoseCashFlow = async function() {
         if (!supabaseClient) throw new Error('客户端未初始化');
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin') throw new Error('需管理员权限');
 
-        // 拉取所有未作废流水（只取诊断必要字段）
         const { data: flows, error: flowErr } = await supabaseClient
             .from('cash_flow_records')
             .select('id, order_id, flow_type, direction, amount, source_target, flow_date, recorded_at, description, reference_id')
@@ -2461,16 +2379,13 @@
             .order('flow_date', { ascending: false });
         if (flowErr) throw flowErr;
 
-        // 拉取所有 orders 的内部 UUID，用于比对
         const { data: orderRows } = await supabaseClient
             .from('orders')
             .select('id');
         const existingOrderUUIDs = new Set((orderRows || []).map(o => o.id));
 
-        // ① 找孤立流水：flow.order_id 非空，但对应 orders 行不存在
         const orphaned = (flows || []).filter(f => f.order_id && !existingOrderUUIDs.has(f.order_id));
 
-        // ② 找重复流水：同 order_id + flow_type + amount 出现 2+ 条
         const seen = {};
         const duplicates = [];
         for (const f of (flows || [])) {
@@ -2482,11 +2397,9 @@
         for (const key of Object.keys(seen)) {
             const group = seen[key];
             if (group.length >= 2) {
-                // 保留最早一条，其余标为重复
                 const sorted = group.slice().sort((a, b) =>
                     new Date(a.flow_date || a.recorded_at) - new Date(b.flow_date || b.recorded_at));
                 for (let i = 1; i < sorted.length; i++) {
-                    // 不与孤立流水重复报告
                     if (!orphaned.find(o => o.id === sorted[i].id)) {
                         duplicates.push(sorted[i]);
                     }
@@ -2508,7 +2421,6 @@
         if (profile?.role !== 'admin') throw new Error('需管理员权限');
         if (!ids || ids.length === 0) return;
         const nowTs = nowStr();
-        // 分批处理，每批最多 50 条，避免 URL 超长
         const BATCH = 50;
         for (let i = 0; i < ids.length; i += BATCH) {
             const batch = ids.slice(i, i + BATCH);
