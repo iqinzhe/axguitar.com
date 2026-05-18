@@ -1,6 +1,8 @@
-// app-dashboard-core.js - v2.0 (JF 命名空间)  
+// app-dashboard-core.js - v2.1 (JF 命名空间)  
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
 // 数据修复功能：全面修复（订单费用同步 + 现金流清理 + 缺失发放补录）
+// 修复【重要】：KPI收入构成统计现已包含 completed（已结清）订单的管理费/服务费/利息/本金
+//             原代码仅统计 status==='active' 的订单，导致已结清订单的全部收入在收入构成中消失
 
 'use strict';
 
@@ -666,11 +668,15 @@
                         if (o.status === 'active') {
                             activeOrders++; totalLoanActive += (o.loan_amount || 0);
                             if ((o.overdue_days || 0) >= 1) overdueOrders++;
+                        } else if (o.status === 'completed') { completedOrders++; }
+                        // 修复：管理费/服务费/利息/本金统计需包含 active 和 completed 两类订单
+                        // 原代码仅在 active 分支累加，导致已结清订单的收入全部遗漏于收入构成
+                        if (o.status === 'active' || o.status === 'completed') {
                             if (o.admin_fee_paid) adminFeesCollected += (o.admin_fee || 0);
                             serviceFeesCollected += (o.service_fee_paid || 0);
                             interestCollected += (o.interest_paid_total || 0);
                             principalCollected += (o.principal_paid || 0);
-                        } else if (o.status === 'completed') { completedOrders++; }
+                        }
                     }
 
                     const newThisMonth = newThisMonthData.length;
