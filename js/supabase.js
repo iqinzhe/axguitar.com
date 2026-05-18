@@ -1654,70 +1654,71 @@
             Utils.toast.success(Utils.lang==='id'?'Pelunasan dipercepat berhasil!':'提前结清成功！');
             return true;
         },
-                // ==================== 灵活还款提前结清（独立挂载到 SupabaseAPI） ====================
-SupabaseAPI.earlySettleFlexibleOrder = async function(orderId, paymentMethod, finalPrincipalAmount = null) {
-    if(paymentMethod===undefined) paymentMethod='cash';
-    const profile = await this.getCurrentProfile();
-    const order = await this.getOrder(orderId);
-    
-    if (order.status === 'liquidated') {
-        throw new Error(Utils.lang === 'id' 
-            ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
-            : '抵押物已变卖，无法继续收款。');
-    }
-    
-    if(order.status === 'completed') throw new Error(Utils.t('order_completed'));
-    if(order.repayment_type !== 'flexible') throw new Error(Utils.lang === 'id' ? 'Bukan cicilan fleksibel' : '不是灵活还款');
-    
-    const shortfall = order.interest_shortfall || 0;
-    if (shortfall > 0) {
-        throw new Error(Utils.lang === 'id'
-            ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu sebelum pelunasan.`
-            : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再结清。`);
-    }
-    
-    let remainingPrincipal = order.principal_remaining ?? (order.loan_amount - (order.principal_paid || 0));
-    let paidAmount = (finalPrincipalAmount !== null && finalPrincipalAmount > 0) 
-        ? Math.min(finalPrincipalAmount, remainingPrincipal) 
-        : remainingPrincipal;
-    if (paidAmount <= 0) throw new Error(Utils.t('invalid_amount'));
-    
-    const recordDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
-    
-    await supabaseClient.from('payment_history').insert({
-        order_id: order.id, date: recordDate, type:'principal',
-        amount: paidAmount, description: Utils.lang === 'id' ? 'Pelunasan (fleksibel)' : '结清（灵活还款）',
-        recorded_by: profile.id, payment_method: paymentMethod
-    });
-    
-    await this.recordCashFlow({
-        store_id: order.store_id, flow_type:'principal', direction:'inflow',
-        amount: paidAmount, source_target: paymentMethod, order_id: order.id,
-        customer_id: order.customer_id,
-        description: (Utils.lang === 'id' ? 'Pelunasan fleksibel' : '灵活还款结清') + ' - ' + order.order_id,
-        reference_id: order.order_id,
-        flow_date: recordDate
-    });
-    
-    const newPrincipalPaid = (order.principal_paid || 0) + paidAmount;
-    const newPrincipalRemaining = (order.loan_amount || 0) - newPrincipalPaid;
-    const updates = {
-        status: newPrincipalRemaining <= 0 ? 'completed' : 'active',
-        principal_paid: newPrincipalPaid,
-        principal_remaining: newPrincipalRemaining,
-        monthly_interest: 0,
-        fund_status: newPrincipalRemaining <= 0 ? 'returned' : 'deployed',
-        completed_at: newPrincipalRemaining <= 0 ? nowStr() : null,
-        updated_at: nowStr()
-    };
-    
-    const { error } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
-    if(error) throw error;
-    
-    if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement_flexible', paidAmount, paymentMethod);
-    Utils.toast.success(Utils.lang === 'id' ? '✅ Pelunasan berhasil!' : '✅ 结清成功！');
-    return true;
-};
+
+        // ==================== 灵活还款提前结清 ====================
+        earlySettleFlexibleOrder: async function(orderId, paymentMethod, finalPrincipalAmount = null) {
+            if(paymentMethod===undefined) paymentMethod='cash';
+            const profile = await this.getCurrentProfile();
+            const order = await this.getOrder(orderId);
+            
+            if (order.status === 'liquidated') {
+                throw new Error(Utils.lang === 'id' 
+                    ? 'Barang jaminan sudah dijual, tidak dapat menerima pembayaran lagi.'
+                    : '抵押物已变卖，无法继续收款。');
+            }
+            
+            if(order.status === 'completed') throw new Error(Utils.t('order_completed'));
+            if(order.repayment_type !== 'flexible') throw new Error(Utils.lang === 'id' ? 'Bukan cicilan fleksibel' : '不是灵活还款');
+            
+            const shortfall = order.interest_shortfall || 0;
+            if (shortfall > 0) {
+                throw new Error(Utils.lang === 'id'
+                    ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu sebelum pelunasan.`
+                    : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再结清。`);
+            }
+            
+            let remainingPrincipal = order.principal_remaining ?? (order.loan_amount - (order.principal_paid || 0));
+            let paidAmount = (finalPrincipalAmount !== null && finalPrincipalAmount > 0) 
+                ? Math.min(finalPrincipalAmount, remainingPrincipal) 
+                : remainingPrincipal;
+            if (paidAmount <= 0) throw new Error(Utils.t('invalid_amount'));
+            
+            const recordDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
+            
+            await supabaseClient.from('payment_history').insert({
+                order_id: order.id, date: recordDate, type:'principal',
+                amount: paidAmount, description: Utils.lang === 'id' ? 'Pelunasan (fleksibel)' : '结清（灵活还款）',
+                recorded_by: profile.id, payment_method: paymentMethod
+            });
+            
+            await this.recordCashFlow({
+                store_id: order.store_id, flow_type:'principal', direction:'inflow',
+                amount: paidAmount, source_target: paymentMethod, order_id: order.id,
+                customer_id: order.customer_id,
+                description: (Utils.lang === 'id' ? 'Pelunasan fleksibel' : '灵活还款结清') + ' - ' + order.order_id,
+                reference_id: order.order_id,
+                flow_date: recordDate
+            });
+            
+            const newPrincipalPaid = (order.principal_paid || 0) + paidAmount;
+            const newPrincipalRemaining = (order.loan_amount || 0) - newPrincipalPaid;
+            const updates = {
+                status: newPrincipalRemaining <= 0 ? 'completed' : 'active',
+                principal_paid: newPrincipalPaid,
+                principal_remaining: newPrincipalRemaining,
+                monthly_interest: 0,
+                fund_status: newPrincipalRemaining <= 0 ? 'returned' : 'deployed',
+                completed_at: newPrincipalRemaining <= 0 ? nowStr() : null,
+                updated_at: nowStr()
+            };
+            
+            const { error } = await supabaseClient.from('orders').update(updates).eq('order_id', orderId);
+            if(error) throw error;
+            
+            if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement_flexible', paidAmount, paymentMethod);
+            Utils.toast.success(Utils.lang === 'id' ? '✅ Pelunasan berhasil!' : '✅ 结清成功！');
+            return true;
+        },
         
         // ==================== 逾期天数更新（已修复雅加达时区） ====================
         async updateOverdueDays() {
@@ -2481,9 +2482,6 @@ SupabaseAPI.earlySettleFlexibleOrder = async function(orderId, paymentMethod, fi
         return { interestMonths, interestTotal, principalPaid, principalRemaining, newStatus };
     };
 
-    JF.Supabase = SupabaseAPI;
-    window.SUPABASE = SupabaseAPI;
-
     // ==================== 现金流水诊断 & 批量清理（管理员）====================
     SupabaseAPI.diagnoseCashFlow = async function() {
         if (!supabaseClient) throw new Error('客户端未初始化');
@@ -2534,62 +2532,60 @@ SupabaseAPI.earlySettleFlexibleOrder = async function(orderId, paymentMethod, fi
     };
 
     // 补录缺失的贷款发放流水（针对在押订单没有发放记录的）
-SupabaseAPI.generateMissingDisbursements = async function() {
-    const profile = await this.getCurrentProfile();
-    if (profile?.role !== 'admin') throw new Error('需管理员权限');
-    if (!supabaseClient) throw new Error('客户端未初始化');
+    SupabaseAPI.generateMissingDisbursements = async function() {
+        const profile = await this.getCurrentProfile();
+        if (profile?.role !== 'admin') throw new Error('需管理员权限');
+        if (!supabaseClient) throw new Error('客户端未初始化');
 
-    // 1. 查出所有 active 订单
-    const { data: activeOrders, error: ordersErr } = await supabaseClient
-        .from('orders')
-        .select('id, order_id, loan_amount, store_id, customer_id, created_at')
-        .eq('status', 'active');
-    if (ordersErr) throw ordersErr;
-    if (!activeOrders.length) return { missing: 0, created: 0 };
+        const { data: activeOrders, error: ordersErr } = await supabaseClient
+            .from('orders')
+            .select('id, order_id, loan_amount, store_id, customer_id, created_at')
+            .eq('status', 'active');
+        if (ordersErr) throw ordersErr;
+        if (!activeOrders.length) return { missing: 0, created: 0 };
 
-    // 2. 查询已有发放流水（未作废）
-    const orderIds = activeOrders.map(o => o.id);
-    const { data: existingDisb, error: disbErr } = await supabaseClient
-        .from('cash_flow_records')
-        .select('order_id')
-        .eq('flow_type', 'loan_disbursement')
-        .eq('is_voided', false)
-        .in('order_id', orderIds);
-    if (disbErr) throw disbErr;
+        const orderIds = activeOrders.map(o => o.id);
+        const { data: existingDisb, error: disbErr } = await supabaseClient
+            .from('cash_flow_records')
+            .select('order_id')
+            .eq('flow_type', 'loan_disbursement')
+            .eq('is_voided', false)
+            .in('order_id', orderIds);
+        if (disbErr) throw disbErr;
 
-    const existingSet = new Set(existingDisb.map(d => d.order_id));
-    const missingOrders = activeOrders.filter(o => !existingSet.has(o.id));
+        const existingSet = new Set(existingDisb.map(d => d.order_id));
+        const missingOrders = activeOrders.filter(o => !existingSet.has(o.id));
 
-    let created = 0;
-    for (const order of missingOrders) {
-        const flowDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
-        const description = Utils.lang === 'id'
-            ? `Pencairan gadai (perbaikan otomatis) - ${order.order_id}`
-            : `当金发放 (自动补录) - ${order.order_id}`;
-        await this.recordCashFlow({
-            store_id: order.store_id,
-            flow_type: 'loan_disbursement',
-            direction: 'outflow',
-            amount: order.loan_amount,
-            source_target: 'cash',
-            order_id: order.id,
-            customer_id: order.customer_id,
-            description: description,
-            reference_id: order.order_id,
-            flow_date: flowDate
-        });
-        created++;
-        if (created % 10 === 0) await new Promise(r => setTimeout(r, 100));
-    }
-    if (window.Audit) {
-        await window.Audit.log('generate_missing_disbursements', JSON.stringify({
-            missing_count: missingOrders.length,
-            created_count: created,
-            operator: profile.id
-        }));
-    }
-    return { missing: missingOrders.length, created };
-};
+        let created = 0;
+        for (const order of missingOrders) {
+            const flowDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
+            const description = Utils.lang === 'id'
+                ? `Pencairan gadai (perbaikan otomatis) - ${order.order_id}`
+                : `当金发放 (自动补录) - ${order.order_id}`;
+            await this.recordCashFlow({
+                store_id: order.store_id,
+                flow_type: 'loan_disbursement',
+                direction: 'outflow',
+                amount: order.loan_amount,
+                source_target: 'cash',
+                order_id: order.id,
+                customer_id: order.customer_id,
+                description: description,
+                reference_id: order.order_id,
+                flow_date: flowDate
+            });
+            created++;
+            if (created % 10 === 0) await new Promise(r => setTimeout(r, 100));
+        }
+        if (window.Audit) {
+            await window.Audit.log('generate_missing_disbursements', JSON.stringify({
+                missing_count: missingOrders.length,
+                created_count: created,
+                operator: profile.id
+            }));
+        }
+        return { missing: missingOrders.length, created };
+    };
 
     SupabaseAPI.voidCashFlowBatch = async function(ids) {
         if (!supabaseClient) throw new Error('客户端未初始化');
@@ -2609,4 +2605,9 @@ SupabaseAPI.generateMissingDisbursements = async function() {
         if (window.JF && JF.Cache) JF.Cache.clear();
         return true;
     };
+
+    // 最终挂载到全局
+    JF.Supabase = SupabaseAPI;
+    window.SUPABASE = SupabaseAPI;
+
 })();
