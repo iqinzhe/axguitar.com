@@ -1,6 +1,7 @@
 // order.js - v2.0 (JF 命名空间) 
 // getOrderCashFlow 返回订单专属流水（而非整个门店流水）
-// 订单号传递确保客户ID-序号格式生效
+// 修复：订单号传递问题，确保客户ID-序号格式生效
+// 修复：资金流水日期与订单创建日期保持一致
 
 'use strict';
 
@@ -12,7 +13,7 @@
         // ==================== 创建订单 ====================
         async create(data) {
             const orderData = {
-                order_id: data.order_id,  // 传递订单号，确保客户ID-序号格式生效
+                order_id: data.order_id,
                 customer_name: data.customer.name,
                 customer_ktp: data.customer.ktp,
                 customer_phone: data.customer.phone,
@@ -44,10 +45,10 @@
             }
         },
 
-        // ==================== 管理费记录 ====================
-        async recordAdminFee(orderId, paymentMethod, adminFeeAmount) {
+        // ==================== 管理费记录（支持传入流水日期） ====================
+        async recordAdminFee(orderId, paymentMethod, adminFeeAmount, flowDate) {
             try {
-                return await SUPABASE.recordAdminFee(orderId, paymentMethod, adminFeeAmount);
+                return await SUPABASE.recordAdminFee(orderId, paymentMethod, adminFeeAmount, flowDate);
             } catch (error) {
                 console.error("recordAdminFee error:", error);
                 Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya admin' : '管理费记录失败');
@@ -55,10 +56,10 @@
             }
         },
 
-        // ==================== 服务费记录 ====================
-        async recordServiceFee(orderId, monthsPaid, paymentMethod) {
+        // ==================== 服务费记录（支持传入流水日期） ====================
+        async recordServiceFee(orderId, monthsPaid, paymentMethod, flowDate) {
             try {
-                return await SUPABASE.recordServiceFee(orderId, monthsPaid, paymentMethod);
+                return await SUPABASE.recordServiceFee(orderId, monthsPaid, paymentMethod, flowDate);
             } catch (error) {
                 console.error("recordServiceFee error:", error);
                 Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat biaya layanan' : '服务费记录失败');
@@ -66,10 +67,10 @@
             }
         },
 
-        // ==================== 利息记录（灵活还款） ====================
-        async recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid = null) {
+        // ==================== 利息记录（灵活还款，支持传入流水日期） ====================
+        async recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid, paymentDate) {
             try {
-                return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid);
+                return await SUPABASE.recordInterestPayment(orderId, monthsPaid, paymentMethod, actualPaid, paymentDate);
             } catch (error) {
                 console.error("recordInterestPayment error:", error);
                 Utils.toast.warning(Utils.lang === 'id' ? 'Gagal mencatat pembayaran bunga' : '利息记录失败');
@@ -88,10 +89,10 @@
             }
         },
 
-        // ==================== 贷款发放记录 ====================
-        async recordLoanDisbursement(orderId, amount, source, description) {
+        // ==================== 贷款发放记录（支持传入流水日期） ====================
+        async recordLoanDisbursement(orderId, amount, source, description, flowDate) {
             try {
-                return await SUPABASE.recordLoanDisbursement(orderId, amount, source, description);
+                return await SUPABASE.recordLoanDisbursement(orderId, amount, source, description, flowDate);
             } catch (error) {
                 console.error("recordLoanDisbursement error:", error);
                 if (error.message === Utils.t('loan_already_disbursed')) {
@@ -266,7 +267,6 @@
                 
                 const client = SUPABASE.getClient();
                 
-                // 通过 order_id 查询（最精确）
                 let query = client.from('cash_flow_records')
                     .select('*')
                     .eq('order_id', order.id)
@@ -279,7 +279,6 @@
                     console.warn('通过 order_id 查询现金流失败:', orderIdError.message);
                 }
                 
-                // 同时通过 reference_id = order.order_id 查询（备用）
                 const { data: refIdFlows, error: refIdError } = await client
                     .from('cash_flow_records')
                     .select('*')
@@ -291,7 +290,6 @@
                     console.warn('通过 reference_id 查询现金流失败:', refIdError.message);
                 }
                 
-                // 合并去重
                 const allFlows = [...(orderIdFlows || []), ...(refIdFlows || [])];
                 const uniqueFlows = [];
                 const seenIds = new Set();
@@ -303,7 +301,6 @@
                     }
                 }
                 
-                // 按时间倒序排序
                 uniqueFlows.sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at));
                 
                 return uniqueFlows;
@@ -358,7 +355,6 @@
         },
     };
 
-    // 挂载到命名空间
     JF.Order = Order;
     window.Order = Order;
 
