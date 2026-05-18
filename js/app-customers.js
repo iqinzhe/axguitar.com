@@ -835,13 +835,11 @@
                 serviceFeePercent = 0;
             }
             
-            // ========== 费用缴纳检查（新增） ==========
-            // 检查管理费：如果管理费 > 0 且未标记为已缴，则不能创建订单
+                        // ========== 费用缴纳检查 ==========
             const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
-            const adminFeeValue = adminFee;
-            const adminFeeIsPaid = adminFeeValue === 0 ? true : false;
             
-            if (adminFeeValue > 0 && !adminFeeIsPaid) {
+            // 管理费检查：金额 > 0 时必须缴纳，金额 = 0 表示免费
+            if (adminFee > 0) {
                 Utils.toast.warning(lang === 'id' 
                     ? '⚠️ Biaya admin harus dibayar sebelum pesanan dibuat. Nasabah harus membayar admin fee terlebih dahulu.'
                     : '⚠️ 管理费未缴纳。客户必须先缴纳管理费才能创建订单。');
@@ -849,17 +847,15 @@
                 return;
             }
             
-            // 检查服务费：如果服务费 > 0 且未标记为已缴，则不能创建订单
-            const serviceFeeValue = serviceFee;
-            const serviceFeeIsPaid = serviceFeeValue === 0 ? true : false;
-            
-            if (serviceFeeValue > 0 && !serviceFeeIsPaid) {
+            // 服务费检查：金额 > 0 时必须缴纳，金额 = 0 表示免费
+            if (serviceFee > 0) {
                 Utils.toast.warning(lang === 'id' 
                     ? '⚠️ Biaya layanan harus dibayar sebelum pesanan dibuat. Nasabah harus membayar service fee terlebih dahulu.'
                     : '⚠️ 服务费未缴纳。客户必须先缴纳服务费才能创建订单。');
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
                 return;
             }
+            // ========== 费用缴纳检查结束 ==========
             // ========== 费用缴纳检查结束 ==========
             
             const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 10;
