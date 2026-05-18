@@ -271,6 +271,20 @@
   .badge--fixed { background: #fed7aa; color: #9a3412; }
   .badge--cash { background: #fef3c7; color: #92400e; }
   .badge--bank { background: #e0f2fe; color: #0369a1; }
+  
+  /* 费用状态徽章 */
+  .badge--paid {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  .badge--unpaid {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+  .badge--exempt {
+    background: #fef3c7;
+    color: #b45309;
+  }
 
   .locked-badge {
     display: inline-block;
@@ -1648,4 +1662,82 @@
         min-width: 500px;
     }
 
+}
+
+/* ==================== JF! 通用分页控件 ==================== */
+.jf-paginator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 4px 4px;
+    border-top: 1px solid var(--gray-100);
+    margin-top: 4px;
+}
+.jf-page-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-right: 4px;
+    white-space: nowrap;
+}
+.jf-page-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.jf-page-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    background: var(--white);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    line-height: 1;
+}
+.jf-page-btn:hover:not(:disabled):not(.jf-page-active) {
+    background: var(--gray-100);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.jf-page-btn.jf-page-active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    cursor: default;
+}
+.jf-page-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.jf-page-nav {
+    padding: 0 12px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.jf-page-ellipsis {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 0 2px;
+    line-height: 32px;
+}
+.jf-page-size-select {
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    font-size: 12px;
+    background: var(--white);
+    color: var(--text-primary);
+    cursor: pointer;
+    margin-left: 8px;
+}
+.jf-page-size-label {
+    font-size: 12px;
+    color: var(--text-muted);
 }
