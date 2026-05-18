@@ -1,6 +1,5 @@
 // app-dashboard-core.js - v2.0 (JF 命名空间)  
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
-// [新增] 门店操作员财务汇总菜单
 
 'use strict';
 
