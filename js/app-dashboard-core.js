@@ -556,7 +556,7 @@
             const npValEl = document.querySelector('.np-val');
             if (npValEl) { npValEl.style.transition = 'opacity 0.4s'; npValEl.style.opacity = '0'; setTimeout(function(){ npValEl.textContent = Utils.formatCurrency(netProfit); npValEl.style.opacity = '1'; }, 400); }
             const expenseAmtEl = document.querySelector('.income-item .income-amt.expense');
-            if (expenseAmtEl) { expenseAmtEl.style.transition = 'opacity 0.4s'; expenseAmtEl.style.opacity = '0'; setTimeout(function(){ expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses); expenseAmtEl.style.opacity = '1'; }, 400); }
+            if (expenseAmtEl) { expenseAmtEl.style.transition = 'opacity 0.4s'; expenseAmtEl.style.opacity = '0'; setTimeout(function(){ expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses); expenseAmtEl.style.opacity = '1'; }, 400); const expenseSubEl = expenseAmtEl.closest('.income-item') && expenseAmtEl.closest('.income-item').querySelector('.income-sub'); if (expenseSubEl) expenseSubEl.textContent = lang === 'id' ? 'Bulan ini' : '本月合计'; }
             const messagePreview = document.querySelector('.message-preview');
             if (messagePreview) {
                 const pendingCount = messages.length;
