@@ -382,7 +382,11 @@
                 '状态': 'status', 'Status': 'status',
                 '约定利率': 'interest_rate', 'Suku Bunga': 'interest_rate',
                 '月利息': 'monthly_interest', 'Bunga Bulanan': 'monthly_interest',
-                '剩余本金': 'remaining_principal', 'Sisa Pokok': 'remaining_principal'
+                '剩余本金': 'remaining_principal', 'Sisa Pokok': 'remaining_principal',
+                '建立订单日期': 'order_date', 'Tanggal Mulai': 'order_date',
+                '合同到期日': 'maturity_date', 'Tanggal Jatuh Tempo': 'maturity_date',
+                '每期还款额': 'installment_amount', 'Angsuran Per Periode': 'installment_amount',
+                '已还期数 / 剩余期数': 'paid_remaining_periods', 'Periode Terbayar / Sisa': 'paid_remaining_periods'
             };
             
             const fields = {};
@@ -397,6 +401,11 @@
             }
             
             const lang = Utils.lang;
+            // 判断是否固定还款（从已解析字段或卡片文本推断）
+            const repayTypeValue = fields.repayment_type || '';
+            const isFixed = repayTypeValue.includes('固定') || repayTypeValue.includes('Tetap') ||
+                            orderInfoCard.textContent.includes('每期还款额') || orderInfoCard.textContent.includes('Angsuran Per Periode');
+
             const labels = {
                 order_id: lang === 'id' ? 'ID Pesanan' : '订单号',
                 customer_name: lang === 'id' ? 'Nama Nasabah' : '客户姓名',
@@ -406,20 +415,43 @@
                 status: lang === 'id' ? 'Status' : '状态',
                 interest_rate: lang === 'id' ? 'Suku Bunga' : '约定利率',
                 monthly_interest: lang === 'id' ? 'Bunga Bulanan' : '月利息',
-                remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金'
+                remaining_principal: lang === 'id' ? 'Sisa Pokok' : '剩余本金',
+                order_date: lang === 'id' ? 'Tanggal Mulai' : '建立订单日期',
+                maturity_date: lang === 'id' ? 'Tanggal Jatuh Tempo' : '合同到期日',
+                installment_amount: lang === 'id' ? 'Angsuran Per Periode' : '每期还款额',
+                paid_remaining_periods: lang === 'id' ? 'Periode Terbayar / Sisa' : '已还期数 / 剩余期数'
             };
-            
-            const infoItems = [
-                { label: labels.order_id, value: fields.order_id || '-' },
-                { label: labels.customer_name, value: fields.customer_name || '-' },
-                { label: labels.collateral_name, value: fields.collateral_name || '-' },
-                { label: labels.loan_amount, value: fields.loan_amount || '-' },
-                { label: labels.repayment_type, value: fields.repayment_type || '-' },
-                { label: labels.status, value: fields.status || '-' },
-                { label: labels.interest_rate, value: fields.interest_rate || '-' },
-                { label: labels.monthly_interest, value: fields.monthly_interest || '-' },
-                { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
-            ];
+
+            let infoItems;
+            if (isFixed) {
+                // 固定还款打印格式：不显示月利息/剩余本金
+                infoItems = [
+                    { label: labels.order_id, value: fields.order_id || '-' },
+                    { label: labels.customer_name, value: fields.customer_name || '-' },
+                    { label: labels.collateral_name, value: fields.collateral_name || '-' },
+                    { label: labels.loan_amount, value: fields.loan_amount || '-' },
+                    { label: labels.repayment_type, value: fields.repayment_type || '-' },
+                    { label: labels.status, value: fields.status || '-' },
+                    { label: labels.order_date, value: fields.order_date || '-' },
+                    { label: labels.maturity_date, value: fields.maturity_date || '-' },
+                    { label: labels.installment_amount, value: fields.installment_amount || '-' },
+                    { label: labels.paid_remaining_periods, value: fields.paid_remaining_periods || '-' }
+                ];
+            } else {
+                // 灵活还款打印格式：保持原有月利息/剩余本金
+                infoItems = [
+                    { label: labels.order_id, value: fields.order_id || '-' },
+                    { label: labels.customer_name, value: fields.customer_name || '-' },
+                    { label: labels.collateral_name, value: fields.collateral_name || '-' },
+                    { label: labels.loan_amount, value: fields.loan_amount || '-' },
+                    { label: labels.repayment_type, value: fields.repayment_type || '-' },
+                    { label: labels.status, value: fields.status || '-' },
+                    { label: labels.order_date, value: fields.order_date || '-' },
+                    { label: labels.interest_rate, value: fields.interest_rate || '-' },
+                    { label: labels.monthly_interest, value: fields.monthly_interest || '-' },
+                    { label: labels.remaining_principal, value: fields.remaining_principal || '-' }
+                ];
+            }
             
             const gridHtml = `
                 <div class="order-info-grid">

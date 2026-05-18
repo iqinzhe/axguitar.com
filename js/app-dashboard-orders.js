@@ -687,30 +687,65 @@
                 var statusText = order.status === 'active' ? (lang === 'id' ? '进行中' : '进行中') :
                                    order.status === 'completed' ? (lang === 'id' ? '已结清' : '已结清') :
                                    (lang === 'id' ? '已变卖' : '已变卖');
-                var repaymentText = order.repayment_type === 'fixed' ? (lang === 'id' ? '固定还款' : '固定还款') :
+                var isFixed = order.repayment_type === 'fixed';
+                var repaymentText = isFixed ? (lang === 'id' ? '固定还款' : '固定还款') :
                                      (lang === 'id' ? '灵活还款' : '灵活还款');
-                var labels = {
-                    order_id: lang === 'id' ? '订单号' : '订单号',
-                    customer_name: lang === 'id' ? '客户姓名' : '客户姓名',
-                    collateral_name: lang === 'id' ? '质押物名称' : '质押物名称',
-                    loan_amount: lang === 'id' ? '贷款金额' : '贷款金额',
-                    repayment_type: lang === 'id' ? '还款方式' : '还款方式',
-                    status: lang === 'id' ? '状态' : '状态',
-                    interest_rate: lang === 'id' ? '约定利率' : '约定利率',
-                    monthly_interest: lang === 'id' ? '月利息' : '月利息',
-                    remaining_principal: lang === 'id' ? '剩余本金' : '剩余本金'
-                };
-                var infoItems = [
-                    { label: labels.order_id, value: order.order_id },
-                    { label: labels.customer_name, value: order.customer_name },
-                    { label: labels.collateral_name, value: order.collateral_name },
-                    { label: labels.loan_amount, value: Utils.formatCurrency(order.loan_amount) },
-                    { label: labels.repayment_type, value: repaymentText },
-                    { label: labels.status, value: statusText },
-                    { label: labels.interest_rate, value: (monthlyRate * 100).toFixed(0) + '%' },
-                    { label: labels.monthly_interest, value: Utils.formatCurrency(currentMonthlyInterest) },
-                    { label: labels.remaining_principal, value: Utils.formatCurrency(remainingPrincipal) }
-                ];
+
+                // 建立订单日期
+                var printOrderStartDate = order.custom_order_date
+                    ? Utils.formatDate(order.custom_order_date)
+                    : (order.created_at ? Utils.formatDate(order.created_at) : '-');
+
+                // 到期日（仅固定还款）
+                var printMaturityDateStr = '-';
+                if (isFixed && order.repayment_term) {
+                    var printStartRaw = order.custom_order_date || order.created_at;
+                    if (printStartRaw) {
+                        var printMatDate = new Date(printStartRaw);
+                        printMatDate.setMonth(printMatDate.getMonth() + (order.repayment_term || 0));
+                        printMaturityDateStr = Utils.formatDate(printMatDate.toISOString().substring(0, 10));
+                    }
+                }
+
+                // 固定还款：期数信息
+                var printPaidMonths = order.fixed_paid_months || 0;
+                var printTotalMonths = order.repayment_term || 0;
+                var printRemainingMonths = printTotalMonths - printPaidMonths;
+                var printFixedPayment = order.monthly_fixed_payment || 0;
+
+                var infoItems;
+                if (isFixed) {
+                    // 固定还款：不显示月利息/剩余本金，改为还款期数信息和日期
+                    var repayTypeLabel = isFixed
+                        ? (lang === 'id' ? '固定还款' : '固定还款') + ' (' + printTotalMonths + (lang === 'id' ? ' bulan' : ' 个月') + ')'
+                        : repaymentText;
+                    infoItems = [
+                        { label: lang === 'id' ? 'ID Pesanan' : '订单号', value: order.order_id },
+                        { label: lang === 'id' ? 'Nama Nasabah' : '客户姓名', value: order.customer_name },
+                        { label: lang === 'id' ? 'Nama Jaminan' : '质押物名称', value: order.collateral_name },
+                        { label: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额', value: Utils.formatCurrency(order.loan_amount) },
+                        { label: lang === 'id' ? 'Jenis Cicilan' : '还款方式', value: repayTypeLabel },
+                        { label: lang === 'id' ? 'Status' : '状态', value: statusText },
+                        { label: lang === 'id' ? 'Tanggal Mulai' : '建立订单日期', value: printOrderStartDate },
+                        { label: lang === 'id' ? 'Tanggal Jatuh Tempo' : '合同到期日', value: printMaturityDateStr },
+                        { label: lang === 'id' ? 'Angsuran Per Periode' : '每期还款额', value: Utils.formatCurrency(printFixedPayment) },
+                        { label: lang === 'id' ? 'Periode Terbayar / Sisa' : '已还期数 / 剩余期数', value: printPaidMonths + (lang === 'id' ? ' periode' : ' 期') + ' / ' + printRemainingMonths + (lang === 'id' ? ' periode' : ' 期') }
+                    ];
+                } else {
+                    // 灵活还款：保持原有显示
+                    infoItems = [
+                        { label: lang === 'id' ? 'ID Pesanan' : '订单号', value: order.order_id },
+                        { label: lang === 'id' ? 'Nama Nasabah' : '客户姓名', value: order.customer_name },
+                        { label: lang === 'id' ? 'Nama Jaminan' : '质押物名称', value: order.collateral_name },
+                        { label: lang === 'id' ? 'Jumlah Pinjaman' : '贷款金额', value: Utils.formatCurrency(order.loan_amount) },
+                        { label: lang === 'id' ? 'Jenis Cicilan' : '还款方式', value: repaymentText },
+                        { label: lang === 'id' ? 'Status' : '状态', value: statusText },
+                        { label: lang === 'id' ? 'Tanggal Mulai' : '建立订单日期', value: printOrderStartDate },
+                        { label: lang === 'id' ? 'Suku Bunga' : '约定利率', value: (monthlyRate * 100).toFixed(0) + '%' },
+                        { label: lang === 'id' ? 'Bunga Bulanan' : '月利息', value: Utils.formatCurrency(currentMonthlyInterest) },
+                        { label: lang === 'id' ? 'Sisa Pokok' : '剩余本金', value: Utils.formatCurrency(remainingPrincipal) }
+                    ];
+                }
                 var orderInfoGrid = '<div class="order-info-grid">';
                 for (var i = 0; i < infoItems.length; i++) {
                     var item = infoItems[i];
@@ -897,16 +932,43 @@
             var serviceFeeAmount = order.service_fee_amount || 0;
             var serviceFeePaid = order.service_fee_paid || 0;
             var serviceFeeStatus = serviceFeeAmount === 0 ? (lang === 'id' ? '免费' : '免费') : (serviceFeePaid >= serviceFeeAmount ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴'));
+
+            // 建立订单日期（优先使用 custom_order_date，否则用 created_at）
+            var orderStartDate = order.custom_order_date
+                ? Utils.formatDate(order.custom_order_date)
+                : (order.created_at ? Utils.formatDate(order.created_at) : '-');
+
+            // 到期日：订单起始日 + 还款期数（月）
+            var maturityDateStr = '-';
+            if (order.repayment_type === 'fixed' && order.repayment_term) {
+                var startRaw = order.custom_order_date || order.created_at;
+                if (startRaw) {
+                    var matDate = new Date(startRaw);
+                    matDate.setMonth(matDate.getMonth() + (order.repayment_term || 0));
+                    maturityDateStr = Utils.formatDate(matDate.toISOString().substring(0, 10));
+                }
+            }
+
             var repaymentInfoHtml = '';
             if (order.repayment_type === 'fixed') {
                 var paidMonths = order.fixed_paid_months || 0;
-                var totalMonths = order.repayment_term;
+                var totalMonths = order.repayment_term || 0;
+                var remainingMonths = totalMonths - paidMonths;
                 var fixedPayment = order.monthly_fixed_payment || 0;
-                repaymentInfoHtml = '<p><strong>' + t('repayment_type') + ':</strong> 📅 ' + t('fixed_repayment') + ' (' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</p>' +
-                    '<p><strong>' + t('monthly_payment') + ':</strong> ' + Utils.formatCurrency(fixedPayment) + '</p>' +
-                    '<p><strong>' + (lang === 'id' ? 'Progress' : '进度') + ':</strong> ' + paidMonths + '/' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</p>';
+                repaymentInfoHtml =
+                    '<p><strong>' + t('repayment_type') + ':</strong> 📅 ' + t('fixed_repayment') + ' (' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Tanggal Mulai' : '建立订单日期') + ':</strong> ' + orderStartDate + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Tanggal Jatuh Tempo' : '合同到期日') + ':</strong> ' + maturityDateStr + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Angsuran Per Periode' : '每期还款额') + ':</strong> <strong style="color:var(--color-primary)">' + Utils.formatCurrency(fixedPayment) + '</strong></p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Periode Terbayar / Sisa' : '已还期数 / 剩余期数') + ':</strong> ' +
+                        '<span style="color:var(--color-success)">✅ ' + paidMonths + ' ' + (lang === 'id' ? 'periode' : '期') + '</span>' +
+                        ' / ' +
+                        '<span style="color:var(--color-warning)">⏳ ' + remainingMonths + ' ' + (lang === 'id' ? 'periode' : '期') + '</span>' +
+                    '</p>';
             } else {
-                repaymentInfoHtml = '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? '最长延期10个月' : '最长延期10个月') + ')</p>';
+                repaymentInfoHtml =
+                    '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? '最长延期10个月' : '最长延期10个月') + ')</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Tanggal Mulai' : '建立订单日期') + ':</strong> ' + orderStartDate + '</p>';
             }
             // 修复：利息历史表格 5 列，使用 t('times') 等翻译键
             var payRows = '';
@@ -980,7 +1042,6 @@
                 '<h3>📋 ' + (lang === 'id' ? '订单信息' : '订单信息') + '</h3>' +
                 '<p><strong>' + t('order_id') + ':</strong> ' + Utils.escapeHtml(order.order_id) + '</p>' +
                 '<p><strong>' + t('status') + ':</strong> <span class="badge badge--' + order.status + '">' + (statusMap[order.status] || order.status) + '</span></p>' +
-                '<p><strong>' + (lang === 'id' ? '创建日期' : '创建日期') + ':</strong> ' + Utils.formatDate(order.created_at) + '</p>' +
                 repaymentInfoHtml +
                 '<h3 style="margin-top:16px;">👤 ' + t('customer_info') + '</h3>' +
                 '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(order.customer_name) + '</p>' +
@@ -995,23 +1056,44 @@
                 '<h3 style="margin-top:16px;">💰 ' + (lang === 'id' ? '费用明细' : '费用明细') + '</h3>' +
                 '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' — ' + adminFeeStatus + '</p>' +
                 '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) — ' + serviceFeeStatus + '</p>' +
-                '<p><strong>' + (lang === 'id' ? '月利息（当前）' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? '基于剩余本金' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
-                '<p><strong>' + (lang === 'id' ? '已付利息' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? '个月' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
-                '<p><strong>' + (lang === 'id' ? '剩余本金' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
-                '<p><strong>' + t('payment_due_date') + ':</strong> ' + nextDueDate + '</p>' +
-                '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>' +
+                (order.repayment_type !== 'fixed' ?
+                    '<p><strong>' + (lang === 'id' ? '月利息（当前）' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? '基于剩余本金' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
+                    '<p><strong>' + (lang === 'id' ? '已付利息' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? '个月' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
+                    '<p><strong>' + (lang === 'id' ? '剩余本金' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
+                    '<p><strong>' + t('payment_due_date') + ':</strong> ' + nextDueDate + '</p>'
+                :
+                    (function() {
+                        var detPaidM = order.fixed_paid_months || 0;
+                        var detTotalM = order.repayment_term || 0;
+                        var detRemM = detTotalM - detPaidM;
+                        var detFixedPmt = order.monthly_fixed_payment || 0;
+                        return '<p><strong>' + (lang === 'id' ? 'Angsuran Per Periode' : '每期还款额') + ':</strong> <strong style="color:var(--color-primary)">' + Utils.formatCurrency(detFixedPmt) + '</strong></p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Periode Terbayar / Sisa' : '已还期数 / 剩余期数') + ':</strong> ' +
+                                '<span style="color:var(--color-success)">✅ ' + detPaidM + (lang === 'id' ? ' periode' : ' 期') + '</span>' +
+                                ' / ' +
+                                '<span style="color:var(--color-warning)">⏳ ' + detRemM + (lang === 'id' ? ' periode' : ' 期') + '</span>' +
+                            '</p>' +
+                            '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>';
+                    })()
+                ) +
+                (order.repayment_type !== 'fixed' ? '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>' : '') +
                 '</div>' +
                 '</div>' +
-                '<div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>' + (lang === 'id' ? '温馨提示：' : '温馨提示：') + '</strong> ' + (lang === 'id' ? '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。') + '</div></div>' +
+                '<div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>' + (lang === 'id' ? '温馨提示：' : '温馨提示：') + '</strong> ' +
+                (order.repayment_type === 'fixed'
+                    ? (lang === 'id' ? 'Setiap angsuran mencakup bunga dan pokok. Pelunasan dipercepat dapat mengurangi sisa bunga.' : '每期还款已包含本金和利息，提前结清可减免剩余利息。')
+                    : (lang === 'id' ? '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。')
+                ) + '</div></div>' +
                 '<div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px;">' +
                 '<div style="flex: 1; min-width: 280px;">' +
-                '<h3>📋 ' + t('interest_history') + '</h3>' +
-                '<div class="table-container"><table class="data-table"><thead><tr><th class="text-center" style="width:50px;">' + t('times') + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + t('month') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead><tbody>' + interestRows + '</tbody></table></div>' +
+                '<h3>📋 ' + (order.repayment_type === 'fixed' ? (lang === 'id' ? '还款记录' : '还款记录') : t('interest_history')) + '</h3>' +
+                '<div class="table-container"><table class="data-table"><thead><tr><th class="text-center" style="width:50px;">' + (order.repayment_type === 'fixed' ? (lang === 'id' ? '期' : '期') : t('times')) + '</th><th class="col-date">' + t('date') + '</th><th class="col-months text-center">' + (order.repayment_type === 'fixed' ? (lang === 'id' ? 'Periode' : '期数') : t('month')) + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead><tbody>' + interestRows + '</tbody></table></div>' +
                 '</div>' +
+                (order.repayment_type !== 'fixed' ?
                 '<div style="flex: 1; min-width: 280px;">' +
                 '<h3>🏦 ' + t('principal_history') + '</h3>' +
                 '<div class="table-container"><table class="data-table"><thead><tr><th class="col-date">' + t('date') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + t('payment_method') + '</th></tr></thead><tbody>' + principalRows + '</tbody></table></div>' +
-                '</div>' +
+                '</div>' : '') +
                 '</div>' +
                 '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
                 '<button onclick="APP.navigateTo(\'orderTable\')" class="btn btn--outline">↩️ ' + t('back') + '</button>' +
