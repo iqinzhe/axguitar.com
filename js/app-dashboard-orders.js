@@ -1,5 +1,6 @@
 // app-dashboard-orders.js - v2.0 (完整版，五状态筛选 + 权限控制 + 所有功能完整 + 管理员可编辑利息/本金)
 // 功能：订单列表支持 全部/进行中/已逾期/已结清/已变卖 筛选
+// 费用显示：管理费/服务费为0时显示"免费"
 
 'use strict';
 
@@ -15,6 +16,30 @@
                 orders: result.data,
                 totalCount: result.totalCount
             };
+        },
+
+        // ==================== 获取费用状态显示 ====================
+        _getAdminFeeStatus: function(order, lang) {
+            var fee = order.admin_fee || 0;
+            if (fee === 0) {
+                return '<span class="badge badge--exempt">' + (lang === 'id' ? '免费' : '免费') + '</span>';
+            }
+            if (order.admin_fee_paid) {
+                return '<span class="badge badge--paid">✅ ' + (lang === 'id' ? '已缴' : '已缴') + '</span>';
+            }
+            return '<span class="badge badge--unpaid">❌ ' + (lang === 'id' ? '未缴' : '未缴') + '</span>';
+        },
+
+        _getServiceFeeStatus: function(order, lang) {
+            var fee = order.service_fee_amount || 0;
+            if (fee === 0) {
+                return '<span class="badge badge--exempt">' + (lang === 'id' ? '免费' : '免费') + '</span>';
+            }
+            var paid = order.service_fee_paid || 0;
+            if (paid >= fee) {
+                return '<span class="badge badge--paid">✅ ' + (lang === 'id' ? '已缴' : '已缴') + '</span>';
+            }
+            return '<span class="badge badge--unpaid">❌ ' + (lang === 'id' ? '未缴' : '未缴') + '</span>';
         },
 
         // ==================== 构建订单列表 HTML ====================
@@ -43,7 +68,7 @@
                 storeMap[s.id] = s.name;
             }
 
-            var totalCols = isAdmin ? 10 : 9;
+            var totalCols = isAdmin ? 12 : 11;
             var statusMap = {
                 active: t('status_active'),
                 completed: t('status_completed'),
@@ -64,6 +89,8 @@
                 var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                 var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
+                var adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
+                var serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
 
                 var rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
@@ -77,12 +104,12 @@
                     '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                     '<td class="date-cell text-center">' + nextDueDate + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                    '<td class="text-center">' + adminFeeStatus + '</td>' +
+                    '<td class="text-center">' + serviceFeeStatus + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
             }
-
-            // [分页] loadMore已由分页控件取代
 
             // [分页] 保存状态供分页跳转使用
             window._orderTableState = {
@@ -163,6 +190,8 @@
                 '<th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th>' +
                 '<th class="col-date text-center">' + t('payment_due_date') + '</th>' +
                 '<th class="col-status text-center">' + t('repayment_type') + '</th>' +
+                '<th class="col-status text-center">📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</th>' +
+                '<th class="col-status text-center">✨ ' + (lang === 'id' ? 'Service Fee' : '服务费') + '</th>' +
                 '<th class="col-status text-center">' + t('status') + '</th>' +
                 (isAdmin ? '<th class="col-store text-center">' + t('store') + '</th>' : '') +
                 '</tr>' +
@@ -174,7 +203,6 @@
                 '<div id="orderTablePaginator"></div>';
 
             // [分页] 注入分页控件内容
-            // 使用 setTimeout 确保 DOM 已渲染
             (function(ph) {
                 setTimeout(function() {
                     var el = document.getElementById('orderTablePaginator');
@@ -307,6 +335,8 @@
                 var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                 var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
                 var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
+                var adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
+                var serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
                 var rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
 
@@ -319,6 +349,8 @@
                     '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
                     '<td class="date-cell text-center">' + nextDueDate + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
+                    '<td class="text-center">' + adminFeeStatus + '</td>' +
+                    '<td class="text-center">' + serviceFeeStatus + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
@@ -525,8 +557,6 @@
             APP.saveCurrentPageState();
             var isAdmin = PERMISSION.isAdmin();
             var defaultStatus = isAdmin ? 'all' : 'active';
-            // 管理员：currentFilter 为 null 时默认 all；非 null 则尊重用户选择
-            // 非管理员：强制 active
             var currentStatus = APP.currentFilter || defaultStatus;
             if (!isAdmin) {
                 currentStatus = 'active';
@@ -602,12 +632,10 @@
             var isAdmin = PERMISSION.isAdmin();
             if (!isAdmin && status !== 'active') status = 'active';
             APP.currentFilter = status;
-            // 原地刷新：只重新拉数据替换 tbody，不重建整页，不 push historyStack
             var lang = Utils.lang;
             var tbody = document.getElementById('orderTableBody');
             if (!tbody) { this.showOrderTable(); return; }
-            // 显示加载中
-            var totalCols = window._orderTableState ? window._orderTableState.totalCols : 9;
+            var totalCols = window._orderTableState ? window._orderTableState.totalCols : 11;
             tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:24px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</td></tr>';
             try {
                 var result = await this._fetchOrderData({ status: status }, 0, 50);
@@ -622,7 +650,6 @@
                 this._renderOrdersIntoTable(orders, false);
                 this._updateLoadMoreRow();
                 this._clearSelection();
-                // 同步下拉框显示（以防通过代码调用）
                 var sel = document.getElementById('statusFilter');
                 if (sel && sel.value !== status) sel.value = status;
             } catch (err) {
@@ -632,7 +659,6 @@
         },
 
         viewOrder: async function(orderId) {
-            // 通过 navigateTo 跳转，确保 historyStack 记录 orderTable，返回时能回到列表
             APP.navigateTo('viewOrder', { orderId: orderId });
         },
 
@@ -759,7 +785,7 @@
                         var p2 = allPayments[idx];
                         var methodClass = p2.payment_method === 'cash' ? 'cash' : 'bank';
                         rows += '<tr>' +
-                            '<td class="order-id">' + Utils.escapeHtml(p2.orders ? p2.orders.order_id : '-') + '<td>' +
+                            '<td class="order-id">' + Utils.escapeHtml(p2.orders ? p2.orders.order_id : '-') + '</td>' +
                             '<td>' + Utils.escapeHtml(p2.orders ? p2.orders.customer_name : '-') + '</td>' +
                             '<td class="date-cell">' + Utils.formatDate(p2.date) + '</td>' +
                             '<td>' + (typeMap[p2.type] || p2.type) + '</td>' +
@@ -784,7 +810,7 @@
                     '<table class="data-table payment-table">' +
                     '<thead><tr><th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
                     '<tbody>' + rows + '</tbody>' +
-                    '</table>' +
+                    '<table>' +
                     '</div>' +
                     '</div>';
             } catch (error) {
@@ -818,6 +844,8 @@
                     var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
                     var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
                     var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? '固定' : '固定') : (lang === 'id' ? '灵活' : '灵活');
+                    var adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
+                    var serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
                     var statusText = o.status === 'active' ? t('status_active') : (o.status === 'completed' ? t('status_completed') : t('status_liquidated'));
                     rows += '<tr>' +
                         '<td>' + Utils.escapeHtml(o.order_id) + '</td>' +
@@ -828,6 +856,8 @@
                         '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? '个月' : '个月') + '</td>' +
                         '<td class="text-center">' + nextDueDate + '</td>' +
                         '<td class="text-center">' + repaymentTypeText + '</td>' +
+                        '<td class="text-center">' + adminFeeStatus + '</td>' +
+                        '<td class="text-center">' + serviceFeeStatus + '</td>' +
                         '<td class="text-center">' + statusText + '</td>' +
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeMap[o.store_id] || '-') + '</td>' : '') +
                         '</tr>';
@@ -841,6 +871,8 @@
                     '<th class="text-center">' + (lang === 'id' ? '已付利息' : '已付利息') + '</th>' +
                     '<th class="text-center">' + t('payment_due_date') + '</th>' +
                     '<th class="text-center">' + t('repayment_type') + '</th>' +
+                    '<th class="text-center">📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</th>' +
+                    '<th class="text-center">✨ ' + (lang === 'id' ? 'Service Fee' : '服务费') + '</th>' +
                     '<th class="text-center">' + t('status') + '</th>' +
                     (isAdmin ? '<th class="text-center">' + t('store') + '</th>' : '') +
                     '</tr>';
@@ -854,7 +886,7 @@
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
                 var printDateTime = new Date().toLocaleString();
                 var printWindow = window.open('', '_blank');
-                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + t('print_order_list') + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 26px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }\n.page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; }\ntable { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }\ntd { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }\n.amount { text-align: right; }\n.text-center { text-align: center; }\ncol.col-id       { width: 22mm; }\ncol.col-customer { width: 32mm; }\ncol.col-collat   { width: 30mm; }\ncol.col-loan     { width: 22mm; }\ncol.col-interest { width: 20mm; }\ncol.col-paid     { width: 14mm; }\ncol.col-due      { width: 18mm; }\ncol.col-type     { width: 13mm; }\ncol.col-status   { width: 14mm; }\ncol.col-store    { width: 19mm; }\n@media print { @page { size: A4 portrait; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n.print-warning { background: #fef3c7; color: #d97706; padding: 8px; margin-bottom: 12px; border-radius: 4px; font-size: 8pt; text-align: center; }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n' + (totalCount > MAX_PRINT_ORDERS ? '<div class="print-warning">\n⚠️ ' + (lang === 'id' ? '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。') + '\n</div>\n' : '') + '<div class="page-title">📋 ' + t('order_list') + ' &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">' + (lang === 'id' ? '共' : '共') + ' ' + orders.length + ' ' + (lang === 'id' ? '条订单' : '条订单') + (totalCount > orders.length ? ' (共 ' + totalCount + ')' : '') + '</small></div>\n<table>\n<colgroup>\n<col class="col-id">\n<col class="col-customer">\n<col class="col-collat">\n<col class="col-loan">\n<col class="col-interest">\n<col class="col-paid">\n<col class="col-due">\n<col class="col-type">\n<col class="col-status">\n' + (isAdmin ? '<col class="col-store">' : '') + '\n</colgroup>\n<thead>' + headerHtml + '</thead>\n<tbody>' + rows + '</tbody>\n</table>\n<div class="print-footer">\nJF! by Gadai - ' + (lang === 'id' ? '典当管理系统' : '典当管理系统') + '\n</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
+                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + t('print_order_list') + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 26px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }\n.page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; }\ntable { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }\ntd { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }\n.amount { text-align: right; }\n.text-center { text-align: center; }\ncol.col-id       { width: 22mm; }\ncol.col-customer { width: 32mm; }\ncol.col-collat   { width: 30mm; }\ncol.col-loan     { width: 22mm; }\ncol.col-interest { width: 20mm; }\ncol.col-paid     { width: 14mm; }\ncol.col-due      { width: 18mm; }\ncol.col-type     { width: 13mm; }\ncol.col-status   { width: 14mm; }\ncol.col-store    { width: 19mm; }\n@media print { @page { size: A4 portrait; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n.print-warning { background: #fef3c7; color: #d97706; padding: 8px; margin-bottom: 12px; border-radius: 4px; font-size: 8pt; text-align: center; }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n' + (totalCount > MAX_PRINT_ORDERS ? '<div class="print-warning">\n⚠️ ' + (lang === 'id' ? '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '仅打印 ' + orders.length + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。') + '\n</div>\n' : '') + '<div class="page-title">📋 ' + t('order_list') + ' &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">' + (lang === 'id' ? '共' : '共') + ' ' + orders.length + ' ' + (lang === 'id' ? '条订单' : '条订单') + (totalCount > orders.length ? ' (共 ' + totalCount + ')' : '') + '</small></div>\n<table>\n<colgroup>\n<col class="col-id">\n<col class="col-customer">\n<col class="col-collat">\n<col class="col-loan">\n<col class="col-interest">\n<col class="col-paid">\n<col class="col-due">\n<col class="col-type">\n<col class="col-status">\n<col class="col-status">\n<col class="col-status">\n' + (isAdmin ? '<col class="col-store">' : '') + '\n</colgroup>\n<thead>' + headerHtml + '</thead>\n<tbody>' + rows + '</tbody>\n</table>\n<div class="print-footer">\nJF! by Gadai - ' + (lang === 'id' ? '典当管理系统' : '典当管理系统') + '\n</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
                 console.error('打印订单列表失败:', error);
@@ -877,6 +909,10 @@
             var monthlyRate = order.agreed_interest_rate || 0.10;
             var currentMonthlyInterest = remainingPrincipal * monthlyRate;
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
+            var adminFeeStatus = order.admin_fee === 0 ? (lang === 'id' ? '免费' : '免费') : (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴'));
+            var serviceFeeAmount = order.service_fee_amount || 0;
+            var serviceFeePaid = order.service_fee_paid || 0;
+            var serviceFeeStatus = serviceFeeAmount === 0 ? (lang === 'id' ? '免费' : '免费') : (serviceFeePaid >= serviceFeeAmount ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴'));
             var repaymentInfoHtml = '';
             if (order.repayment_type === 'fixed') {
                 var paidMonths = order.fixed_paid_months || 0;
@@ -894,8 +930,8 @@
                     var p = payments[i];
                     var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
                     var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    payRows += '<tr>' +
-                        '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                    payRows += '<td>' +
+                        '<td class="date-cell">' + Utils.formatDate(p.date) + '<tr>' +
                         '<td>' + typeText + '</td>' +
                         '<td class="text-center">' + (p.months ? p.months + ' ' + (lang === 'id' ? 'bulan' : '个月') : '-') + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
@@ -933,8 +969,8 @@
                 '<p><strong>' + t('collateral_name') + ':</strong> ' + Utils.escapeHtml(order.collateral_name) + '</p>' +
                 '<p><strong>' + t('loan_amount') + ':</strong> ' + Utils.formatCurrency(order.loan_amount) + '</p>' +
                 '<h3 style="margin-top:16px;">💰 ' + (lang === 'id' ? '费用明细' : '费用明细') + '</h3>' +
-                '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' ' + (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴')) + '</p>' +
-                '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) ' + (order.service_fee_amount > 0 ? ((order.service_fee_paid || 0) >= (order.service_fee_amount || 0) ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴')) : '—') + '</p>' +
+                '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' — ' + adminFeeStatus + '</p>' +
+                '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) — ' + serviceFeeStatus + '</p>' +
                 '<p><strong>' + (lang === 'id' ? '月利息（当前）' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? '基于剩余本金' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
                 '<p><strong>' + (lang === 'id' ? '已付利息' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? '个月' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
                 '<p><strong>' + (lang === 'id' ? '剩余本金' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
@@ -1076,7 +1112,7 @@
                 '<div style="overflow-x:auto;margin-bottom:10px;">' +
                 '<table style="width:100%;border-collapse:collapse;" id="principal_records_table">' +
                 tableHead + '<tbody id="principal_rows">' + pRows + '</tbody>' +
-                '</table></div>' +
+                '</td></div>' +
                 '<button onclick="JF.AdminEditOrder._addPaymentRow(\'principal\')" style="background:var(--success);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;">＋ ' + (lang === 'id' ? '新增本金记录' : '新增本金记录') + '</button>' +
                 '</div>';
         },
@@ -1225,10 +1261,10 @@
                     '<div class="form-grid">' +
                     '<div class="form-group"><label>' + t('admin_fee') + ' (Rp)</label>' +
                     '<input type="text" id="edit_admin_fee" class="amount-input" value="' + Utils.formatNumberWithCommas(order.admin_fee || 0) + '">' +
-                    '<div class="form-hint">💡 ' + (lang === 'id' ? '填0即为免除' : '填0即为免除') + '</div></div>' +
+                    '<div class="form-hint">💡 ' + (lang === 'id' ? '填0即为免费' : '填0即为免费') + '</div></div>' +
                     '<div class="form-group"><label>' + t('service_fee') + ' (Rp)</label>' +
                     '<input type="text" id="edit_service_fee" class="amount-input" value="' + Utils.formatNumberWithCommas(order.service_fee_amount || 0) + '">' +
-                    '<div class="form-hint">💡 ' + (lang === 'id' ? '填0即为免除' : '填0即为免除') + '</div></div>' +
+                    '<div class="form-hint">💡 ' + (lang === 'id' ? '填0即为免费' : '填0即为免费') + '</div></div>' +
                     '<div class="form-group"><label>' + t('service_fee') + ' %</label>' +
                     '<input type="number" id="edit_service_fee_percent" value="' + (order.service_fee_percent || 0) + '" min="0" max="10" step="0.5"></div>' +
                     '<div class="form-group"><label>' + (lang === 'id' ? '月利率 (%)' : '月利率 (%)') + '</label>' +
@@ -1338,7 +1374,7 @@
                 // Step 1：保存订单基本字段（汇总字段暂留，后面由 adminSyncPaymentRecords 覆盖）
                 var updates = {
                     collateral_name: collateral, loan_amount: loanAmount,
-                    admin_fee: adminFee, admin_fee_paid: adminFeePaid,
+                    admin_fee: adminFee, admin_fee_paid: adminFeePaid && adminFee > 0,
                     service_fee_amount: serviceFee, service_fee_percent: servicePct,
                     agreed_interest_rate: agreedRate, agreed_service_fee_rate: servicePct / 100,
                     repayment_type: repayType, repayment_term: repayTerm,
@@ -1355,7 +1391,7 @@
                 if (res.error) throw res.error;
 
                 // Step 2：同步管理费/服务费流水
-                await SUPABASE.syncFeesAfterAdminEdit(orderId, adminFee, adminFeePaid, serviceFee, orderDate);
+                await SUPABASE.syncFeesAfterAdminEdit(orderId, adminFee, adminFeePaid && adminFee > 0, serviceFee, orderDate);
 
                 // Step 3：逐条同步利息/本金缴费记录，并重算汇总字段
                 await SUPABASE.adminSyncPaymentRecords(orderId, payEdits);
