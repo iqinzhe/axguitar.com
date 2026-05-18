@@ -1,4 +1,4 @@
-// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复)
+// supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
 
 'use strict';
 
@@ -112,8 +112,6 @@
     let _practiceStoreIdsCache = null;
     let _practiceStoreIdsCacheTime = 0;
     const PRACTICE_IDS_TTL = 5 * 60 * 1000;
-
-    const QUERY_TIMEOUT_MS = 12000;
 
     const safeQuery = async (fn, fallback = null, silent = false) => {
         try {
@@ -783,16 +781,19 @@
             }
         },
 
-        async recordLoanDisbursement(orderId, amount, source, description) {
+        async recordLoanDisbursement(orderId, amount, source, description, flowDate) {
             const order = await this.getOrder(orderId);
             const { data: exist } = await supabaseClient.from('cash_flow_records')
                 .select('id').eq('order_id', order.id).eq('flow_type','loan_disbursement').eq('is_voided',false).maybeSingle();
             if(exist) throw new Error(Utils.t('loan_already_disbursed'));
+            // 确定流水日期：优先使用传入的日期，否则使用订单创建日期
+            const recordDate = flowDate || (order.created_at ? order.created_at.substring(0, 10) : todayStr());
             return await this.recordCashFlow({
                 store_id: order.store_id, flow_type:'loan_disbursement', direction:'outflow',
                 amount, source_target: source, order_id: order.id, customer_id: order.customer_id,
                 description: description || (Utils.lang==='id'?'Pencairan gadai':'当金发放') + ' - ' + order.order_id,
-                reference_id: order.order_id
+                reference_id: order.order_id,
+                flow_date: recordDate
             });
         },
 
@@ -1150,7 +1151,7 @@
             return newOrder;
         },
 
-        async recordAdminFee(orderId, paymentMethod, adminFeeAmount) {
+        async recordAdminFee(orderId, paymentMethod, adminFeeAmount, flowDate) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
             if (order.admin_fee_paid) {
@@ -1159,9 +1160,12 @@
             }
             const profile = await this.getCurrentProfile();
             const feeAmount = (adminFeeAmount !== undefined && adminFeeAmount !== null) ? adminFeeAmount : order.admin_fee;
+            // 确定流水日期：优先使用传入的日期，否则使用订单创建日期
+            const recordDate = flowDate || (order.created_at ? order.created_at.substring(0, 10) : todayStr());
+            
             if (!feeAmount || feeAmount <= 0) {
                 const { error: e0 } = await supabaseClient.from('orders').update({
-                    admin_fee_paid: true, admin_fee_paid_date: todayStr(),
+                    admin_fee_paid: true, admin_fee_paid_date: recordDate,
                     admin_fee: 0, updated_at: nowStr()
                 }).eq('order_id', orderId);
                 if(e0) throw e0;
@@ -1169,12 +1173,12 @@
                 return true;
             }
             const { error: e1 } = await supabaseClient.from('orders').update({
-                admin_fee_paid: true, admin_fee_paid_date: todayStr(),
+                admin_fee_paid: true, admin_fee_paid_date: recordDate,
                 admin_fee: feeAmount, updated_at: nowStr()
             }).eq('order_id', orderId);
             if(e1) throw e1;
             const paymentData = {
-                order_id: order.id, date: todayStr(), type:'admin_fee',
+                order_id: order.id, date: recordDate, type:'admin_fee',
                 amount: feeAmount, description: Utils.t('admin_fee'),
                 recorded_by: profile.id, payment_method: paymentMethod
             };
@@ -1183,15 +1187,19 @@
                 store_id: order.store_id, flow_type:'admin_fee', direction:'inflow',
                 amount: feeAmount, source_target: paymentMethod, order_id: order.id,
                 customer_id: order.customer_id, description: Utils.t('admin_fee') + ' - ' + order.order_id,
-                reference_id: order.order_id
+                reference_id: order.order_id,
+                flow_date: recordDate
             });
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'admin_fee', feeAmount, paymentMethod);
             return true;
         },
 
-        async recordServiceFee(orderId, months, paymentMethod) {
+        async recordServiceFee(orderId, months, paymentMethod, flowDate) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
+            // 确定流水日期：优先使用传入的日期，否则使用订单创建日期
+            const recordDate = flowDate || (order.created_at ? order.created_at.substring(0, 10) : todayStr());
+            
             if(order.service_fee_percent<=0 && order.service_fee_amount<=0) {
                 await supabaseClient.from('orders').update({ service_fee_paid: 0, updated_at: nowStr() }).eq('order_id', orderId);
                 console.info(`[recordServiceFee] 订单 ${orderId} 服务费为0，仅标记，不写流水`);
@@ -1209,7 +1217,7 @@
             }).eq('order_id', orderId);
             if(e1) throw e1;
             const paymentData = {
-                order_id: order.id, date: todayStr(), type:'service_fee',
+                order_id: order.id, date: recordDate, type:'service_fee',
                 months:1, amount: totalServiceFee, description: Utils.t('service_fee'),
                 recorded_by: (await this.getCurrentProfile()).id, payment_method: paymentMethod
             };
@@ -1218,7 +1226,8 @@
                 store_id: order.store_id, flow_type:'service_fee', direction:'inflow',
                 amount: totalServiceFee, source_target: paymentMethod, order_id: order.id,
                 customer_id: order.customer_id, description: Utils.t('service_fee') + ' - ' + order.order_id,
-                reference_id: order.order_id
+                reference_id: order.order_id,
+                flow_date: recordDate
             });
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'service_fee', totalServiceFee, paymentMethod);
             return true;
@@ -1639,7 +1648,6 @@
             if(error) throw error;
             if(!activeOrders?.length) return true;
             
-            // 修复：使用雅加达时间 (UTC+7)
             const todayJakarta = Utils.getJakartaDate();
             todayJakarta.setUTCHours(0, 0, 0, 0);
             const todayTime = todayJakarta.getTime();
@@ -1648,7 +1656,6 @@
             for(const o of activeOrders){
                 if(!o.next_interest_due_date) continue;
                 
-                // 解析到期日并转换为雅加达时区的0点时间戳
                 const dueDateStr = o.next_interest_due_date;
                 const [year, month, day] = dueDateStr.split('-').map(Number);
                 const dueJakarta = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
