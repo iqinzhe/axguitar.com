@@ -1653,7 +1653,7 @@
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remaining, paymentMethod);
             Utils.toast.success(Utils.lang==='id'?'Pelunasan dipercepat berhasil!':'提前结清成功！');
             return true;
-        },
+        }
                 // ==================== 灵活还款提前结清 ====================
         async earlySettleFlexibleOrder(orderId, paymentMethod, finalPrincipalAmount = null) {
             if(paymentMethod===undefined) paymentMethod='cash';
