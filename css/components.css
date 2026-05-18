@@ -1011,22 +1011,157 @@
   .payment-double-column {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--spacing-3);
+    gap: var(--spacing-4);
     margin-bottom: var(--spacing-3);
+    align-items: stretch;
   }
-  .payment-double-column .card { flex: 1; min-width: 280px; margin-bottom: 0; }
+  .payment-double-column .card {
+    flex: 1;
+    min-width: 300px;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    border: none;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    transition: box-shadow var(--transition-fast);
+  }
+  .payment-double-column .card:hover { box-shadow: var(--shadow-lg); }
+
+  /* 利息卡片 — 蓝绿色调 */
+  .payment-double-column .card:first-child {
+    border-top: 4px solid var(--primary);
+  }
+  .payment-double-column .card:first-child .card-header {
+    background: linear-gradient(135deg, #e0f7fa 0%, #f0f9ff 100%);
+    border-bottom: 1px solid #b2ebf2;
+  }
+  .payment-double-column .card:first-child .card-header h3 { color: var(--primary-dark); }
+
+  /* 本金卡片 — 琥珀/橙调 */
+  .payment-double-column .card:last-child {
+    border-top: 4px solid var(--warning);
+  }
+  .payment-double-column .card:last-child .card-header {
+    background: linear-gradient(135deg, #fff8e1 0%, #fffbeb 100%);
+    border-bottom: 1px solid #ffe082;
+  }
+  .payment-double-column .card:last-child .card-header h3 { color: var(--warning-dark); }
+
+  /* card-header 通用升级 */
+  .payment-double-column .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-3) var(--spacing-4);
+    margin-bottom: 0;
+  }
+  .payment-double-column .card-header h3 {
+    font-size: var(--font-md);
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* card-body 升级 */
+  .payment-double-column .card-body {
+    padding: var(--spacing-4);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3);
+  }
+
+  /* 输入区块统一样式 */
+  .payment-double-column .action-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .payment-double-column .action-label {
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .payment-double-column .action-input-group .amount-input {
+    width: 100%;
+    border: 1.5px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    font-size: var(--font-md);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    background: var(--bg-card);
+  }
+  .payment-double-column .action-input-group .amount-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(14,116,144,0.12);
+  }
+
+  /* 支付方式区 */
+  .payment-double-column .payment-method-group {
+    margin: 0;
+    padding: var(--spacing-2) var(--spacing-3);
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+  }
+  .payment-double-column .payment-method-title {
+    font-size: var(--font-xs);
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-1);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .payment-double-column .payment-method-options {
+    display: flex;
+    gap: var(--spacing-4);
+  }
+  .payment-double-column .payment-method-options label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--font-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* 按钮区 */
+  .payment-double-column .action-buttons,
+  .payment-double-column > div > div[style*="display:flex"] {
+    display: flex;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+    margin-top: auto;
+  }
 
   .card-history {
-    margin-top: var(--spacing-3);
-    padding-top: var(--spacing-3);
+    margin-top: 0;
+    padding: var(--spacing-3) var(--spacing-4);
     border-top: 1px solid var(--border-light);
+    background: var(--gray-50);
   }
-  .card-history .history-title { font-size: var(--font-xs); font-weight: 600; color: var(--text-secondary); margin-bottom: var(--spacing-2); }
+  .card-history .history-title {
+    font-size: var(--font-xs);
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-2);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
 
   .info-box {
-    padding: var(--spacing-2) var(--spacing-3);
+    padding: var(--spacing-3);
     border-radius: var(--radius-md);
-    margin-bottom: var(--spacing-3);
+    margin-bottom: 0;
+    border: 1px solid transparent;
   }
   .info-box .info-row {
     display: flex;
@@ -1034,12 +1169,21 @@
     align-items: center;
     margin-bottom: var(--spacing-2);
     padding-bottom: var(--spacing-2);
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
     font-size: var(--font-sm);
   }
+  .info-box .info-row span:first-child { color: var(--text-secondary); }
   .info-box .info-row:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-  .info-box.success-box { border-left: 4px solid var(--success); background: var(--success-light); }
-  .info-box.warning-box { border-left: 4px solid var(--warning); background: var(--warning-light); }
+  .info-box.success-box {
+    border-left: 4px solid var(--success);
+    border-color: #bbf7d0;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  }
+  .info-box.warning-box {
+    border-left: 4px solid var(--warning);
+    border-color: #fde68a;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  }
 
 /* ---------- 异常页面专属布局 ---------- */
   .anomaly-grid {
