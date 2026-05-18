@@ -1,8 +1,5 @@
 // store.js - v2.0 (JF 命名空间) 卡片式财务汇总
-// 打印：卡片单列垂直排列，占满宽度；屏幕：卡片间单列，内部4×3；手机：全单列
-// 12项双语标签；增加 totalOrders
-// 删除门店时增加完整的关联表检查，防止孤儿子数据
-// 门店操作员也能看到本门店财务汇总卡片
+// [新增] 门店操作员财务汇总独立页面
 
 'use strict';
 
@@ -14,7 +11,6 @@
         stores: [],
         _loaded: false,
 
-        // ==================== 加载门店列表 ====================
         async loadStores(force = false) {
             if (!force && StoreManager._loaded && StoreManager.stores.length > 0) {
                 return StoreManager.stores;
@@ -29,7 +25,6 @@
             }
         },
 
-        // ==================== 生成门店编码 ====================
         async _generateStoreCode(name) {
             await StoreManager.loadStores(true);
             const nameLower = name.toLowerCase();
@@ -48,7 +43,6 @@
             return 'STORE_' + String(nextNumber).padStart(3, '0');
         },
 
-        // ==================== 创建门店 ====================
         async createStore(name, address, phone) {
             const code = await StoreManager._generateStoreCode(name);
             const newStore = await SUPABASE.createStore(code, name, address, phone);
@@ -57,7 +51,6 @@
             return newStore;
         },
 
-        // ==================== 更新门店 ====================
         async updateStore(id, updates) {
             const updated = await SUPABASE.updateStore(id, updates);
             const idx = StoreManager.stores.findIndex(s => s.id === id);
@@ -65,7 +58,6 @@
             return updated;
         },
 
-        // ==================== 删除门店（增强关联表检查） ====================
         async deleteStore(id) {
             const lang = Utils.lang;
             const client = SUPABASE.getClient();
@@ -110,13 +102,10 @@
             try {
                 const { error } = await client.from('stores').delete().eq('id', id);
                 if (error) throw error;
-                
                 StoreManager.stores = StoreManager.stores.filter(s => s.id !== id);
-                
                 if (window.Audit) {
-                    await window.Audit.logStoreAction(id, 'delete', '门店已删除，已检查所有关联表');
+                    await window.Audit.logStoreAction(id, 'delete', '门店已删除');
                 }
-                
                 Utils.toast.success(lang === 'id' ? 'Toko berhasil dihapus' : '门店已删除');
             } catch (error) {
                 console.error('[StoreManager] deleteStore 执行失败:', error);
@@ -124,7 +113,6 @@
             }
         },
 
-        // ==================== 暂停营业 ====================
         async suspendStore(storeId) {
             const lang = Utils.lang;
             const confirmMsg = lang === 'id'
@@ -146,7 +134,6 @@
             }
         },
 
-        // ==================== 恢复营业 ====================
         async resumeStore(storeId) {
             const lang = Utils.lang;
             const confirmed = await Utils.toast.confirm(lang === 'id' ? 'Aktifkan kembali toko ini?' : '恢复此门店营业？');
@@ -165,7 +152,6 @@
             }
         },
 
-        // ==================== 编辑门店（弹窗） ====================
         async editStore(storeId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -218,7 +204,6 @@
             }
         },
 
-        // ==================== 保存编辑门店 ====================
         async _saveEditStore(storeId) {
             const lang = Utils.lang;
             const name = document.getElementById('editStoreName')?.value.trim();
@@ -245,7 +230,6 @@
             }
         },
 
-        // ==================== 更新门店 WA 号码 ====================
         async updateStoreWANumber(storeId, waNumber) {
             if (!storeId) return;
             try {
@@ -259,7 +243,6 @@
             }
         },
 
-        // ==================== 获取所有门店现金流余额（排除练习门店） ====================
         async _getAllStoreCashFlowBalances() {
             try {
                 const client = SUPABASE.getClient();
@@ -294,7 +277,6 @@
             }
         },
 
-        // ==================== 练习模式切换 ====================
         async togglePracticeMode(storeId, currentIsPractice) {
             const lang = Utils.lang;
             const newValue = !currentIsPractice;
@@ -377,12 +359,429 @@
             if (window.JFCache) window.JFCache.clear();
         },
 
-        // ==================== 构建门店管理 HTML ====================
+        // ==================== 获取门店财务统计数据 ====================
+        async _getStoreFinanceStats(storeId) {
+            const client = SUPABASE.getClient();
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth();
+            const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+            const monthEnd = Utils.getLocalToday();
+
+            // 获取订单数据
+            const { data: orders, error: orderError } = await client
+                .from('orders')
+                .select('id, store_id, status, loan_amount, created_at, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid')
+                .eq('store_id', storeId);
+            if (orderError) console.error('[StoreManager] 查询订单失败:', orderError);
+
+            // 获取支出数据
+            const { data: expenses, error: expenseError } = await client
+                .from('expenses').select('id, store_id, amount, expense_date')
+                .eq('store_id', storeId);
+            if (expenseError) console.error('[StoreManager] 查询支出失败:', expenseError);
+
+            // 获取偿还本金数据
+            const { data: returnCapitalData, error: returnError } = await client
+                .from('profit_distributions').select('store_id, amount').eq('type', 'return_capital').eq('store_id', storeId);
+            if (returnError) console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
+
+            // 获取现金流余额
+            const { data: flows, error: flowError } = await client
+                .from('cash_flow_records')
+                .select('direction, amount, source_target')
+                .eq('store_id', storeId)
+                .eq('is_voided', false);
+            
+            let cashBalance = 0, bankBalance = 0;
+            if (!flowError && flows) {
+                for (const f of flows) {
+                    const amt = f.amount || 0;
+                    if (f.direction === 'inflow') {
+                        if (f.source_target === 'cash') cashBalance += amt;
+                        else if (f.source_target === 'bank') bankBalance += amt;
+                    } else {
+                        if (f.source_target === 'cash') cashBalance -= amt;
+                        else if (f.source_target === 'bank') bankBalance -= amt;
+                    }
+                }
+            }
+
+            const stats = {
+                monthNewOrders: 0, monthLoanAmount: 0, monthAdminFee: 0,
+                monthServiceFee: 0, monthInterest: 0, monthExpense: 0,
+                totalOrders: 0, activeOrders: 0, completedOrders: 0,
+                totalLoanAmount: 0, totalAdminFee: 0, totalServiceFee: 0,
+                totalInterest: 0, totalPrincipal: 0, totalExpense: 0,
+                returnCapital: 0, deployedCapital: 0,
+                cashBalance: cashBalance, bankBalance: bankBalance,
+                availableCapital: cashBalance + bankBalance
+            };
+
+            const orderIds = [];
+            for (const o of (orders || [])) {
+                orderIds.push(o.id);
+                stats.totalOrders++;
+                stats.totalLoanAmount += (o.loan_amount || 0);
+                if (o.admin_fee_paid) stats.totalAdminFee += (o.admin_fee || 0);
+                stats.totalServiceFee += (o.service_fee_paid || 0);
+                stats.totalInterest += (o.interest_paid_total || 0);
+                stats.totalPrincipal += (o.principal_paid || 0);
+                if (o.status === 'active') {
+                    stats.activeOrders++;
+                    stats.deployedCapital += (o.loan_amount || 0) - (o.principal_paid || 0);
+                } else if (o.status === 'completed') {
+                    stats.completedOrders++;
+                }
+                if (o.created_at && o.created_at >= monthStart && o.created_at <= monthEnd + 'T23:59:59') {
+                    stats.monthNewOrders++;
+                    stats.monthLoanAmount += (o.loan_amount || 0);
+                }
+            }
+
+            // 获取本月费用
+            if (orderIds.length > 0) {
+                const { data: monthAdminFees } = await client
+                    .from('payment_history').select('order_id, amount')
+                    .eq('type', 'admin_fee').gte('date', monthStart).lte('date', monthEnd).in('order_id', orderIds);
+                if (monthAdminFees) {
+                    for (const p of monthAdminFees) stats.monthAdminFee += (p.amount || 0);
+                }
+                
+                const { data: monthServiceFees } = await client
+                    .from('payment_history').select('order_id, amount')
+                    .eq('type', 'service_fee').gte('date', monthStart).lte('date', monthEnd).in('order_id', orderIds);
+                if (monthServiceFees) {
+                    for (const p of monthServiceFees) stats.monthServiceFee += (p.amount || 0);
+                }
+                
+                const { data: monthInterests } = await client
+                    .from('payment_history').select('order_id, amount')
+                    .eq('type', 'interest').gte('date', monthStart).lte('date', monthEnd).in('order_id', orderIds);
+                if (monthInterests) {
+                    for (const p of monthInterests) stats.monthInterest += (p.amount || 0);
+                }
+            }
+
+            // 统计支出
+            for (const e of (expenses || [])) {
+                stats.totalExpense += (e.amount || 0);
+                if (e.expense_date >= monthStart && e.expense_date <= monthEnd) {
+                    stats.monthExpense += (e.amount || 0);
+                }
+            }
+
+            // 统计偿还本金
+            for (const rc of (returnCapitalData || [])) {
+                stats.returnCapital += (rc.amount || 0);
+            }
+
+            stats.monthProfit = stats.monthAdminFee + stats.monthServiceFee + stats.monthInterest - stats.monthExpense;
+            stats.totalProfit = stats.totalAdminFee + stats.totalServiceFee + stats.totalInterest - stats.totalExpense;
+
+            return stats;
+        },
+
+        // ==================== 构建财务汇总卡片 HTML ====================
+        _buildFinanceCardHTML(stats, storeName, storeCode, lang) {
+            const fmt = (val) => Utils.formatCurrency(val);
+            return `
+<div class="store-finance-card">
+    <div class="card-header">${Utils.escapeHtml(storeName)} <span style="font-size:0.8rem;">(${Utils.escapeHtml(storeCode)})</span></div>
+    <div class="card-grid">
+        <div><strong>📋 ${lang === 'id' ? 'Pesanan Baru / Total' : '本月新增订单 / 单数总计'}</strong><br>${stats.monthNewOrders} / ${stats.totalOrders}</div>
+        <div><strong>🔄 ${lang === 'id' ? 'Aktif / Lunas' : '进行中订单/已结清订单'}</strong><br>${stats.activeOrders} / ${stats.completedOrders}</div>
+        <div><strong>💰 ${lang === 'id' ? 'Pinjaman Bulan Ini' : '本月当金'}</strong><br>${fmt(stats.monthLoanAmount)}</div>
+
+        <div><strong>🧾 ${lang === 'id' ? 'Admin Bulan Ini / Total Admin' : '本月管理费 / 累管理费'}</strong><br>${fmt(stats.monthAdminFee)} / ${fmt(stats.totalAdminFee)}</div>
+        <div><strong>🛠️ ${lang === 'id' ? 'Layanan Bulan Ini / Total Layanan' : '本月服务费 / 累计服务费'}</strong><br>${fmt(stats.monthServiceFee)} / ${fmt(stats.totalServiceFee)}</div>
+        <div><strong>💸 ${lang === 'id' ? 'Bunga Bulan Ini / Total Bunga' : '本月利息 / 累计利息'}</strong><br>${fmt(stats.monthInterest)} / ${fmt(stats.totalInterest)}</div>
+
+        <div><strong>📦 ${lang === 'id' ? 'Dana Terjamin' : '在押资金'}</strong><br>${fmt(stats.deployedCapital)}</div>
+        <div><strong>💵 ${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</strong><br>${fmt(stats.availableCapital)}</div>
+        <div><strong>🏦 ${lang === 'id' ? 'Brankas / Bank BNI' : '保险柜现金 / 银行BNI存款'}</strong><br>${fmt(stats.cashBalance)} / ${fmt(stats.bankBalance)}</div>
+
+        <div><strong>📉 ${lang === 'id' ? 'Pengeluaran Bulan Ini / Total' : '本月支出 / 累支出'}</strong><br>${fmt(stats.monthExpense)} / ${fmt(stats.totalExpense)}</div>
+        <div><strong>📈 ${lang === 'id' ? 'Laba Bulan Ini / Total Laba' : '本月利润 / 累计利润'}</strong><br>${fmt(stats.monthProfit)} / ${fmt(stats.totalProfit)}</div>
+        <div><strong>💳 ${lang === 'id' ? 'Cicilan Pokok' : '偿还本金'}</strong><br>${fmt(stats.returnCapital)}</div>
+    </div>
+</div>`;
+        },
+
+        // ==================== 独立显示财务汇总（供侧边栏调用） ====================
+        async showStoreFinance() {
+            const lang = Utils.lang;
+            const t = Utils.t.bind(Utils);
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = PERMISSION.isAdmin();
+            
+            APP.currentPage = 'storeFinance';
+            APP.saveCurrentPageState();
+            
+            try {
+                let stats, storeName, storeCode;
+                
+                if (isAdmin) {
+                    // 管理员：显示门店选择器 + 选中的门店财务汇总
+                    const stores = await SUPABASE.getAllStores();
+                    const validStores = stores.filter(s => s.code !== 'STORE_000');
+                    
+                    let selectedStoreId = sessionStorage.getItem('jf_store_finance_selected');
+                    if (!selectedStoreId || !validStores.find(s => s.id === selectedStoreId)) {
+                        selectedStoreId = validStores[0]?.id || null;
+                    }
+                    
+                    const storeSelector = `
+                        <div class="form-group" style="max-width: 300px; margin-bottom: 16px;">
+                            <label>🏪 ${lang === 'id' ? 'Pilih Toko' : '选择门店'}</label>
+                            <select id="storeFinanceSelect" onchange="StoreManager.refreshStoreFinance()" style="width:100%;padding:8px;border-radius:6px;">
+                                ${validStores.map(s => `<option value="${s.id}" ${selectedStoreId === s.id ? 'selected' : ''}>${Utils.escapeHtml(s.name)} (${s.code})</option>`).join('')}
+                            </select>
+                        </div>
+                    `;
+                    
+                    if (selectedStoreId) {
+                        const selectedStore = validStores.find(s => s.id === selectedStoreId);
+                        storeName = selectedStore.name;
+                        storeCode = selectedStore.code;
+                        stats = await StoreManager._getStoreFinanceStats(selectedStoreId);
+                        sessionStorage.setItem('jf_store_finance_selected', selectedStoreId);
+                    } else {
+                        stats = { totalOrders: 0 };
+                        storeName = lang === 'id' ? 'Tidak ada toko' : '无门店';
+                        storeCode = '-';
+                    }
+                    
+                    const financeHtml = stats.totalOrders !== undefined ? StoreManager._buildFinanceCardHTML(stats, storeName, storeCode, lang) : `<div class="empty-state">${lang === 'id' ? 'Tidak ada data' : '暂无数据'}</div>`;
+                    
+                    document.getElementById("app").innerHTML = `
+                        <div class="page-header">
+                            <h2>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h2>
+                            <div class="header-actions">
+                                <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                                <button onclick="StoreManager.printCurrentFinance()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            </div>
+                        </div>
+                        ${storeSelector}
+                        <div class="card">
+                            <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan' : '财务汇总'}</h3>
+                            <div class="store-cards-grid" id="storeFinanceContainer">
+                                ${financeHtml}
+                            </div>
+                            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total' : '格式: 本月 / 累计'}</p>
+                        </div>
+                    `;
+                    
+                    window._currentFinanceStoreId = selectedStoreId;
+                    
+                } else {
+                    // 门店操作员：直接显示本门店财务汇总
+                    const storeId = profile?.store_id;
+                    if (!storeId) {
+                        document.getElementById("app").innerHTML = `<div class="card"><p>${lang === 'id' ? 'Tidak ada data toko' : '没有门店数据'}</p><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div>`;
+                        return;
+                    }
+                    
+                    const currentStore = StoreManager.stores.find(s => s.id === storeId);
+                    storeName = currentStore?.name || profile?.stores?.name || (lang === 'id' ? 'Toko' : '门店');
+                    storeCode = currentStore?.code || '-';
+                    stats = await StoreManager._getStoreFinanceStats(storeId);
+                    
+                    const financeHtml = StoreManager._buildFinanceCardHTML(stats, storeName, storeCode, lang);
+                    
+                    document.getElementById("app").innerHTML = `
+                        <div class="page-header">
+                            <h2>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h2>
+                            <div class="header-actions">
+                                <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button>
+                                <button onclick="StoreManager.printCurrentFinance()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印'}</button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan' : '财务汇总'} - ${Utils.escapeHtml(storeName)}</h3>
+                            <div class="store-cards-grid" id="storeFinanceContainer">
+                                ${financeHtml}
+                            </div>
+                            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total' : '格式: 本月 / 累计'}</p>
+                        </div>
+                    `;
+                }
+                
+                // 添加样式
+                if (!document.getElementById('storeFinanceStyle')) {
+                    const style = document.createElement('style');
+                    style.id = 'storeFinanceStyle';
+                    style.textContent = `
+                        .store-cards-grid {
+                            display: flex !important;
+                            flex-direction: column !important;
+                            gap: 16px !important;
+                        }
+                        .store-finance-card .card-grid {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 10px;
+                        }
+                        @media screen and (max-width: 768px) {
+                            .store-finance-card .card-grid {
+                                grid-template-columns: 1fr !important;
+                            }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+                
+            } catch (error) {
+                console.error('[showStoreFinance] 错误:', error);
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat data keuangan' : '加载财务数据失败');
+                document.getElementById("app").innerHTML = `<div class="card"><p>❌ ${error.message}</p><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${t('back')}</button></div>`;
+            }
+        },
+        
+        async refreshStoreFinance() {
+            const select = document.getElementById('storeFinanceSelect');
+            if (!select) return;
+            const storeId = select.value;
+            if (storeId) {
+                sessionStorage.setItem('jf_store_finance_selected', storeId);
+                await StoreManager.showStoreFinance();
+            }
+        },
+        
+        async printCurrentFinance() {
+            const lang = Utils.lang;
+            const container = document.getElementById('storeFinanceContainer');
+            if (!container || !container.innerHTML.trim()) {
+                Utils.toast.warning(lang === 'id' ? 'Tidak ada data untuk dicetak' : '没有数据可打印');
+                return;
+            }
+            
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = PERMISSION.isAdmin();
+            let storeName = '', roleText = '', userName = '';
+            try {
+                storeName = AUTH.getCurrentStoreName();
+                roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工');
+                userName = AUTH.user?.name || '-';
+            } catch (e) { /* ignore */ }
+            
+            const printDateTime = new Date().toLocaleString();
+            const isZh = lang !== 'id';
+            
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                Utils.toast.warning(lang === 'id' ? 'Popup diblokir. Izinkan popup untuk halaman ini lalu coba lagi.' : '弹出窗口被拦截，请允许本页弹出窗口后重试。', 5000);
+                return;
+            }
+            
+            const cardsHtml = container.innerHTML;
+            
+            printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JF! by Gadai - ${isZh ? '门店财务汇总' : 'Ringkasan Keuangan Toko'}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #1e293b; background: #fff; }
+        @page { size: A4 portrait; margin: 8mm 10mm; }
+        @media print { html { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        .ph {
+            text-align: center;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+        .ph-logo { font-size: 13pt; font-weight: bold; color: #0e7490; margin-bottom: 2px; }
+        .ph-info { font-size: 7.5pt; color: #475569; white-space: nowrap; }
+        .pf {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 4px;
+            margin-top: 5px;
+            text-align: center;
+            font-size: 7pt;
+            color: #94a3b8;
+        }
+        .store-finance-card {
+            border: 1.5px solid #334155;
+            border-radius: 5px;
+            margin-bottom: 5mm;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            width: 100%;
+        }
+        .card-header {
+            font-weight: bold;
+            font-size: 12pt;
+            text-align: center;
+            padding: 5px 8px;
+            background: #f1f5f9;
+            border-bottom: 1.5px solid #334155;
+        }
+        .card-header span { font-size: 10pt; color: #64748b; font-weight: normal; }
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+        }
+        .card-grid > div {
+            border-right: 1px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 6px 8px;
+        }
+        .card-grid > div:nth-child(4n) { border-right: none; }
+        .card-grid > div:nth-child(n+9) { border-bottom: none; }
+        @media print {
+            .card-grid {
+                grid-template-columns: repeat(4, 1fr) !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ph">
+        <div class="ph-logo">JF! by Gadai</div>
+        <div class="ph-info">
+            🏪 ${isAdmin ? (isZh ? '总部' : 'Kantor Pusat') : (isZh ? '门店：' : 'Toko: ') + Utils.escapeHtml(storeName)}
+            &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
+            &nbsp;|&nbsp; 📅 ${printDateTime}
+        </div>
+    </div>
+    ${cardsHtml}
+    <div class="pf">
+        JF! by Gadai &nbsp;·&nbsp; ${isZh ? '典当管理系统' : 'Sistem Manajemen Gadai'}
+    </div>
+    <script>
+        window.onload = function() {
+            window.addEventListener('afterprint', function() { window.close(); });
+            window.print();
+        };
+    <\/script>
+</body>
+</html>`);
+            printWindow.document.close();
+        },
+
+        // ==================== 原有的 renderStoreManagement（管理员完整视图） ====================
+        async renderStoreManagement() {
+            const lang = Utils.lang;
+            const isAdmin = PERMISSION.isAdmin();
+            const profile = await SUPABASE.getCurrentProfile();
+            
+            if (!isAdmin) {
+                // 门店操作员：直接显示财务汇总页面
+                await StoreManager.showStoreFinance();
+                return;
+            }
+            
+            // 管理员：显示完整门店管理页面
+            document.getElementById("app").innerHTML = await StoreManager.buildStoreManagementHTML();
+        },
+
         async buildStoreManagementHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
-            const isAdmin = PERMISSION.isAdmin();
-            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = true; // 只有管理员进入此方法
             
             try {
                 await StoreManager.loadStores(true);
@@ -393,55 +792,28 @@
                 const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
                 const monthEnd = Utils.getLocalToday();
 
-                // 获取所有订单数据（根据角色过滤）
                 let orderQuery = client.from('orders')
                     .select('id, store_id, status, loan_amount, created_at, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid');
-                
-                if (!isAdmin && profile?.store_id) {
-                    orderQuery = orderQuery.eq('store_id', profile.store_id);
-                }
                 
                 const { data: allOrders, error: orderError } = await orderQuery;
                 if (orderError) console.error('[StoreManager] 查询订单失败:', orderError);
 
-                // 获取所有支出数据（根据角色过滤）
                 let expenseQuery = client.from('expenses').select('id, store_id, amount, expense_date');
-                if (!isAdmin && profile?.store_id) {
-                    expenseQuery = expenseQuery.eq('store_id', profile.store_id);
-                }
                 const { data: allExpenses, error: expenseError } = await expenseQuery;
                 if (expenseError) console.error('[StoreManager] 查询支出失败:', expenseError);
 
-                // 获取偿还本金数据（根据角色过滤）
-                let returnCapitalQuery = client.from('profit_distributions').select('store_id, amount').eq('type', 'return_capital');
-                if (!isAdmin && profile?.store_id) {
-                    returnCapitalQuery = returnCapitalQuery.eq('store_id', profile.store_id);
-                }
-                const { data: returnCapitalData, error: returnError } = await returnCapitalQuery;
+                const { data: returnCapitalData, error: returnError } = await client
+                    .from('profit_distributions').select('store_id, amount').eq('type', 'return_capital');
                 if (returnError) console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
 
-                // 获取现金流余额
                 const storeBalances = await StoreManager._getAllStoreCashFlowBalances();
 
-                // 构建统计数据
                 const storeStats = {};
-                
-                // 确定要统计的门店列表
-                let storesToProcess = [];
-                if (isAdmin) {
-                    storesToProcess = StoreManager.stores.filter(s => s.code !== 'STORE_000');
-                } else {
-                    const currentStore = StoreManager.stores.find(s => s.id === profile?.store_id);
-                    if (currentStore && currentStore.code !== 'STORE_000') {
-                        storesToProcess = [currentStore];
-                    }
-                }
+                const storesToProcess = StoreManager.stores.filter(s => s.code !== 'STORE_000');
 
                 for (const s of storesToProcess) {
                     storeStats[s.id] = {
-                        id: s.id,
-                        name: s.name,
-                        code: s.code,
+                        id: s.id, name: s.name, code: s.code,
                         monthNewOrders: 0, monthLoanAmount: 0, monthAdminFee: 0,
                         monthServiceFee: 0, monthInterest: 0, monthExpense: 0,
                         totalOrders: 0, activeOrders: 0, completedOrders: 0,
@@ -451,7 +823,6 @@
                     };
                 }
 
-                // 统计订单数据
                 for (const o of (allOrders || [])) {
                     const sid = o.store_id;
                     if (!storeStats[sid]) continue;
@@ -474,7 +845,6 @@
                     }
                 }
 
-                // 获取本月管理费/服务费/利息（通过 payment_history）
                 const allOrderIds = (allOrders || []).map(o => o.id);
                 if (allOrderIds.length > 0) {
                     const { data: monthAdminFees } = await client
@@ -514,7 +884,6 @@
                     }
                 }
 
-                // 统计支出
                 for (const e of (allExpenses || [])) {
                     const sid = e.store_id;
                     if (!storeStats[sid]) continue;
@@ -524,14 +893,12 @@
                     }
                 }
 
-                // 统计偿还本金
                 for (const rc of (returnCapitalData || [])) {
                     const sid = rc.store_id;
                     if (!storeStats[sid]) continue;
                     storeStats[sid].returnCapital += (rc.amount || 0);
                 }
 
-                // 计算利润和可用资金
                 for (const sid of Object.keys(storeStats)) {
                     const s = storeStats[sid];
                     s.monthProfit = s.monthAdminFee + s.monthServiceFee + s.monthInterest - s.monthExpense;
@@ -542,15 +909,11 @@
                     s.availableCapital = balance.cashBalance + balance.bankBalance;
                 }
 
-                // 转换为数组用于显示和全局存储
                 const statsArray = Object.values(storeStats);
-                
-                // 保存到全局变量，供打印功能使用（保留原功能）
                 window._storeCardsData = statsArray;
 
                 const fmt = (val) => Utils.formatCurrency(val);
                 
-                // 构建单个门店财务卡片 HTML
                 const buildStoreFinanceCard = (stats) => {
                     return `
 <div class="store-finance-card">
@@ -575,9 +938,7 @@
 </div>`;
                 };
 
-                // 构建门店财务汇总区域
                 let cardsHtml = '';
-                
                 if (statsArray.length > 0) {
                     cardsHtml = '<div class="store-cards-grid">';
                     for (const stats of statsArray) {
@@ -585,9 +946,7 @@
                     }
                     cardsHtml += '</div>';
                     
-                    // 如果是管理员且有多门店，显示总计卡片
-                    if (isAdmin && statsArray.length > 1) {
-                        // 计算总计
+                    if (statsArray.length > 1) {
                         const grandTotal = {
                             monthNewOrders: 0, totalOrders: 0, activeOrders: 0, completedOrders: 0,
                             monthLoanAmount: 0, totalLoanAmount: 0,
@@ -649,53 +1008,51 @@
                     }
                 }
 
-                // 构建门店列表行（非管理员不显示门店列表）
-                let storeRows = '';
-                if (isAdmin) {
-                    if (StoreManager.stores.filter(s => s.code !== 'STORE_000').length === 0) {
-                        storeRows = `</tr><td colspan="6" class="text-center">${t('no_data')}<\/td>`;
-                    } else {
-                        for (const store of StoreManager.stores) {
-                            if (store.code === 'STORE_000') continue;
-                            const isActive = store.is_active !== false;
-                            const isStorePractice = store.is_practice === true;
-                            let statusBadgeHtml = isActive
-                                ? `<span class="badge badge--active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
-                                : `<span class="badge badge--liquidated">${lang === 'id' ? 'Ditutup' : '已暂停'}</span>`;
-                            if (isStorePractice) statusBadgeHtml += ` <span class="badge" style="background:#a78bfa;color:#fff;">🎓 ${lang === 'id' ? 'Latihan' : '练习'}</span>`;
-                            const practiceRowStyle2 = isStorePractice ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
-                            storeRows += `<tr${practiceRowStyle2}>
-                                <td class="store-code">${Utils.escapeHtml(store.code)}<\/td>
-                                <td class="store-name">${Utils.escapeHtml(store.name)}<\/td>
-                                <td class="store-address desc-cell">${Utils.escapeHtml(store.address || '-')}<\/td>
-                                <td>${Utils.escapeHtml(store.phone || '-')}<\/td>
-                                <td><input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" onchange="StoreManager.updateStoreWANumber('${store.id}', this.value)"><\/td>
-                                <td class="text-center">${statusBadgeHtml}<\/td>
-                              </table>`;
-
-                            let actionButtons = '';
-                            actionButtons = `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>` +
-                                (isActive
-                                    ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn btn--sm btn--warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
-                                    : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn btn--sm btn--success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`);
-                            const isStore004 = (store.code === 'STORE_004');
-                            if (isStore004) {
-                                const isPractice = store.is_practice === true;
-                                const practiceLabel = isPractice ? (lang === 'id' ? 'Mode Latihan (Aktif)' : '练习模式 (已开启)') : (lang === 'id' ? 'Jadikan Toko Latihan' : '设为练习门店');
-                                const practiceBtnStyle = isPractice ? 'background:#a78bfa;color:#fff;' : 'background:#ede9fe;color:#6d28d9;';
-                                actionButtons += `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}">${practiceLabel}</button>`;
-                            }
-                            actionButtons += `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
-                            storeRows += `<tr class="action-row"${practiceRowStyle2}>
-                                <td class="action-label">${t('action')}<\/td>
-                                <td colspan="5"><div class="action-buttons">${actionButtons}</div><\/td>
-                              </tr>`;
-                        }
-                    }
+                let totalCashBalance = 0, totalBankBalance = 0;
+                for (const stats of statsArray) {
+                    totalCashBalance += stats.cashBalance || 0;
+                    totalBankBalance += stats.bankBalance || 0;
                 }
 
-                // 构建内容
-                let content = `
+                let storeRows = '';
+                for (const store of StoreManager.stores) {
+                    if (store.code === 'STORE_000') continue;
+                    const isActive = store.is_active !== false;
+                    const isStorePractice = store.is_practice === true;
+                    let statusBadgeHtml = isActive
+                        ? `<span class="badge badge--active">${lang === 'id' ? 'Aktif' : '营业中'}</span>`
+                        : `<span class="badge badge--liquidated">${lang === 'id' ? 'Ditutup' : '已暂停'}</span>`;
+                    if (isStorePractice) statusBadgeHtml += ` <span class="badge" style="background:#a78bfa;color:#fff;">🎓 ${lang === 'id' ? 'Latihan' : '练习'}</span>`;
+                    const practiceRowStyle2 = isStorePractice ? ' style="background:#f5f3ff;opacity:0.85;"' : '';
+                    storeRows += `<tr${practiceRowStyle2}>
+                        <td class="store-code">${Utils.escapeHtml(store.code)}<\/td>
+                        <td class="store-name">${Utils.escapeHtml(store.name)}<\/td>
+                        <td class="store-address desc-cell">${Utils.escapeHtml(store.address || '-')}<\/td>
+                        <td>${Utils.escapeHtml(store.phone || '-')}<\/td>
+                        <td><input type="text" id="wa_${store.id}" value="${Utils.escapeHtml(store.wa_number || '')}" placeholder="628xxxxxxxxxx" style="width:140px;font-size:12px;padding:6px;" onchange="StoreManager.updateStoreWANumber('${store.id}', this.value)"><\/td>
+                        <td class="text-center">${statusBadgeHtml}<\/td>
+                      </tr>`;
+
+                    let actionButtons = '';
+                    actionButtons = `<button onclick="StoreManager.editStore('${store.id}')" class="btn btn--sm">✏️ ${t('edit')}</button>` +
+                        (isActive
+                            ? `<button onclick="StoreManager.suspendStore('${store.id}')" class="btn btn--sm btn--warning">⏸️ ${lang === 'id' ? 'Tutup Sementara' : '暂停营业'}</button>`
+                            : `<button onclick="StoreManager.resumeStore('${store.id}')" class="btn btn--sm btn--success">▶️ ${lang === 'id' ? 'Buka Kembali' : '恢复营业'}</button>`);
+                    const isStore004 = (store.code === 'STORE_004');
+                    if (isStore004) {
+                        const isPractice = store.is_practice === true;
+                        const practiceLabel = isPractice ? (lang === 'id' ? 'Mode Latihan (Aktif)' : '练习模式 (已开启)') : (lang === 'id' ? 'Jadikan Toko Latihan' : '设为练习门店');
+                        const practiceBtnStyle = isPractice ? 'background:#a78bfa;color:#fff;' : 'background:#ede9fe;color:#6d28d9;';
+                        actionButtons += `<button onclick="StoreManager.togglePracticeMode('${store.id}', ${isPractice})" class="btn btn--sm" style="${practiceBtnStyle}">${practiceLabel}</button>`;
+                    }
+                    actionButtons += `<button class="btn btn--sm btn--danger" onclick="APP.deleteStore('${store.id}')">🗑️ ${t('delete')}</button>`;
+                    storeRows += `<tr class="action-row"${practiceRowStyle2}>
+                        <td class="action-label">${t('action')}<\/td>
+                        <td colspan="5"><div class="action-buttons">${actionButtons}</div><\/td>
+                      </tr>`;
+                }
+
+                const content = `
                     <style>
                         .store-cards-grid {
                             display: flex !important;
@@ -723,23 +1080,12 @@
                         </div>
                     </div>
                     
-                    <!-- 财务汇总卡片（管理员显示所有门店，门店操作员显示本门店） -->
                     <div class="card">
                         <h3>📊 ${lang === 'id' ? 'Ringkasan Keuangan Toko' : '门店财务汇总'}</h3>
                         ${cardsHtml || `<div class="empty-state"><div class="empty-state-text">${lang === 'id' ? 'Belum ada data keuangan' : '暂无财务数据'}</div></div>`}
                         <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">💡 ${lang === 'id' ? 'Format: Bulan Ini / Total' : '格式: 本月 / 累计'}</p>
-                    </div>`;
-
-                // 管理员显示现金流汇总和门店列表
-                if (isAdmin) {
-                    // 计算总计现金流
-                    let totalCashBalance = 0, totalBankBalance = 0;
-                    for (const stats of statsArray) {
-                        totalCashBalance += stats.cashBalance || 0;
-                        totalBankBalance += stats.bankBalance || 0;
-                    }
+                    </div>
                     
-                    content += `
                     <div class="card cashflow-card no-print">
                         <h3>💰 ${lang === 'id' ? 'RINGKASAN ARUS KAS' : '现金流汇总'}</h3>
                         <div class="cashflow-stats">
@@ -798,175 +1144,16 @@
                             </div>
                         </div>
                     </div>`;
-                }
 
                 return content;
             } catch (error) {
                 console.error('[StoreManager] 构建页面失败:', error);
-                const lang = Utils.lang;
-                return `<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                        <h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2>
-                        <div class="header-actions">
-                            <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button>
-                        </div>
-                    </div>
-                    <div class="card" style="text-align:center;padding:40px;">
-                        <p style="color:var(--danger);">❌ ${lang === 'id' ? 'Gagal memuat data: ' : '加载失败：'}${error.message}</p>
-                        <button onclick="StoreManager.renderStoreManagement()" class="btn btn--sm" style="margin-top:16px;">🔄 ${lang === 'id' ? 'Coba Lagi' : '重试'}</button>
-                    </div>`;
+                return `<div class="page-header"><h2>🏪 ${lang === 'id' ? 'Manajemen Toko' : '门店管理'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${Utils.t('back')}</button></div></div>
+                    <div class="card" style="text-align:center;padding:40px;"><p>❌ ${lang === 'id' ? 'Gagal memuat data: ' : '加载失败：'}${error.message}</p><button onclick="StoreManager.renderStoreManagement()" class="btn btn--sm" style="margin-top:16px;">🔄 ${lang === 'id' ? 'Coba Lagi' : '重试'}</button></div>`;
             }
         },
 
-        // ==================== 打印门店财务汇总（卡片单列垂直排列，占满宽度） ====================
-        printStoreFinanceSummary() {
-            const lang = Utils.lang;
-            const cards = window._storeCardsData || [];
-            
-            if (cards.length === 0) {
-                Utils.toast.warning(lang === 'id' ? 'Tidak ada data toko' : '没有门店数据');
-                return;
-            }
-
-            const isAdmin = PERMISSION.isAdmin();
-            let storeName = '', roleText = '', userName = '';
-            try {
-                storeName = AUTH.getCurrentStoreName();
-                roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') : AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : (lang === 'id' ? 'Staf' : '员工');
-                userName = AUTH.user?.name || '-';
-            } catch (e) { /* ignore */ }
-
-            const printDateTime = new Date().toLocaleString();
-            const _pNow = new Date();
-            const periodStart = `${_pNow.getFullYear()}-${String(_pNow.getMonth() + 1).padStart(2, '0')}-01`;
-            const periodEnd = Utils.getLocalToday();
-
-            const fmt = (val) => Utils.formatCurrency(val);
-            const isZh = lang !== 'id';
-
-            const cell = (icon, label, value) =>
-                `<div class="mc"><div class="ml">${icon} ${label}</div><div class="mv">${value}</div></div>`;
-
-            const headerBlock = `
-                <div class="ph">
-                    <div class="ph-logo"><img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'" style="height:22px;vertical-align:middle;margin-right:6px;"> JF! by Gadai</div>
-                    <div class="ph-info">
-                        🏪 ${isAdmin ? (isZh ? '总部' : 'Kantor Pusat') : (isZh ? '门店：' : 'Toko: ') + Utils.escapeHtml(storeName)}
-                        &nbsp;|&nbsp; 👤 ${Utils.escapeHtml(roleText)}
-                        &nbsp;|&nbsp; 📅 ${printDateTime}
-                        &nbsp;|&nbsp; 📆 ${isZh ? '统计期间' : 'Periode'}: ${periodStart} ~ ${periodEnd}
-                    </div>
-                </div>`;
-
-            // 构建卡片 HTML，单列垂直排列
-            let cardsHtml = headerBlock;
-            for (const s of cards) {
-                cardsHtml += `
-<div class="sc">
-    <div class="st">${Utils.escapeHtml(s.name)} <span class="sc2">(${Utils.escapeHtml(s.code)})</span></div>
-    <div class="mg">
-        ${cell('📋', isZh ? '本月新增订单 / 单数总计' : 'Pesanan Baru / Total', `${s.monthNewOrders} / ${s.totalOrders}`)}
-        ${cell('🔄', isZh ? '进行中订单/已结清订单' : 'Aktif / Lunas', `${s.activeOrders} / ${s.completedOrders}`)}
-        ${cell('💰', isZh ? '本月当金' : 'Pinjaman Bulan Ini', fmt(s.monthLoanAmount))}
-        ${cell('🧾', isZh ? '本月管理费 / 累管理费' : 'Admin Bulan Ini / Total Admin', `${fmt(s.monthAdminFee)} / ${fmt(s.totalAdminFee)}`)}
-        ${cell('🛠️', isZh ? '本月服务费 / 累计服务费' : 'Layanan Bulan Ini / Total Layanan', `${fmt(s.monthServiceFee)} / ${fmt(s.totalServiceFee)}`)}
-        ${cell('💸', isZh ? '本月利息 / 累计利息' : 'Bunga Bulan Ini / Total Bunga', `${fmt(s.monthInterest)} / ${fmt(s.totalInterest)}`)}
-        ${cell('📦', isZh ? '在押资金' : 'Dana Terjamin', fmt(s.deployedCapital))}
-        ${cell('💵', isZh ? '可动用资金' : 'Dana Tersedia', fmt(s.availableCapital))}
-        ${cell('🏦', isZh ? '保险柜现金 / 银行BNI存款' : 'Brankas / Bank BNI', `${fmt(s.cashBalance)} / ${fmt(s.bankBalance)}`)}
-        ${cell('📉', isZh ? '本月支出 / 累支出' : 'Pengeluaran Bulan Ini / Total', `${fmt(s.monthExpense)} / ${fmt(s.totalExpense)}`)}
-        ${cell('📈', isZh ? '本月利润 / 累计利润' : 'Laba Bulan Ini / Total Laba', `${fmt(s.monthProfit)} / ${fmt(s.totalProfit)}`)}
-        ${cell('💳', isZh ? '偿还本金' : 'Cicilan Pokok', fmt(s.returnCapital))}
-    </div>
-</div>`;
-            }
-
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                Utils.toast.warning(lang === 'id' ? 'Popup diblokir. Izinkan popup untuk halaman ini lalu coba lagi.' : '弹出窗口被拦截，请允许本页弹出窗口后重试。', 5000);
-                return;
-            }
-            printWindow.document.write(`
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>JF! by Gadai - ${isZh ? '门店财务汇总' : 'Ringkasan Keuangan Toko'}</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #1e293b; background: #fff; }
-
-        @page { size: A4 portrait; margin: 8mm 10mm; }
-        @media print { html { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-
-        .ph {
-            text-align: center;
-            border-bottom: 2px solid #1e293b;
-            padding-bottom: 5px;
-            margin-bottom: 5px;
-        }
-        .ph-logo { font-size: 13pt; font-weight: bold; color: #0e7490; margin-bottom: 2px; }
-        .ph-info { font-size: 7.5pt; color: #475569; white-space: nowrap; }
-
-        .pf {
-            border-top: 1px solid #e2e8f0;
-            padding-top: 4px;
-            margin-top: 5px;
-            text-align: center;
-            font-size: 7pt;
-            color: #94a3b8;
-        }
-
-        .sc {
-            border: 1.5px solid #334155;
-            border-radius: 5px;
-            margin-bottom: 5mm;
-            break-inside: avoid;
-            page-break-inside: avoid;
-            width: 100%;
-        }
-        .st {
-            font-weight: bold;
-            font-size: 12pt;
-            text-align: center;
-            padding: 5px 8px;
-            background: #f1f5f9;
-            border-bottom: 1.5px solid #334155;
-        }
-        .sc2 { font-size: 10pt; color: #64748b; font-weight: normal; }
-
-        .mg {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-        }
-        .mc {
-            border-right: 1px solid #cbd5e1;
-            border-bottom: 1px solid #cbd5e1;
-            padding: 6px 8px;
-        }
-        .mc:nth-child(4n)   { border-right: none; }
-        .mc:nth-child(n+9)  { border-bottom: none; }
-        .ml { font-size: 9pt; color: #475569; font-weight: 600; margin-bottom: 3px; }
-        .mv { font-size: 11pt; font-weight: 700; color: #0f172a; line-height: 1.4; word-break: break-all; }
-    </style>
-</head>
-<body>
-    ${cardsHtml}
-    <div class="pf">
-        JF! by Gadai &nbsp;·&nbsp; ${isZh ? '典当管理系统' : 'Sistem Manajemen Gadai'}
-    </div>
-    <script>
-        window.onload = function() {
-            window.addEventListener('afterprint', function() { window.close(); });
-            window.print();
-        };
-    <\/script>
-</body>
-</html>`);
-            printWindow.document.close();
-        },
-
-        async renderStoreManagementHTML() { return await this.buildStoreManagementHTML(); },
-        async renderStoreManagement() { document.getElementById("app").innerHTML = await this.buildStoreManagementHTML(); }
+        async renderStoreManagementHTML() { return await this.buildStoreManagementHTML(); }
     };
 
     // 挂载到命名空间
