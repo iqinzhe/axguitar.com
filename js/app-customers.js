@@ -1,5 +1,8 @@
 // app-customers.js - v2.0 (客户列表ID排序修复、管理员分组、ID重用、服务费可手工修改)
 // 订单ID格式：客户ID-序号（如 BL001-01, BL001-02...）
+// 费用检查：管理费/服务费 > 0 且未缴时禁止创建订单
+// 修复：手工将管理费改为0时，不会被自动覆盖
+// 修复：资金流水日期与订单创建日期保持一致
 
 'use strict';
 
@@ -19,7 +22,6 @@
                 let customers = await SUPABASE.getCustomers();
                 const stores = await SUPABASE.getAllStores();
                 
-                // 获取活跃订单映射
                 const client = SUPABASE.getClient();
                 const customerIds = (customers || []).map(c => c.id);
                 const activeOrderMap = {};
@@ -41,14 +43,12 @@
                     }
                 }
                 
-                // 按客户编号排序（字符串降序）
                 customers.sort((a, b) => {
                     const idA = a.customer_id || '';
                     const idB = b.customer_id || '';
                     return idB.localeCompare(idA);
                  });
                 
-                // 辅助函数：生成表格行（接收已排序的客户列表）
                 const buildRowsForCustomers = (customerList) => {
                     let rows = '';
                     for (const c of customerList) {
@@ -86,14 +86,12 @@
                 let mainContent = '';
                 
                 if (isAdmin) {
-                    // 管理员：按门店分组，每组一个表格（每个表格内客户已排序）
                     const customersByStore = {};
                     for (const c of customers) {
                         const storeId = c.store_id;
                         if (!customersByStore[storeId]) customersByStore[storeId] = [];
                         customersByStore[storeId].push(c);
                     }
-                    // 获取门店列表并排序（按名称）
                     const sortedStores = stores.filter(s => s.code !== 'STORE_000').sort((a, b) => a.name.localeCompare(b.name));
                     let groupedTablesHtml = '';
                     for (const store of sortedStores) {
@@ -126,7 +124,6 @@
                                 <div id="${paginatorId}"></div>
                             </div>
                         `;
-                        // [分页] 每个门店的客户表各自分页
                         setTimeout((function(bid, pid, sc) {
                             return function() {
                                 if (window.JF && JF.Pagination) {
@@ -142,7 +139,6 @@
                     }
                     mainContent = groupedTablesHtml;
                 } else {
-                    // 门店操作员：直接显示一个表格（客户已全局排序）
                     const rows = buildRowsForCustomers(customers);
                     const _custPageSize = 15;
                     const _buildCustRow = buildRowsForCustomers;
@@ -176,7 +172,6 @@
                     }, 0);
                 }
                 
-                // 新增客户卡片（仅门店操作员可见）
                 let addCustomerCardHtml = '';
                 if (!isAdmin) {
                     addCustomerCardHtml =
@@ -233,7 +228,6 @@
             if (el) el.style.display = value === 'different' ? 'block' : 'none';
         },
 
-        // ==================== 添加客户（使用 _generateCustomerId 实现 ID 重用） ====================
         addCustomer: async function () {
             const isAdmin = PERMISSION.isAdmin();
             const lang = Utils.lang;
@@ -262,7 +256,6 @@
                 const storeId = profile?.store_id;
                 if (!storeId) { if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); } Utils.toast.error(lang === 'id' ? 'User tidak memiliki toko' : '用户没有关联门店'); return; }
 
-                // 黑名单重复检查
                 if (ktp || phone) {
                     try {
                         const blacklistedCustomer = await SUPABASE.checkBlacklistDuplicate(ktp, phone);
@@ -284,7 +277,6 @@
                     } catch (blErr) { console.warn('黑名单重复检查失败:', blErr.message); }
                 }
 
-                // 使用 _generateCustomerId 自动获取最小可用ID（支持重用）
                 let newCustomer = null;
                 try {
                     const customerId = await SUPABASE._generateCustomerId(storeId);
@@ -317,7 +309,6 @@
             }
         },
 
-        // ==================== 客户详情卡片（完整保留） ====================
         showCustomerDetailCard: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
@@ -654,7 +645,6 @@
             }
         },
 
-        // ==================== 为客户创建订单（服务费可手工修改，增加费用缴纳检查） ====================
         createOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -793,7 +783,6 @@
             }
         },
 
-        // ==================== 保存订单（服务费支持手工修改，订单ID格式：客户ID-序号，增加费用缴纳检查） ====================
         saveOrderForCustomer: async function (customerId) {
             const lang = Utils.lang; 
             const t = Utils.t.bind(Utils); 
@@ -807,14 +796,11 @@
             const adminFeeInput = document.getElementById("adminFeeInput");
             let adminFee = adminFeeInput ? Utils.parseNumberFromCommas(adminFeeInput.value) || 0 : 0;
             
-            // 修复：只有用户没有手工修改过，且管理费为0时，才自动计算默认管理费
-            // 如果用户手工改为了0，则尊重用户的选择（免费）
             const isManualAdminFee = adminFeeInput && adminFeeInput.dataset.manual === 'true';
             if (!isManualAdminFee && adminFee === 0 && amount > 0) {
                 adminFee = Utils.calculateAdminFee(amount);
             }
             
-            // 服务费：优先使用手工录入的值，否则自动计算
             let serviceFeePercent = 0;
             let serviceFee = 0;
             const serviceFeeInput = document.getElementById('serviceFeeInput');
@@ -833,10 +819,9 @@
                 serviceFeePercent = 0;
             }
             
-                        // ========== 费用缴纳检查 ==========
             const feePaymentMethod = document.querySelector('input[name="feePaymentMethod"]:checked')?.value || 'cash';
             
-            // 管理费检查：金额 > 0 时必须缴纳，金额 = 0 表示免费
+            // 管理费检查：金额 > 0 时必须缴纳
             if (adminFee > 0) {
                 Utils.toast.warning(lang === 'id' 
                     ? '⚠️ Biaya admin harus dibayar sebelum pesanan dibuat. Nasabah harus membayar admin fee terlebih dahulu.'
@@ -845,7 +830,7 @@
                 return;
             }
             
-            // 服务费检查：金额 > 0 时必须缴纳，金额 = 0 表示免费
+            // 服务费检查：金额 > 0 时必须缴纳
             if (serviceFee > 0) {
                 Utils.toast.warning(lang === 'id' 
                     ? '⚠️ Biaya layanan harus dibayar sebelum pesanan dibuat. Nasabah harus membayar service fee terlebih dahulu.'
@@ -853,8 +838,6 @@
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); }
                 return;
             }
-            // ========== 费用缴纳检查结束 ==========
-            // ========== 费用缴纳检查结束 ==========
             
             const agreedInterestRate = parseFloat(document.getElementById("agreedInterestRateSelect")?.value) || 10;
             const repaymentTypeRadio = document.querySelector('input[name="repaymentType"]:checked'); 
@@ -894,7 +877,6 @@
                 const blacklistData = await SUPABASE.checkBlacklist(customer.id); 
                 if (blacklistData.isBlacklisted) { if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + t('save'); } Utils.toast.error(lang === 'id' ? 'Nasabah ini telah di-blacklist, tidak dapat membuat pesanan baru.' : '此客户已被拉黑，无法创建新订单。', 4000); return; }
                 
-                // ==================== 生成订单ID：客户ID-序号（两位数字，如 BL026001-01） ====================
                 const client = SUPABASE.getClient();
                 const { data: existingOrders } = await client
                     .from('orders')
@@ -914,14 +896,13 @@
                 const orderIdSuffix = nextSeq.toString().padStart(2, '0');
                 const bizId = customer.customer_id; 
                 const generatedOrderId = `${bizId}-${orderIdSuffix}`;
-                // ==================== 订单ID生成结束 ====================
                 
                 const orderData = { 
                     order_id: generatedOrderId,
                     customer: { name: customer.name, ktp: customer.ktp_number || '', phone: customer.phone, address: customer.ktp_address || customer.address || '' }, 
                     collateral_name: fullCollateralName, loan_amount: amount, notes, customer_id: customerId, store_id: storeId, 
                     admin_fee: adminFee, 
-                    admin_fee_paid: adminFee === 0 ? true : false,  // 费用为0时自动标记为已缴
+                    admin_fee_paid: adminFee === 0 ? true : false,
                     service_fee_percent: serviceFeePercent, 
                     service_fee_amount: serviceFee,
                     service_fee_paid: serviceFee === 0 ? 0 : 0,
@@ -933,18 +914,18 @@
                 };
                 const newOrder = await Order.create(orderData);
                 
-                // 记录管理费（如果金额 > 0）
+                // 记录管理费（如果金额 > 0），传递订单日期
                 if (adminFee > 0) {
-                    await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee).catch(() => {
+                    await Order.recordAdminFee(newOrder.order_id, feePaymentMethod, adminFee, customOrderDate).catch(() => {
                         Utils.toast.warning(lang === 'id'
                             ? `⚠️ Pesanan ${newOrder.order_id} tersimpan, tapi biaya admin GAGAL dicatat. Harap catat manual!`
                             : `⚠️ 订单 ${newOrder.order_id} 已保存，但管理费流水记录失败，请手动补录！`, 8000);
                     });
                 }
                 
-                // 记录服务费（如果金额 > 0）
+                // 记录服务费（如果金额 > 0），传递订单日期
                 if (serviceFee > 0) {
-                    await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod).catch(() => {
+                    await Order.recordServiceFee(newOrder.order_id, 1, feePaymentMethod, customOrderDate).catch(() => {
                         Utils.toast.warning(lang === 'id'
                             ? `⚠️ Pesanan ${newOrder.order_id} tersimpan, tapi biaya layanan GAGAL dicatat. Harap catat manual!`
                             : `⚠️ 订单 ${newOrder.order_id} 已保存，但服务费流水记录失败，请手动补录！`, 8000);
@@ -955,7 +936,7 @@
                     const desc = lang === 'id'
                         ? `Pencairan gadai dari ${loanSource === 'cash' ? 'Brankas' : 'Bank BNI'} - Order: ${newOrder.order_id} - ${customer.name}`
                         : `当金发放自 ${loanSource === 'cash' ? '保险柜' : '银行BNI'} - 订单: ${newOrder.order_id} - ${customer.name}`;
-                    await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, desc).catch(() => {
+                    await Order.recordLoanDisbursement(newOrder.order_id, amount, loanSource, desc, customOrderDate).catch(() => {
                         Utils.toast.warning(lang === 'id'
                             ? `⚠️ Pesanan ${newOrder.order_id} tersimpan, tapi pencairan dana GAGAL dicatat. Harap catat manual!`
                             : `⚠️ 订单 ${newOrder.order_id} 已保存，但当金发放流水记录失败，请手动补录！`, 8000);
@@ -964,7 +945,6 @@
                 const successMsg = repaymentType === 'fixed' ? (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Tetap\nJangka: ${repaymentTerm} bulan\nAngsuran per bulan: ${Utils.formatCurrency(monthlyFixedPayment)}` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 固定还款\n期限: ${repaymentTerm}个月\n每月还款: ${Utils.formatCurrency(monthlyFixedPayment)}`) : (lang === 'id' ? `Pesanan berhasil dibuat!\n\nID Pesanan: ${newOrder.order_id}\nJenis: Cicilan Fleksibel\nJangka Waktu Gadai: ${pawnTermMonths} bulan` : `订单创建成功！\n\n订单号: ${newOrder.order_id}\n还款方式: 灵活还款\n典当期限: ${pawnTermMonths}个月`);
                 Utils.toast.success(successMsg, 5000);
                 if (window.JF && JF.Cache) JF.Cache.clear();
-                // 保存成功后跳转到订单列表
                 if (window.APP && APP.showOrderTable) {
                     APP.showOrderTable();
                 } else {
@@ -979,7 +959,6 @@
             }
         },
 
-        // ==================== 费用重算（支持手工标记） ====================
         recalculateAllFees() {
             const amount = Utils.getAmountFromInput('amount');
             
@@ -1027,7 +1006,7 @@
             this._updateAdminFeeHint(amount);
         },
 
-                _updateAdminFeeHint(amount) {
+        _updateAdminFeeHint(amount) {
             const hint = document.getElementById('adminFeeHint');
             if (!hint) return;
             const lang = Utils.lang;
@@ -1134,7 +1113,6 @@
             if (value === 'fixed') APP.recalculateAllFees(); 
         },
 
-        // ==================== 客户订单列表 ====================
         async showCustomerOrders(customerId) {
             APP.currentPage = 'customerOrders'; 
             APP.currentCustomerId = customerId; 
@@ -1164,7 +1142,6 @@
 
         async renderCustomerOrdersHTML(customerId) { return await this.buildCustomerOrdersHTML(customerId); },
 
-        // ==================== 客户缴费历史 ====================
         async showCustomerPaymentHistory(customerId) {
             APP.currentPage = 'customerPaymentHistory'; 
             APP.currentCustomerId = customerId; 
