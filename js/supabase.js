@@ -1,6 +1,8 @@
-// supabase.js - v2.1 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
+// supabase.js - v2.2 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
 // v2.1 修复：recordPrincipalPayment / recordFixedPayment / earlySettleFixedOrder / recordInterestPayment 超额抵扣
 //           中 payment_history.date 和 cash_flow_records.flow_date 统一改用订单创建日期，不再使用 todayStr()
+// v2.2 修复：updateOrder 修改 loan_amount 时，同步更新 cash_flow_records 中对应的 loan_disbursement 流水金额
+//           确保资金结构总览（保险柜支出）与订单金额始终保持一致
 
 'use strict';
 
@@ -1743,6 +1745,23 @@
             updateData.updated_at = nowStr();
             const { data, error } = await supabaseClient.from('orders').update(updateData).eq('order_id', orderId).select().single();
             if(error) throw error;
+            // 同步更新资金流水：若 loan_amount 有变动，更新对应的 loan_disbursement 流水金额
+            if(updateData.hasOwnProperty('loan_amount') && updateData.loan_amount !== currentOrder.loan_amount) {
+                try {
+                    await supabaseClient.from('cash_flow_records')
+                        .update({ amount: updateData.loan_amount })
+                        .eq('order_id', currentOrder.id)
+                        .eq('flow_type', 'loan_disbursement')
+                        .eq('is_voided', false);
+                    if(window.Audit) await window.Audit.log('update_loan_disbursement_flow', JSON.stringify({
+                        order_id: orderId,
+                        old_amount: currentOrder.loan_amount,
+                        new_amount: updateData.loan_amount
+                    }));
+                } catch(flowErr) {
+                    console.warn('[updateOrder] 同步贷款发放流水金额失败:', flowErr.message);
+                }
+            }
             if(customerId && (updateData.customer_name || updateData.customer_phone || updateData.customer_ktp)){
                 const cUpd = {};
                 if(updateData.customer_name) cUpd.name = updateData.customer_name;
