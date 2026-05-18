@@ -1,9 +1,6 @@
-// app-dashboard-core.js - v2.1 (JF 命名空间)  
+// app-dashboard-core.js - v2.0 (JF 命名空间)  
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
-// v2.1 修复：
-//   ① 保险柜/银行初始值从 getCashFlowSummary() 真实数据读取，不再硬编码为 0
-//   ② 可动用资金 = 保险柜余额 + 银行余额（基于流水实算），与订单金额变更同步
-//   ③ kpiReport 与 detailsData 并行 await，消除初始渲染数据缺失问题
+// 数据修复功能：全面修复（订单费用同步 + 现金流清理 + 缺失发放补录）
 
 'use strict';
 
@@ -117,7 +114,7 @@
                 row += `<td class="cal-cell${count>0?' has-due':''}">${cellContent}<\/td>`;
                 day++;
             }
-            row += '<tr>';
+            row += '</tr>';
             tableRows += row;
             if (day > totalDays) break;
         }
@@ -275,7 +272,7 @@
                 let raw = sessionStorage.getItem('jf_current_state');
                 if (!raw) return { page: null, filter: "all", orderId: null, customerId: null };
                 const state = JSON.parse(raw);
-                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist','storeFinance'];
+                const validPages = ['dashboard','orderTable','createOrder','viewOrder','payment','anomaly','userManagement','storeManagement','expenses','customers','paymentHistory','messageCenter','customerOrders','customerPaymentHistory','blacklist','storeFinance','dataRepair','backupRestore'];
                 const validFilters = ['all', 'active', 'completed', 'liquidated'];
                 if (!state.filter || !validFilters.includes(state.filter)) state.filter = 'all';
                 if (state.page && validPages.includes(state.page) && AUTH.isLoggedIn()) {
@@ -418,14 +415,16 @@
                     const lang = Utils.lang;
                     contentHtml = `<div class="page-header"><h2>🔧 ${lang === 'id' ? 'Perbaikan Data' : '数据修复'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button></div></div>
                     <div class="card" style="max-width:680px;margin:0 auto;">
-                        <h3 style="margin:0 0 8px;">🧹 ${lang === 'id' ? 'Sinkronkan Semua Catatan Biaya' : '批量同步所有订单费用流水'}</h3>
-                        <p style="color:var(--text-muted);font-size:13px;margin:0 0 16px;">${lang === 'id'
-                            ? 'Fungsi ini akan membersihkan dan menyinkronkan ulang catatan biaya admin/layanan di <b>semua pesanan</b> sesuai nilai yang tersimpan di pesanan (bukan angka lama yang salah). Cocok untuk memperbaiki data historis sekaligus.'
-                            : '此功能将对<b>全部订单</b>的管理费/服务费进行一次性清理和重新同步，使缴费历史、收入构成、资金流水三处数据与订单中保存的金额完全一致。适用于历史脏数据的批量清理。'}</p>
+                        <h3 style="margin:0 0 8px;">🧹 ${lang === 'id' ? 'Sinkronkan Semua Catatan Biaya & Bersihkan Arus Kas' : '批量同步费用流水 + 清理现金流水'}</h3>
+                        <p style="color:var(--text-muted);font-size:13px;margin:0 0 12px;">
+                            ${lang === 'id'
+                                ? 'Fungsi ini akan:<br>✅ Menyinkronkan ulang catatan biaya admin/layanan di <b>semua pesanan</b><br>✅ Menghapus arus kas yang <b>yatim piatu</b> (pesanan sudah dihapus)<br>✅ Menghapus arus kas <b>duplikat</b><br>✅ Melengkapi pencairan pinjaman yang <b>hilang</b><br><br>Hasil akhir: Saldo kas, komposisi pendapatan, dan struktur modal menjadi akurat.'
+                                : '此功能将：<br>✅ 重新同步 <b>全部订单</b> 的管理费/服务费流水<br>✅ 删除 <b>孤立流水</b>（对应订单已删除）<br>✅ 删除 <b>重复流水</b><br>✅ 补录缺失的 <b>贷款发放流水</b><br><br>最终效果：保险柜现金、收入构成、资金结构总览全部准确。'}
+                        </p>
                         <div class="info-box" style="margin-bottom:16px;background:var(--warning-bg,#fffbeb);border-left:4px solid #f59e0b;padding:12px 16px;border-radius:6px;">
                             ⚠️ ${lang === 'id'
-                                ? '<b>Perhatian:</b> Proses ini tidak dapat dibatalkan. Pastikan data pesanan sudah benar sebelum menjalankan.'
-                                : '<b>注意：</b>此操作不可撤销。执行前请确认各订单中的管理费/服务费金额已经是正确值。'}
+                                ? '<b>Perhatian:</b> Proses ini tidak dapat dibatalkan. <strong>Cadangkan data</strong> sebelum melanjutkan.'
+                                : '<b>注意：</b>此操作不可撤销。<strong>请先备份数据</strong>再继续。'}
                         </div>
                         <div id="dataRepairProgress" style="display:none;margin-bottom:16px;">
                             <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
@@ -437,7 +436,7 @@
                             </div>
                         </div>
                         <div id="dataRepairResult" style="display:none;"></div>
-                        <button id="dataRepairBtn" class="btn btn--primary" style="width:100%;" onclick="APP.runBatchRepair()">
+                        <button id="dataRepairBtn" class="btn btn--primary" style="width:100%;" onclick="APP.runFullSystemRepair()">
                             🔧 ${lang === 'id' ? 'Mulai Perbaikan Semua Pesanan' : '开始批量修复所有订单'}
                         </button>
                     </div>`;
@@ -621,10 +620,7 @@
                 }, { ttl: 10 * 60 * 1000 });
 
                 const kpiCacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
-
-                // 并行拉取 KPI 和资金流水，两者同步完成后再渲染，确保保险柜/银行/可动用资金初始值准确
-                const [kpiReport, detailsData] = await Promise.all([
-                    JF.Cache.get(kpiCacheKey, async () => {
+                const kpiReport = await JF.Cache.get(kpiCacheKey, async () => {
                     const client = SUPABASE.getClient();
                     const practiceIds = isAdmin ? await SUPABASE._getPracticeStoreIds() : [];
                     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -690,9 +686,7 @@
                         principal_collected: principalCollected, total_injected_capital: injected,
                         deployed_capital: deployed, available_capital: injected - deployed, due_orders: dueOrdersRes
                     };
-                }, { ttl: 10 * 60 * 1000 }),
-                    detailsPromise  // 与 kpiReport 并行，避免串行等待
-                ]);
+                }, { ttl: 10 * 60 * 1000 });
 
                 const totalOrders = kpiReport.total_orders;
                 const activeOrders = kpiReport.active_orders;
@@ -701,17 +695,10 @@
                 const newThisMonth = kpiReport.new_this_month;
                 const newLoanThisMonth = kpiReport.new_loan_this_month;
                 const injected = kpiReport.total_injected_capital;
-                const deployed = kpiReport.deployed_capital;       // 在押资金 = 活跃订单 loan_amount 之和（实时）
-                // 可动用资金 = 总现金流水余额（保险柜 + 银行），反映真实可用现金，与订单金额同步
-                const _cf = detailsData?.cashFlow;
-                const cashBalance  = (_cf?.cash?.balance)  || 0;
-                const bankBalance  = (_cf?.bank?.balance)  || 0;
-                const cashIncome   = (_cf?.cash?.income)   || 0;
-                const cashExpense  = (_cf?.cash?.expense)  || 0;
-                const bankIncome   = (_cf?.bank?.income)   || 0;
-                const bankExpense  = (_cf?.bank?.expense)  || 0;
-                const available    = cashBalance + bankBalance;    // 可动用 = 保险柜余额 + 银行余额
+                const deployed = kpiReport.deployed_capital;
+                const available = kpiReport.available_capital;
                 const utilizationRate = injected > 0 ? ((deployed / injected) * 100).toFixed(1) : '0';
+                const cashBalance = 0, bankBalance = 0, cashIncome = 0, cashExpense = 0, bankIncome = 0, bankExpense = 0;
                 const activeNormal = activeOrders - overdueOrders;
 
                 const donutData = [
@@ -984,59 +971,92 @@
     if (!window.APP) { window.APP = DashboardCore; }
     else { for (const key of Object.keys(DashboardCore)) { if (typeof DashboardCore[key] === 'function' && !window.APP[key]) window.APP[key] = DashboardCore[key].bind(DashboardCore); } window.APP.navigateTo = DashboardCore.navigateTo.bind(DashboardCore); window.APP.goBack = DashboardCore.goBack.bind(DashboardCore); window.APP.refreshCurrentPage = DashboardCore.refreshCurrentPage.bind(DashboardCore); window.APP.renderDashboard = DashboardCore.renderDashboard.bind(DashboardCore); window.APP.logout = DashboardCore.logout.bind(DashboardCore); window.APP.forceRecovery = DashboardCore.forceRecovery.bind(DashboardCore); window.APP.invalidateDashboardCache = DashboardCore.invalidateDashboardCache.bind(DashboardCore); window.APP.toggleLanguage = DashboardCore.toggleLanguage.bind(DashboardCore); window.APP.login = DashboardCore.login.bind(DashboardCore); window.APP.renderLogin = DashboardCore.renderLogin.bind(DashboardCore); window.APP.init = DashboardCore.init.bind(DashboardCore); }
 
-    window.APP.runBatchRepair = async function() {
+    // 全面修复函数（替代原来的 runBatchRepair）
+    window.APP.runFullSystemRepair = async function() {
         const lang = Utils.lang;
         const btn = document.getElementById('dataRepairBtn');
         const progressBox = document.getElementById('dataRepairProgress');
         const progressBar = document.getElementById('dataRepairProgressBar');
         const progressText = document.getElementById('dataRepairProgressText');
-        const currentOrder = document.getElementById('dataRepairCurrentOrder');
+        const currentSpan = document.getElementById('dataRepairCurrentOrder');
         const resultBox = document.getElementById('dataRepairResult');
 
         const confirmed = await Utils.toast.confirm(lang === 'id'
-            ? '🔧 Mulai perbaikan semua pesanan?\n\nProses ini akan menyinkronkan ulang catatan biaya admin/layanan di SEMUA pesanan.\nTidak dapat dibatalkan. Lanjutkan?'
-            : '🔧 确认开始批量修复？\n\n将对所有订单的管理费/服务费进行清理和重新同步。\n此操作不可撤销，确认继续？');
+            ? '🔧 Mulai perbaikan menyeluruh?\n\nProses ini akan:\n1. Menyinkronkan biaya admin/layanan semua pesanan\n2. Membersihkan arus kas yatim piatu & duplikat\n3. Melengkapi pencairan pinjaman yang hilang\n\n⚠️ Cadangkan data terlebih dahulu!\n\nLanjutkan?'
+            : '🔧 开始全面修复？\n\n将执行：\n1. 同步所有订单的管理费/服务费流水\n2. 清理孤立/重复流水\n3. 补录缺失的贷款发放流水\n\n⚠️ 请先备份数据！\n\n确认继续？');
         if (!confirmed) return;
 
-        if (btn) { btn.disabled = true; btn.textContent = lang === 'id' ? '⏳ Sedang diproses...' : '⏳ 处理中，请稍候...'; }
+        if (btn) { btn.disabled = true; btn.textContent = lang === 'id' ? '⏳ Memproses...' : '⏳ 处理中...'; }
         if (progressBox) progressBox.style.display = 'block';
         if (resultBox) resultBox.style.display = 'none';
 
+        const updateProgress = (step, current, total, detail = '') => {
+            const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (progressText) progressText.textContent = `${step}: ${current}/${total} (${pct}%)`;
+            if (currentSpan) currentSpan.textContent = detail;
+        };
+
+        let finalResult = { total: 0, success: 0, failed: 0, failedList: [] };
+
         try {
-            const result = await SUPABASE.batchRepairAllOrderFees(function(p) {
-                const pct = Math.round((p.current / p.total) * 100);
-                if (progressBar) progressBar.style.width = pct + '%';
-                if (progressText) progressText.textContent = p.current + ' / ' + p.total + ' (' + pct + '%)';
-                if (currentOrder) currentOrder.textContent = p.orderId;
+            // 步骤1：批量修复订单费用
+            updateProgress(lang === 'id' ? '同步订单费用' : '同步订单费用', 0, 1, lang === 'id' ? 'Mempersiapkan...' : '准备中...');
+            finalResult = await SUPABASE.batchRepairAllOrderFees(function(p) {
+                updateProgress(lang === 'id' ? '同步订单费用' : '同步订单费用', p.current, p.total, p.orderId);
             });
 
-            if (progressBar) progressBar.style.width = '100%';
-            if (currentOrder) currentOrder.textContent = '';
+            // 步骤2：诊断并清理孤立/重复流水
+            updateProgress(lang === 'id' ? 'Diagnosa arus kas' : '诊断现金流', 0, 1);
+            const diagnose = await SUPABASE.diagnoseCashFlow();
+            let orphanCleaned = 0, dupCleaned = 0;
 
-            const isAllOk = result.failed === 0;
-            const summaryColor = isAllOk ? '#16a34a' : '#dc2626';
-            const summaryIcon = isAllOk ? '✅' : '⚠️';
-            const failedHtml = result.failedList.length > 0
+            if (diagnose.totalOrphaned > 0) {
+                updateProgress(lang === 'id' ? 'Membersihkan arus kas yatim' : '清理孤立流水', 0, diagnose.totalOrphaned);
+                await SUPABASE.voidCashFlowBatch(diagnose.orphaned.map(o => o.id));
+                orphanCleaned = diagnose.totalOrphaned;
+            }
+            if (diagnose.totalDuplicates > 0) {
+                updateProgress(lang === 'id' ? 'Membersihkan arus kas duplikat' : '清理重复流水', 0, diagnose.totalDuplicates);
+                await SUPABASE.voidCashFlowBatch(diagnose.duplicates.map(d => d.id));
+                dupCleaned = diagnose.totalDuplicates;
+            }
+
+            // 步骤3：补录缺失的贷款发放流水
+            updateProgress(lang === 'id' ? 'Melengkapi pencairan hilang' : '补录缺失发放', 0, 1);
+            const missingResult = await SUPABASE.generateMissingDisbursements();
+
+            if (progressBar) progressBar.style.width = '100%';
+            const summaryColor = finalResult.failed === 0 ? '#16a34a' : '#dc2626';
+            const summaryIcon = finalResult.failed === 0 ? '✅' : '⚠️';
+            const failedHtml = finalResult.failedList.length > 0
                 ? '<div style="margin-top:10px;font-size:12px;color:#dc2626;"><b>' + (lang === 'id' ? 'Gagal:' : '失败订单：') + '</b><br>' +
-                  result.failedList.map(f => f.order_id + ': ' + f.error).join('<br>') + '</div>'
+                  finalResult.failedList.slice(0,5).map(f => f.order_id + ': ' + f.error).join('<br>') + '</div>'
                 : '';
 
             if (resultBox) {
                 resultBox.style.display = 'block';
-                resultBox.innerHTML = '<div style="padding:16px;border-radius:8px;background:' + (isAllOk ? '#f0fdf4' : '#fef2f2') + ';border:1px solid ' + (isAllOk ? '#bbf7d0' : '#fecaca') + ';color:' + summaryColor + ';">' +
+                resultBox.innerHTML = '<div style="padding:16px;border-radius:8px;background:' + (finalResult.failed === 0 ? '#f0fdf4' : '#fef2f2') + ';border:1px solid ' + (finalResult.failed === 0 ? '#bbf7d0' : '#fecaca') + ';color:' + summaryColor + ';">' +
                     '<div style="font-size:16px;font-weight:bold;margin-bottom:6px;">' + summaryIcon + ' ' + (lang === 'id' ? 'Selesai' : '修复完成') + '</div>' +
                     '<div style="font-size:13px;line-height:1.8;">' +
-                    '📦 ' + (lang === 'id' ? 'Total pesanan' : '订单总数') + ': <b>' + result.total + '</b><br>' +
-                    '✅ ' + (lang === 'id' ? 'Berhasil' : '成功') + ': <b>' + result.success + '</b><br>' +
-                    (result.failed > 0 ? '❌ ' + (lang === 'id' ? 'Gagal' : '失败') + ': <b>' + result.failed + '</b>' : '') +
+                    '📦 ' + (lang === 'id' ? 'Total pesanan' : '订单总数') + ': <b>' + finalResult.total + '</b><br>' +
+                    '✅ ' + (lang === 'id' ? 'Berhasil' : '成功') + ': <b>' + finalResult.success + '</b><br>' +
+                    (finalResult.failed > 0 ? '❌ ' + (lang === 'id' ? 'Gagal' : '失败') + ': <b>' + finalResult.failed + '</b><br>' : '') +
+                    '🗑️ ' + (lang === 'id' ? 'Arus kas yatim dibersihkan' : '清理孤立流水') + ': <b>' + orphanCleaned + '</b><br>' +
+                    '⚠️ ' + (lang === 'id' ? 'Arus kas duplikat dibersihkan' : '清理重复流水') + ': <b>' + dupCleaned + '</b><br>' +
+                    '🔄 ' + (lang === 'id' ? 'Pencairan hilang dilengkapi' : '补录缺失发放') + ': <b>' + missingResult.created + '/' + missingResult.missing + '</b>' +
                     '</div>' + failedHtml + '</div>';
             }
             if (window.JF && JF.Cache) JF.Cache.clear();
-            Utils.toast.success(lang === 'id' ? '✅ Perbaikan selesai! ' + result.success + ' pesanan berhasil.' : '✅ 批量修复完成！成功 ' + result.success + ' 笔，失败 ' + result.failed + ' 笔。', 6000);
+            Utils.toast.success(lang === 'id' ? '✅ Perbaikan selesai! ' + finalResult.success + ' pesanan berhasil.' : '✅ 批量修复完成！成功 ' + finalResult.success + ' 笔。', 6000);
         } catch (e) {
             Utils.toast.error(e.message || (lang === 'id' ? 'Gagal memulai perbaikan' : '批量修复启动失败'));
+            if (resultBox) {
+                resultBox.style.display = 'block';
+                resultBox.innerHTML = '<div style="padding:16px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;"><strong>❌ ' + (lang === 'id' ? 'Perbaikan gagal' : '修复失败') + '</strong><br>' + e.message + '</div>';
+            }
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = '🔧 ' + (lang === 'id' ? 'Mulai Perbaikan Semua Pesanan' : '开始批量修复所有订单'); }
+            if (btn) { btn.disabled = false; btn.textContent = lang === 'id' ? '🔧 Mulai Perbaikan Semua Pesanan' : '🔧 开始批量修复所有订单'; }
         }
     };
 
