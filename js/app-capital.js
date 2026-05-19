@@ -862,11 +862,7 @@
                 }
                 tbody.innerHTML = rows;
             }
-        }
-    };
-
-    // 挂载到命名空间
-    JF.CapitalModule = CapitalModule;
+        },  // end _loadCapitalAccounting — continue CapitalModule
 
         // ==================== 月度资金健康报表 ====================
         async buildFundHealthReportHTML() {
@@ -1062,7 +1058,12 @@
                         : '「本金回笼」单独列示，<strong>不计入</strong>真实收入和净利润，因为它是您的自有资金归位，与损益无关。'}
                 </div>
             </div>`;
-        },
+        },  // end buildFundHealthReportHTML
+
+    };  // end CapitalModule
+
+    // 挂载到命名空间
+    JF.CapitalModule = CapitalModule;
 
     // ==================== 向下兼容挂载 ====================
     if (window.APP) {

@@ -72,8 +72,8 @@
                         rows += `<tr class="data-row">
                             <td class="col-id">${customerId}</td>
                             <td class="col-name">${name}</td>
-                            <td class="col-phone">${phone}</td>
                             <td class="col-ktp">${ktpNumber}</td>
+                            <td class="col-phone">${phone}</td>
                             <td class="col-occupation">${occupation}</td>
                             <td class="text-center">${createBtnHtml}</td>
                             <td class="text-center"><button onclick="APP.showCustomerDetailCard('${Utils.escapeAttr(c.id)}')" class="btn btn--sm">📋 ${t('detail')}</button></td>
