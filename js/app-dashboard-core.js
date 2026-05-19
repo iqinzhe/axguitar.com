@@ -836,7 +836,28 @@
                             <div class="fund-block fund-block--deployed"><div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div><div class="fund-block-val">${Utils.formatCurrency(deployed)}</div><div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div>
                             <div class="fund-block fund-block--free"><div class="fund-block-label">${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</div><div class="fund-block-val">${Utils.formatCurrency(available)}</div><div class="fund-block-sub">${lang === 'id' ? 'Kas + Bank' : '现金 + 银行'}</div></div>
                         </div>
-                        <div class="util-bar-wrap"><div class="util-bar-label"><span>${lang === 'id' ? 'Tingkat Utilisasi' : '资金利用率'}</span><span class="util-bar-pct">${utilizationRate}%</span></div><div class="util-bar-track"><div class="util-bar-fill" style="width:${Math.min(utilizationRate, 100)}%;"></div></div></div>
+                        <div class="util-bar-wrap">
+                            <div class="util-bar-label"><span>${lang === 'id' ? 'Tingkat Utilisasi Modal' : '资金利用率'}</span><span class="util-bar-pct">${utilizationRate}%</span></div>
+                            <div class="util-bar-track"><div class="util-bar-fill" style="width:${Math.min(utilizationRate, 100)}%;"></div></div>
+                            <div style="font-size:0.68rem;color:var(--gray-500);display:flex;justify-content:space-between;margin-top:2px;">
+                                <span>${lang === 'id' ? 'Ideal: 70–90%' : '建议区间：70–90%'}</span>
+                                <span>${utilizationRate < 30 ? (lang === 'id' ? '⚠️ Utilisasi rendah' : '⚠️ 利用率偏低') : utilizationRate > 90 ? (lang === 'id' ? '⚠️ Terlalu tinggi' : '⚠️ 利用率偏高') : (lang === 'id' ? '✅ Normal' : '✅ 正常')}</span>
+                            </div>
+                        </div>
+                        <div class="fund-stat-row">
+                            <div class="fund-stat-item">
+                                <div class="fund-stat-icon">📥</div>
+                                <div><div class="fund-stat-label">${lang === 'id' ? 'Pinjaman Baru (bln ini)' : '本月新增当金'}</div><div class="fund-stat-val">${Utils.formatCurrency(newLoanThisMonth)}</div><div class="fund-stat-sub">${newThisMonth} ${lang === 'id' ? 'pesanan baru' : '笔新订单'}</div></div>
+                            </div>
+                            <div class="fund-stat-item">
+                                <div class="fund-stat-icon">⏰</div>
+                                <div><div class="fund-stat-label">${lang === 'id' ? 'Jatuh Tempo 7 Hari' : '7日内到期'}</div><div class="fund-stat-val" style="color:${dueOrders.length > 0 ? '#d97706' : '#16a34a'}">${dueOrders.length} ${lang === 'id' ? 'pesanan' : '笔'}</div><div class="fund-stat-sub">${lang === 'id' ? 'Perlu ditindaklanjuti' : '需跟进催收'}</div></div>
+                            </div>
+                            <div class="fund-stat-item">
+                                <div class="fund-stat-icon">⚠️</div>
+                                <div><div class="fund-stat-label">${lang === 'id' ? 'Pesanan Terlambat' : '逾期订单'}</div><div class="fund-stat-val" style="color:${overdueOrders > 0 ? '#dc2626' : '#16a34a'}">${overdueOrders} ${lang === 'id' ? 'pesanan' : '笔'}</div><div class="fund-stat-sub">${lang === 'id' ? 'Sudah lewat jatuh tempo' : '已超还款日'}</div></div>
+                            </div>
+                        </div>
                         <div class="cash-bank-row">
                             <div class="cash-bank-item"><div class="cb-label">🏦 ${lang === 'id' ? 'Brankas (Tunai)' : '保险柜（现金）'}</div><div class="cb-val">${Utils.formatCurrency(cashBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(cashIncome)}</span><span class="out">↓ −${Utils.formatCurrency(cashExpense)}</span></div></div>
                             <div class="cash-bank-item"><div class="cb-label">🏧 ${lang === 'id' ? 'Bank BNI' : '银行 BNI'}</div><div class="cb-val">${Utils.formatCurrency(bankBalance)}</div><div class="cb-flow"><span class="in">↑ +${Utils.formatCurrency(bankIncome)}</span><span class="out">↓ −${Utils.formatCurrency(bankExpense)}</span></div></div>
