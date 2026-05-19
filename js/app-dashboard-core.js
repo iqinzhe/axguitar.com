@@ -839,7 +839,7 @@
                         <div class="util-bar-wrap">
                             <div class="util-bar-label"><span>${lang === 'id' ? 'Tingkat Utilisasi Modal' : '资金利用率'}</span><span class="util-bar-pct">${utilizationRate}%</span></div>
                             <div class="util-bar-track"><div class="util-bar-fill" style="width:${Math.min(utilizationRate, 100)}%;"></div></div>
-                            <div style="font-size:0.68rem;color:var(--gray-500);display:flex;justify-content:space-between;margin-top:2px;">
+                            <div style="display:flex;justify-content:space-between;color:var(--gray-500);margin-top:2px;">
                                 <span>${lang === 'id' ? 'Ideal: 70–90%' : '建议区间：70–90%'}</span>
                                 <span>${utilizationRate < 30 ? (lang === 'id' ? '⚠️ Utilisasi rendah' : '⚠️ 利用率偏低') : utilizationRate > 90 ? (lang === 'id' ? '⚠️ Terlalu tinggi' : '⚠️ 利用率偏高') : (lang === 'id' ? '✅ Normal' : '✅ 正常')}</span>
                             </div>
