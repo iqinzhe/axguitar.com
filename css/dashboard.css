@@ -339,9 +339,28 @@
     padding: 12px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 8px;
   }
   .fund-flow-card:hover, .income-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+
+  .fund-stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .fund-stat-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    background: #f4f8fb;
+    border: 1px solid #dde8f0;
+    border-radius: 9px;
+    padding: 9px 8px;
+  }
+  .fund-stat-icon { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+  .fund-stat-label { font-size: 0.65rem; color: var(--gray-500); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+  .fund-stat-val { font-size: var(--font-sm); font-weight: 700; color: var(--gray-800); font-family: var(--font-mono); }
+  .fund-stat-sub { font-size: 0.62rem; color: var(--gray-500); margin-top: 2px; }
 
   .fund-total-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
   .fund-block { border-radius: 9px; padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -358,13 +377,13 @@
   .fund-block--free      .fund-block-val { color: #14532d; }
   .fund-block-sub { font-size: 0.65rem; color: var(--gray-500); }
 
-  .util-bar-wrap { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+  .util-bar-wrap { display: flex; flex-direction: column; gap: 4px; margin: 0; }
   .util-bar-label { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--gray-600); }
   .util-bar-pct { font-weight: 700; color: var(--amber-500); }
   .util-bar-track { height: 8px; background: var(--gray-100); border-radius: 8px; overflow: hidden; }
   .util-bar-fill { height: 100%; background: var(--gradient-util-bar); border-radius: 8px; transition: width 0.6s ease; }
 
-  .cash-bank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .cash-bank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0; }
   .cash-bank-item {
     background: #f4f8fb;
     border: 1px solid #c8d8e8;
