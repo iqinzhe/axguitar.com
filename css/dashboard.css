@@ -529,16 +529,40 @@
     .kpi-card { grid-column: span 10; }
     .kpi-card--calendar { grid-column: span 14; }
 
-    .mid-row { display: grid; grid-template-columns: repeat(44, 1fr); gap: 10px; }
-    .fund-flow-card { grid-column: span 30; }
-    .income-card { grid-column: span 14; }
+    /* mid-row：2行 × 44列 */
+    .mid-row {
+      display: grid;
+      grid-template-columns: repeat(44, 1fr);
+      grid-auto-rows: auto;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .fund-flow-card    { grid-column: 1 / span 30;  grid-row: 1; }
+    .income-card       { grid-column: 31 / span 14; grid-row: 1 / 3; } /* 跨两行，底部与订单状态卡对齐 */
+    .order-status-card { grid-column: 1 / span 30;  grid-row: 2; }
 
-    .bottom-row { display: grid; grid-template-columns: repeat(44, 1fr); gap: 10px; }
-    .quick-card { grid-column: span 15; }
-    .order-status-card { grid-column: span 15; }
-    .message-center-card { grid-column: span 14; }
+    /* bottom-row 桌面隐藏（快捷操作仅手机端用） */
+    .bottom-row { display: none !important; }
+  }
 
-    .quick-card, .order-status-card, .message-center-card { min-width: 0; }
+  /* 收入构成卡底部嵌入消息中心 */
+  .income-msg-divider {
+    border-top: 1px dashed var(--border-light);
+    margin: 10px 0 8px;
+  }
+  .income-msg-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .income-msg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  /* mobile-only：桌面隐藏，手机显示 */
+  .mobile-only { display: none !important; }
+  @media (max-width: 768px) {
+    .mobile-only { display: flex !important; }
+    .income-msg-divider,
+    .income-msg-section { display: none !important; } /* 手机端收入构成不嵌入消息中心 */
   }
 
   /* 移动端 */
@@ -588,13 +612,17 @@
     body.menu-open { overflow: hidden; position: fixed; width: 100%; }
 
     .dash-main > * { order: 0; }
-    .message-center-card { order: 1 !important; }
+    .message-preview { order: 1 !important; }
+    .income-msg-section { order: 1 !important; }
     .quick-card { order: 2 !important; }
     .income-card { order: 3 !important; }
     .kpi-row, .mid-row, .fund-flow-card, .cash-bank-row, .transfer-row-v2, .util-bar-wrap { order: 4 !important; }
     .order-status-card { order: 999 !important; margin-top: 10px; }
 
-    .bottom-row { display: contents !important; }
+    /* 手机端恢复 bottom-row 和 mid-row 内新增卡片的显示 */
+    .bottom-row { display: flex !important; flex-direction: column; gap: 10px; }
+    .income-msg-divider { display: none; } /* 手机端收入构成卡不嵌入消息中心，避免重复 */
+    .income-msg-section { display: none; } /* 手机端消息中心独立显示 */
     .kpi-row { grid-template-columns: 1fr 1fr !important; gap: 8px; }
     .mid-row, .fund-total-row, .cash-bank-row { grid-template-columns: 1fr; gap: 12px; }
     .income-card { margin-top: 10px; border-top: 2px solid var(--border-light); padding-top: 18px; }
