@@ -880,12 +880,24 @@
                             </div>
                             <div class="np-val" id="netProfitVal">${Utils.formatCurrency(netProfitInitial)}</div>
                         </div>
+                        <!-- 消息中心嵌入收入构成卡片底部，桌面端与资金结构总览右侧对齐 -->
+                        <div class="income-msg-divider"></div>
+                        <div class="income-msg-section">
+                            <div class="income-msg-header">
+                                <span class="card-title" style="font-size:var(--font-sm)">💬 ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</span>
+                                <span class="card-action" onclick="JF.MessageCenter.showMessageCenter()" style="font-size:12px;cursor:pointer;color:var(--primary)">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</span>
+                            </div>
+                            <div class="message-preview">${previewHtml}</div>
+                        </div>
                     </div>
+                    <!-- 订单状态分布：桌面端第二行左侧 30 列 -->
+                    <div class="order-status-card"><div class="card-header"><div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div></div><div class="donut-area"><svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="none" stroke="#f1f5f9" stroke-width="14"/>${donutPaths}<text x="50" y="48" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a2e" font-family="var(--font-mono)">${totalOrders}</text><text x="50" y="60" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="var(--font-sans)">${lang === 'id' ? 'Total Pesanan' : '总订单'}</text></svg><div class="donut-legend">${donutData.map(d => `<div class="legend-item"><div class="legend-dot" style="background:${d.color}"></div><div><div class="legend-name">${d.label}</div><div class="legend-pct">${d.pct}%</div></div><div class="legend-count">${d.count}</div></div>`).join('')}</div></div></div>
                 </div>
                 <div class="bottom-row">
+                    <!-- 快捷操作：桌面端隐藏，手机端显示 -->
                     <div class="quick-card"><div class="card-header"><div class="card-title">⚡ ${lang === 'id' ? 'Aksi Cepat' : '快捷操作'}</div></div><div class="quick-grid">${quickActionsHtml}</div></div>
-                    <div class="order-status-card"><div class="card-header"><div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div></div><div class="donut-area"><svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="none" stroke="#f1f5f9" stroke-width="14"/>${donutPaths}<text x="50" y="48" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a2e" font-family="var(--font-mono)">${totalOrders}</text><text x="50" y="60" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="var(--font-sans)">${lang === 'id' ? 'Total Pesanan' : '总订单'}</text></svg><div class="donut-legend">${donutData.map(d => `<div class="legend-item"><div class="legend-dot" style="background:${d.color}"></div><div><div class="legend-name">${d.label}</div><div class="legend-pct">${d.pct}%</div></div><div class="legend-count">${d.count}</div></div>`).join('')}</div></div></div>
-                    <div class="message-center-card" style="display:flex; flex-direction:column;"><div class="card-header"><div class="card-title">💬 ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</div><div class="card-action" onclick="JF.MessageCenter.showMessageCenter()">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div></div><div class="message-preview">${previewHtml}</div></div>
+                    <!-- 消息中心（手机端独立显示，桌面端由 income-card 内嵌） -->
+                    <div class="message-center-card mobile-only" style="display:flex; flex-direction:column;"><div class="card-header"><div class="card-title">💬 ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</div><div class="card-action" onclick="JF.MessageCenter.showMessageCenter()">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div></div><div class="message-preview">${previewHtml}</div></div>
                 </div>
             </div>
         </div>`;
