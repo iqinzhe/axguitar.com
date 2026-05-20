@@ -983,47 +983,47 @@
 
             <!-- 顶部摘要卡片 -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px;">
-                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid #16a34a">
-                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">💰 ${lang === 'id' ? 'Pendapatan Nyata (6 bln)' : '真实收入（6个月）'}</div>
-                    <div style="font-size:20px;font-weight:800;color:#16a34a">${fmt(totals.trueIncome)}</div>
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Bunga + Admin + Layanan' : '利息 + 管理费 + 服务费'}</div>
+                <div class="card summary-card" style="text-align:center;padding:16px 12px;border-top:4px solid #16a34a">
+                    <div class="s-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">💰 ${lang === 'id' ? 'Pendapatan Nyata (6 bln)' : '真实收入（6个月）'}</div>
+                    <div class="s-val" style="font-size:20px;font-weight:800;color:#16a34a">${fmt(totals.trueIncome)}</div>
+                    <div class="s-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Bunga + Admin + Layanan' : '利息 + 管理费 + 服务费'}</div>
                 </div>
-                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid #ef4444">
-                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📤 ${lang === 'id' ? 'Pengeluaran (6 bln)' : '运营支出（6个月）'}</div>
-                    <div style="font-size:20px;font-weight:800;color:#ef4444">−${fmt(totals.exp)}</div>
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Biaya operasional' : '独立核算，非资金流转'}</div>
+                <div class="card summary-card" style="text-align:center;padding:16px 12px;border-top:4px solid #ef4444">
+                    <div class="s-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📤 ${lang === 'id' ? 'Pengeluaran (6 bln)' : '运营支出（6个月）'}</div>
+                    <div class="s-val" style="font-size:20px;font-weight:800;color:#ef4444">−${fmt(totals.exp)}</div>
+                    <div class="s-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Biaya operasional' : '独立核算，非资金流转'}</div>
                 </div>
-                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid ${totals.netProfit >= 0 ? '#0e7490' : '#dc2626'}">
-                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📊 ${lang === 'id' ? 'Laba Bersih (6 bln)' : '净利润（6个月）'}</div>
-                    <div style="font-size:20px;font-weight:800;${profitColor(totals.netProfit)}">${fmt(totals.netProfit)}</div>
-                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Pendapatan − Pengeluaran' : '真实收入 − 运营支出'}</div>
+                <div class="card summary-card" style="text-align:center;padding:16px 12px;border-top:4px solid ${totals.netProfit >= 0 ? '#0e7490' : '#dc2626'}">
+                    <div class="s-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📊 ${lang === 'id' ? 'Laba Bersih (6 bln)' : '净利润（6个月）'}</div>
+                    <div class="s-val" style="font-size:20px;font-weight:800;${profitColor(totals.netProfit)}">${fmt(totals.netProfit)}</div>
+                    <div class="s-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px">${lang === 'id' ? 'Pendapatan − Pengeluaran' : '真实收入 − 运营支出'}</div>
                 </div>
-                <div class="card" style="text-align:center;padding:16px 12px;border-top:4px solid ${healthColor}">
-                    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🏦 ${lang === 'id' ? 'Kesehatan Dana' : '资金健康度'}</div>
-                    <div style="font-size:20px;font-weight:800;color:${healthColor}">${healthScore}分</div>
-                    <div style="font-size:12px;font-weight:600;color:${healthColor};margin-top:2px">${healthLabel}</div>
+                <div class="card summary-card" style="text-align:center;padding:16px 12px;border-top:4px solid ${healthColor}">
+                    <div class="s-label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🏦 ${lang === 'id' ? 'Kesehatan Dana' : '资金健康度'}</div>
+                    <div class="s-val" style="font-size:20px;font-weight:800;color:${healthColor}">${healthScore}分</div>
+                    <div class="s-sub" style="font-size:12px;font-weight:600;color:${healthColor};margin-top:2px">${healthLabel}</div>
                 </div>
             </div>
 
             <!-- 资金结构说明 -->
             <div class="card" style="margin-bottom:16px;border-left:4px solid var(--primary)">
                 <div class="card-header"><div class="card-title">🔄 ${lang === 'id' ? 'Struktur Modal Saat Ini' : '当前资金结构'}</div></div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:4px 0 8px">
-                    <div style="text-align:center">
-                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '💼 Total Modal Disetor' : '💼 总投入资本'}</div>
-                        <div style="font-size:17px;font-weight:700">${fmt(totalInjected)}</div>
+                <div class="fund-struct" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:4px 0 8px">
+                    <div class="fund-struct-item" style="text-align:center">
+                        <div class="fs-label" style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '💼 Total Modal Disetor' : '💼 总投入资本'}</div>
+                        <div class="fs-val" style="font-size:17px;font-weight:700">${fmt(totalInjected)}</div>
                     </div>
-                    <div style="text-align:center">
-                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '📤 Dalam Gadai (Modal Keluar)' : '📤 在押资金（资金出口②）'}</div>
-                        <div style="font-size:17px;font-weight:700;color:var(--primary)">${fmt(deployedNow)}</div>
+                    <div class="fund-struct-item" style="text-align:center">
+                        <div class="fs-label" style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '📤 Dalam Gadai (Modal Keluar)' : '📤 在押资金（资金出口②）'}</div>
+                        <div class="fs-val" style="font-size:17px;font-weight:700;color:var(--primary)">${fmt(deployedNow)}</div>
                     </div>
-                    <div style="text-align:center">
-                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '🔄 Pokok Kembali (Bukan Pendapatan)' : '🔄 已回笼本金（非收入）'}</div>
-                        <div style="font-size:17px;font-weight:700;color:#94a3b8">${fmt(totalPrincipalBack)}</div>
+                    <div class="fund-struct-item" style="text-align:center">
+                        <div class="fs-label" style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '🔄 Pokok Kembali (Bukan Pendapatan)' : '🔄 已回笼本金（非收入）'}</div>
+                        <div class="fs-val" style="font-size:17px;font-weight:700;color:#94a3b8">${fmt(totalPrincipalBack)}</div>
                     </div>
-                    <div style="text-align:center">
-                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '📈 Utilisasi Modal' : '📈 资金利用率'}</div>
-                        <div style="font-size:17px;font-weight:700;color:${utilizationRate > 85 ? '#d97706' : '#16a34a'}">${utilizationRate.toFixed(1)}%</div>
+                    <div class="fund-struct-item" style="text-align:center">
+                        <div class="fs-label" style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${lang === 'id' ? '📈 Utilisasi Modal' : '📈 资金利用率'}</div>
+                        <div class="fs-val" style="font-size:17px;font-weight:700;color:${utilizationRate > 85 ? '#d97706' : '#16a34a'}">${utilizationRate.toFixed(1)}%</div>
                     </div>
                 </div>
                 <div style="font-size:11px;color:var(--text-muted);padding:8px;background:var(--bg-highlight);border-radius:6px;line-height:1.6">
@@ -1131,10 +1131,18 @@ tbody tr:last-child { font-weight: 700; background: #f8fafc; border-top: 2px sol
 /* 说明框 */
 .note-box { font-size: 7pt; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px 8px; margin-top: 8px; line-height: 1.5; }
 
+/* card 通用边框（打印时确保显示） */
+.card { border: 1px solid #e2e8f0; border-radius: 5px; padding: 8px; margin-bottom: 8px; break-inside: avoid; }
+.card-header { font-size: 9pt; font-weight: 700; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+
 @media print {
     @page { size: A4 landscape; margin: 8mm; }
     body { margin: 0; padding: 0; }
     .print-wrap { padding: 0; }
+    /* 确保 card 边框在打印时显示 */
+    .card { border: 1px solid #cbd5e1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .summary-card { border: 1px solid #cbd5e1 !important; }
+    .fund-struct { border: 1px solid #cbd5e1 !important; }
 }
 </style>
 </head>

@@ -56,6 +56,7 @@
                         const phone = Utils.escapeHtml(c.phone || '-');
                         const ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
                         const occupation = Utils.escapeHtml(c.occupation || '-');
+                        const address = Utils.escapeHtml(c.ktp_address || c.address || '-');
 
                         const hasActiveOrders = activeOrderMap[c.id] && activeOrderMap[c.id].length > 0;
                         let createBtnHtml;
@@ -75,6 +76,7 @@
                             <td class="col-phone">${phone}</td>
                             <td class="col-ktp">${ktpNumber}</td>
                             <td class="col-occupation">${occupation}</td>
+                            <td class="col-address">${address}</td>
                             <td class="text-center">${createBtnHtml}</td>
                             <td class="text-center"><button onclick="APP.showCustomerDetailCard('${Utils.escapeAttr(c.id)}')" class="btn btn--sm">📋 ${t('detail')}</button></td>
                         </tr>`;
@@ -113,6 +115,7 @@
                                                 <th class="col-phone">${t('phone')}</th>
                                                 <th class="col-ktp">${t('ktp_number')}</th>
                                                 <th class="col-occupation">${t('occupation')}</th>
+                                                <th class="col-address">${lang === 'id' ? 'Alamat' : '地址'}</th>
                                                 <th class="text-center">${t('create_order_for')}</th>
                                                 <th class="text-center">${t('action')}</th>
                                             </tr>
@@ -153,6 +156,7 @@
                                             <th class="col-phone">${t('phone')}</th>
                                             <th class="col-ktp">${t('ktp_number')}</th>
                                             <th class="col-occupation">${t('occupation')}</th>
+                                            <th class="col-address">${lang === 'id' ? 'Alamat' : '地址'}</th>
                                             <th class="text-center">${t('create_order_for')}</th>
                                             <th class="text-center">${t('action')}</th>
                                         </tr>
