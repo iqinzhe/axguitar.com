@@ -1,4 +1,5 @@
-// app-dashboard-core.js - v2.1 (JF 命名空间)  
+// app-dashboard-core.js - v2.2 (JF 命名空间)  
+// 修复：KPI 缓存损坏检测与自动恢复
 // localStorage 敏感信息移除, 日历 HTML 结构, 记住用户名加密, 闲置登出审计
 // 数据修复功能：全面修复（订单费用同步 + 现金流清理 + 缺失发放补录）
 // 修复【重要】：KPI收入构成统计现已包含 completed（已结清）订单的管理费/服务费/利息/本金
@@ -9,6 +10,9 @@
 (function () {
     const JF = window.JF || {};
     window.JF = JF;
+
+    // 仪表盘缓存版本号 - 更新时自动清除旧缓存
+    const DASHBOARD_CACHE_VERSION = 'v2.2';
 
     // ========== 模块降级 ==========
     const ModuleFallback = {
@@ -145,6 +149,46 @@
         _isInitialized: false,
         _popStateNavigation: false,
         _enterProcessing: false,
+
+        // 检查并清理损坏的缓存
+        async _validateAndCleanCache() {
+            try {
+                // 1. 版本检查
+                const cachedVersion = localStorage.getItem('jf_dashboard_version');
+                if (cachedVersion !== DASHBOARD_CACHE_VERSION) {
+                    console.log('[Dashboard] 版本更新，清除旧缓存');
+                    JF.Cache.clear();
+                    localStorage.setItem('jf_dashboard_version', DASHBOARD_CACHE_VERSION);
+                    return;
+                }
+
+                // 2. 检查 KPI 缓存是否损坏（总订单为 0 但实际有订单）
+                const profile = await SUPABASE.getCurrentProfile();
+                if (profile) {
+                    const isAdmin = profile?.role === 'admin';
+                    const storeId = profile?.store_id;
+                    const cacheKey = 'dashboard_kpi_' + (isAdmin ? 'admin' : storeId);
+                    const cachedKpi = JF.Cache.getSync(cacheKey);
+                    
+                    if (cachedKpi && cachedKpi.total_orders === 0) {
+                        // 快速检查是否有订单数据
+                        const client = SUPABASE.getClient();
+                        let countQuery = client.from('orders').select('*', { count: 'exact', head: true });
+                        if (!isAdmin && storeId) {
+                            countQuery = countQuery.eq('store_id', storeId);
+                        }
+                        const { count, error } = await countQuery;
+                        
+                        if (!error && count && count > 0) {
+                            console.warn('[Dashboard] 检测到损坏的KPI缓存，已自动清除', { cacheKey, actualCount: count });
+                            JF.Cache.invalidate(cacheKey);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[Dashboard] 缓存验证失败:', e.message);
+            }
+        },
 
         _cleanupOverlays() {
             const overlay = document.getElementById('sidebarOverlay');
@@ -583,6 +627,10 @@
         // ========== 仪表盘渲染（核心 - 已优化数据并行加载）==========
         async originalRenderDashboard() {
             if (!AUTH.isLoggedIn()) { await this.renderLogin(); return; }
+            
+            // 修复：在渲染前验证并清理损坏的缓存
+            await this._validateAndCleanCache();
+            
             this.currentPage = 'dashboard';
             this.saveCurrentPageState();
             this._cleanupOverlays();
@@ -644,12 +692,10 @@
                         applyFilter(client.from('orders').select('status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at, custom_order_date, next_interest_due_date')),
                         (async () => {
                             try {
-                                // 本月新增：取本月内创建或自定义日期在本月的订单
                                 let q = client.from('orders').select('loan_amount, created_at, custom_order_date').gte('created_at', monthStart);
                                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                                 else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const r = await q;
-                                // 以 custom_order_date 优先判断是否在本月
                                 return (r.data || []).filter(o => {
                                     const effectiveDate = o.custom_order_date || o.created_at?.substring(0, 10);
                                     return effectiveDate >= monthStart;
@@ -672,7 +718,6 @@
                                 in7Days.setDate(in7Days.getDate() + 7);
                                 const todayStr = today.toISOString().split('T')[0];
                                 const in7DaysStr = in7Days.toISOString().split('T')[0];
-                                // 只取 next_interest_due_date 在今天到7天内（含今天、含逾期）的活跃订单
                                 const r = await applyFilter(
                                     client.from('orders')
                                         .select('order_id, customer_name, next_interest_due_date')
@@ -697,7 +742,6 @@
                         totalOrders++; totalLoanAll += (o.loan_amount || 0);
                         if (o.status === 'active') {
                             activeOrders++; totalLoanActive += (o.loan_amount || 0);
-                            // 实时计算逾期：next_interest_due_date < 今天 才算逾期
                             if (o.next_interest_due_date && o.next_interest_due_date < todayStr) overdueOrders++;
                         } else if (o.status === 'completed') { completedOrders++; }
                         if (o.status === 'active' || o.status === 'completed') {
@@ -776,7 +820,6 @@
 
                 const totalIncomeInitial = kpiReport.admin_fees_collected + kpiReport.service_fees_collected + kpiReport.interest_collected;
                 const principalCollected = kpiReport.principal_collected || 0;
-                // 三区分离：真实收入 / 本金流转 / 运营支出
                 const incomeItemsHtml = `
                   <div class="income-section">
                     <div class="income-section-title">💰 ${lang === 'id' ? 'Pendapatan Nyata' : '真实收入'}</div>
@@ -811,7 +854,6 @@
     <div class="kpi-card kpi-card--calendar">${calendarHTML}</div>
 </div>`;
 
-                // 构建侧边栏菜单
                 const sidebarMenuHtml = `
                 <div class="sidebar-nav">
                     <div class="nav-section-label">${lang === 'id' ? 'Menu Utama' : '主菜单'}</div>
@@ -907,13 +949,10 @@
                             <div class="np-val" id="netProfitVal">${Utils.formatCurrency(netProfitInitial)}</div>
                         </div>
                     </div>
-                    <!-- 订单状态分布：row 2 左侧 -->
                     <div class="order-status-card"><div class="card-header"><div class="card-title">🗂 ${lang === 'id' ? 'Distribusi Status Pesanan' : '订单状态分布'}</div></div><div class="donut-area"><svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="36" fill="none" stroke="#f1f5f9" stroke-width="14"/>${donutPaths}<text x="50" y="48" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a2e" font-family="var(--font-mono)">${totalOrders}</text><text x="50" y="60" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="var(--font-sans)">${lang === 'id' ? 'Total Pesanan' : '总订单'}</text></svg><div class="donut-legend">${donutData.map(d => `<div class="legend-item"><div class="legend-dot" style="background:${d.color}"></div><div><div class="legend-name">${d.label}</div><div class="legend-pct">${d.pct}%</div></div><div class="legend-count">${d.count}</div></div>`).join('')}</div></div></div>
-                    <!-- 消息中心：row 2 右侧，与收入构成同列 -->
                     <div class="message-center-card" style="display:flex;flex-direction:column;"><div class="card-header"><div class="card-title">💬 ${lang === 'id' ? 'Pusat Pesan' : '消息中心'}</div><div class="card-action" onclick="JF.MessageCenter.showMessageCenter()">${lang === 'id' ? 'Lihat Semua →' : '查看全部 →'}</div></div><div class="message-preview">${previewHtml}</div></div>
                 </div>
                 <div class="bottom-row">
-                    <!-- 快捷操作：桌面隐藏，手机端显示 -->
                     <div class="quick-card"><div class="card-header"><div class="card-title">⚡ ${lang === 'id' ? 'Aksi Cepat' : '快捷操作'}</div></div><div class="quick-grid">${quickActionsHtml}</div></div>
                 </div>
             </div>
@@ -1037,6 +1076,15 @@
 
         async init() {
             if (this._isInitialized) { console.warn('[DashboardCore] 已初始化，忽略重复调用'); return; }
+            
+            // 修复：初始化时检查版本并清除过期缓存
+            const cachedVersion = localStorage.getItem('jf_dashboard_version');
+            if (cachedVersion !== DASHBOARD_CACHE_VERSION) {
+                console.log('[Dashboard] 版本更新，清除旧缓存');
+                JF.Cache.clear();
+                localStorage.setItem('jf_dashboard_version', DASHBOARD_CACHE_VERSION);
+            }
+            
             ModuleFallback.clearAll();
             try {
                 await AUTH.init();
@@ -1084,13 +1132,11 @@
         let finalResult = { total: 0, success: 0, failed: 0, failedList: [] };
 
         try {
-            // 步骤1：批量修复订单费用
             updateProgress(lang === 'id' ? '同步订单费用' : '同步订单费用', 0, 1, lang === 'id' ? 'Mempersiapkan...' : '准备中...');
             finalResult = await SUPABASE.batchRepairAllOrderFees(function(p) {
                 updateProgress(lang === 'id' ? '同步订单费用' : '同步订单费用', p.current, p.total, p.orderId);
             });
 
-            // 步骤2：诊断并清理孤立/重复流水
             updateProgress(lang === 'id' ? 'Diagnosa arus kas' : '诊断现金流', 0, 1);
             const diagnose = await SUPABASE.diagnoseCashFlow();
             let orphanCleaned = 0, dupCleaned = 0;
@@ -1106,7 +1152,6 @@
                 dupCleaned = diagnose.totalDuplicates;
             }
 
-            // 步骤3：补录缺失的贷款发放流水
             updateProgress(lang === 'id' ? 'Melengkapi pencairan hilang' : '补录缺失发放', 0, 1);
             const missingResult = await SUPABASE.generateMissingDisbursements();
 
