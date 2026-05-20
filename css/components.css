@@ -253,6 +253,20 @@
   .col-collateral   { width: 15%; }
   .col-occupation   { width: 12%; }
 
+  /* 订单列表表格：固定最小宽度，超出时由 table-container 横向滚动接管 */
+  .order-table {
+    min-width: 1100px;
+    table-layout: fixed;
+  }
+  .order-table .col-id     { width: 96px; }
+  .order-table .col-name   { width: 140px; }
+  .order-table th:nth-child(3),
+  .order-table td:nth-child(3) { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .order-table .col-amount { width: 108px; }
+  .order-table .col-months { width: 86px; }
+  .order-table .col-date   { width: 94px; white-space: nowrap; }
+  .order-table .col-status { width: 78px; }
+
   /* ---------- 徽章系统 ---------- */
   .badge {
     display: inline-block;
