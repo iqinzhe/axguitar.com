@@ -1,5 +1,6 @@
 // app-dashboard-orders.js - v2.0 (完整版，五状态筛选 + 权限控制 + 所有功能完整 + 管理员可编辑利息/本金)
-// 修复：固定还款详情页重复显示“每期还款额”和“已还期数”；根据 payment_history 动态计算已还期数，避免与订单表不一致
+// 功能：订单列表支持 全部/进行中/已逾期/已结清/已变卖 筛选
+// 费用显示：管理费/服务费为0时显示"免费"
 
 'use strict';
 
@@ -106,7 +107,7 @@
                     '<td class="text-center">' + serviceFeeStatus + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
-                    '</table>';
+                    '</tr>';
             }
 
             window._orderTableState = {
@@ -690,10 +691,12 @@
                 var repaymentText = isFixed ? (lang === 'id' ? '固定还款' : '固定还款') :
                                      (lang === 'id' ? '灵活还款' : '灵活还款');
 
+                // 建立订单日期
                 var printOrderStartDate = order.custom_order_date
                     ? Utils.formatDate(order.custom_order_date)
                     : (order.created_at ? Utils.formatDate(order.created_at) : '-');
 
+                // 到期日（仅固定还款）
                 var printMaturityDateStr = '-';
                 if (isFixed && order.repayment_term) {
                     var printStartRaw = order.custom_order_date || order.created_at;
@@ -704,6 +707,7 @@
                     }
                 }
 
+                // 固定还款：期数信息
                 var printPaidMonths = order.fixed_paid_months || 0;
                 var printTotalMonths = order.repayment_term || 0;
                 var printRemainingMonths = printTotalMonths - printPaidMonths;
@@ -713,15 +717,19 @@
                 var orderNotes    = order.notes || '-';
                 var repayTypeLabel = repaymentText + (isFixed ? ' (' + (order.repayment_term||0) + (lang==='id'?' bln':' 个月') + ')' : '');
 
+                // 统一 3行4列布局（固定/灵活还款共用）
                 var infoItems = [
+                    // 行1
                     { label: lang==='id' ? 'ID Pesanan'      : '订单号',   value: order.order_id },
                     { label: lang==='id' ? 'Tgl. Mulai'      : '起始日期', value: printOrderStartDate },
                     { label: lang==='id' ? 'Nama Nasabah'    : '客户姓名', value: order.customer_name },
                     { label: lang==='id' ? 'No. HP'          : '电话号码', value: customerPhone },
+                    // 行2
                     { label: lang==='id' ? 'Nama Jaminan'    : '质押物品名', value: order.collateral_name },
                     { label: lang==='id' ? 'Jumlah Pinjaman' : '贷款金额',   value: Utils.formatCurrency(order.loan_amount) },
                     { label: lang==='id' ? 'Suku Bunga'      : '约定利率',   value: (monthlyRate*100).toFixed(0)+'%' },
                     { label: lang==='id' ? 'Jenis Cicilan'   : '还款方式',   value: repayTypeLabel },
+                    // 行3
                     { label: lang==='id' ? 'Bunga Bulanan'   : '月利息',     value: Utils.formatCurrency(currentMonthlyInterest) },
                     { label: lang==='id' ? 'Sisa Pokok'      : '剩余本金',   value: Utils.formatCurrency(remainingPrincipal) },
                     { label: lang==='id' ? 'Catatan'         : '订单备注',   value: orderNotes },
@@ -742,7 +750,7 @@
                                          p.type === 'interest' ? t('interest') : t('principal');
                         paymentRows += '<tr>' +
                             '<td>' + Utils.formatDate(p.date) + '</td>' +
-                            '<td>' + Utils.escapeHtml(typeText) + '<td>' +
+                            '<td>' + Utils.escapeHtml(typeText) + '</td>' +
                             '<td class="text-right">' + Utils.formatCurrency(p.amount) + '</td>' +
                             '<td>' + Utils.escapeHtml(p.payment_method || '-') + '</td>' +
                             '<td>' + Utils.escapeHtml(p.description || '') + '</td>' +
@@ -752,7 +760,7 @@
                     paymentRows = '<tr><td colspan="5" class="text-center">' + (lang === 'id' ? '无' : '无') + '</td></tr>';
                 }
                 var printWindow = window.open('', '_blank');
-                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + ' - ' + Utils.escapeHtml(order.order_id) + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\n.page-title { font-size: 14pt; font-weight: bold; margin: 12px 0; color: #1e293b; }\n.order-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 16px; margin-bottom: 12px; }\n.info-item { padding: 4px 0; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }\n.info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }\n.info-item .value { font-size: 9.5pt; font-weight: 500; color: #1e293b; }\n.info-disclaimer { font-size: 7.5pt; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; margin-bottom: 12px; line-height: 1.5; }\n.card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; }\n.card h3 { font-size: 10pt; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }\ntable { width: 100%; border-collapse: collapse; margin: 6px 0; }\nthead { display: table-header-group; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; }\nth, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }\n.text-right { text-align: right; }\n.text-center { text-align: center; }\n@media print { @page { size: A4; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n<h1 class="page-title">📄 ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + '</h1>\n<div class="card">\n<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>\n' + orderInfoGrid + '\n<h3>📋 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>\n<tr>\n<thead>\n<tr>\n<th>' + t('date') + '</th>\n<th>' + t('type') + '</th>\n<th class="text-right">' + t('amount') + '</th>\n<th>' + t('payment_method') + '</th>\n<th>' + t('description') + '</th>\n</tr>\n</thead>\n<tbody>' + paymentRows + '</tbody>\n</table>\n</div>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
+                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + ' - ' + Utils.escapeHtml(order.order_id) + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\n.page-title { font-size: 14pt; font-weight: bold; margin: 12px 0; color: #1e293b; }\n.order-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 16px; margin-bottom: 12px; }\n.info-item { padding: 4px 0; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }\n.info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }\n.info-item .value { font-size: 9.5pt; font-weight: 500; color: #1e293b; }\n.info-disclaimer { font-size: 7.5pt; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; margin-bottom: 12px; line-height: 1.5; }\n.card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; }\n.card h3 { font-size: 10pt; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }\ntable { width: 100%; border-collapse: collapse; margin: 6px 0; }\nthead { display: table-header-group; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; }\nth, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }\n.text-right { text-align: right; }\n.text-center { text-align: center; }\n@media print { @page { size: A4; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n<h1 class="page-title">📄 ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + '</h1>\n<div class="card">\n<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>\n' + orderInfoGrid + '\n<h3>📋 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>\n<table>\n<thead>\n<tr>\n<th>' + t('date') + '</th>\n<th>' + t('type') + '</th>\n<th class="text-right">' + t('amount') + '</th>\n<th>' + t('payment_method') + '</th>\n<th>' + t('description') + '</th>\n</tr>\n</thead>\n<tbody>' + paymentRows + '</tbody>\n</table>\n</div>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
                 console.error("printOrder error:", error);
@@ -810,7 +818,7 @@
                     '<table class="data-table payment-table">' +
                     '<thead><tr><th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
                     '<tbody>' + rows + '</tbody>' +
-                    '<table>' +
+                    '</table>' +
                     '</div>' +
                     '</div>';
             } catch (error) {
@@ -898,7 +906,6 @@
             }
         },
 
-        // ==================== 订单详情页面（修复重复显示 + 动态期数） ====================
         renderViewOrderHTML: async function(orderId) {
             var lang = Utils.lang;
             var t = Utils.t.bind(Utils);
@@ -906,32 +913,8 @@
             var result = await SUPABASE.getPaymentHistory(orderId);
             var isAdmin = PERMISSION.isAdmin();
             var order = result.order;
-            var payments = result.payments || [];
+            var payments = result.payments;
             if (!order) throw new Error('order_not_found');
-
-            // ----- 动态计算已还期数（避免与订单表不一致）-----
-            var dynamicFixedPaidMonths = 0;
-            var dynamicInterestPaidMonths = 0;
-            for (var p of payments) {
-                if (p.type === 'interest') {
-                    if (order.repayment_type === 'fixed') {
-                        dynamicFixedPaidMonths += 1;          // 固定还款每期产生一条 interest 记录
-                    } else {
-                        dynamicInterestPaidMonths += (p.months || 1);
-                    }
-                }
-            }
-            var displayFixedPaidMonths = order.fixed_paid_months || 0;
-            var displayInterestPaidMonths = order.interest_paid_months || 0;
-            if (order.repayment_type === 'fixed' && dynamicFixedPaidMonths !== displayFixedPaidMonths) {
-                console.warn(`订单 ${order.order_id} 固定还款期数不一致: 表记录 ${displayFixedPaidMonths}, 实际缴费期数 ${dynamicFixedPaidMonths}，使用实际值显示。`);
-                displayFixedPaidMonths = dynamicFixedPaidMonths;
-            }
-            if (order.repayment_type !== 'fixed' && dynamicInterestPaidMonths !== displayInterestPaidMonths) {
-                console.warn(`订单 ${order.order_id} 灵活还款已付期数不一致: 表记录 ${displayInterestPaidMonths}, 实际缴费期数 ${dynamicInterestPaidMonths}，使用实际值显示。`);
-                displayInterestPaidMonths = dynamicInterestPaidMonths;
-            }
-
             var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
             var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
             var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
@@ -943,10 +926,12 @@
             var serviceFeePaid = order.service_fee_paid || 0;
             var serviceFeeStatus = serviceFeeAmount === 0 ? (lang === 'id' ? '免费' : '免费') : (serviceFeePaid >= serviceFeeAmount ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴'));
 
+            // 建立订单日期（优先使用 custom_order_date，否则用 created_at）
             var orderStartDate = order.custom_order_date
                 ? Utils.formatDate(order.custom_order_date)
                 : (order.created_at ? Utils.formatDate(order.created_at) : '-');
 
+            // 到期日：订单起始日 + 还款期数（月）
             var maturityDateStr = '-';
             if (order.repayment_type === 'fixed' && order.repayment_term) {
                 var startRaw = order.custom_order_date || order.created_at;
@@ -957,31 +942,58 @@
                 }
             }
 
-            // ==================== 还款信息（只构建一次，避免重复） ====================
             var repaymentInfoHtml = '';
             if (order.repayment_type === 'fixed') {
-                var paidMonths = displayFixedPaidMonths;
+                var paidMonths = order.fixed_paid_months || 0;
                 var totalMonths = order.repayment_term || 0;
                 var remainingMonths = totalMonths - paidMonths;
                 var fixedPayment = order.monthly_fixed_payment || 0;
-                repaymentInfoHtml = `
-                    <p><strong>${t('repayment_type')}:</strong> 📅 ${t('fixed_repayment')} (${totalMonths} ${lang === 'id' ? 'bulan' : '个月'})</p>
-                    <p><strong>${lang === 'id' ? 'Tanggal Mulai' : '建立订单日期'}:</strong> ${orderStartDate}</p>
-                    <p><strong>${lang === 'id' ? 'Tanggal Jatuh Tempo' : '合同到期日'}:</strong> ${maturityDateStr}</p>
-                    <p><strong>${lang === 'id' ? 'Angsuran Per Periode' : '每期还款额'}:</strong> <strong style="color:var(--color-primary)">${Utils.formatCurrency(fixedPayment)}</strong></p>
-                    <p><strong>${lang === 'id' ? 'Periode Terbayar / Sisa' : '已还期数 / 剩余期数'}:</strong> 
-                        <span style="color:var(--color-success)">✅ ${paidMonths} ${lang === 'id' ? 'periode' : '期'}</span>
-                        / <span style="color:var(--color-warning)">⏳ ${remainingMonths} ${lang === 'id' ? 'periode' : '期'}</span>
-                    </p>
-                `;
+                repaymentInfoHtml =
+                    '<p><strong>' + t('repayment_type') + ':</strong> 📅 ' + t('fixed_repayment') + ' (' + totalMonths + ' ' + (lang === 'id' ? 'bulan' : '个月') + ')</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Tanggal Mulai' : '建立订单日期') + ':</strong> ' + orderStartDate + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Tanggal Jatuh Tempo' : '合同到期日') + ':</strong> ' + maturityDateStr + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Angsuran Per Periode' : '每期还款额') + ':</strong> <strong style="color:var(--color-primary)">' + Utils.formatCurrency(fixedPayment) + '</strong></p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Periode Terbayar / Sisa' : '已还期数 / 剩余期数') + ':</strong> ' +
+                        '<span style="color:var(--color-success)">✅ ' + paidMonths + ' ' + (lang === 'id' ? 'periode' : '期') + '</span>' +
+                        ' / ' +
+                        '<span style="color:var(--color-warning)">⏳ ' + remainingMonths + ' ' + (lang === 'id' ? 'periode' : '期') + '</span>' +
+                    '</p>';
             } else {
-                repaymentInfoHtml = `
-                    <p><strong>${t('repayment_type')}:</strong> 💰 ${t('flexible_repayment')} ${lang === 'id' ? '(maks. perpanjangan 10 bulan)' : '(最长延期10个月)'}</p>
-                    <p><strong>${lang === 'id' ? 'Tanggal Mulai' : '建立订单日期'}:</strong> ${orderStartDate}</p>
-                `;
+                repaymentInfoHtml =
+                    '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? '最长延期10个月' : '最长延期10个月') + ')</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Tanggal Mulai' : '建立订单日期') + ':</strong> ' + orderStartDate + '</p>';
             }
-
-            // ==================== 利息和本金记录表格 ====================
+            // 修复：利息历史表格 5 列，使用 t('times') 等翻译键
+            var payRows = '';
+            if (payments && payments.length > 0) {
+                for (var i = 0; i < payments.length; i++) {
+                    var p = payments[i];
+                    var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
+                    var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
+                    // 利息表格单独处理，保持 5 列；本金表格可沿用原 6 列（但此处统一简化）
+                    if (p.type === 'interest') {
+                        payRows += '<td>' +
+                            '<td class="text-center">' + (i + 1) + '</td>' +
+                            '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                            '<td class="text-center">' + (p.months || 1) + ' ' + t('month') + '</td>' +
+                            '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                            '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                            '</tr>';
+                    } else {
+                        payRows += '<tr>' +
+                            '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
+                            '<td>' + typeText + '</td>' +
+                            '<td class="text-center">' + (p.months ? p.months + ' ' + t('month') : '-') + '</td>' +
+                            '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
+                            '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
+                            '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
+                            '</tr>';
+                    }
+                }
+            } else {
+                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
+            }
+            // 分离利息和本金表格展示，便于阅读
             var interestRows = '', principalRows = '';
             var interestCount = 0, principalCount = 0;
             for (var j = 0; j < (payments || []).length; j++) {
@@ -1003,13 +1015,12 @@
                         '<td class="date-cell">' + Utils.formatDate(pj.date) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(pj.amount) + '</td>' +
                         '<td class="text-center"><span class="badge badge--' + methodClassPr + '">' + (methodMap[pj.payment_method] || '-') + '</span></td>' +
-                        '</tr>';
+                        '<tr>';
                 }
             }
-            if (interestRows === '') interestRows = '<tr><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
+            if (interestRows === '') interestRows = '<td><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
             if (principalRows === '') principalRows = '<tr><td colspan="3" class="text-center">' + t('no_data') + '</td></tr>';
 
-            // ==================== 构建整体 HTML ====================
             var content = '' +
                 '<div class="page-header">' +
                 '<h2>📄 ' + t('order_details') + '</h2>' +
@@ -1024,7 +1035,7 @@
                 '<h3>📋 ' + (lang === 'id' ? '订单信息' : '订单信息') + '</h3>' +
                 '<p><strong>' + t('order_id') + ':</strong> ' + Utils.escapeHtml(order.order_id) + '</p>' +
                 '<p><strong>' + t('status') + ':</strong> <span class="badge badge--' + order.status + '">' + (statusMap[order.status] || order.status) + '</span></p>' +
-                repaymentInfoHtml +   // 只在这里显示一次还款信息
+                repaymentInfoHtml +
                 '<h3 style="margin-top:16px;">👤 ' + t('customer_info') + '</h3>' +
                 '<p><strong>' + t('customer_name') + ':</strong> ' + Utils.escapeHtml(order.customer_name) + '</p>' +
                 '<p><strong>' + t('ktp_number') + ':</strong> ' + Utils.escapeHtml(order.customer_ktp) + '</p>' +
@@ -1038,16 +1049,29 @@
                 '<h3 style="margin-top:16px;">💰 ' + (lang === 'id' ? '费用明细' : '费用明细') + '</h3>' +
                 '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' — ' + adminFeeStatus + '</p>' +
                 '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) — ' + serviceFeeStatus + '</p>' +
-                (order.repayment_type !== 'fixed' ? `
-                    <p><strong>${lang === 'id' ? '月利息（当前）' : '月利息（当前）'}:</strong> ${Utils.formatCurrency(currentMonthlyInterest)} <small>（${lang === 'id' ? '基于剩余本金' : '基于剩余本金'} ${Utils.formatCurrency(remainingPrincipal)} × ${(monthlyRate*100).toFixed(0)}%）</small></p>
-                    <p><strong>${lang === 'id' ? '已付利息' : '已付利息'}:</strong> ${displayInterestPaidMonths} ${lang === 'id' ? '个月' : '个月'} (${Utils.formatCurrency(order.interest_paid_total)})</p>
-                    <p><strong>${lang === 'id' ? '剩余本金' : '剩余本金'}:</strong> ${Utils.formatCurrency(remainingPrincipal)}</p>
-                    <p><strong>${t('payment_due_date')}:</strong> ${nextDueDate}</p>
-                ` : `
-                    <p><strong>${t('notes')}:</strong> ${Utils.escapeHtml(order.notes || '-')}</p>
-                `) +
+                (order.repayment_type !== 'fixed' ?
+                    '<p><strong>' + (lang === 'id' ? '月利息（当前）' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? '基于剩余本金' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
+                    '<p><strong>' + (lang === 'id' ? '已付利息' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? '个月' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
+                    '<p><strong>' + (lang === 'id' ? '剩余本金' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
+                    '<p><strong>' + t('payment_due_date') + ':</strong> ' + nextDueDate + '</p>'
+                :
+                    (function() {
+                        var detPaidM = order.fixed_paid_months || 0;
+                        var detTotalM = order.repayment_term || 0;
+                        var detRemM = detTotalM - detPaidM;
+                        var detFixedPmt = order.monthly_fixed_payment || 0;
+                        return '<p><strong>' + (lang === 'id' ? 'Angsuran Per Periode' : '每期还款额') + ':</strong> <strong style="color:var(--color-primary)">' + Utils.formatCurrency(detFixedPmt) + '</strong></p>' +
+                            '<p><strong>' + (lang === 'id' ? 'Periode Terbayar / Sisa' : '已还期数 / 剩余期数') + ':</strong> ' +
+                                '<span style="color:var(--color-success)">✅ ' + detPaidM + (lang === 'id' ? ' periode' : ' 期') + '</span>' +
+                                ' / ' +
+                                '<span style="color:var(--color-warning)">⏳ ' + detRemM + (lang === 'id' ? ' periode' : ' 期') + '</span>' +
+                            '</p>' +
+                            '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>';
+                    })()
+                ) +
+                (order.repayment_type !== 'fixed' ? '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>' : '') +
                 '</div>' +
-                '</div>' +   // end order-detail-grid
+                '</div>' +
                 '<div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>' + (lang === 'id' ? '温馨提示：' : '温馨提示：') + '</strong> ' +
                 (order.repayment_type === 'fixed'
                     ? (lang === 'id' ? 'Setiap angsuran mencakup bunga dan pokok. Pelunasan dipercepat dapat mengurangi sisa bunga.' : '每期还款已包含本金和利息，提前结清可减免剩余利息。')
