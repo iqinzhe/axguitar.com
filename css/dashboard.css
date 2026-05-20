@@ -297,6 +297,9 @@
   .cal-table th, .cal-table td { padding: 1px 0; font-weight: normal; color: var(--text-secondary); border: none; }
   .cal-cell { position: relative; }
   .cal-date { display: block; font-size: 11px; color: var(--text-primary); }
+  .cal-today { font-weight: 700; color: var(--primary) !important; text-decoration: underline; }
+  .cal-cell.is-today { background: rgba(14,116,144,0.07); border-radius: 4px; }
+  .cal-cell.is-overdue { background: rgba(239,68,68,0.08); border-radius: 4px; }
   .cal-due-count {
     display: inline-block;
     background: var(--red-500);
@@ -311,6 +314,11 @@
     line-height: 1.4;
   }
   .cal-due-count:hover { background: var(--red-600); }
+  /* 今天到期：橙色徽章 */
+  .cal-cell.is-today .cal-due-count { background: var(--amber-500); }
+  /* 逾期（已过日期）：深红徽章 */
+  .cal-due-count.cal-overdue { background: #991b1b; }
+  .cal-due-count.cal-overdue:hover { background: #7f1d1d; }
 
   .cal-popup {
     background: var(--white);
