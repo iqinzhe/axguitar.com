@@ -1067,12 +1067,27 @@
             const contentEl = document.getElementById('app');
             if (!contentEl) return;
 
-            // 克隆页面内容
+            // 克隆页面内容，仅保留主内容区（排除侧边栏、顶栏等）
             const clone = contentEl.cloneNode(true);
-            // 移除按钮、操作区
-            clone.querySelectorAll('button, .header-actions, .page-header').forEach(el => el.remove());
+            // 移除侧边栏、顶栏、按钮、操作区等非打印元素
+            ['.dashboard-v2 .dash-sidebar', '.dash-sidebar', '.sidebar', '#dashSidebar',
+             '.dashboard-v2 .dash-topbar', '.dash-topbar', '.topbar', '#dashTopbar',
+             '.sidebar-overlay', '#sidebarOverlay', '.toolbar', '.no-print',
+             'button', '.form-actions', '.lang-toggle', '.lang-btn-side',
+             '#hamburgerBtn', '[onclick*="toggleLanguage"]',
+             '.modal-overlay', '.modal-content', '[id*="loadMore"]',
+             '.sidebar-footer', '.nav-badge', '.header-actions', '.page-header'
+            ].forEach(sel => { try { clone.querySelectorAll(sel).forEach(el => el.remove()); } catch(e) {} });
 
             const dt = new Date().toLocaleString();
+            const isAdmin = (typeof PERMISSION !== 'undefined') ? PERMISSION.isAdmin() : false;
+            let storeName = '-', roleText = '-';
+            try {
+                storeName = AUTH.getCurrentStoreName();
+                roleText = AUTH.isAdmin() ? (lang==='id'?'Administrator':'管理员') :
+                           AUTH.isStoreManager() ? (lang==='id'?'Manajer Toko':'店长') : (lang==='id'?'Staf':'员工');
+            } catch(e) {}
+
             const pw = window.open('', '_blank');
             if (!pw) { Utils.toast.warning(lang==='id'?'Popup diblokir.':'弹出窗口被拦截，请允许后重试。', 4000); return; }
 
@@ -1085,9 +1100,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8pt; color: #1e293b; }
 .print-wrap { padding: 6mm; }
-.print-header { text-align: center; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }
-.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; }
-.print-header-info { font-size: 8pt; color: #475569; margin-top: 4px; }
+.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; break-after: avoid; page-break-after: avoid; }
+.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }
+.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; }
 .print-title { font-size: 12pt; font-weight: 800; margin: 8px 0 12px; color: #1e293b; text-align: center; }
 .print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }
 
@@ -1125,8 +1141,11 @@ tbody tr:last-child { font-weight: 700; background: #f8fafc; border-top: 2px sol
 <body>
 <div class="print-wrap">
 <div class="print-header">
-    <div class="logo">JF! by Gadai</div>
-    <div class="print-header-info">📅 ${dt}</div>
+    <div class="logo"><img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display='none'"> JF! by Gadai</div>
+    <div class="print-header-info">
+        🏪 ${isAdmin ? (lang==='id'?'Kantor Pusat':'总部') : (lang==='id'?'Toko：':'门店：') + storeName}
+        &nbsp;|&nbsp; 👤 ${roleText} &nbsp;|&nbsp; 📅 ${dt}
+    </div>
 </div>
 <div class="print-title">📈 ${lang==='id'?'Laporan Keuangan Bulanan':'月度资金健康报表'}</div>
 ${clone.innerHTML}
@@ -1134,8 +1153,8 @@ ${clone.innerHTML}
 </div>
 <script>
 window.onload = function() {
-    // 移除页面内的多余按钮
-    document.querySelectorAll('button,.btn,.header-actions,.page-header').forEach(function(el){el.remove();});
+    // 移除页面内残余的多余元素
+    document.querySelectorAll('button,.btn,.header-actions,.page-header,.sidebar,.topbar,.dash-sidebar,.dash-topbar').forEach(function(el){el.remove();});
     window.print();
     setTimeout(function(){ window.close(); }, 800);
 };
