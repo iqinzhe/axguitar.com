@@ -1463,6 +1463,7 @@
                     customer_name: custName, customer_ktp: custKtp,
                     customer_phone: custPhone, customer_address: custAddress,
                     notes: notes,
+                    custom_order_date: orderDate,
                     created_at: orderDate + 'T00:00:00.000Z',
                     updated_at: new Date().toISOString()
                 };

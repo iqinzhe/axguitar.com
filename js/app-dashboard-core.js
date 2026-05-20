@@ -643,7 +643,7 @@
                     const [allOrdersData, newThisMonthData, injectedCapitalRes, dueOrdersRes] = await Promise.all([
                         (async () => {
                             try {
-                                const r = await applyFilter(client.from('orders').select('status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at, custom_order_date, next_interest_due_date'));
+                                const r = await applyFilter(client.from('orders').select('status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at, next_interest_due_date'));
                                 if (r.error) { console.error('[KPI] 订单查询失败:', r.error); return { data: [] }; }
                                 return r;
                             } catch (e) { console.error('[KPI] 订单查询异常:', e); return { data: [] }; }
@@ -651,15 +651,11 @@
                         (async () => {
                             try {
                                 // 本月新增：取本月内创建或自定义日期在本月的订单
-                                let q = client.from('orders').select('loan_amount, created_at, custom_order_date').gte('created_at', monthStart);
+                                let q = client.from('orders').select('loan_amount, created_at').gte('created_at', monthStart);
                                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                                 else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const r = await q;
-                                // 以 custom_order_date 优先判断是否在本月
-                                return (r.data || []).filter(o => {
-                                    const effectiveDate = o.custom_order_date || o.created_at?.substring(0, 10);
-                                    return effectiveDate >= monthStart;
-                                });
+                                return r.data || [];
                             } catch (e) { return []; }
                         })(),
                         (async () => {
