@@ -56,7 +56,11 @@
                         const phone = Utils.escapeHtml(c.phone || '-');
                         const ktpNumber = Utils.escapeHtml(c.ktp_number || '-');
                         const occupation = Utils.escapeHtml(c.occupation || '-');
-                        const address = Utils.escapeHtml(c.ktp_address || c.address || '-');
+                        const address = Utils.escapeHtml(
+                            (c.living_same_as_ktp === false && c.living_address)
+                                ? c.living_address
+                                : (c.ktp_address || c.address || '-')
+                        );
 
                         const hasActiveOrders = activeOrderMap[c.id] && activeOrderMap[c.id].length > 0;
                         let createBtnHtml;
