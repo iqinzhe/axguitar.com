@@ -14,13 +14,27 @@
             const isAdmin = profile?.role === 'admin';
             const storeId = profile?.store_id;
             const client = SUPABASE.getClient();
+
+            // 实时计算逾期：基于 next_interest_due_date 与今天的差值
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            // 逾期 minDays 对应的日期上限：today - minDays
+            const maxDueDate = new Date(todayDate);
+            maxDueDate.setDate(maxDueDate.getDate() - minDays);
+            const maxDueDateStr = maxDueDate.toISOString().split('T')[0];
+            // 逾期 maxDays 对应的日期下限：today - maxDays
+            const minDueDate = new Date(todayDate);
+            minDueDate.setDate(minDueDate.getDate() - maxDays);
+            const minDueDateStr = minDueDate.toISOString().split('T')[0];
+
             let query = client
                 .from('orders')
-                .select('order_id, customer_name, overdue_days, loan_amount, status')
+                .select('order_id, customer_name, next_interest_due_date, loan_amount, status')
                 .eq('status', 'active')
-                .gte('overdue_days', minDays)
-                .lte('overdue_days', maxDays)
-                .order('overdue_days', { ascending: false });
+                .not('next_interest_due_date', 'is', null)
+                .lte('next_interest_due_date', maxDueDateStr)
+                .gte('next_interest_due_date', minDueDateStr)
+                .order('next_interest_due_date', { ascending: true });
 
             if (!isAdmin && storeId) {
                 query = query.eq('store_id', storeId);
@@ -32,7 +46,15 @@
             }
             const { data, error } = await query;
             if (error) { console.warn('获取逾期订单失败:', error); return []; }
-            return data || [];
+
+            // 前端补充实时 overdue_days 字段供显示用
+            const todayStr = todayDate.toISOString().split('T')[0];
+            return (data || []).map(o => {
+                const dueDateStr = o.next_interest_due_date;
+                const dueTime = new Date(dueDateStr).getTime();
+                const overdueDays = Math.floor((todayDate.getTime() - dueTime) / 86400000);
+                return { ...o, overdue_days: overdueDays };
+            });
         },
 
         async _getBlacklistCustomers(page = 0, pageSize = 50) {
@@ -56,10 +78,15 @@
             const client = SUPABASE.getClient();
             const { data: monthlyOrders, error } = await client
                 .from('orders')
-                .select('id, store_id, loan_amount, status, created_at, overdue_days')
+                .select('id, store_id, loan_amount, status, created_at, custom_order_date, next_interest_due_date')
                 .gte('created_at', monthStart)
                 .lte('created_at', monthEnd);
             if (error) { console.warn('获取本月订单失败:', error); return { top3: [], bottom3: [] }; }
+
+            // 实时计算逾期门店
+            const todayForRanking = new Date();
+            todayForRanking.setHours(0, 0, 0, 0);
+            const todayRankStr = todayForRanking.toISOString().split('T')[0];
 
             const { data: monthlyFlows } = await client
                 .from('cash_flow_records')
@@ -92,7 +119,13 @@
                 }
                 storeStats[order.store_id].orderCount++;
                 storeStats[order.store_id].totalLoanOutflow += (order.loan_amount || 0);
-                if ((order.overdue_days || 0) >= 15 && order.status === 'active') storeStats[order.store_id].badOrders++;
+                // 实时判断逾期：next_interest_due_date 超过今天 15 天以上
+                const isRealOverdue = order.status === 'active' &&
+                    order.next_interest_due_date &&
+                    order.next_interest_due_date < todayRankStr;
+                const dueTime = order.next_interest_due_date ? new Date(order.next_interest_due_date).getTime() : null;
+                const realOverdueDays = dueTime ? Math.floor((todayForRanking.getTime() - dueTime) / 86400000) : 0;
+                if (isRealOverdue && realOverdueDays >= 15) storeStats[order.store_id].badOrders++;
                 storeStats[order.store_id].totalRecovery += (flowAmountByOrder[order.id] || 0);
             }
 

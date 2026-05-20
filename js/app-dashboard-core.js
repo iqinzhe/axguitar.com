@@ -107,13 +107,17 @@
                     continue;
                 }
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                const todayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(today.getUTCDate()).padStart(2,'0')}`;
                 const ordersOnDay = dueMap[dateStr] || [];
                 const count = ordersOnDay.length;
-                let cellContent = `<span class="cal-date">${day}</span>`;
+                const isToday = dateStr === todayStr;
+                const isPast = count > 0 && dateStr < todayStr;
+                let cellContent = `<span class="cal-date${isToday?' cal-today':''}">${day}</span>`;
                 if (count > 0) {
-                    cellContent += `<span class="cal-due-count" data-date="${dateStr}" title="${count} ${lang==='id'?'pesanan':'orders'}">${count}</span>`;
+                    const dotClass = isPast ? 'cal-due-count cal-overdue' : 'cal-due-count';
+                    cellContent += `<span class="${dotClass}" data-date="${dateStr}" title="${count} ${lang==='id'?'pesanan':'orders'}">${count}</span>`;
                 }
-                row += `<td class="cal-cell${count>0?' has-due':''}">${cellContent}<\/td>`;
+                row += `<td class="cal-cell${count>0?' has-due':''}${isPast?' is-overdue':''}${isToday?' is-today':''}">${cellContent}<\/td>`;
                 day++;
             }
             row += '</tr>';
@@ -637,13 +641,19 @@
                     };
 
                     const [allOrdersData, newThisMonthData, injectedCapitalRes, dueOrdersRes] = await Promise.all([
-                        applyFilter(client.from('orders').select('status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at')),
+                        applyFilter(client.from('orders').select('status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at, custom_order_date, next_interest_due_date')),
                         (async () => {
                             try {
-                                let q = client.from('orders').select('loan_amount').gte('created_at', monthStart);
+                                // 本月新增：取本月内创建或自定义日期在本月的订单
+                                let q = client.from('orders').select('loan_amount, created_at, custom_order_date').gte('created_at', monthStart);
                                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                                 else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                                const r = await q; return r.data || [];
+                                const r = await q;
+                                // 以 custom_order_date 优先判断是否在本月
+                                return (r.data || []).filter(o => {
+                                    const effectiveDate = o.custom_order_date || o.created_at?.substring(0, 10);
+                                    return effectiveDate >= monthStart;
+                                });
                             } catch (e) { return []; }
                         })(),
                         (async () => {
@@ -656,11 +666,28 @@
                         })(),
                         (async () => {
                             try {
-                                const r = await applyFilter(client.from('orders').select('order_id, customer_name, next_interest_due_date').eq('status', 'active'));
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                const in7Days = new Date(today);
+                                in7Days.setDate(in7Days.getDate() + 7);
+                                const todayStr = today.toISOString().split('T')[0];
+                                const in7DaysStr = in7Days.toISOString().split('T')[0];
+                                // 只取 next_interest_due_date 在今天到7天内（含今天、含逾期）的活跃订单
+                                const r = await applyFilter(
+                                    client.from('orders')
+                                        .select('order_id, customer_name, next_interest_due_date')
+                                        .eq('status', 'active')
+                                        .lte('next_interest_due_date', in7DaysStr)
+                                        .not('next_interest_due_date', 'is', null)
+                                );
                                 return r.data || [];
                             } catch (e) { return []; }
                         })()
                     ]);
+
+                    const todayDate = new Date();
+                    todayDate.setHours(0, 0, 0, 0);
+                    const todayStr = todayDate.toISOString().split('T')[0];
 
                     let totalOrders = 0, activeOrders = 0, completedOrders = 0, overdueOrders = 0;
                     let totalLoanActive = 0, totalLoanAll = 0;
@@ -670,10 +697,9 @@
                         totalOrders++; totalLoanAll += (o.loan_amount || 0);
                         if (o.status === 'active') {
                             activeOrders++; totalLoanActive += (o.loan_amount || 0);
-                            if ((o.overdue_days || 0) >= 1) overdueOrders++;
+                            // 实时计算逾期：next_interest_due_date < 今天 才算逾期
+                            if (o.next_interest_due_date && o.next_interest_due_date < todayStr) overdueOrders++;
                         } else if (o.status === 'completed') { completedOrders++; }
-                        // 修复：管理费/服务费/利息/本金统计需包含 active 和 completed 两类订单
-                        // 原代码仅在 active 分支累加，导致已结清订单的收入全部遗漏于收入构成
                         if (o.status === 'active' || o.status === 'completed') {
                             if (o.admin_fee_paid) adminFeesCollected += (o.admin_fee || 0);
                             serviceFeesCollected += (o.service_fee_paid || 0);
